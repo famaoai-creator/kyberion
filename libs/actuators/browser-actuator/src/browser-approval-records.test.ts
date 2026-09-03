@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseBrowserOperatorApprovalRecord } from './browser-approval-records.js';
+import {
+  completeBrowserOperatorApproval,
+  parseBrowserOperatorApprovalRecord,
+} from './browser-approval-records.js';
 
 const validApproval = {
   request_id: 'request-1',
@@ -51,5 +54,24 @@ describe('browser operator approval records', () => {
     expect(() => parseBrowserOperatorApprovalRecord({ ...validApproval, session_id: 42 })).toThrow(
       'session_id must be a non-empty string'
     );
+  });
+
+  it('fails closed for malformed or mismatched completion artifacts', () => {
+    expect(
+      completeBrowserOperatorApproval(
+        '{"constructor":{}}',
+        'session-1',
+        'approved',
+        '2026-09-04T00:02:00.000Z'
+      )
+    ).toEqual({ status: 'approved', completed_at: '2026-09-04T00:02:00.000Z' });
+    expect(
+      completeBrowserOperatorApproval(
+        JSON.stringify(validApproval),
+        'other-session',
+        'rejected',
+        '2026-09-04T00:02:00.000Z'
+      )
+    ).toEqual({ status: 'rejected', completed_at: '2026-09-04T00:02:00.000Z' });
   });
 });

@@ -26,8 +26,7 @@ describe('browser runtime resource boundary', () => {
     expect(source).toContain('function isExistingRegularFile(filePath: string): boolean');
     expect(source).toContain('return safeLstat(filePath).isFile();');
     expect(source).toContain('browserSessionArtifactPath(BROWSER_SNAPSHOT_DIR, sessionId');
-    expect(source).toContain('parseBrowserOperatorApprovalRecord(');
-    expect(source).toContain('if (parsed.session_id === sessionId) current = parsed;');
+    expect(source).toContain('completeBrowserOperatorApproval(');
   });
 
   it('loads persisted session metadata through the runtime schema', () => {

@@ -32,7 +32,7 @@ import {
 import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
-import { parseBrowserOperatorApprovalRecord } from './browser-approval-records.js';
+import { completeBrowserOperatorApproval } from './browser-approval-records.js';
 import { parseChromeCdpVersionResponse } from './browser-cdp-response.js';
 
 export interface BrowserSnapshotElement {
@@ -714,28 +714,12 @@ function completeOperatorApproval(
   status: 'approved' | 'expired' | 'rejected'
 ): void {
   const filePath = approvalPath(sessionId);
-  let current: ReturnType<typeof parseBrowserOperatorApprovalRecord> | undefined;
-  if (isExistingRegularFile(filePath)) {
-    try {
-      const parsed = parseBrowserOperatorApprovalRecord(
-        parseSafeJsonInput(
-          String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
-          `browser operator approval ${sessionId}`
-        ),
-        `browser operator approval ${sessionId}`
-      );
-      if (parsed.session_id === sessionId) current = parsed;
-    } catch {
-      // A corrupt approval artifact is replaced with a fresh terminal state.
-    }
-  }
+  const raw = isExistingRegularFile(filePath)
+    ? String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
+    : undefined;
   safeWriteFile(
     filePath,
-    JSON.stringify(
-      current ? { ...current, status, completed_at: nowIso() } : { status, completed_at: nowIso() },
-      null,
-      2
-    )
+    JSON.stringify(completeBrowserOperatorApproval(raw, sessionId, status, nowIso()), null, 2)
   );
 }
 
