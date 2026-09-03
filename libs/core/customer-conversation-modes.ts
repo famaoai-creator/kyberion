@@ -1,11 +1,12 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
@@ -144,6 +145,10 @@ export interface DealRequirementsCapture {
   requirements: ExtractedRequirements;
 }
 
+const DEAL_REQUIREMENTS_CAPTURE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/deal-requirements-capture.schema.json'
+);
+
 function dealRequirementsPath(tenantSlug: string, dealId: string): string {
   if (!isValidTenantSlug(tenantSlug)) {
     throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${tenantSlug}`);
@@ -162,14 +167,22 @@ function dealRequirementsPath(tenantSlug: string, dealId: string): string {
   );
 }
 
+function dealRequirementsCaptureCatalog(filePath: string) {
+  return defineCatalog<DealRequirementsCapture>({
+    id: 'deal-requirements-capture',
+    path: filePath,
+    schema: DEAL_REQUIREMENTS_CAPTURE_SCHEMA_PATH,
+  });
+}
+
 export function readDealRequirementsCapture(
   tenantSlug: string,
   dealId: string
 ): DealRequirementsCapture | null {
   const filePath = dealRequirementsPath(tenantSlug, dealId);
   try {
-    if (!safeExistsSync(filePath)) return null;
-    return readJson<DealRequirementsCapture>(filePath);
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
+    return dealRequirementsCaptureCatalog(filePath).load();
   } catch (err) {
     logger.warn(
       `[customer-conversation-modes] unreadable requirements capture ${filePath}: ${err instanceof Error ? err.message : String(err)}`
@@ -193,8 +206,9 @@ export function saveDealRequirementsCapture(input: {
   };
   const filePath = dealRequirementsPath(input.tenantSlug, input.dealId);
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(capture, null, 2));
-  return capture;
+  const validated = dealRequirementsCaptureCatalog(filePath).validate(capture, filePath);
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  return validated;
 }
 
 /**

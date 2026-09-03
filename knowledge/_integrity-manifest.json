@@ -6961,6 +6961,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/deal-requirements-capture.schema.json",
+      "tier": "public",
+      "size": 4820,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/decision-rights.schema.json",
       "tier": "public",
       "size": 2098,
@@ -9045,7 +9051,7 @@
     {
       "path": "product/schemas/requirements-draft.schema.json",
       "tier": "public",
-      "size": 6617,
+      "size": 6635,
       "type": "json"
     },
     {
