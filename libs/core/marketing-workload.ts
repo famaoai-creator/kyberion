@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { computeApprovalPayloadHash, type ApprovalRequestRecord } from './approval-store.js';
 import { evaluateArtifactReviews } from './artifact-review.js';
@@ -151,16 +150,21 @@ const MARKETING_REVIEW_PACKAGE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/marketing-review-package.schema.json'
 );
 
-const marketingReviewCatalog = defineCatalog<MarketingReview>({
-  id: 'marketing-review',
-  path: MARKETING_REVIEW_SCHEMA_PATH,
-  schema: MARKETING_REVIEW_SCHEMA_PATH,
-});
-const marketingReviewPackageCatalog = defineCatalog<MarketingReviewPackage>({
-  id: 'marketing-review-package',
-  path: MARKETING_REVIEW_PACKAGE_SCHEMA_PATH,
-  schema: MARKETING_REVIEW_PACKAGE_SCHEMA_PATH,
-});
+function marketingReviewCatalogAtPath(filePath: string) {
+  return defineCatalog<MarketingReview>({
+    id: 'marketing-review',
+    path: filePath,
+    schema: MARKETING_REVIEW_SCHEMA_PATH,
+  });
+}
+
+function marketingReviewPackageCatalogAtPath(filePath: string) {
+  return defineCatalog<MarketingReviewPackage>({
+    id: 'marketing-review-package',
+    path: filePath,
+    schema: MARKETING_REVIEW_PACKAGE_SCHEMA_PATH,
+  });
+}
 
 export function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
@@ -197,13 +201,13 @@ function requireRegularMarketingFile(filePath: string, label: string): string {
 /** Load the persisted review package through its strict schema boundary. */
 export function loadMarketingReviewPackageAtPath(filePath: string): MarketingReviewPackage {
   const safeFilePath = requireRegularMarketingFile(filePath, 'review package');
-  return marketingReviewPackageCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  return marketingReviewPackageCatalogAtPath(safeFilePath).load();
 }
 
 /** Load one persisted marketing review through its strict schema boundary. */
 export function loadMarketingReviewAtPath(filePath: string): MarketingReview {
   const safeFilePath = requireRegularMarketingFile(filePath, 'review');
-  return marketingReviewCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  return marketingReviewCatalogAtPath(safeFilePath).load();
 }
 
 export function scanMarketingTextForSensitiveData(
