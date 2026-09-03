@@ -3,7 +3,8 @@
  * CLI argument parsing utilities for the Mission Controller.
  */
 
-import { safeExistsSync } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { readJson } from '@agent/core/foundation';
 import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
 import { normalizeRelationships } from './mission-state.js';
@@ -194,10 +195,13 @@ export function extractFileRelationshipsOption(
 ): Partial<MissionRelationships> {
   const filePath = getOptionValue('--relationships-file', argv);
   if (!filePath) return {};
-  if (!safeExistsSync(filePath)) {
+  const safeFilePath = assertSafeRepositoryPath(pathResolver.rootResolve(filePath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(safeFilePath)) {
     throw new Error(`Relationships file not found: ${filePath}`);
   }
-  const parsed = parseSafeJsonObjectValue(readJson<unknown>(filePath), 'Relationships file');
+  const parsed = parseSafeJsonObjectValue(readJson<unknown>(safeFilePath), 'Relationships file');
   return normalizeRelationships(parsed);
 }
 
