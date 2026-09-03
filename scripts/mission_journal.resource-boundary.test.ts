@@ -35,6 +35,51 @@ describe('mission journal resource boundary', () => {
     safeMkdir(malformed, { recursive: true });
     safeWriteFile(path.join(malformed, 'mission-state.json'), '[]');
     expect(scanMissions(undefined, [root])).toEqual([]);
+
+    const schemaInvalid = path.join(root, 'schema-invalid-mission');
+    safeMkdir(schemaInvalid, { recursive: true });
+    safeWriteFile(
+      path.join(schemaInvalid, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MSN-SCHEMA-INVALID',
+        status: 'active',
+        tier: 'public',
+        history: [],
+      })
+    );
+    expect(scanMissions(undefined, [root])).toEqual([]);
+  });
+
+  it('projects schema-valid mission states through the canonical loader', () => {
+    const missionDir = path.join(root, 'valid-mission');
+    safeMkdir(missionDir, { recursive: true });
+    safeWriteFile(
+      path.join(missionDir, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MSN-JOURNAL-VALID',
+        tier: 'public',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'abc1234',
+          latest_commit: 'abc1234',
+          checkpoints: [],
+        },
+        history: [{ ts: '2026-09-03T00:00:00.000Z', event: 'started', note: 'valid' }],
+      })
+    );
+
+    expect(scanMissions(undefined, [root])).toMatchObject([
+      {
+        mission_id: 'MSN-JOURNAL-VALID',
+        status: 'active',
+        tier: 'public',
+      },
+    ]);
   });
 
   it('projects only finite trust scores from a JSON object', () => {
