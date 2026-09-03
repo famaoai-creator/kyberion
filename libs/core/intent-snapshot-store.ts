@@ -11,8 +11,9 @@ import { nowIso } from './foundation/time.js';
 
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { missionEvidenceDir } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeMkdir } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { missionEvidenceDir, pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import {
   classifyDrift,
   computeIntentDelta,
@@ -26,6 +27,11 @@ import {
 const SNAPSHOT_FILE = 'intent-snapshots.jsonl';
 const DELTA_FILE = 'intent-deltas.jsonl';
 const SCOPE_CHANGE_FILE = 'intent-scope-changes.jsonl';
+const SNAPSHOT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-snapshot.schema.json');
+const DELTA_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-delta.schema.json');
+const SCOPE_CHANGE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/approved-intent-scope-change.schema.json'
+);
 
 export interface EmitSnapshotParams {
   missionId: string;
@@ -54,19 +60,49 @@ function scopeChangePath(missionId: string): string | null {
   return assertSafeRepositoryPath(path.join(dir, SCOPE_CHANGE_FILE), { allowMissingLeaf: true });
 }
 
-function readJsonl<T>(filePath: string): T[] {
-  return readJsonLines<T>(filePath);
+function snapshotCatalog(filePath: string) {
+  return defineCatalog<IntentSnapshot>({
+    id: 'intent-snapshot',
+    path: filePath,
+    schema: SNAPSHOT_SCHEMA_PATH,
+  });
 }
 
-function appendJsonl(filePath: string, record: unknown): void {
+function deltaCatalog(filePath: string) {
+  return defineCatalog<IntentDelta>({
+    id: 'intent-delta',
+    path: filePath,
+    schema: DELTA_SCHEMA_PATH,
+  });
+}
+
+function scopeChangeCatalog(filePath: string) {
+  return defineCatalog<ApprovedIntentScopeChange>({
+    id: 'approved-intent-scope-change',
+    path: filePath,
+    schema: SCOPE_CHANGE_SCHEMA_PATH,
+  });
+}
+
+function readJsonl<T>(filePath: string, catalog: GovernedCatalog<T>): T[] {
+  if (!safeExistsSync(filePath)) return [];
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[intent-snapshot-store] persisted record must be a regular file: ${filePath}`);
+  }
+  return readJsonLines<T>(filePath, {
+    map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
+  });
+}
+
+function appendJsonl<T>(filePath: string, record: T, catalog: GovernedCatalog<T>): void {
   safeMkdir(path.dirname(filePath), { recursive: true });
-  appendJsonLine(filePath, record);
+  appendJsonLine(filePath, catalog.validate(record, filePath));
 }
 
 export function listSnapshots(missionId: string): IntentSnapshot[] {
   const file = snapshotPath(missionId);
   if (!file) return [];
-  return readJsonl<IntentSnapshot>(file);
+  return readJsonl(file, snapshotCatalog(file));
 }
 
 export function latestSnapshot(missionId: string): IntentSnapshot | null {
@@ -92,7 +128,7 @@ function appendScopeChange(missionId: string, record: ApprovedIntentScopeChange)
       `[intent-snapshot-store] mission evidence dir not found for ${missionId} scope change`
     );
   }
-  appendJsonl(filePath, record);
+  appendJsonl(filePath, record, scopeChangeCatalog(filePath));
 }
 
 /**
@@ -123,16 +159,17 @@ export function emitIntentSnapshot(
   }
 
   const previous = latestSnapshot(params.missionId);
-  appendJsonl(snapFile, snapshot);
+  const validatedSnapshot = snapshotCatalog(snapFile).validate(snapshot, snapFile);
+  appendJsonLine(snapFile, validatedSnapshot);
 
   let delta: IntentDelta | null = null;
   if (previous) {
-    delta = computeIntentDelta(previous, snapshot, thresholds);
+    delta = computeIntentDelta(previous, validatedSnapshot, thresholds);
     const deltaFile = deltaPath(params.missionId);
-    if (deltaFile) appendJsonl(deltaFile, delta);
+    if (deltaFile) appendJsonl(deltaFile, delta, deltaCatalog(deltaFile));
   }
 
-  return { snapshot, delta };
+  return { snapshot: validatedSnapshot, delta };
 }
 
 /**

@@ -30,7 +30,7 @@ vi.mock('./policy-engine.js', () => ({
 
 import { missionEvidenceDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeSymlinkSync } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 
 describe('intent-snapshot-store', () => {
   let tmpDir = '';
@@ -128,6 +128,16 @@ describe('intent-snapshot-store', () => {
     );
 
     expect(() => listSnapshots('MSN-LINK')).toThrow('[RESOURCE_PATH_SYMLINK]');
+  });
+
+  it('rejects invalid and non-file persisted snapshots before drift evaluation', () => {
+    const snapshotFile = path.join(tmpDir, 'intent-snapshots.jsonl');
+    safeWriteFile(snapshotFile, `${JSON.stringify({ snapshot_id: 'incomplete' })}\n`);
+    expect(() => listSnapshots('MSN-INVALID')).toThrow(/Invalid catalog intent-snapshot/);
+
+    safeRmSync(snapshotFile, { force: true });
+    safeMkdir(snapshotFile, { recursive: true });
+    expect(() => listSnapshots('MSN-DIRECTORY')).toThrow('regular file');
   });
 
   describe('evaluateIntentDriftGate', () => {

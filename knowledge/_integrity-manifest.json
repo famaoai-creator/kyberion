@@ -6505,6 +6505,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/approved-intent-scope-change.schema.json",
+      "tier": "public",
+      "size": 1390,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/architecture-adf.example.json",
       "tier": "public",
       "size": 1928,
@@ -7545,7 +7551,7 @@
     {
       "path": "product/schemas/intent-snapshot.schema.json",
       "tier": "public",
-      "size": 2229,
+      "size": 2419,
       "type": "json"
     },
     {
