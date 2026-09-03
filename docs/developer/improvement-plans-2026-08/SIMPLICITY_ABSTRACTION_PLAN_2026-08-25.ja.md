@@ -14153,6 +14153,12 @@ SX-03／SX-04 のAL-02 scoped artifact indexとAL-03 mission artifact closureを
 
 検証: artifact store／mission artifact closure **2 files / 21 tests passed**、mission lifecycle **1 file / 26 tests passed**、対象lint、typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 649
+
+SX-03 のscript-side JSON loaderを再監査し、dependency patch flowがroot `package.json`を`safeReadFile` + 汎用`safeJsonParse`で読み込む二重経路が残っていたため修正した。root package JSONのreadはfoundation `readJson`へ統合し、patch適用時は検証済みobjectのstructured cloneを利用するようにした。pnpm auditのCLI stdoutは非標準出力を含むため、既存の切り出し・fail-closed判定を持つ専用parserとして維持している。
+
+検証: apply dependency patch **1 file / 10 tests passed**、対象lint、typecheck、Prettier、canonical full gate **69/69 passed**。SX-03の追加script loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
