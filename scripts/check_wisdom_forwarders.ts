@@ -1,17 +1,18 @@
 import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
+import {
+  loadActuatorOpRegistry,
+  type ActuatorOpRegistryFile,
+} from '@agent/core/actuator-op-registry';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type PipelineKind = 'capture' | 'transform' | 'apply' | 'control';
-type Registry = { domains: Record<string, Record<PipelineKind, string[]>> };
 
 export function checkWisdomForwarders(): string[] {
-  const registry = readJson<Registry>(
-    pathResolver.knowledge('product/governance/actuator-op-registry.json')
-  );
+  const registry = loadActuatorOpRegistry();
   const forwarders = describeOps()
     .filter((entry) => entry.forward_to)
     .map((entry) => ({
@@ -56,7 +57,7 @@ export function checkWisdomForwarders(): string[] {
 }
 
 function findTargetKind(
-  registry: Registry,
+  registry: ActuatorOpRegistryFile,
   target: { actuator: string; op: string }
 ): PipelineKind | undefined {
   const domain = registry.domains[target.actuator];
