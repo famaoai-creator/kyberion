@@ -27,6 +27,11 @@ import { reflexEngine } from '@agent/shared-nerve';
 import { handleAction as dispatchService } from '@actuator/service';
 import * as path from 'node:path';
 import { parseGuspStimulusLine, type GuspStimulus } from './nexus-stimulus.js';
+import {
+  parseNexusBrainProfileRegistry,
+  parseNexusSessionMetadata,
+  parseNexusSessionResponse,
+} from './nexus-runtime-records.js';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('nexus-daemon');
@@ -36,7 +41,7 @@ const STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl'
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
 const NEXUS_MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
 
-function readNexusJson(filePath: string): ReturnType<JSON['parse']> {
+function readNexusJson(filePath: string): unknown {
   const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
     throw new Error(`Nexus JSON resource must be an existing regular file: ${safePath}`);
@@ -232,8 +237,8 @@ function extractBrainProfile(payload: string): { profile: string; cleanPayload: 
       const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
       const safeRegistryPath = safeNexusPath(registryPath, true);
       if (safeExistsSync(safeRegistryPath)) {
-        const registry = readNexusJson(safeRegistryPath);
-        if (registry.profiles[profile]) {
+        const registry = parseNexusBrainProfileRegistry(readNexusJson(safeRegistryPath));
+        if (registry && Object.hasOwn(registry.profiles, profile)) {
           return { profile, cleanPayload };
         }
       }
@@ -282,10 +287,14 @@ async function scanAndDispatch(channels: ChannelRegistryChannel[]) {
 
       if (isExistingRegularFile(metaPath) && isExistingRegularFile(responsePath)) {
         try {
-          const meta = readNexusJson(metaPath);
-          if (meta.stimulus_id === stimulus.id) {
-            const response = readNexusJson(responsePath);
-            const text = response.data?.message || JSON.stringify(response.data || {}, null, 2);
+          const meta = parseNexusSessionMetadata(readNexusJson(metaPath));
+          if (meta?.stimulus_id === stimulus.id) {
+            const response = parseNexusSessionResponse(readNexusJson(responsePath));
+            if (!response) continue;
+            const text =
+              typeof response.message === 'string' && response.message.trim()
+                ? response.message
+                : JSON.stringify(response, null, 2);
 
             logger.info(`🎯 [Nexus] Match found! Stimulus ${stimulus.id} -> Session ${sid}`);
             await dispatchFeedback(stimulus, text, channels);

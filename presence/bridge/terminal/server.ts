@@ -5,7 +5,6 @@ import {
   getRegisteredEnvText,
   nowIso,
   parseSafeJsonInput,
-  readJson,
 } from '@agent/core/foundation';
 import { installProcessGuards } from '@agent/core/process-guards';
 import { createServer } from 'node:http';
@@ -40,6 +39,7 @@ import {
   readPersistedSessionState,
 } from './session-utils.js';
 import { authorizeTerminalRequest } from './auth.js';
+import { parseNexusBrainProfileRegistry } from '../nexus-runtime-records.js';
 
 /**
  * Terminal Hub v6.2 [STANDARDIZED]
@@ -279,10 +279,13 @@ async function setupSessionWatcher(session: Session) {
             { allowMissingLeaf: true }
           );
           if (safeExistsSync(registryPath) && safeLstat(registryPath).isFile()) {
-            const registry = readJson<{
-              default_profile: string;
-              profiles: Record<string, { cmd: string; args: string[] }>;
-            }>(registryPath);
+            const registry = parseNexusBrainProfileRegistry(
+              parseSafeJsonInput(
+                String(safeReadFile(registryPath, { encoding: 'utf8' })),
+                'terminal brain profile registry'
+              )
+            );
+            if (!registry) throw new Error('invalid brain profile registry');
             const profileKey =
               requestedBrain === 'default' ? registry.default_profile : requestedBrain;
             const profile =
