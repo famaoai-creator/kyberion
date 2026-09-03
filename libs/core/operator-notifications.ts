@@ -173,9 +173,9 @@ export function saveNotificationPreferences(prefs: NotificationPreferences): str
   const parsed = parseNotificationPreferences(prefs);
   if (!parsed) throw new Error('Invalid notification preferences');
   const filePath = notificationPreferencesPath();
-  notificationPreferencesCatalogAtPath(filePath).validate(parsed, filePath);
+  const validated = notificationPreferencesCatalogAtPath(filePath).validate(parsed, filePath);
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, `${JSON.stringify(parsed, null, 2)}\n`);
+  safeWriteFile(filePath, `${JSON.stringify(validated, null, 2)}\n`);
   return filePath;
 }
 
