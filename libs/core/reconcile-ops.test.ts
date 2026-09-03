@@ -5,7 +5,9 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const secureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
@@ -38,6 +40,14 @@ describe('reconcile ops (LE-03)', () => {
     process.env.KYBERION_ROOT = tmpRoot;
     registerFoundationIo({
       loadJson: <T>(filePath: string): T => {
+        if (filePath.includes('config-fallback-registry.schema.json')) {
+          return JSON.parse(
+            fs.readFileSync(
+              path.resolve('knowledge/product/schemas/config-fallback-registry.schema.json'),
+              'utf8'
+            )
+          ) as T;
+        }
         if (filePath.includes('unhandled-intent-registry.schema.json')) {
           return JSON.parse(
             fs.readFileSync(

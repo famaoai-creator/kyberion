@@ -6799,6 +6799,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/config-fallback-registry.schema.json",
+      "tier": "public",
+      "size": 1218,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/config-mission-brief.schema.json",
       "tier": "public",
       "size": 3086,

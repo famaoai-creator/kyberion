@@ -13637,6 +13637,12 @@ SX-03／SX-04／SX-09 のad-hoc pipeline promotion ledgerを再監査し、成�
 
 検証: promotion candidates **1 file / 4 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 563
+
+SX-03／SX-04 のconfig fallback registryを再監査し、catalog fallbackの発生履歴を保持する共有stateがraw `readJson<FallbackRegistry>`で読み書きされ、entryの型・reason・resolved状態・regular-file境界をreconcile側へ委ねていた残存を修正した。`config-fallback-registry.schema.json`と`loadConfigFallbackRegistryAtPath`を追加し、record／list／resolve／pruneの全経路をstrict schema、regular-file、canonical catalog loaderへ統合した。不正・directory registryはfallback記録やreconcileを壊さず空状態へfail-closedし、既存の非ブロッキング記録、public-only auto-repair、proposal／prune semanticsは維持している。
+
+検証: config fallback registry／reconcile **2 files / 7 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
