@@ -98,6 +98,28 @@ describe('knowledge-index', () => {
       expect(browserHint!.tags).toEqual(['browser']);
     });
 
+    it('skips unsafe or malformed persisted hint records', async () => {
+      fs.writeFileSync(
+        path.join(HINTS_DIR, 'unsafe-hints.json'),
+        JSON.stringify([
+          {
+            topic: 'unsafe',
+            hint: 'must not enter the index',
+            confidence: 0.9,
+            ['__proto__']: { poisoned: true },
+          },
+          { topic: 'invalid confidence', hint: 'must not enter the index', confidence: 2 },
+          { topic: 'invalid tags', hint: 'must not enter the index', tags: ['ok', 7] },
+          { topic: 'valid', hint: 'enters the index', confidence: 0.75, tags: ['safe'] },
+        ])
+      );
+
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+
+      expect(index.hints.map((hint) => hint.topic)).toEqual(['valid']);
+      expect(index.hints[0]).toMatchObject({ confidence: 0.75, tags: ['safe'] });
+    });
+
     it('promotes markdown frontmatter and taxonomy defaults into ranking metadata', async () => {
       const proceduresDir = path.join(TEST_ROOT, 'public/procedures');
       ensureDir(proceduresDir);

@@ -15898,6 +15898,16 @@ path／symlink boundary semanticsは維持し、unsafe／incorrectly typed demot
 検証: Chronos system status **1 file / 9 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 835
+
+SX-03／SX-04／SX-10 のknowledge index JSON hint loaderを再監査し、`topic`／`hint`だけを確認した任意recordを
+ranking／surface read modelへ投影していた残存を修正した。safe object parserを共通利用し、root／dangerous JSON key、必須文字列、
+confidenceの有限範囲、tagsのstring配列を明示検証してからindexへ追加するようにした。不正hintは他の有効なhintを隠さずfail-closedで
+除外し、tier／tenant付与、markdown fallback、既存の検索順位 semanticsは維持した。unsafe／型不正hintの回帰を追加した。
+
+検証: knowledge index **1 file / 14 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

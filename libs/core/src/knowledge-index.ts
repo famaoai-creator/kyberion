@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { readJson } from '../foundation/json.js';
+import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
 import * as pathResolver from '../path-resolver.js';
 import {
@@ -873,6 +874,63 @@ function scannerSource(knowledgeBase: string, filePath: string): string {
   return path.relative(knowledgeBase, filePath).replaceAll('\\', '/');
 }
 
+function parseKnowledgeHint(
+  value: unknown
+): Omit<KnowledgeHint, 'source' | 'tier' | 'customerId'> | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'knowledge hint');
+    const topic = record.topic;
+    const hint = record.hint;
+    const confidence = record.confidence;
+    const tags = record.tags;
+    if (typeof topic !== 'string' || topic.trim() === '') return null;
+    if (typeof hint !== 'string' || hint.trim() === '') return null;
+
+    const normalizedConfidence =
+      confidence === undefined
+        ? 0.5
+        : typeof confidence === 'number' &&
+            Number.isFinite(confidence) &&
+            confidence >= 0 &&
+            confidence <= 1
+          ? confidence
+          : null;
+    if (normalizedConfidence === null) return null;
+
+    const normalizedTags =
+      tags === undefined
+        ? undefined
+        : Array.isArray(tags) &&
+            tags.every((tag): tag is string => typeof tag === 'string' && tag.trim() !== '')
+          ? tags
+          : null;
+    if (normalizedTags === null) return null;
+
+    const optionalString = (key: string): string | undefined => {
+      const candidate = record[key];
+      if (candidate === undefined) return undefined;
+      return typeof candidate === 'string' && candidate.trim() ? candidate : undefined;
+    };
+
+    return {
+      topic,
+      hint,
+      confidence: normalizedConfidence,
+      ...(normalizedTags === undefined ? {} : { tags: [...normalizedTags] }),
+      ...(optionalString('last_updated') ? { last_updated: optionalString('last_updated') } : {}),
+      ...(optionalString('doc_authority')
+        ? { doc_authority: optionalString('doc_authority') }
+        : {}),
+      ...(optionalString('scope') ? { scope: optionalString('scope') } : {}),
+      ...(typeof record.usage_yield === 'number' && Number.isFinite(record.usage_yield)
+        ? { usage_yield: record.usage_yield }
+        : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function _loadJsonHints(
   dir: string,
   knowledgeBase: string,
@@ -897,25 +955,12 @@ function _loadJsonHints(
       const entries: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
       const relSource = scannerSource(knowledgeBase, filePath);
       for (const entry of entries) {
-        if (
-          entry !== null &&
-          typeof entry === 'object' &&
-          'topic' in entry &&
-          'hint' in entry &&
-          typeof (entry as Record<string, unknown>).topic === 'string' &&
-          typeof (entry as Record<string, unknown>).hint === 'string'
-        ) {
-          const e = entry as Record<string, unknown>;
+        const parsedHint = parseKnowledgeHint(entry);
+        if (parsedHint) {
           hints.push({
-            topic: e.topic as string,
-            hint: e.hint as string,
+            ...parsedHint,
             source: relSource,
-            confidence: typeof e.confidence === 'number' ? (e.confidence as number) : 0.5,
-            tags: Array.isArray(e.tags) ? (e.tags as string[]) : undefined,
             tier,
-            ...(typeof e.last_updated === 'string' ? { last_updated: e.last_updated } : {}),
-            ...(typeof e.doc_authority === 'string' ? { doc_authority: e.doc_authority } : {}),
-            ...(typeof e.scope === 'string' ? { scope: e.scope } : {}),
             ...(customerId ? { customerId } : {}),
           });
         }
