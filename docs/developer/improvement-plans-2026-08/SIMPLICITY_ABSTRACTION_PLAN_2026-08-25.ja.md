@@ -15685,6 +15685,16 @@ executable pathも`assertSafeRepositoryPath`で再検証し、canonical payload 
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、
 SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 814
+
+SX-06／SX-10 の`create:actuator`を再監査し、`defineScript`は存在するもののshared flagsを無効化し、scaffold生成を
+直接実行していたため、preview／machine executionの契約がなかった残存を修正した。scaffold planの組み立てをwrite処理から
+分離し、`--dry-run`／`--check`では5ファイルの出力計画と`ok`／modeだけをJSONで返して、directory作成・file writeへ進まない
+ようにした。既存の`createActuatorScaffold` API、テンプレート内容、name normalization、重複directory拒否、通常の対話表示と
+生成 semanticsは維持し、output pathをrepository root内で再検証する回帰を追加した。
+
+検証: create actuator **1 file / 3 tests passed**、実機 `pnpm exec tsx scripts/create_actuator.ts harness-preview-20260904 --dry-run --json`（`ok: true`、対象directory未作成）、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
