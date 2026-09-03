@@ -1,5 +1,5 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 
@@ -41,6 +41,13 @@ function loadPersistedPreferences(): UserPreferences | null {
 
 function isSafePreferenceSegment(segment: string): boolean {
   return !['__proto__', 'constructor', 'prototype'].includes(segment);
+}
+
+export function writeUserPreferencesAtPath(filePath: string, preferences: UserPreferences): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = userPreferencesCatalogAtPath(safePath).validate(preferences, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2) + '\n', { mkdir: true });
+  return safePath;
 }
 
 export function readUserPreference(
@@ -95,8 +102,7 @@ export const preferenceAdapter = {
       const prefs = safeExistsSync(PREF_PATH) ? loadPersistedPreferences() : {};
       if (!prefs || !writeUserPreference(prefs, key, value)) return false;
 
-      userPreferencesCatalogAtPath(PREF_PATH).validate(prefs, PREF_PATH);
-      safeWriteFile(PREF_PATH, JSON.stringify(prefs, null, 2) + '\n');
+      writeUserPreferencesAtPath(PREF_PATH, prefs);
       return true;
     } catch (_e) {
       return false;
