@@ -8929,6 +8929,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/provider-pins.schema.json",
+      "tier": "public",
+      "size": 1152,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/publication-approval.schema.json",
       "tier": "public",
       "size": 2936,

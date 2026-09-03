@@ -14015,6 +14015,12 @@ SX-03／SX-04 のsurface coordination async request／notification／dead-letter
 
 検証: surface async／coordination **2 files / 15 focused tests passed**、knowledge index生成、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 626
+
+SX-03／SX-04 のcapability broker provider pin readerを再監査し、mission／shared runtimeのprovider-pins.jsonがraw `readJson`と最小shape predicateだけで実行先固定情報へ入る残存を修正した。provider pin専用schemaとpath-bound canonical catalogを追加し、regular-file境界をloader入口へ適用した。schema-invalid・directory pinは空として扱い、stale providerのfresh resolution、mission pathのrepository boundary、pin／unpin、orchestration tierの既存semanticsは維持している。
+
+検証: capability broker **1 file / 6 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
