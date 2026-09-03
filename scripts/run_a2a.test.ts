@@ -16,6 +16,17 @@ vi.mock('@agent/core/foundation', async () => {
   return { ...actual, readJson: mocks.readJson };
 });
 
+vi.mock('@agent/core/a2a-envelope', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/a2a-envelope')>(
+    '@agent/core/a2a-envelope'
+  );
+  return {
+    ...actual,
+    loadA2AEnvelopeAtPath: (sourcePath: string) =>
+      actual.validateA2AEnvelope(mocks.readJson(), sourcePath),
+  };
+});
+
 vi.mock('@agent/core/core', async () => {
   const actual = await vi.importActual<typeof import('@agent/core/core')>('@agent/core/core');
   return { ...actual, logger: mocks.logger };
