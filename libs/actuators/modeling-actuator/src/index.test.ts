@@ -13,7 +13,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { handleAction } from './index.js';
-import { extractDesignSpec, extractRequirements } from './sdlc-ops.js';
+import { extractDesignSpec, extractRequirements, extractTestPlan } from './sdlc-ops.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -38,6 +38,48 @@ describe('modeling-actuator terraform_to_architecture_adf', () => {
         requirements_draft_path: '/tmp/external-requirements.json',
       })
     ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a malformed explicit requirements draft before design extraction', async () => {
+    const draftPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/malformed-requirements-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(draftPath), { recursive: true });
+    safeWriteFile(draftPath, JSON.stringify({ version: 'v1', project_name: 'Broken' }));
+
+    try {
+      await expect(
+        extractDesignSpec({
+          mission_id: 'MSN-MODELING-MALFORMED-DRAFT',
+          project_name: 'malformed-draft',
+          requirements_draft_path: path.relative(ROOT, draftPath),
+        })
+      ).rejects.toThrow(/Invalid catalog requirements-draft/);
+    } finally {
+      safeRmSync(draftPath, { force: true });
+    }
+  });
+
+  it('rejects a malformed explicit requirements draft before test-plan extraction', async () => {
+    const draftPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/malformed-test-plan-requirements-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(draftPath), { recursive: true });
+    safeWriteFile(draftPath, JSON.stringify({ version: 'v1', project_name: 'Broken' }));
+
+    try {
+      await expect(
+        extractTestPlan({
+          mission_id: 'MSN-MODELING-MALFORMED-TEST-PLAN',
+          project_name: 'malformed-draft',
+          requirements_draft_path: path.relative(ROOT, draftPath),
+        })
+      ).rejects.toThrow(/Invalid catalog requirements-draft/);
+    } finally {
+      safeRmSync(draftPath, { force: true });
+    }
   });
 
   it('rejects an unsupported action instead of running an empty pipeline', async () => {

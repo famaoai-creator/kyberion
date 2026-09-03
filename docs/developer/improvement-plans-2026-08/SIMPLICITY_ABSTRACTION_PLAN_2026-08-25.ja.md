@@ -15787,6 +15787,17 @@ context／params由来のcontract parser、missing contract、output path、retr
 検証: modeling actuator **1 file / 13 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 824
+
+SX-03／SX-04／SX-10 のmodeling SDLC抽出経路を再監査し、`prior_draft_ref`、design specのrequirements path、
+test planのrequirements／design pathで、既存domain storeとschemaを迂回して `readJson<unknown>` を呼ぶ残存を修正した。
+requirements draft／design specのcanonical explicit loaderを各抽出経路へ統合し、path scope、存在確認、schema、domain shapeの検証後に
+reasoning backendへ渡すようにした。既存のmission canonical artifact、missing input、保存／gate semanticsを維持し、design／test plan抽出の
+malformed explicit draft回帰を追加した。
+
+検証: modeling SDLC **1 file / 15 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
