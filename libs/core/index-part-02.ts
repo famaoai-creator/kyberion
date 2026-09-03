@@ -66,6 +66,8 @@ export type {
 
 export * from './company.js';
 
+export * from './knowledge-taxonomy.js';
+
 export * from './financial-model.js';
 
 export * from './finance-controller.js';
