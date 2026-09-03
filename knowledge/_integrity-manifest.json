@@ -9393,7 +9393,7 @@
     {
       "path": "product/schemas/surface-mission-proposal-state.schema.json",
       "tier": "public",
-      "size": 1291,
+      "size": 1280,
       "type": "json"
     },
     {

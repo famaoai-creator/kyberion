@@ -6,7 +6,6 @@ import {
   renderIntentOutcomeLabel,
   type IntentResolutionContract,
 } from './intent-resolution-contract.js';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
@@ -39,6 +38,9 @@ const SURFACE_MISSION_PROPOSAL_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-mission-proposal-state.schema.json'
 );
 
+type PersistedSurfaceMissionProposalState = Omit<SurfaceMissionProposalState, 'surface'> &
+  Partial<Pick<SurfaceMissionProposalState, 'surface'>>;
+
 type SurfaceProposalRole = 'slack_bridge' | 'chronos_gateway';
 
 export interface MissionProposalStateBinding {
@@ -48,7 +50,7 @@ export interface MissionProposalStateBinding {
 }
 
 function proposalStateCatalogAtPath(filePath: string) {
-  return defineCatalog<SurfaceMissionProposalState>({
+  return defineCatalog<PersistedSurfaceMissionProposalState>({
     id: 'surface-mission-proposal-state',
     path: filePath,
     schema: SURFACE_MISSION_PROPOSAL_SCHEMA_PATH,
@@ -64,16 +66,12 @@ export function loadMissionProposalStateAtPath(
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[SURFACE_MISSION_PROPOSAL] state must be a regular file: ${filePath}`);
   }
-  const raw = readJson<unknown>(safeFilePath);
-  const rawRecord =
-    raw && typeof raw === 'object' && !Array.isArray(raw)
-      ? (raw as Record<string, unknown>)
-      : undefined;
-  const candidate =
-    expected?.surface && rawRecord && rawRecord.surface === undefined
-      ? { ...rawRecord, surface: expected.surface }
-      : raw;
-  const state = proposalStateCatalogAtPath(safeFilePath).validate(candidate, safeFilePath);
+  const loaded = proposalStateCatalogAtPath(safeFilePath).load();
+  const surface = loaded.surface ?? expected?.surface;
+  if (!surface) {
+    throw new Error(`[SURFACE_MISSION_PROPOSAL] state is missing surface binding: ${safeFilePath}`);
+  }
+  const state: SurfaceMissionProposalState = { ...loaded, surface };
   for (const key of ['surface', 'channel', 'threadTs'] as const) {
     const expectedValue = expected?.[key];
     if (expectedValue !== undefined && state[key] !== expectedValue) {
