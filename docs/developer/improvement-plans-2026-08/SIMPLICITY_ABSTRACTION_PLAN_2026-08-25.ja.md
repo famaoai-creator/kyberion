@@ -14039,6 +14039,12 @@ SX-03／SX-04 のtenant activationが参照するorganization context binding re
 
 検証: tenant activation **1 file / 7 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 630
+
+SX-03／SX-04 のcustomer requirements capture readerを再監査し、商談の`requirements.json`が汎用`readJson`と手書きshapeに依存したまま、保存時にschema境界を通らず、要件キャプチャからSDLCのrequirements draftへ移る契約が暗黙だった残存を修正した。専用`deal-requirements-capture.schema.json`とdeal／tenant pathに結び付くcanonical catalog loaderを追加し、read／write双方へregular-file・repository path・schema validationを適用した。不正・directory captureは通常の未提供扱いへfail-closedし、要件キャプチャの既存turn／deal bindingと、保存済み要件をwon handoffでdraftへ昇格するsemanticsは維持した。実利用の`FR-SEARCH-1`形式を拒否していたrequirements-draftのID patternも、意味を保ったsegment形式へ修正した。
+
+検証: customer conversation requirements **1 file / 3 tests passed**、customer dialogue E2E **1 file / 17 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
