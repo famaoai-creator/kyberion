@@ -1,10 +1,11 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeReaddir,
@@ -78,6 +79,43 @@ function nextVersion(dir: string, prefix: string): number {
 // TODO(I18N-04): thread a resolved customer/tenant locale once this
 // template itself is localized.
 const QUOTE_DOCUMENT_LOCALE = 'ja-JP';
+
+export interface ContractReviewRecord {
+  kind: 'contract-review-record';
+  deal_id: string;
+  version: number;
+  verdict: 'approve' | 'reject';
+  reviewer: string;
+  notes: string;
+  reviewed_at: string;
+}
+
+const CONTRACT_REVIEW_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/contract-review-record.schema.json'
+);
+
+export function loadContractReviewAtPath(
+  filePath: string,
+  tenantSlug: string,
+  dealId: string,
+  version: number
+): ContractReviewRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`contract review record must be a regular file: ${filePath}`);
+  }
+  const record = defineCatalog<ContractReviewRecord>({
+    id: 'contract-review-record',
+    path: safeFilePath,
+    schema: CONTRACT_REVIEW_SCHEMA_PATH,
+  }).load();
+  if (record.deal_id !== dealId || record.version !== version || tenantSlug.trim() === '') {
+    throw new Error(
+      `contract review record binding mismatch for ${tenantSlug}/${dealId} v${version}`
+    );
+  }
+  return record;
+}
 
 function renderQuoteMarkdown(deal: DealRecord, quote: QuoteResult, version: number): string {
   return [
@@ -268,9 +306,7 @@ function contractReviewApproved(tenantSlug: string, dealId: string, version: num
   );
   try {
     if (!safeExistsSync(filePath)) return false;
-    const record = readJson<{
-      verdict?: string;
-    }>(filePath);
+    const record = loadContractReviewAtPath(filePath, tenantSlug, dealId, version);
     return record.verdict === 'approve';
   } catch {
     return false;
