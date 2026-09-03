@@ -301,6 +301,19 @@ export function validateAdapterDefaultPreferences(
   return next;
 }
 
+export function writeAdapterDefaultPreferencesAtPath(
+  filePath: string,
+  preferences: AdapterDefaultPreferences
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = adapterDefaultPreferencesCatalog.validate(preferences, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2) + '\n', {
+    mkdir: true,
+    encoding: 'utf8',
+  });
+  return safePath;
+}
+
 export function saveAdapterDefaultPreferences(
   input: Record<string, unknown>
 ): AdapterDefaultSelectionSnapshot {
@@ -312,11 +325,8 @@ export function saveAdapterDefaultPreferences(
     defaults: nextDefaults,
     updated_at: nowIso(),
   };
+  writeAdapterDefaultPreferencesAtPath(selectionPath(), preferences);
   setAdapterDefaultPreferences(preferences);
-  safeWriteFile(selectionPath(), JSON.stringify(preferences, null, 2) + '\n', {
-    mkdir: true,
-    encoding: 'utf8',
-  });
   return { ...snapshot, preferences };
 }
 
