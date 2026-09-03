@@ -7,6 +7,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
+import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 
 const REPO_ROOT = process.cwd();
 
@@ -80,6 +81,7 @@ const mocks = vi.hoisted(() => {
   const safeExistsSync = vi.fn((filePath: string) => fileStore.has(filePath));
   const safeMkdir = vi.fn();
   const safeReadFile = vi.fn((filePath: string) => fileStore.get(filePath) || '');
+  const safeLstat = vi.fn((filePath: string) => ({ isFile: () => fileStore.has(filePath) }));
   const safeWriteFile = vi.fn((filePath: string, content: string) => {
     fileStore.set(filePath, content);
   });
@@ -152,6 +154,7 @@ const mocks = vi.hoisted(() => {
     safeExistsSync,
     safeMkdir,
     safeReadFile,
+    safeLstat,
     safeWriteFile,
     safeRmSync,
     safeExec,
@@ -169,6 +172,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
     safeReadFile: mocks.safeReadFile,
+    safeLstat: mocks.safeLstat,
     safeWriteFile: mocks.safeWriteFile,
     safeRmSync: mocks.safeRmSync,
     safeExec: mocks.safeExec,
@@ -216,6 +220,39 @@ describe('browser-actuator v3 contract', () => {
       })
     ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
     expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+  });
+
+  it('sanitizes persisted operator approval fields before completing the artifact', async () => {
+    const approval = browserRuntimeHelpers.beginOperatorApproval({
+      sessionId: 'approval-boundary',
+      message: 'Confirm action',
+      continueFile: 'active/shared/runtime/browser/approval-boundary.continue',
+    });
+    mocks.safeWriteFile(
+      approval.path,
+      JSON.stringify({
+        request_id: approval.request_id,
+        session_id: 'approval-boundary',
+        status: 'pending',
+        message: 'Confirm action',
+        continue_file: approval.continue_file,
+        created_at: '2026-09-04T00:00:00.000Z',
+        unexpected: 'discard me',
+      })
+    );
+
+    browserRuntimeHelpers.completeOperatorApproval('approval-boundary', 'approved');
+
+    const completed = JSON.parse(mocks.fileStore.get(approval.path) || '{}');
+    expect(completed).toMatchObject({
+      request_id: approval.request_id,
+      session_id: 'approval-boundary',
+      status: 'approved',
+      message: 'Confirm action',
+    });
+    expect(Object.hasOwn(completed, 'constructor')).toBe(false);
+    expect(completed.unexpected).toBeUndefined();
+    expect(completed.completed_at).toEqual(expect.any(String));
   });
 
   it('uses the manifest recovery policy for ref interactions', async () => {
