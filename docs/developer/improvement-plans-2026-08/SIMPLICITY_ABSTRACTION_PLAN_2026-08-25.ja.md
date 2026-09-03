@@ -13619,6 +13619,12 @@ SX-03／SX-04 のintent goal handoffとdesktop promotion transactionを再監査
 
 検証: intent handoff／desktop promotion transaction **2 files / 11 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 560
+
+SX-03／SX-04／SX-09 のsurface coordination outboxを再監査し、既存のcanonical outbox loaderがschema・regular-file・surface bindingを備えている一方、実ファイル読込だけ`defineCatalog.validate(readJson(...))`のbypassを残していたため、catalog read pathが二重化していた残存を修正した。outbox recordを実パスごとの`defineCatalog.load()`へ移行し、secure foundation I/Oを通るschema検証へ統一した。既存のscope検証、quarantine、deduplication、dead-letter／replay semanticsは維持している。
+
+検証: surface coordination outbox／contract **2 files / 13 tests passed**、変更対象のPrettier、`git diff --check`を実行済み。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
