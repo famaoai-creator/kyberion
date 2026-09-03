@@ -14,5 +14,8 @@ describe('system focus resource boundary', () => {
     expect(source).toContain('function safeFocusTargetStorePath(');
     expect(source).toContain('const safeStorePath = safeFocusTargetStorePath(');
     expect(source).toContain('safeFocusTargetStorePath({ allowMissingLeaf: true })');
+    expect(source).toContain('focusTargetStoreCatalog.load()');
+    expect(source).toContain('focusTargetStoreCatalog.validate(');
+    expect(source).not.toContain('readJson');
   });
 });

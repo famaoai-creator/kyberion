@@ -1299,7 +1299,7 @@ function restorePlatform() {
   });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   safeExec.mockImplementation(() => '');
   safeReadFile.mockImplementation(() => '{}');
@@ -1330,6 +1330,8 @@ beforeEach(() => {
       content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
     })
   );
+  const { installFocusTargetStoreTestIo } = await import('../tests/system-focus-io.test.js');
+  await installFocusTargetStoreTestIo({ loadJson, safeReadFile, safeWriteFile, safeExistsSync });
   restorePlatform();
 });
 

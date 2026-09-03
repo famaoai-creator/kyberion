@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "focus-target-store.schema.json",
+  "title": "Focused Target Store",
+  "description": "Persisted focused application/input targets used by the computer actuator.",
+  "type": "object",
+  "patternProperties": {
+    "^(?!(__proto__|constructor|prototype)$).+$": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "application": { "type": "string" },
+        "windowTitle": { "type": "string" },
+        "role": { "type": "string" },
+        "description": { "type": "string" },
+        "editable": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

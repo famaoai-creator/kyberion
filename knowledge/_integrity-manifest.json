@@ -7285,6 +7285,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/focus-target-store.schema.json",
+      "tier": "public",
+      "size": 799,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/frontmatter-exclusions.schema.json",
       "tier": "public",
       "size": 647,
