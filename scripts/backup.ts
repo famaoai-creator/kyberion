@@ -10,6 +10,7 @@ import {
   safeMkdir,
   safeReaddir,
   safeLstat,
+  safeReadFile,
   safeMoveSync,
   safeRmSync,
   safeStat,
@@ -21,13 +22,7 @@ import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core/protocol-service-lifecycle';
-import {
-  getRegisteredEnvText,
-  isRecord,
-  nowIso,
-  parseSafeJsonInput,
-  readJson,
-} from '@agent/core/foundation';
+import { getRegisteredEnvText, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { logger } from '@agent/core/core';
 
@@ -982,7 +977,11 @@ function findRestoredManifests(target: string): string[] {
   const manifests: string[] = [];
   for (const entry of safeReaddir(tmpDir)) {
     const manifestPath = path.join(tmpDir, entry, 'manifest.json');
-    if (entry.startsWith('backup-') && safeExistsSync(manifestPath)) {
+    if (
+      entry.startsWith('backup-') &&
+      safeExistsSync(manifestPath) &&
+      safeLstat(manifestPath).isFile()
+    ) {
       manifests.push(manifestPath);
     }
   }
@@ -992,7 +991,9 @@ function findRestoredManifests(target: string): string[] {
 function restoreMissionGitBundles(target: string): void {
   const [manifestPath] = findRestoredManifests(target);
   if (!manifestPath) return;
-  const manifest = readJson<RestoredBackupManifest>(manifestPath);
+  const manifest = parseRestoredBackupManifest(
+    String(safeReadFile(manifestPath, { encoding: 'utf8' }))
+  );
   if (manifest.format !== 'kyberion-backup-v1') return;
 
   for (const entry of manifest.mission_git_repos || []) {

@@ -14429,6 +14429,12 @@ SX-03／SX-04 のprocess-definition registryを再監査し、registry本体はs
 
 検証: process-definition registry **1 file / 5 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 695
+
+SX-03 のbackup restore manifest readerを再監査し、復元先の`manifest.json`候補だけがregular-file確認後も汎用`readJson`で読み込まれ、既存の厳格なbackup manifest parserと分岐していた残存を修正した。候補列挙でregular-file境界を確認し、読込は`safeReadFile`から`parseRestoredBackupManifest`へ統合した。format／scope／tenant／entries／mission git metadataの既存fail-closed検証とrestore quarantine semanticsは維持している。
+
+検証: backup restore **1 file / 18 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
