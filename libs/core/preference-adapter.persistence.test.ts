@@ -86,4 +86,16 @@ describe('preference-adapter persistence boundary', () => {
     expect(preferenceAdapter.get('voice.backend', 'fallback')).toBe('fallback');
     expect(preferenceAdapter.set('voice.backend', 'local')).toBe(false);
   });
+
+  it('persists the catalog-normalized preference payload', async () => {
+    const { writeUserPreferencesAtPath } = await import('./preference-adapter.js');
+    writeUserPreferencesAtPath('/repo/knowledge/personal/normalized.json', {
+      voice: { backend: 'local' },
+      $schema: 'governance-metadata',
+    });
+
+    expect(JSON.parse(mockFiles.get('/repo/knowledge/personal/normalized.json') || '{}')).toEqual({
+      voice: { backend: 'local' },
+    });
+  });
 });
