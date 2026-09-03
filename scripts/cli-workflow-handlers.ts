@@ -11,7 +11,10 @@ import {
 import { t as coreT } from '@agent/core/t';
 import type { VocabularyKey } from '@agent/core/t';
 import { offboardScope } from '@agent/core/scope-offboarding';
-import { buildProductivityTaskPlan } from '@agent/core/productivity-task-plan';
+import {
+  buildProductivityTaskPlan,
+  validateProductivityTaskPlan,
+} from '@agent/core/productivity-task-plan';
 import {
   classifyTaskSessionIntent,
   createTaskSession,
@@ -388,7 +391,8 @@ export async function handleTaskCommand(
     if (outputPath) {
       const absoluteOutputPath = resolveWorkflowPath(outputPath, 'output path', true);
       safeMkdir(path.dirname(absoluteOutputPath), { recursive: true });
-      safeWriteFile(absoluteOutputPath, `${JSON.stringify(plan, null, 2)}\n`);
+      const validatedPlan = validateProductivityTaskPlan(plan, absoluteOutputPath);
+      safeWriteFile(absoluteOutputPath, `${JSON.stringify(validatedPlan, null, 2)}\n`);
     }
     console.log(JSON.stringify(outputPath ? { ...plan, plan_path: outputPath } : plan, null, 2));
     return;
@@ -434,7 +438,8 @@ export async function handleTaskCommand(
     outputPath || `active/shared/tmp/productivity-task-plans/${session.session_id}.json`;
   const absolutePlanPath = resolveWorkflowPath(planPath, 'plan path', true);
   safeMkdir(path.dirname(absolutePlanPath), { recursive: true });
-  safeWriteFile(absolutePlanPath, `${JSON.stringify(plan, null, 2)}\n`);
+  const validatedPlan = validateProductivityTaskPlan(plan, absolutePlanPath);
+  safeWriteFile(absolutePlanPath, `${JSON.stringify(validatedPlan, null, 2)}\n`);
   const sessionPath = saveTaskSession(session);
   console.log(
     JSON.stringify(
