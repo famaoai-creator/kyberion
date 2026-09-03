@@ -7003,6 +7003,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/delegation-notification.schema.json",
+      "tier": "public",
+      "size": 1457,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/deliverable-inbox-entry.schema.json",
       "tier": "public",
       "size": 3678,
