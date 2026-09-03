@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
-import { readJsonIfPresent } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 import { discoverProviders } from './provider-discovery.js';
 import {
@@ -9,9 +9,10 @@ import {
   type ReasoningEndpointInfo,
 } from './reasoning-endpoint-discovery.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
+import { pathResolver } from './path-resolver.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
 import { loadReasoningRoutePolicy, type ReasoningRoutePolicy } from './reasoning-route-resolver.js';
-import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 
 export type LlmSelectionStatus = 'ready' | 'needs_setup' | 'unsupported';
 
@@ -44,6 +45,18 @@ const DEFAULT_SELECTION: LlmSelectionPreferences = {
   provider: 'codex-cli',
 };
 
+const LLM_SELECTION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/llm-selection-preferences.schema.json'
+);
+
+function llmSelectionCatalogAtPath(filePath: string) {
+  return defineCatalog<LlmSelectionPreferences>({
+    id: 'llm-selection-preferences',
+    path: filePath,
+    schema: LLM_SELECTION_SCHEMA_PATH,
+  });
+}
+
 function selectionPath(): string {
   return assertSafeRepositoryPath(
     path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json'),
@@ -53,9 +66,10 @@ function selectionPath(): string {
 
 function readSelection(): LlmSelectionPreferences | null {
   const filePath = selectionPath();
-  const parsed = readJsonIfPresent<Partial<LlmSelectionPreferences>>(filePath);
-  if (!parsed) return null;
+  if (!safeExistsSync(filePath)) return null;
   try {
+    if (!safeLstat(filePath).isFile()) return null;
+    const parsed = llmSelectionCatalogAtPath(filePath).load();
     if (typeof parsed.provider !== 'string' || !parsed.provider.trim()) return null;
     return {
       version: '1.0.0',
@@ -219,7 +233,9 @@ export function saveLlmSelectionPreferences(input: {
     model_id,
     updated_at: nowIso(),
   };
-  safeWriteFile(selectionPath(), JSON.stringify(next, null, 2) + '\n', {
+  const filePath = selectionPath();
+  const validated = llmSelectionCatalogAtPath(filePath).validate(next, filePath);
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2) + '\n', {
     mkdir: true,
     encoding: 'utf8',
   });
