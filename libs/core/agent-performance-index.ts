@@ -44,9 +44,20 @@ export interface AgentPerformanceIndex {
 
 const OUTCOMES_PATH = 'observability/retrospectives/agent-role-outcomes.jsonl';
 const INDEX_PATH = 'observability/retrospectives/agent-performance.json';
+const OUTCOME_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-role-outcome.schema.json'
+);
 const INDEX_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/agent-performance-index.schema.json'
 );
+
+function outcomeCatalog(filePath: string) {
+  return defineCatalog<AgentRoleOutcome>({
+    id: 'agent-role-outcome',
+    path: filePath,
+    schema: OUTCOME_SCHEMA_PATH,
+  });
+}
 
 function performanceIndexCatalog(filePath: string) {
   return defineCatalog<AgentPerformanceIndex>({
@@ -149,23 +160,22 @@ export function recordAgentRoleOutcomes(outcomes: AgentRoleOutcome[]): void {
   if (outcomes.length === 0) return;
   const outcomesPath = agentRoleOutcomesPath();
   safeMkdir(path.dirname(outcomesPath), { recursive: true });
-  for (const outcome of outcomes) appendJsonLine(outcomesPath, outcome);
+  const catalog = outcomeCatalog(outcomesPath);
+  const validatedOutcomes = outcomes.map((outcome) => catalog.validate(outcome, outcomesPath));
+  for (const outcome of validatedOutcomes) appendJsonLine(outcomesPath, outcome);
   rebuildAgentPerformanceIndex();
 }
 
 export function rebuildAgentPerformanceIndex(): Record<string, AgentRolePerformance> {
   const outcomesPath = agentRoleOutcomesPath();
   const byKey: Record<string, AgentRolePerformance> = {};
-  if (safeExistsSync(outcomesPath)) {
-    const outcomes = readJsonLines<AgentRoleOutcome | null>(outcomesPath, {
+  if (safeExistsSync(outcomesPath) && safeLstat(outcomesPath).isFile()) {
+    const catalog = outcomeCatalog(outcomesPath);
+    const outcomes = readJsonLines<AgentRoleOutcome>(outcomesPath, {
       onMalformed: 'skip',
-      map: (value) =>
-        value && typeof value === 'object' && !Array.isArray(value)
-          ? (value as AgentRoleOutcome)
-          : null,
+      map: (value, lineNumber) => catalog.validate(value, `${outcomesPath}:${lineNumber}`),
     });
     for (const outcome of outcomes) {
-      if (!outcome) continue;
       if (!outcome.assignee || !outcome.team_role) continue;
       const key = keyFor(outcome.assignee, outcome.team_role);
       const bucket = (byKey[key] ||= {
