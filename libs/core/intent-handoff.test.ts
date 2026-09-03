@@ -37,6 +37,21 @@ vi.mock('./foundation/json.js', () => ({
   readJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
 }));
 
+import { registerFoundationIo } from './foundation/io.js';
+
+registerFoundationIo({
+  loadJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+  loadJsonIfPresent: <T>(filePath: string) => {
+    if (!fs.existsSync(filePath)) return null;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+  },
+  appendFile: (filePath, content) => fs.appendFileSync(filePath, content, 'utf8'),
+  exists: (filePath) => fs.existsSync(filePath),
+  readFile: (filePath) => fs.readFileSync(filePath, 'utf8'),
+  stat: (filePath) => fs.statSync(filePath),
+  writeFile: (filePath, content) => fs.writeFileSync(filePath, content, 'utf8'),
+});
+
 import {
   writeIntentGoalHandoff,
   consumeIntentGoalHandoff,
