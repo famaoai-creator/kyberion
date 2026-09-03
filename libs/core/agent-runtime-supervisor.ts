@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, rootDir } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { appendSupervisorEvent } from './agent-runtime-events.js';
 import { registerAgentRuntimeEnsurer } from './agent-runtime-port.js';
@@ -74,17 +74,27 @@ const AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/agent-runtime-ensure-request.schema.json'
 );
 
-const agentRuntimeEnsureRequestCatalog = defineCatalog<ParsedAgentRuntimeEnsureRequest>({
-  id: 'agent-runtime-ensure-request',
-  path: AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH,
-  schema: AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH,
-});
-
 const agentRuntimeEnsureResultCatalog = defineCatalog<AgentRuntimeEnsureResult>({
   id: 'agent-runtime-ensure-result',
   path: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
   schema: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
 });
+
+function agentRuntimeEnsureRequestCatalogAtPath(filePath: string) {
+  return defineCatalog<AgentRuntimeEnsureRequest>({
+    id: 'agent-runtime-ensure-request',
+    path: filePath,
+    schema: AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH,
+  });
+}
+
+function agentRuntimeEnsureResultCatalogAtPath(filePath: string) {
+  return defineCatalog<AgentRuntimeEnsureResult>({
+    id: 'agent-runtime-ensure-result',
+    path: filePath,
+    schema: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
+  });
+}
 
 function safeQueuePath(filePath: string, queueDir: string): string {
   const resolved = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
@@ -251,10 +261,10 @@ export function enqueueMissionTeamPrewarmRequest(input: {
 
 export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
   const safePath = safeQueuePath(requestPath, REQUESTS_DIR);
-  const validated = agentRuntimeEnsureRequestCatalog.validate(
-    readJson<unknown>(safePath),
-    safePath
-  );
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[AGENT_RUNTIME_REQUEST] request must be a regular file: ${requestPath}`);
+  }
+  const validated = agentRuntimeEnsureRequestCatalogAtPath(safePath).load();
   const request = parseAgentRuntimeEnsureRequest(
     validated,
     path.basename(safePath, path.extname(safePath))
@@ -368,10 +378,7 @@ export function loadMissionTeamPrewarmResultAtPath(
   if (!safeLstat(safeResultPath).isFile()) {
     throw new Error(`[AGENT_RUNTIME_RESULT] result must be a regular file: ${resultPath}`);
   }
-  const result = agentRuntimeEnsureResultCatalog.validate(
-    readJson<unknown>(safeResultPath),
-    safeResultPath
-  );
+  const result = agentRuntimeEnsureResultCatalogAtPath(safeResultPath).load();
   if (result.request_id !== expectedRequestId) {
     throw new Error(
       `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] result belongs to ${result.request_id}, expected ${expectedRequestId}`
