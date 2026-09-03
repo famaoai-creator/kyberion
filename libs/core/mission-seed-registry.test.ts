@@ -3,7 +3,7 @@ import AjvModule from 'ajv';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
 import {
   listMissionSeedRecords,
   loadMissionSeedRecord,
@@ -82,6 +82,26 @@ describe('mission-seed-registry', () => {
     };
     const valid = validate(record);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('persists the canonical seed payload returned by the catalog', () => {
+    const seedId = 'MSD-TEST-CANONICAL';
+    saveMissionSeedRecord({
+      seed_id: seedId,
+      project_id: 'PRJ-TEST-WEB',
+      title: 'Canonical seed',
+      summary: 'Seed metadata is canonicalized before persistence.',
+      status: 'ready',
+      specialist_id: 'document-specialist',
+      created_at: new Date('2026-09-04T00:00:00.000Z').toISOString(),
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveMissionSeedRecord>[0]);
+
+    const persisted = JSON.parse(
+      String(safeReadFile(missionSeedRecordPath(seedId), { encoding: 'utf8' }))
+    ) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.seed_id).toBe(seedId);
   });
 
   it('rejects a seed id that could escape the registry namespace', () => {
