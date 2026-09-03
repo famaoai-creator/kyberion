@@ -6385,6 +6385,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/agent-input-queue-record.schema.json",
+      "tier": "public",
+      "size": 1775,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/agent-manifest.schema.json",
       "tier": "public",
       "size": 3944,

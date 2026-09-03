@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-input-queue-record.schema.json",
+  "title": "Agent input queue durable record",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "entry", "recorded_at"],
+      "properties": {
+        "kind": { "const": "enqueued" },
+        "entry": { "$ref": "#/$defs/entry" },
+        "recorded_at": { "type": "string", "minLength": 1 }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "entry_id", "recorded_at"],
+      "properties": {
+        "kind": { "enum": ["consumed", "cancelled"] },
+        "entry_id": { "type": "string", "minLength": 1 },
+        "recorded_at": { "type": "string", "minLength": 1 }
+      }
+    }
+  ],
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "mission_id", "delivery", "text", "enqueued_at"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "delivery": { "enum": ["steer", "follow_up", "next_run", "inject"] },
+        "text": { "type": "string", "minLength": 1 },
+        "enqueued_at": { "type": "string", "minLength": 1 },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "taskId": { "type": "string", "minLength": 1 },
+            "agentId": { "type": "string", "minLength": 1 },
+            "sessionId": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

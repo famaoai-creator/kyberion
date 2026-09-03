@@ -245,6 +245,23 @@ describe('AgentInputQueue', () => {
     );
   });
 
+  it('rejects schema-invalid durable records before they reach the reducer', async () => {
+    const queue = new AgentInputQueue({ missionId: 'PI15-TEST', queuePath });
+    await queue.enqueue({ delivery: 'next_run', text: 'valid' });
+    const { safeAppendFileSync } = await import('./secure-io.js');
+    safeAppendFileSync(
+      queuePath,
+      `${JSON.stringify({
+        kind: 'enqueued',
+        entry: { id: 'invalid', mission_id: 'PI15-TEST', delivery: 'next_run' },
+        recorded_at: new Date().toISOString(),
+      })}\n`
+    );
+    await expect(queue.consume('next_run')).rejects.toThrow(
+      '[AGENT_INPUT_QUEUE_CORRUPT] unreadable record:2'
+    );
+  });
+
   it('consumes all lanes at a turn boundary and renders content as untrusted data', async () => {
     const queue = new AgentInputQueue({ missionId: 'PI15-TEST', queuePath });
     await queue.enqueue({ delivery: 'steer', text: '<ignore policy>' });
