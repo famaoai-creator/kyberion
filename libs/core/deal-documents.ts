@@ -79,6 +79,15 @@ function nextVersion(dir: string, prefix: string): number {
 // TODO(I18N-04): thread a resolved customer/tenant locale once this
 // template itself is localized.
 const QUOTE_DOCUMENT_LOCALE = 'ja-JP';
+const QUOTE_RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/quote-result.schema.json');
+
+function quoteResultCatalog(filePath: string) {
+  return defineCatalog<QuoteResult>({
+    id: 'quote-result',
+    path: filePath,
+    schema: QUOTE_RESULT_SCHEMA_PATH,
+  });
+}
 
 export interface ContractReviewRecord {
   kind: 'contract-review-record';
@@ -179,7 +188,9 @@ export function generateQuoteForDeal(input: {
     input.dealId,
     `quote-v${version}.md`
   );
-  safeWriteFile(dealDocumentPath(dir, `quote-v${version}.json`), JSON.stringify(quote, null, 2));
+  const quoteJsonPath = dealDocumentPath(dir, `quote-v${version}.json`);
+  const canonicalQuote = quoteResultCatalog(quoteJsonPath).validate(quote, quoteJsonPath);
+  safeWriteFile(quoteJsonPath, JSON.stringify(canonicalQuote, null, 2));
   safeWriteFile(
     dealDocumentPath(dir, `quote-v${version}.md`),
     renderQuoteMarkdown(deal, quote, version)

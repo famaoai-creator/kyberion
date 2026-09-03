@@ -9349,6 +9349,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/quote-result.schema.json",
+      "tier": "public",
+      "size": 1506,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/realtime-voice-conversation-session.schema.json",
       "tier": "public",
       "size": 1377,
