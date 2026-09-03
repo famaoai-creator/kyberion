@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/service-pid-registry.schema.json",
+  "title": "Service PID Registry",
+  "description": "Persisted service process IDs used only for liveness-aware process selection.",
+  "type": "object",
+  "patternProperties": {
+    "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    }
+  },
+  "additionalProperties": false
+}
