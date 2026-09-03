@@ -959,6 +959,10 @@
       "types": "./dist/brand-tokens.d.ts",
       "default": "./dist/brand-tokens.js"
     },
+    "./golden-output": {
+      "types": "./dist/golden-output.d.ts",
+      "default": "./dist/golden-output.js"
+    },
     "./fs-primitives": {
       "types": "./dist/fs-primitives.d.ts",
       "default": "./dist/fs-primitives.js"

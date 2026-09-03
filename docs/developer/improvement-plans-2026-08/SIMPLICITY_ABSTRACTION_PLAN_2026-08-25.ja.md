@@ -14579,6 +14579,12 @@ SX-03／SX-04 のdesign token読込を再監査し、生成scriptが`readJson`�
 
 検証: brand token／design token／creative design **4 files / 35 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 720
+
+SX-03／SX-04 のgolden output checkerを再監査し、pipeline registryとresult snapshotがraw `readJson`とscript内のローカル型で読み込まれ、registry由来のpipeline pathも直接連結されていた残存を修正した。専用schemaとcore canonical loader／公開サブパスを追加し、registry／snapshotのenvelope、ID、SHA-256、repo-relative pathを共通境界で検証してからgolden実行・比較へ渡すようにした。任意形状のpipeline result投影、volatile pathのelision、missing snapshotの初回生成、rebaseline semanticsは維持している。
+
+検証: golden output loader **1 file / 2 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
