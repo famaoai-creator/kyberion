@@ -11,6 +11,7 @@ import {
   loadArtifactBundle,
   loadLatestArtifactBundleForMission,
   saveArtifactBundle,
+  writeArtifactBundleAtPath,
 } from './artifact-bundle.js';
 
 const missionId = 'MSN-ARTIFACT-BUNDLE-TEST-001';
@@ -100,5 +101,21 @@ describe('artifact-bundle', () => {
     } finally {
       fs.rmSync(boundaryRoot, { recursive: true, force: true });
     }
+  });
+
+  it('rejects an invalid bundle before persisting it', () => {
+    const target = pathResolver.sharedTmp('artifact-bundle/invalid.json');
+    const bundle = buildBundleFromOutcomeContract({
+      missionId,
+      outcomeContract: { outcome_id: 'outcome-invalid', expected_artifacts: [] },
+    });
+
+    expect(() =>
+      writeArtifactBundleAtPath(target, {
+        ...bundle,
+        status: 'approved',
+      } as unknown as typeof bundle)
+    ).toThrow(/Invalid artifact bundle|Invalid catalog artifact-bundle/);
+    expect(safeExistsSync(target)).toBe(false);
   });
 });

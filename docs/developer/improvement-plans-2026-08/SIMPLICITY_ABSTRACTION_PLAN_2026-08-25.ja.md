@@ -15175,6 +15175,18 @@ focused mission pointer、repair readの既存semanticsは変更していない�
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
 state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 770
+
+SX-03／SX-04／SX-10／SX-11 のartifact bundle persistenceを再監査し、bundle saveはAJV／approval consistencyを
+事前検証していた一方、`updated_at` を付加した最終 payloadだけがread側の専用 catalogを通らず raw writeされていたため
+修正した。mission path／bundle id boundary、artifact fulfillment、approval status遷移、bundleをmission evidenceに
+保持する既存責務を維持し、最終 envelopeをschema-bound writerで検証してから保存する。schema-invalid bundleが
+ファイルを生成しない回帰も追加した。
+
+検証: artifact bundle **1 file / 4 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
+state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
