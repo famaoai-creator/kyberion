@@ -1,6 +1,13 @@
+import * as path from 'node:path';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 
 export interface ServiceBindingRecord {
   binding_id: string;
@@ -29,7 +36,25 @@ const serviceBindingRecordCatalog = defineCatalog<ServiceBindingRecord>({
 });
 
 function bindingPath(bindingId: string): string {
-  return `${BINDING_DIR}/${bindingId}.json`;
+  const directory = path.resolve(BINDING_DIR);
+  const candidate = path.resolve(directory, `${bindingId}.json`);
+  const relative = path.relative(directory, candidate).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] service binding path escapes its directory: ${bindingId}`
+    );
+  }
+  return assertSafeRepositoryPath(candidate, {
+    allowMissingLeaf: true,
+  });
+}
+
+function serviceBindingRecordCatalogAtPath(filePath: string) {
+  return defineCatalog<ServiceBindingRecord>({
+    id: 'service-binding-record',
+    path: filePath,
+    schema: BINDING_SCHEMA_PATH,
+  });
 }
 
 export function validateServiceBindingRecord(value: unknown): value is ServiceBindingRecord {
@@ -42,16 +67,17 @@ export function validateServiceBindingRecord(value: unknown): value is ServiceBi
 }
 
 export function saveServiceBindingRecord(record: ServiceBindingRecord): string {
+  const filePath = bindingPath(record.binding_id);
+  let validated: ServiceBindingRecord;
   try {
-    serviceBindingRecordCatalog.validate(record);
+    validated = serviceBindingRecordCatalogAtPath(filePath).validate(record, filePath);
   } catch (error) {
     throw new Error(
       `Invalid service binding record: ${error instanceof Error ? error.message : String(error)}`
     );
   }
   if (!safeExistsSync(BINDING_DIR)) safeMkdir(BINDING_DIR, { recursive: true });
-  const filePath = bindingPath(record.binding_id);
-  safeWriteFile(filePath, JSON.stringify(record, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return filePath;
 }
 
@@ -59,11 +85,7 @@ export function loadServiceBindingRecord(bindingId: string): ServiceBindingRecor
   const filePath = bindingPath(bindingId);
   if (!safeExistsSync(filePath)) return null;
   try {
-    return defineCatalog<ServiceBindingRecord>({
-      id: 'service-binding-record',
-      path: filePath,
-      schema: BINDING_SCHEMA_PATH,
-    }).load();
+    return serviceBindingRecordCatalogAtPath(filePath).load();
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
     throw error;

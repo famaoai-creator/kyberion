@@ -108,6 +108,43 @@ describe('project and artifact registries', () => {
     );
   });
 
+  it('persists the canonical service binding payload returned by the catalog', () => {
+    saveServiceBindingRecord({
+      binding_id: 'BIND-TEST-CANONICAL',
+      service_type: 'github',
+      scope: 'repository',
+      target: 'org/repo',
+      allowed_actions: ['read'],
+      secret_refs: [],
+      approval_policy: { read: 'allowed' },
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveServiceBindingRecord>[0]);
+
+    const persisted = JSON.parse(
+      String(
+        safeReadFile(pathResolver.shared('runtime/service-bindings/BIND-TEST-CANONICAL.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.binding_id).toBe('BIND-TEST-CANONICAL');
+  });
+
+  it('rejects a service binding id that escapes the binding directory', () => {
+    expect(() =>
+      saveServiceBindingRecord({
+        binding_id: '../outside',
+        service_type: 'github',
+        scope: 'repository',
+        target: 'org/repo',
+        allowed_actions: ['read'],
+        secret_refs: [],
+        approval_policy: { read: 'allowed' },
+      })
+    ).toThrow(/escapes its directory/);
+  });
+
   it('persists artifact ownership and attaches it to a task session', () => {
     const session = createTaskSession({
       sessionId: 'TSK-TEST-ARTIFACT',

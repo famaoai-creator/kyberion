@@ -64,6 +64,14 @@ const missionSeedRecordCatalog = defineCatalog<MissionSeedRecord>({
   schema: SEED_SCHEMA_PATH,
 });
 
+function missionSeedRecordCatalogAtPath(filePath: string) {
+  return defineCatalog<MissionSeedRecord>({
+    id: 'mission-seed-record',
+    path: filePath,
+    schema: SEED_SCHEMA_PATH,
+  });
+}
+
 function seedDirs(rootDir = pathResolver.rootDir()): string[] {
   const dirs: string[] = [];
   const customerSeedDir = customerResolver.customerRoot('mission-seeds', process.env, rootDir);
@@ -94,17 +102,19 @@ export function saveMissionSeedRecord(
   record: MissionSeedRecord,
   options: { rootDir?: string } = {}
 ): string {
+  const rootDir = options.rootDir || pathResolver.rootDir();
+  const filePath = missionSeedRecordPath(record.seed_id, rootDir);
+  let validated: MissionSeedRecord;
   try {
-    missionSeedRecordCatalog.validate(record);
+    validated = missionSeedRecordCatalogAtPath(filePath).validate(record, filePath);
   } catch (error) {
     throw new Error(
       `Invalid mission seed record: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  const directory = seedDir(options.rootDir || pathResolver.rootDir());
+  const directory = seedDir(rootDir);
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
-  const filePath = missionSeedRecordPath(record.seed_id, options.rootDir || pathResolver.rootDir());
-  safeWriteFile(filePath, JSON.stringify(record, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return filePath;
 }
 
@@ -121,11 +131,7 @@ export function loadMissionSeedRecord(
     }
     if (!safeExistsSync(filePath)) continue;
     try {
-      return defineCatalog<MissionSeedRecord>({
-        id: 'mission-seed-record',
-        path: filePath,
-        schema: SEED_SCHEMA_PATH,
-      }).load();
+      return missionSeedRecordCatalogAtPath(filePath).load();
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('Invalid catalog ')) continue;
       throw error;
