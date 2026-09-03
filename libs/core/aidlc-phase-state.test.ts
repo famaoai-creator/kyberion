@@ -190,4 +190,16 @@ describe('aidlc-phase-state (HO-02 Task 1)', () => {
     );
     expect(loadAiDlcPhaseState(missionId, baseDir)).toBeNull();
   });
+
+  it('rejects schema-invalid state before persisting it', () => {
+    const baseDir = path.join(
+      pathResolver.active('shared/tmp/tests'),
+      `aidlc-save-invalid-${Date.now()}`
+    );
+    const state = createAiDlcPhaseState('MSN-AIDLC-SAVE-INVALID', { now: NOW });
+
+    expect(() =>
+      saveAiDlcPhaseState({ ...state, attempts: null } as unknown as typeof state, baseDir)
+    ).toThrow(/Invalid catalog aidlc-phase-state/);
+  });
 });

@@ -227,8 +227,9 @@ export function aiDlcPhaseStatePath(missionId: string, baseDir?: string): string
 
 export function saveAiDlcPhaseState(state: AiDlcPhaseState, baseDir?: string): string {
   const filePath = aiDlcPhaseStatePath(state.mission_id, baseDir);
+  const validated = aiDlcPhaseStateCatalog(filePath).validate(state, filePath);
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, `${JSON.stringify(state, null, 2)}\n`);
+  safeWriteFile(filePath, `${JSON.stringify(validated, null, 2)}\n`);
   return filePath;
 }
 
