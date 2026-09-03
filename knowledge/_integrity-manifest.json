@@ -7987,6 +7987,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-closure-audit-record.schema.json",
+      "tier": "public",
+      "size": 3472,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-context-pack.schema.json",
       "tier": "public",
       "size": 17796,
@@ -9196,6 +9202,12 @@
       "path": "product/schemas/runtime-surface-manifest.schema.json",
       "tier": "public",
       "size": 1451,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/scoped-artifact-index-entry.schema.json",
+      "tier": "public",
+      "size": 1164,
       "type": "json"
     },
     {

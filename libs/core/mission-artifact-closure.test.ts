@@ -136,6 +136,17 @@ describe('mission-artifact-closure (AL-03)', () => {
       path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'),
       path.join(policyTarget, 'agent-policies.yaml')
     );
+    const schemaTarget = path.join(tmpRoot, 'knowledge', 'product', 'schemas');
+    fs.mkdirSync(schemaTarget, { recursive: true });
+    for (const schema of [
+      'scoped-artifact-index-entry.schema.json',
+      'mission-closure-audit-record.schema.json',
+    ]) {
+      fs.copyFileSync(
+        path.join(REPO_ROOT, 'knowledge/product/schemas', schema),
+        path.join(schemaTarget, schema)
+      );
+    }
 
     mod = await import('./mission-artifact-closure.js');
   });

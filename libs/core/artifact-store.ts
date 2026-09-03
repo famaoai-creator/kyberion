@@ -3,6 +3,7 @@ import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { withExecutionContext } from './authority.js';
 import {
   RETENTION_ARTIFACT_CLASSES,
@@ -11,6 +12,7 @@ import {
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
@@ -161,6 +163,28 @@ export interface WriteScopedArtifactResult {
 }
 
 export const SCOPED_ARTIFACT_INDEX_FILENAME = 'artifacts-index.jsonl';
+
+const SCOPED_ARTIFACT_INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/scoped-artifact-index-entry.schema.json'
+);
+
+/** Canonical catalog for persisted scope-local artifact index rows. */
+export function scopedArtifactIndexCatalog(
+  filePath: string
+): GovernedCatalog<ScopedArtifactIndexEntry> {
+  return defineCatalog<ScopedArtifactIndexEntry>({
+    id: 'scoped-artifact-index-entry',
+    path: filePath,
+    schema: SCOPED_ARTIFACT_INDEX_SCHEMA_PATH,
+  });
+}
+
+/** Reject a directory or symlink before a persisted artifact index is used. */
+export function ensureRegularScopedArtifactIndex(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`scoped artifact index must be a regular file: ${filePath}`);
+  }
+}
 
 function sanitizeScopeSegment(value: string, label: string): string {
   const cleaned = String(value ?? '')
@@ -384,11 +408,14 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
     scope_kind: kind,
     written_at: nowIso(),
   };
+  const catalog = scopedArtifactIndexCatalog(indexPath);
+  const validatedEntry = catalog.validate(entry, indexPath);
 
   const performWrite = (): void => {
     if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
+    ensureRegularScopedArtifactIndex(indexPath);
     safeWriteFile(absolutePath, data);
-    appendJsonLine(indexPath, entry);
+    appendJsonLine(indexPath, validatedEntry);
   };
   if (input.role) withRole(input.role, performWrite);
   else performWrite();
@@ -408,8 +435,11 @@ export function readScopedArtifactIndex(
 ): ScopedArtifactIndexEntry[] {
   const { base } = resolveScopeBase(scope, tier ?? 'confidential');
   const indexPath = path.join(base, 'artifacts', SCOPED_ARTIFACT_INDEX_FILENAME);
-  return readJsonLines<ScopedArtifactIndexEntry>(
-    assertSafeRepositoryPath(indexPath, { allowMissingLeaf: true }),
-    { map: (value) => parseScopedArtifactIndexEntry(value) }
-  );
+  const safeIndexPath = assertSafeRepositoryPath(indexPath, { allowMissingLeaf: true });
+  ensureRegularScopedArtifactIndex(safeIndexPath);
+  const catalog = scopedArtifactIndexCatalog(safeIndexPath);
+  return readJsonLines<ScopedArtifactIndexEntry>(safeIndexPath, {
+    map: (value, lineNumber) =>
+      parseScopedArtifactIndexEntry(catalog.validate(value, `${safeIndexPath}:${lineNumber}`)),
+  });
 }

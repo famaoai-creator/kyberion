@@ -14147,6 +14147,12 @@ SX-03／SX-04 のtenant ingest asset ledgerを再監査し、dedup／lineage／s
 
 検証: ingest asset ledger／tenant ingest curation **2 files / 18 tests passed**、対象lint、typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 648
+
+SX-03／SX-04 のAL-02 scoped artifact indexとAL-03 mission artifact closureを再監査し、artifact indexのappend／readは`readJsonLines`とdomain parserに分かれていたものの、persisted row schema・path-bound catalog・regular-file境界がなく、closure auditも型なしのJSONL appendに残っていた残存を修正した。scoped artifact index専用schemaとmission closure audit専用schemaを追加し、artifact write／index read／mission closure rewrite前のrow validation、およびclosure audit appendのschema validation・regular-file検査を統合した。malformed／schema-invalid index rowの既存fail-closed、closure時の不正row保持、disposable class GC、bundle失敗時の`.git`保持、idempotencyとNHI retirementの既存semanticsは維持している。
+
+検証: artifact store／mission artifact closure **2 files / 21 tests passed**、mission lifecycle **1 file / 26 tests passed**、対象lint、typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
