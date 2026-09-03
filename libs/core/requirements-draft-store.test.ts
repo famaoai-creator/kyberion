@@ -26,6 +26,7 @@ import {
   evaluateCustomerSignoffGate,
   evaluateRequirementsCompletenessGate,
   readRequirementsDraft,
+  readRequirementsDraftAtPath,
   recordCustomerSignoff,
   saveRequirementsDraft,
   writeRequirementsDraftAtPath,
@@ -108,6 +109,28 @@ describe('requirements-draft-store', () => {
       expect(() => readRequirementsDraft('MSN-INVALID')).toThrow(
         /Invalid catalog requirements-draft/
       );
+    });
+
+    it('loads an explicitly supplied draft through the same schema boundary', () => {
+      const file = path.join(tmpDir, 'explicit-requirements-draft.json');
+      fs.writeFileSync(
+        file,
+        JSON.stringify({
+          version: 'v1',
+          project_name: 'Explicit project',
+          ...sampleExtracted,
+          generated_at: new Date().toISOString(),
+        })
+      );
+
+      expect(readRequirementsDraftAtPath(file)?.project_name).toBe('Explicit project');
+    });
+
+    it('rejects a schema-invalid explicitly supplied draft', () => {
+      const file = path.join(tmpDir, 'explicit-invalid-requirements-draft.json');
+      fs.writeFileSync(file, JSON.stringify({ version: 'v1', project_name: 'Broken' }));
+
+      expect(() => readRequirementsDraftAtPath(file)).toThrow(/Invalid catalog requirements-draft/);
     });
 
     it('preserves the parse error contract for malformed drafts', () => {

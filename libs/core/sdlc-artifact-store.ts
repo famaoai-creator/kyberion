@@ -67,7 +67,12 @@ function bumpVersion(previous?: string): string {
 
 function readArtifact<T>(missionId: string, filename: string, schemaPath?: string): T | null {
   const file = artifactPath(missionId, filename);
-  if (!file || !safeExistsSync(file)) return null;
+  return file ? readArtifactAtPath<T>(file, filename, schemaPath) : null;
+}
+
+function readArtifactAtPath<T>(filePath: string, filename: string, schemaPath?: string): T | null {
+  const file = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(file)) return null;
   if (schemaPath) {
     return defineCatalog<T>({
       id: `sdlc-${filename.replace(/\.json$/u, '')}`,
@@ -117,6 +122,11 @@ export interface SaveDesignSpecParams {
 
 export function readDesignSpec(missionId: string): DesignSpec | null {
   return readArtifact<DesignSpec>(missionId, DESIGN_FILE, DESIGN_SCHEMA_PATH);
+}
+
+/** Load an explicitly supplied design spec through the canonical schema boundary. */
+export function readDesignSpecAtPath(filePath: string): DesignSpec | null {
+  return readArtifactAtPath<DesignSpec>(filePath, DESIGN_FILE, DESIGN_SCHEMA_PATH);
 }
 
 export function saveDesignSpec(params: SaveDesignSpecParams): DesignSpec {
