@@ -5,20 +5,15 @@ import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { knowledgeWritePathFor } from '@agent/core/knowledge-scope';
 import {
   applyKnowledgeRankingWeightProposal,
+  loadKnowledgeRankingWeightProposal,
   proposeKnowledgeRankingWeightRecalculation,
-  type KnowledgeRankingWeightProposal,
 } from '@agent/core/knowledge-weight-recalculation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordHumanKnowledgeFeedback } from '@agent/core/src/knowledge-feedback-loop';
 import { resolveTenant } from '@agent/core/tenant-registry';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeWriteFile,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(args: string[], name: string): string | undefined {
@@ -62,12 +57,7 @@ export const main = defineScript({
       if (!safeExistsSync(proposalPath)) {
         throw new Error(`[KNOWLEDGE_WEIGHT_INVALID] proposal not found: ${proposalPathArg}`);
       }
-      if (!safeLstat(proposalPath).isFile()) {
-        throw new Error(
-          `[KNOWLEDGE_WEIGHT_INVALID] proposal must be a regular file: ${proposalPathArg}`
-        );
-      }
-      const proposal = readJson<KnowledgeRankingWeightProposal>(proposalPath);
+      const proposal = loadKnowledgeRankingWeightProposal(proposalPath);
       if (!proposal?.scope?.tenant_slug || !isValidTenantSlug(proposal.scope.tenant_slug)) {
         throw new Error('[SCOPE_CONTEXT_INVALID] proposal must contain a registered tenant slug');
       }

@@ -1,9 +1,16 @@
 import { createHash } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { clamp } from './foundation/text.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { auditChain } from './audit-chain.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   loadKnowledgeUsageAggregate,
   type KnowledgeUsageAggregateEntry,
@@ -71,6 +78,29 @@ function proposalPath(scope: ScopeContext): string {
   );
 }
 
+const KNOWLEDGE_WEIGHT_PROPOSAL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-ranking-weight-proposal.schema.json'
+);
+
+function knowledgeWeightProposalCatalog(filePath: string) {
+  return defineCatalog<KnowledgeRankingWeightProposal>({
+    id: 'knowledge-ranking-weight-proposal',
+    path: filePath,
+    schema: KNOWLEDGE_WEIGHT_PROPOSAL_SCHEMA_PATH,
+  });
+}
+
+/** Load a persisted proposal through the shared schema/path boundary. */
+export function loadKnowledgeRankingWeightProposal(
+  filePath: string
+): KnowledgeRankingWeightProposal {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`Knowledge weight proposal must be a regular file: ${safePath}`);
+  }
+  return knowledgeWeightProposalCatalog(safePath).load();
+}
+
 function summarizeUsage(entries: KnowledgeUsageAggregateEntry[]) {
   const used = entries.reduce((sum, entry) => sum + Math.max(0, entry.used_count || 0), 0);
   const notUsed = entries.reduce((sum, entry) => sum + Math.max(0, entry.not_used_count || 0), 0);
@@ -136,7 +166,8 @@ export function proposeKnowledgeRankingWeightRecalculation(
   };
   if (options.persist !== false) {
     const outputPath = proposalPath(tenantScope);
-    safeWriteFile(outputPath, `${JSON.stringify(proposal, null, 2)}\n`, { mkdir: true });
+    const persisted = knowledgeWeightProposalCatalog(outputPath).validate(proposal, outputPath);
+    safeWriteFile(outputPath, `${JSON.stringify(persisted, null, 2)}\n`, { mkdir: true });
     proposal.output_path = outputPath;
   }
   return proposal;

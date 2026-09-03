@@ -7645,6 +7645,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/knowledge-ranking-weight-proposal.schema.json",
+      "tier": "public",
+      "size": 2373,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/knowledge-scope-check.schema.json",
       "tier": "public",
       "size": 903,

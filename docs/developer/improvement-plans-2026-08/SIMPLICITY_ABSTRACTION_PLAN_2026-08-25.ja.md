@@ -14249,6 +14249,12 @@ SX-03／LC-02 のmax-file-lines policy readerを再監査し、CIのsource line 
 
 検証: max-file-lines loader／checker **1 file / 2 tests passed**、実CLI、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 665
+
+SX-03／SX-04 のknowledge weight proposal reader／writerを再監査し、tenant feedbackから生成される提案がraw JSON write、`knowledge weights apply`側の局所parse、承認評価へ分岐していた残存を修正した。proposal専用schemaを追加し、生成時のwriteとapply時のreadをcore canonical catalogへ統合した。confidential tenant scope、approval_required、sample／status、bounded weightsを承認前に検証し、human approval、stale proposal拒否、governance backup／history、audit記録の既存semanticsは維持している。
+
+検証: knowledge weight proposal／CLI **2 files / 5 tests passed**、knowledge index生成、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
