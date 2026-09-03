@@ -4,12 +4,35 @@ import { parseSafeJsonObjectValue } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 
+const MISSION_NEXT_TASKS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-next-tasks.schema.json'
+);
+
 function missionNextTasksCatalog(filePath: string) {
   return defineCatalog<Array<Record<string, unknown>>>({
     id: 'mission-next-tasks',
     path: filePath,
-    schema: pathResolver.knowledge('product/schemas/mission-next-tasks.schema.json'),
+    schema: MISSION_NEXT_TASKS_SCHEMA_PATH,
   });
+}
+
+const missionNextTasksValidator = defineCatalog<Array<Record<string, unknown>>>({
+  id: 'mission-next-tasks',
+  path: MISSION_NEXT_TASKS_SCHEMA_PATH,
+  schema: MISSION_NEXT_TASKS_SCHEMA_PATH,
+});
+
+/** Validate the task-board envelope before a lifecycle mutation persists it. */
+export function validateMissionNextTaskObjects(
+  value: unknown,
+  sourcePath = 'NEXT_TASKS.json'
+): Array<Record<string, unknown>> {
+  const validated = missionNextTasksValidator.validate(value, sourcePath);
+  const parsed = parseMissionNextTaskObjects(validated, sourcePath);
+  if (!parsed) {
+    throw new Error(`[MISSION_NEXT_TASKS] invalid task object in ${sourcePath}`);
+  }
+  return parsed;
 }
 
 /** The fields needed by mission gates and progress projections. */
