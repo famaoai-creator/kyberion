@@ -15628,6 +15628,17 @@ keyは利用可能として扱わず fail-closed にした。API key／endpoint 
 この追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、
 SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 809
+
+SX-03／SX-08／SX-10 のPresence demo scriptを再監査し、成功HTTP responseを`response.json()`の結果のまま
+console outputへ渡していた残存を修正した。voice hub ingest／presence timelineのresponse rootをsafe JSON objectとして
+検証し、primitive・array・nested dangerous keyは表示前に拒否するようにした。既存のlocal endpoint、request payload、HTTP
+status error、demo output semanticsは維持し、両demoのmalformed response回帰を追加した。
+
+検証: Presence demo response boundary **1 file / 2 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、
+SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

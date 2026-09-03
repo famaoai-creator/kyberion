@@ -1,4 +1,9 @@
+import { parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from '../lib/harness.js';
+
+export function parsePresenceTimelineResponse(payload: unknown): Record<string, unknown> {
+  return parseSafeJsonObjectValue(payload, 'presence timeline response');
+}
 
 async function main() {
   const timeline = {
@@ -33,7 +38,7 @@ async function main() {
     throw new Error(`Timeline dispatch failed: HTTP ${response.status}`);
   }
 
-  const body = await response.json();
+  const body = parsePresenceTimelineResponse(await response.json());
   console.log(JSON.stringify(body, null, 2));
 }
 

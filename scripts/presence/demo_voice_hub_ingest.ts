@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from '../lib/harness.js';
+
+export function parseVoiceHubIngestResponse(payload: unknown): Record<string, unknown> {
+  return parseSafeJsonObjectValue(payload, 'voice hub ingest response');
+}
 
 async function main() {
   const response = await fetch('http://127.0.0.1:3032/api/ingest-text', {
@@ -18,7 +23,7 @@ async function main() {
     throw new Error(`Voice hub ingest failed: HTTP ${response.status}`);
   }
 
-  const body = await response.json();
+  const body = parseVoiceHubIngestResponse(await response.json());
   console.log(JSON.stringify(body, null, 2));
 }
 
