@@ -34,7 +34,10 @@ import {
 import { loadState } from './mission-state.js';
 import { nowIso } from './foundation/time.js';
 import type { IntentReconciliationInput } from './intent-reconciliation.js';
-import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+import {
+  loadMissionNextTaskObjectsAtPath,
+  validateMissionNextTaskObjects,
+} from './mission-next-task-reader.js';
 
 function safeMissionDir(missionDir: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(missionDir, { allowMissingLeaf });
@@ -381,7 +384,8 @@ export function writeMissionNextTasks(
   tasks: Array<Record<string, unknown>>
 ): void {
   const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
-  safeWriteFile(nextTasksPath, JSON.stringify(tasks, null, 2));
+  const validated = validateMissionNextTaskObjects(tasks, nextTasksPath);
+  safeWriteFile(nextTasksPath, JSON.stringify(validated, null, 2));
 }
 
 export const MISSION_TASK_COMPLETED_STATUSES = new Set([

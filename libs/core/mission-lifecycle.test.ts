@@ -41,6 +41,7 @@ import {
   reconcileLifecycleClosureCriteria,
   tryAutoCompleteTaskFromEvidence,
   verifyMission,
+  writeMissionNextTasks,
 } from './mission-lifecycle.js';
 
 const missionId = 'MSN-LIFECYCLE-GATE-001';
@@ -277,6 +278,15 @@ describe('mission lifecycle finish gate', () => {
         deliverable: 'evidence/task-1.md',
       },
     ]);
+  });
+
+  it('validates task-board writes through the shared task schema', () => {
+    expect(() =>
+      writeMissionNextTasks(missionPath, [
+        { task_id: 'task-1', status: 'planned' },
+        42 as unknown as Record<string, unknown>,
+      ])
+    ).toThrow('Invalid catalog mission-next-tasks');
   });
 
   it('resolves circular lifecycle closure criteria from verify and distill history', () => {
