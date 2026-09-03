@@ -10,7 +10,7 @@ import {
 } from './untrusted-content.js';
 import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
-import { getInjectionSignalPath } from './injection-signal.js';
+import { getInjectionSignalPath, writeInjectionSignalAtPath } from './injection-signal.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile, safeRmSync } from './secure-io.js';
 
@@ -116,6 +116,16 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
   });
 
   describe('Taint propagation & policy downgrades', () => {
+    it('rejects an invalid signal before persisting it', () => {
+      expect(() =>
+        writeInjectionSignalAtPath(getInjectionSignalPath(), {
+          injection_suspected: true,
+          scopes: [],
+          unexpected: true,
+        } as unknown as { injection_suspected: boolean; scopes: string[] })
+      ).toThrow(/Invalid catalog injection-signal/);
+    });
+
     it('fails closed when the persisted injection signal is not an object', () => {
       const signalPath = getInjectionSignalPath();
       safeWriteFile(signalPath, JSON.stringify(['malformed']));
