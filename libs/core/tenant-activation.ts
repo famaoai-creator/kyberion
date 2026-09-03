@@ -3,7 +3,6 @@ import { customerDirForSlug } from './customer-resolver.js';
 import { resolveTenant } from './tenant-registry.js';
 import { loadOrganizationOperationalState } from './organization-operating-model.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import {
@@ -72,6 +71,9 @@ export interface TenantActivationRecord {
 
 const TENANT_ACTIVATION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/tenant-activation.schema.json'
+);
+const ONBOARDING_CONTEXT_BINDING_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/onboarding-context-binding.schema.json'
 );
 
 function tenantActivationCatalog(filePath: string) {
@@ -159,8 +161,13 @@ function readBinding(customerSlug: string, rootDir: string): Record<string, unkn
   const filePath = bindingPath(customerSlug, rootDir);
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = readJson<unknown>(filePath);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+    if (!safeLstat(safeFilePath).isFile()) return null;
+    return defineCatalog<Record<string, unknown>>({
+      id: 'onboarding-context-binding',
+      path: safeFilePath,
+      schema: ONBOARDING_CONTEXT_BINDING_SCHEMA_PATH,
+    }).load();
   } catch {
     return null;
   }
