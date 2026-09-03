@@ -1156,6 +1156,9 @@ export function validateTaskSession(session: unknown): ValidationResult<TaskSess
 }
 
 export function saveTaskSession(session: TaskSession, options: { rootDir?: string } = {}): string {
+  const rootDir = options.rootDir || pathResolver.rootDir();
+  const directory = taskSessionDir(rootDir);
+  const filePath = taskSessionPath(session.session_id, rootDir);
   if (session.status === 'completed') {
     const evidenceRefs = collectTaskSessionEvidenceRefs(session);
     const evidenceTexts = collectTaskSessionEvidenceTexts(session);
@@ -1191,17 +1194,23 @@ export function saveTaskSession(session: TaskSession, options: { rootDir?: strin
       throw new Error(`Cannot complete task session: ${completionValidation.reason}`);
     }
   }
-  const result = validateTaskSession(session);
+  let canonicalSession: TaskSession;
+  try {
+    canonicalSession = taskSessionCatalog(filePath).validate(session, filePath);
+  } catch (error) {
+    throw new Error(
+      `Invalid task session: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
+  }
+  const result = validateTaskSession(canonicalSession);
   if (!result.valid) {
     throw new Error(`Invalid task session: ${result.errors.join('; ')}`);
   }
-  const rootDir = options.rootDir || pathResolver.rootDir();
-  const directory = taskSessionDir(rootDir);
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
-  const filePath = taskSessionPath(session.session_id, rootDir);
-  safeWriteFile(filePath, JSON.stringify(session, null, 2));
-  if (session.status === 'completed') {
-    recordTaskSessionCompletionLearning(session);
+  safeWriteFile(filePath, `${JSON.stringify(canonicalSession, null, 2)}\n`);
+  if (canonicalSession.status === 'completed') {
+    recordTaskSessionCompletionLearning(canonicalSession);
   }
   return filePath;
 }

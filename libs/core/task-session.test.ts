@@ -210,6 +210,31 @@ describe('task-session', () => {
     expect(getActiveTaskSession('presence')?.session_id).toBeTruthy();
   });
 
+  it('persists the task-session catalog canonical payload', () => {
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-CANONICAL',
+      surface: 'presence',
+      taskType: 'analysis',
+      status: 'planning',
+      goal: {
+        summary: 'canonical task session',
+        success_condition: 'the session is saved without catalog metadata',
+      },
+    });
+    const sessionWithMetadata = session as TaskSession & { $schema: string };
+    sessionWithMetadata.$schema = 'https://example.invalid/task-session.json';
+
+    saveTaskSession(sessionWithMetadata);
+    const filePath = pathResolver.shared('runtime/task-sessions/TSK-TEST-CANONICAL.json');
+    const persisted = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as Record<
+      string,
+      unknown
+    >;
+
+    expect(persisted.$schema).toBeUndefined();
+    expect(loadTaskSession('TSK-TEST-CANONICAL')?.session_id).toBe('TSK-TEST-CANONICAL');
+  });
+
   it('persists iMessage-backed task sessions', () => {
     const session = createTaskSession({
       sessionId: 'TSK-TEST-IMESSAGE',
