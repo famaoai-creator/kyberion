@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mission-graph-run-journal-event.schema.json",
+  "title": "Mission graph run journal event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "sequence", "run_id", "mission_id", "event", "timestamp", "payload"],
+  "properties": {
+    "version": { "const": 1 },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "event": { "enum": ["graph_started", "node_state", "graph_finished"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "payload": { "type": "object", "additionalProperties": true }
+  }
+}
