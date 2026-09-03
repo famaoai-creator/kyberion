@@ -15,6 +15,7 @@ import {
   getWritableVoiceProfileRegistryForTier,
   getVoiceProfileRecord,
   getVoiceProfileRegistry,
+  loadVoiceProfileRegistryAtPath,
   listVoiceProfiles,
   resetVoiceProfileRegistryCache,
 } from './voice-profile-registry.js';
@@ -292,5 +293,22 @@ describe('voice profile registry', () => {
 
     const writable = getWritableVoiceProfileRegistryForTier('personal');
     expect(writable.registry).toEqual({ version: 'test', default_profile_id: '', profiles: [] });
+  });
+
+  it('loads a path-bound registry with the same empty-overlay contract', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+
+    expect(loadVoiceProfileRegistryAtPath(overridePath, { allowEmpty: true })).toEqual({
+      version: 'test',
+      default_profile_id: '',
+      profiles: [],
+    });
+    expect(() => loadVoiceProfileRegistryAtPath(overridePath)).toThrow(
+      /Invalid catalog voice-profile-registry/
+    );
   });
 });

@@ -102,6 +102,18 @@ function readRegistryFile(
   }
 }
 
+/** Load one persisted registry through the shared schema and path boundary. */
+export function loadVoiceProfileRegistryAtPath(
+  registryPath: string,
+  options: { allowEmpty?: boolean } = {}
+): VoiceProfileRegistry {
+  return readRegistryFile(
+    registryPath,
+    'voice profile registry',
+    options.allowEmpty ? VOICE_PROFILE_OVERLAY_SCHEMA_PATH : VOICE_PROFILE_SCHEMA_PATH
+  );
+}
+
 function loadRegistryDirectory(
   dirPath: string,
   fallbackDefaultProfileId = ''
