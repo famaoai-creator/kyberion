@@ -30,13 +30,14 @@ import { t as coreT } from '@agent/core/t';
 import type { VocabularyKey } from '@agent/core/t';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import { loadMobileAppProfileIndex, loadWebAppProfileIndex } from '@agent/core/app-profiles';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import { createProjectTrustApprovalRequest } from '@agent/core/project-trust';
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import chalk from 'chalk';
-import { nowIso, parseSafeJsonInput, readJson, readTextFile } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   handleCalendarWorkflowCommand,
@@ -270,7 +271,8 @@ function printMissionContextBanner(missionId?: string) {
   }
 
   try {
-    const state = readJson<{ status?: string }>(statePath);
+    const state = loadStateAtPath(statePath);
+    if (!state) return;
     process.stderr.write(
       chalk.cyan(
         `\n🧠 BRAIN: Context hydrated from mission "${missionId}" (Status: ${state.status || 'unknown'})\n`
