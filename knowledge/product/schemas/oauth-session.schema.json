@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/oauth-session.schema.json",
+  "title": "Pending OAuth Session",
+  "description": "Short-lived OAuth initiation and callback state stored under active/shared/tmp/oauth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["serviceId", "state", "scopes", "createdAt"],
+  "properties": {
+    "serviceId": { "type": "string", "minLength": 1 },
+    "state": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,256}$" },
+    "codeVerifier": { "type": "string", "minLength": 1 },
+    "redirectUri": { "type": "string", "minLength": 1 },
+    "scopes": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "callbackStartedAt": { "type": "string", "format": "date-time" },
+    "callbackExpiresAt": { "type": "string", "format": "date-time" }
+  }
+}
