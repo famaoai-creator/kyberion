@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import { resolveAvatarGenerationPaths } from './generate_avatar.js';
 import { normalizeIdentityRecord, resolveAvatarRegistrationPaths } from './register_avatar.js';
 
 describe('avatar script path boundaries', () => {
+  it('uses the canonical personal identity loader for updates', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/register_avatar.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain('loadPersonalIdentityAtPath(identityJsonPath)');
+    expect(source).not.toContain('readJson');
+  });
+
   it('keeps generation input and output inside the repository', () => {
     const paths = resolveAvatarGenerationPaths(
       'active/shared/tmp/user_face.jpg',
