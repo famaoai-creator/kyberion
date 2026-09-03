@@ -84,7 +84,7 @@ describe('code-actuator', () => {
     });
     vi.mocked(safeExistsSync).mockReturnValue(false);
     vi.mocked(safeReaddir).mockReturnValue([]);
-    vi.mocked(safeLstat).mockReturnValue({ isDirectory: () => false } as any);
+    vi.mocked(safeLstat).mockReturnValue({ isDirectory: () => false, isFile: () => true } as any);
     vi.mocked(safeExec).mockReturnValue('');
   });
 
@@ -107,20 +107,25 @@ describe('code-actuator', () => {
     });
 
     it('malformed persisted strategyをstep実行前に拒否する', async () => {
-      const { safeExistsSync, safeExec } = await import('@agent/core/secure-io');
-      const foundation = await import('@agent/core/foundation');
+      const { safeExistsSync, safeExec, safeLstat, safeReadFile } =
+        await import('@agent/core/secure-io');
       vi.mocked(safeExistsSync).mockReturnValue(true);
-      const readJsonSpy = vi.spyOn(foundation, 'readJson').mockReturnValue({
-        strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }],
+      vi.mocked(safeLstat).mockReturnValue({
+        isDirectory: () => false,
+        isFile: () => true,
+      } as never);
+      vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+        if (String(filePath).endsWith('/strategy.json')) {
+          return JSON.stringify({
+            strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }],
+          });
+        }
+        return 'file content';
       });
-      try {
-        await expect(
-          handleAction({ action: 'reconcile', strategy_path: 'strategy.json' })
-        ).rejects.toThrow('code strategy.strategies[0].pipeline[0].params must be a JSON object');
-        expect(safeExec).not.toHaveBeenCalled();
-      } finally {
-        readJsonSpy.mockRestore();
-      }
+      await expect(
+        handleAction({ action: 'reconcile', strategy_path: 'strategy.json' })
+      ).rejects.toThrow('code strategy.strategies[0].pipeline[0].params must be a JSON object');
+      expect(safeExec).not.toHaveBeenCalled();
     });
 
     it('サポートされていないactionを拒否する', async () => {
@@ -386,6 +391,37 @@ describe('code-actuator', () => {
           expect.stringContaining('code-ctx.json'),
           expect.any(String)
         );
+      });
+
+      it('context_pathのpersisted JSONをsafe objectとして検証する', async () => {
+        const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
+        vi.mocked(safeExistsSync).mockReturnValue(true);
+        vi.mocked(safeReadFile).mockReturnValue('{"constructor":{"polluted":true}}');
+
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { context_path: 'active/shared/tmp/code-invalid-context.json' },
+          steps: [],
+        });
+        expect(result.status).toBe('error');
+        expect(result.message).toContain('dangerous JSON key');
+      });
+
+      it('context_pathがdirectoryならcontextを読み込まない', async () => {
+        const { safeExistsSync, safeLstat } = await import('@agent/core/secure-io');
+        vi.mocked(safeExistsSync).mockReturnValue(true);
+        vi.mocked(safeLstat).mockReturnValue({
+          isDirectory: () => true,
+          isFile: () => false,
+        } as never);
+
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { context_path: 'active/shared/tmp/code-directory-context.json' },
+          steps: [],
+        });
+        expect(result.status).toBe('error');
+        expect(result.message).toContain('existing regular file');
       });
     });
 
