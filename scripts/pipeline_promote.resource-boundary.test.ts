@@ -10,6 +10,8 @@ describe('pipeline promotion resource boundaries', () => {
       })
     );
     expect(source).toContain("parseSafeJsonInput(jsonText, 'pipeline promotion advice')");
+    expect(source).toContain('loadPipelineAdfAtPath(resolvedInput)');
+    expect(source).not.toContain('readJson<unknown>(resolvedInput)');
     expect(source).not.toContain('JSON.parse(jsonText)');
   });
 
