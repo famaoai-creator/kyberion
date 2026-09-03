@@ -10135,6 +10135,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/worker-event-envelope.schema.json",
+      "tier": "public",
+      "size": 1308,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/workflow-registration-request.schema.json",
       "tier": "public",
       "size": 5819,
