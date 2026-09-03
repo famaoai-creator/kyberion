@@ -33,7 +33,7 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
-import { appendJsonLine, nowIso } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, readJson } from '@agent/core/foundation';
 import { runDegradationWatch, type DegradationReport } from '@agent/core/health-degradation';
 import { withExecutionContext } from '@agent/core/governance';
 
@@ -193,10 +193,7 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   const packageJsonPath = path.join(rootDir, 'package.json');
   const timestamp = nowIso();
 
-  const pkg = safeJsonParse<RootPackageJson>(
-    safeReadFile(packageJsonPath, { encoding: 'utf8' }) as string,
-    'root package.json'
-  );
+  const pkg = readJson<RootPackageJson>(packageJsonPath);
   const plan = planDependencyPatch(
     pkg,
     options.packageName,
@@ -243,7 +240,7 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   safeWriteFile(path.join(backupDir, 'package.json'), packageJsonRaw);
 
   // 2. Apply the version bump (direct section or pnpm.overrides).
-  const nextPkg: RootPackageJson = safeJsonParse(packageJsonRaw, 'root package.json');
+  const nextPkg: RootPackageJson = structuredClone(pkg);
   applyPlanToPackage(nextPkg, options.packageName, plan);
   safeWriteFile(packageJsonPath, `${JSON.stringify(nextPkg, null, 2)}\n`);
 
