@@ -14375,6 +14375,12 @@ SX-03／SX-04 のSovereign Dashboard identity readerを再監査し、既存のp
 
 検証: Sovereign Dashboard **6 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 686
+
+SX-03／SX-04 のA2A gateway inputを再監査し、既存の`a2a-envelope` catalog／schemaで検証済みの値を、`run_a2a.ts`だけfoundationのraw JSON readerで読み込んでからvalidatorへ渡していた残存を修正した。既存catalogへrepository／regular-file-bound loaderを追加し、A2A gatewayがschema boundaryを通過したenvelopeだけをSuper-Nerveへ渡すようにした。A2A response、performative、payloadの既存semanticsと、ファイル外／symlink入力の拒否は維持している。
+
+検証: A2A gateway／envelope loader **5 tests passed**、root typecheck、core build、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

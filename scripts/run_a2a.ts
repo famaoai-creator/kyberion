@@ -3,10 +3,10 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { validateA2AEnvelope } from '@agent/core/a2a-envelope';
+import { loadA2AEnvelopeAtPath } from '@agent/core/a2a-envelope';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { A2AMessage } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 export async function main(args: string[] = [], print: (value: unknown) => void = () => undefined) {
@@ -26,7 +26,7 @@ export async function main(args: string[] = [], print: (value: unknown) => void 
   if (!safeLstat(resolvedInput).isFile()) {
     throw new Error(`A2A input must be a regular file: ${inputPath}`);
   }
-  const a2aMsg = validateA2AEnvelope(readJson<unknown>(resolvedInput), resolvedInput);
+  const a2aMsg = loadA2AEnvelopeAtPath(resolvedInput);
 
   logger.info(
     `🚀 [A2A_GATEWAY] Receiving A2A message [ID: ${a2aMsg.header.msg_id}] from ${a2aMsg.header.sender}`
