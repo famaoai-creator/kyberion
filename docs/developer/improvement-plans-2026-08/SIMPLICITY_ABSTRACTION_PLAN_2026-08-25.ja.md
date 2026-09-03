@@ -14977,6 +14977,18 @@ pending_suggestions、symlink／path boundaryの既存semanticsは維持して�
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 754
+
+SX-03／SX-04／SX-06 のprovider capability TTL cacheを再監査し、snapshot readは既存専用schemaで
+fail-softに扱っている一方、probe後の`{computed_at, ttl_ms, value}` envelopeだけが検証なしでraw
+`safeWriteFile`されていたため修正した。既存`provider-capability-registry.schema.json`を保存直前にも適用し、
+負のTTLやprovider capabilityの未知fieldをcacheへ残さない。probe失敗時の非致命fallback、TTL再probe、
+provider discoveryの実行境界とcache miss semanticsは維持している。
+
+検証: provider capability registry **1 file / 14 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
