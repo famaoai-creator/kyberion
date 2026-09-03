@@ -42,6 +42,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import type { EventScope } from '@agent/core/event-scope';
 import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
@@ -65,13 +66,8 @@ function assertActiveMission(missionId: string): void {
   if (!safeLstat(statePath).isFile()) {
     throw new Error(`Mission state must be a regular file: ${statePath}`);
   }
-  const state = withExecutionContext('mission_controller', () =>
-    readJson<{
-      mission_id?: string;
-      status?: string;
-    }>(statePath)
-  );
-  if (state.mission_id?.toUpperCase() !== missionId || state.status !== 'active') {
+  const state = withExecutionContext('mission_controller', () => loadStateAtPath(statePath));
+  if (!state || state.mission_id.toUpperCase() !== missionId || state.status !== 'active') {
     throw new Error(`Mission must be active: ${missionId} (status=${state.status || 'unknown'})`);
   }
 }

@@ -14519,6 +14519,12 @@ SX-03 のdata-vault expiry scanを再監査し、`storage-janitor`だけが既�
 
 検証: storage janitor／data-vault **2 files / 66 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 710
+
+SX-03／SX-04 のbackground-review mission E2E harnessを再監査し、active missionの`mission-state.json`だけがregular-file確認後に局所`readJson`と部分型キャストで読まれていた残存を修正した。既存`loadStateAtPath`へ接続し、schema-invalid／missing stateはactive missionとして扱わず、mission controller authorityの既存検証境界とE2E cleanup semanticsを維持した。
+
+検証: background-review mission E2E **対象 script lint／root typecheck／`git diff --check` passed**、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
