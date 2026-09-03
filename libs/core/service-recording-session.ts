@@ -10,6 +10,7 @@ import {
   type ServiceRecording,
   type ServiceRecordingStep,
 } from './service-recording.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
@@ -36,6 +37,18 @@ export interface ServiceRecordingSessionOptions {
 export interface RecordedServiceCall extends ServiceCallObservation {
   operation: ServiceOperationContract;
   plan_validation_errors: string[];
+}
+
+const SERVICE_RECORDING_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-recording.schema.json'
+);
+
+function serviceRecordingCatalog(filePath: string) {
+  return defineCatalog<ServiceRecording>({
+    id: 'service-recording',
+    path: filePath,
+    schema: SERVICE_RECORDING_SCHEMA_PATH,
+  });
 }
 
 const SECRET_KEY =
@@ -204,7 +217,8 @@ export class ServiceRecordingSession {
     const recordingPath = assertSafeRepositoryPath(path.join(dir, `${this.recording_id}.json`), {
       allowMissingLeaf: true,
     });
-    safeWriteFile(recordingPath, `${JSON.stringify(recording, null, 2)}\n`);
+    const canonical = serviceRecordingCatalog(recordingPath).validate(recording, recordingPath);
+    safeWriteFile(recordingPath, `${JSON.stringify(canonical, null, 2)}\n`);
     return pathResolver.toRepoRelative(recordingPath);
   }
 }

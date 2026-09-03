@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { safeReadFile, safeRmSync } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import { ServiceRecordingSession } from './service-recording-session.js';
 import { validateServiceRecording } from './service-recording.js';
 import { compileServiceRecording } from './service-recording-compiler.js';
@@ -64,5 +66,29 @@ describe('ServiceRecordingSession', () => {
       op: 'core:await_decision',
     });
     expect(compiled.warnings).toContain('step-001 requires human secret binding: authorization');
+  });
+
+  it('persists the catalog canonical payload', () => {
+    const session = new ServiceRecordingSession({
+      recording_id: 'svc-session-canonical',
+      target_name: 'Canonical recording',
+      now: () => '2026-08-16T00:00:00.000Z',
+    });
+    session.recordCall({ service_id: 'github', action: 'create_issue' });
+    const originalToRecording = session.toRecording.bind(session);
+    session.toRecording = (() => ({
+      ...originalToRecording(),
+      $schema: 'https://example.invalid/service-recording.json',
+    })) as typeof session.toRecording;
+
+    const logicalPath = session.persist();
+    const filePath = pathResolver.rootResolve(logicalPath);
+    try {
+      const persisted = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' })));
+      expect(persisted.$schema).toBeUndefined();
+      expect(persisted.schema_version).toBe('service-recording.v1');
+    } finally {
+      safeRmSync(filePath);
+    }
   });
 });
