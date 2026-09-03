@@ -6355,6 +6355,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/adapter-default-preferences.schema.json",
+      "tier": "public",
+      "size": 1081,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/adf-execution-policy.schema.json",
       "tier": "public",
       "size": 876,

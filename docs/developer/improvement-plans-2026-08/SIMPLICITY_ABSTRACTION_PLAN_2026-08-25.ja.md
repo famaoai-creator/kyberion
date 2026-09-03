@@ -14003,6 +14003,12 @@ SX-03／SX-04 のcreative design resolverを再監査し、brand tokenとmedia d
 
 検証: creative design resolver **1 file / 11 focused tests passed**、knowledge index生成、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 624
+
+SX-03／SX-04 のadapter default preferences readerを再監査し、active profileの永続設定をraw JSONとして部分的に正規化していた残存を修正した。専用schemaとpath-bound canonical catalogへ統合し、regular-file境界をloader入口へ適用した。未知category・schema-invalid・directoryは空のdefaultsへfail-closedし、候補のselectable検証、profile分離、保存時の既存adapter selection semanticsは維持している。
+
+検証: adapter default selection **1 file / 3 focused tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
