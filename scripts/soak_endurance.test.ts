@@ -17,6 +17,15 @@ import {
 } from './soak_endurance.js';
 
 describe('soak_endurance', () => {
+  it('uses the canonical evidence manifest loader and writer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/soak_endurance.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain('loadSoakEvidenceManifestAtPath');
+    expect(source).toContain('writeSoakEvidenceManifestAtPath');
+    expect(source).not.toContain('readJsonIfPresent<SoakEvidenceManifest>');
+    expect(source).not.toContain('JSON.stringify(manifest, null, 2)');
+  });
   it('captures a time series with sampled file sizes', async () => {
     const sampleRoot = pathResolver.sharedTmp('soak-endurance-tests/series');
     safeRmSync(sampleRoot, { recursive: true, force: true });

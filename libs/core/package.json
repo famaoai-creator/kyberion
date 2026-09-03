@@ -675,6 +675,10 @@
       "types": "./dist/soak-restart-state.d.ts",
       "default": "./dist/soak-restart-state.js"
     },
+    "./soak-evidence-manifest": {
+      "types": "./dist/soak-evidence-manifest.d.ts",
+      "default": "./dist/soak-evidence-manifest.js"
+    },
     "./runtime-health-history": {
       "types": "./dist/runtime-health-history.d.ts",
       "default": "./dist/runtime-health-history.js"

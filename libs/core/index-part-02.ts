@@ -84,6 +84,8 @@ export * from './daemon-heartbeat.js';
 
 export * from './soak-restart-state.js';
 
+export * from './soak-evidence-manifest.js';
+
 export * from './ops-alert.js';
 
 export * from './health-degradation.js';

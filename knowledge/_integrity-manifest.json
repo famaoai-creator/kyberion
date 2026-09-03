@@ -9571,6 +9571,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/soak-evidence-manifest.schema.json",
+      "tier": "public",
+      "size": 1184,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/soak-restart-state.schema.json",
       "tier": "public",
       "size": 616,
