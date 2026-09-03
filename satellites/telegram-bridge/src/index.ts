@@ -192,14 +192,17 @@ function pickText(message: TelegramMessage): string {
   return (message.text || message.caption || '').trim();
 }
 
-function parseTelegramApiResponse(value: unknown): TelegramApiResponse {
-  if (!value || typeof value !== 'object') return {};
-  const record = value as Record<string, unknown>;
-  return {
-    ok: typeof record.ok === 'boolean' ? record.ok : undefined,
-    description: typeof record.description === 'string' ? record.description : undefined,
-    result: record.result,
-  };
+export function parseTelegramApiResponse(value: unknown): TelegramApiResponse {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'Telegram API response');
+    return {
+      ok: typeof record.ok === 'boolean' ? record.ok : undefined,
+      description: typeof record.description === 'string' ? record.description : undefined,
+      result: record.result,
+    };
+  } catch {
+    return {};
+  }
 }
 
 function errorDetail(error: unknown): string {
