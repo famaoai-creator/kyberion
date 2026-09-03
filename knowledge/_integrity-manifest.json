@@ -7861,6 +7861,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/manual-driver-descriptor.schema.json",
+      "tier": "public",
+      "size": 2035,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/marketing-completion-evidence.schema.json",
       "tier": "public",
       "size": 2789,
