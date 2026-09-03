@@ -182,6 +182,40 @@ describe('project-operational-state-registry', () => {
     expect(persisted.project_id).toBe('PRJ-TEST-OPS');
   });
 
+  it('persists canonical mission links and track states', () => {
+    const missionLink = saveProjectMissionLink({
+      project_id: 'PRJ-TEST-OPS',
+      tier: 'public',
+      tenant_slug: 'tenant-alpha',
+      mission_id: 'MSN-TEST-CANONICAL',
+      relationship_type: 'primary',
+      summary: 'Canonical mission link.',
+      status: 'active',
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveProjectMissionLink>[0]);
+    const trackState = saveProjectTrackState({
+      project_id: 'PRJ-TEST-OPS',
+      tier: 'public',
+      tenant_slug: 'tenant-alpha',
+      track_id: 'TRK-TEST-CANONICAL',
+      name: 'Canonical track',
+      summary: 'Canonical track state.',
+      status: 'active',
+      active_mission_ids: ['MSN-TEST-CANONICAL'],
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveProjectTrackState>[0]);
+
+    const persistedMissionLink = JSON.parse(
+      String(safeReadFile(missionLink, { encoding: 'utf8' }))
+    ) as Record<string, unknown>;
+    const persistedTrackState = JSON.parse(
+      String(safeReadFile(trackState, { encoding: 'utf8' }))
+    ) as Record<string, unknown>;
+    expect(persistedMissionLink).not.toHaveProperty('$schema');
+    expect(persistedTrackState).not.toHaveProperty('$schema');
+    expect(persistedTrackState.active_mission_ids).toEqual(['MSN-TEST-CANONICAL']);
+  });
+
   it('keeps tenantless public state in the shared partition without serializing shared', () => {
     const filePath = syncProjectOperationalStateFromMission({
       mission_id: 'MSN-TEST-TENANTLESS',

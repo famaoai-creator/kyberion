@@ -1,8 +1,32 @@
 import * as path from 'node:path';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { ProjectOperationalState } from './project-operational-state-registry.js';
+
+const MISSION_LINK_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/project-operational-mission-link.schema.json'
+);
+const TRACK_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/project-operational-track-state.schema.json'
+);
+
+function missionLinkCatalog(filePath: string) {
+  return defineCatalog({
+    id: 'project-operational-mission-link',
+    path: filePath,
+    schema: MISSION_LINK_SCHEMA_PATH,
+  });
+}
+
+function trackStateCatalog(filePath: string) {
+  return defineCatalog({
+    id: 'project-operational-track-state',
+    path: filePath,
+    schema: TRACK_STATE_SCHEMA_PATH,
+  });
+}
 
 function normalizeSegment(value: string, fallback = 'shared'): string {
   return (
@@ -75,19 +99,16 @@ export function saveProjectMissionLink(input: {
     input.tenant_slug,
     input.mission_id
   );
+  const validated = missionLinkCatalog(filePath).validate(
+    {
+      ...input,
+      updated_at: input.updated_at || nowIso(),
+    },
+    filePath
+  );
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(
-    filePath,
-    JSON.stringify(
-      {
-        ...input,
-        updated_at: input.updated_at || nowIso(),
-      },
-      null,
-      2
-    )
-  );
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return filePath;
 }
 
@@ -110,20 +131,17 @@ export function saveProjectTrackState(input: {
     input.tenant_slug,
     input.track_id
   );
+  const validated = trackStateCatalog(filePath).validate(
+    {
+      ...input,
+      tenant_slug: input.tenant_slug?.trim() || undefined,
+      active_mission_ids: input.active_mission_ids || [],
+      updated_at: input.updated_at || nowIso(),
+    },
+    filePath
+  );
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(
-    filePath,
-    JSON.stringify(
-      {
-        ...input,
-        tenant_slug: input.tenant_slug?.trim() || undefined,
-        active_mission_ids: input.active_mission_ids || [],
-        updated_at: input.updated_at || nowIso(),
-      },
-      null,
-      2
-    )
-  );
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return filePath;
 }
