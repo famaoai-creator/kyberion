@@ -114,6 +114,73 @@ describe('modeling-actuator terraform_to_architecture_adf', () => {
     }
   });
 
+  it('rejects a dangerous persisted context before merging it', async () => {
+    const contextPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/dangerous-context-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(contextPath), { recursive: true });
+    safeWriteFile(contextPath, '{"constructor":{"polluted":true}}');
+
+    try {
+      await expect(
+        handleAction({
+          action: 'pipeline',
+          context: { context_path: path.relative(ROOT, contextPath) },
+          steps: [],
+        } as Parameters<typeof handleAction>[0])
+      ).rejects.toThrow('dangerous JSON key');
+    } finally {
+      safeRmSync(contextPath, { force: true });
+    }
+  });
+
+  it('rejects a directory masquerading as persisted context', async () => {
+    const contextPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/directory-context-${process.pid}`
+    );
+    safeMkdir(contextPath, { recursive: true });
+
+    try {
+      await expect(
+        handleAction({
+          action: 'pipeline',
+          context: { context_path: path.relative(ROOT, contextPath) },
+          steps: [],
+        } as Parameters<typeof handleAction>[0])
+      ).rejects.toThrow('existing regular file');
+    } finally {
+      safeRmSync(contextPath, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects dangerous read_json input before returning persisted data', async () => {
+    const inputPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/dangerous-input-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(inputPath), { recursive: true });
+    safeWriteFile(inputPath, '{"prototype":{"polluted":true}}');
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'read_json',
+            params: { path: path.relative(ROOT, inputPath) },
+          },
+        ],
+      } as Parameters<typeof handleAction>[0]);
+      expect(result.status).toBe('failed');
+      expect(result.results[0]?.error).toContain('dangerous JSON key');
+    } finally {
+      safeRmSync(inputPath, { force: true });
+    }
+  });
+
   it('rejects a malformed quality contract before deriving a test inventory', async () => {
     const result = await handleAction({
       action: 'pipeline',
