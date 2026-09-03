@@ -21,7 +21,6 @@
 
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
@@ -43,7 +42,7 @@ import type {
 } from './meeting-session-types.js';
 import { abortableAudioChunks } from './meeting-session-types.js';
 import { BargeInController } from './barge-in-controller.js';
-import { validateVoiceConsentRecord } from './voice-consent.js';
+import { loadVoiceConsentAtPath, validateVoiceConsentRecord } from './voice-consent.js';
 
 export interface ConversationAgent {
   /**
@@ -151,8 +150,8 @@ export function checkMeetingParticipationConsent(input: {
     };
   }
   try {
-    const raw = readJson<unknown>(consentPath);
-    return validateVoiceConsentRecord(raw, {
+    const consent = loadVoiceConsentAtPath(consentPath);
+    return validateVoiceConsentRecord(consent, {
       missionId,
       tenantSlug: input.tenant_slug,
     });
