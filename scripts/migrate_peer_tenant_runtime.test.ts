@@ -5,6 +5,7 @@ import {
   applyPeerTenantMigrationPlan,
   buildPeerTenantMigrationPlan,
   parsePeerTenantMigrationPlan,
+  runPeerTenantMigration,
   type PeerTenantMigrationRoot,
 } from './migrate_peer_tenant_runtime.js';
 
@@ -70,6 +71,12 @@ describe('peer tenant runtime migration', () => {
       enumerable: true,
     });
     expect(parsePeerTenantMigrationPlan(malformedPlan)).toBeNull();
+  });
+
+  it('rejects an external plan path before reading it', () => {
+    expect(() =>
+      runPeerTenantMigration({ planPath: '/tmp/external-peer-migration-plan.json' })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('splits explicit tenant records and quarantines legacy sources', () => {

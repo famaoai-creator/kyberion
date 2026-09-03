@@ -25,6 +25,7 @@ import {
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
@@ -470,9 +471,15 @@ export function runPeerTenantMigration(
 ): PeerTenantMigrationPlan {
   let plan: PeerTenantMigrationPlan;
   if (options.planPath) {
+    const safePlanPath = assertSafeRepositoryPath(pathResolver.rootResolve(options.planPath), {
+      allowMissingLeaf: false,
+    });
+    if (!safeExistsSync(safePlanPath) || !safeLstat(safePlanPath).isFile()) {
+      throw new Error(`peer migration plan must be a regular file: ${options.planPath}`);
+    }
     try {
       plan = parsePeerTenantMigrationPlan(
-        readJson<unknown>(options.planPath)
+        readJson<unknown>(safePlanPath)
       ) as PeerTenantMigrationPlan | null;
     } catch {
       throw new Error(`peer_migration_plan_invalid:${options.planPath}`);
