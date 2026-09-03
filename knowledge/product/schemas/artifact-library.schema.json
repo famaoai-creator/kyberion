@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["profiles"],
   "properties": {
+    "domain": { "type": "string", "minLength": 1 },
     "profiles": {
       "type": "object",
       "additionalProperties": {

@@ -20,10 +20,9 @@ import {
   assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
-  safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { defineCatalog, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -37,11 +36,14 @@ type SurfaceActionHandler = (
   json: boolean
 ) => Promise<void>;
 type CatalogActionHandler = (args: string[], json: boolean) => Promise<void>;
+const ARTIFACT_LIBRARY_DIR = pathResolver.knowledge(
+  'public/design-patterns/media-templates/artifact-library'
+);
 const ARTIFACT_LIBRARY_INDEX_PATH = pathResolver.knowledge(
   'public/design-patterns/media-templates/artifact-library/index.json'
 );
-const ARTIFACT_LIBRARY_DIR = pathResolver.knowledge(
-  'public/design-patterns/media-templates/artifact-library'
+const ARTIFACT_LIBRARY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/artifact-library.schema.json'
 );
 const DESIGN_MD_INDEX_PATH = pathResolver.knowledge(
   'public/design-patterns/media-templates/design-md-catalog/index.json'
@@ -54,6 +56,12 @@ const DESIGN_MD_SYSTEM_PATH = pathResolver.knowledge(
 );
 const DESIGN_MD_INDEX_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/imported-design-md-index.schema.json'
+);
+const DESIGN_MD_THEME_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/design-md-theme-imports.schema.json'
+);
+const DESIGN_MD_SYSTEM_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/design-md-system-imports.schema.json'
 );
 
 interface ImportedDesignMdSummary {
@@ -75,16 +83,12 @@ interface ImportedDesignMdIndex {
   systems: ImportedDesignMdSummary[];
 }
 
-function loadCatalogJson<T = any>(filePath: string): T {
-  const safePath = assertSafeRepositoryPath(filePath);
-  if (!safeLstat(safePath).isFile()) {
-    throw new Error(`[control-plane] catalog must be a regular file: ${filePath}`);
-  }
-  return readJson<T>(safePath);
-}
-
 function loadArtifactLibraryIndex(): any {
-  return loadCatalogJson(ARTIFACT_LIBRARY_INDEX_PATH);
+  return defineCatalog({
+    id: 'control-plane-artifact-library-index',
+    path: ARTIFACT_LIBRARY_INDEX_PATH,
+    schema: pathResolver.knowledge('product/schemas/artifact-library-index.schema.json'),
+  }).load();
 }
 
 function loadDesignMdIndex(): ImportedDesignMdIndex {
@@ -96,11 +100,27 @@ function loadDesignMdIndex(): ImportedDesignMdIndex {
 }
 
 function loadDesignMdThemes(): any {
-  return loadCatalogJson(DESIGN_MD_THEME_PATH);
+  return defineCatalog({
+    id: 'control-plane-design-md-themes',
+    path: DESIGN_MD_THEME_PATH,
+    schema: DESIGN_MD_THEME_SCHEMA_PATH,
+  }).load();
 }
 
 function loadDesignMdSystems(): any {
-  return loadCatalogJson(DESIGN_MD_SYSTEM_PATH);
+  return defineCatalog({
+    id: 'control-plane-design-md-systems',
+    path: DESIGN_MD_SYSTEM_PATH,
+    schema: DESIGN_MD_SYSTEM_SCHEMA_PATH,
+  }).load();
+}
+
+function loadArtifactLibraryPack(filePath: string): any {
+  return defineCatalog({
+    id: 'control-plane-artifact-library-pack',
+    path: filePath,
+    schema: ARTIFACT_LIBRARY_SCHEMA_PATH,
+  }).load();
 }
 
 function normalizeCatalogQuery(input: unknown): string {
@@ -139,8 +159,7 @@ function resolveArtifactLibraryProfile(profileId: string): any {
   const normalizedProfileId = String(profileId || '').trim();
   for (const pack of asArray(index.packs)) {
     if (!asArray<string>(pack.profiles).includes(normalizedProfileId)) continue;
-    const fullPath = resolveArtifactLibraryResource(String(pack.file));
-    const doc = loadCatalogJson<any>(fullPath);
+    const doc = loadArtifactLibraryPack(resolveArtifactLibraryResource(String(pack.file)));
     return {
       profile_id: normalizedProfileId,
       domain: pack.domain,

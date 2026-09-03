@@ -6535,9 +6535,15 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/artifact-library-index.schema.json",
+      "tier": "public",
+      "size": 1100,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/artifact-library.schema.json",
       "tier": "public",
-      "size": 1175,
+      "size": 1227,
       "type": "json"
     },
     {
@@ -7042,6 +7048,18 @@
       "path": "product/schemas/deployment-adapter-config.schema.json",
       "tier": "public",
       "size": 1050,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/design-md-system-imports.schema.json",
+      "tier": "public",
+      "size": 335,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/design-md-theme-imports.schema.json",
+      "tier": "public",
+      "size": 332,
       "type": "json"
     },
     {
