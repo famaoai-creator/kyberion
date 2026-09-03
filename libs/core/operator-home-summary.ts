@@ -5,9 +5,9 @@ import { listArtifactRecords } from './artifact-record.js';
 import { buildNextAction, type NextAction } from './next-action.js';
 import { listInboxEntries, type DeliverableInboxEntry } from './deliverable-inbox.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadSoftwareQualityReportAtPath } from './software-quality-report-reader.js';
 import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 import { buildNhiLedgerReport } from './nhi-lifecycle-governance.js';
 import { loadMissionManagementConfig } from './mission-management-config.js';
@@ -193,29 +193,17 @@ function collectQualitySummary(): OperatorHomeQualitySummary | undefined {
   }
   if (!safeExistsSync(reportPath)) return undefined;
   try {
-    const report = readJson<{
-      report_id?: string;
-      project_id?: string;
-      subject_ref?: string;
-      recommendation?: OperatorHomeQualitySummary['recommendation'];
-      human_decision?: OperatorHomeQualitySummary['humanDecision'];
-      accountable_human_id?: string;
-      generated_at?: string;
-      residual_risks?: string[];
-      evidence_refs?: string[];
-    }>(reportPath);
-    if (!report.report_id || !report.recommendation || !report.accountable_human_id)
-      return undefined;
+    const report = loadSoftwareQualityReportAtPath(reportPath);
     return {
       reportId: report.report_id,
-      projectId: report.project_id ?? '',
-      subjectRef: report.subject_ref ?? '',
+      projectId: report.project_id,
+      subjectRef: report.subject_ref,
       recommendation: report.recommendation,
-      humanDecision: report.human_decision ?? 'pending',
+      humanDecision: report.human_decision,
       accountableHumanId: report.accountable_human_id,
-      generatedAt: report.generated_at ?? '',
-      residualRisks: report.residual_risks ?? [],
-      evidenceRefs: report.evidence_refs ?? [],
+      generatedAt: report.generated_at,
+      residualRisks: report.residual_risks,
+      evidenceRefs: report.evidence_refs,
     };
   } catch {
     return undefined;

@@ -73,6 +73,8 @@ export type {
 
 export * from './software-quality-operations.js';
 
+export * from './software-quality-report-reader.js';
+
 export * from './source-analysis.js';
 
 export * from './agentic-source-review.js';
