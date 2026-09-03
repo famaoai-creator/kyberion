@@ -4,10 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
-import { parseServicePidRegistry } from './service-pid-registry.js';
+import { loadServicePidRegistryAtPath } from './service-pid-registry.js';
 import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
@@ -315,8 +314,7 @@ function isRunningPid(pid: unknown): pid is number {
 function loadRunningServiceIds(): string[] {
   try {
     const safePidFile = assertSafeRepositoryPath(SERVICE_PID_FILE);
-    if (!safeExistsSync(safePidFile)) return [];
-    const parsed = parseServicePidRegistry(readJson<unknown>(safePidFile));
+    const parsed = loadServicePidRegistryAtPath(safePidFile);
     if (!parsed) return [];
     return Object.entries(parsed)
       .filter(([, pid]) => isRunningPid(pid))

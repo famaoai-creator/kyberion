@@ -8295,7 +8295,7 @@
     {
       "path": "product/schemas/onboarding-state.schema.json",
       "tier": "public",
-      "size": 4896,
+      "size": 4840,
       "type": "json"
     },
     {
@@ -9136,6 +9136,12 @@
       "path": "product/schemas/service-onboarding-catalog.schema.json",
       "tier": "public",
       "size": 970,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/service-pid-registry.schema.json",
+      "tier": "public",
+      "size": 480,
       "type": "json"
     },
     {
