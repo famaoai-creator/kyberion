@@ -204,10 +204,10 @@ export function saveIntentContractMemory(
   scope?: ScopeContext
 ): void {
   const filePath = runtimeMemoryPath(scope);
-  memoryCatalog(filePath).validate(memory, filePath);
+  const validated = memoryCatalog(filePath).validate(memory, filePath);
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(memory, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
 }
 
 export function loadIntentContractSelectionPolicy(): IntentContractSelectionPolicy {
