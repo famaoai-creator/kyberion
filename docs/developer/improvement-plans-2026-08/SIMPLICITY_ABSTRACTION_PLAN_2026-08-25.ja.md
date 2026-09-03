@@ -15829,6 +15829,16 @@ safe JSON object parser／relationship normalizerへ渡すようにした。miss
 検証: mission CLI relationship boundary **1 file / 1 test passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 828
+
+SX-03／SX-10 のbrowser action trail復元・export経路を再監査し、永続JSONやin-memory contextが配列であることだけを確認して
+`BrowserRecordedAction`へ型キャストしていた残存を修正した。action kind／op／timestamp、列挙値、各フィールドの型を検証・再構成する
+共通parserを読み書き・record・exportの各入口へ統合し、不正レコードをfail-closedで除外し未知フィールドを引き継がないようにした。
+既存のsecret_ref redaction、action trail上限、Playwright／ADF export semanticsは維持し、永続・in-memoryの不正レコード回帰を追加した。
+
+検証: browser runtime **2 files / 44 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
