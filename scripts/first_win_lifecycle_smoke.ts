@@ -4,6 +4,10 @@ import { matchesCron } from '@agent/core/src/cron-utils';
 import type { Trace, TraceSpan } from '@agent/core/src/trace';
 import { loadOrganizationOperationalState } from '@agent/core/organization-operating-model';
 import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
+import {
+  loadOnboardingApplyInputAtPath,
+  type OnboardingApplyInput,
+} from '@agent/core/onboarding-apply-input';
 import { loadProjectRecord } from '@agent/core/project-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -17,7 +21,6 @@ import {
   getRegisteredEnvText,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
-  readJson,
 } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -395,10 +398,10 @@ function runHintsStage(stages: StageObservation[]): StageObservation {
 }
 
 export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
-  const identity = readJson<{ identity?: { agent_id?: string } }>(
+  const identity = loadOnboardingApplyInputAtPath(
     resolveFirstWinResourcePath(IDENTITY_FIXTURE, false)
   );
-  const expectedAgentId = identity.identity?.agent_id || '';
+  const expectedAgentId = identity.identity.agent_id;
   const stages: StageObservation[] = [
     runCommand(
       'onboard',
@@ -547,13 +550,13 @@ export function runFirstWinLifecycleLive(
       ],
     };
   }
-  let identity: { identity?: { agent_id?: string } };
+  let identity: OnboardingApplyInput;
   let safeIdentityFile: string;
   try {
     safeIdentityFile = resolveFirstWinResourcePath(plan.identityFile, false);
     if (!isRegularFile(safeIdentityFile))
       throw new Error('identity resource is not a regular file');
-    identity = readJson<{ identity?: { agent_id?: string } }>(safeIdentityFile);
+    identity = loadOnboardingApplyInputAtPath(safeIdentityFile);
   } catch (error) {
     return {
       mode: 'live',
@@ -568,7 +571,7 @@ export function runFirstWinLifecycleLive(
       ],
     };
   }
-  const expectedAgentId = identity.identity?.agent_id || '';
+  const expectedAgentId = identity.identity.agent_id;
   const stages: StageObservation[] = [];
   const appendStage = (stage: StageObservation): boolean => {
     stages.push(stage);

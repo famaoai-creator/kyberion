@@ -41,6 +41,16 @@ describe('first-win lifecycle resource boundary', () => {
     expect(source).not.toContain('readJson<{ schedule?:');
   });
 
+  it('uses the canonical onboarding input loader for the identity contract', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/first_win_lifecycle_smoke.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('loadOnboardingApplyInputAtPath(');
+    expect(source).not.toContain('readJson<{ identity?:');
+  });
+
   it('rejects repository-external identity resources', () => {
     expect(() => resolveFirstWinResourcePath('/tmp/first-win-identity.json')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
