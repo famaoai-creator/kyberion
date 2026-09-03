@@ -4,7 +4,9 @@ import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as pathResolver from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { handleAction, parseProcessAction } from './index.js';
+import { readProcessJson } from './process-actuator-helpers.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -84,5 +86,38 @@ describe('process-actuator path boundaries', () => {
         },
       } as any)
     ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects dangerous persisted process input before parsing the action', () => {
+    const inputPath = path.join(
+      pathResolver.rootDir(),
+      `active/shared/tmp/process-actuator-tests/dangerous-input-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(inputPath), { recursive: true });
+    safeWriteFile(inputPath, '{"constructor":{"polluted":true}}');
+
+    try {
+      expect(() => readProcessJson(inputPath, 'process action input')).toThrow(
+        'dangerous JSON key'
+      );
+    } finally {
+      safeRmSync(inputPath, { force: true });
+    }
+  });
+
+  it('rejects a directory masquerading as persisted process input', () => {
+    const inputPath = path.join(
+      pathResolver.rootDir(),
+      `active/shared/tmp/process-actuator-tests/directory-input-${process.pid}`
+    );
+    safeMkdir(inputPath, { recursive: true });
+
+    try {
+      expect(() => readProcessJson(inputPath, 'process action input')).toThrow(
+        'existing regular file'
+      );
+    } finally {
+      safeRmSync(inputPath, { recursive: true, force: true });
+    }
   });
 });

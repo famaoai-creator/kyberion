@@ -4,8 +4,13 @@ import {
   currentProcessArgv,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
-import { readJson } from '@agent/core/foundation';
-import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
@@ -29,6 +34,26 @@ const DEFAULT_PROCESS_RETRY = {
 
 function resolveProcessPath(ref: string, allowMissingLeaf = true): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+export function readProcessJson(filePath: string, label: string): unknown {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
+}
+
+export function readProcessJsonObject(filePath: string, label: string): Record<string, unknown> {
+  return parseSafeJsonObjectValue(readProcessJson(filePath, label), label);
 }
 
 const buildRetryOptions = createGovernedRetryOptionsBuilder({
@@ -184,7 +209,7 @@ const main = async () => {
     .parseSync();
 
   const inputPath = resolveProcessPath(String(argv.input), false);
-  const input = readJson<unknown>(inputPath);
+  const input = readProcessJson(inputPath, 'process action input');
   const result = await handleAction(parseProcessAction(input));
   console.log(JSON.stringify(result, null, 2));
 };
