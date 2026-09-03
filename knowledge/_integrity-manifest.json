@@ -7885,6 +7885,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/marketing-review-aggregation.schema.json",
+      "tier": "public",
+      "size": 2118,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/marketing-review-package.schema.json",
       "tier": "public",
       "size": 836,
