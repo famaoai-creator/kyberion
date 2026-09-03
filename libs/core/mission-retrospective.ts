@@ -24,6 +24,7 @@ import { nowIso } from './foundation/time.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import type { MissionState } from './mission-types.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 function safeMissionRoot(missionPath: string): string {
   return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
@@ -276,9 +277,20 @@ function normalizeProposalDraft(
 }
 
 const IMPROVEMENT_QUEUE_PATH = 'coordination/process-improvements/queue.jsonl';
+const PROPOSAL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/process-improvement-proposal.schema.json'
+);
 
 export function processImprovementQueuePath(): string {
   return safeRepositoryPath(pathResolver.shared(IMPROVEMENT_QUEUE_PATH));
+}
+
+function processImprovementProposalCatalog(filePath: string) {
+  return defineCatalog<ProcessImprovementProposal>({
+    id: 'process-improvement-proposal',
+    path: filePath,
+    schema: PROPOSAL_SCHEMA_PATH,
+  });
 }
 
 function readJsonl(filePath: string): JsonRecord[] {
@@ -495,14 +507,33 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
 function enqueueProposal(proposal: ProcessImprovementProposal): void {
   const queuePath = processImprovementQueuePath();
   safeMkdir(path.dirname(queuePath), { recursive: true });
-  appendJsonLine(queuePath, proposal);
+  appendJsonLine(
+    queuePath,
+    processImprovementProposalCatalog(queuePath).validate(proposal, queuePath)
+  );
 }
 
 export function listProcessImprovementProposals(): ProcessImprovementProposal[] {
-  return readJsonl(processImprovementQueuePath()).flatMap((entry) => {
-    const proposal = normalizeProcessImprovementProposal(entry);
-    return proposal ? [proposal] : [];
+  const queuePath = processImprovementQueuePath();
+  return readJsonl(queuePath).flatMap((entry) => {
+    try {
+      const canonical = processImprovementProposalCatalog(queuePath).validate(entry, queuePath);
+      const proposal = normalizeProcessImprovementProposal(canonical);
+      return proposal ? [proposal] : [];
+    } catch {
+      return [];
+    }
   });
+}
+
+function writeProcessImprovementQueue(
+  queuePath: string,
+  proposals: ProcessImprovementProposal[]
+): void {
+  const catalog = processImprovementProposalCatalog(queuePath);
+  const canonical = proposals.map((proposal) => catalog.validate(proposal, queuePath));
+  safeMkdir(path.dirname(queuePath), { recursive: true });
+  safeWriteFile(queuePath, canonical.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
 }
 
 /**
@@ -529,8 +560,7 @@ export function decideProcessImprovementProposal(
   };
   proposals[index] = updated;
   const queuePath = processImprovementQueuePath();
-  safeMkdir(path.dirname(queuePath), { recursive: true });
-  safeWriteFile(queuePath, proposals.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
+  writeProcessImprovementQueue(queuePath, proposals);
   logger.info(
     `[process-improvement] ${proposalId} ${decision} by ${decidedBy}: ${current.proposal.slice(0, 80)}`
   );
@@ -577,7 +607,7 @@ export function applyProcessImprovementProposal(proposalId: string): {
   const updated: ProcessImprovementProposal = { ...current, status: 'applied' };
   proposals[index] = updated;
   const queuePath = processImprovementQueuePath();
-  safeWriteFile(queuePath, proposals.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
+  writeProcessImprovementQueue(queuePath, proposals);
   void notifyOperator('deliverable_ready', {
     title: `改善ワークオーダー発行: ${current.kind} (${proposalId})`,
     body: current.proposal.slice(0, 200),

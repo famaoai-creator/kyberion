@@ -9151,6 +9151,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/process-improvement-proposal.schema.json",
+      "tier": "public",
+      "size": 1015,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/production-evidence-register.schema.json",
       "tier": "public",
       "size": 11839,
