@@ -4,6 +4,8 @@ import { pathResolver } from './path-resolver.js';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
+  writePersonalAgentIdentityAtPath,
+  writePersonalIdentityAtPath,
 } from './personal-identity-state.js';
 import {
   safeMkdir,
@@ -48,6 +50,29 @@ describe('personal identity state loaders', () => {
       expect(loadPersonalIdentityAtPath(malformedPath)).toBeNull();
       expect(loadPersonalAgentIdentityAtPath(directoryPath)).toBeNull();
       expect(loadPersonalAgentIdentityAtPath(linkedPath)).toBeNull();
+    });
+  });
+
+  it('writes sovereign and agent records through their schema-bound catalogs', () => {
+    withExecutionContext('mission_controller', () => {
+      const sovereignPath = path.join(fixtureRoot, 'nested', 'my-identity.json');
+      const agentPath = path.join(fixtureRoot, 'nested', 'agent-identity.json');
+
+      expect(writePersonalIdentityAtPath(sovereignPath, { name: 'operator' })).toBe(sovereignPath);
+      expect(writePersonalAgentIdentityAtPath(agentPath, { agent_id: 'agent-1' })).toBe(agentPath);
+      expect(loadPersonalIdentityAtPath(sovereignPath)).toMatchObject({ name: 'operator' });
+      expect(loadPersonalAgentIdentityAtPath(agentPath)).toMatchObject({ agent_id: 'agent-1' });
+    });
+  });
+
+  it('rejects non-object records before persisting them', () => {
+    withExecutionContext('mission_controller', () => {
+      expect(() =>
+        writePersonalIdentityAtPath(
+          path.join(fixtureRoot, 'invalid.json'),
+          [] as unknown as Record<string, unknown>
+        )
+      ).toThrow(/Invalid catalog personal-identity/);
     });
   });
 });
