@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { readModelRegistryDirectory } from '@agent/core/model-registry-directory';
 import { assertProcessDefinitionRegistry } from '@agent/core/process-definition-registry';
 import { pathResolver } from '@agent/core/path-resolver';
+import { loadSurfaceManifest } from '@agent/core/surface-runtime';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -703,10 +704,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       for (const entry of safeReaddir(surfacesDir)
         .filter((name) => name.endsWith('.json'))
         .sort()) {
-        const surfaceManifest = readJson<{
-          version?: number;
-          surfaces?: Array<{ id?: string; enabled?: boolean }>;
-        }>(pathResolver.rootResolve(path.join('knowledge/product/governance/surfaces', entry)));
+        const surfaceManifest = loadSurfaceManifest(
+          pathResolver.rootResolve(path.join('knowledge/product/governance/surfaces', entry))
+        );
         if (!validate(surfaceManifest)) {
           for (const error of validate.errors || []) {
             violations.push(
