@@ -39,6 +39,7 @@ import {
 import { withLock } from './src/lock-utils.js';
 import { getToolRuntimePolicy, writeToolRuntimePolicyAtPath } from './tool-runtime-policy.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { writeServiceConnectionAtPath } from './service-engine-helpers.js';
 import {
   getVoiceProfileRegistry,
   loadVoiceProfileRegistryAtPath,
@@ -350,7 +351,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
 
         for (const service of draft.services) {
           const servicePath = path.join(profileRoot(), 'connections', `${service.service_id}.json`);
-          writeJson(servicePath, {
+          writeServiceConnectionAtPath(servicePath, {
             version: '1.0.0',
             service_id: service.service_id,
             status: 'proposed',
