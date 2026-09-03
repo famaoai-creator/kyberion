@@ -2,10 +2,18 @@ import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
-import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { resolveMissionStatePathForBanner } from './cli.js';
 
 describe('cli mission path scope', () => {
+  it('uses the canonical mission state loader for the context banner', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/cli.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain('loadStateAtPath(statePath)');
+    expect(source).not.toContain('readJson<{ status?: string }>(statePath)');
+  });
+
   it('uses the resolved mission path instead of the legacy public root', () => {
     const missionId = 'MSN-CLI-CONFIDENTIAL-SCOPE';
     const confidential = pathResolver.missionDir(missionId, 'confidential');
