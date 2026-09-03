@@ -88,11 +88,16 @@ function writeArtifact(
     throw new Error(`[sdlc-artifact-store] mission evidence dir not found for ${missionId}`);
   }
   if (schemaPath) {
-    defineCatalog({
+    const validated = defineCatalog({
       id: `sdlc-${filename.replace(/\.json$/u, '')}`,
       path: file,
       schema: schemaPath,
     }).validate(data, file);
+    safeWriteFile(file, `${JSON.stringify(validated, null, 2)}\n`, {
+      encoding: 'utf8',
+      mkdir: true,
+    });
+    return file;
   }
   safeWriteFile(file, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
   return file;

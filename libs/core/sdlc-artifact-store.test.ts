@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { safeReadFile } from './secure-io.js';
 
 vi.mock('./path-resolver.js', async () => {
   const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
@@ -203,6 +204,24 @@ describe('sdlc-artifact-store', () => {
         })
       ).toBe(false);
     });
+
+    it('persists the canonical design payload returned by the catalog', () => {
+      const saved = saveDesignSpec({
+        missionId: 'MSN-D-CANONICAL',
+        projectName: 'Canonical Project',
+        extracted: {
+          ...designExtracted,
+          $schema: 'governance-metadata',
+        } as unknown as typeof designExtracted,
+      });
+
+      const persisted = JSON.parse(
+        String(safeReadFile(path.join(tmpDir, 'design-spec.json'), { encoding: 'utf8' }))
+      ) as Record<string, unknown>;
+      expect(saved).toHaveProperty('project_name', 'Canonical Project');
+      expect(persisted).not.toHaveProperty('$schema');
+      expect(persisted.project_name).toBe('Canonical Project');
+    });
   });
 
   describe('test plan', () => {
@@ -355,6 +374,24 @@ describe('sdlc-artifact-store', () => {
           tasks: [],
         })
       ).toBe(false);
+    });
+
+    it('persists the canonical task payload returned by the catalog', () => {
+      const saved = saveTaskPlan({
+        missionId: 'MSN-TP-CANONICAL',
+        projectName: 'Canonical Project',
+        decomposed: {
+          ...decomposed,
+          $schema: 'governance-metadata',
+        } as unknown as typeof decomposed,
+      });
+
+      const persisted = JSON.parse(
+        String(safeReadFile(path.join(tmpDir, 'task-plan.json'), { encoding: 'utf8' }))
+      ) as Record<string, unknown>;
+      expect(saved).toHaveProperty('project_name', 'Canonical Project');
+      expect(persisted).not.toHaveProperty('$schema');
+      expect(persisted.project_name).toBe('Canonical Project');
     });
   });
 });
