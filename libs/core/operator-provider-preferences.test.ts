@@ -1,7 +1,10 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { loadOperatorProviderPreferencesAtPath } from './operator-provider-preferences.js';
+import {
+  loadOperatorProviderPreferencesAtPath,
+  writeOperatorProviderPreferencesAtPath,
+} from './operator-provider-preferences.js';
 import {
   safeMkdir,
   safeRmSync,
@@ -51,6 +54,18 @@ describe('operator provider preferences loader', () => {
       expect(loadOperatorProviderPreferencesAtPath(malformedPath)).toBeNull();
       expect(loadOperatorProviderPreferencesAtPath(directoryPath)).toBeNull();
       expect(loadOperatorProviderPreferencesAtPath(linkedPath)).toBeNull();
+    });
+  });
+
+  it('rejects invalid preferences before persisting them', () => {
+    withExecutionContext('mission_controller', () => {
+      const filePath = path.join(fixtureRoot, 'invalid.json');
+
+      expect(() =>
+        writeOperatorProviderPreferencesAtPath(filePath, {
+          priority: ['codex', ''],
+        })
+      ).toThrow(/Invalid catalog operator-provider-preferences/);
     });
   });
 });

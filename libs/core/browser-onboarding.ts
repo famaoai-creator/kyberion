@@ -15,7 +15,10 @@ import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
 } from './personal-identity-state.js';
-import { loadOperatorProviderPreferencesAtPath } from './operator-provider-preferences.js';
+import {
+  loadOperatorProviderPreferencesAtPath,
+  writeOperatorProviderPreferencesAtPath,
+} from './operator-provider-preferences.js';
 import {
   loadBrowserOnboardingStateAtPath,
   writeBrowserOnboardingStateAtPath,
@@ -313,7 +316,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         artifacts.push(agentPath);
 
         const providerPath = onboardingPath('provider-preferences.json');
-        writeJson(providerPath, {
+        writeOperatorProviderPreferencesAtPath(providerPath, {
           version: '1.0.0',
           priority: draft.providers.priority,
           default_models: draft.providers.default_models,

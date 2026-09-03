@@ -15076,6 +15076,19 @@ identity／provider／tool／service／voice artifactの既存責務、profile p
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 762
+
+SX-03／SX-04／SX-06／SX-08 のbrowser onboarding provider preferencesを再監査し、provider preference
+loaderは専用 `operator-provider-preferences.schema.json`へ接続済みである一方、apply側のprovider artifact
+だけが汎用 `writeJson` 経由でschemaなし保存されていたため修正した。priority／default_models／provider
+overlayの既存拡張性を維持しつつ、保存直前に同じcatalogで検証し、不正なprovider preferenceをprofileへ
+残さない。previewのno-write、provider catalog warning、identity／tool／service artifactの既存責務は
+維持している。
+
+検証: operator provider preferences **1 file / 3 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
