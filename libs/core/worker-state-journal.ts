@@ -755,7 +755,8 @@ export class WorkerStateJournal {
     try {
       const indexPath = assertSafeRepositoryPath(this.indexPath, { allowMissingLeaf: true });
       this.ensureDir(indexPath);
-      safeWriteFile(indexPath, `${JSON.stringify(summary, null, 2)}\n`);
+      const validated = goalDelegationSummarySchema.parse(summary);
+      safeWriteFile(indexPath, `${JSON.stringify(validated, null, 2)}\n`);
     } catch (error) {
       // The index is derived and rebuildable; never fail on a write hiccup.
       logger.warn(

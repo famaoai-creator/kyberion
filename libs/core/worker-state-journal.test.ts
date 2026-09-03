@@ -313,6 +313,15 @@ describe('KD-03 AC4: derived index (CQRS) self-heals from the journal', () => {
     // The index file is valid JSON again after healing.
     const raw = String(safeReadFile(indexPath, { encoding: 'utf-8' }));
     expect(() => JSON.parse(raw)).not.toThrow();
+    expect(JSON.parse(raw)).toMatchObject({
+      goalId: 'goal-kd03',
+      goalState: 'active',
+      delegationCount: 2,
+      activeDelegationCount: 1,
+      pendingApprovalCount: 0,
+      hasPendingReminder: false,
+      projectedThroughSeq: 2,
+    });
   });
 
   it('the journal remains the source of truth when the index is absent', () => {
