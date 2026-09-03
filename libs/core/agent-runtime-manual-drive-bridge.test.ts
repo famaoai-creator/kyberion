@@ -12,7 +12,7 @@ import {
 import { AgentRuntimeManualDriver } from './agent-runtime-manual-drive.js';
 import { readJsonLines } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { withExecutionContext, withExecutionContextAsync } from './authority.js';
 
 function bridgeFiles(agentId: string): string[] {
@@ -27,6 +27,33 @@ function bridgeFiles(agentId: string): string[] {
 }
 
 describe('durable manual-drive bridge', () => {
+  it('rejects schema-invalid descriptors before bridge state projection', () => {
+    withExecutionContext('mission_controller', () => {
+      const agentId = `bridge-invalid-${process.pid}-${Date.now()}`;
+      const descriptorPath = bridgeFiles(agentId)[0];
+      safeMkdir(path.dirname(descriptorPath), { recursive: true });
+      safeWriteFile(
+        descriptorPath,
+        JSON.stringify({
+          version: 1,
+          agent_id: agentId,
+          owner_id: 'owner-invalid',
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-a' },
+          status: 'online',
+          updated_at: '2026-09-04T00:00:00.000Z',
+          expires_at: '2099-09-04T00:00:00.000Z',
+          action: null,
+          unexpected: true,
+        })
+      );
+      try {
+        expect(() => readManualDriverDescriptor(agentId)).toThrow('[MANUAL_DRIVE_BRIDGE_CORRUPT]');
+      } finally {
+        safeRmSync(descriptorPath, { force: true });
+      }
+    });
+  });
+
   it('publishes only safe action data and completes a queued command', async () => {
     return withExecutionContextAsync('mission_controller', async () => {
       const agentId = `bridge-test-${process.pid}-${Date.now()}`;

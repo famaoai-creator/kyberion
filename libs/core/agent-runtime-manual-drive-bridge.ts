@@ -9,9 +9,10 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { readJsonIfPresent, appendJsonLine, readJsonLines } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -100,6 +101,18 @@ export interface ManualDriverBridgeOptions {
   driver: AgentRuntimeManualDriver;
   scope: EventScopeInput;
   pollIntervalMs?: number;
+}
+
+const MANUAL_DRIVER_DESCRIPTOR_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/manual-driver-descriptor.schema.json'
+);
+
+function manualDriverDescriptorCatalog(filePath: string) {
+  return defineCatalog<DurableManualDriverDescriptor>({
+    id: 'manual-driver-descriptor',
+    path: filePath,
+    schema: MANUAL_DRIVER_DESCRIPTOR_SCHEMA_PATH,
+  });
 }
 
 function normalizeAgentId(agentId: string): string {
@@ -239,11 +252,28 @@ function descriptorFromUnknown(value: unknown, agentId: string): DurableManualDr
   };
 }
 
+function loadManualDriverDescriptorRecord(
+  descriptorPath: string,
+  agentId: string
+): DurableManualDriverDescriptor {
+  try {
+    return descriptorFromUnknown(manualDriverDescriptorCatalog(descriptorPath).load(), agentId);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith('Invalid catalog manual-driver-descriptor')
+    ) {
+      throw new Error('[MANUAL_DRIVE_BRIDGE_CORRUPT] descriptor shape is invalid.');
+    }
+    throw error;
+  }
+}
+
 export function readManualDriverDescriptor(agentId: string): DurableManualDriverDescriptor | null {
   const normalized = normalizeAgentId(agentId);
   const { descriptorPath } = bridgePaths(normalized);
   if (!safeExistsSync(descriptorPath)) return null;
-  const descriptor = descriptorFromUnknown(readJsonIfPresent(descriptorPath), normalized);
+  const descriptor = loadManualDriverDescriptorRecord(descriptorPath, normalized);
   const updatedAt = Date.parse(descriptor.updated_at);
   const expiresAt = Date.parse(descriptor.expires_at);
   if (!Number.isFinite(updatedAt) || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
@@ -261,9 +291,8 @@ function writeDescriptor(input: {
   const { descriptorPath } = bridgePaths(input.agentId);
   const action = projectBridgeActionInfo(input.action);
   const updatedAt = isoNow();
-  safeWriteFile(
-    descriptorPath,
-    `${JSON.stringify({
+  const descriptor = manualDriverDescriptorCatalog(descriptorPath).validate(
+    {
       version: 1,
       agent_id: input.agentId,
       owner_id: input.ownerId,
@@ -272,8 +301,10 @@ function writeDescriptor(input: {
       updated_at: updatedAt,
       expires_at: nowIso(new Date(Date.now() + DESCRIPTOR_TTL_MS)),
       action,
-    } satisfies DurableManualDriverDescriptor)}\n`
+    } satisfies DurableManualDriverDescriptor,
+    descriptorPath
   );
+  safeWriteFile(descriptorPath, `${JSON.stringify(descriptor)}\n`);
 }
 
 function readCommands(agentId: string): ManualDriverCommandRecord[] {
@@ -563,7 +594,9 @@ export function startManualDriverBridge(input: ManualDriverBridgeOptions): () =>
     clearInterval(timer);
     try {
       withLockSync(lockId, () => {
-        const current = readJsonIfPresent<DurableManualDriverDescriptor>(descriptorPath);
+        const current = safeExistsSync(descriptorPath)
+          ? loadManualDriverDescriptorRecord(descriptorPath, agentId)
+          : null;
         if (current?.owner_id === ownerId) safeRmSync(descriptorPath, { force: true });
       });
     } catch {
