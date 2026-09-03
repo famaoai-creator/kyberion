@@ -29,6 +29,7 @@ const secureIo = vi.hoisted(() => {
       }
     },
     safeExistsSync: (filePath: string) => fs.existsSync(abs(filePath)),
+    safeLstat: (filePath: string) => fs.lstatSync(abs(filePath)),
     safeReaddir: (dirPath: string) => fs.readdirSync(abs(dirPath)).map(String),
   };
 });
@@ -135,6 +136,13 @@ describe('WorkerEventStream', () => {
 
     const replayed = readWorkerEventStreamJsonl(file);
     expect(replayed.map((event) => event.type)).toEqual(['turn_begin', 'turn_end']);
+  });
+
+  it('rejects an event log that is not a regular file', () => {
+    const file = 'active/shared/tmp/worker-events-test/directory.jsonl';
+    fs.mkdirSync(path.join(tmpRoot, file), { recursive: true });
+
+    expect(() => readWorkerEventStreamJsonl(file)).toThrow(/must be a regular file/);
   });
 
   it('exposes a resettable process-wide default stream', () => {

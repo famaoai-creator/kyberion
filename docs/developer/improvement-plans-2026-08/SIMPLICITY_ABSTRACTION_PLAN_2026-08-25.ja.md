@@ -14093,6 +14093,12 @@ SX-03／SX-04 のaction-item storeを再監査し、既存の`action-item.schema
 
 検証: action-item store **1 file / 19 tests passed**、対象lint、typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 639
+
+SX-03／SX-04 のworker event streamを再監査し、emit側のzod契約はあるものの、JSONL recorder／replayがraw JSONLとzod parserに分かれ、path-bound catalogとregular-file境界を共有していない残存を修正した。worker event envelope専用schemaと実ファイルpath単位のcanonical catalogを追加し、record／replay双方を同じschema検証へ統合した。既存のSPMC配信、seq／event vocabulary、listener fail-open、corrupt line skip、trigger correlationとobservability redaction semanticsは維持している。
+
+検証: worker event stream **1 file / 8 tests passed**、knowledge index生成、対象lint、typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
