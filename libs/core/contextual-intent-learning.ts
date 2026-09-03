@@ -50,16 +50,22 @@ function defaultStore(): ContextualIntentLearningStore {
   return { version: '1.0.0', entries: [] };
 }
 
-function contextualIntentLearningCatalog(
-  scope?: ScopeContext
+function contextualIntentLearningCatalogAtPath(
+  filePath: string
 ): GovernedCatalog<ContextualIntentLearningStore> {
   return defineCatalog<ContextualIntentLearningStore>({
     id: 'contextual-intent-learning',
-    path: learningStorePath(scope),
+    path: filePath,
     schema: LEARNING_SCHEMA_PATH,
     fallback: defaultStore,
     fallbackOnInvalid: true,
   });
+}
+
+function contextualIntentLearningCatalog(
+  scope?: ScopeContext
+): GovernedCatalog<ContextualIntentLearningStore> {
+  return contextualIntentLearningCatalogAtPath(learningStorePath(scope));
 }
 
 function readStore(scope?: ScopeContext): ContextualIntentLearningStore {
@@ -67,17 +73,26 @@ function readStore(scope?: ScopeContext): ContextualIntentLearningStore {
 }
 
 function writeStore(store: ContextualIntentLearningStore, scope?: ScopeContext): void {
-  const filePath = learningStorePath(scope);
+  writeContextualIntentLearningStoreAtPath(learningStorePath(scope), store);
+}
+
+export function writeContextualIntentLearningStoreAtPath(
+  filePath: string,
+  store: ContextualIntentLearningStore
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  let validated: ContextualIntentLearningStore;
   try {
-    contextualIntentLearningCatalog(scope).validate(store, filePath);
+    validated = contextualIntentLearningCatalogAtPath(safePath).validate(store, safePath);
   } catch (error) {
     throw new Error(
       `Invalid contextual-intent-learning store: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  const dir = path.dirname(filePath);
+  const dir = path.dirname(safePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(store, null, 2));
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2));
+  return safePath;
 }
 
 export function loadContextualIntentLearningStore(
