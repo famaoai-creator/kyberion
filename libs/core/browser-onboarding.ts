@@ -17,6 +17,7 @@ import {
   loadPersonalIdentityAtPath,
 } from './personal-identity-state.js';
 import { loadOperatorProviderPreferencesAtPath } from './operator-provider-preferences.js';
+import { loadBrowserOnboardingStateAtPath } from './browser-onboarding-state.js';
 import {
   getLlmSelectionSnapshot,
   saveLlmSelectionPreferences,
@@ -483,7 +484,9 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
         agent_identity: loadPersonalAgentIdentityAtPath(
           path.join(profileRoot(), 'agent-identity.json')
         ),
-        onboarding: readJson(onboardingPath('browser-onboarding-state.json')),
+        onboarding: loadBrowserOnboardingStateAtPath(
+          onboardingPath('browser-onboarding-state.json')
+        ),
         providers: providerPreference || {
           version: 'default',
           priority: providerConfig.default_priority,
