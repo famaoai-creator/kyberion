@@ -8353,6 +8353,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-provisioned-entry.schema.json",
+      "tier": "public",
+      "size": 524,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-queue.schema.json",
       "tier": "public",
       "size": 669,
