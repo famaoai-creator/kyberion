@@ -1,13 +1,15 @@
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { distillHttpResponse } from '@agent/core/observation-distill';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
 import { secureFetch } from '@agent/core/network';
 import {
+  safeReadFile,
   assertSafeRepositoryPath,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
+  safeLstat,
   safeExec,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -80,6 +82,28 @@ function resolveNetworkPath(ref: string, allowMissingLeaf = true): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
 }
 
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readNetworkContext(filePath: string): Record<string, unknown> {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`network context must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonObjectValue(
+    parseSafeJsonInput(
+      String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
+      'network context'
+    ),
+    'network context'
+  );
+}
+
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
@@ -121,7 +145,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     ? resolveNetworkPath(String(initialCtx.context_path))
     : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
-    const saved = readJson<Record<string, unknown>>(contextPath);
+    const saved = readNetworkContext(contextPath);
     ctx = { ...ctx, ...saved };
   }
 

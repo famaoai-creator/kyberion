@@ -13,6 +13,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeWriteFile: vi.fn(),
   safeMkdir: vi.fn(),
   safeExistsSync: vi.fn().mockReturnValue(false),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeExec: vi.fn().mockReturnValue(''),
 }));
 
@@ -45,6 +46,35 @@ describe('network-actuator', () => {
       const result = await handleAction({ action: 'pipeline', steps: [] });
       expect(result.status).toBe('succeeded');
       expect(result.results).toHaveLength(0);
+    });
+
+    it('context_pathのpersisted JSONをsafe objectとして検証する', async () => {
+      const { safeExistsSync, safeReadFile, safeLstat } = await import('@agent/core/secure-io');
+      vi.mocked(safeExistsSync).mockReturnValue(true);
+      vi.mocked(safeLstat).mockReturnValue({ isFile: () => true } as never);
+      vi.mocked(safeReadFile).mockReturnValue('{"constructor":{"polluted":true}}');
+
+      await expect(
+        handleAction({
+          action: 'pipeline',
+          context: { context_path: 'active/shared/tmp/network-invalid-context.json' },
+          steps: [],
+        })
+      ).rejects.toThrow('dangerous JSON key');
+    });
+
+    it('context_pathがdirectoryならcontextを読み込まない', async () => {
+      const { safeExistsSync, safeLstat } = await import('@agent/core/secure-io');
+      vi.mocked(safeExistsSync).mockReturnValue(true);
+      vi.mocked(safeLstat).mockReturnValue({ isFile: () => false } as never);
+
+      await expect(
+        handleAction({
+          action: 'pipeline',
+          context: { context_path: 'active/shared/tmp/network-directory-context.json' },
+          steps: [],
+        })
+      ).rejects.toThrow('existing regular file');
     });
 
     it('サポートされていないactionでエラーをスロー', async () => {
