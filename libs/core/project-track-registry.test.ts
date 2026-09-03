@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
 import {
   listProjectTrackRecords,
   listProjectTracksForProject,
@@ -45,6 +45,30 @@ describe('project-track-registry', () => {
         utterance: 'Release 1 のテスト計画を更新して',
       })?.track_id
     ).toBe('TRK-TEST-REL1');
+  });
+
+  it('persists the canonical track payload returned by the catalog', () => {
+    saveProjectTrackRecord({
+      track_id: 'TRK-TEST-CANONICAL',
+      project_id: 'PRJ-TEST-WEB',
+      name: 'Canonical Track',
+      summary: 'Track metadata is canonicalized before persistence.',
+      status: 'planned',
+      track_type: 'research',
+      lifecycle_model: 'research_cycle',
+      tier: 'public',
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveProjectTrackRecord>[0]);
+
+    const persisted = JSON.parse(
+      String(
+        safeReadFile(pathResolver.shared('runtime/project-tracks/TRK-TEST-CANONICAL.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.track_id).toBe('TRK-TEST-CANONICAL');
   });
 
   it('rejects a track id that escapes the track directory', () => {

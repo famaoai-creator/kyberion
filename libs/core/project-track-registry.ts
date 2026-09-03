@@ -61,6 +61,14 @@ const projectTrackRecordCatalog = defineCatalog<ProjectTrackRecord>({
   schema: TRACK_SCHEMA_PATH,
 });
 
+function projectTrackRecordCatalogAtPath(filePath: string) {
+  return defineCatalog<ProjectTrackRecord>({
+    id: 'project-track-record',
+    path: filePath,
+    schema: TRACK_SCHEMA_PATH,
+  });
+}
+
 export function validateProjectTrackRecord(value: unknown): value is ProjectTrackRecord {
   try {
     projectTrackRecordCatalog.validate(value);
@@ -74,8 +82,10 @@ export function saveProjectTrackRecord(
   record: ProjectTrackRecord,
   options: { rootDir?: string } = {}
 ): string {
+  const filePath = trackPath(record.track_id, options.rootDir);
+  let validated: ProjectTrackRecord;
   try {
-    projectTrackRecordCatalog.validate(record);
+    validated = projectTrackRecordCatalogAtPath(filePath).validate(record, filePath);
   } catch (error) {
     throw new Error(
       `Invalid project track record: ${error instanceof Error ? error.message : String(error)}`
@@ -83,8 +93,7 @@ export function saveProjectTrackRecord(
   }
   const directory = trackDir(options.rootDir);
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
-  const filePath = trackPath(record.track_id, options.rootDir);
-  safeWriteFile(filePath, JSON.stringify(record, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return filePath;
 }
 
@@ -95,11 +104,7 @@ export function loadProjectTrackRecord(
   const filePath = trackPath(trackId, options.rootDir);
   if (!safeExistsSync(filePath)) return null;
   try {
-    return defineCatalog<ProjectTrackRecord>({
-      id: 'project-track-record',
-      path: filePath,
-      schema: TRACK_SCHEMA_PATH,
-    }).load();
+    return projectTrackRecordCatalogAtPath(filePath).load();
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
     throw error;
