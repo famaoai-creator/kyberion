@@ -1398,6 +1398,7 @@ describe('mission work item dispatch', () => {
         assignments: [
           {
             team_role: 'implementer',
+            required: true,
             status: 'assigned',
             agent_id: 'implementation-agent',
             authority_role: 'software_developer',
@@ -1406,6 +1407,7 @@ describe('mission work item dispatch', () => {
           },
           {
             team_role: 'reviewer',
+            required: true,
             status: 'assigned',
             agent_id: 'reviewer-agent',
             authority_role: 'ruthless_auditor',
