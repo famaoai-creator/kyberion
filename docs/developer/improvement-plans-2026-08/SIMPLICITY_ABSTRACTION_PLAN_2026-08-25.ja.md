@@ -13877,6 +13877,12 @@ SX-03／SX-04 のBrowser Onboarding provider preference readerを再監査し、
 
 検証: operator provider preferences／browser onboarding **2 files / 14 tests passed**、対象 typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 603
+
+SX-03／SX-04 のBrowser Onboarding tool policy readerを再監査し、`tool-runtime-policy.json` をraw `readJson`で読みつつ、同じstate表示で既存の `getToolRuntimePolicy()` fallbackを別経路として持っていた残存を修正した。state projectionを既存のschema／overlay／regular-file／fallbackを備えたpolicy loaderへ一本化し、不正・missing overlayの既定値復帰、tool preference表示、onboarding write semanticsは維持している。provider preference、onboarding receipt、voice registryは別契約のまま変更していない。
+
+検証: browser onboarding／tool runtime policy **2 files / 16 tests passed**、対象 typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
