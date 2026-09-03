@@ -46,6 +46,7 @@ const realFsSecureIo = vi.hoisted(() => ({
     fs.appendFileSync(filePath, data, 'utf8');
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string, options?: { recursive?: boolean }) =>
     fs.mkdirSync(dirPath, { recursive: options?.recursive !== false }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
@@ -58,7 +59,15 @@ const realFsSecureIo = vi.hoisted(() => ({
       return null;
     }
   },
-  loadJson: <T>(filePath: string): T => JSON.parse(String(fs.readFileSync(filePath, 'utf8'))) as T,
+  loadJson: <T>(filePath: string): T => {
+    const schemaPath = filePath.includes('notification-preferences.schema.json')
+      ? path.resolve(
+          process.cwd(),
+          'knowledge/product/schemas/notification-preferences.schema.json'
+        )
+      : filePath;
+    return JSON.parse(String(fs.readFileSync(schemaPath, 'utf8'))) as T;
+  },
   safeWriteFile: (filePath: string, data: string | Buffer) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, data);

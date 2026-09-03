@@ -1,12 +1,14 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonObjectValue } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeAppendFileSync,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeWriteFile,
 } from './secure-io.js';
@@ -52,6 +54,9 @@ export interface OperatorNotificationPayload {
 }
 
 const PREFERENCES_LOGICAL_PATH = 'personal/notification-preferences.json';
+const NOTIFICATION_PREFERENCES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/notification-preferences.schema.json'
+);
 
 const NOTIFICATION_SURFACES = new Set<NotificationChannelTarget['surface']>([
   'slack',
@@ -142,11 +147,21 @@ export function notificationPreferencesPath(): string {
   });
 }
 
+function notificationPreferencesCatalogAtPath(filePath: string) {
+  return defineCatalog<NotificationPreferences>({
+    id: 'notification-preferences',
+    path: filePath,
+    schema: NOTIFICATION_PREFERENCES_SCHEMA_PATH,
+  });
+}
+
 export function loadNotificationPreferences(): NotificationPreferences {
   try {
     const filePath = notificationPreferencesPath();
-    if (!safeExistsSync(filePath)) return {};
-    return parseNotificationPreferences(readJson<unknown>(filePath)) || {};
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return {};
+    return (
+      parseNotificationPreferences(notificationPreferencesCatalogAtPath(filePath).load()) || {}
+    );
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn(`[operator-notifications] failed to read preferences: ${detail}`);
@@ -158,6 +173,7 @@ export function saveNotificationPreferences(prefs: NotificationPreferences): str
   const parsed = parseNotificationPreferences(prefs);
   if (!parsed) throw new Error('Invalid notification preferences');
   const filePath = notificationPreferencesPath();
+  notificationPreferencesCatalogAtPath(filePath).validate(parsed, filePath);
   safeMkdir(path.dirname(filePath), { recursive: true });
   safeWriteFile(filePath, `${JSON.stringify(parsed, null, 2)}\n`);
   return filePath;
