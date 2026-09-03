@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
@@ -38,11 +37,13 @@ const DAEMON_HEARTBEAT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/daemon-heartbeat.schema.json'
 );
 
-const daemonHeartbeatCatalog = defineCatalog<DaemonHeartbeat>({
-  id: 'daemon-heartbeat',
-  path: DAEMON_HEARTBEAT_SCHEMA_PATH,
-  schema: DAEMON_HEARTBEAT_SCHEMA_PATH,
-});
+function daemonHeartbeatCatalogAtPath(filePath: string) {
+  return defineCatalog<DaemonHeartbeat>({
+    id: 'daemon-heartbeat',
+    path: filePath,
+    schema: DAEMON_HEARTBEAT_SCHEMA_PATH,
+  });
+}
 
 function heartbeatRoot(rootDir?: string): string {
   return assertSafeRepositoryPath(rootDir ?? pathResolver.shared('runtime/heartbeats'), {
@@ -66,7 +67,7 @@ export function loadDaemonHeartbeatAtPath(
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[DAEMON_HEARTBEAT] heartbeat must be a regular file: ${filePath}`);
   }
-  const heartbeat = daemonHeartbeatCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  const heartbeat = daemonHeartbeatCatalogAtPath(safeFilePath).load();
   if (heartbeat.daemon_id !== expectedDaemonId) {
     throw new Error(
       `[DAEMON_HEARTBEAT_SCOPE_MISMATCH] heartbeat belongs to ${heartbeat.daemon_id}, expected ${expectedDaemonId}`
@@ -89,7 +90,10 @@ export function recordDaemonHeartbeat(
     timestamp: (options.now ?? new Date()).toISOString(),
     ...(input.details ? { details: input.details } : {}),
   };
-  const validated = daemonHeartbeatCatalog.validate(heartbeat, heartbeatPath(daemonId, root));
+  const validated = daemonHeartbeatCatalogAtPath(heartbeatPath(daemonId, root)).validate(
+    heartbeat,
+    heartbeatPath(daemonId, root)
+  );
   safeWriteFile(heartbeatPath(daemonId, root), `${JSON.stringify(validated, null, 2)}\n`, {
     encoding: 'utf8',
   });
