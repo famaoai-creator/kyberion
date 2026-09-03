@@ -13949,6 +13949,12 @@ SX-03／SX-04 のtenant design override／theme overlay readerを再監査し、
 
 検証: tenant design resolver **1 file / 13 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 615
+
+SX-03／SX-04 のAgent Runtime Supervisor request／result readerを再監査し、専用schemaとqueue path境界はあるものの、実ファイル読込が`validate(readJson(...))`に残る二重経路を修正した。request／resultそれぞれを実ファイルpath単位のcanonical catalog loadへ統合し、requestにもregular-file境界を適用した。queue filename binding、mission／scope binding、malformed／directory artifactの拒否、prewarm orchestration semanticsは維持している。
+
+検証: agent runtime supervisor **1 file / 12 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
