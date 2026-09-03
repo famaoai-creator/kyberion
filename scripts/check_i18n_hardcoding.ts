@@ -13,15 +13,13 @@
 import * as path from 'node:path';
 import ts from 'typescript';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeStat, safeReaddir } from '@agent/core/secure-io';
+import { nowIso } from '@agent/core/foundation';
 import {
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeStat,
-  safeReaddir,
-  safeWriteFile,
-} from '@agent/core/secure-io';
-import { nowIso, readJson } from '@agent/core/foundation';
+  loadI18nHardcodingBaselineAtPath,
+  writeI18nHardcodingBaselineAtPath,
+  type I18nHardcodingBaseline,
+} from '@agent/core/i18n-hardcoding-baseline';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -68,14 +66,6 @@ export type I18nHardcodingReport = {
   violations: string[];
   stale_entries: string[];
   updated_baseline: boolean;
-};
-
-type I18nBaseline = {
-  version: 1;
-  $schema?: string;
-  generated_at: string;
-  scan_roots: string[];
-  files: Record<string, number>;
 };
 
 export function isTestFile(repoRelativePath: string): boolean {
@@ -209,30 +199,20 @@ function scanTree(scanRoots: string[]): {
   return { currentCounts, scannedFiles, checkedFiles, exemptionCount };
 }
 
-function loadBaseline(baselinePath: string): I18nBaseline | null {
-  if (!safeExistsSync(baselinePath)) return null;
-  return readJson<I18nBaseline>(baselinePath);
+function loadBaseline(baselinePath: string): I18nHardcodingBaseline | null {
+  return loadI18nHardcodingBaselineAtPath(baselinePath);
 }
 
 function writeBaselineFile(
   baselinePath: string,
-  baseline: I18nBaseline,
+  baseline: I18nHardcodingBaseline,
   relativeScanRootsForNote: string[]
 ): void {
   withExecutionContext('ecosystem_architect', () => {
-    safeMkdir(path.dirname(baselinePath), { recursive: true });
-    safeWriteFile(
-      baselinePath,
-      JSON.stringify(
-        {
-          $schema: baseline.$schema || '../schemas/governance-catalog.schema.json',
-          ...baseline,
-          scan_roots: relativeScanRootsForNote,
-        },
-        null,
-        2
-      )
-    );
+    writeI18nHardcodingBaselineAtPath(baselinePath, {
+      ...baseline,
+      scan_roots: relativeScanRootsForNote,
+    });
   });
 }
 
@@ -253,7 +233,7 @@ export function checkI18nHardcoding(
   const totalViolationsInTree = Object.values(currentCounts).reduce((sum, n) => sum + n, 0);
 
   if (options.updateBaseline) {
-    const nextBaseline: I18nBaseline = {
+    const nextBaseline: I18nHardcodingBaseline = {
       version: 1,
       generated_at: nowIso(),
       scan_roots: relativeScanRoots,
