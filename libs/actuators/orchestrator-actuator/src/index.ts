@@ -1,4 +1,3 @@
-import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { parsePersistedPipelineStrategy, readJson } from '@agent/core/foundation';
@@ -12,7 +11,11 @@ import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import * as path from 'node:path';
 import { executePipeline, type PipelineStep } from './orchestrator-helpers.js';
-import { runActuatorCli } from '@agent/core/cli-utils';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 
 /**
  * Orchestrator-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
@@ -128,16 +131,13 @@ async function performReconcile(input: OrchestratorAction) {
 const main = async () => {
   await runActuatorCli({
     name: 'orchestrator-actuator',
-    args: process.argv,
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/orchestrator-actuator/src/index.ts')) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'orchestrator-actuator');
 }
 
 export { handleAction };

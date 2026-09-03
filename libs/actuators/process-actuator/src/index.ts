@@ -1,4 +1,8 @@
-import { runActuatorCli } from '@agent/core/cli-utils';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { readJson } from '@agent/core/foundation';
 import * as pathResolver from '@agent/core/path-resolver';
@@ -11,7 +15,7 @@ async function main() {
   );
   await runActuatorCli({
     name: 'process-actuator',
-    args: process.argv,
+    args: currentProcessArgv(),
     handleAction,
     schema: processActionSchema,
   });
@@ -26,10 +30,7 @@ export const actuator = defineCatalogBackedActuator({
 export { handleAction, parseProcessAction };
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/process-actuator/src/index.ts')) {
-  main().catch((err) => {
-    console.error(`[process-actuator] ${err?.message || err}`);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'process-actuator');
 }
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';
