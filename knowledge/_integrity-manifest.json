@@ -9127,6 +9127,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/skill-plugins-config.schema.json",
+      "tier": "public",
+      "size": 914,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/skill-validation-contract.schema.json",
       "tier": "public",
       "size": 868,

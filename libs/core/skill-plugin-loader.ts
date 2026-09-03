@@ -26,10 +26,12 @@
  */
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { ValidateFunction } from 'ajv';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { compileSchema } from './foundation/ajv.js';
 import { isRecord } from './foundation/text.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import {
@@ -132,7 +134,18 @@ export function normalizePluginContributionDeclaration(
 const RESTRICTED_SKILLS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/restricted-skills.schema.json'
 );
+const SKILL_PLUGINS_CONFIG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/skill-plugins-config.schema.json'
+);
 const restrictedSkillsCatalogs = new Map<string, GovernedCatalog<RestrictedSkillsPolicy>>();
+let skillPluginsConfigValidateFn: ValidateFunction | null = null;
+
+interface SkillPluginsConfig {
+  plugins?: string[];
+  tenant_overrides?: Record<string, { plugins?: string[] }>;
+  organization_overrides?: Record<string, { plugins?: string[] }>;
+  project_overrides?: Record<string, { plugins?: string[] }>;
+}
 
 /**
  * Project/plugin configuration may live outside this repository, so the
@@ -171,6 +184,40 @@ function getRestrictedSkillsCatalog(rootDir?: string): GovernedCatalog<Restricte
     restrictedSkillsCatalogs.set(policyPath, catalog);
   }
   return catalog;
+}
+
+function ensureSkillPluginsConfigValidator(): ValidateFunction {
+  if (skillPluginsConfigValidateFn) return skillPluginsConfigValidateFn;
+  skillPluginsConfigValidateFn = compileSchema(SKILL_PLUGINS_CONFIG_SCHEMA_PATH);
+  return skillPluginsConfigValidateFn;
+}
+
+/**
+ * Load a project-owned plugin configuration without applying the
+ * repository-only catalog boundary: project cwd may be outside this repo.
+ * The resource itself remains symlink- and schema-gated before selectors are
+ * interpreted.
+ */
+export function loadSkillPluginsConfigAtPath(filePath: string): SkillPluginsConfig {
+  const safeFilePath = assertNoSymlinkTraversal(filePath);
+  if (!safeExistsSync(safeFilePath)) {
+    throw new Error(`[PLUGIN_CONFIG_MISSING] ${safeFilePath}`);
+  }
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[PLUGIN_CONFIG_INVALID] config must be a regular file: ${filePath}`);
+  }
+  const parsed = parseSafeJsonInput(
+    String(safeReadFile(safeFilePath, { encoding: 'utf8' })),
+    `skill plugin config ${safeFilePath}`
+  );
+  const validate = ensureSkillPluginsConfigValidator();
+  if (!validate(parsed)) {
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim())
+      .join('; ');
+    throw new Error(`[PLUGIN_CONFIG_INVALID] ${safeFilePath}: ${errors}`);
+  }
+  return parsed as SkillPluginsConfig;
 }
 
 /**
@@ -225,12 +272,7 @@ export function readSkillPluginsConfig(cwd: string, scope?: ScopeContext): strin
   try {
     const configPath = assertNoSymlinkTraversal(path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME));
     if (!safeExistsSync(configPath)) return [];
-    const parsed = readJson<{
-      plugins?: unknown;
-      tenant_overrides?: Record<string, { plugins?: unknown }>;
-      organization_overrides?: Record<string, { plugins?: unknown }>;
-      project_overrides?: Record<string, { plugins?: unknown }>;
-    }>(configPath);
+    const parsed = loadSkillPluginsConfigAtPath(configPath);
     const base = (Array.isArray(parsed.plugins) ? parsed.plugins : []).filter(
       (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0
     );
@@ -284,7 +326,10 @@ function readPluginManifestProvides(resolvedPath: string): {
       .find((candidate) => safeExistsSync(candidate));
     if (manifestPath) {
       try {
-        const parsed = readJson<unknown>(manifestPath);
+        const parsed = parseSafeJsonInput(
+          String(safeReadFile(manifestPath, { encoding: 'utf8' })),
+          `plugin manifest ${manifestPath}`
+        );
         if (!isRecord(parsed)) throw new Error('plugin manifest root must be a JSON object');
         const provides = normalizePluginContributionDeclaration(parsed.provides);
         return {
