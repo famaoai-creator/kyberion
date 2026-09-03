@@ -248,6 +248,18 @@ describe('shared report output boundary', () => {
     expect(output).toContain('ja: 100% -> 66.67%');
   });
 
+  it('uses the canonical coverage history loader and writer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/report_i18n_translation_coverage.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('loadI18nCoverageHistoryAtPath');
+    expect(source).toContain('writeI18nCoverageHistoryAtPath');
+    expect(source).not.toContain('readJsonIfPresent<CoverageHistorySnapshot>');
+    expect(source).not.toContain('JSON.stringify(snapshot, null, 2)');
+  });
+
   it('keeps alert history read-only for a dry-run and check invocation', async () => {
     const historyPath = pathResolver.sharedTmp('report-i18n-coverage-test/read-only.json');
     const original = JSON.stringify({ recorded_at: '2026-07-01T00:00:00.000Z', locales: {} });

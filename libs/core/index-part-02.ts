@@ -86,6 +86,8 @@ export * from './soak-restart-state.js';
 
 export * from './soak-evidence-manifest.js';
 
+export * from './i18n-coverage-history.js';
+
 export * from './ops-alert.js';
 
 export * from './health-degradation.js';

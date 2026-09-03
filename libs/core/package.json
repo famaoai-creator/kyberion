@@ -679,6 +679,10 @@
       "types": "./dist/soak-evidence-manifest.d.ts",
       "default": "./dist/soak-evidence-manifest.js"
     },
+    "./i18n-coverage-history": {
+      "types": "./dist/i18n-coverage-history.d.ts",
+      "default": "./dist/i18n-coverage-history.js"
+    },
     "./runtime-health-history": {
       "types": "./dist/runtime-health-history.d.ts",
       "default": "./dist/runtime-health-history.js"

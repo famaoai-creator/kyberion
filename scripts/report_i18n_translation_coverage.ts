@@ -35,13 +35,17 @@
  *     `pipelines/i18n-drift-audit.json` run, not routine local use.
  */
 import * as path from 'node:path';
-import { readJsonIfPresent } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { loadVocabularyCatalog, type VocabularyCatalogFile } from '@agent/core/vocabulary-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { safeMkdir } from '@agent/core/secure-io';
 import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
+import {
+  loadI18nCoverageHistoryAtPath,
+  writeI18nCoverageHistoryAtPath,
+  type I18nCoverageHistorySnapshot,
+} from '@agent/core/i18n-coverage-history';
 
 export interface NamespaceCoverageStat {
   namespace: string;
@@ -76,10 +80,7 @@ export interface TranslationCoverageReport {
   violations: string[];
 }
 
-export interface CoverageHistorySnapshot {
-  recorded_at: string;
-  locales: Record<string, number>;
-}
+export type CoverageHistorySnapshot = I18nCoverageHistorySnapshot;
 
 function roundPct(translated: number, total: number): number {
   // A namespace with zero keys (e.g. `bridge`/`onboarding` are currently
@@ -220,7 +221,11 @@ function defaultHistoryPath(): string {
 }
 
 function loadHistory(historyPath: string): CoverageHistorySnapshot | null {
-  return readJsonIfPresent<CoverageHistorySnapshot>(historyPath);
+  try {
+    return loadI18nCoverageHistoryAtPath(historyPath);
+  } catch {
+    return null;
+  }
 }
 
 function writeHistory(historyPath: string, snapshot: CoverageHistorySnapshot): void {
@@ -231,7 +236,7 @@ function writeHistory(historyPath: string, snapshot: CoverageHistorySnapshot): v
   // to notice because the weekly pipeline is the path that looks healthy.
   withExecutionContext('ecosystem_architect', () => {
     safeMkdir(path.dirname(historyPath), { recursive: true });
-    safeWriteFile(historyPath, JSON.stringify(snapshot, null, 2));
+    writeI18nCoverageHistoryAtPath(historyPath, snapshot);
   });
 }
 
