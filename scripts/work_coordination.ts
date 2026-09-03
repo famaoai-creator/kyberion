@@ -34,6 +34,7 @@ import {
   formatIntegratedHandoffHistory,
 } from '@agent/core/handoff-history';
 import { loadAiDlcPhaseState } from '@agent/core/aidlc-phase-state';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { projectWorkGraphToNextTasks } from '@agent/core/work-graph-projection';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -143,11 +144,13 @@ function discoverReadableMissionStates(): Array<{ missionId: string; state: any 
         });
         if (safeExistsSync(candidate)) {
           try {
-            const state = readJson<Record<string, unknown>>(candidate);
-            const missionId = String(state?.mission_id || path.basename(missionDir));
-            if (!seen.has(missionId)) {
-              seen.add(missionId);
-              states.push({ missionId, state });
+            const state = loadStateAtPath(candidate);
+            if (state) {
+              const missionId = String(state.mission_id || path.basename(missionDir));
+              if (!seen.has(missionId)) {
+                seen.add(missionId);
+                states.push({ missionId, state });
+              }
             }
           } catch {
             // Ignore malformed mission state; the history view remains best-effort.
