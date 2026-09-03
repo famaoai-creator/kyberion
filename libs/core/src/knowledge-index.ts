@@ -3,13 +3,11 @@ import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { readJson } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
-import { isRecord } from '../foundation/text.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExistsSync,
   safeReadFile,
   safeReaddir,
-  safeWriteFile,
   safeMkdir,
   safeStat,
   safeLstat,
@@ -33,6 +31,10 @@ import {
   type KnowledgeIndexCache,
   type KnowledgeIndexCacheEntry,
 } from '../knowledge-index-cache.js';
+import {
+  loadKnowledgeIndexUsageAtPath,
+  writeKnowledgeIndexUsageAtPath,
+} from '../knowledge-index-usage.js';
 import { physicalScopedPath } from '../physical-namespace.js';
 import type { ScopeContext } from '../scope-context.js';
 import { currentScope } from '../scope-context.js';
@@ -374,14 +376,7 @@ function usageFilePath(): string {
 
 function loadUsageMap(): Record<string, string> {
   try {
-    if (!safeExistsSync(usageFilePath())) return {};
-    const parsed = readJson<unknown>(usageFilePath());
-    if (!isRecord(parsed)) return {};
-    const usage: Record<string, string> = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      if (typeof value === 'string') usage[key] = value;
-    }
-    return usage;
+    return loadKnowledgeIndexUsageAtPath(usageFilePath());
   } catch {
     /* corrupt usage map: rebuild from scratch */
     return {};
@@ -394,7 +389,7 @@ function touchScopeUsage(scopeHash: string): void {
     usage[scopeHash] = nowIso();
     const dir = cacheDir();
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(usageFilePath(), JSON.stringify(usage));
+    writeKnowledgeIndexUsageAtPath(usageFilePath(), usage);
   } catch {
     /* usage tracking is best-effort; eviction falls back to mtime */
   }
@@ -438,7 +433,7 @@ export function enforceKnowledgeCacheBudget(): void {
     }
     if (evictedScopes.length > 0) {
       for (const scope of evictedScopes) delete usage[scope];
-      safeWriteFile(usageFilePath(), JSON.stringify(usage));
+      writeKnowledgeIndexUsageAtPath(usageFilePath(), usage);
     }
   } catch {
     /* eviction is best-effort; an oversized cache is not fatal */
