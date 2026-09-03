@@ -162,11 +162,50 @@ function resetTestDoubles(): void {
   });
 }
 
+async function installMockFoundationIo(): Promise<void> {
+  const foundation = await import('@agent/core/foundation');
+  const actualSecureIo =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  const readFile = (filePath: string): string => {
+    const normalizedPath = String(filePath).replaceAll('\\', '/');
+    const useActualFile =
+      normalizedPath.includes('/knowledge/product/schemas/') ||
+      normalizedPath.endsWith('/knowledge/product/governance/error-classifier-rules.json') ||
+      normalizedPath.endsWith('/libs/actuators/media-generation-actuator/manifest.json');
+    return String(
+      useActualFile
+        ? actualSecureIo.safeReadFile(filePath, { encoding: 'utf8' })
+        : mocks.safeReadFile(filePath)
+    );
+  };
+  const loadJson = <T>(filePath: string): T => JSON.parse(readFile(filePath)) as T;
+  foundation.registerFoundationIo({
+    loadJson,
+    loadJsonIfPresent: <T>(filePath: string): T | null => {
+      const mockedExists = mocks.safeExistsSync(filePath);
+      const exists = typeof mockedExists === 'boolean' ? mockedExists : true;
+      return exists ? loadJson<T>(filePath) : null;
+    },
+    appendFile: (filePath, content) => mocks.safeWriteFile(filePath, content),
+    exists: (filePath) => {
+      const mockedExists = mocks.safeExistsSync(filePath);
+      return typeof mockedExists === 'boolean' ? mockedExists : true;
+    },
+    readFile,
+    stat: (filePath) => ({
+      mtimeMs: 0,
+      size: readFile(filePath).length,
+    }),
+    writeFile: (filePath, content) => mocks.safeWriteFile(filePath, content),
+  });
+}
+
 describe('prompt style pack injection (E2E-02 Task 4)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
     resetTestDoubles();
+    await installMockFoundationIo();
   });
 
   async function prepare(action: string, params: Record<string, unknown>) {
@@ -222,10 +261,28 @@ describe('prompt style pack injection (E2E-02 Task 4)', () => {
 });
 
 describe('media-generation-actuator', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
     resetTestDoubles();
+    await installMockFoundationIo();
+  });
+
+  it('uses the schema-bound catalog for persisted generation jobs', async () => {
+    const actual =
+      await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+    const source = String(
+      actual.safeReadFile(
+        pathResolver.rootResolve(
+          'libs/actuators/media-generation-actuator/src/media-generation-helpers.ts'
+        ),
+        { encoding: 'utf8' }
+      )
+    );
+
+    expect(source).toContain("id: 'generation-job'");
+    expect(source).toContain("'product/schemas/generation-job.schema.json'");
+    expect(source).not.toContain('readJson<unknown>(jobPath)');
   });
 
   it('uses the manifest recovery policy when polling generation history', async () => {
