@@ -371,4 +371,10 @@ describe('metrics core', () => {
     expect(report.skills[0].skill).toBe('code-actuator');
     expect(report.skills[0].sloCompliance).toBe(50);
   });
+
+  it('loads SLO targets through the governed catalog boundary', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'libs/core/metrics.ts'), 'utf8');
+    expect(source).toContain('sloTargetsCatalog(safeCandidate).load()');
+    expect(source).not.toContain('readJson<{');
+  });
 });
