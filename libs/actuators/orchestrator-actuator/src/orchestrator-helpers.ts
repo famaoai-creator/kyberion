@@ -1,11 +1,12 @@
 import { logger } from '@agent/core/core';
-import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import {
   safeReadFile,
   safeWriteFile,
   safeExec,
   safeMkdir,
   safeExistsSync,
+  safeLstat,
   safeUnlinkSync,
   safeSymlinkSync,
   assertSafeRepositoryPath,
@@ -128,6 +129,22 @@ function resolveOrchestratorRepositoryPath(rootDir: string, value: unknown): str
   });
 }
 
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readOrchestratorJson(filePath: string, label: string): unknown {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
+}
+
 /**
  * Universal Pipeline Engine with Control Flow & Safety Guards
  */
@@ -147,7 +164,10 @@ export async function executePipeline(
     ? resolveOrchestratorRepositoryPath(rootDir, initialCtx.context_path)
     : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
-    const saved = readJson<Record<string, unknown>>(contextPath);
+    const saved = parseSafeJsonObjectValue(
+      readOrchestratorJson(contextPath, 'orchestrator context'),
+      'orchestrator context'
+    );
     ctx = { ...ctx, ...saved };
   }
 
@@ -236,10 +256,12 @@ async function opCapture(op: string, params: any, ctx: any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json':
+      const inputPath = resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx));
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: readJson<unknown>(
-          resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx))
+        [params.export_as || 'last_capture_data']: readOrchestratorJson(
+          inputPath,
+          'orchestrator read_json'
         ),
       };
     case 'read_file':
