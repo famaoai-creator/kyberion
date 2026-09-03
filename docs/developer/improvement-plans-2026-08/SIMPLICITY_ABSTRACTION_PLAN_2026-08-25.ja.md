@@ -15754,6 +15754,17 @@ valid ledger、malformed ledger、repository外pathの回帰を追加した。
 検証: project mission ledger boundary **1 file / 4 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateは
 この追記後に実行する。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 821
+
+SX-11／SX-10 のSuper-Nerve repair再読込を再監査し、修復後JSONの`steps`配列だけを確認して型キャストし、
+不正なADFを再実行へ渡す残存を修正した。既存の`loadPipelineAdfAtPath`へ再読込を統合し、path scope、regular file、
+pipeline ADF schema、step shapeを検証してから再試行するようにした。repairが失敗した場合は既存の失敗結果を返し、
+未検証pipelineの二度目の実行へ進まない。通常のrepair成功、core macro include、trust、retry semanticsは維持し、
+canonical loader失敗時のnon-retry回帰を追加した。
+
+検証: Super-Nerve **1 file / 10 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
