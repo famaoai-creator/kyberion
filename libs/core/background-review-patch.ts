@@ -18,7 +18,6 @@ import {
   type DistillCandidateRecord,
 } from './distill-candidate-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
@@ -570,11 +569,13 @@ export interface ManagedSkillProvenance {
   registered_by: string;
 }
 
-const managedSkillProvenanceCatalog = defineCatalog<ManagedSkillProvenance>({
-  id: 'background-review-managed-skill-provenance',
-  path: MANAGED_SKILL_PROVENANCE_SCHEMA_PATH,
-  schema: MANAGED_SKILL_PROVENANCE_SCHEMA_PATH,
-});
+function managedSkillProvenanceCatalog(sidecarPath: string) {
+  return defineCatalog<ManagedSkillProvenance>({
+    id: 'background-review-managed-skill-provenance',
+    path: sidecarPath,
+    schema: MANAGED_SKILL_PROVENANCE_SCHEMA_PATH,
+  });
+}
 
 /** Load managed-skill provenance through schema, regular-file, and skill binding checks. */
 export function loadManagedSkillProvenanceAtPath(
@@ -587,10 +588,7 @@ export function loadManagedSkillProvenanceAtPath(
       `[POLICY_VIOLATION] Managed skill provenance must be a regular file: ${sidecarPath}`
     );
   }
-  const provenance = managedSkillProvenanceCatalog.validate(
-    readJson<unknown>(safeSidecarPath),
-    safeSidecarPath
-  );
+  const provenance = managedSkillProvenanceCatalog(safeSidecarPath).load();
   if (provenance.skill_ref !== skillRef) {
     throw new Error(
       `[POLICY_VIOLATION] Managed skill provenance skill reference mismatch: ${skillRef}`
