@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { parseOnboardingState } from './onboarding-state.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeRmSync, safeWriteFile } from './secure-io.js';
+import { loadOnboardingStateAtPath, parseOnboardingState } from './onboarding-state.js';
 
 describe('onboarding state loader', () => {
+  const persistedStatePath = pathResolver.sharedTmp('onboarding-state-loader-test.json');
+
+  afterEach(() => {
+    safeRmSync(persistedStatePath, { force: true });
+  });
+
   const valid = {
     version: '1.0.0' as const,
     status: 'draft' as const,
@@ -43,5 +51,24 @@ describe('onboarding state loader', () => {
         )
       )
     ).toThrow('dangerous JSON key');
+  });
+
+  it('loads legacy persisted identity state through the catalog before normalization', () => {
+    safeWriteFile(
+      persistedStatePath,
+      JSON.stringify({
+        ...valid,
+        identity: {
+          name: 'Operator',
+          language: 'ja',
+          interaction_style: 'Senior Partner',
+          primary_domain: 'operations',
+          vision: 'ship safely',
+          agent_id: 'operator',
+        },
+      })
+    );
+
+    expect(loadOnboardingStateAtPath(persistedStatePath)?.identity?.persona).toBe('sovereign');
   });
 });

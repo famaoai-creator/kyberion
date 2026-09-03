@@ -8295,7 +8295,7 @@
     {
       "path": "product/schemas/onboarding-state.schema.json",
       "tier": "public",
-      "size": 4915,
+      "size": 4896,
       "type": "json"
     },
     {

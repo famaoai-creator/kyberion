@@ -1,5 +1,6 @@
 import { compileSchema } from './foundation/ajv.js';
-import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonObjectValue } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 
@@ -70,6 +71,17 @@ export interface OnboardingProfileState {
 const onboardingStateValidate = compileSchema<OnboardingProfileState>(
   pathResolver.knowledge('product/schemas/onboarding-state.schema.json')
 );
+const ONBOARDING_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/onboarding-state.schema.json'
+);
+
+function onboardingStateCatalogAtPath(filePath: string) {
+  return defineCatalog<OnboardingProfileState>({
+    id: 'onboarding-state',
+    path: filePath,
+    schema: ONBOARDING_STATE_SCHEMA_PATH,
+  });
+}
 
 /** Parse a persisted onboarding state, including the legacy persona default. */
 export function parseOnboardingState(value: unknown): OnboardingProfileState {
@@ -99,5 +111,5 @@ export function parseOnboardingState(value: unknown): OnboardingProfileState {
 export function loadOnboardingStateAtPath(filePath: string): OnboardingProfileState | null {
   const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
-  return parseOnboardingState(readJson<unknown>(safePath));
+  return parseOnboardingState(onboardingStateCatalogAtPath(safePath).load());
 }
