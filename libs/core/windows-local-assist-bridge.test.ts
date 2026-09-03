@@ -47,4 +47,19 @@ describe('windows local assist bridge', () => {
       'support'
     );
   });
+
+  it('fails closed when the chat response content is not a string', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ choices: [{ message: { content: { leaked: true } } }] }), {
+          status: 200,
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.KYBERION_WINDOWS_AI_ENDPOINT = 'http://127.0.0.1:5272';
+
+    await expect(windowsLocalAssistPrompt('malformed response')).resolves.toBeNull();
+  });
 });
