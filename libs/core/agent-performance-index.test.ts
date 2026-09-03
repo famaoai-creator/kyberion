@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseAgentPerformanceIndex } from './agent-performance-index.js';
+import { pathResolver } from './path-resolver.js';
+import {
+  loadAgentPerformanceIndexAtPath,
+  parseAgentPerformanceIndex,
+} from './agent-performance-index.js';
 
 describe('agent performance index', () => {
   const valid = {
@@ -49,5 +53,11 @@ describe('agent performance index', () => {
         },
       })
     ).toThrow('between 0 and 1');
+  });
+
+  it('rejects a directory before attempting to load the persisted index', () => {
+    expect(() => loadAgentPerformanceIndexAtPath(pathResolver.knowledge('product'))).toThrow(
+      'regular file'
+    );
   });
 });

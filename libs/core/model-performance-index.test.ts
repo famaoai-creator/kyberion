@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const mockFiles = vi.hoisted(() => new Map<string, string>());
+const mockLstatIsFile = vi.hoisted(() => vi.fn(() => true));
 
 vi.mock('./secure-io.js', () => ({
   assertSafeRepositoryPath: (filePath: string) => filePath,
   safeAppendFileSync: (filePath: string, data: string) =>
     mockFiles.set(filePath, `${mockFiles.get(filePath) || ''}${data}`),
   safeExistsSync: (filePath: string) => mockFiles.has(filePath),
+  safeLstat: () => ({ isFile: () => mockLstatIsFile() }),
   safeMkdir: () => {},
   safeReadFile: (filePath: string) => mockFiles.get(filePath) || '',
   loadJson: (filePath: string) => JSON.parse(mockFiles.get(filePath) || 'null'),
@@ -18,10 +22,21 @@ describe('model performance index', () => {
 
   beforeEach(async () => {
     mockFiles.clear();
+    mockLstatIsFile.mockReturnValue(true);
     vi.resetModules();
     const { registerFoundationIo } = await import('./foundation/io.js');
     registerFoundationIo({
-      loadJson: <T>(filePath: string): T => JSON.parse(mockFiles.get(filePath) || 'null') as T,
+      loadJson: <T>(filePath: string): T => {
+        if (filePath.includes('model-performance-index.schema.json')) {
+          return JSON.parse(
+            fs.readFileSync(
+              path.resolve('knowledge/product/schemas/model-performance-index.schema.json'),
+              'utf8'
+            )
+          ) as T;
+        }
+        return JSON.parse(mockFiles.get(filePath) || 'null') as T;
+      },
       loadJsonIfPresent: <T>(filePath: string): T | null => {
         const value = mockFiles.get(filePath);
         return value === undefined ? null : (JSON.parse(value) as T);
@@ -42,6 +57,7 @@ describe('model performance index', () => {
 
   afterEach(() => {
     mockFiles.clear();
+    mockLstatIsFile.mockReset();
   });
 
   it('learns a bounded model×role score from retrospective outcomes', () => {
@@ -136,5 +152,27 @@ describe('model performance index', () => {
         )
       )
     ).toThrow('dangerous JSON key');
+  });
+
+  it('loads persisted projections through the governed catalog and rejects directories', () => {
+    const indexPath = mod.modelPerformanceIndexPath();
+    const projection = {
+      by_model_role: {
+        'openai:gpt-5.6-luna|planner': {
+          samples: 5,
+          success: 5,
+          review: 0,
+          blocked: 0,
+          success_rate: 1,
+          feedback_samples: 0,
+          average_rating: 0,
+        },
+      },
+    };
+    mockFiles.set(indexPath, JSON.stringify(projection));
+    expect(mod.loadModelPerformanceIndexAtPath(indexPath)).toEqual(projection);
+
+    mockLstatIsFile.mockReturnValue(false);
+    expect(() => mod.loadModelPerformanceIndexAtPath(indexPath)).toThrow('regular file');
   });
 });

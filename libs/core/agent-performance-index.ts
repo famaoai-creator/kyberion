@@ -1,12 +1,14 @@
-import {
-  appendJsonLine,
-  parseSafeJsonObjectValue,
-  readJson,
-  readJsonLines,
-} from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonObjectValue, readJsonLines } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 
 /**
  * Agent×role performance index — the deterministic data path from mission
@@ -42,6 +44,17 @@ export interface AgentPerformanceIndex {
 
 const OUTCOMES_PATH = 'observability/retrospectives/agent-role-outcomes.jsonl';
 const INDEX_PATH = 'observability/retrospectives/agent-performance.json';
+const INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-performance-index.schema.json'
+);
+
+function performanceIndexCatalog(filePath: string) {
+  return defineCatalog<AgentPerformanceIndex>({
+    id: 'agent-performance-index',
+    path: filePath,
+    schema: INDEX_SCHEMA_PATH,
+  });
+}
 
 export function agentRoleOutcomesPath(): string {
   return assertSafeRepositoryPath(pathResolver.shared(OUTCOMES_PATH), { allowMissingLeaf: true });
@@ -175,7 +188,11 @@ export function rebuildAgentPerformanceIndex(): Record<string, AgentRolePerforma
   }
   const indexPath = agentPerformanceIndexPath();
   safeMkdir(path.dirname(indexPath), { recursive: true });
-  safeWriteFile(indexPath, JSON.stringify({ by_agent_role: byKey }, null, 2));
+  const validated = performanceIndexCatalog(indexPath).validate(
+    { by_agent_role: byKey },
+    indexPath
+  );
+  safeWriteFile(indexPath, JSON.stringify(validated, null, 2));
   return byKey;
 }
 
@@ -190,7 +207,17 @@ export function resetAgentPerformanceIndexCache(): void {
 export function loadAgentPerformanceIndex(): Record<string, AgentRolePerformance> {
   const indexPath = agentPerformanceIndexPath();
   if (!safeExistsSync(indexPath)) return {};
-  return parseAgentPerformanceIndex(readJson<unknown>(indexPath)).by_agent_role;
+  return loadAgentPerformanceIndexAtPath(indexPath).by_agent_role;
+}
+
+/** Load an agent performance projection through the governed catalog boundary. */
+export function loadAgentPerformanceIndexAtPath(filePath: string): AgentPerformanceIndex {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[AGENT_PERFORMANCE] index must be a regular file: ${filePath}`);
+  }
+  const indexed = performanceIndexCatalog(safeFilePath).load();
+  return parseAgentPerformanceIndex(indexed);
 }
 
 export function getAgentRolePerformance(
