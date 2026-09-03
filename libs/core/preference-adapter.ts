@@ -1,5 +1,5 @@
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 
@@ -8,6 +8,9 @@ import { pathResolver } from './path-resolver.js';
  */
 
 const PREF_PATH = pathResolver.knowledge('personal/user-preferences.json');
+const USER_PREFERENCES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/user-preferences.schema.json'
+);
 
 export type UserPreferences = Record<string, unknown>;
 
@@ -17,6 +20,23 @@ export type UserPreferences = Record<string, unknown>;
  */
 export function parseUserPreferences(value: unknown): UserPreferences | null {
   return isRecord(value) ? value : null;
+}
+
+function userPreferencesCatalogAtPath(filePath: string) {
+  return defineCatalog<UserPreferences>({
+    id: 'user-preferences',
+    path: filePath,
+    schema: USER_PREFERENCES_SCHEMA_PATH,
+  });
+}
+
+function loadPersistedPreferences(): UserPreferences | null {
+  if (!safeExistsSync(PREF_PATH) || !safeLstat(PREF_PATH).isFile()) return null;
+  try {
+    return parseUserPreferences(userPreferencesCatalogAtPath(PREF_PATH).load());
+  } catch {
+    return null;
+  }
 }
 
 function isSafePreferenceSegment(segment: string): boolean {
@@ -63,8 +83,7 @@ export function writeUserPreference(
 export const preferenceAdapter = {
   get: (key: string, defaultValue: unknown = null): unknown => {
     try {
-      if (!safeExistsSync(PREF_PATH)) return defaultValue;
-      const prefs = parseUserPreferences(readJson<unknown>(PREF_PATH));
+      const prefs = loadPersistedPreferences();
       return prefs ? readUserPreference(prefs, key, defaultValue) : defaultValue;
     } catch (_e) {
       return defaultValue;
@@ -73,11 +92,10 @@ export const preferenceAdapter = {
 
   set: (key: string, value: unknown): boolean => {
     try {
-      const prefs = safeExistsSync(PREF_PATH)
-        ? parseUserPreferences(readJson<unknown>(PREF_PATH))
-        : {};
+      const prefs = safeExistsSync(PREF_PATH) ? loadPersistedPreferences() : {};
       if (!prefs || !writeUserPreference(prefs, key, value)) return false;
 
+      userPreferencesCatalogAtPath(PREF_PATH).validate(prefs, PREF_PATH);
       safeWriteFile(PREF_PATH, JSON.stringify(prefs, null, 2) + '\n');
       return true;
     } catch (_e) {
