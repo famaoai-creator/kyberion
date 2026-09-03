@@ -8,7 +8,15 @@ import {
   validateSlidePatternContent,
 } from './presentation-slide-pattern.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
+import { withExecutionContext } from './authority.js';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -40,6 +48,52 @@ describe('presentation slide pattern pack', () => {
 
     expect(validate(catalog)).toBe(true);
     expect(validate(example)).toBe(true);
+  });
+
+  it('loads custom packs through the schema and regular-file boundary', () => {
+    const root = pathResolver.sharedTmp(`slide-pattern-pack-loader-${process.pid}`);
+    const filePath = path.join(root, 'pack.json');
+    const directoryPath = path.join(root, 'directory.json');
+    const linkedPath = path.join(root, 'linked.json');
+    const pack = {
+      kind: 'slide-pattern-pack',
+      version: '1.0.0',
+      pack_id: 'loader-test',
+      source: { name: 'test' },
+      patterns: [
+        {
+          pattern_id: 'single-message',
+          category: 'message',
+          summary: 'Single message',
+          suitable_scenes: ['summary'],
+          slide_types: ['content'],
+          semantic_types: ['summary'],
+          structure: { layout: 'single-message' },
+          element_slots: [{ slot_id: 'message', role: 'Message', required: true }],
+          renderer_hints: { layout_key: 'decision-cta', body_zone: 'decision-cta' },
+        },
+      ],
+    };
+
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(root, { recursive: true });
+        safeWriteFile(filePath, JSON.stringify(pack));
+        expect(loadSlidePatternPack(filePath).pack_id).toBe('loader-test');
+
+        safeWriteFile(filePath, JSON.stringify({ ...pack, unexpected: true }));
+        expect(() => loadSlidePatternPack(filePath)).toThrow(/Invalid catalog slide-pattern-pack/);
+
+        safeMkdir(directoryPath);
+        safeSymlinkSync(filePath, linkedPath);
+        expect(() => loadSlidePatternPack(directoryPath)).toThrow(
+          '[SLIDE_PATTERN_PACK] pack must be a regular file'
+        );
+        expect(() => loadSlidePatternPack(linkedPath)).toThrow('[RESOURCE_PATH_SYMLINK]');
+      });
+    } finally {
+      safeRmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('selects a pattern by explicit policy before scoring', () => {
