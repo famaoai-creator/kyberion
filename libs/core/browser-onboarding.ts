@@ -464,9 +464,7 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
       const providerPreference = loadOperatorProviderPreferencesAtPath(
         onboardingPath('provider-preferences.json')
       );
-      const toolPreference = readJson<Record<string, unknown>>(
-        onboardingPath('tool-runtime-policy.json')
-      );
+      const toolPreference = getToolRuntimePolicy();
       const identity = loadPersonalIdentityAtPath(path.join(profileRoot(), 'my-identity.json'));
       const visionPath = path.join(profileRoot(), 'my-vision.md');
       const vision = String(
@@ -493,7 +491,7 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
         },
         reasoning_selection: getLlmSelectionSnapshot(),
         adapter_defaults: getAdapterDefaultSelectionSnapshot(),
-        tools: toolPreference || getToolRuntimePolicy(),
+        tools: toolPreference,
         voice_profiles: getVoiceProfileRegistry().profiles,
         service_bindings: listServiceBindingRecords(),
         allowed_services: allowedServices,
