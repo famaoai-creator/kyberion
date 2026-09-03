@@ -235,6 +235,10 @@
       "types": "./dist/knowledge-scope.d.ts",
       "default": "./dist/knowledge-scope.js"
     },
+    "./i18n-hardcoding-baseline": {
+      "types": "./dist/i18n-hardcoding-baseline.d.ts",
+      "default": "./dist/i18n-hardcoding-baseline.js"
+    },
     "./knowledge-taxonomy": {
       "types": "./dist/knowledge-taxonomy.d.ts",
       "default": "./dist/knowledge-taxonomy.js"
