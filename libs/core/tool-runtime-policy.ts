@@ -3,7 +3,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { withExecutionContext } from './authority.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 
 export type ToolRuntimeMode = 'trial' | 'approved_install' | 'installed' | 'pinned';
 export type ToolRuntimeEcosystem = 'python' | 'node' | 'system';
@@ -86,6 +86,21 @@ export function getToolRuntimePolicy(): ToolRuntimePolicy {
     'ecosystem_architect'
   );
   return cachedPolicy;
+}
+
+/** Validate and persist a profile policy through the same catalog as reads. */
+export function writeToolRuntimePolicyAtPath(filePath: string, policy: ToolRuntimePolicy): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = defineCatalog<ToolRuntimePolicy>({
+    id: 'tool-runtime-policy',
+    path: safePath,
+    schema: POLICY_SCHEMA_PATH,
+  }).validate(policy, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2) + '\n', {
+    mkdir: true,
+    encoding: 'utf8',
+  });
+  return safePath;
 }
 
 export function resolveToolRuntimeRoot(policy: ToolRuntimePolicy = getToolRuntimePolicy()): string {
