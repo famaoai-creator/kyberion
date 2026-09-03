@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import videoCompositionJobTicketSchema from '../../../../knowledge/product/schemas/video-composition-job-ticket.schema.json';
 
 const mocks = vi.hoisted(() => ({
   compileSchemaFromPath: vi.fn(() => {
@@ -146,11 +147,13 @@ const mocks = vi.hoisted(() => ({
     ],
   })),
   writeVideoCompositionBundle: vi.fn(() => ({
+    bundle_dir: '/tmp/video-composition',
     artifact_refs: ['/tmp/video-composition/index.html', '/tmp/video-composition/render-plan.json'],
   })),
 }));
 
-vi.mock('@agent/core/foundation', () => ({
+vi.mock('@agent/core/foundation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
   compileSchema: mocks.compileSchemaFromPath,
   getRegisteredEnvText: (name: string) => process.env[name],
   nowIso: vi.fn(() => '2026-01-01T00:00:00.000Z'),
@@ -217,6 +220,59 @@ vi.mock('@agent/core/video-render-backend', async (importOriginal) => ({
   renderVideoCompositionBundleAsync: mocks.renderVideoCompositionBundleAsync,
 }));
 
+async function installMockFoundationIo(): Promise<void> {
+  const foundation = await import('@agent/core/foundation');
+  const actualSecureIo =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  const actualPathResolver = await vi.importActual<typeof import('@agent/core/path-resolver')>(
+    '@agent/core/path-resolver'
+  );
+  const resolveActualPath = (filePath: string): string => {
+    const normalizedPath = String(filePath).replaceAll('\\', '/');
+    const schemaMarker = '/product/schemas/';
+    if (normalizedPath.includes(schemaMarker)) {
+      return actualPathResolver.pathResolver.rootResolve(
+        `knowledge/product/schemas/${normalizedPath.split(schemaMarker)[1]}`
+      );
+    }
+    return filePath;
+  };
+  const readFile = (filePath: string): string => {
+    const normalizedPath = String(filePath).replaceAll('\\', '/');
+    return normalizedPath.includes('/product/schemas/')
+      ? actualSecureIo.safeReadFile(resolveActualPath(filePath), { encoding: 'utf8' })
+      : String(mocks.safeReadFile(filePath));
+  };
+  foundation.registerFoundationIo({
+    loadJson: <T>(filePath: string): T => {
+      if (String(filePath).endsWith('/video-composition-job-ticket.schema.json')) {
+        return videoCompositionJobTicketSchema as T;
+      }
+      return JSON.parse(readFile(filePath)) as T;
+    },
+    loadJsonIfPresent: <T>(filePath: string): T | null => {
+      try {
+        return JSON.parse(readFile(filePath)) as T;
+      } catch {
+        return null;
+      }
+    },
+    appendFile: vi.fn(),
+    exists: (filePath: string): boolean =>
+      String(filePath).replaceAll('\\', '/').includes('/product/schemas/')
+        ? true
+        : mocks.safeExistsSync(filePath),
+    readFile,
+    stat: (filePath: string) => ({
+      mtimeMs: 0,
+      size: String(readFile(filePath)).length,
+    }),
+    writeFile: (filePath: string, content: string): void => {
+      mocks.safeWriteFile(filePath, content);
+    },
+  });
+}
+
 describe('video-composition-actuator', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -230,6 +286,7 @@ describe('video-composition-actuator', () => {
     vi.mocked(mocks.safeExistsSync).mockImplementation(() => true);
     vi.mocked(mocks.safeWriteFile).mockImplementation(() => undefined);
     vi.mocked(mocks.safeMkdir).mockImplementation(() => undefined);
+    await installMockFoundationIo();
     vi.mocked(mocks.safeExec).mockImplementation((command: string, args: any[]) => {
       if (command === 'ffprobe' && Array.isArray(args) && args.includes('a:0')) {
         return '0';
