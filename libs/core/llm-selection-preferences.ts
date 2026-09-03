@@ -1,27 +1,24 @@
-import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
 
 import { discoverProviders } from './provider-discovery.js';
 import {
   discoverReasoningEndpoints,
   type ReasoningEndpointInfo,
 } from './reasoning-endpoint-discovery.js';
-import { resolveActiveProfileRoot } from './profile-root.js';
-import { pathResolver } from './path-resolver.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
 import { loadReasoningRoutePolicy, type ReasoningRoutePolicy } from './reasoning-route-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
+import {
+  getLlmSelectionPreferencesPath,
+  loadLlmSelectionPreferences as loadPersistedLlmSelectionPreferences,
+  validateLlmSelectionPreferencesAtPath,
+  type LlmSelectionPreferences,
+} from './llm-selection-state.js';
+import { safeWriteFile } from './secure-io.js';
 
 export type LlmSelectionStatus = 'ready' | 'needs_setup' | 'unsupported';
 
-export interface LlmSelectionPreferences {
-  version: '1.0.0';
-  provider: string;
-  model_id?: string;
-  updated_at?: string;
-}
+export type { LlmSelectionPreferences } from './llm-selection-state.js';
 
 export interface LlmSelectionCandidate {
   provider: string;
@@ -44,46 +41,6 @@ const DEFAULT_SELECTION: LlmSelectionPreferences = {
   version: '1.0.0',
   provider: 'codex-cli',
 };
-
-const LLM_SELECTION_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/llm-selection-preferences.schema.json'
-);
-
-function llmSelectionCatalogAtPath(filePath: string) {
-  return defineCatalog<LlmSelectionPreferences>({
-    id: 'llm-selection-preferences',
-    path: filePath,
-    schema: LLM_SELECTION_SCHEMA_PATH,
-  });
-}
-
-function selectionPath(): string {
-  return assertSafeRepositoryPath(
-    path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json'),
-    { allowMissingLeaf: true }
-  );
-}
-
-function readSelection(): LlmSelectionPreferences | null {
-  const filePath = selectionPath();
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    if (!safeLstat(filePath).isFile()) return null;
-    const parsed = llmSelectionCatalogAtPath(filePath).load();
-    if (typeof parsed.provider !== 'string' || !parsed.provider.trim()) return null;
-    return {
-      version: '1.0.0',
-      provider: parsed.provider.trim(),
-      model_id:
-        typeof parsed.model_id === 'string' && parsed.model_id.trim()
-          ? parsed.model_id.trim()
-          : undefined,
-      updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : undefined,
-    };
-  } catch {
-    return null;
-  }
-}
 
 function hasProfileForMode(policy: ReasoningRoutePolicy, mode: string): boolean {
   return Object.values(policy.profiles).some((profile) => profile.mode === mode);
@@ -155,7 +112,7 @@ function defaultSelection(policy: ReasoningRoutePolicy): LlmSelectionPreferences
 }
 
 function getPreferences(policy: ReasoningRoutePolicy): LlmSelectionPreferences {
-  return readSelection() || defaultSelection(policy);
+  return loadPersistedLlmSelectionPreferences() || defaultSelection(policy);
 }
 
 export function getLlmSelectionSnapshot(
@@ -193,11 +150,11 @@ export function getLlmSelectionSnapshot(
       reason,
     };
   });
-  return { preferences, storage_path: selectionPath(), candidates };
+  return { preferences, storage_path: getLlmSelectionPreferencesPath(), candidates };
 }
 
 export function loadLlmSelectionPreferences(): LlmSelectionPreferences | null {
-  return readSelection();
+  return loadPersistedLlmSelectionPreferences();
 }
 
 export function validateLlmSelectionPreferences(
@@ -233,8 +190,8 @@ export function saveLlmSelectionPreferences(input: {
     model_id,
     updated_at: nowIso(),
   };
-  const filePath = selectionPath();
-  const validated = llmSelectionCatalogAtPath(filePath).validate(next, filePath);
+  const filePath = getLlmSelectionPreferencesPath();
+  const validated = validateLlmSelectionPreferencesAtPath(next, filePath);
   safeWriteFile(filePath, JSON.stringify(validated, null, 2) + '\n', {
     mkdir: true,
     encoding: 'utf8',

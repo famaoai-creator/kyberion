@@ -1,15 +1,13 @@
 import type { ValidateFunction } from 'ajv';
-import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import { safeWriteFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
-import { resolveActiveProfileRoot } from './profile-root.js';
+import { loadLlmSelectionPreferences } from './llm-selection-state.js';
 import {
   BACKEND_CAPABILITY_PROFILES,
   backendRouteCapabilities,
@@ -244,27 +242,12 @@ function requestedBinding(role: ReasoningRole, env: NodeJS.ProcessEnv): string |
 }
 
 function loadOperatorLlmSelection(): { provider: string; model_id?: string } | null {
-  try {
-    const filePath = assertSafeRepositoryPath(
-      path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json'),
-      { allowMissingLeaf: true }
-    );
-    if (!safeExistsSync(filePath)) return null;
-    const value = readJson<{
-      provider?: unknown;
-      model_id?: unknown;
-    }>(filePath);
-    if (typeof value.provider !== 'string' || !value.provider.trim()) return null;
-    return {
-      provider: value.provider.trim(),
-      model_id:
-        typeof value.model_id === 'string' && value.model_id.trim()
-          ? value.model_id.trim()
-          : undefined,
-    };
-  } catch {
-    return null;
-  }
+  const value = loadLlmSelectionPreferences();
+  if (!value) return null;
+  return {
+    provider: value.provider,
+    model_id: value.model_id,
+  };
 }
 
 function parseBinding(binding: string): { profile?: string; mode?: string; model?: string } {
