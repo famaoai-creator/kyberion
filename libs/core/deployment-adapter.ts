@@ -16,16 +16,14 @@
  * before the pipeline reaches this step.
  */
 
-import type { ValidateFunction } from 'ajv';
 import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
-import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
@@ -157,15 +155,22 @@ function loadShellDeploymentAdapterConfig(
   return withExecutionContext('ecosystem_architect', () => {
     const configPath = resolveDeploymentConfigPath(env);
     if (!configPath || !safeExistsSync(configPath)) return null;
-    const parsed = readJson<unknown>(configPath);
-    const validate = ensureDeploymentConfigValidator();
-    if (!validate(parsed)) {
-      const errors = (validate.errors || [])
-        .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-        .join('; ');
-      throw new Error(`Invalid deployment adapter config at ${configPath}: ${errors}`);
+    if (!safeLstat(configPath).isFile()) {
+      throw new Error(
+        `Invalid deployment adapter config at ${configPath}: config must be a regular file`
+      );
     }
-    return { config: parsed as ShellDeploymentAdapterConfig, path: configPath };
+    try {
+      const parsed = defineCatalog<ShellDeploymentAdapterConfig>({
+        id: 'deployment-adapter-config',
+        path: configPath,
+        schema: DEPLOYMENT_CONFIG_SCHEMA_PATH,
+      }).load();
+      return { config: parsed, path: configPath };
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid deployment adapter config at ${configPath}: ${reason}`);
+    }
   });
 }
 
@@ -282,11 +287,3 @@ export function installShellDeploymentAdapterFromConfigIfAvailable(
 const DEPLOYMENT_CONFIG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/deployment-adapter-config.schema.json'
 );
-
-let deploymentConfigValidateFn: ValidateFunction | null = null;
-
-function ensureDeploymentConfigValidator(): ValidateFunction {
-  if (deploymentConfigValidateFn) return deploymentConfigValidateFn;
-  deploymentConfigValidateFn = compileSchema(DEPLOYMENT_CONFIG_SCHEMA_PATH);
-  return deploymentConfigValidateFn;
-}
