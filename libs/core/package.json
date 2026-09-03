@@ -239,6 +239,10 @@
       "types": "./dist/i18n-hardcoding-baseline.d.ts",
       "default": "./dist/i18n-hardcoding-baseline.js"
     },
+    "./frontmatter-exclusions": {
+      "types": "./dist/frontmatter-exclusions.d.ts",
+      "default": "./dist/frontmatter-exclusions.js"
+    },
     "./knowledge-taxonomy": {
       "types": "./dist/knowledge-taxonomy.d.ts",
       "default": "./dist/knowledge-taxonomy.js"
