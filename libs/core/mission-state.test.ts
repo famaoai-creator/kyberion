@@ -69,4 +69,19 @@ describe('mission-state loader', () => {
     expect(readJsonFileSafe(link)).toBeNull();
     expect(() => writeFocusedMissionId(link, missionId)).toThrow(/symbolic link/);
   });
+
+  it('round-trips the focused mission pointer through its governed catalog', () => {
+    const target = `${rootDir}/focus.json`;
+
+    writeFocusedMissionId(target, missionId.toLowerCase());
+
+    expect(readFocusedMissionId(target)).toBe(missionId);
+  });
+
+  it('rejects unknown fields in the focused mission pointer', () => {
+    const target = `${rootDir}/focus.json`;
+    safeWriteFile(target, JSON.stringify({ mission_id: missionId, ts: 'now', unexpected: true }));
+
+    expect(readFocusedMissionId(target)).toBeNull();
+  });
 });

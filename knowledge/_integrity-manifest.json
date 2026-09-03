@@ -8209,6 +8209,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-focus.schema.json",
+      "tier": "public",
+      "size": 494,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-gate-record.schema.json",
       "tier": "public",
       "size": 1761,

@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mission-focus.schema.json",
+  "title": "Focused mission pointer",
+  "description": "Shared pointer to the operator's focused mission. Scope and authorization are resolved by mission state, not this pointer.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "ts": { "type": "string", "minLength": 1 }
+  }
+}
