@@ -437,7 +437,8 @@ function writeRegistryCache(value: ProviderCapability[], ttlMs: number, now: () 
       ttl_ms: ttlMs,
       value,
     };
-    safeWriteFile(filePath, JSON.stringify(envelope, null, 2), { encoding: 'utf8' });
+    const validated = providerCapabilityRegistryCatalog.validate(envelope, filePath);
+    safeWriteFile(filePath, JSON.stringify(validated, null, 2), { encoding: 'utf8' });
   } catch (err) {
     logger.warn(
       `[provider-capability-registry] failed to persist snapshot (non-fatal): ${err instanceof Error ? err.message : String(err)}`

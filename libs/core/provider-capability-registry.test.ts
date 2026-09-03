@@ -353,6 +353,20 @@ describe('provider-capability-registry', () => {
     expect(execCallCounts.length).toBe(firstCallCount);
   });
 
+  it('does not persist a schema-invalid TTL envelope', async () => {
+    resetMocks();
+    const { loadProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
+
+    loadProviderCapabilityRegistry({
+      providerIds: ['codex'],
+      exec: () => ({ ok: true, stdout: '', stderr: '' }),
+      maxAgeMs: -1,
+      now: () => new Date('2026-07-25T00:00:00.000Z'),
+    });
+
+    expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+  });
+
   it('the persisted envelope validates against provider-capability-registry.schema.json', async () => {
     resetMocks();
     let stored: any = null;
