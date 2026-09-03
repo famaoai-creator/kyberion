@@ -146,6 +146,23 @@ describe('artifact-registry', () => {
     expect(() => listArtifactOwnershipRecords()).toThrow();
   });
 
+  it('rejects schema-invalid ownership records when reading the registry', () => {
+    safeWriteFile(
+      registryPath,
+      `${JSON.stringify({
+        artifact_id: 'ART-INVALID-READ',
+        kind: 'report',
+        storage_class: 'artifact_store',
+        created_at: '2026-09-03T00:00:00.000Z',
+        evidence_refs: [],
+      })}\n`
+    );
+
+    expect(() => listArtifactOwnershipRecords()).toThrow(
+      /Invalid catalog artifact-ownership-record/
+    );
+  });
+
   it('rejects a registry file that traverses a symlink', () => {
     const target = pathResolver.sharedTmp('artifact-ownership-registry-target.jsonl');
     safeWriteFile(target, '{}\n');

@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
-import type { ValidateFunction } from 'ajv';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
@@ -34,24 +33,18 @@ export interface ArtifactOwnershipQuery {
   includeTmp?: boolean;
 }
 
-function artifactOwnershipSchemaPath(): string {
-  return pathResolver.rootResolve(
-    'knowledge/product/schemas/artifact-ownership-record.schema.json'
-  );
-}
-
 function artifactRegistryPath(): string {
   return assertSafeRepositoryPath(pathResolver.shared('runtime/artifacts/registry.jsonl'), {
     allowMissingLeaf: true,
   });
 }
 
-let artifactOwnershipValidateFn: ValidateFunction | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (artifactOwnershipValidateFn) return artifactOwnershipValidateFn;
-  artifactOwnershipValidateFn = compileSchema(artifactOwnershipSchemaPath());
-  return artifactOwnershipValidateFn;
+function artifactOwnershipCatalog(filePath: string) {
+  return defineCatalog<ArtifactOwnershipRecord>({
+    id: 'artifact-ownership-record',
+    path: filePath,
+    schema: pathResolver.knowledge('product/schemas/artifact-ownership-record.schema.json'),
+  });
 }
 
 function hasOwnership(record: ArtifactOwnershipRecord): boolean {
@@ -107,12 +100,15 @@ export function validateArtifactOwnershipRecord(record: ArtifactOwnershipRecord)
   valid: boolean;
   errors: string[];
 } {
-  const validate = ensureValidator();
-  const valid = validate(record);
-  const errors = (validate.errors || []).map(
-    (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
-  );
-  return { valid: Boolean(valid), errors };
+  try {
+    artifactOwnershipCatalog(artifactRegistryPath()).validate(record);
+    return { valid: true, errors: [] };
+  } catch (error) {
+    return {
+      valid: false,
+      errors: [error instanceof Error ? error.message : String(error)],
+    };
+  }
 }
 
 export function appendArtifactOwnershipRecord(
@@ -145,7 +141,9 @@ export function listArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
   const registryPath = artifactRegistryPath();
   if (!safeExistsSync(registryPath)) return [];
   try {
-    return readJsonLines<ArtifactOwnershipRecord>(registryPath);
+    return readJsonLines<ArtifactOwnershipRecord>(registryPath, {
+      map: (value) => artifactOwnershipCatalog(registryPath).validate(value, registryPath),
+    });
   } catch (error) {
     // The registry is shared runtime state. A concurrent cleanup can remove it
     // after the existence check; treat that race like an empty registry.
