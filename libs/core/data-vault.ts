@@ -155,6 +155,11 @@ function readEntryFile<T>(filePath: string): VaultEntry<T> | null {
   }
 }
 
+/** Read and validate one persisted vault entry for other governed consumers. */
+export function loadVaultEntryAtPath<T = unknown>(filePath: string): VaultEntry<T> | null {
+  return readEntryFile<T>(filePath);
+}
+
 function writeEntryFile(filePath: string, entry: VaultEntry): void {
   const dir = nodePath.dirname(filePath);
   safeMkdir(dir, { recursive: true });

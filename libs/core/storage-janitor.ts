@@ -1,5 +1,5 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import * as nodePath from 'node:path';
 import { knowledge, sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
@@ -16,6 +16,7 @@ import {
   safeRmSync,
 } from './secure-io.js';
 import { logger } from './core.js';
+import { loadVaultEntryAtPath } from './data-vault.js';
 import {
   DELEGATION_CHILDREN_REGISTRY_SUBPATH,
   loadDelegationChildrenRegistryAtPath,
@@ -491,8 +492,8 @@ export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
     if (!filePath.endsWith('.json')) continue;
     try {
       if (!safeExistsSync(filePath)) continue;
-      const entry = readJson<Record<string, unknown>>(filePath);
-      if (typeof entry.expiresAt === 'string' && Date.parse(entry.expiresAt) <= Date.now()) {
+      const entry = loadVaultEntryAtPath(filePath);
+      if (entry?.expiresAt && Date.parse(entry.expiresAt) <= Date.now()) {
         expired.push(filePath);
         if (!opts.dryRun) {
           safeUnlinkSync(filePath);
