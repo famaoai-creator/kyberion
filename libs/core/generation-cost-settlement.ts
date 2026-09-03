@@ -11,7 +11,6 @@ import { metrics, MetricsCollector } from './metrics.js';
 import { pathResolver } from './path-resolver.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { withLockSync } from './src/lock-utils.js';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
@@ -67,6 +66,14 @@ const generationCostSettlementCatalog = defineCatalog<GenerationCostSettlement>(
   path: GENERATION_COST_SETTLEMENT_SCHEMA_PATH,
   schema: GENERATION_COST_SETTLEMENT_SCHEMA_PATH,
 });
+
+function generationCostSettlementCatalogAtPath(filePath: string) {
+  return defineCatalog<GenerationCostSettlement>({
+    id: 'generation-cost-settlement',
+    path: filePath,
+    schema: GENERATION_COST_SETTLEMENT_SCHEMA_PATH,
+  });
+}
 
 function settlementFile(
   jobId: string,
@@ -185,7 +192,11 @@ export function loadGenerationCostSettlementAtPath(
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[GENERATION_COST_SETTLEMENT] settlement must be a regular file: ${filePath}`);
   }
-  return parseSettlement(readJson<unknown>(safeFilePath), safeFilePath, options);
+  return parseSettlement(
+    generationCostSettlementCatalogAtPath(safeFilePath).load(),
+    safeFilePath,
+    options
+  );
 }
 
 function readSettlement(
