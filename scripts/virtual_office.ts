@@ -40,6 +40,7 @@ import { listTaskSessions } from '@agent/core/task-session';
 import { loadAgentProfileIndex } from '@agent/core/mission-team-index';
 import { loadAgentPerformanceIndex } from '@agent/core/agent-performance-index';
 import { loadStateAtPath } from '@agent/core/mission-state';
+import { readOpsAlertLogRecords } from '@agent/core/ops-alert';
 import { resolveOrganizationOrgChart, summarizeOrganizationOrgChart } from '@agent/core/org-chart';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -47,12 +48,11 @@ import {
   safeExistsSync,
   safeLstat,
   safeReaddir,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
-import { getRegisteredEnvText, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 
 // ---------- data collection ----------
 
@@ -578,29 +578,19 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
       return entryTenant ? visibleTenantSlugs.has(entryTenant) : allowUnscopedRecords;
     }).length;
   // bulletin board
-  const alertLines =
-    tenantScopeReadable && safeExistsSync(pathResolver.shared('observability/ops-alerts.jsonl'))
-      ? String(
-          safeReadFile(pathResolver.shared('observability/ops-alerts.jsonl'), { encoding: 'utf8' })
-        )
-          .trim()
-          .split('\n')
-          .slice(-5)
-      : [];
-  const alerts = alertLines
-    .map((line) => {
-      try {
-        const parsed = parseSafeJsonInput(line, 'virtual office ops alert');
-        if (!isRecord(parsed)) return null;
-        const title = typeof parsed.title === 'string' ? parsed.title : '';
-        const severity = typeof parsed.severity === 'string' ? parsed.severity : 'info';
-        return {
-          title: title.slice(0, 70),
-          severity,
-        };
-      } catch {
-        return null;
-      }
+  const alerts = (
+    tenantScopeReadable
+      ? readOpsAlertLogRecords(pathResolver.shared('observability/ops-alerts.jsonl'))
+      : []
+  )
+    .slice(-5)
+    .map((record) => {
+      const raw = record?.raw;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+      const title = typeof raw.title === 'string' ? raw.title : '';
+      if (!title) return null;
+      const severity = typeof raw.severity === 'string' ? raw.severity : 'info';
+      return { title: title.slice(0, 70), severity };
     })
     .filter((entry): entry is { title: string; severity: string } => Boolean(entry))
     .reverse();

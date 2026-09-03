@@ -60,12 +60,18 @@ const realFsSecureIo = vi.hoisted(() => ({
     }
   },
   loadJson: <T>(filePath: string): T => {
-    const schemaPath = filePath.includes('notification-preferences.schema.json')
-      ? path.resolve(
-          process.cwd(),
-          'knowledge/product/schemas/notification-preferences.schema.json'
-        )
-      : filePath;
+    const schemaPath =
+      filePath.includes('notification-preferences.schema.json') ||
+      filePath.includes('ops-alert-log-record.schema.json')
+        ? path.resolve(
+            process.cwd(),
+            `knowledge/product/schemas/${
+              filePath.includes('ops-alert-log-record.schema.json')
+                ? 'ops-alert-log-record.schema.json'
+                : 'notification-preferences.schema.json'
+            }`
+          )
+        : filePath;
     return JSON.parse(String(fs.readFileSync(schemaPath, 'utf8'))) as T;
   },
   safeWriteFile: (filePath: string, data: string | Buffer) => {

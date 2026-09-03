@@ -14129,6 +14129,12 @@ SX-03／SX-04 のsecurity quarantineを再監査し、strict-screened contentの
 
 検証: security-screen quarantine **1 file / 30 tests passed**、対象lint、typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 645
+
+SX-03／SX-04 のops-alert JSONLを再監査し、運用アラート、undelivered通知、ack、redeliveryの4種recordがraw append／parserへ分散し、schema・regular-file・repository path境界を共有していない残存を修正した。既存の複数record種別を表す専用schemaとpath-bound canonical writer／readerを追加し、`sendOpsAlert`、operator notification、triage、redelivery、Virtual Office掲示板を同じ契約へ統合した。未知・schema-invalid行は全体を中断せず`unknown`として非actionableに保持し、append-only、dedupe、ack／redelivery判定、tenant表示の既存semanticsは維持している。
+
+検証: ops-alert／operator-notifications **2 files / 23 tests passed**、Virtual Officeのschema-valid alert projection focused test **1 passed**、対象lint、typecheck、Prettier、`git diff --check`。全Virtual Office suiteには今回の変更を外した状態でも再現する既存deal fixture失敗2件が残る。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

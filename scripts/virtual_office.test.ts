@@ -496,6 +496,29 @@ describe('virtual office surface', () => {
       ),
       JSON.stringify(session, null, 2)
     );
+    const alertDir = path.join(tmpRoot, 'active', 'shared', 'observability');
+    fs.mkdirSync(alertDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(alertDir, 'ops-alerts.jsonl'),
+      `${JSON.stringify({
+        id: 'office-alert-1',
+        timestamp: '2026-08-08T00:00:00.000Z',
+        suppressed: false,
+        severity: 'warning',
+        title: 'Governed office alert',
+        context: {},
+        recommendation: 'review',
+      })}\n${JSON.stringify({
+        id: 'office-alert-invalid',
+        timestamp: '2026-08-08T00:01:00.000Z',
+        suppressed: false,
+        severity: 'warning',
+        title: 'Invalid office alert',
+        context: [],
+        recommendation: 'ignore',
+      })}\n`,
+      'utf8'
+    );
 
     mod = await import('./virtual_office.js');
   });
@@ -571,6 +594,15 @@ describe('virtual office surface', () => {
     expect(html).not.toMatch(/src="http|href="http/);
     // archived mission is on the shelf, not a floor room
     expect(html.indexOf('MSN-OFFICE-OLD')).toBeGreaterThan(html.indexOf('Archive'));
+  });
+
+  it('projects only schema-valid ops alerts onto the bulletin board', () => {
+    const snapshot = mod.collectOfficeSnapshot();
+    expect(snapshot.alerts).toContainEqual({
+      title: 'Governed office alert',
+      severity: 'warning',
+    });
+    expect(snapshot.alerts.map((alert) => alert.title)).not.toContain('Invalid office alert');
   });
 
   it('keeps generated HTML inside the repository', async () => {
