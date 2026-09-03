@@ -7129,6 +7129,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/diagram-graph.schema.json",
+      "tier": "public",
+      "size": 1114,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/dissent-log.schema.json",
       "tier": "public",
       "size": 2012,
@@ -7180,6 +7186,12 @@
       "path": "product/schemas/documentation-source-map.schema.json",
       "tier": "public",
       "size": 2480,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/drawio-icon-map.schema.json",
+      "tier": "public",
+      "size": 894,
       "type": "json"
     },
     {
