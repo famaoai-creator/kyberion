@@ -6403,6 +6403,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/agent-runtime-ensure-request.schema.json",
+      "tier": "public",
+      "size": 1897,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/agent-runtime-ensure-result.schema.json",
       "tier": "public",
       "size": 7887,
