@@ -7687,6 +7687,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/media-generation-quota-counter.schema.json",
+      "tier": "public",
+      "size": 652,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/media-generation-quota-policy.schema.json",
       "tier": "public",
       "size": 1260,

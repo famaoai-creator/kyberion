@@ -3,9 +3,14 @@ import * as pathResolver from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
 
 export const GENERATION_QUOTA_POLICY_REPO_PATH =
@@ -40,6 +45,16 @@ export const DEFAULT_GENERATION_QUOTA_POLICY: GenerationQuotaPolicy = Object.fre
 const GENERATION_QUOTA_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/media-generation-quota-policy.schema.json'
 );
+const GENERATION_QUOTA_COUNTER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/media-generation-quota-counter.schema.json'
+);
+
+interface GenerationQuotaCounterRecord {
+  tenant_slug: string;
+  date: string;
+  units: number;
+  updated_at: string;
+}
 
 function createGenerationQuotaPolicyCatalog(root: string) {
   return defineCatalog<GenerationQuotaPolicy>({
@@ -196,14 +211,28 @@ function effectivePolicy(policy: GenerationQuotaPolicy, tenantSlug: string, acti
   };
 }
 
-function readUsage(counterPath: string): ReadGenerationQuotaUsage {
+function readUsage(
+  counterPath: string,
+  expectedTenantSlug?: string,
+  expectedDate?: string
+): ReadGenerationQuotaUsage {
   if (!safeExistsSync(counterPath)) return { usage: { units: 0 }, invalid: false };
   try {
-    const parsed = readJson<{
-      units?: unknown;
-    }>(counterPath);
+    const safeCounterPath = assertSafeRepositoryPath(counterPath, { allowMissingLeaf: true });
+    if (!safeLstat(safeCounterPath).isFile()) return { usage: { units: 0 }, invalid: true };
+    const parsed = defineCatalog<GenerationQuotaCounterRecord>({
+      id: 'media-generation-quota-counter',
+      path: safeCounterPath,
+      schema: GENERATION_QUOTA_COUNTER_SCHEMA_PATH,
+    }).load();
+    if (
+      (expectedTenantSlug !== undefined && parsed.tenant_slug !== expectedTenantSlug) ||
+      (expectedDate !== undefined && parsed.date !== expectedDate)
+    ) {
+      return { usage: { units: 0 }, invalid: true };
+    }
     if (parsed.units === 0 || positive(parsed.units)) {
-      return { usage: { units: parsed.units as number }, invalid: false };
+      return { usage: { units: parsed.units }, invalid: false };
     }
     return { usage: { units: 0 }, invalid: true };
   } catch {
@@ -223,19 +252,20 @@ function writeUsage(
     rootDir: rootDir(options),
   });
   safeMkdir(path.dirname(counterPath), { recursive: true });
-  safeWriteFile(
-    counterPath,
-    JSON.stringify(
-      {
-        tenant_slug: tenantSlug,
-        date,
-        units: usage.units,
-        updated_at: options.now === undefined ? nowIso() : nowIso(new Date(options.now)),
-      },
-      null,
-      2
-    )
+  const validated = defineCatalog<GenerationQuotaCounterRecord>({
+    id: 'media-generation-quota-counter',
+    path: counterPath,
+    schema: GENERATION_QUOTA_COUNTER_SCHEMA_PATH,
+  }).validate(
+    {
+      tenant_slug: tenantSlug,
+      date,
+      units: usage.units,
+      updated_at: options.now === undefined ? nowIso() : nowIso(new Date(options.now)),
+    },
+    counterPath
   );
+  safeWriteFile(counterPath, JSON.stringify(validated, null, 2));
 }
 
 function normalizedTenant(scope: EventScopeInput): { scope: EventScope; tenant?: string } {
@@ -293,7 +323,7 @@ export function checkGenerationQuota(
     action,
     options,
     ({ tenant, date, units, limit, warnRatio, counterPath }) => {
-      const counter = readUsage(counterPath);
+      const counter = readUsage(counterPath, tenant, date);
       const usage = counter.usage;
       const projected = { units: usage.units + units };
       if (counter.invalid) {
@@ -340,7 +370,7 @@ export function reserveGenerationQuota(
 ): GenerationQuotaDecision {
   return decide(scope, action, options, (input) =>
     withLockSync(`generation-quota-${input.tenant}-${input.date}`, () => {
-      const counter = readUsage(input.counterPath);
+      const counter = readUsage(input.counterPath, input.tenant, input.date);
       const usage = counter.usage;
       const projected = { units: usage.units + input.units };
       const warned = projected.units >= input.warnRatio * input.limit;
@@ -377,7 +407,7 @@ export function releaseGenerationQuota(
 ): GenerationQuotaDecision {
   return decide(scope, action, options, (input) =>
     withLockSync(`generation-quota-${input.tenant}-${input.date}`, () => {
-      const counter = readUsage(input.counterPath);
+      const counter = readUsage(input.counterPath, input.tenant, input.date);
       const usage = counter.usage;
       if (counter.invalid) {
         return {
