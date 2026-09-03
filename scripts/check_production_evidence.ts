@@ -1,41 +1,25 @@
 #!/usr/bin/env node
 import { pathResolver } from '@agent/core/path-resolver';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { resolveOnboardingText } from '@agent/core/onboarding-flow-policy';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { resolveProductionEvidenceSummaryPolicy } from '@agent/core/production-evidence-summary-policy';
+import {
+  loadProductionEvidenceRegister,
+  type ProductionEvidenceItem,
+  type ProductionEvidenceRefRequirement,
+  type ProductionEvidenceRegister,
+} from '@agent/core/production-evidence-register';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-export type ProductionEvidenceStatus = 'pending_external_evidence' | 'verified';
-
-export interface ProductionEvidenceItem {
-  id: string;
-  gate: string;
-  required_evidence: string;
-  status: ProductionEvidenceStatus;
-  owner: string;
-  template_ref: string;
-  acceptance_criteria: string[];
-  verification_artifact: string;
-  reviewed_at: string | null;
-  reviewer: string | null;
-  ref_requirements: ProductionEvidenceRefRequirement[];
-  evidence_refs: string[];
-}
-
-export interface ProductionEvidenceRefRequirement {
-  id: string;
-  description: string;
-  accepted_ref_patterns: string[];
-}
-
-export interface ProductionEvidenceRegister {
-  version: string;
-  last_updated: string;
-  release_decision: ProductionEvidenceStatus;
-  items: ProductionEvidenceItem[];
-}
+export {
+  loadProductionEvidenceRegister,
+  type ProductionEvidenceItem,
+  type ProductionEvidenceRefRequirement,
+  type ProductionEvidenceRegister,
+  type ProductionEvidenceStatus,
+} from '@agent/core/production-evidence-register';
 
 export interface ProductionEvidenceSummary {
   ok: boolean;
@@ -47,7 +31,6 @@ export interface ProductionEvidenceSummary {
   release_decision: string;
 }
 
-const DEFAULT_REGISTER_PATH = 'knowledge/product/governance/production-evidence-register.json';
 const SUPPORTED_REF_SCHEMES = ['http:', 'https:'];
 export const REQUIRED_PRODUCTION_EVIDENCE_IDS = [
   'EV-30DAY-OPS',
@@ -97,22 +80,6 @@ const REQUIRED_REF_REQUIREMENT_PATTERNS: Record<string, readonly string[]> = {
   runtime_artifact: ['active/shared/logs/traces/', 'active/shared/tmp/', 'https://'],
   no_fork_statement: ['docs/operator/', 'migration/', 'https://'],
 };
-
-export function loadProductionEvidenceRegister(
-  registerPath = DEFAULT_REGISTER_PATH
-): ProductionEvidenceRegister {
-  const resolved = pathResolver.rootResolve(registerPath);
-  try {
-    return readJson<ProductionEvidenceRegister>(resolved);
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      throw new Error(
-        `Invalid production evidence register JSON at ${registerPath}: ${error.message}`
-      );
-    }
-    throw error;
-  }
-}
 
 function isSupportedUrlRef(ref: string): boolean {
   try {
@@ -448,7 +415,7 @@ export const runCheckProductionEvidence = defineScript({
     const args = context.argv;
     let json = false;
     let requireComplete = false;
-    let registerPath = DEFAULT_REGISTER_PATH;
+    let registerPath = 'knowledge/product/governance/production-evidence-register.json';
 
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
