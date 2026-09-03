@@ -13,7 +13,7 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
-import { safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ export interface ExternalServiceEntry {
   failure_count: number;
 }
 
-interface ExternalServiceRegistry {
+export interface ExternalServiceRegistry {
   version: string;
   services: ExternalServiceEntry[];
 }
@@ -111,12 +111,21 @@ function loadMerged(): ExternalServiceRegistry {
 }
 
 function saveRuntime(registry: ExternalServiceRegistry): void {
-  defineCatalog<ExternalServiceRegistry>({
+  writeExternalServiceRegistryAtPath(RUNTIME_PATH, registry);
+}
+
+export function writeExternalServiceRegistryAtPath(
+  filePath: string,
+  registry: ExternalServiceRegistry
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = defineCatalog<ExternalServiceRegistry>({
     id: 'external-service-registry',
-    path: RUNTIME_PATH,
+    path: safePath,
     schema: REGISTRY_SCHEMA_PATH,
-  }).validate(registry, RUNTIME_PATH);
-  safeWriteFile(RUNTIME_PATH, JSON.stringify(registry, null, 2), { mkdir: true });
+  }).validate(registry, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2), { mkdir: true });
+  return safePath;
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
