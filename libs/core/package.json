@@ -735,6 +735,10 @@
       "types": "./dist/migration-state.d.ts",
       "default": "./dist/migration-state.js"
     },
+    "./knowledge-scope-health-history": {
+      "types": "./dist/knowledge-scope-health-history.d.ts",
+      "default": "./dist/knowledge-scope-health-history.js"
+    },
     "./nhi-lifecycle-governance": {
       "types": "./dist/nhi-lifecycle-governance.d.ts",
       "default": "./dist/nhi-lifecycle-governance.js"
