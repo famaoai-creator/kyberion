@@ -14195,6 +14195,12 @@ SX-03／SX-04 のbaseline TTL cacheを再監査し、`tenant-drift`／`cowork-he
 
 検証: baseline cache／baseline **2 files / 32 tests passed**、core package build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 656
+
+SX-03 のtenant drift watchdogを再監査し、confidential mission stateの実ファイルを確認した後にscript固有の汎用`readJson`で値を取得していた残存を修正した。既存のschema検証済み`loadStateAtPath`へ接続し、tenant／mission metadataはcanonical `MissionState`からのみ投影するようにした。不正・必須項目欠落stateをdrift scanへ流さず、path prefix走査、finding、audit summary、alertの既存semanticsは維持している。
+
+検証: tenant drift／entrypoint **2 files / 3 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
