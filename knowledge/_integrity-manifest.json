@@ -8299,6 +8299,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/oauth-session.schema.json",
+      "tier": "public",
+      "size": 994,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/observation-to-op-map.schema.json",
       "tier": "public",
       "size": 1078,

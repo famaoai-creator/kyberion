@@ -4,6 +4,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeRmSync,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -102,5 +103,21 @@ describe('oauth session hygiene', () => {
       'const filePath = assertSafeRepositoryPath(path.join(dir, files[0]));'
     );
     expect(source).toContain('if (!safeLstat(filePath).isFile()) return null;');
+  });
+
+  it('ignores a directory in the session directory instead of reading it as JSON', () => {
+    const serviceId = 'oauth-session-directory-test';
+    const state = 'C'.repeat(32);
+    const filePath = serviceSessionPath(serviceId, state);
+    safeMkdir(serviceSessionDir(serviceId), { recursive: true });
+    safeMkdir(filePath, { recursive: true });
+    try {
+      expect(loadPendingOAuthSession(serviceId, state)).toBeNull();
+      expect(listPendingOAuthSessions()).not.toContainEqual(
+        expect.objectContaining({ serviceId, state })
+      );
+    } finally {
+      safeRmSync(filePath, { recursive: true, force: true });
+    }
   });
 });
