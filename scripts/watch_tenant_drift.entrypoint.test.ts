@@ -18,6 +18,17 @@ describe('tenant drift watchdog entrypoint', () => {
     expect(source).not.toContain('logger.warn(');
   });
 
+  it('uses the canonical schema-validated mission state loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/watch_tenant_drift.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).toContain('loadStateAtPath(statePath)');
+    expect(source).not.toContain('readJson(');
+  });
+
   it('handles help without scanning confidential mission state', () => {
     expect(main(['--help'])).toEqual({
       status: 0,
