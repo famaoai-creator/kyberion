@@ -83,7 +83,7 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
   function seedExceptions(exceptions: Array<{ slug: string; reason: string }>): void {
     const file = path.join(fixtureRoot, EXCEPTIONS_RELATIVE_PATH);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ exceptions }));
+    fs.writeFileSync(file, JSON.stringify({ _meta: 'test fixture', exceptions }));
   }
 
   const options = () => ({ rootDir: fixtureRoot, env: EMPTY_ENV });
@@ -191,12 +191,12 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     expect(exitCode).toBe(0);
   });
 
-  it('rejects exceptions without a reason', () => {
+  it('rejects schema-invalid exceptions without a reason', () => {
     seedCustomerTenantProfile('acme-corp', 'ghost-co');
     seedExceptions([{ slug: 'ghost-co', reason: '' }]);
     const { exitCode, output } = runCheck(options());
     expect(exitCode).toBe(1);
-    expect(output).toContain("'ghost-co' has no reason");
+    expect(output).toContain('Invalid catalog tenant-registry-exceptions');
   });
 
   it('rejects duplicate exception entries', () => {
