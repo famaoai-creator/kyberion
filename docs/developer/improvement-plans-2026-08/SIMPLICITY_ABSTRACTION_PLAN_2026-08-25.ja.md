@@ -15453,6 +15453,18 @@ session更新・history・候補確認・actuator実行の既存状態遷移、s
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、
 Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 794
+
+SX-03／SX-04／IL-01 のintent goal handoff persistenceを再監査し、consume側は専用schema／catalogを通る一方、
+生成側だけがparserの戻り値をschemaなしでraw writeしていたため修正した。既存の安全なmissionId／temporary path、
+入力parserのunknown field／malformed payload拒否、consume時のfail-soft delete semanticsは維持し、最終handoff payloadを
+path-bound `defineCatalog`で再検証してから保存するよう統合した。persisted payloadにcatalog metadataが混入しないことも
+回帰で確認した。
+
+検証: intent handoff **1 file / 8 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、
+Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
