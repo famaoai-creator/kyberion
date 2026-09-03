@@ -280,22 +280,23 @@ export function saveProjectOperationalState(
   options: { rootDir?: string } = {}
 ): string {
   const normalized = normalizeProjectOperationalState(record);
-  try {
-    projectOperationalStateCatalog.validate(normalized);
-  } catch (error) {
-    throw new Error(
-      `Invalid project operational state: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
   const filePath = projectOperationalStatePath(
     normalized.project_id,
     normalized.tier,
     normalized.tenant_slug,
     options.rootDir
   );
+  let validated: ProjectOperationalState;
+  try {
+    validated = projectOperationalStateFileCatalog(filePath).validate(normalized, filePath);
+  } catch (error) {
+    throw new Error(
+      `Invalid project operational state: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(normalized, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return filePath;
 }
 

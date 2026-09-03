@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeWriteFile } from './secure-io.js';
+import { safeReadFile, safeWriteFile } from './secure-io.js';
 import {
   consumeTenantBudget,
   inspectTenantBudget,
@@ -143,5 +143,22 @@ describe('tenant-rate-limiter (IP-29)', () => {
     expect(consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toMatchObject({
       allowed: true,
     });
+  });
+
+  it('persists a canonical state payload after quota enforcement', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'worker';
+    consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 });
+
+    const persisted = JSON.parse(
+      String(
+        safeReadFile(
+          pathResolver.rootResolve('active/shared/runtime/tenant-rate-limit-state.json'),
+          { encoding: 'utf8' }
+        )
+      )
+    ) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.tenants).toHaveProperty('acme-corp');
   });
 });

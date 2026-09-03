@@ -142,9 +142,9 @@ function loadState(): RateLimitState {
 
 function saveState(state: RateLimitState): void {
   const abs = pathResolver.rootResolve(STATE_PATH);
-  stateCatalog.validate(state, abs);
+  const validated = stateCatalog.validate(state, abs);
   safeMkdir(path.dirname(abs), { recursive: true });
-  safeWriteFile(abs, JSON.stringify(state, null, 2) + '\n');
+  safeWriteFile(abs, JSON.stringify(validated, null, 2) + '\n');
 }
 
 function sleepSync(ms: number): void {
