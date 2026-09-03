@@ -5,28 +5,31 @@ import * as os from 'node:os';
 
 let sharedBase: string;
 
-vi.mock('./path-resolver.js', () => ({
-  shared: (sub = '') => path.join(sharedBase, sub),
-}));
+vi.mock('./path-resolver.js', async () => {
+  const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
+  return {
+    ...actual,
+    shared: (sub = '') => path.join(sharedBase, sub),
+    knowledge: (sub = '') => path.join(process.cwd(), 'knowledge', sub),
+    pathResolver: {
+      ...actual.pathResolver,
+      shared: (sub = '') => path.join(sharedBase, sub),
+      knowledge: (sub = '') => path.join(process.cwd(), 'knowledge', sub),
+    },
+  };
+});
 
 vi.mock('./secure-io.js', async () => {
   const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
     safeReadFile: (p: string, opts: any) => actualFs.readFileSync(p, opts),
     safeWriteFile: (p: string, content: string) => actualFs.writeFileSync(p, content),
+    assertSafeRepositoryPath: (p: string) => p,
     safeExistsSync: (p: string) => actualFs.existsSync(p),
     safeMkdir: (p: string, opts: any) => actualFs.mkdirSync(p, opts),
     safeUnlinkSync: (p: string) => actualFs.unlinkSync(p),
     safeReaddir: (p: string) => actualFs.readdirSync(p),
     safeStat: (p: string) => actualFs.statSync(p),
-  };
-});
-
-vi.mock('./foundation/json.js', async () => {
-  const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
-  return {
-    readJson: (filePath: string) =>
-      JSON.parse(actualFs.readFileSync(filePath, { encoding: 'utf8' })),
   };
 });
 
@@ -40,10 +43,21 @@ import {
   invalidateVaultEntry,
   listVaultEntries,
 } from './data-vault.js';
+import { registerFoundationIo } from './foundation/io.js';
 
 describe('data-vault', () => {
   beforeEach(() => {
     sharedBase = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-vault-test-'));
+    registerFoundationIo({
+      loadJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+      loadJsonIfPresent: <T>(filePath: string) =>
+        fs.existsSync(filePath) ? (JSON.parse(fs.readFileSync(filePath, 'utf8')) as T) : null,
+      appendFile: (filePath, content) => fs.appendFileSync(filePath, content),
+      exists: (filePath) => fs.existsSync(filePath),
+      readFile: (filePath) => fs.readFileSync(filePath, 'utf8'),
+      stat: (filePath) => fs.statSync(filePath),
+      writeFile: (filePath, content) => fs.writeFileSync(filePath, content),
+    });
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-04T00:00:00.000Z'));
   });

@@ -1,8 +1,8 @@
 import * as crypto from 'node:crypto';
 import * as nodePath from 'node:path';
-import { shared } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { knowledge, shared } from './path-resolver.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   safeWriteFile,
   safeExistsSync,
@@ -78,6 +78,16 @@ const VAULT_ENTRY_FIELDS = [
   'expiresAt',
 ] as const;
 
+const VAULT_ENTRY_SCHEMA_PATH = knowledge('product/schemas/data-vault-entry.schema.json');
+
+function vaultEntryCatalogAtPath(filePath: string) {
+  return defineCatalog<VaultEntry>({
+    id: 'data-vault-entry',
+    path: filePath,
+    schema: VAULT_ENTRY_SCHEMA_PATH,
+  });
+}
+
 function requiredEntryString(
   record: Record<string, unknown>,
   field: string,
@@ -149,7 +159,7 @@ function isExpired(entry: VaultEntry): boolean {
 function readEntryFile<T>(filePath: string): VaultEntry<T> | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return parseVaultEntry(readJson<unknown>(filePath), filePath) as VaultEntry<T>;
+    return parseVaultEntry(vaultEntryCatalogAtPath(filePath).load(), filePath) as VaultEntry<T>;
   } catch {
     return null;
   }
@@ -163,7 +173,8 @@ export function loadVaultEntryAtPath<T = unknown>(filePath: string): VaultEntry<
 function writeEntryFile(filePath: string, entry: VaultEntry): void {
   const dir = nodePath.dirname(filePath);
   safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(entry, null, 2));
+  const validated = vaultEntryCatalogAtPath(filePath).validate(entry, filePath);
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
 }
 
 export async function fetchWithVaultCache<T>(

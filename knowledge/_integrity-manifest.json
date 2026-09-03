@@ -7003,6 +7003,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/data-vault-entry.schema.json",
+      "tier": "public",
+      "size": 841,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/deal-record.schema.json",
       "tier": "public",
       "size": 2725,
