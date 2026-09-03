@@ -3,16 +3,17 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
-let rootDir: string;
+const rootDirRef = vi.hoisted(() => ({ value: process.cwd() }));
+let rootDir = rootDirRef.value;
 
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
-    knowledge: (sub = '') => path.join(rootDir, 'knowledge', sub),
+    knowledge: (sub = '') => path.join(rootDirRef.value, 'knowledge', sub),
     rootResolve: (sub = '') =>
       sub.startsWith('knowledge/product/schemas/')
         ? path.join(process.cwd(), sub)
-        : path.join(rootDir, sub),
-    rootDir: () => rootDir,
+        : path.join(rootDirRef.value, sub),
+    rootDir: () => rootDirRef.value,
   },
 }));
 
@@ -25,7 +26,7 @@ vi.mock('./secure-io.js', async () => {
     options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
   ): string => {
     const resolved = path.resolve(filePath);
-    const root = path.resolve(options.rootDir ?? rootDir);
+    const root = path.resolve(options.rootDir ?? rootDirRef.value);
     const relative = path.relative(root, resolved);
     if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
       throw new Error('[RESOURCE_PATH_SCOPE]');
@@ -65,6 +66,7 @@ vi.mock('./secure-io.js', async () => {
   });
   return {
     assertSafeRepositoryPath,
+    safeLstat: (p: string) => actual.lstatSync(p),
     safeExistsSync: (p: string) => actual.existsSync(p),
     safeReadFile: (p: string, opts: { encoding?: string }) =>
       actual.readFileSync(p, opts as { encoding: BufferEncoding }),
@@ -82,24 +84,29 @@ vi.mock('./secure-io.js', async () => {
 import { resolveCreativeDesign, renderPromptStyleBlock } from './creative-design-resolver.js';
 
 const BRAND_TOKENS = {
+  version: '1.1.0',
   brand_name: 'Kyberion',
   tokens: {
     colors: {
       light: {
         bg_main: '#ffffff',
+        panel_bg: '#f8fafc',
         primary: '#0f172a',
         secondary: '#334155',
         accent: '#0066cc',
         warning: '#eab308',
         text_primary: '#0f172a',
+        text_secondary: '#475569',
       },
       dark: {
         bg_main: '#020617',
+        panel_bg: '#0f172a',
         primary: '#0A192F',
         secondary: '#31415B',
         accent: '#00F2FF',
         warning: '#f59e0b',
         text_primary: '#F8FAFC',
+        text_secondary: '#cbd5e1',
       },
     },
     fonts: { sans: "Inter, 'Noto Sans JP', sans-serif", mono: "'JetBrains Mono', monospace" },
@@ -115,6 +122,7 @@ function write(rel: string, data: unknown): void {
 describe('creative-design-resolver', () => {
   beforeEach(() => {
     rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-creative-design-'));
+    rootDirRef.value = rootDir;
     write('knowledge/public/design-patterns/brand-tokens/kyberion.json', BRAND_TOKENS);
   });
 
@@ -146,6 +154,37 @@ describe('creative-design-resolver', () => {
       expect(prompt.projection.style_pack.palette_hex).toContain('#00F2FF');
       expect(prompt.projection.style_pack.avoid.length).toBeGreaterThan(0);
     }
+  });
+
+  it('loads a schema-valid media style pack through the catalog boundary', () => {
+    write('knowledge/public/design-patterns/media-templates/media-design-systems.json', {
+      version: '1.0.0',
+      default_system: 'test-system',
+      systems: { 'test-system': { theme: 'kyberion-standard' } },
+      style_pack: {
+        tone_words: ['calm', 'precise'],
+        typography_hint: 'humanist sans',
+        avoid: ['noise'],
+        music: { mood: 'calm', bpm_range: [80, 100] },
+      },
+    });
+
+    const resolved = resolveCreativeDesign({ surface: 'prompt' });
+    if (resolved.projection.surface !== 'prompt') throw new Error('unexpected projection');
+    expect(resolved.projection.style_pack.tone_words).toEqual(['calm', 'precise']);
+    expect(resolved.projection.style_pack.typography_hint).toBe('humanist sans');
+  });
+
+  it('falls back when the brand token catalog violates its schema', () => {
+    write('knowledge/public/design-patterns/brand-tokens/kyberion.json', {
+      version: '1.1.0',
+      brand_name: 'Kyberion',
+      tokens: { colors: { light: {} }, fonts: {} },
+    });
+
+    const resolved = resolveCreativeDesign({ surface: 'pptx' });
+    expect(resolved.source).toBe('brand-default');
+    expect(resolved.colors.accent).toBe('#0066cc');
   });
 
   it('applies tenant overrides across all surfaces with the same hex (G1/G2 regression)', () => {
