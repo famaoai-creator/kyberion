@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeMkdir } from '@agent/core';
-import { createActuatorScaffold } from './create_actuator.js';
+import { createActuatorScaffold, previewActuatorScaffold } from './create_actuator.js';
 
 describe('create_actuator', () => {
   const tmpRoot = pathResolver.sharedTmp('create-actuator-tests');
@@ -47,6 +47,14 @@ describe('create_actuator', () => {
     expect(indexSource).not.toContain('dispatchDecisionOp');
     expect(schemaSource).toContain('"execute"');
     expect(manifestSource).toContain('knowledge/product/schemas/sample-feature-action.schema.json');
+  });
+
+  it('previews machine-mode output without creating files', () => {
+    safeMkdir(tmpRoot);
+    const preview = previewActuatorScaffold({ name: 'preview-feature', rootDir: tmpRoot });
+    expect(preview.name).toBe('preview-feature-actuator');
+    expect(preview.files_to_write).toHaveLength(5);
+    expect(safeExistsSync(preview.outDir)).toBe(false);
   });
 
   it('refuses to overwrite an existing actuator directory', () => {
