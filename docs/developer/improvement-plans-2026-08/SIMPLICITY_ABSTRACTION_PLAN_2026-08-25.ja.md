@@ -14818,6 +14818,20 @@ semanticsは維持している。
 境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了
 である。
 
+## 2026-09-04 再レビュー修正 741
+
+SX-03／SX-04／E2E-02 のcampaign suite durable manifestを再監査し、briefは既にcanonical loaderへ
+接続済みである一方、実行後の`campaign-manifest.json`だけが局所`CampaignManifest`型とschemaなし
+`safeWriteFile`に残っていたため修正した。専用`campaign-manifest.schema.json`とcore validatorを追加し、
+deliverable status、design fingerprint、tenant slug、output directoryのenvelopeをpersist前に検証する。
+actuator action inputの一時ファイル、per-deliverable failure記録、design resolutionの既存semanticsは
+維持している。
+
+検証: campaign suite／planner **1 file / 3 tests passed**、campaign path boundary **3 tests passed**、
+core build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に
+実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private
+helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

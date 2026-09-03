@@ -12,6 +12,7 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   buildCampaignPlan,
   loadCampaignBriefAtPath,
+  validateCampaignManifest,
   type CampaignManifest,
   type CampaignPlanEntry,
 } from '@agent/core/campaign-suite';
@@ -118,9 +119,12 @@ export function runCampaignSuite(options: {
     'campaign manifest path',
     true
   );
-  safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
-  logger.info(`[campaign-suite] manifest: ${manifestPath} (design=${manifest.primary_hex})`);
-  return manifest;
+  const validatedManifest = validateCampaignManifest(manifest, manifestPath);
+  safeWriteFile(manifestPath, JSON.stringify(validatedManifest, null, 2));
+  logger.info(
+    `[campaign-suite] manifest: ${manifestPath} (design=${validatedManifest.primary_hex})`
+  );
+  return validatedManifest;
 }
 
 async function main(args: string[] = []): Promise<number> {

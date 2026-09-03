@@ -6781,6 +6781,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/campaign-manifest.schema.json",
+      "tier": "public",
+      "size": 1627,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/capability-bundle-registry.schema.json",
       "tier": "public",
       "size": 1875,
