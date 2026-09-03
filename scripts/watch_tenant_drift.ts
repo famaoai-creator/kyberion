@@ -27,7 +27,8 @@ import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { auditChain } from '@agent/core/audit-chain';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const TENANT_DRIFT_USAGE = 'Usage: pnpm watch:tenant-drift [--json] [--quiet] [--alert]';
@@ -84,7 +85,13 @@ function readMissionState(
       pathResolver.rootResolve(`${missionDirRel}/mission-state.json`)
     );
     if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return null;
-    return readJson(statePath);
+    const state = loadStateAtPath(statePath);
+    return state
+      ? {
+          tenant_slug: state.tenant_slug,
+          mission_id: state.mission_id,
+        }
+      : null;
   } catch {
     return null;
   }
