@@ -6787,6 +6787,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/cloudflare-os-control-plane-state.schema.json",
+      "tier": "public",
+      "size": 1112,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/code-pipeline.schema.json",
       "tier": "public",
       "size": 933,
