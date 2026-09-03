@@ -4,6 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
   safeMkdir,
+  safeReadFile,
   safeRmSync,
   safeSymlinkSync,
   safeUnlinkSync,
@@ -84,6 +85,26 @@ describe('KC-06 delegated-task-observability store', () => {
     });
     expect(completed?.settlement).toMatchObject({ source: 'owner', status: 'completed' });
     expect(delegatedTaskStoreDir()).toContain('kc06-tests');
+  });
+
+  it('persists the canonical schema payload for resumable snapshots', () => {
+    const trace = startDelegatedTaskTrace({
+      owner: 'canonical-owner',
+      instruction: 'Persist only the governed snapshot shape.',
+    });
+    const traceWithSchema = {
+      ...trace,
+      $schema: 'https://example.invalid/delegated-task.json',
+    } as typeof trace & { $schema: string };
+
+    completeDelegatedTaskTrace(traceWithSchema, { resultSummary: 'snapshot ready' });
+
+    const persistedPath = pathResolver.rootResolve(
+      path.join(STORE_OVERRIDE, `${trace.trace_id}.json`)
+    );
+    const persisted = JSON.parse(String(safeReadFile(persistedPath, { encoding: 'utf8' })));
+    expect(persisted.$schema).toBeUndefined();
+    expect(loadDelegatedTaskRecord(trace.trace_id)?.status).toBe('completed');
   });
 
   it('fails closed for schema-invalid and non-regular records', () => {

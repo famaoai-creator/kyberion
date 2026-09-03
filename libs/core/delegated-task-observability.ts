@@ -160,12 +160,16 @@ const DELEGATED_TASK_RECORD_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/delegated-task-record.schema.json'
 );
 
-function loadDelegatedTaskRecordCatalog(filePath: string): DelegatedTaskRecord {
+function delegatedTaskRecordCatalog(filePath: string) {
   return defineCatalog<DelegatedTaskRecord>({
     id: 'delegated-task-record',
     path: filePath,
     schema: DELEGATED_TASK_RECORD_SCHEMA_PATH,
-  }).load();
+  });
+}
+
+function loadDelegatedTaskRecordCatalog(filePath: string): DelegatedTaskRecord {
+  return delegatedTaskRecordCatalog(filePath).load();
 }
 
 function childInboxPath(childSessionId: string): string {
@@ -437,7 +441,9 @@ function persistRecordStrict(trace: DelegatedTaskTrace): void {
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   const { trace_id, ...rest } = trace;
   const record: DelegatedTaskRecord = { delegation_id: trace_id, ...rest };
-  safeWriteFile(recordPath(trace_id), `${JSON.stringify(record, null, 2)}\n`);
+  const filePath = recordPath(trace_id);
+  const canonical = delegatedTaskRecordCatalog(filePath).validate(record, filePath);
+  safeWriteFile(filePath, `${JSON.stringify(canonical, null, 2)}\n`);
 }
 
 export function startDelegatedTaskTrace(input: {
