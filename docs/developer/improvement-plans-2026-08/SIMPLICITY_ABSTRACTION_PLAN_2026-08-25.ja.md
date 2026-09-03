@@ -15743,6 +15743,17 @@ SX-05 の細粒度 verb registry を再監査し、ハーネス化済みの offl
 
 検証: CLI manifest gate **1 gate passed**、CLI manifest／Kyberion **2 files / 31 tests passed**、実機 `pnpm exec tsx scripts/kyberion.ts review stamp presence/displays/presence-studio/static/onboarding.html --dry-run --json`（`ok: true`、対象HTML未変更）、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。SX-03 の追加script／state loader、SX-04 の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 820
+
+SX-04／SX-10 のproject status read modelを再監査し、`mission-ledger.json`を型引数だけで読み込んで
+`entries`の存在と`status`だけを暗黙に参照していた残存を修正した。既存の
+`project-mission-ledger.schema.json`をgoverned catalogへ接続し、project_id、entryの必須項目、relationship typeなどを
+検証してからstatus projectionへ渡すようにした。repository path boundaryと既存のlinked／active mission集計 semanticsは維持し、
+valid ledger、malformed ledger、repository外pathの回帰を追加した。
+
+検証: project mission ledger boundary **1 file / 4 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateは
+この追記後に実行する。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

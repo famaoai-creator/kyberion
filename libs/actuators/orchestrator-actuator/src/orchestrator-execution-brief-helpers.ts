@@ -31,6 +31,24 @@ const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge(
 const ACTUATOR_ARCHETYPES_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/actuator-request-archetypes.schema.json'
 );
+const PROJECT_MISSION_LEDGER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/project-mission-ledger.schema.json'
+);
+
+interface ProjectMissionLedgerEntry {
+  mission_id: string;
+  relationship_type: string;
+  status: string;
+  summary: string;
+  [key: string]: unknown;
+}
+
+interface ProjectMissionLedger {
+  project_id: string;
+  project_name?: string;
+  entries: ProjectMissionLedgerEntry[];
+  [key: string]: unknown;
+}
 
 const actuatorRequestArchetypeCatalog = defineCatalog<ActuatorRequestArchetypeCatalog>({
   id: 'actuator-request-archetypes',
@@ -46,8 +64,13 @@ export function loadActuatorRequestArchetypes(): ActuatorRequestArchetypeCatalog
   return parsed;
 }
 
-function loadRepositoryJson<T>(filePath: string): T {
-  return readJson<T>(assertSafeRepositoryPath(filePath));
+export function loadProjectMissionLedger(filePath: string): ProjectMissionLedger {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  return defineCatalog<ProjectMissionLedger>({
+    id: 'project-mission-ledger',
+    path: safeFilePath,
+    schema: PROJECT_MISSION_LEDGER_SCHEMA_PATH,
+  }).load();
 }
 export type DetectedRequestArchetype = ActuatorRequestArchetype & { score: number };
 
@@ -1003,7 +1026,7 @@ export function collectProjectStatusSnapshot(targetProjectId?: string) {
       const titleLine =
         readme.split('\n').find((line) => line.startsWith('# ')) || '# Unknown Project';
       const ledger = safeExistsSync(ledgerPath)
-        ? loadRepositoryJson<{ project_id?: unknown; entries?: unknown }>(ledgerPath)
+        ? loadProjectMissionLedger(ledgerPath)
         : { entries: [] };
       const entries = Array.isArray(ledger.entries) ? ledger.entries : [];
       projectEntries.push({
