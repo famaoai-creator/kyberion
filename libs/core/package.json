@@ -691,6 +691,14 @@
       "types": "./dist/cowork-artifact-packet.d.ts",
       "default": "./dist/cowork-artifact-packet.js"
     },
+    "./delegation-child-registry": {
+      "types": "./dist/delegation-child-registry.d.ts",
+      "default": "./dist/delegation-child-registry.js"
+    },
+    "./delegation-child-registry.js": {
+      "types": "./dist/delegation-child-registry.d.ts",
+      "default": "./dist/delegation-child-registry.js"
+    },
     "./customer-resolver": {
       "types": "./dist/customer-resolver.d.ts",
       "default": "./dist/customer-resolver.js"

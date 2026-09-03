@@ -7021,6 +7021,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/delegation-children.schema.json",
+      "tier": "public",
+      "size": 713,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/delegation-notification.schema.json",
       "tier": "public",
       "size": 1457,
