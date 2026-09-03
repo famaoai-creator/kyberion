@@ -3,7 +3,6 @@ import * as path from 'node:path';
 import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { createLogger } from './logger.js';
@@ -22,6 +21,9 @@ import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-super
 
 const SURFACE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/runtime-surface-manifest.schema.json'
+);
+const SURFACE_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-runtime-state.schema.json'
 );
 
 export type SurfaceRuntimeKind = Extract<RuntimeResourceKind, 'gateway' | 'ui' | 'service'>;
@@ -137,6 +139,14 @@ function surfaceManifestCatalog(filePath: string) {
     id: 'surface-runtime-manifest',
     path: filePath,
     schema: SURFACE_MANIFEST_SCHEMA_PATH,
+  });
+}
+
+function surfaceStateCatalog(filePath: string) {
+  return defineCatalog<SurfaceRuntimeState>({
+    id: 'surface-runtime-state',
+    path: filePath,
+    schema: SURFACE_STATE_SCHEMA_PATH,
   });
 }
 
@@ -365,7 +375,7 @@ export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntime
   if (!safeExistsSync(safeStatePath)) {
     return { version: 1, surfaces: {} };
   }
-  return parsePersistedSurfaceState(readJson<unknown>(safeStatePath));
+  return parsePersistedSurfaceState(surfaceStateCatalog(safeStatePath).load());
 }
 
 export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surfaceStatePath()): void {
@@ -373,7 +383,9 @@ export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surface
     allowMissingLeaf: true,
   });
   ensureParentDir(safeStatePath);
-  safeWriteFile(safeStatePath, JSON.stringify(parsePersistedSurfaceState(state), null, 2));
+  const validated = parsePersistedSurfaceState(state);
+  surfaceStateCatalog(safeStatePath).validate(validated, safeStatePath);
+  safeWriteFile(safeStatePath, JSON.stringify(validated, null, 2));
 }
 
 export function resolveSurfaceCwd(definition: SurfaceRuntimeDefinition): string {

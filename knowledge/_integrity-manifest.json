@@ -9853,6 +9853,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/surface-runtime-state.schema.json",
+      "tier": "public",
+      "size": 1617,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/system-pipeline.schema.json",
       "tier": "public",
       "size": 11011,
