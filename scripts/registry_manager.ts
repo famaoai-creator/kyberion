@@ -146,7 +146,12 @@ export async function main(args: string[] = []) {
       path.join(absAdaptersDir, path.basename(adapterPath)),
       { allowMissingLeaf: true }
     );
-    safeWriteFile(absTargetAdapterPath, JSON.stringify(payload, null, 2));
+    const validatedPayload = defineCatalog<Record<string, unknown>>({
+      id: `registry-manager-${type}-adapter`,
+      path: absTargetAdapterPath,
+      schema: ADAPTER_SCHEMA_PATHS[type],
+    }).validate(payload, absTargetAdapterPath);
+    safeWriteFile(absTargetAdapterPath, JSON.stringify(validatedPayload, null, 2));
 
     const newEntry = {
       capability_id: capabilityId,
