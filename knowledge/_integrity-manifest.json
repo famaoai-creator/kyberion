@@ -7309,6 +7309,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/file-secrets.schema.json",
+      "tier": "public",
+      "size": 425,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/financial-model.schema.json",
       "tier": "public",
       "size": 1903,
@@ -7738,6 +7744,12 @@
       "path": "product/schemas/judgment-rules.schema.json",
       "tier": "public",
       "size": 3751,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/keychain-registry.schema.json",
+      "tier": "public",
+      "size": 785,
       "type": "json"
     },
     {
