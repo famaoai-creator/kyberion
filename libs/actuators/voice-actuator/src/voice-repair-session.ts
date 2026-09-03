@@ -1,4 +1,5 @@
-import { isRecord } from '@agent/core/foundation';
+import { defineCatalog, isRecord, type GovernedCatalog } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
 
 export interface VoiceRepairAttempt {
   segment_id: string;
@@ -27,6 +28,23 @@ export interface VoiceRepairSession {
   repair_attempts: VoiceRepairAttempt[];
   replacements: VoiceRepairReplacement[];
   next_action: string;
+}
+
+const VOICE_REPAIR_SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-repair-session.schema.json'
+);
+const voiceRepairSessionCatalogs = new Map<string, GovernedCatalog<VoiceRepairSession>>();
+
+function voiceRepairSessionCatalogAtPath(sessionPath: string): GovernedCatalog<VoiceRepairSession> {
+  const existing = voiceRepairSessionCatalogs.get(sessionPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<VoiceRepairSession>({
+    id: 'voice-repair-session',
+    path: sessionPath,
+    schema: VOICE_REPAIR_SESSION_SCHEMA_PATH,
+  });
+  voiceRepairSessionCatalogs.set(sessionPath, catalog);
+  return catalog;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -111,4 +129,15 @@ export function parseVoiceRepairSession(value: unknown): VoiceRepairSession | nu
     replacements,
     next_action: value.next_action,
   };
+}
+
+export function loadVoiceRepairSessionAtPath(sessionPath: string): VoiceRepairSession | null {
+  return parseVoiceRepairSession(voiceRepairSessionCatalogAtPath(sessionPath).load());
+}
+
+export function validateVoiceRepairSessionAtPath(
+  value: unknown,
+  sessionPath: string
+): VoiceRepairSession {
+  return voiceRepairSessionCatalogAtPath(sessionPath).validate(value, sessionPath);
 }

@@ -23,7 +23,7 @@ import {
 import { getVoiceRuntimePolicy } from '@agent/core/voice-runtime-policy';
 import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
 import { logger } from '@agent/core/core';
-import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   safeExec,
   safeExecResult,
@@ -56,7 +56,10 @@ import {
   waitForVoiceJob,
   type VoiceArtifactFormat,
 } from './voice-runtime-helpers.js';
-import { parseVoiceRepairSession } from './voice-repair-session.js';
+import {
+  loadVoiceRepairSessionAtPath,
+  validateVoiceRepairSessionAtPath,
+} from './voice-repair-session.js';
 import { runActuatorCli } from '@agent/core/cli-utils';
 import { extractActionParams } from './voice-loopback-helpers.js';
 import {
@@ -388,9 +391,9 @@ async function recordVerifyRepairVoiceSample(input: {
   }> = [];
 
   if (input.resume_session_path) {
-    let session: NonNullable<ReturnType<typeof parseVoiceRepairSession>>;
+    let session: NonNullable<ReturnType<typeof loadVoiceRepairSessionAtPath>>;
     try {
-      const parsedSession = parseVoiceRepairSession(readJson<unknown>(sessionPath));
+      const parsedSession = loadVoiceRepairSessionAtPath(sessionPath);
       if (!parsedSession) throw new Error('voice repair session has an invalid shape');
       session = parsedSession;
     } catch (error: any) {
@@ -516,29 +519,27 @@ async function recordVerifyRepairVoiceSample(input: {
   }
 
   safeMkdir(path.dirname(sessionPath), { recursive: true });
-  const persistRepairSession = (): void =>
-    safeWriteFile(
-      sessionPath,
-      JSON.stringify(
-        {
-          version: 1,
-          created_at: nowIso(),
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          request_id: requestId,
-          sample_id: sampleId,
-          prompt_text: promptText,
-          initial_recording: initial,
-          initial_transcript: initialTranscript,
-          verification: initialVerification,
-          repair_attempts: repairAttempts,
-          replacements,
-          next_action:
-            'record only the listed mismatched segments, then rerun with resume_session_path',
-        },
-        null,
-        2
-      )
+  const persistRepairSession = (): void => {
+    const session = validateVoiceRepairSessionAtPath(
+      {
+        version: 1,
+        created_at: nowIso(),
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        request_id: requestId,
+        sample_id: sampleId,
+        prompt_text: promptText,
+        initial_recording: initial,
+        initial_transcript: initialTranscript,
+        verification: initialVerification,
+        repair_attempts: repairAttempts,
+        replacements,
+        next_action:
+          'record only the listed mismatched segments, then rerun with resume_session_path',
+      },
+      sessionPath
     );
+    safeWriteFile(sessionPath, JSON.stringify(session, null, 2));
+  };
   persistRepairSession();
 
   for (const [mismatchIndex, mismatch] of initialVerification.mismatches.entries()) {
