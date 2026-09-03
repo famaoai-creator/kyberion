@@ -1,6 +1,6 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
@@ -175,6 +175,19 @@ export function loadReasoningRoutePolicy(): ReasoningRoutePolicy {
 
 export function loadReasoningRouteUserConfig(): ReasoningRouteUserConfig {
   return reasoningRouteUserConfigCatalog.load();
+}
+
+/** Load a persisted user-config snapshot through the same schema/path boundary. */
+export function loadReasoningRouteUserConfigAtPath(filePath: string): ReasoningRouteUserConfig {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`Reasoning route user config must be a regular file: ${safePath}`);
+  }
+  return defineCatalog<ReasoningRouteUserConfig>({
+    id: 'reasoning-route-user-config',
+    path: safePath,
+    schema: USER_SCHEMA_PATH,
+  }).load();
 }
 
 export function validateReasoningRouteUserConfig(

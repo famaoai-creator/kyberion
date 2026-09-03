@@ -1,5 +1,6 @@
 import {
   loadReasoningRoutePolicy,
+  loadReasoningRouteUserConfigAtPath,
   loadReasoningRouteUserConfig,
   normalizeReasoningRole,
   reasoningRouteUserConfigPath,
@@ -10,16 +11,10 @@ import {
 } from '@agent/core/reasoning-route-resolver';
 import { inspectReasoningRoutes } from '@agent/core/reasoning-route-doctor';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 
 const HELP = `Usage:
   pnpm reasoning:config list [--json]
@@ -186,10 +181,7 @@ function rollback(argv: string[], dryRun: boolean, print: (value: unknown) => vo
   const path = reasoningRouteUserConfigPath();
   const backup = `${path}.previous`;
   if (!safeExistsSync(backup)) throw new Error(`No rollback snapshot at ${backup}`);
-  const safeBackup = assertSafeRepositoryPath(backup);
-  if (!safeLstat(safeBackup).isFile())
-    throw new Error(`Rollback snapshot is not a regular file: ${backup}`);
-  const restored = readJson<ReasoningRouteUserConfig>(safeBackup);
+  const restored = loadReasoningRouteUserConfigAtPath(backup);
   validateReasoningRouteUserConfig(restored, backup);
   validateConfigResolves(restored);
   if (dryRun) return print({ dry_run: true, restore: backup, target: path, config: restored });
