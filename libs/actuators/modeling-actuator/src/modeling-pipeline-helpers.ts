@@ -41,7 +41,10 @@ import {
   parsePersistedPipelineStrategy,
   readJson,
 } from '@agent/core/foundation';
-import { parseSoftwareQualityContract } from '@agent/core/software-quality';
+import {
+  loadSoftwareQualityContractAtPath,
+  parseSoftwareQualityContract,
+} from '@agent/core/software-quality';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as addFormatsModule from 'ajv-formats';
@@ -987,13 +990,13 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
             allowMissingLeaf: true,
           })
         : undefined;
-      const contractValue =
-        params.contract ??
-        ctx[params.contract_from || 'quality_contract'] ??
-        (contractFilePath && safeExistsSync(contractFilePath)
-          ? readJson<unknown>(contractFilePath)
-          : null);
-      const contract = parseSoftwareQualityContract(contractValue);
+      const contractValue = params.contract ?? ctx[params.contract_from || 'quality_contract'];
+      const contract =
+        contractValue !== undefined && contractValue !== null
+          ? parseSoftwareQualityContract(contractValue)
+          : contractFilePath && safeExistsSync(contractFilePath)
+            ? loadSoftwareQualityContractAtPath(contractFilePath)
+            : null;
       if (!contract) throw new Error('[derive_test_inventory] quality contract is invalid');
       const systemTags = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
       const riskRefs = params.risk_refs ?? ctx[params.risk_refs_from || 'risk_refs'];
