@@ -7161,7 +7161,7 @@
     {
       "path": "product/schemas/environment-capability-manifest.schema.json",
       "tier": "public",
-      "size": 5558,
+      "size": 5742,
       "type": "json"
     },
     {

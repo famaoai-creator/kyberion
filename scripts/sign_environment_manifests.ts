@@ -16,13 +16,12 @@ import * as path from 'node:path';
 import {
   computeManifestSignature,
   listEnvironmentManifestIds,
+  loadEnvironmentManifestForSigning,
   verifyManifestSignature,
-  type EnvironmentManifest,
 } from '@agent/core/environment-capability';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeJsonParse } from '@agent/core/validators';
-import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -49,10 +48,7 @@ export async function main(argv: string[] = []): Promise<number> {
   withExecutionContext('ecosystem_architect', () => {
     for (const id of ids) {
       const filePath = pathResolver.rootResolve(path.join(MANIFEST_DIR, `${id}.json`));
-      const manifest = safeJsonParse<EnvironmentManifest>(
-        safeReadFile(filePath, { encoding: 'utf8' }) as string,
-        `manifest ${id}`
-      );
+      const manifest = loadEnvironmentManifestForSigning(id);
       if (checkOnly) {
         if (verifyManifestSignature(manifest, signingKey)) {
           logger.info(`[manifests:sign] ${id}: signature ok`);
