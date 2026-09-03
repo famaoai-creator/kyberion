@@ -9223,6 +9223,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/scheduler-ops-alert-days.schema.json",
+      "tier": "public",
+      "size": 348,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/scoped-artifact-index-entry.schema.json",
       "tier": "public",
       "size": 1164,
