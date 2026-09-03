@@ -4,6 +4,7 @@ import { resolveVars } from '@agent/core/src/logic-utils';
 import { safeExecResult } from '@agent/core/secure-io';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline-contract';
+import { validateProductivityTaskPlan } from '@agent/core/productivity-task-plan';
 import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 import { applyOnboardingInput } from './onboarding_apply.js';
 import { runCampaignSuite } from './campaign_suite.js';
@@ -99,32 +100,28 @@ export function runInlineProductivityDryRunValidation(
   if (plan.kind !== 'productivity-task-plan') {
     throw new Error('invalid productivity task plan kind');
   }
-  if (
-    (plan.execution as Record<string, unknown> | undefined)?.mode !== 'dry_run' ||
-    (plan.execution as Record<string, unknown> | undefined)?.external_effects_executed !== false
-  ) {
-    throw new Error('productivity task plan must be dry-run only');
+  let validatedPlan;
+  try {
+    validatedPlan = validateProductivityTaskPlan(plan);
+  } catch (error) {
+    throw new Error(
+      `invalid productivity task plan shape: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
   }
-  if (
-    !Array.isArray(plan.steps) ||
-    plan.steps.some((item) => (item as Record<string, unknown>)?.execution_mode !== 'preview_only')
-  ) {
-    throw new Error('all productivity steps must remain preview_only');
-  }
-  const approval = plan.approval as Record<string, unknown> | undefined;
   return exportValue(
     params,
     step,
     {
       kind: 'productivity-review-package',
       mission_id: ctx.mission_id,
-      status: approval?.required ? 'approval_required' : 'ready_for_local_draft',
-      request: plan.request,
-      domains: plan.domains,
-      steps: plan.steps,
-      approval: plan.approval,
-      missing_inputs: plan.missing_inputs,
-      evidence_plan: plan.evidence_plan,
+      status: validatedPlan.approval.required ? 'approval_required' : 'ready_for_local_draft',
+      request: validatedPlan.request,
+      domains: validatedPlan.domains,
+      steps: validatedPlan.steps,
+      approval: validatedPlan.approval,
+      missing_inputs: validatedPlan.missing_inputs,
+      evidence_plan: validatedPlan.evidence_plan,
       external_effects_executed: false,
     },
     ctx
