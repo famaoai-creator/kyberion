@@ -7,7 +7,6 @@ import {
 import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import { latestSnapshot } from './intent-snapshot-store.js';
 import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
@@ -98,7 +97,7 @@ export function loadMissionGateRecordAtPath(
     id: 'mission-gate-record',
     path: safeFilePath,
     schema: MISSION_GATE_RECORD_SCHEMA_PATH,
-  }).validate(readJson<unknown>(safeFilePath), safeFilePath);
+  }).load();
   const expectedMissionId = missionId.trim().toUpperCase();
   if (record.mission_id?.trim().toUpperCase() !== expectedMissionId) {
     throw new Error(
