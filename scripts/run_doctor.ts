@@ -4,9 +4,7 @@ import {
   loadEnvironmentManifest,
   probeManifest,
 } from '@agent/core/environment-capability';
-import { pathResolver } from '@agent/core/path-resolver';
-import { readJanitorLastRunMs } from '@agent/core/storage-janitor';
-import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { readJanitorLastRunMs, readJanitorLastSubmissionMs } from '@agent/core/storage-janitor';
 import { inspectMeshHub } from '@agent/core/mesh-hub-inspection';
 import { getGovernanceControlSummary } from '@agent/core/governance-status';
 import { listScheduledPipelines } from '@agent/core/pipeline-scheduler';
@@ -45,7 +43,7 @@ import {
   stripSharedScriptFlags,
   type ScriptContext,
 } from './lib/harness.js';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   formatAppPreflightReport,
   runAppPreflight,
@@ -64,7 +62,6 @@ const RUNTIME_PRESETS: Record<string, string[]> = {
   browser: ['meeting-participation-runtime'],
   baseline: DEFAULT_MANIFESTS,
 };
-const JANITOR_SUBMIT_MARKER = 'runtime/state/janitor-last-submit.json';
 const JANITOR_MAINTENANCE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface DoctorRunReport {
@@ -274,18 +271,8 @@ export function collectBackupDoctorLines(): string[] {
 
 export function collectMaintenanceDoctorLines(): string[] {
   const lastRunMs = readJanitorLastRunMs();
-  const submitPath = pathResolver.shared(JANITOR_SUBMIT_MARKER);
-  const submitPending = safeExistsSync(submitPath);
-  let lastSubmittedAt: number | null = null;
-  if (submitPending && safeLstat(submitPath).isFile()) {
-    try {
-      const parsed = readJson<{ submitted_at?: string }>(submitPath);
-      const submittedAt = Date.parse(String(parsed?.submitted_at || ''));
-      lastSubmittedAt = Number.isFinite(submittedAt) ? submittedAt : null;
-    } catch {
-      lastSubmittedAt = null;
-    }
-  }
+  const lastSubmittedAt = readJanitorLastSubmissionMs();
+  const submitPending = lastSubmittedAt !== null;
 
   if (lastRunMs === null && !submitPending) {
     return ['Maintenance: janitor idle; no last run marker'];

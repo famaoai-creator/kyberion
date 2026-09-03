@@ -14177,6 +14177,12 @@ SX-03／SX-04 のTaskScenario readerを再監査し、既存の`task-scenario.sc
 
 検証: TaskScenario／list／run／smoke **5 files / 18 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 653
+
+SX-03／SX-04／LC-01 のjanitor marker readerを再監査し、storage janitorの完了markerとbaseline／doctorが共有するsubmission markerを汎用`readJson`で個別に読み込んでいた残存を修正した。last-run／submission marker専用schemaと`storage-janitor`のcanonical catalog loader／writerを追加し、完了・再投入の時刻と固定pipeline／dry-run契約、regular-file境界をcoreへ集約した。malformed／unknown field／directory markerの安全側fallback、janitor freshness、baseline maintenance pending、doctor表示の既存semanticsは維持している。
+
+検証: janitor／baseline／doctor **3 files / 83 tests passed**、対象typecheck、lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

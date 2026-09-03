@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "janitor-submission-marker.schema.json",
+  "title": "Storage janitor submission marker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["submitted_at", "pipeline_id", "dry_run"],
+  "properties": {
+    "submitted_at": { "type": "string", "format": "date-time" },
+    "pipeline_id": { "const": "storage-janitor" },
+    "dry_run": { "const": false }
+  }
+}

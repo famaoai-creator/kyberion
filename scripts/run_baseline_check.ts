@@ -16,7 +16,11 @@ import { logger } from '@agent/core/core';
 import { withExecutionContext } from '@agent/core/authority';
 import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
 import { killSwitch } from '@agent/core/kill-switch';
-import { readJanitorLastRunMs } from '@agent/core/storage-janitor';
+import {
+  readJanitorLastRunMs,
+  readJanitorLastSubmissionMs as readJanitorLastSubmissionMarkerMs,
+  writeJanitorSubmissionMarker,
+} from '@agent/core/storage-janitor';
 import { listOrphanNhiIdentities } from '@agent/core/nhi-lifecycle-governance';
 import { readReasoningDegraded } from '@agent/core/reasoning-degradation';
 import {
@@ -70,7 +74,6 @@ type ReadinessRule = {
 const BASELINE_CACHE_TTL_MS = 60 * 60 * 1000;
 const BASELINE_CACHE_DIR = 'runtime/baseline-check-cache';
 const JANITOR_MAINTENANCE_TTL_MS = 24 * 60 * 60 * 1000;
-const JANITOR_SUBMIT_MARKER = 'runtime/state/janitor-last-submit.json';
 
 // AL-01: janitor liveness observation. The maintenance fallback above only
 // re-submits the janitor job — it cannot see a submission machinery that is
@@ -559,30 +562,11 @@ function getCachedCoworkHealth() {
 }
 
 function readJanitorLastSubmissionMs(): number | null {
-  const markerPath = pathResolver.shared(JANITOR_SUBMIT_MARKER);
-  if (!safeExistsSync(markerPath)) return null;
-  try {
-    const parsed = readJson<{ submitted_at?: string }>(markerPath);
-    const submittedAt = Date.parse(String(parsed?.submitted_at || ''));
-    return Number.isFinite(submittedAt) ? submittedAt : null;
-  } catch {
-    return null;
-  }
+  return readJanitorLastSubmissionMarkerMs();
 }
 
 function markJanitorSubmission(): void {
-  safeWriteFile(
-    pathResolver.shared(JANITOR_SUBMIT_MARKER),
-    JSON.stringify(
-      {
-        submitted_at: nowIso(),
-        pipeline_id: 'storage-janitor',
-        dry_run: false,
-      },
-      null,
-      2
-    )
-  );
+  writeJanitorSubmissionMarker();
 }
 
 function maybeSubmitJanitorMaintenanceJob(): {

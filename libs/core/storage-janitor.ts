@@ -1,7 +1,8 @@
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import * as nodePath from 'node:path';
-import { sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
+import { knowledge, sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
 import {
   safeReaddir,
   safeExecResult,
@@ -972,10 +973,12 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
 
   if (!opts.dryRun) {
     try {
-      safeWriteFile(
-        shared(JANITOR_MARKER_SUBPATH),
-        JSON.stringify({ completed_at: report.timestamp, errors: errors.length }, null, 2)
+      const markerPath = shared(JANITOR_MARKER_SUBPATH);
+      const marker = janitorLastRunCatalog(markerPath).validate(
+        { completed_at: report.timestamp, errors: errors.length },
+        markerPath
       );
+      safeWriteFile(markerPath, JSON.stringify(marker, null, 2));
     } catch (err) {
       // The marker only powers the staleness gate; a real run without a marker
       // just means the next session re-runs the janitor.
@@ -988,18 +991,70 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
 }
 
 const JANITOR_MARKER_SUBPATH = 'runtime/state/janitor-last-run.json';
+const JANITOR_SUBMIT_MARKER_SUBPATH = 'runtime/state/janitor-last-submit.json';
+const JANITOR_LAST_RUN_SCHEMA_PATH = knowledge(
+  'product/schemas/janitor-last-run-marker.schema.json'
+);
+const JANITOR_SUBMISSION_SCHEMA_PATH = knowledge(
+  'product/schemas/janitor-submission-marker.schema.json'
+);
+
+type JanitorLastRunMarker = { completed_at: string; errors: number };
+type JanitorSubmissionMarker = {
+  submitted_at: string;
+  pipeline_id: 'storage-janitor';
+  dry_run: false;
+};
+
+function janitorLastRunCatalog(filePath: string) {
+  return defineCatalog<JanitorLastRunMarker>({
+    id: 'janitor-last-run-marker',
+    path: filePath,
+    schema: JANITOR_LAST_RUN_SCHEMA_PATH,
+  });
+}
+
+function janitorSubmissionCatalog(filePath: string) {
+  return defineCatalog<JanitorSubmissionMarker>({
+    id: 'janitor-submission-marker',
+    path: filePath,
+    schema: JANITOR_SUBMISSION_SCHEMA_PATH,
+  });
+}
 
 export function readJanitorLastRunMs(): number | null {
   const markerPath = shared(JANITOR_MARKER_SUBPATH);
   if (!safeExistsSync(markerPath)) return null;
   try {
-    const parsed = readJson<Record<string, unknown>>(markerPath);
-    const ts =
-      typeof parsed.completed_at === 'string' ? Date.parse(parsed.completed_at) : Number.NaN;
+    if (!safeLstat(markerPath).isFile()) return null;
+    const parsed = janitorLastRunCatalog(markerPath).load();
+    const ts = Date.parse(parsed.completed_at);
     return Number.isFinite(ts) ? ts : null;
   } catch {
     return null;
   }
+}
+
+export function readJanitorLastSubmissionMs(): number | null {
+  const markerPath = shared(JANITOR_SUBMIT_MARKER_SUBPATH);
+  if (!safeExistsSync(markerPath)) return null;
+  try {
+    if (!safeLstat(markerPath).isFile()) return null;
+    const parsed = janitorSubmissionCatalog(markerPath).load();
+    const ts = Date.parse(parsed.submitted_at);
+    return Number.isFinite(ts) ? ts : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeJanitorSubmissionMarker(): void {
+  const markerPath = shared(JANITOR_SUBMIT_MARKER_SUBPATH);
+  const marker = janitorSubmissionCatalog(markerPath).validate(
+    { submitted_at: nowIso(), pipeline_id: 'storage-janitor', dry_run: false },
+    markerPath
+  );
+  safeWriteFile(markerPath, JSON.stringify(marker, null, 2));
 }
 
 /**

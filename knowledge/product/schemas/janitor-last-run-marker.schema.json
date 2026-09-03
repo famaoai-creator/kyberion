@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "janitor-last-run-marker.schema.json",
+  "title": "Storage janitor last-run marker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["completed_at", "errors"],
+  "properties": {
+    "completed_at": { "type": "string", "format": "date-time" },
+    "errors": { "type": "integer", "minimum": 0 }
+  }
+}
