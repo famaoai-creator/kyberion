@@ -14327,6 +14327,12 @@ SX-03／SX-04 のprovider capability snapshotを再監査し、dashboardのstric
 
 検証: provider capability overview／dashboard **9 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`、knowledge index再生成、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 678
+
+SX-03／SX-04 のfirst-win lifecycle schedule readerを再監査し、既存のpipeline ADF canonical loaderがあるにもかかわらず、weekly pipelineのscheduleだけraw `readJson`で読み込んでいた残存を修正した。`loadPipelineAdfAtPath`へ接続し、pipeline schema、repository／regular-file境界を通過したscheduleだけをsmoke判定へ渡すようにした。identity templateの入力検証、cron／timezone判定、dry-run／live lifecycleの既存semanticsは維持している。
+
+検証: first-win lifecycle **18 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
