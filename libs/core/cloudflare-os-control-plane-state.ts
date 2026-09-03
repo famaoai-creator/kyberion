@@ -56,6 +56,13 @@ export function loadPersistedControlPlaneStateAtPath(
   return parsePersistedControlPlaneState(controlPlaneStateCatalogAtPath(safePath).load());
 }
 
+/** Validate a state envelope before a control-plane caller persists it. */
+export function validatePersistedControlPlaneStateAtPath(filePath: string, value: unknown): void {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const schemaValidated = controlPlaneStateCatalogAtPath(safePath).validate(value, safePath);
+  parsePersistedControlPlaneState(schemaValidated);
+}
+
 type PersistedRecord = Record<string, unknown>;
 
 const HELD_ACTION_STATUSES = new Set<HeldActionStatus>([
@@ -177,6 +184,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       'autoApproved',
       'appliedAt',
       'result',
+      'applyError',
       'simulation',
       'effectBinding',
       'payloadHash',
@@ -204,7 +212,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
   if (typeof normalized.autoApproved !== 'boolean') {
     throw new Error(`${label} has invalid required fields`);
   }
-  for (const field of ['taskId', 'actionTag', 'resolvedBy'] as const) {
+  for (const field of ['taskId', 'actionTag', 'resolvedBy', 'applyError'] as const) {
     const value = persistedOptionalString(record, field, label);
     if (value !== undefined) normalized[field] = value;
   }

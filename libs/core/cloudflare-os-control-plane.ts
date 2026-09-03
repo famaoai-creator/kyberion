@@ -7,6 +7,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   loadPersistedControlPlaneStateAtPath,
+  validatePersistedControlPlaneStateAtPath,
   type PersistedControlPlaneState,
 } from './cloudflare-os-control-plane-state.js';
 import { isRecord } from './foundation/text.js';
@@ -1164,6 +1165,7 @@ export class CloudflareOsControlPlane {
         ];
       }),
     };
+    validatePersistedControlPlaneStateAtPath(this.statePath, state);
     safeWriteFile(this.statePath, JSON.stringify(state, null, 2) + '\n', { encoding: 'utf8' });
   }
 
