@@ -18,7 +18,8 @@ import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 
@@ -34,6 +35,10 @@ export interface MissionEvidenceDocOptions<T> {
    * On `false` the doc is treated as unreadable (logged + null).
    */
   validate?: (doc: unknown) => doc is T;
+  /** Optional schema used to validate the persisted document through a catalog boundary. */
+  schema?: string;
+  /** Stable catalog identifier used in schema validation errors. */
+  catalog_id?: string;
 }
 
 export class MissionEvidenceDoc<T> {
@@ -69,7 +74,21 @@ export class MissionEvidenceDoc<T> {
   read(): T | null {
     if (!this.exists()) return null;
     try {
-      const data = readJson<unknown>(this.filePath);
+      const filePath = this.filePath;
+      const data = this.options.schema
+        ? (() => {
+            if (!safeLstat(filePath).isFile()) {
+              throw new Error(
+                `[MISSION_EVIDENCE_DOC] document must be a regular file: ${filePath}`
+              );
+            }
+            return defineCatalog<T>({
+              id: this.options.catalog_id ?? `mission-evidence:${this.options.filename}`,
+              path: filePath,
+              schema: this.options.schema,
+            }).load();
+          })()
+        : readJson<unknown>(filePath);
       if (this.options.validate && !this.options.validate(data)) {
         logger.warn(`[mission-evidence-doc] ${this.filePath} failed validator; ignoring`);
         return null;

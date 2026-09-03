@@ -40,12 +40,12 @@ import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
 import { resolveIdentityContext } from '@agent/core/authority';
-import { validateVoiceConsentRecord } from '@agent/core/voice-consent';
+import { loadVoiceConsentAtPath, validateVoiceConsentRecord } from '@agent/core/voice-consent';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { resolveVars } from '@agent/core/src/logic-utils';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { getRegisteredEnvText, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import {
@@ -253,7 +253,7 @@ export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
     };
   }
   try {
-    const consent = readJson<unknown>(consentPath);
+    const consent = loadVoiceConsentAtPath(consentPath);
     return validateVoiceConsentRecord(consent, {
       missionId,
       tenantSlug: resolveIdentityContext().tenantSlug,

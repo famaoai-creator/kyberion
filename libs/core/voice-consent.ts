@@ -1,6 +1,13 @@
 import { MissionEvidenceDoc } from './mission-evidence-doc.js';
 import { resolveIdentityContext } from './authority.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
+import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+
+const VOICE_CONSENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-consent.schema.json'
+);
 
 export interface VoiceConsentRecord {
   consent: 'granted' | 'revoked';
@@ -107,7 +114,27 @@ function consentDoc(missionId: string): MissionEvidenceDoc<VoiceConsentRecord> {
     filename: 'voice-consent.json',
     agent_id: 'voice-consent',
     validate: isVoiceConsentRecord,
+    schema: VOICE_CONSENT_SCHEMA_PATH,
+    catalog_id: 'voice-consent',
   });
+}
+
+/** Load an existing consent artifact through its repository and schema boundary. */
+export function loadVoiceConsentAtPath(filePath: string): VoiceConsentRecord {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[VOICE_CONSENT] consent record must be a regular file: ${filePath}`);
+  }
+  try {
+    return defineCatalog<VoiceConsentRecord>({
+      id: 'voice-consent',
+      path: safePath,
+      schema: VOICE_CONSENT_SCHEMA_PATH,
+    }).load();
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`voice-consent.json is malformed: ${reason}`);
+  }
 }
 
 export function grantVoiceConsent(options: {

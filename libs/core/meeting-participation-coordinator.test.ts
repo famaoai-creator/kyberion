@@ -394,6 +394,23 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     expect(JSON.stringify(trace.finalize())).toContain('meeting_participation.speak_denied');
   });
 
+  it('fails closed when consent contains fields outside the persisted schema', () => {
+    writeVoiceConsent({
+      consent: 'granted',
+      mission_id: CONSENT_MISSION,
+      operator_handle: 'operator',
+      unexpected: true,
+    });
+
+    const result = checkMeetingParticipationConsent({
+      mission_id: CONSENT_MISSION,
+      purpose: 'recording',
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/malformed/);
+  });
+
   it('allows capture and speech when mission consent is granted', async () => {
     writeVoiceConsent({
       consent: 'granted',

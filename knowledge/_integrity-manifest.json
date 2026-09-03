@@ -9817,6 +9817,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/voice-consent.schema.json",
+      "tier": "public",
+      "size": 674,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/voice-engine-registry.schema.json",
       "tier": "public",
       "size": 2393,
