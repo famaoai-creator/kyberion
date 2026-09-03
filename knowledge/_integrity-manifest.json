@@ -7573,6 +7573,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/llm-selection-preferences.schema.json",
+      "tier": "public",
+      "size": 620,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/maintenance-schedule.schema.json",
       "tier": "public",
       "size": 705,
