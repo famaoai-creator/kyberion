@@ -34,7 +34,6 @@ import {
   safeWriteFile,
   safeMkdir,
 } from './secure-io.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import {
   createMemoryPromotionCandidate,
@@ -99,11 +98,13 @@ function syncStateLogicalPath(scope?: ScopeContext): string {
     : SYNC_STATE_LOGICAL;
 }
 
-const syncStateCatalog = defineCatalog<SyncState>({
-  id: 'cowork-sync-state',
-  path: SYNC_STATE_SCHEMA_PATH,
-  schema: SYNC_STATE_SCHEMA_PATH,
-});
+function syncStateCatalogAtPath(statePath: string) {
+  return defineCatalog<SyncState>({
+    id: 'cowork-sync-state',
+    path: statePath,
+    schema: SYNC_STATE_SCHEMA_PATH,
+  });
+}
 
 function emptySyncState(): SyncState {
   return { ingested: {}, supplied: {}, last_sync_at: '' };
@@ -115,7 +116,7 @@ export function loadCoworkSyncStateAtPath(statePath: string): SyncState {
   if (!safeLstat(safeStatePath).isFile()) {
     throw new Error(`[COWORK_SYNC_STATE] state must be a regular file: ${statePath}`);
   }
-  return syncStateCatalog.validate(readJson<unknown>(safeStatePath), safeStatePath);
+  return syncStateCatalogAtPath(safeStatePath).load();
 }
 
 function loadSyncState(scope?: ScopeContext): SyncState {
@@ -141,7 +142,10 @@ function saveSyncState(state: SyncState, scope?: ScopeContext): void {
   if (safeExistsSync(resolved) && !safeLstat(resolved).isFile()) {
     throw new Error(`[COWORK_SYNC_STATE] state must be a regular file: ${resolved}`);
   }
-  const validated = syncStateCatalog.validate({ ...state, last_sync_at: nowIso() }, resolved);
+  const validated = syncStateCatalogAtPath(resolved).validate(
+    { ...state, last_sync_at: nowIso() },
+    resolved
+  );
   safeWriteFile(resolved, JSON.stringify(validated, null, 2));
 }
 

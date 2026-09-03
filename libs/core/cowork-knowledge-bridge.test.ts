@@ -187,6 +187,7 @@ function defaultExistsImpl(p: string): boolean {
 describe('Cowork sync state loader', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSafeExistsSync.mockReturnValue(true);
     mockSafeLstat.mockReturnValue({ isFile: () => true });
   });
 
