@@ -13727,6 +13727,12 @@ SX-03／SX-04 のpipeline ADF参照を再監査し、sub-pipeline readerが任�
 
 検証: pipeline engine **1 file / 10 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 578
+
+SX-03／SX-04 のbackground review nudge stateを再監査し、session別の非ブロッキングreview reminderをraw `readJson`と寛容な局所normalizeだけで読み、state schema・regular-file境界・session bindingを共有していなかった残存を修正した。`background-review-nudge.schema.json`とsession pathに結び付くcanonical loaderを追加し、load／saveをstrict schemaへ統合した。不正・未知フィールド・directory stateはメインworkerを停止させず新規stateへ安全にフォールバックし、threshold、modulo remainder、review reservation／completion／cancel semanticsは維持している。
+
+検証: background review nudge **1 file / 4 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

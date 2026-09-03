@@ -7,14 +7,17 @@
  */
 
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeLstat, safeMkdir, safeWriteFile } from './secure-io.js';
 
 const STATE_VERSION = 1;
 const DEFAULT_THRESHOLD = 10;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/u;
+const NUDGE_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/background-review-nudge.schema.json'
+);
 
 export interface BackgroundReviewNudgeConfig {
   turnThreshold?: number;
@@ -54,6 +57,14 @@ function statePath(sessionId: string): string {
   );
 }
 
+function nudgeStateCatalogAtPath(filePath: string) {
+  return defineCatalog<BackgroundReviewNudgeState>({
+    id: 'background-review-nudge',
+    path: filePath,
+    schema: NUDGE_STATE_SCHEMA_PATH,
+  });
+}
+
 function defaultState(sessionId: string): BackgroundReviewNudgeState {
   return {
     version: STATE_VERSION,
@@ -84,7 +95,8 @@ function loadState(sessionId: string): BackgroundReviewNudgeState {
   const filePath = statePath(normalized);
   if (!safeExistsSync(filePath)) return defaultState(normalized);
   try {
-    return normalizeState(readJson<unknown>(filePath), normalized);
+    if (!safeLstat(filePath).isFile()) return defaultState(normalized);
+    return normalizeState(nudgeStateCatalogAtPath(filePath).load(), normalized);
   } catch {
     // A corrupt nudge file must not block the main worker; start a clean
     // counter while preserving the same logical session identity.
@@ -97,7 +109,8 @@ function saveState(state: BackgroundReviewNudgeState): BackgroundReviewNudgeStat
   const parent = path.dirname(filePath);
   if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
   const next = { ...state, updated_at: nowIso() };
-  safeWriteFile(filePath, `${JSON.stringify(next, null, 2)}\n`);
+  const validated = nudgeStateCatalogAtPath(filePath).validate(next, filePath);
+  safeWriteFile(filePath, `${JSON.stringify(validated, null, 2)}\n`);
   return next;
 }
 
