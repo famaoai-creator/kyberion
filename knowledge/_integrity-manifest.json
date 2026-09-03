@@ -6907,6 +6907,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/contextual-intent-memory.schema.json",
+      "tier": "public",
+      "size": 1373,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/contract-review-record.schema.json",
       "tier": "public",
       "size": 710,
