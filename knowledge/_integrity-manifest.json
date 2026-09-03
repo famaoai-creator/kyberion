@@ -6553,6 +6553,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/audio-device-lease.schema.json",
+      "tier": "public",
+      "size": 872,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/authority-role-index.schema.json",
       "tier": "public",
       "size": 809,

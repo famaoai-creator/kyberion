@@ -4,12 +4,12 @@ import {
   assertSafeRepositoryPath,
   safeCreateExclusiveFileSync,
   safeExistsSync,
+  safeLstat,
   safeUnlink,
   safeWriteFile,
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface AudioDeviceLeaseRecord {
   lease_id: string;
@@ -31,6 +31,18 @@ export interface AudioDeviceLeaseManagerOptions {
   lease_dir?: string;
   now?: () => number;
   pid?: number;
+}
+
+const AUDIO_DEVICE_LEASE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/audio-device-lease.schema.json'
+);
+
+function audioDeviceLeaseCatalogAtPath(filePath: string) {
+  return defineCatalog<AudioDeviceLeaseRecord>({
+    id: 'audio-device-lease',
+    path: filePath,
+    schema: AUDIO_DEVICE_LEASE_SCHEMA_PATH,
+  });
 }
 
 const localLeases = new Set<string>();
@@ -69,7 +81,8 @@ export class AudioDeviceLeaseManager {
       heartbeat_at: new Date(nowMs).toISOString(),
     };
     try {
-      safeCreateExclusiveFileSync(lockPath, JSON.stringify(record, null, 2));
+      const validated = audioDeviceLeaseCatalogAtPath(lockPath).validate(record, lockPath);
+      safeCreateExclusiveFileSync(lockPath, JSON.stringify(validated, null, 2));
     } catch (error) {
       if (!safeExistsSync(lockPath) || !this.isStale(lockPath)) {
         throw new Error(`audio device '${uid}' is already leased`);
@@ -91,7 +104,8 @@ export class AudioDeviceLeaseManager {
         };
         record.heartbeat_at = next.heartbeat_at;
         record.expires_at = next.expires_at;
-        safeWriteFile(lockPath, JSON.stringify(next, null, 2));
+        const validated = audioDeviceLeaseCatalogAtPath(lockPath).validate(next, lockPath);
+        safeWriteFile(lockPath, JSON.stringify(validated, null, 2));
       },
       release: () => {
         if (released) return;
@@ -109,8 +123,8 @@ export class AudioDeviceLeaseManager {
 
   private isStale(lockPath: string): boolean {
     try {
-      const parsed: unknown = readJson<unknown>(lockPath);
-      if (!isRecord(parsed) || typeof parsed.expires_at !== 'string') return true;
+      if (!safeLstat(lockPath).isFile()) return true;
+      const parsed = audioDeviceLeaseCatalogAtPath(lockPath).load();
       return Date.parse(parsed.expires_at) <= this.now();
     } catch {
       return true;
