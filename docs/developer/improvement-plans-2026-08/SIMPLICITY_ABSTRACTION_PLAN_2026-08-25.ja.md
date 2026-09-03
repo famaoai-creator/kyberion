@@ -14411,6 +14411,12 @@ SX-03／SX-04／I18N-03 のhardcoded Japanese baselineを再監査し、checker�
 
 検証: i18n hardcoding baseline／checker **2 files / 22 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 692
+
+SX-03／SX-04／KP-05 のknowledge usage aggregateを再監査し、delivery／feedback集計のpersisted配列が型キャスト付きraw JSON read／writeに残っていた残存を修正した。専用`knowledge-usage-aggregate.schema.json`とcore canonical loader／writerを追加し、欠如時の空集合、malformed／schema-invalid時の既存fail-safe、tenant別runtime path、entry／byte capの既存semanticsを維持したまま、集計stateのschema・repository／regular-file境界を共有化した。
+
+検証: knowledge usage aggregate／feedback loop／curation／weight recalculation **4 files / 41 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、knowledge index再生成、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

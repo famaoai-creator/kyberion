@@ -68,6 +68,8 @@ export * from './company.js';
 
 export * from './i18n-hardcoding-baseline.js';
 
+export * from './knowledge-usage-aggregate.js';
+
 export * from './knowledge-taxonomy.js';
 
 export * from './financial-model.js';

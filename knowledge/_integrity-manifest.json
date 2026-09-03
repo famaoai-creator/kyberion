@@ -7735,6 +7735,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/knowledge-usage-aggregate.schema.json",
+      "tier": "public",
+      "size": 845,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/knowledge-weights.schema.json",
       "tier": "public",
       "size": 1040,
