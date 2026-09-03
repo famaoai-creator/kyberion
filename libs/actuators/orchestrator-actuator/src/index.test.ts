@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   safeMkdir: vi.fn(),
   safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(() => ({ isFile: () => true, isSymbolicLink: () => false })),
   safeUnlinkSync: vi.fn(),
   safeSymlinkSync: vi.fn(),
   resolveVars: vi.fn((value: string) => value),
@@ -41,6 +42,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeExec: mocks.safeExec,
   safeMkdir: mocks.safeMkdir,
   safeExistsSync: mocks.safeExistsSync,
+  safeLstat: mocks.safeLstat,
   safeUnlinkSync: mocks.safeUnlinkSync,
   safeSymlinkSync: mocks.safeSymlinkSync,
 }));
@@ -81,6 +83,7 @@ describe('orchestrator-actuator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeLstat.mockReturnValue({ isFile: () => true, isSymbolicLink: () => false });
   });
 
   it('keeps non-JSON command output as text but rejects dangerous JSON', async () => {
@@ -239,7 +242,9 @@ describe('orchestrator-actuator', () => {
       if (filePath === resolvedInputPath) return JSON.stringify({ answer: 42 });
       throw new Error(`unexpected read: ${filePath}`);
     });
-    mocks.safeExistsSync.mockImplementation((filePath: string) => filePath === resolvedContextPath);
+    mocks.safeExistsSync.mockImplementation(
+      (filePath: string) => filePath === resolvedContextPath || filePath === resolvedInputPath
+    );
 
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -266,6 +271,43 @@ describe('orchestrator-actuator', () => {
       resolvedContextPath,
       expect.stringContaining('"payload"')
     );
+  });
+
+  it('rejects unsafe or non-object persisted orchestrator context before merging it', async () => {
+    const contextPath = 'active/shared/tmp/orchestrator-tests/invalid-context.json';
+    const resolvedContextPath = `${ROOT}/${contextPath}`;
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeReadFile.mockReturnValue('{"constructor":{"polluted":true}}');
+
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        context: { context_path: contextPath },
+        steps: [],
+      } as unknown as Parameters<typeof handleAction>[0])
+    ).rejects.toThrow('dangerous JSON key');
+
+    expect(mocks.safeReadFile).toHaveBeenCalledWith(resolvedContextPath, { encoding: 'utf8' });
+  });
+
+  it('rejects a directory or invalid JSON through the read_json boundary', async () => {
+    const inputPath = 'active/shared/tmp/orchestrator-tests/invalid-input.json';
+    const resolvedInputPath = `${ROOT}/${inputPath}`;
+    mocks.safeExistsSync.mockImplementation((filePath: string) => filePath === resolvedInputPath);
+    mocks.safeLstat.mockReturnValue({ isFile: () => false });
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        { type: 'capture', op: 'read_json', params: { path: inputPath, export_as: 'payload' } },
+      ],
+    } as unknown as Parameters<typeof handleAction>[0]);
+
+    expect(result.results[0]?.status).toBe('failed');
+    expect(result.results[0]?.error).toContain('existing regular file');
+    expect(mocks.safeLstat).toHaveBeenCalled();
   });
 
   it('unknown capture op suggests a nearby known op', async () => {
