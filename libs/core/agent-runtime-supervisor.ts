@@ -70,6 +70,15 @@ const RESULTS_DIR = pathResolver.shared('coordination/agent-runtime/results');
 const AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/agent-runtime-ensure-result.schema.json'
 );
+const AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-runtime-ensure-request.schema.json'
+);
+
+const agentRuntimeEnsureRequestCatalog = defineCatalog<ParsedAgentRuntimeEnsureRequest>({
+  id: 'agent-runtime-ensure-request',
+  path: AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH,
+  schema: AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH,
+});
 
 const agentRuntimeEnsureResultCatalog = defineCatalog<AgentRuntimeEnsureResult>({
   id: 'agent-runtime-ensure-result',
@@ -242,8 +251,12 @@ export function enqueueMissionTeamPrewarmRequest(input: {
 
 export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
   const safePath = safeQueuePath(requestPath, REQUESTS_DIR);
-  const request = parseAgentRuntimeEnsureRequest(
+  const validated = agentRuntimeEnsureRequestCatalog.validate(
     readJson<unknown>(safePath),
+    safePath
+  );
+  const request = parseAgentRuntimeEnsureRequest(
+    validated,
     path.basename(safePath, path.extname(safePath))
   );
   return {
