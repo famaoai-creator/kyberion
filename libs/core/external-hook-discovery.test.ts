@@ -117,6 +117,36 @@ describe('external hook discovery', () => {
     }
   });
 
+  it('skips an approved project config containing dangerous JSON keys', () => {
+    safeMkdir(`${fixtureRoot}/.claude`, { recursive: true });
+    const configPath = `${fixtureRoot}/.claude/settings.json`;
+    safeWriteFile(
+      configPath,
+      JSON.stringify({
+        PreToolUse: [{ hooks: [{ type: 'command', command: ['safe-hook'] }] }],
+        nested: { ['__proto__']: { polluted: true } },
+      })
+    );
+    let approvalId = '';
+    try {
+      approvalId = approveProjectConfig(configPath);
+      const result = registerDiscoveredExternalLifecycleHooks(new LifecycleHookEngine(), {
+        rootDir: fixtureRoot,
+        trustResolved: true,
+        projectTrustApprovalIds: { [configPath]: approvalId },
+      });
+      expect(result.registered).toBe(0);
+      expect(result.skipped[0]?.reason).toContain('dangerous JSON key');
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(fixtureRoot, { recursive: true, force: true });
+        if (approvalId) {
+          safeRmSync(approvalRequestLogicalPath('project-trust', approvalId), { force: true });
+        }
+      });
+    }
+  });
+
   it('requires an explicit global opt-in and separate trust decision', async () => {
     const globalHome = pathResolver.shared('tmp/external-hook-global-test');
     safeMkdir(`${globalHome}/.claude`, { recursive: true });

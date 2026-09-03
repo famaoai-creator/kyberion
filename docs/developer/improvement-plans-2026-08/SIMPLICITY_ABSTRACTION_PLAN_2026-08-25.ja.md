@@ -15849,6 +15849,16 @@ SX-03／SX-08／SX-10 のpeer tenant runtime migration再開経路を再監査�
 検証: peer tenant migration **1 file / 4 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 830
+
+SX-03／SX-04／SX-10 のexternal hook config登録経路を再監査し、path containmentとhash-bound approval後の設定内容を
+`Record<string, unknown>`へ直接castしていた残存を修正した。foundationの`parseSafeJsonObjectValue`を読み込み境界へ接続し、
+root shapeとネストした危険JSON keyを検証してから lifecycle hook bridgeへ渡すようにした。既存のproject／global trust、hook登録、
+malformed configのskip semanticsは維持し、approved configのdangerous key回帰を追加した。
+
+検証: external hook discovery **1 file / 7 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
