@@ -34,13 +34,14 @@ import { createWorkItem, getWorkItem, updateWorkItem, type WorkItem } from './wo
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
+  safeLstat,
   safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
@@ -290,7 +291,21 @@ export function loadOnboardingFirstWorkRecord(
 ): OnboardingFirstWorkRecord | null {
   const filePath = firstWorkPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateFirstWorkRecord(readJson<unknown>(filePath));
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(
+      `Invalid onboarding first work record: document must be a regular file: ${filePath}`
+    );
+  }
+  try {
+    return defineCatalog<OnboardingFirstWorkRecord>({
+      id: 'onboarding-first-work',
+      path: filePath,
+      schema: FIRST_WORK_SCHEMA_PATH,
+    }).load();
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid onboarding first work record: ${reason}`);
+  }
 }
 
 function saveOnboardingFirstWorkRecord(record: OnboardingFirstWorkRecord, rootDir: string): string {
@@ -538,7 +553,21 @@ export function loadOnboardingContextBinding(
 ): OnboardingContextBinding | null {
   const filePath = contextPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateBinding(readJson<unknown>(filePath));
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(
+      `Invalid onboarding context binding: document must be a regular file: ${filePath}`
+    );
+  }
+  try {
+    return defineCatalog<OnboardingContextBinding>({
+      id: 'onboarding-context-binding',
+      path: filePath,
+      schema: SCHEMA_PATH,
+    }).load();
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid onboarding context binding: ${reason}`);
+  }
 }
 
 export function resolveOnboardingContext(
