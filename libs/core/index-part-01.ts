@@ -174,6 +174,8 @@ export * from './brand-tokens.js';
 
 export * from './golden-output.js';
 
+export * from './documentation-source-map.js';
+
 export * from './campaign-suite.js';
 
 export * from './config-mission.js';

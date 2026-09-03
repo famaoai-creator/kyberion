@@ -1,5 +1,5 @@
+import { loadDocumentationSourceMapAtPath } from '@agent/core/documentation-source-map';
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -173,9 +173,9 @@ export function checkDocumentationSourceMap(): string[] {
 
   let manifest: SourceMap;
   try {
-    manifest = readJson<SourceMap>(mapPath);
+    manifest = loadDocumentationSourceMapAtPath(mapPath);
   } catch (error) {
-    return [`${DOCUMENTATION_SOURCE_MAP}: invalid JSON (${String(error)})`];
+    return [`${DOCUMENTATION_SOURCE_MAP}: invalid catalog (${String(error)})`];
   }
 
   const pathCandidates = new Set<string>();

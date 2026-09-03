@@ -7177,6 +7177,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/documentation-source-map.schema.json",
+      "tier": "public",
+      "size": 2480,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/dynamic-permission-policy.schema.json",
       "tier": "public",
       "size": 1609,
