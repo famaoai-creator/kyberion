@@ -85,6 +85,19 @@ describe('FileSecretProvider', () => {
       fs.rmSync(target, { force: true });
     }
   });
+
+  it('rejects malformed secret maps before persistence', () => {
+    const provider = new FileSecretProvider(secretsFile) as unknown as {
+      writeSecretsFile: (secrets: unknown) => void;
+    };
+
+    expect(() =>
+      provider.writeSecretsFile({
+        'test-service': { 'test-account': 'secret' },
+        unexpected: ['not-a-secret-map'],
+      })
+    ).toThrow('Invalid catalog file-secrets');
+  });
 });
 
 describe('SecretPolicyRouter file fallback warn phase', () => {

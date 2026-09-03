@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import {
@@ -18,16 +18,36 @@ import { SecretProvider, RegistryEntry } from './secret-types.js';
 
 const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
 const FILE_SECRETS_PATH = pathResolver.vault('secrets/file-secrets.json');
+const KEYCHAIN_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/keychain-registry.schema.json'
+);
+const FILE_SECRETS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/file-secrets.schema.json');
 
 // Helper to manage the registry catalog
 interface KeychainRegistry {
   entries: RegistryEntry[];
 }
 
+function keychainRegistryCatalog() {
+  return defineCatalog<KeychainRegistry>({
+    id: 'keychain-registry',
+    path: KEYCHAIN_REGISTRY_PATH,
+    schema: KEYCHAIN_REGISTRY_SCHEMA_PATH,
+  });
+}
+
+function fileSecretsCatalog(filePath: string) {
+  return defineCatalog<Record<string, Record<string, string>>>({
+    id: 'file-secrets',
+    path: filePath,
+    schema: FILE_SECRETS_SCHEMA_PATH,
+  });
+}
+
 function loadRegistry(): KeychainRegistry {
   if (!safeExistsSync(KEYCHAIN_REGISTRY_PATH)) return { entries: [] };
   try {
-    return readJson<KeychainRegistry>(KEYCHAIN_REGISTRY_PATH);
+    return keychainRegistryCatalog().load();
   } catch {
     return { entries: [] };
   }
@@ -36,7 +56,8 @@ function loadRegistry(): KeychainRegistry {
 function saveRegistry(registry: KeychainRegistry): void {
   const dir = path.dirname(KEYCHAIN_REGISTRY_PATH);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(KEYCHAIN_REGISTRY_PATH, JSON.stringify(registry, null, 2));
+  const validated = keychainRegistryCatalog().validate(registry, KEYCHAIN_REGISTRY_PATH);
+  safeWriteFile(KEYCHAIN_REGISTRY_PATH, JSON.stringify(validated, null, 2));
 }
 
 export function registryAdd(service: string, account: string): void {
@@ -242,7 +263,7 @@ export class FileSecretProvider implements SecretProvider {
     if (!safeExistsSync(this.secretsPath)) return {};
     this.assertNotSymlink(this.secretsPath, 'secret file');
     try {
-      return readJson<Record<string, Record<string, string>>>(this.secretsPath);
+      return fileSecretsCatalog(this.secretsPath).load();
     } catch {
       return {};
     }
@@ -259,7 +280,8 @@ export class FileSecretProvider implements SecretProvider {
     if (safeExistsSync(this.secretsPath)) {
       this.assertNotSymlink(this.secretsPath, 'secret file');
     }
-    safeWriteFile(this.secretsPath, JSON.stringify(secrets, null, 2), { mode: 0o600 });
+    const validated = fileSecretsCatalog(this.secretsPath).validate(secrets, this.secretsPath);
+    safeWriteFile(this.secretsPath, JSON.stringify(validated, null, 2), { mode: 0o600 });
     // Also repair permissions of files created by older versions.
     safeChmodSync(this.secretsPath, 0o600);
   }
