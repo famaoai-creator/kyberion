@@ -6361,6 +6361,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/adhoc-pipeline-run-ledger.schema.json",
+      "tier": "public",
+      "size": 503,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/agent-action.schema.json",
       "tier": "public",
       "size": 553,
