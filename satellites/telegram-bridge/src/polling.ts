@@ -1,35 +1,7 @@
 import { logger } from '@agent/core/core';
 import { secretGuard } from '@agent/core/secret-guard';
+import { parsePollingResponse, parsePollingUpdates } from './polling-response.js';
 const BRIDGE_WEBHOOK_URL = 'http://127.0.0.1:3035/webhook';
-
-interface TelegramPollingUpdate {
-  update_id: number;
-  [key: string]: unknown;
-}
-
-interface TelegramPollingResponse {
-  ok?: boolean;
-  result?: unknown;
-}
-
-function parsePollingResponse(value: unknown): TelegramPollingResponse {
-  if (!value || typeof value !== 'object') return {};
-  const record = value as Record<string, unknown>;
-  return {
-    ok: typeof record.ok === 'boolean' ? record.ok : undefined,
-    result: record.result,
-  };
-}
-
-function parsePollingUpdates(value: unknown): TelegramPollingUpdate[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (item): item is TelegramPollingUpdate =>
-      Boolean(item) &&
-      typeof item === 'object' &&
-      typeof (item as Record<string, unknown>).update_id === 'number'
-  );
-}
 
 async function main() {
   const connection = secretGuard.loadConnectionDocument('telegram');
