@@ -29,9 +29,10 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { isRecord, nowIso, parseSafeJsonInput, readJson, slugify } from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput, slugify } from '@agent/core/foundation';
 import { tryRepairJson } from '@agent/core/json-repair';
 import {
+  loadPipelineAdfAtPath,
   validatePipelineAdf,
   type PipelineAdf,
   type PipelineAdfStep,
@@ -234,10 +235,8 @@ async function main(args: string[] = []): Promise<void> {
   const traceId = getFlag(argv, '--trace');
 
   const resolvedInput = resolvePromotionInputPath(inputPath);
-  const source = readJson<unknown>(resolvedInput);
-
   // 1. Preflight the source exactly like run_pipeline would.
-  const pipeline: PromotablePipeline = { ...validatePipelineAdf(source) };
+  const pipeline: PromotablePipeline = { ...loadPipelineAdfAtPath(resolvedInput) };
   const sourceGuardrails = validatePipelineGuardrails(pipeline, inputPath);
   if (!sourceGuardrails.ok) {
     fail(
