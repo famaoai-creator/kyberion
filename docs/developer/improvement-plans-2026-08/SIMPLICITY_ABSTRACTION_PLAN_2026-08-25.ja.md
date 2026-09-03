@@ -15025,6 +15025,19 @@ provider failover、best-effort persistenceとstate path／symlink boundaryの�
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 758
+
+SX-03／SX-04／SX-06／SX-10 のagent runtime prewarm requestを再監査し、queue readは専用
+`agent-runtime-ensure-request.schema.json`とscope parserを通過し、result writeも既にschema-boundである
+一方、enqueue側のrequest artifactだけが未検証raw `safeWriteFile`に残っていたため修正した。mission／scope／
+team_roles／requested_byのrequest envelopeをqueue投入直前に同じcatalogで検証し、不正なteam roleが supervisor
+queueへ残らないようにする。request path boundary、runtime owner、result binding、prewarm orchestrationの
+既存semanticsは維持している。
+
+検証: agent runtime supervisor **1 file / 13 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

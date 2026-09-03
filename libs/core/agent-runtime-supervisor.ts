@@ -244,10 +244,12 @@ export function enqueueMissionTeamPrewarmRequest(input: {
     reason: input.reason,
     created_at: nowIso(),
   };
-  safeWriteFile(
-    getAgentRuntimeEnsureRequestPath(request.request_id),
-    JSON.stringify(request, null, 2)
+  const requestPath = getAgentRuntimeEnsureRequestPath(request.request_id);
+  const validated = agentRuntimeEnsureRequestCatalogAtPath(requestPath).validate(
+    request,
+    requestPath
   );
+  safeWriteFile(requestPath, JSON.stringify(validated, null, 2));
   appendSupervisorEvent({
     decision: 'agent_runtime_prewarm_requested',
     request_id: request.request_id,
