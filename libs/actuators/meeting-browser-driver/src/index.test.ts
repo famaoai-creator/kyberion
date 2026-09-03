@@ -298,6 +298,16 @@ describe('cookie-store', () => {
     expect(cookies).toEqual([]);
   });
 
+  it('readCookies returns empty array when a persisted cookie has an invalid shape', async () => {
+    const { safeExistsSync } = await import('@agent/core/secure-io');
+    const { readJson } = await import('@agent/core/foundation');
+    vi.mocked(safeExistsSync).mockReturnValue(true);
+    vi.mocked(readJson).mockReturnValue([{ name: 'session', value: 'abc', expires: 'never' }]);
+
+    const { readCookies } = await import('./cookie-store.js');
+    expect(readCookies('test-account')).toEqual([]);
+  });
+
   it('writeCookies calls safeWriteFile with serialized cookies', async () => {
     const { safeWriteFile, safeMkdir } = await import('@agent/core/secure-io');
 
@@ -310,6 +320,14 @@ describe('cookie-store', () => {
       expect.stringContaining('"session"')
     );
     expect(safeMkdir).toHaveBeenCalled();
+  });
+
+  it('writeCookies rejects an invalid cookie shape before persistence', async () => {
+    const { writeCookies } = await import('./cookie-store.js');
+
+    expect(() =>
+      writeCookies('test-account', [{ name: 'session', value: 'xyz', secure: 'yes' }])
+    ).toThrow('cookie payload has an invalid shape');
   });
 
   it('cookiePathFor returns path containing account slug', async () => {

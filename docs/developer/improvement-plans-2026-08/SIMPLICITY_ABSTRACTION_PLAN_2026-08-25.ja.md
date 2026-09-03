@@ -15808,6 +15808,16 @@ session path、symlink boundary、CDP reattach、lease lifecycle semanticsは維
 検証: browser runtime **2 files / 8 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 826
+
+SX-03／SX-10 のmeeting browser cookie persistenceを再監査し、永続JSONが配列であることだけを確認して
+`context.addCookies()`へ型キャストし、未知key・不正型・不正なsameSite／expiresを認証状態復元へ渡し得る残存を修正した。
+cookie name／valueとPlaywright互換の許可フィールドを検証・再構成し、read時は不正jarを空配列へfail-closed、write時は不正payloadを永続化前に拒否するようにした。
+account slug、secure path、既存のcookie resume semanticsは維持し、invalid read／write回帰を追加した。
+
+検証: meeting browser driver **1 file / 25 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
