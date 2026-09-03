@@ -1,10 +1,8 @@
 import * as path from 'node:path';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
 import { isRecord } from './foundation/text.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
-import { pathResolver } from './path-resolver.js';
 import { resolveLocale, type SupportedLocale } from './locale.js';
+import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
 
 /**
  * UX-04 acceptance 5: approval decisions should carry the onboarding
@@ -14,26 +12,11 @@ import { resolveLocale, type SupportedLocale } from './locale.js';
  * Lives apart from profile-root so that module keeps its dependency-light
  * mockable shape (its tests stub path-resolver with a minimal surface).
  */
-const PERSONAL_IDENTITY_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/personal-identity.schema.json'
-);
-
-function personalIdentityCatalogAtPath(filePath: string) {
-  return defineCatalog<Record<string, unknown>>({
-    id: 'personal-identity',
-    path: filePath,
-    schema: PERSONAL_IDENTITY_SCHEMA_PATH,
-  });
-}
-
 export function resolveOperatorDisplayName(fallback = 'sovereign-user'): string {
   try {
-    const identityPath = assertSafeRepositoryPath(
-      path.join(resolveActiveProfileRoot(), 'my-identity.json'),
-      { allowMissingLeaf: true }
+    const parsed = loadPersonalIdentityAtPath(
+      path.join(resolveActiveProfileRoot(), 'my-identity.json')
     );
-    if (!safeExistsSync(identityPath) || !safeLstat(identityPath).isFile()) return fallback;
-    const parsed = personalIdentityCatalogAtPath(identityPath).load();
     if (!isRecord(parsed)) return fallback;
     const name = typeof parsed.name === 'string' ? parsed.name.trim() : '';
     return name || fallback;
