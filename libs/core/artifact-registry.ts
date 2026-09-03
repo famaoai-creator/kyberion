@@ -82,6 +82,13 @@ function compareArtifactOwnershipRecords(
   return String(b.artifact_id || '').localeCompare(String(a.artifact_id || ''));
 }
 
+function canonicalArtifactOwnershipRecord(
+  record: ArtifactOwnershipRecord
+): ArtifactOwnershipRecord {
+  const registryPath = artifactRegistryPath();
+  return artifactOwnershipCatalog(registryPath).validate(record, registryPath);
+}
+
 export function createArtifactOwnershipRecord(
   input: Omit<ArtifactOwnershipRecord, 'created_at' | 'evidence_refs'> & {
     created_at?: string;
@@ -101,7 +108,7 @@ export function validateArtifactOwnershipRecord(record: ArtifactOwnershipRecord)
   errors: string[];
 } {
   try {
-    artifactOwnershipCatalog(artifactRegistryPath()).validate(record);
+    canonicalArtifactOwnershipRecord(record);
     return { valid: true, errors: [] };
   } catch (error) {
     return {
@@ -123,9 +130,13 @@ export function appendArtifactOwnershipRecord(
   if (options.for_delivery && record.storage_class === 'tmp') {
     throw new Error('tmp storage_class cannot be registered as a delivery artifact.');
   }
-  const validation = validateArtifactOwnershipRecord(record);
-  if (!validation.valid) {
-    throw new Error(`Invalid artifact ownership record: ${validation.errors.join('; ')}`);
+  let validated: ArtifactOwnershipRecord;
+  try {
+    validated = canonicalArtifactOwnershipRecord(record);
+  } catch (error) {
+    throw new Error(
+      `Invalid artifact ownership record: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 
   const registryPath = artifactRegistryPath();
@@ -133,7 +144,7 @@ export function appendArtifactOwnershipRecord(
     allowMissingLeaf: true,
   });
   if (!safeExistsSync(registryDir)) safeMkdir(registryDir, { recursive: true });
-  appendJsonLine(registryPath, record);
+  appendJsonLine(registryPath, validated);
   return registryPath;
 }
 

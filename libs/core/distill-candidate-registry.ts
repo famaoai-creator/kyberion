@@ -100,20 +100,21 @@ export function validateDistillCandidateRecord(value: unknown): value is Distill
 }
 
 export function saveDistillCandidateRecord(record: DistillCandidateRecord): string {
+  const filePath = recordPath(record.candidate_id);
+  const updated: DistillCandidateRecord = {
+    ...record,
+    updated_at: nowIso(),
+  };
+  let validated: DistillCandidateRecord;
   try {
-    distillCandidateRecordCatalog.validate(record);
+    validated = distillCandidateRecordCatalogAtPath(filePath).validate(updated, filePath);
   } catch (error) {
     throw new Error(
       `Invalid distill candidate record: ${error instanceof Error ? error.message : String(error)}`
     );
   }
   if (!safeExistsSync(DISTILL_DIR)) safeMkdir(DISTILL_DIR, { recursive: true });
-  const filePath = recordPath(record.candidate_id);
-  const updated: DistillCandidateRecord = {
-    ...record,
-    updated_at: nowIso(),
-  };
-  safeWriteFile(filePath, JSON.stringify(updated, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   distillCandidateListCache = null;
   return filePath;
 }

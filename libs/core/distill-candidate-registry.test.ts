@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile, safeRmSync } from './secure-io.js';
 import {
   createDistillCandidateRecord,
   listDistillCandidateRecords,
@@ -47,6 +49,33 @@ describe('distill-candidate-registry', () => {
     expect(
       listDistillCandidateRecords().some((item) => item.candidate_id === record.candidate_id)
     ).toBe(true);
+  });
+
+  it('persists the canonical candidate payload after updating its timestamp', () => {
+    const candidateId = 'DSC-TEST-CANONICAL';
+    const filePath = pathResolver.shared(`runtime/distill-candidates/${candidateId}.json`);
+    const record = createDistillCandidateRecord({
+      candidate_id: candidateId,
+      source_type: 'artifact',
+      title: 'Canonical candidate',
+      summary: 'Candidate metadata is canonicalized before persistence.',
+      status: 'proposed',
+      target_kind: 'pattern',
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof createDistillCandidateRecord>[0]);
+
+    try {
+      saveDistillCandidateRecord(record);
+      const persisted = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as Record<
+        string,
+        unknown
+      >;
+      expect(persisted).not.toHaveProperty('$schema');
+      expect(persisted.candidate_id).toBe(candidateId);
+      expect(persisted.updated_at).toBeTypeOf('string');
+    } finally {
+      safeRmSync(filePath, { force: true });
+    }
   });
 
   it('updates promotion state and ref', () => {
