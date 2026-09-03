@@ -429,6 +429,13 @@ describe('action-item-store', () => {
     expect(listActionItems(FIX_MISSION).map((item) => item.item_id)).toEqual(['AI-VALID-1']);
   });
 
+  it('rejects an action item store that is not a regular file', () => {
+    const file = path.join(MISSION_DIR, 'evidence/action-items.jsonl');
+    fs.mkdirSync(file, { recursive: true });
+
+    expect(() => listActionItems(FIX_MISSION)).toThrow(/must be a regular file/);
+  });
+
   it('speaker_rejected transitions the item to cancelled', async () => {
     const { confirmActionItemBySpeaker } = await import('./action-item-store.js');
     recordActionItem({
