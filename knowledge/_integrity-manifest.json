@@ -7237,6 +7237,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/feedback-knowledge-hints.schema.json",
+      "tier": "public",
+      "size": 1413,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/file-pipeline.schema.json",
       "tier": "public",
       "size": 2446,
