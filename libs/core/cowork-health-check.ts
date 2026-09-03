@@ -13,8 +13,25 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+
+const SYNC_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/cowork-sync-state.schema.json'
+);
+
+interface CoworkSyncState {
+  last_sync_at: string;
+  [key: string]: unknown;
+}
+
+function syncStateCatalogAtPath(filePath: string) {
+  return defineCatalog<CoworkSyncState>({
+    id: 'cowork-health-sync-state',
+    path: filePath,
+    schema: SYNC_STATE_SCHEMA_PATH,
+  });
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -88,8 +105,11 @@ function checkCoworkOutbox(): CoworkHealthCheck {
 }
 
 function checkSyncStateFreshness(maxAgeHours = 24): { check: CoworkHealthCheck; warning?: string } {
-  const statePath = pathResolver.resolve('active/shared/runtime/cowork-sync-state.json');
-  if (!safeExistsSync(statePath)) {
+  const statePath = assertSafeRepositoryPath(
+    pathResolver.resolve('active/shared/runtime/cowork-sync-state.json'),
+    { allowMissingLeaf: true }
+  );
+  if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) {
     return {
       check: {
         name: 'sync_state_freshness',
@@ -100,7 +120,7 @@ function checkSyncStateFreshness(maxAgeHours = 24): { check: CoworkHealthCheck; 
   }
 
   try {
-    const state = readJson<{ last_sync_at?: string }>(statePath);
+    const state = syncStateCatalogAtPath(statePath).load();
     const lastSync = state.last_sync_at ? new Date(state.last_sync_at).getTime() : 0;
     const ageHours = (Date.now() - lastSync) / (1000 * 60 * 60);
     const stale = lastSync > 0 && ageHours > maxAgeHours;
