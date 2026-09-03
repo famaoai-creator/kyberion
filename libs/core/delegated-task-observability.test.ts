@@ -1,7 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
+  safeMkdir,
   safeRmSync,
   safeSymlinkSync,
   safeUnlinkSync,
@@ -82,6 +84,24 @@ describe('KC-06 delegated-task-observability store', () => {
     });
     expect(completed?.settlement).toMatchObject({ source: 'owner', status: 'completed' });
     expect(delegatedTaskStoreDir()).toContain('kc06-tests');
+  });
+
+  it('fails closed for schema-invalid and non-regular records', () => {
+    const trace = startDelegatedTaskTrace({
+      owner: 'test-owner',
+      instruction: 'Validate the persisted record boundary.',
+    });
+    const persistedPath = pathResolver.rootResolve(
+      path.join(STORE_OVERRIDE, `${trace.trace_id}.json`)
+    );
+    safeWriteFile(persistedPath, JSON.stringify({ delegation_id: trace.trace_id }), {
+      encoding: 'utf8',
+    });
+    expect(loadDelegatedTaskRecord(trace.trace_id)).toBeNull();
+
+    safeRmSync(persistedPath, { recursive: true, force: true });
+    safeMkdir(persistedPath, { recursive: true });
+    expect(loadDelegatedTaskRecord(trace.trace_id)).toBeNull();
   });
 
   it('builds a runtime-supervised worker spec without putting inbox text in argv', () => {
