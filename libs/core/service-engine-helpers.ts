@@ -7,7 +7,7 @@ import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveRepositoryPathToken } from './path-token-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';
-import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from './secure-io.js';
 import { secretGuard } from './secret-guard.js';
 import { transform } from './transformer.js';
 
@@ -44,6 +44,19 @@ export function loadServiceConnectionAtPath(filePath: string): Record<string, un
   if (!safeLstat(safeFilePath).isFile())
     throw new Error(`Service connection is not a regular file: ${safeFilePath}`);
   return serviceConnectionCatalogAtPath(safeFilePath).load();
+}
+
+export function writeServiceConnectionAtPath(
+  filePath: string,
+  connection: Record<string, unknown>
+): string {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = serviceConnectionCatalogAtPath(safeFilePath).validate(connection, safeFilePath);
+  safeWriteFile(safeFilePath, JSON.stringify(validated, null, 2) + '\n', {
+    mkdir: true,
+    encoding: 'utf8',
+  });
+  return safeFilePath;
 }
 
 function isPlainObject(value: unknown): value is Record<string, any> {
