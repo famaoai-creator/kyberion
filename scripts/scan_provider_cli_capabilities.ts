@@ -1,5 +1,8 @@
 import * as path from 'node:path';
-import { buildProviderCapabilitySnapshot } from '@agent/core/provider-capability-overview';
+import {
+  buildProviderCapabilitySnapshot,
+  validateProviderCapabilitySnapshot,
+} from '@agent/core/provider-capability-overview';
 import {
   discoverProviders,
   mergeProbedCapabilitiesIntoCatalog,
@@ -59,8 +62,11 @@ export function main(args: string[]): unknown {
   const resolvedOutPath = assertSafeRepositoryPath(pathResolver.resolve(outPath), {
     allowMissingLeaf: true,
   });
+  const validatedSummary = validateProviderCapabilitySnapshot(summary, resolvedOutPath);
   safeMkdir(path.dirname(resolvedOutPath), { recursive: true });
-  safeWriteFile(resolvedOutPath, JSON.stringify(summary, null, 2), { encoding: 'utf8' });
+  safeWriteFile(resolvedOutPath, JSON.stringify(validatedSummary, null, 2), {
+    encoding: 'utf8',
+  });
 
   // probe -> knowledge loop: optionally merge what was discovered into the knowledge catalog
   // (knowledge/product/orchestration/provider-capabilities.json), preserving manual edits.

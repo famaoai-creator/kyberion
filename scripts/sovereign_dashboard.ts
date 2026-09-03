@@ -14,7 +14,7 @@ import { listSurfaceOutboxMessages } from '@agent/core/surface-coordination-stor
 import { discoverProviders } from '@agent/core/provider-discovery';
 import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
 import {
-  parseProviderCapabilitySnapshot,
+  loadProviderCapabilitySnapshotAtPath,
   type ProviderCapabilitySnapshot,
 } from '@agent/core/provider-capability-overview';
 import {
@@ -319,10 +319,8 @@ function readJsonIfExists<T>(logicalPath: string): T | null {
 export function readProviderCapabilitySnapshot(
   filePath: string
 ): ProviderCapabilitySnapshot | null {
-  const raw = readJsonIfExists<unknown>(filePath);
-  if (raw === null) return null;
   try {
-    return parseProviderCapabilitySnapshot(raw);
+    return loadProviderCapabilitySnapshotAtPath(filePath);
   } catch {
     return null;
   }

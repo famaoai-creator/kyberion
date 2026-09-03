@@ -9073,6 +9073,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/provider-capability-snapshot.schema.json",
+      "tier": "public",
+      "size": 1948,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/provider-cli-capability-report-policy.schema.json",
       "tier": "public",
       "size": 842,

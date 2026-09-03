@@ -4,8 +4,10 @@ import type {
   ProbeResult,
 } from './provider-capability-scanner.js';
 import type { ProviderInfo } from './provider-discovery.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
+import { pathResolver } from './path-resolver.js';
 
 export type ProviderCapabilitySnapshotProvider = Pick<
   ProviderInfo,
@@ -29,6 +31,18 @@ export type ProviderCapabilitySnapshot = {
   providers: ProviderCapabilitySnapshotProvider[];
   capabilities: ProviderCapabilitySnapshotCapability[];
 };
+
+const PROVIDER_CAPABILITY_SNAPSHOT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/provider-capability-snapshot.schema.json'
+);
+
+function providerCapabilitySnapshotCatalog(filePath: string) {
+  return defineCatalog<ProviderCapabilitySnapshot>({
+    id: 'provider-capability-snapshot',
+    path: filePath,
+    schema: PROVIDER_CAPABILITY_SNAPSHOT_SCHEMA_PATH,
+  });
+}
 
 function assertExactKeys(
   record: Record<string, unknown>,
@@ -161,6 +175,21 @@ export function parseProviderCapabilitySnapshot(value: unknown): ProviderCapabil
     providers: providers.map(parseSnapshotProvider),
     capabilities: capabilities.map(parseSnapshotCapability),
   };
+}
+
+/** Validate an in-memory or persisted provider snapshot through the catalog boundary. */
+export function validateProviderCapabilitySnapshot(
+  value: unknown,
+  sourcePath = 'provider capability snapshot'
+): ProviderCapabilitySnapshot {
+  const validated = providerCapabilitySnapshotCatalog(sourcePath).validate(value, sourcePath);
+  return parseProviderCapabilitySnapshot(validated);
+}
+
+/** Load the persisted provider snapshot through repository, file, and schema boundaries. */
+export function loadProviderCapabilitySnapshotAtPath(filePath: string): ProviderCapabilitySnapshot {
+  const loaded = providerCapabilitySnapshotCatalog(filePath).load();
+  return parseProviderCapabilitySnapshot(loaded);
 }
 
 export function buildProviderCapabilitySnapshot(params: {
