@@ -15430,6 +15430,18 @@ SX-03／SX-04 のmission work reconciliationを再監査し、既存schemaを使
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、
 Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 792
+
+SX-03／SX-04 のassistant compiler request／result persistenceを再監査し、request／result schemaは存在するものの、
+保存時だけvalidation結果を捨ててraw payloadを書いていたため修正した。request／result双方をpath-bound `defineCatalog`
+のcanonical payload保存へ統合し、`$schema` governance metadataがruntime artifactへ混入しないことを回帰で確認した。
+resultの任意出力先は既定のassistant compiler result store配下に限定し、repo外は既存resource boundary、repo内の別領域は
+専用scope boundaryで拒否する。公開validator、normalizer、既定のrequest／result path semanticsは維持している。
+
+検証: assistant compiler request **1 file / 5 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、
+Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
