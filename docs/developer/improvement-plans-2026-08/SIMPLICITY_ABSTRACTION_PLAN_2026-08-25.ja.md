@@ -15695,6 +15695,16 @@ SX-06／SX-10 の`create:actuator`を再監査し、`defineScript`は存在す�
 
 検証: create actuator **1 file / 3 tests passed**、実機 `pnpm exec tsx scripts/create_actuator.ts harness-preview-20260904 --dry-run --json`（`ok: true`、対象directory未作成）、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 815
+
+SX-06 の `report-review/stamp.ts` を再監査し、共有 `defineScript` は呼び出しているものの `--dry-run`／`--check` が
+実際のHTML書き込みを止めず、`--json`／`--quiet` も通常の `console.log` を迂回できない残存を修正した。レイヤー追加・削除・
+既存レイヤーの no-op を純粋な stamp plan として分離し、dry-run は変更計画だけを返し、check は差分がある場合に exit code 1
+で fail-closed に報告するようにした。通常の file:// 用 stamp／remove の出力と secure-io 経由の書き込みは維持し、追加・削除・
+二重埋め込み防止の回帰を追加した。
+
+検証: report-review stamp **1 file / 3 tests passed**、実機 `pnpm exec tsx scripts/report-review/stamp.ts presence/displays/presence-studio/static/onboarding.html --dry-run --json`（`ok: true`、action=`add`、対象HTML未変更）、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。SX-03 の追加script／state loader、SX-04 の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
