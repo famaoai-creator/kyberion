@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/terminal-session-state.schema.json",
+  "title": "Terminal Session State",
+  "description": "Persisted state for a ReflexTerminal session used for liveness-aware discovery.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pid"],
+  "properties": {
+    "pid": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "status": { "type": "string" }
+  }
+}

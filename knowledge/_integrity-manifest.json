@@ -9559,6 +9559,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/terminal-response.schema.json",
+      "tier": "public",
+      "size": 487,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/terminal-session-state.schema.json",
+      "tier": "public",
+      "size": 507,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/test-case-adf.schema.json",
       "tier": "public",
       "size": 1111,
