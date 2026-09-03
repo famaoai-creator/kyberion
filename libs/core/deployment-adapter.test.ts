@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   getDeploymentAdapter,
   installShellDeploymentAdapterFromConfigIfAvailable,
@@ -20,7 +20,7 @@ describe('deployment-adapter', () => {
     resetDeploymentAdapter();
     withExecutionContext('ecosystem_architect', () => {
       safeRmSync(configPath, { force: true });
-      safeRmSync(explicitConfigPath, { force: true });
+      safeRmSync(explicitConfigPath, { recursive: true, force: true });
     });
   });
 
@@ -174,5 +174,17 @@ describe('deployment-adapter', () => {
         KYBERION_DEPLOY_CONFIG_PATH: '/tmp/outside-deployment-config.json',
       })
     ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a directory at the explicit deployment config path', () => {
+    withExecutionContext('ecosystem_architect', () =>
+      safeMkdir(explicitConfigPath, { recursive: true })
+    );
+
+    expect(() =>
+      installShellDeploymentAdapterFromConfigIfAvailable({
+        KYBERION_DEPLOY_CONFIG_PATH: explicitConfigPath,
+      })
+    ).toThrow(/regular file/);
   });
 });
