@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { safeExecResult } from './secure-io.js';
 
 /** Availability of the optional Windows local-LLM assist adapter. */
@@ -58,6 +58,21 @@ function discoverEndpoint(payload: unknown, fallback: string): string {
   if (Array.isArray(endpoints)) candidates.push(...endpoints);
   const found = candidates.find((value) => typeof value === 'string' && value.length > 0);
   return (typeof found === 'string' ? found : fallback).replace(/\/$/, '');
+}
+
+function parseChatCompletionText(payload: unknown): string | null {
+  try {
+    const root = parseSafeJsonObjectValue(payload, 'Windows local assist chat response');
+    if (!Array.isArray(root.choices)) return null;
+    const first = root.choices[0];
+    if (first === null || typeof first !== 'object' || Array.isArray(first)) return null;
+    const message = (first as Record<string, unknown>).message;
+    if (message === null || typeof message !== 'object' || Array.isArray(message)) return null;
+    const content = (message as Record<string, unknown>).content;
+    return typeof content === 'string' && content.trim() ? content.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function probeUncached(): Promise<WindowsLocalAssistAvailability> {
@@ -135,9 +150,8 @@ export async function windowsLocalAssistPrompt(
     },
     timeoutMs
   );
-  const content = (payload as { choices?: Array<{ message?: { content?: unknown } }> } | null)
-    ?.choices?.[0]?.message?.content;
-  if (typeof content === 'string' && content.trim()) return content.trim();
+  const content = parseChatCompletionText(payload);
+  if (content) return content;
   logger.warn('[windows-local-ai] prompt returned no text');
   return null;
 }
