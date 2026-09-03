@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { loadPersonalIdentityAtPath } from '@agent/core/personal-identity-state';
+import { loadPersonalIdentityAtPath } from '@agent/core/personal-identity-reader';
 import {
   assertSafeRepositoryPath,
   safeCopyFileSync,
