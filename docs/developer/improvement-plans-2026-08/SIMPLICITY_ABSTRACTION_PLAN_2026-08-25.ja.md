@@ -14111,6 +14111,12 @@ SX-03／SX-04 のdelegation notificationsを再監査し、child completionをwo
 
 検証: delegation notifications **2 files / 11 tests passed**、knowledge index生成、対象lint、typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 642
+
+SX-03／SX-04 のprompt visibility ledgerを再監査し、hash／length／mission bindingのmodule invariantはあるものの、実ファイルのJSONL read／appendがraw helperと局所validatorに分かれ、schema・regular-file境界を共有していない残存を修正した。prompt visibility record専用schemaとpath-bound canonical catalogを追加し、append／load双方を同じ契約へ統合した。raw prompt contentを保存しないhash／length設計、knowledge refの重複排除、stable corruption code、任意ledger pathのrepository boundaryは維持している。
+
+検証: prompt visibility ledger／reasoning backend **2 files / 33 tests passed**、knowledge index生成、対象lint、typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -73,4 +73,12 @@ describe('prompt visibility ledger', () => {
     ).toThrow('[RESOURCE_PATH_SCOPE]');
     expect(() => loadPromptVisibilityLedger(outside)).toThrow('[RESOURCE_PATH_SCOPE]');
   });
+
+  it('rejects a ledger directory', () => {
+    safeRmSync(root, { recursive: true, force: true });
+    const ledgerPath = path.join(root, 'coordination', 'prompt-visibility.jsonl');
+    safeMkdir(ledgerPath, { recursive: true });
+
+    expect(() => loadPromptVisibilityLedger(ledgerPath)).toThrow(/must be a regular file/);
+  });
 });
