@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { safeExistsSync, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   claimPendingDelegationNotifications,
   delegationNotificationsPath,
@@ -142,5 +142,29 @@ describe('KC-06 delegation-notifications', () => {
     process.env.KYBERION_DELEGATION_NOTIFICATIONS_PATH = '../outside/notifications.jsonl';
     expect(() => delegationNotificationsPath()).toThrow(/outside the repository root/);
     process.env.KYBERION_DELEGATION_NOTIFICATIONS_PATH = QUEUE_OVERRIDE;
+  });
+
+  it('rejects schema-invalid persisted notifications', () => {
+    safeWriteFile(
+      delegationNotificationsPath(),
+      `${JSON.stringify({
+        notification_id: 'N-INVALID',
+        delegation_id: 'DLG-INVALID',
+        owner: 'worker',
+        status: 'completed',
+        instruction_excerpt: 'invalid claimed value',
+        completed_at: new Date().toISOString(),
+        enqueued_at: new Date().toISOString(),
+        claimed: 'no',
+      })}\n`
+    );
+
+    expect(() => listDelegationNotifications()).toThrow(/Invalid catalog delegation-notification/);
+  });
+
+  it('rejects a notification queue directory', () => {
+    safeMkdir(delegationNotificationsPath(), { recursive: true });
+
+    expect(() => listDelegationNotifications()).toThrow(/queue must be a regular file/);
   });
 });

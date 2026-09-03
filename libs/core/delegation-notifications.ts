@@ -17,8 +17,15 @@ import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { withLockSync } from './src/lock-utils.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 
 export interface DelegationNotification {
   notification_id: string;
@@ -44,6 +51,9 @@ export interface DelegationNotification {
 
 export const DELEGATION_NOTIFICATION_CLAIM_LIMIT = 4;
 const EXCERPT_MAX_CHARS = 240;
+const DELEGATION_NOTIFICATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/delegation-notification.schema.json'
+);
 
 export interface DelegationNotificationFilter {
   missionId?: string;
@@ -66,6 +76,20 @@ function resolveQueuePath(): string {
 function ensureQueueDir(): void {
   const dir = resolveQueuePath().replace(/[/\\][^/\\]+$/, '');
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+}
+
+function delegationNotificationCatalog(filePath: string): GovernedCatalog<DelegationNotification> {
+  return defineCatalog<DelegationNotification>({
+    id: 'delegation-notification',
+    path: filePath,
+    schema: DELEGATION_NOTIFICATION_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularQueueFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[delegation-notifications] queue must be a regular file: ${filePath}`);
+  }
 }
 
 function excerpt(value: string | undefined): string {
@@ -114,23 +138,32 @@ export function enqueueDelegationNotification(input: {
   }
   withLockSync('delegation-notifications', () => {
     ensureQueueDir();
-    appendJsonLine(resolveQueuePath(), notification);
+    const queuePath = resolveQueuePath();
+    ensureRegularQueueFile(queuePath);
+    appendJsonLine(
+      queuePath,
+      delegationNotificationCatalog(queuePath).validate(notification, queuePath)
+    );
   });
   return notification;
 }
 
 export function listDelegationNotifications(): DelegationNotification[] {
-  if (!safeExistsSync(resolveQueuePath())) return [];
-  return readJsonLines<DelegationNotification>(resolveQueuePath(), {
-    map: (value) => {
+  const queuePath = resolveQueuePath();
+  if (!safeExistsSync(queuePath)) return [];
+  ensureRegularQueueFile(queuePath);
+  const catalog = delegationNotificationCatalog(queuePath);
+  return readJsonLines<DelegationNotification>(queuePath, {
+    map: (value, lineNumber) => {
       const parsed = value as Partial<DelegationNotification>;
-      return {
+      const normalized = {
         ...(parsed as DelegationNotification),
         report_provenance: parsed.report_provenance ?? {
           source: 'child' as const,
           delegation_id: String(parsed.delegation_id || ''),
         },
       };
+      return catalog.validate(normalized, `${queuePath}:${lineNumber}`);
     },
   });
 }
@@ -163,7 +196,11 @@ export function claimPendingDelegationNotifications(
     });
     if (claimed.length === 0) return [];
     ensureQueueDir();
-    safeWriteFile(resolveQueuePath(), `${next.map((row) => JSON.stringify(row)).join('\n')}\n`);
+    const queuePath = resolveQueuePath();
+    ensureRegularQueueFile(queuePath);
+    const catalog = delegationNotificationCatalog(queuePath);
+    const validated = next.map((row) => catalog.validate(row, queuePath));
+    safeWriteFile(queuePath, `${validated.map((row) => JSON.stringify(row)).join('\n')}\n`);
     return claimed;
   });
 }

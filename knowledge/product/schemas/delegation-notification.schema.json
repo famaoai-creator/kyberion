@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "delegation-notification.schema.json",
+  "title": "Delegation completion notification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "notification_id",
+    "delegation_id",
+    "owner",
+    "status",
+    "instruction_excerpt",
+    "completed_at",
+    "enqueued_at",
+    "claimed",
+    "report_provenance"
+  ],
+  "properties": {
+    "notification_id": { "type": "string", "minLength": 1 },
+    "delegation_id": { "type": "string", "minLength": 1 },
+    "owner": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["completed", "failed"] },
+    "instruction_excerpt": { "type": "string" },
+    "result_excerpt": { "type": "string" },
+    "error": { "type": "string" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "enqueued_at": { "type": "string", "format": "date-time" },
+    "claimed": { "type": "boolean" },
+    "claimed_at": { "type": "string", "format": "date-time" },
+    "report_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "delegation_id"],
+      "properties": {
+        "source": { "const": "child" },
+        "delegation_id": { "type": "string", "minLength": 1 },
+        "child_session_id": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
