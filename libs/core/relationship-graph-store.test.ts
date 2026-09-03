@@ -21,7 +21,7 @@ vi.mock('./policy-engine.js', () => ({
 }));
 
 import { pathResolver, rootResolve } from './path-resolver.js';
-import { safeSymlinkSync, safeUnlinkSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeSymlinkSync, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 import {
   getTrustLevel,
   listNgTopics,
@@ -187,6 +187,16 @@ describe('relationship-graph-store', () => {
       );
 
       expect(() => readNode('nbs', 'malformed')).toThrow(/trust_level.current/);
+    });
+
+    it('rejects a relationship node path that is a directory', () => {
+      const directoryPath = path.join(
+        tmpDir,
+        'knowledge/confidential/relationships/nbs/directory.json'
+      );
+      safeMkdir(directoryPath, { recursive: true });
+
+      expect(() => readNode('nbs', 'directory')).toThrow(/regular file/);
     });
 
     it('returns defaults for missing fields', () => {
