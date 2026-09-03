@@ -23,7 +23,9 @@ import { auditChain } from '@agent/core/audit-chain';
 import { compileBrowserRecording } from '@agent/core/browser-recording-compiler';
 import {
   invalidateProcedureCache,
+  readProcedureCatalog,
   resolveAllowlistedRecordingRef,
+  validateProcedureCatalog,
 } from '@agent/core/procedure-registry';
 import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -33,8 +35,8 @@ import {
   safeLstat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
-import type { ProcedureCatalog, ProcedureEntry } from '@agent/core/procedure-types';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import type { ProcedureEntry } from '@agent/core/procedure-types';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const CATALOG_PATH = 'knowledge/product/orchestration/procedures.json';
@@ -148,19 +150,20 @@ export function main(argv: string[] = []): void {
   if (safeExistsSync(catalogAbs) && !safeLstat(catalogAbs).isFile()) {
     fail(`procedure catalog must be a regular file: ${catalogAbs}`);
   }
-  let catalog: ProcedureCatalog;
+  let catalog = { schema_version: 'procedures.v1' as const, procedures: [] as ProcedureEntry[] };
   try {
-    catalog = readJson<ProcedureCatalog>(catalogAbs);
+    catalog = readProcedureCatalog(catalogAbs);
   } catch {
-    catalog = { schema_version: 'procedures.v1', procedures: [] };
+    // Preserve the promotion command's bootstrap behavior when the optional
+    // public catalog has not been provisioned yet or is unreadable.
   }
-  if (!Array.isArray(catalog.procedures)) catalog.procedures = [];
   if (catalog.procedures.some((p) => p.procedure_id === procedureId)) {
     fail(`procedure_id "${procedureId}" already exists in the catalog`);
   }
   catalog.procedures.push(compiled.procedureEntry);
 
-  safeWriteFile(catalogAbs, `${JSON.stringify(catalog, null, 2)}\n`);
+  const validatedCatalog = validateProcedureCatalog(catalog, catalogAbs);
+  safeWriteFile(catalogAbs, `${JSON.stringify(validatedCatalog, null, 2)}\n`);
   invalidateProcedureCache();
 
   // Governed audit trail for the promotion.
