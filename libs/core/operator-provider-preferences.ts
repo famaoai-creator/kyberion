@@ -1,6 +1,6 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 
 export interface OperatorProviderPreferences {
   version?: string;
@@ -30,4 +30,22 @@ export function loadOperatorProviderPreferencesAtPath(
   } catch {
     return null;
   }
+}
+
+/** Validate and persist provider preferences through the same catalog as reads. */
+export function writeOperatorProviderPreferencesAtPath(
+  filePath: string,
+  preferences: OperatorProviderPreferences
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = defineCatalog<OperatorProviderPreferences>({
+    id: 'operator-provider-preferences',
+    path: safePath,
+    schema: OPERATOR_PROVIDER_PREFERENCES_SCHEMA_PATH,
+  }).validate(preferences, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2), {
+    encoding: 'utf8',
+    mkdir: true,
+  });
+  return safePath;
 }
