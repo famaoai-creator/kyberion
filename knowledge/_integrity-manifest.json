@@ -9139,6 +9139,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/runtime-health-sample.schema.json",
+      "tier": "public",
+      "size": 628,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/runtime-surface-manifest.schema.json",
       "tier": "public",
       "size": 1451,

@@ -1,10 +1,12 @@
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
@@ -36,11 +38,28 @@ export interface RuntimeTrendFinding {
 const HISTORY_RELATIVE = 'active/shared/runtime/health/runtime-health.jsonl';
 const MAX_LINES = 5000;
 const KEEP_LINES = 2500;
+const HEALTH_SAMPLE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/runtime-health-sample.schema.json'
+);
 
 function historyPath(): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(HISTORY_RELATIVE), {
     allowMissingLeaf: true,
   });
+}
+
+function healthSampleCatalog(filePath: string): GovernedCatalog<RuntimeHealthSample> {
+  return defineCatalog<RuntimeHealthSample>({
+    id: 'runtime-health-sample',
+    path: filePath,
+    schema: HEALTH_SAMPLE_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularHistoryFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[runtime-health] history must be a regular file: ${filePath}`);
+  }
 }
 
 export function recordRuntimeHealthSample(input: {
@@ -61,7 +80,8 @@ export function recordRuntimeHealthSample(input: {
   try {
     const filePath = historyPath();
     safeMkdir(path.dirname(filePath), { recursive: true });
-    appendJsonLine(filePath, sample);
+    ensureRegularHistoryFile(filePath);
+    appendJsonLine(filePath, healthSampleCatalog(filePath).validate(sample, filePath));
     pruneIfOversized(filePath);
   } catch (err: any) {
     logger.warn(`[runtime-health] sample append failed: ${err?.message || err}`);
@@ -71,6 +91,7 @@ export function recordRuntimeHealthSample(input: {
 
 function pruneIfOversized(filePath: string): void {
   try {
+    ensureRegularHistoryFile(filePath);
     const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
     const lines = raw.split('\n').filter(Boolean);
     if (lines.length <= MAX_LINES) return;
@@ -86,13 +107,12 @@ export function loadRuntimeHealthSamples(
 ): RuntimeHealthSample[] {
   const filePath = historyPath();
   if (!safeExistsSync(filePath)) return [];
+  ensureRegularHistoryFile(filePath);
   const since = now - windowMs;
+  const catalog = healthSampleCatalog(filePath);
   return readJsonLines<RuntimeHealthSample | null>(filePath, {
     onMalformed: 'skip',
-    map: (value) =>
-      value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as RuntimeHealthSample)
-        : null,
+    map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
   }).filter((sample): sample is RuntimeHealthSample => {
     const at = Date.parse(sample?.timestamp || '');
     return Number.isFinite(at) && at >= since;
