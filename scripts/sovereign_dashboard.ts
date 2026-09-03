@@ -48,6 +48,7 @@ import { readJson, readTextFile } from '@agent/core/foundation';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { parsePersonalSovereignIdentity } from '@agent/core/personal-identity-reader';
+import { loadPersonalIdentityAtPath } from '@agent/core/personal-identity-state';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 /**
@@ -217,8 +218,8 @@ function drawHeader() {
 }
 
 export function readDashboardOperatorIdentity(identityPath: string): { name?: string } | null {
-  const raw = readJsonIfExists<unknown>(identityPath);
-  return raw === null ? null : parsePersonalSovereignIdentity(raw);
+  const identity = loadPersonalIdentityAtPath(identityPath);
+  return identity === null ? null : parsePersonalSovereignIdentity(identity);
 }
 
 function drawCompanyOverview() {
