@@ -1,6 +1,7 @@
+import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
-import { safeRmSync } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   backgroundReviewNudgeStatePath,
   completeBackgroundReview,
@@ -96,5 +97,37 @@ describe('background-review-nudge', () => {
 
   it('rejects path-unsafe session ids', () => {
     expect(() => loadBackgroundReviewNudgeState('../escape')).toThrow('[POLICY_VIOLATION]');
+  });
+
+  it('falls back safely for schema-invalid and non-file session state', () => {
+    const filePath = backgroundReviewNudgeStatePath(SESSION_ID);
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    safeWriteFile(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        session_id: SESSION_ID,
+        turns_since_review: 3,
+        tool_calls_since_review: 2,
+        review_pending: false,
+        updated_at: new Date().toISOString(),
+        unexpected: true,
+      })
+    );
+    expect(loadBackgroundReviewNudgeState(SESSION_ID)).toMatchObject({
+      session_id: SESSION_ID,
+      turns_since_review: 0,
+      tool_calls_since_review: 0,
+      review_pending: false,
+    });
+
+    safeRmSync(filePath, { force: true });
+    safeMkdir(filePath, { recursive: true });
+    expect(loadBackgroundReviewNudgeState(SESSION_ID)).toMatchObject({
+      session_id: SESSION_ID,
+      turns_since_review: 0,
+      tool_calls_since_review: 0,
+    });
+    safeRmSync(filePath, { recursive: true, force: true });
   });
 });

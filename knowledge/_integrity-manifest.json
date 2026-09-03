@@ -6577,6 +6577,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/background-review-nudge.schema.json",
+      "tier": "public",
+      "size": 837,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/blockchain-action.schema.json",
       "tier": "public",
       "size": 294,
