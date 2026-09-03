@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
@@ -40,6 +39,14 @@ const pendingIntentCatalog = defineCatalog<PendingIntentRecord>({
   path: PENDING_INTENT_SCHEMA_PATH,
   schema: PENDING_INTENT_SCHEMA_PATH,
 });
+
+function pendingIntentCatalogAtPath(filePath: string) {
+  return defineCatalog<PendingIntentRecord>({
+    id: 'pending-intent',
+    path: filePath,
+    schema: PENDING_INTENT_SCHEMA_PATH,
+  });
+}
 
 function normalizeSegment(value: string): string {
   return (
@@ -128,7 +135,7 @@ export function loadPendingIntentAtPath(
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[PENDING_INTENT] record must be a regular file: ${filePath}`);
   }
-  const record = normalizePendingIntent(readJson<unknown>(safeFilePath));
+  const record = normalizePendingIntent(pendingIntentCatalogAtPath(safeFilePath).load());
   if (!record) throw new Error(`[PENDING_INTENT] invalid record at ${filePath}`);
   if (expectedCorrelationId !== undefined && record.correlation_id !== expectedCorrelationId) {
     throw new Error(
