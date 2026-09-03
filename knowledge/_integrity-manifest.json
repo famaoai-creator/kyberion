@@ -7447,6 +7447,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/graph-run-artifact.schema.json",
+      "tier": "public",
+      "size": 1605,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/guided-coordination-brief.schema.json",
       "tier": "public",
       "size": 2791,
