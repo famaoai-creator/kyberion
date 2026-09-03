@@ -2,6 +2,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import * as customerResolver from '@agent/core/customer-resolver';
 import { inspectServiceAuth } from '@agent/core/service-validator';
+import { loadServiceConnectionAtPath } from '@agent/core/service-engine-helpers';
 import {
   loadNotificationPreferences,
   resolveOperatorNotificationRoute,
@@ -9,7 +10,6 @@ import {
 import { resolveOpsAlertChannelStatus } from '@agent/core/ops-alert';
 import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
 import { logger } from '@agent/core/core';
-import { readJsonIfPresent } from '@agent/core/foundation';
 import {
   isServiceConnectionReady,
   requiredServiceConnectionKeys,
@@ -69,8 +69,7 @@ function inspectConnection(serviceId: string): {
     if (!safeExistsSync(filePath)) return false;
     if (requiredKeys.length === 0) return true;
     try {
-      const record = readJsonIfPresent<Record<string, unknown>>(filePath);
-      if (!record) return false;
+      const record = loadServiceConnectionAtPath(filePath);
       return isServiceConnectionReady(serviceId, record);
     } catch {
       return false;
