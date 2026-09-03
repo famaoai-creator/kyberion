@@ -4,14 +4,14 @@ import {
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { readJson } from '@agent/core/foundation';
 import * as pathResolver from '@agent/core/path-resolver';
-import { handleAction } from './process-actuator-helpers.js';
+import { handleAction, readProcessJsonObject } from './process-actuator-helpers.js';
 import { parseProcessAction } from './process-action-input.js';
 
 async function main() {
-  const processActionSchema = readJson<Record<string, unknown>>(
-    pathResolver.rootResolve('knowledge/product/schemas/process-action.schema.json')
+  const processActionSchema = readProcessJsonObject(
+    pathResolver.rootResolve('knowledge/product/schemas/process-action.schema.json'),
+    'process action schema'
   );
   await runActuatorCli({
     name: 'process-actuator',
