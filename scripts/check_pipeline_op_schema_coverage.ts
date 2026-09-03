@@ -1,4 +1,5 @@
 import { getAllFiles } from '@agent/core/fs-utils';
+import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePipelineInputPlaceholders } from '@agent/core/pipeline-input-contract';
 import { createAjv, readJson } from '@agent/core/foundation';
@@ -97,10 +98,7 @@ export function scanPipelineOpSchemas(
 }
 
 function readDiscovery(): PipelineSchemaDiscovery {
-  const discoveryPath = assertSafeRepositoryPath(
-    pathResolver.knowledge('product/orchestration/actuator-op-discovery.json')
-  );
-  return readJson<PipelineSchemaDiscovery>(discoveryPath);
+  return loadActuatorOpDiscoveryAtPath();
 }
 
 function readPipelines(): PipelineDocument[] {

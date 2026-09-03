@@ -301,6 +301,7 @@ export * from './adf-lifecycle.js';
 export * from './channel-adapter.js';
 
 export * from './actuator-sdk.js';
+export * from './actuator-op-discovery.js';
 export * from './pipeline-input-contract.js';
 export * from './super-nerve-execution-port.js';
 

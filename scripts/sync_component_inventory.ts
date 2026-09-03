@@ -1,11 +1,12 @@
 import * as path from 'node:path';
+import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
 import {
   loadActuatorManifest,
   type ActuatorManifestFile,
 } from '@agent/core/src/actuator-manifest-index';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
-import { nowIso, parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonObjectInput } from '@agent/core/foundation';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 interface CurrentIndexRecord {
@@ -182,12 +183,8 @@ interface DiscoveryOpsRecord {
 // AR-02: the op tables are generated from the self-described discovery index
 // (all actuators), not just the system actuator's exported constants.
 function loadDiscoveryOps(): DiscoveryOpsRecord[] {
-  const discoveryPath = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
   try {
-    const parsed = readJson<{
-      actuators?: DiscoveryOpsRecord[];
-    }>(discoveryPath);
-    return parsed.actuators ?? [];
+    return loadActuatorOpDiscoveryAtPath().actuators;
   } catch {
     return [];
   }

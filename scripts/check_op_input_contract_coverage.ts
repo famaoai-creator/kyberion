@@ -1,23 +1,22 @@
+import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
-type DiscoveryEntry = {
-  n?: string;
-  ops?: Array<{
-    op?: string;
-    input_schema?: Record<string, unknown>;
-    examples?: Array<Record<string, unknown>>;
-  }>;
-};
+const DISCOVERY_PATH = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
 
 type DiscoveryFile = {
-  actuators?: DiscoveryEntry[];
+  actuators?: Array<{
+    n?: string;
+    ops?: Array<{
+      op?: string;
+      input_schema?: Record<string, unknown>;
+      examples?: Array<Record<string, unknown>>;
+    }>;
+  }>;
 };
-
-const DISCOVERY_PATH = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
 
 type ContractCoverageBaseline = {
   version: 1;
@@ -29,7 +28,7 @@ function resolveBaselinePath(): string {
 }
 
 function readDiscovery(): DiscoveryFile {
-  return readJson<DiscoveryFile>(DISCOVERY_PATH);
+  return loadActuatorOpDiscoveryAtPath(DISCOVERY_PATH);
 }
 
 export function findOpInputContractViolations(discovery: DiscoveryFile): string[] {

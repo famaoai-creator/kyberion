@@ -363,6 +363,10 @@
       "types": "./dist/actuator-op-registry.d.ts",
       "default": "./dist/actuator-op-registry.js"
     },
+    "./actuator-op-discovery": {
+      "types": "./dist/actuator-op-discovery.d.ts",
+      "default": "./dist/actuator-op-discovery.js"
+    },
     "./actuator-sdk": {
       "types": "./dist/actuator-sdk.d.ts",
       "default": "./dist/actuator-sdk.js"

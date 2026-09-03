@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/actuator-op-discovery.schema.json",
+  "title": "Actuator Operation Discovery",
+  "description": "Generated discovery catalog for actuator operation descriptions.",
+  "type": "object",
+  "required": ["v", "actuators"],
+  "additionalProperties": false,
+  "properties": {
+    "v": { "type": "string", "minLength": 1 },
+    "actuators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["n", "path", "source", "ops"],
+        "additionalProperties": false,
+        "properties": {
+          "n": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "source": { "enum": ["describeOps", "manifest", "registry"] },
+          "ops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["op", "kind"],
+              "additionalProperties": false,
+              "properties": {
+                "op": { "type": "string", "minLength": 1 },
+                "kind": { "enum": ["capture", "transform", "apply", "control"] },
+                "input_schema": { "type": "object" },
+                "examples": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                },
+                "owner": { "type": "string" },
+                "idempotency": { "type": "string" },
+                "execution_kind": { "type": "string" },
+                "deprecated": { "type": "boolean" },
+                "canonical_op": { "type": "string" },
+                "forward_to": {
+                  "type": "object",
+                  "required": ["actuator", "op"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "actuator": { "type": "string", "minLength": 1 },
+                    "op": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

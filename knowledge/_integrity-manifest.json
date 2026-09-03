@@ -6331,6 +6331,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/actuator-op-discovery.schema.json",
+      "tier": "public",
+      "size": 2052,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/actuator-op-registry.schema.json",
       "tier": "public",
       "size": 1371,
