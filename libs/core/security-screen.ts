@@ -28,9 +28,9 @@ import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeMoveSync,
-  safeReadFile,
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
@@ -284,8 +284,13 @@ export interface QuarantineRecord {
   reason: string;
   indicators: string[];
   content: string;
+  content_truncated?: boolean;
   securityTainted: true;
 }
+
+const QUARANTINE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/quarantine-record.schema.json'
+);
 
 function quarantineDir(): string {
   const configured =
@@ -298,6 +303,20 @@ function quarantinePath(): string {
   return assertSafeRepositoryPath(path.join(quarantineDir(), 'quarantine.jsonl'), {
     allowMissingLeaf: true,
   });
+}
+
+function quarantineCatalog(filePath: string) {
+  return defineCatalog<QuarantineRecord>({
+    id: 'quarantine-record',
+    path: filePath,
+    schema: QUARANTINE_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularQuarantineFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[QM-04] quarantine must be a regular file: ${filePath}`);
+  }
 }
 
 /**
@@ -317,8 +336,8 @@ function rotateQuarantineIfOversized(): void {
   const current = quarantinePath();
   if (!safeExistsSync(current)) return;
   try {
-    const raw = safeReadFile(current, { encoding: 'utf8' }) as string;
-    if (Buffer.byteLength(raw, 'utf8') < maxQuarantineFileBytes()) return;
+    ensureRegularQuarantineFile(current);
+    if (safeLstat(current).size < maxQuarantineFileBytes()) return;
     const stamp = nowIso().replace(/[:.]/g, '-');
     safeMoveSync(current, `${quarantineDir()}/quarantine-${stamp}.jsonl`);
   } catch (error) {
@@ -332,9 +351,9 @@ export function recordQuarantine(input: {
   reason: string;
   scope?: string;
   indicators?: string[];
-}): QuarantineRecord & { content_truncated?: boolean } {
+}): QuarantineRecord {
   const truncated = input.content.length > MAX_QUARANTINE_CONTENT_CHARS;
-  const record: QuarantineRecord & { content_truncated?: boolean } = {
+  const record: QuarantineRecord = {
     id: randomUUID(),
     recorded_at: nowIso(),
     source: input.source,
@@ -347,7 +366,9 @@ export function recordQuarantine(input: {
   };
   safeMkdir(quarantineDir());
   rotateQuarantineIfOversized();
-  appendJsonLine(quarantinePath(), record);
+  const filePath = quarantinePath();
+  ensureRegularQuarantineFile(filePath);
+  appendJsonLine(filePath, quarantineCatalog(filePath).validate(record, filePath));
   try {
     auditChain.record({
       agentId: 'security-screen',
@@ -370,9 +391,13 @@ export function recordQuarantine(input: {
 }
 
 export function listQuarantineRecords(limit = 100): QuarantineRecord[] {
-  if (!safeExistsSync(quarantinePath())) return [];
-  const records = readJsonLines<QuarantineRecord>(quarantinePath(), {
+  const filePath = quarantinePath();
+  if (!safeExistsSync(filePath)) return [];
+  ensureRegularQuarantineFile(filePath);
+  const catalog = quarantineCatalog(filePath);
+  const records = readJsonLines<QuarantineRecord>(filePath, {
     onMalformed: () => logger.warn('[QM-04] skipping unparseable quarantine line'),
+    map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
   });
   return records.slice(-limit);
 }
