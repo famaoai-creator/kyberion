@@ -108,7 +108,23 @@ describe('scope-context', () => {
     safeMkdir(missionDir, { recursive: true });
     safeWriteFile(
       pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionDir)}/mission-state.json`),
-      JSON.stringify({ tier: 'confidential', tenant_slug: 'acme-corp' })
+      JSON.stringify({
+        mission_id: 'mission-tier-test',
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'test',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'deadbeef',
+          latest_commit: 'deadbeef',
+          checkpoints: [],
+        },
+        history: [],
+      })
     );
     const findMissionPath = vi.spyOn(pathResolver, 'findMissionPath').mockReturnValue(missionDir);
     try {

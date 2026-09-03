@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
   safeMkdir: vi.fn(),
   safeUnlinkSync: vi.fn(),
   rootResolve: vi.fn((relPath: string) => `/repo/${relPath}`),
+  rootDir: vi.fn(() => '/repo'),
   shared: vi.fn((relPath: string) => `/repo/active/shared/${relPath}`),
+  knowledge: vi.fn((relPath = '') => `/repo/knowledge/${relPath}`),
   schemaPath: '/repo/knowledge/product/schemas/provider-capabilities.schema.json',
   schema: {
     type: 'object',
@@ -39,6 +41,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('node:child_process', () => ({ spawnSync: mocks.spawnSync }));
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
+  safeLstat: () => ({ isFile: () => true, isSymbolicLink: () => false }),
   safeReadFile: mocks.safeReadFile,
   safeWriteFile: mocks.safeWriteFile,
   safeExistsSync: mocks.safeExistsSync,
@@ -72,7 +76,12 @@ vi.mock('./foundation/io.js', () => ({
 }));
 
 vi.mock('./path-resolver.js', () => ({
-  pathResolver: { rootResolve: mocks.rootResolve, shared: mocks.shared },
+  pathResolver: {
+    rootResolve: mocks.rootResolve,
+    rootDir: mocks.rootDir,
+    shared: mocks.shared,
+    knowledge: mocks.knowledge,
+  },
 }));
 
 const CATALOG_PATH = '/repo/knowledge/product/orchestration/provider-capabilities.json';

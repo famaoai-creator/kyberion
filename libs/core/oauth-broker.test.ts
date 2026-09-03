@@ -31,9 +31,14 @@ vi.mock('./secure-io.js', async () => {
     safeCreateExclusiveFileSync: mocks.safeCreateExclusiveFileSync,
     safeUnlinkSync: mocks.safeUnlinkSync,
     safeFsyncFile: mocks.safeFsyncFile,
+    // governed-catalog compiles the real schema file (not a fixture) through
+    // this same loadJson boundary — route .schema.json paths to the real reader.
     loadJson: <T>(filePath: string): T =>
-      JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T,
+      filePath.endsWith('.schema.json')
+        ? (actual.loadJson(filePath) as T)
+        : (JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T),
     loadJsonIfPresent: <T>(filePath: string): T | null => {
+      if (filePath.endsWith('.schema.json')) return actual.loadJsonIfPresent(filePath) as T | null;
       try {
         return JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
       } catch {
@@ -43,11 +48,48 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+// defineCatalog (foundation/governed-catalog.ts) reads presence/content
+// through FoundationIo, which secure-io.ts registers with a direct reference
+// to its own real internal functions at module-evaluation time — overriding
+// the exported `safeExistsSync` etc. above does not reach that already
+// -registered object, so route FoundationIo through the same test doubles.
+vi.mock('./foundation/io.js', async () => {
+  const realSecureIo = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+  return {
+    getFoundationIo: () => ({
+      loadJson: <T>(filePath: string): T =>
+        filePath.endsWith('.schema.json')
+          ? (realSecureIo.loadJson(filePath) as T)
+          : (JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T),
+      loadJsonIfPresent: <T>(filePath: string): T | null => {
+        if (filePath.endsWith('.schema.json')) {
+          return realSecureIo.loadJsonIfPresent(filePath) as T | null;
+        }
+        try {
+          return JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+        } catch {
+          return null;
+        }
+      },
+      appendFile: () => undefined,
+      exists: (filePath: string) => mocks.safeExistsSync(filePath),
+      readFile: (filePath: string) => String(mocks.safeReadFile(filePath, { encoding: 'utf8' })),
+      stat: () => ({ mtimeMs: Date.now(), size: 1 }),
+      writeFile: (filePath: string, content: string) => mocks.safeWriteFile(filePath, content),
+    }),
+    registerFoundationIo: vi.fn(),
+  };
+});
+
 vi.mock('./foundation/json.js', async () => {
   const actual =
     await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  // governed-catalog compiles the real schema file (not a fixture) via this
+  // same readJson boundary — route .schema.json paths to the real reader.
   const read = <T>(filePath: string): T =>
-    JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+    filePath.endsWith('.schema.json')
+      ? actual.readJson<T>(filePath)
+      : (JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T);
   const readIfPresent = <T>(filePath: string): T | null => {
     try {
       return read<T>(filePath);

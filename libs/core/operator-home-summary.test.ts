@@ -118,6 +118,11 @@ describe('operator home summary', () => {
       path.resolve(process.cwd(), 'knowledge/product/schemas/software-quality-report.schema.json'),
       path.join(tmpRoot, 'knowledge/product/schemas/software-quality-report.schema.json')
     );
+    // writeInboxEntries validates rows against the governed deliverable-inbox catalog.
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/deliverable-inbox-entry.schema.json'),
+      path.join(tmpRoot, 'knowledge/product/schemas/deliverable-inbox-entry.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
   });
 
