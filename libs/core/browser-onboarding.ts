@@ -16,7 +16,10 @@ import {
   loadPersonalIdentityAtPath,
 } from './personal-identity-state.js';
 import { loadOperatorProviderPreferencesAtPath } from './operator-provider-preferences.js';
-import { loadBrowserOnboardingStateAtPath } from './browser-onboarding-state.js';
+import {
+  loadBrowserOnboardingStateAtPath,
+  writeBrowserOnboardingStateAtPath,
+} from './browser-onboarding-state.js';
 import {
   getLlmSelectionSnapshot,
   saveLlmSelectionPreferences,
@@ -388,7 +391,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         }
 
         const statePath = onboardingPath('browser-onboarding-state.json');
-        writeJson(statePath, {
+        writeBrowserOnboardingStateAtPath(statePath, {
           version: '1.0.0',
           status: 'complete',
           applied_at: now,

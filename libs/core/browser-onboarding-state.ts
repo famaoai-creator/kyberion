@@ -1,6 +1,6 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 
 export interface BrowserOnboardingState {
   version: string;
@@ -35,4 +35,19 @@ export function loadBrowserOnboardingStateAtPath(filePath: string): BrowserOnboa
   } catch {
     return null;
   }
+}
+
+/** Validate and persist the completion receipt through the same catalog as reads. */
+export function writeBrowserOnboardingStateAtPath(
+  filePath: string,
+  state: BrowserOnboardingState
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = defineCatalog<BrowserOnboardingState>({
+    id: 'browser-onboarding-state',
+    path: safePath,
+    schema: BROWSER_ONBOARDING_STATE_SCHEMA_PATH,
+  }).validate(state, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2), { encoding: 'utf8', mkdir: true });
+  return safePath;
 }
