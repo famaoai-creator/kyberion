@@ -1,4 +1,4 @@
-import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
@@ -10,6 +10,32 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { clamp } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 const logger = createLogger('metrics');
+
+interface SloTarget {
+  latency_ms: number;
+  success_rate?: number;
+}
+
+interface SloTargets {
+  _note?: string;
+  default: SloTarget;
+  critical_path?: Record<string, SloTarget>;
+}
+
+const SLO_TARGETS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/slo-targets.schema.json');
+const sloTargetsCatalogs = new Map<string, ReturnType<typeof defineCatalog<SloTargets>>>();
+
+function sloTargetsCatalog(filePath: string): ReturnType<typeof defineCatalog<SloTargets>> {
+  const existing = sloTargetsCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<SloTargets>({
+    id: 'slo-targets',
+    path: filePath,
+    schema: SLO_TARGETS_SCHEMA_PATH,
+  });
+  sloTargetsCatalogs.set(filePath, catalog);
+  return catalog;
+}
 
 /**
  * Lightweight metrics collection for Kyberion.
@@ -500,18 +526,12 @@ export class MetricsCollector {
       pathResolver.resolve('knowledge/product/orchestration/slo-targets.json'),
       pathResolver.resolve('knowledge/orchestration/slo-targets.json'),
     ];
-    let sloTargets: {
-      critical_path?: Record<string, { latency_ms: number }>;
-      default: { latency_ms: number };
-    } = { default: { latency_ms: 5000 } };
+    let sloTargets: SloTargets = { default: { latency_ms: 5000 } };
     for (const candidate of sloPathCandidates) {
       try {
         const safeCandidate = assertSafeRepositoryPath(candidate);
         if (!safeExistsSync(safeCandidate)) continue;
-        sloTargets = readJson<{
-          critical_path?: Record<string, { latency_ms: number }>;
-          default: { latency_ms: number };
-        }>(assertSafeRepositoryPath(safeCandidate));
+        sloTargets = sloTargetsCatalog(safeCandidate).load();
         break;
       } catch {
         // A malformed or symlinked optional SLO registry must not escape its scope.

@@ -9661,6 +9661,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/slo-targets.schema.json",
+      "tier": "public",
+      "size": 722,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/soak-evidence-manifest.schema.json",
       "tier": "public",
       "size": 1184,
