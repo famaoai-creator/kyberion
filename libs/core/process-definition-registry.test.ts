@@ -55,4 +55,19 @@ describe('process definition registry', () => {
       })
     ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
+
+  it('validates registered JSON sources through their schema boundary', () => {
+    const registry = loadProcessDefinitionRegistry();
+    expect(() =>
+      auditProcessDefinitionRegistry({
+        ...registry,
+        sources: [
+          {
+            ...registry.sources[0]!,
+            path: 'knowledge/product/governance/process-definition-registry.json',
+          },
+        ],
+      })
+    ).toThrow('Invalid catalog process-definition-source-mission-workflow-catalog');
+  });
 });
