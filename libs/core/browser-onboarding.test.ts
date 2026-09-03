@@ -254,6 +254,30 @@ describe('browser onboarding', () => {
     ).toThrow(/unsupported voice sample content type/);
   });
 
+  it('rejects an invalid existing voice registry before onboarding overwrites it', async () => {
+    const voiceDir = path.join(PROFILE_ROOT, 'voice');
+    safeMkdir(voiceDir, { recursive: true });
+    safeWriteFile(path.join(voiceDir, 'profile-registry.json'), JSON.stringify({ profiles: [] }));
+    const samplePath = path.join(PROFILE_ROOT, 'voice', 'samples', 'my-voice', 'sample.webm');
+    safeMkdir(path.dirname(samplePath), { recursive: true });
+    safeWriteFile(samplePath, 'voice sample');
+
+    const { applyBrowserOnboarding } = await import('./browser-onboarding.js');
+    await expect(
+      applyBrowserOnboarding({
+        ...validDraft(),
+        voice: {
+          enabled: true,
+          profile_id: 'my-voice',
+          display_name: 'My Voice',
+          language: 'ja',
+          engine_id: 'mlx_audio_qwen3',
+          sample_refs: [samplePath],
+        },
+      })
+    ).rejects.toThrow(/Invalid catalog voice-profile-registry/);
+  });
+
   it('rejects a symlinked voice sample profile before writing the sample', async () => {
     const targetDir = pathResolver.sharedTmp('browser-onboarding-tests/voice-target');
     const linkedDir = path.join(PROFILE_ROOT, 'voice', 'samples', 'my-voice');

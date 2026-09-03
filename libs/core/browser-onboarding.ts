@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { withExecutionContext } from './authority.js';
-import { readJson as readFoundationJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import {
   getAdapterDefaultSelectionSnapshot,
@@ -36,7 +35,10 @@ import { getToolRuntimePolicy } from './tool-runtime-policy.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   getVoiceProfileRegistry,
+  loadVoiceProfileRegistryAtPath,
   resetVoiceProfileRegistryCache,
+  writeVoiceProfileRegistry,
+  type VoiceProfileRegistry,
 } from './voice-profile-registry.js';
 
 const interactionStyles = ['Senior Partner', 'Concierge', 'Minimalist'] as const;
@@ -186,12 +188,6 @@ function onboardingPath(name: string): string {
   return assertSafeRepositoryPath(path.join(profileRoot(), 'onboarding', name), {
     allowMissingLeaf: true,
   });
-}
-
-function readJson<T>(filePath: string): T | null {
-  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  if (!safeExistsSync(safePath)) return null;
-  return readFoundationJson<T>(safePath);
 }
 
 function writeJson(filePath: string, value: unknown): void {
@@ -363,13 +359,11 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
 
         if (draft.voice.enabled) {
           const voicePath = path.join(profileRoot(), 'voice', 'profile-registry.json');
-          const current = readJson<{
-            version?: string;
-            default_profile_id?: string;
-            profiles?: any[];
-          }>(voicePath);
+          const current: VoiceProfileRegistry = safeExistsSync(voicePath)
+            ? loadVoiceProfileRegistryAtPath(voicePath, { allowEmpty: true })
+            : { version: '1.0.0', default_profile_id: '', profiles: [] };
           const profiles = new Map(
-            (current?.profiles || []).map((profile) => [profile.profile_id, profile])
+            current.profiles.map((profile) => [profile.profile_id, profile])
           );
           profiles.set(draft.voice.profile_id!, {
             profile_id: draft.voice.profile_id,
@@ -381,11 +375,14 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
             status: 'active',
             notes: 'Registered through Browser Onboarding Studio',
           });
-          writeJson(voicePath, {
-            version: '1.0.0',
-            default_profile_id: draft.voice.profile_id,
-            profiles: [...profiles.values()],
-          });
+          writeVoiceProfileRegistry(
+            {
+              version: '1.0.0',
+              default_profile_id: draft.voice.profile_id,
+              profiles: [...profiles.values()],
+            },
+            voicePath
+          );
           resetVoiceProfileRegistryCache();
           artifacts.push(voicePath);
         }
