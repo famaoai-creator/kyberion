@@ -7,9 +7,60 @@ import {
   safeMkdir,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { defineCatalog, nowIso } from '@agent/core/foundation';
 import yargs from 'yargs';
 import { defineScript, isDirectScript } from './lib/harness.js';
+
+type RegistryType = 'harness' | 'gateway';
+
+type CapabilityRegistry = {
+  version: string;
+  capabilities: Array<Record<string, unknown>>;
+};
+
+const REGISTRY_SCHEMA_PATHS: Record<RegistryType, string> = {
+  harness: pathResolver.knowledge('product/schemas/harness-capability-registry.schema.json'),
+  gateway: pathResolver.knowledge('product/schemas/gateway-capability-registry.schema.json'),
+};
+const ADAPTER_SCHEMA_PATHS: Record<RegistryType, string> = {
+  harness: pathResolver.knowledge('product/schemas/harness-capability-entry.schema.json'),
+  gateway: pathResolver.knowledge('product/schemas/gateway-adapter-profile.schema.json'),
+};
+
+export function loadAdapterPayloadAtPath(
+  adapterPath: string,
+  type: RegistryType
+): Record<string, unknown> {
+  return defineCatalog<Record<string, unknown>>({
+    id: `registry-manager-${type}-adapter`,
+    path: assertSafeRepositoryPath(adapterPath),
+    schema: ADAPTER_SCHEMA_PATHS[type],
+  }).load();
+}
+
+export function loadCapabilityRegistryAtPath(
+  registryPath: string,
+  type: RegistryType
+): CapabilityRegistry {
+  return defineCatalog<CapabilityRegistry>({
+    id: `registry-manager-${type}-registry`,
+    path: assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true }),
+    schema: REGISTRY_SCHEMA_PATHS[type],
+    fallback: { version: '1.0.0', capabilities: [] },
+  }).load();
+}
+
+export function validateCapabilityRegistry(
+  registryPath: string,
+  type: RegistryType,
+  registry: CapabilityRegistry
+): CapabilityRegistry {
+  return defineCatalog<CapabilityRegistry>({
+    id: `registry-manager-${type}-registry`,
+    path: assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true }),
+    schema: REGISTRY_SCHEMA_PATHS[type],
+  }).validate(registry, registryPath);
+}
 
 export async function main(args: string[] = []) {
   const argv = await yargs(args)
@@ -42,7 +93,8 @@ export async function main(args: string[] = []) {
     throw new Error(`Input adapter must be a regular file: ${adapterPath}`);
   }
 
-  const payload = readJson<Record<string, unknown>>(adapterPath);
+  const type = argv.type as RegistryType;
+  const payload = loadAdapterPayloadAtPath(adapterPath, type);
   const capabilityId = payload.capability_id || payload.id;
   if (!capabilityId) {
     throw new Error('Payload missing capability_id');
@@ -63,26 +115,25 @@ export async function main(args: string[] = []) {
     safeMkdir(absTierDir, { recursive: true });
   }
 
-  let registry: any = { version: '1.0.0', capabilities: [] };
   if (safeExistsSync(absRegistryPath)) {
     if (!safeLstat(absRegistryPath).isFile()) {
       throw new Error(`Capability registry must be a regular file: ${absRegistryPath}`);
     }
-    registry = readJson<Record<string, unknown>>(absRegistryPath);
   }
+  let registry = loadCapabilityRegistryAtPath(absRegistryPath, type);
 
   const existingIndex = registry.capabilities.findIndex(
     (c: any) => c.capability_id === capabilityId
   );
 
-  if (argv.type === 'harness') {
+  if (type === 'harness') {
     // Harness capabilities are stored inline
     if (existingIndex >= 0) {
       registry.capabilities[existingIndex] = payload;
     } else {
       registry.capabilities.push(payload);
     }
-  } else if (argv.type === 'gateway') {
+  } else if (type === 'gateway') {
     // Gateway capabilities store the profile as a separate artifact and point to it
     const adaptersDir = `${tierDir}/adapters`;
     const absAdaptersDir = assertSafeRepositoryPath(pathResolver.rootResolve(adaptersDir), {
@@ -115,6 +166,7 @@ export async function main(args: string[] = []) {
     }
   }
 
+  registry = validateCapabilityRegistry(absRegistryPath, type, registry);
   safeWriteFile(absRegistryPath, JSON.stringify(registry, null, 2));
   console.log(
     `[REGISTRY_MANAGER] Successfully registered ${capabilityId} into ${argv.tier} tier (${argv.type} registry).`
