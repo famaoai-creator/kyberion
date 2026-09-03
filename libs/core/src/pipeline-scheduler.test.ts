@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   normalizeScheduledPipelinePath,
   resolveScheduledPipelinePath,
+  type PipelineScheduleRegistry,
   type ScheduledPipeline,
 } from './pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
@@ -348,6 +349,22 @@ describe('pipeline scheduler', () => {
           { rootDir }
         )
       ).toThrowError(/Invalid catalog pipeline-schedule-registry/);
+    });
+
+    it('persists the catalog-normalized registry payload', () => {
+      const rootDir = makeRootDir();
+      const registry = {
+        version: '1.0',
+        schedules: [],
+        $schema: 'governance-metadata',
+      } as unknown as PipelineScheduleRegistry;
+
+      saveScheduleRegistry(registry, { rootDir });
+
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(rootDir, 'active/shared/runtime/pipeline-schedules.json'), 'utf8')
+      ) as Record<string, unknown>;
+      expect(raw).toEqual({ version: '1.0', schedules: [] });
     });
   });
 });

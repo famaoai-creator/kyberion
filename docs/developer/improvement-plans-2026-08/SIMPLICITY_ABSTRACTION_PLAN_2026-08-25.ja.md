@@ -15291,6 +15291,18 @@ catalog validationは実行していたものの、その戻り値を捨てて�
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 780
+
+SX-03／SX-04／SX-08／SX-11 のpipeline schedule registryを再監査し、path portabilityの正規化と schema
+validationは実行していたものの、validation結果を捨てて元のnormalized registryをraw writeしていたため修正した。
+schedule登録、runtime state／run lock保持、repo-relative pipeline path、cron／interval catch-upの既存semanticsは
+維持し、検証済みのcanonical registry payloadを保存する。catalog metadataがruntime registryへ残らない回帰も
+追加した。
+
+検証: pipeline scheduler **1 file / 15 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
+state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
