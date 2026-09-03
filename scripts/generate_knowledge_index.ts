@@ -9,7 +9,8 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import { loadFrontmatterExclusions } from '@agent/core/frontmatter-exclusions';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 interface ManifestEntry {
@@ -27,14 +28,6 @@ interface IndexEntry {
   tier: string;
 }
 
-interface FrontmatterExclusionManifest {
-  manifest_version: number;
-  excluded_paths: string[];
-}
-
-const FRONTMATTER_EXCLUSIONS_PATH = pathResolver.knowledge(
-  'product/governance/frontmatter-exclusions.json'
-);
 const KNOWLEDGE_INDEX_PATH = pathResolver.knowledge('_index.md');
 const KNOWLEDGE_MANIFEST_PATH = pathResolver.knowledge('_integrity-manifest.json');
 
@@ -54,7 +47,7 @@ function matchesExclusion(relativePath: string, pattern: string): boolean {
 }
 
 export function validateFrontmatterExclusions(files: readonly string[]): string[] {
-  const manifest = readJson<FrontmatterExclusionManifest>(FRONTMATTER_EXCLUSIONS_PATH);
+  const manifest = loadFrontmatterExclusions();
   const failures: string[] = [];
   if (manifest.manifest_version !== 1 || !Array.isArray(manifest.excluded_paths)) {
     return ['frontmatter exclusion manifest has an unsupported shape'];
