@@ -33,7 +33,8 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
-import { appendJsonLine, nowIso, readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
+import { appendDependencyVulnerabilityLedgerRecord } from '@agent/core/dependency-vulnerability-ledger';
 import { runDegradationWatch, type DegradationReport } from '@agent/core/health-degradation';
 import { withExecutionContext } from '@agent/core/governance';
 
@@ -167,8 +168,7 @@ function applyPlanToPackage(pkg: RootPackageJson, packageName: string, plan: Pat
 }
 
 function appendLedger(ledgerPath: string, record: Record<string, unknown>): void {
-  safeMkdir(path.dirname(ledgerPath), { recursive: true });
-  appendJsonLine(ledgerPath, record);
+  appendDependencyVulnerabilityLedgerRecord(ledgerPath, record);
 }
 
 function auditStillVulnerable(auditStdout: string, packageName: string): boolean {

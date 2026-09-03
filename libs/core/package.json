@@ -491,6 +491,10 @@
       "types": "./dist/model-performance-index.d.ts",
       "default": "./dist/model-performance-index.js"
     },
+    "./dependency-vulnerability-ledger": {
+      "types": "./dist/dependency-vulnerability-ledger.d.ts",
+      "default": "./dist/dependency-vulnerability-ledger.js"
+    },
     "./process-definition-registry": {
       "types": "./dist/process-definition-registry.d.ts",
       "default": "./dist/process-definition-registry.js"
