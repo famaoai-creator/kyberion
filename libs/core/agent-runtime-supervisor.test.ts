@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const mocks = vi.hoisted(() => {
   const ensureMissionTeamRuntime = vi.fn();
@@ -111,6 +111,20 @@ describe('agent-runtime-supervisor', () => {
       );
     } finally {
       safeRmSync(requestPath, { force: true });
+    }
+  });
+
+  it('rejects a request path that is a directory', async () => {
+    const { getAgentRuntimeEnsureRequestPath, loadMissionTeamPrewarmRequest } =
+      await import('./agent-runtime-supervisor.js');
+    const requestPath = getAgentRuntimeEnsureRequestPath(`AR-DIRECTORY-${process.pid}`);
+    safeMkdir(requestPath, { recursive: true });
+    try {
+      expect(() => loadMissionTeamPrewarmRequest(requestPath)).toThrow(
+        '[AGENT_RUNTIME_REQUEST] request must be a regular file'
+      );
+    } finally {
+      safeRmSync(requestPath, { recursive: true, force: true });
     }
   });
 
