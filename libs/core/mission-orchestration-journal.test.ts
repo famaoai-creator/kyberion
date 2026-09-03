@@ -219,6 +219,29 @@ describe('mission-orchestration-journal', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true })
     );
 
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(`${missionPath}/coordination`, { recursive: true });
+      safeWriteFile(
+        `${missionPath}/coordination/orchestration-journal.jsonl`,
+        `${JSON.stringify({
+          ts: new Date().toISOString(),
+          event_id: 'EV-SCHEMA-INVALID',
+          event_type: 'mission_followup_requested',
+          mission_id: missionId,
+          status: 'enqueued',
+          payload_hash: 'hash',
+          operation: { id: 'EV-SCHEMA-INVALID', kind: 'invalid', attempt: 0 },
+          outcome: { status: 'pending' },
+        })}\n`
+      );
+    });
+    expect(() => loadMissionOrchestrationJournal(missionId)).toThrow(
+      'MISSION_LOG_CORRUPT:journal_entry_unreadable:1'
+    );
+    withExecutionContext('mission_controller', () =>
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true })
+    );
+
     const first = appendMissionOrchestrationJournalEntry({
       missionId,
       eventId: 'EV-CORRUPT-1',

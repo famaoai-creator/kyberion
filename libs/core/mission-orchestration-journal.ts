@@ -94,6 +94,18 @@ export interface MissionOrchestrationJournalEntry {
   scope?: EventScope;
 }
 
+const MISSION_ORCHESTRATION_JOURNAL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-orchestration-journal-entry.schema.json'
+);
+
+function missionOrchestrationJournalCatalog(sourcePath: string) {
+  return defineCatalog<MissionOrchestrationJournalEntry>({
+    id: 'mission-orchestration-journal-entry',
+    path: sourcePath,
+    schema: MISSION_ORCHESTRATION_JOURNAL_SCHEMA_PATH,
+  });
+}
+
 export interface ReducedMissionOperation {
   event_id: string;
   operation: MissionOperation;
@@ -701,6 +713,14 @@ export function appendMissionOrchestrationJournalEntry(input: {
     ...(input.correlationId ? { correlation_id: input.correlationId } : {}),
     ...(scope ? { scope } : {}),
   };
+  const journalFilePath = assertSafeRepositoryPath(
+    `${journalMissionPath}/coordination/orchestration-journal.jsonl`,
+    { allowMissingLeaf: true }
+  );
+  const validatedEntry = missionOrchestrationJournalCatalog(journalFilePath).validate(
+    entry,
+    journalFilePath
+  );
   const leasePath = assertSafeRepositoryPath(
     nodePath.join(journalMissionPath, 'coordination', 'writer-lease.json'),
     { allowMissingLeaf: true }
@@ -710,13 +730,8 @@ export function appendMissionOrchestrationJournalEntry(input: {
     ownerId: `process:${process.pid}`,
     leasePath,
     fn: () => {
-      appendJsonLine(
-        assertSafeRepositoryPath(`${journalMissionPath}/coordination/orchestration-journal.jsonl`, {
-          allowMissingLeaf: true,
-        }),
-        entry
-      );
-      return entry;
+      appendJsonLine(journalFilePath, validatedEntry);
+      return validatedEntry;
     },
   });
 }
@@ -750,9 +765,12 @@ export function loadMissionOrchestrationJournal(
     .filter((entry) => Boolean(entry.line))
     .map(({ line, lineNumber }) => {
       try {
-        return normalizeJournalEntry(
-          parseSafeJsonInput(line, 'mission orchestration journal entry')
+        const parsed = parseSafeJsonInput(line, 'mission orchestration journal entry');
+        const validated = missionOrchestrationJournalCatalog(filePath).validate(
+          parsed,
+          `${filePath}:${lineNumber}`
         );
+        return normalizeJournalEntry(validated);
       } catch (error) {
         throw new Error(`MISSION_LOG_CORRUPT:journal_entry_unreadable:${lineNumber}`, {
           cause: error,
