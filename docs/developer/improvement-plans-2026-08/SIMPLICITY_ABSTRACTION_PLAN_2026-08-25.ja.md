@@ -14387,6 +14387,12 @@ SX-03／SX-04 のsoak endurance live evidence manifestを再監査し、固定�
 
 検証: soak endurance／evidence manifest **12 tests passed**、root typecheck、core build、対象lint、Prettier、`git diff --check`、knowledge index再生成、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 688
+
+SX-03／SX-04 のi18n translation coverage historyを再監査し、locale別coverageの固定型`CoverageHistorySnapshot`がfoundationの汎用readerと直接writerへ分岐していた残存を修正した。専用schemaとcoreのcanonical loader／writerを追加し、週次snapshotの新規作成、coverage低下時のalert、dry-run／check時のread-only semanticsを同一契約へ統合した。新規localeを回帰扱いしない比較、required localeの判定、ops alertのdedupe semanticsは維持している。
+
+検証: i18n translation coverage **17 tests passed**、root typecheck、core build、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

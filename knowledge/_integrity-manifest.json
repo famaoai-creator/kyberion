@@ -7435,6 +7435,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/i18n-coverage-history.schema.json",
+      "tier": "public",
+      "size": 595,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/image-generation-adf.schema.json",
       "tier": "public",
       "size": 2178,
