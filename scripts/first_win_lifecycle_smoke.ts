@@ -3,6 +3,7 @@ import { extractHintsFromTrace } from '@agent/core/src/feedback-loop';
 import { matchesCron } from '@agent/core/src/cron-utils';
 import type { Trace, TraceSpan } from '@agent/core/src/trace';
 import { loadOrganizationOperationalState } from '@agent/core/organization-operating-model';
+import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
 import { loadProjectRecord } from '@agent/core/project-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -319,9 +320,7 @@ function validateMissionLiveOutput(action: string, missionId: string, raw: strin
 }
 
 function runScheduleStage(): StageObservation {
-  const pipeline = readJson<{ schedule?: { cron?: string; timezone?: string; enabled?: boolean } }>(
-    resolveFirstWinResourcePath(LIFECYCLE_PIPELINE, false)
-  );
+  const pipeline = loadPipelineAdfAtPath(resolveFirstWinResourcePath(LIFECYCLE_PIPELINE, false));
   const schedule = pipeline.schedule;
   const cron = schedule?.cron || '';
   const timezone = schedule?.timezone || '';
