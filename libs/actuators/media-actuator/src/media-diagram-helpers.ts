@@ -1,6 +1,7 @@
 import { resolveLatinFontFamily } from '@agent/core/design-fonts';
-import { isRecord, readJson } from '@agent/core/foundation';
+import { defineCatalog, isRecord, type GovernedCatalog } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import * as path from 'node:path';
 
 export interface DiagramGraphNode extends Record<string, unknown> {
@@ -36,6 +37,33 @@ export interface DrawioIconMapResource extends Record<string, unknown> {
 
 export interface DrawioIconMap extends Record<string, unknown> {
   resources: Record<string, DrawioIconMapResource>;
+}
+
+const diagramGraphCatalogs = new Map<string, GovernedCatalog<DiagramGraph>>();
+const drawioIconMapCatalogs = new Map<string, GovernedCatalog<DrawioIconMap>>();
+
+function diagramGraphCatalogAtPath(filePath: string): GovernedCatalog<DiagramGraph> {
+  const existing = diagramGraphCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<DiagramGraph>({
+    id: 'diagram-graph',
+    path: filePath,
+    schema: pathResolver.knowledge('product/schemas/diagram-graph.schema.json'),
+  });
+  diagramGraphCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
+function drawioIconMapCatalogAtPath(filePath: string): GovernedCatalog<DrawioIconMap> {
+  const existing = drawioIconMapCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<DrawioIconMap>({
+    id: 'drawio-icon-map',
+    path: filePath,
+    schema: pathResolver.knowledge('product/schemas/drawio-icon-map.schema.json'),
+  });
+  drawioIconMapCatalogs.set(filePath, catalog);
+  return catalog;
 }
 
 function nonEmptyString(value: unknown): value is string {
@@ -170,7 +198,7 @@ export function resolveGraphDefinition(
       resolve(params.input_path),
       'drawio_from_graph'
     );
-    const graph = parseDiagramGraph(readJson<unknown>(inputPath));
+    const graph = parseDiagramGraph(diagramGraphCatalogAtPath(inputPath).load());
     if (!graph) throw new Error(`drawio_from_graph received an invalid graph: ${inputPath}`);
     return graph;
   }
@@ -195,7 +223,7 @@ export function resolveDrawioIconMap(
     return { resources: {} };
   }
 
-  const iconMap = parseDrawioIconMap(readJson<unknown>(mapPath));
+  const iconMap = parseDrawioIconMap(drawioIconMapCatalogAtPath(mapPath).load());
   if (!iconMap) throw new Error(`drawio icon map is malformed: ${mapPath}`);
   return iconMap;
 }
