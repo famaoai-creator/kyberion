@@ -13,6 +13,30 @@ vi.mock('../foundation/json.js', () => ({
   readJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
 }));
 
+// defineCatalog (foundation/governed-catalog.ts) gates its load() on
+// FoundationIo, which the real secure-io.ts would normally register — but
+// ../secure-io.js is fully replaced above (no `...actual`), so that
+// registration never runs. Provide it directly.
+vi.mock('../foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
+    loadJsonIfPresent: (p: string) => {
+      if (!fs.existsSync(p)) return null;
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+      } catch {
+        return null;
+      }
+    },
+    appendFile: () => undefined,
+    exists: (p: string) => fs.existsSync(p),
+    readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    stat: (p: string) => fs.statSync(p),
+    writeFile: () => undefined,
+  }),
+  registerFoundationIo: vi.fn(),
+}));
+
 import { previewPipeline } from './pipeline-preview.js';
 import { pathResolver } from '../path-resolver.js';
 

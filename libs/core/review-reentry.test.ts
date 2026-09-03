@@ -2,8 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerFoundationIo } from './foundation/io.js';
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // secure-io resolves logical paths itself; the mock mirrors that against the
 // hermetic KYBERION_ROOT (same pattern as approval-rejection-reason.test.ts).
@@ -53,6 +56,10 @@ describe('review re-entry queue (LC-11)', () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-review-reentry-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    // persistRejectionLearning -> persistHints validates against this governed catalog schema.
+    const schemaRelative = 'knowledge/product/schemas/feedback-knowledge-hints.schema.json';
+    fs.mkdirSync(path.dirname(path.join(tmpRoot, schemaRelative)), { recursive: true });
+    fs.copyFileSync(path.join(REPO_ROOT, schemaRelative), path.join(tmpRoot, schemaRelative));
     process.env.KYBERION_ROOT = tmpRoot;
     registerFoundationIo({
       loadJson: <T>(filePath: string) =>

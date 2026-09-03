@@ -25,12 +25,21 @@ function seedPolicyFile(root: string): void {
   fs.copyFileSync(path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'), target);
 }
 
+/** writeScopedArtifact validates index rows against the governed catalog schema. */
+function seedScopedArtifactIndexSchema(root: string): void {
+  const relative = 'knowledge/product/schemas/scoped-artifact-index-entry.schema.json';
+  const target = path.join(root, relative);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(path.join(REPO_ROOT, relative), target);
+}
+
 describe('output-artifacts', () => {
   beforeAll(async () => {
     tmpRoot = path.join(os.tmpdir(), `kyb-output-artifacts-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     seedPolicyFile(tmpRoot);
+    seedScopedArtifactIndexSchema(tmpRoot);
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.MISSION_ROLE = 'mission_controller';
     mod = await import('./output-artifacts.js');
