@@ -7021,6 +7021,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/dependency-vulnerability-ledger-record.schema.json",
+      "tier": "public",
+      "size": 4911,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/deployment-action.schema.json",
       "tier": "public",
       "size": 880,

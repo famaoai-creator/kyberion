@@ -3,13 +3,16 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
   safeExecResult,
-  safeMkdir,
   safeReadFile,
   safeReaddir,
   safeLstat,
 } from '@agent/core/secure-io';
 import { decidePatchAction, type PatchDecision } from '@agent/core/patch-decision';
-import { appendJsonLine, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  appendDependencyVulnerabilityLedgerRecord,
+  readDependencyVulnerabilityLedgerRecords,
+} from '@agent/core/dependency-vulnerability-ledger';
+import { isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -276,18 +279,7 @@ function parseLedgerFinding(value: unknown): DependencyVulnerabilityFinding | un
 
 export function readPreviousLedgerState(ledgerPath: string): PreviousLedgerState {
   const state: PreviousLedgerState = { findings: new Map(), patched: new Set() };
-  if (!safeExistsSync(ledgerPath)) return state;
-  const lines = String(safeReadFile(ledgerPath, { encoding: 'utf8' }) || '')
-    .split('\n')
-    .filter((line) => line.trim().length > 0);
-  for (const line of lines) {
-    let record: unknown;
-    try {
-      record = parseSafeJsonInput(line, 'dependency vulnerability ledger entry');
-    } catch {
-      continue;
-    }
-    if (!isRecord(record)) continue;
+  for (const record of readDependencyVulnerabilityLedgerRecords(ledgerPath)) {
     if (Array.isArray(record.findings)) {
       for (const candidate of record.findings) {
         const finding = parseLedgerFinding(candidate);
@@ -422,8 +414,7 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
   };
 
   withExecutionContext('ecosystem_architect', () => {
-    safeMkdir(path.dirname(ledgerPath), { recursive: true });
-    appendJsonLine(ledgerPath, result);
+    appendDependencyVulnerabilityLedgerRecord(ledgerPath, result);
   });
   return result;
 }
