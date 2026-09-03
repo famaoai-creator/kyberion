@@ -3,6 +3,7 @@ import {
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
+  safeLstat,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
@@ -38,8 +39,9 @@ import {
   createAjv,
   defineCatalog,
   nowIso,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
   parsePersistedPipelineStrategy,
-  readJson,
 } from '@agent/core/foundation';
 import {
   loadSoftwareQualityContractAtPath,
@@ -143,6 +145,22 @@ function resolveModelingRepositoryPath(rootDir: string, value: unknown, label: s
   });
 }
 
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readModelingJson(filePath: string, label: string): unknown {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
+}
+
 // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
 // (runAdfActuatorPipeline). Nested control failures now propagate instead of being
 // silently absorbed (AR-06 no-silent-failure).
@@ -160,7 +178,11 @@ export async function executePipeline(
 
   if (contextPath && safeExistsSync(contextPath)) {
     const saved = await retry(
-      async () => readJson<Record<string, unknown>>(contextPath),
+      async () =>
+        parseSafeJsonObjectValue(
+          readModelingJson(contextPath, 'modeling context'),
+          'modeling context'
+        ),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
@@ -241,8 +263,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ...ctx,
         [params.export_as || 'last_capture_data']: await retry(
           async () =>
-            readJson<unknown>(
-              resolveModelingRepositoryPath(rootDir, resolve(params.path), 'read_json')
+            readModelingJson(
+              resolveModelingRepositoryPath(rootDir, resolve(params.path), 'read_json'),
+              'modeling read_json input'
             ),
           buildRetryOptions()
         ),
@@ -1064,10 +1087,12 @@ export async function performReconcile(input: ModelingAction) {
     input.strategy_path || 'knowledge/product/governance/modeling-strategy.json',
     'reconcile'
   );
-  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await retry(
     async () =>
-      parsePersistedPipelineStrategy(readJson<unknown>(strategyPath), 'modeling strategy'),
+      parsePersistedPipelineStrategy(
+        readModelingJson(strategyPath, 'modeling strategy'),
+        'modeling strategy'
+      ),
     buildRetryOptions()
   );
   for (const strategy of config.strategies) {
