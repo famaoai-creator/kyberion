@@ -13751,6 +13751,24 @@ SX-03／SX-04 のLLM selection preferencesを再監査し、active profileのrea
 
 検証: LLM selection preferences **1 file / 2 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 582
+
+SX-03／SX-08 のreasoning route resolverを再監査し、LLM selection preferencesを独自のraw `readJson` readerで再読込していた重複経路を修正した。routing側を共通の`loadLlmSelectionPreferences()`へ統合し、provider／modelの選択は同一のstrict schema、regular-file、profile path境界を通るようにした。symlink／不正selectionをroutingへ流さずnullへ戻す fallbackも共通loaderの公開境界に固定し、既存のrole binding、route policy、model selection semanticsは維持している。
+
+検証: reasoning route resolver **1 file / 20 tests passed**、voice／LLM selection **2 files / 4 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
+## 2026-09-03 再レビュー修正 583
+
+SX-03／SX-12 のLLM selection共通化後の依存グラフを再監査し、routing resolverがpreferences UIモジュールを直接参照したことでruntime cycleが増えた回帰を修正した。profile path、schema、regular-file検査を低依存の`llm-selection-state`へ抽出し、preferences UIとreasoning routingの両方が同一のcanonical persisted loaderを利用する構造へ整理した。symlink／不正stateのnull fallbackと既存のprovider／model selection semanticsは維持している。
+
+検証: reasoning route resolver **20 tests passed**、LLM selection **2 tests passed**、module-boundaries cycle regressionを修正。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
+## 2026-09-03 再レビュー修正 584
+
+SX-03／SX-12 のLLM selection state抽出後に残った保存側参照を再監査し、抽出済みcatalog helperの旧名が1箇所残っていたため、validate経路も低依存state moduleへ統合した。routing／preferencesの共通load・validate・path helperが同一モジュールを通ることを確認し、schema、symlink fallback、provider／model selection semanticsは維持している。
+
+検証: reasoning route／LLM selection **22 tests passed**、package build、root typecheck、module-boundariesを含むcanonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

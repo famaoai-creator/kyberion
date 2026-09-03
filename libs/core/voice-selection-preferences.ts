@@ -281,7 +281,11 @@ export function getVoiceSelectionSnapshot(): VoiceSelectionSnapshot {
 }
 
 export function loadVoiceSelectionPreferences(): VoiceSelectionPreferences | null {
-  return readPreferences();
+  try {
+    return readPreferences();
+  } catch {
+    return null;
+  }
 }
 
 export function saveVoiceSelectionPreferences(input: {
