@@ -10,7 +10,7 @@ describe('knowledge CLI resource boundary', () => {
     );
 
     expect(source).toContain('assertSafeRepositoryPath(pathResolver.rootResolve(proposalPathArg))');
-    expect(source).toContain('safeLstat(proposalPath).isFile()');
+    expect(source).toContain('loadKnowledgeRankingWeightProposal(proposalPath)');
     expect(source).toContain('assertSafeRepositoryPath(pathResolver.knowledge(relativePath), {');
   });
 });
