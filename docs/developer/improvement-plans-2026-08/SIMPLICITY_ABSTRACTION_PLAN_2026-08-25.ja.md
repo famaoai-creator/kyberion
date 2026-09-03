@@ -14045,6 +14045,12 @@ SX-03／SX-04 のcustomer requirements capture readerを再監査し、商談の
 
 検証: customer conversation requirements **1 file / 3 tests passed**、customer dialogue E2E **1 file / 17 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 631
+
+SX-03／SX-04 のartifact ownership registry readerを再監査し、書込み側では`artifact-ownership-record.schema.json`を検証している一方、共有JSONL registryのread／reuse query側は型キャストだけでschema-invalid recordを受け入れる二重経路が残っていたため修正した。既存schemaをpath-bound canonical catalog validationへ接続し、registryの各行を一覧化・再利用判定へ渡す前に同じ契約で検証するよう統合した。malformed JSONL、symlink path、ownership／delivery制約、project／mission queryとcreated_at順序の既存semanticsは維持している。
+
+検証: artifact registry **1 file / 7 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
