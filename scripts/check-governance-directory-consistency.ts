@@ -17,7 +17,7 @@ import { loadSurfaceProviderManifestCatalogDirectory } from '@agent/core/surface
 import { loadVoiceEngineRegistryDirectory } from '@agent/core/voice-engine-registry';
 import { loadVoiceProfileRegistryDirectory } from '@agent/core/voice-profile-registry';
 import { loadSpecialistCatalog } from '@agent/core/work-design';
-import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
+import { defineCatalog } from '@agent/core/foundation';
 
 type VoiceProfileSnapshot = {
   default_profile_id?: string;
@@ -195,7 +195,9 @@ export function validateVoiceProfileDirectoryConsistency(violations: string[]) {
   for (const file of files) {
     const profileId = file.replace(/\.json$/i, '');
     if (!directoryProfiles.has(profileId)) {
-      violations.push(`voice-profile-registry/${file}: governed loader did not return this profile`);
+      violations.push(
+        `voice-profile-registry/${file}: governed loader did not return this profile`
+      );
       continue;
     }
     if (!snapshotIds.has(profileId)) {
@@ -490,7 +492,9 @@ export function validateSpecialistCatalogDirectoryConsistency(violations: string
   for (const file of files) {
     const id = file.replace(/\.json$/i, '');
     if (!directorySpecialists[id]) {
-      violations.push(`specialist-catalog/${file}: canonical loader did not return this specialist`);
+      violations.push(
+        `specialist-catalog/${file}: canonical loader did not return this specialist`
+      );
       continue;
     }
 
