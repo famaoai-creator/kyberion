@@ -1,40 +1,14 @@
-import { pathResolver } from '@agent/core/path-resolver';
-import { isRecord, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import {
+  loadBrandTokensAtPath,
+  type BrandTokenColors,
+  type BrandTokenFonts,
+  type BrandTokens,
+} from '@agent/core/brand-tokens';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 
-export interface KyberionDesignTokens {
-  version: string;
-  brand_name: string;
-  tokens: {
-    colors: {
-      light: KyberionColorTokens;
-      dark: KyberionColorTokens;
-    };
-    fonts: KyberionFontTokens;
-  };
-}
-
-export interface KyberionColorTokens {
-  bg_main: string;
-  panel_bg: string;
-  primary: string;
-  secondary: string;
-  accent: string;
-  warning: string;
-  text_primary: string;
-  text_secondary: string;
-  /** Semantic extensions (v1.1.0) — optional so older token files still parse. */
-  accent_text?: string;
-  surface?: string;
-  muted_text?: string;
-  border?: string;
-  success?: string;
-  danger?: string;
-}
-
-export interface KyberionFontTokens {
-  sans: string;
-  mono: string;
-}
+export type KyberionDesignTokens = BrandTokens;
+export type KyberionColorTokens = BrandTokenColors;
+export type KyberionFontTokens = BrandTokenFonts;
 
 export interface KyberionThemeEntry {
   name: string;
@@ -61,12 +35,8 @@ export interface KyberionThemeEntry {
   };
 }
 
-const BRAND_TOKENS_PATH = pathResolver.rootResolve(
-  'knowledge/public/design-patterns/brand-tokens/kyberion.json'
-);
-
 export function readKyberionDesignTokens(): KyberionDesignTokens {
-  return readJson<KyberionDesignTokens>(BRAND_TOKENS_PATH);
+  return loadBrandTokensAtPath();
 }
 
 export function renderKyberionDesignTokenBlock(tokens: KyberionDesignTokens): string {

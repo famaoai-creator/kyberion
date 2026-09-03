@@ -955,6 +955,10 @@
       "types": "./dist/design-fonts.d.ts",
       "default": "./dist/design-fonts.js"
     },
+    "./brand-tokens": {
+      "types": "./dist/brand-tokens.d.ts",
+      "default": "./dist/brand-tokens.js"
+    },
     "./fs-primitives": {
       "types": "./dist/fs-primitives.d.ts",
       "default": "./dist/fs-primitives.js"

@@ -1,17 +1,8 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineCatalog } from './foundation/governed-catalog.js';
+import { loadBrandTokensAtPath, type BrandTokens } from './brand-tokens.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
-
-type BrandTokens = {
-  tokens?: {
-    fonts?: {
-      sans?: string;
-      mono?: string;
-    };
-  };
-};
 
 type FontFamilyPair = {
   latin: string;
@@ -19,9 +10,6 @@ type FontFamilyPair = {
 };
 
 const BRAND_TOKENS_RELATIVE_PATH = 'knowledge/public/design-patterns/brand-tokens/kyberion.json';
-const BRAND_TOKENS_SCHEMA_PATH = pathResolver.rootResolve(
-  'knowledge/product/schemas/brand-tokens.schema.json'
-);
 const FALLBACK_SANS_STACK = "Inter, 'Noto Sans JP', sans-serif";
 const FALLBACK_MONO_STACK = "'JetBrains Mono', monospace";
 
@@ -56,17 +44,9 @@ function resolveBrandTokensPath(): string {
   }
 }
 
-const brandTokensCatalog = defineCatalog<BrandTokens>({
-  id: 'brand-tokens',
-  path: resolveBrandTokensPath,
-  schema: BRAND_TOKENS_SCHEMA_PATH,
-  fallback: {},
-  fallbackOnInvalid: true,
-});
-
 function loadBrandTokens(): BrandTokens {
   if (!cachedBrandTokens) {
-    cachedBrandTokens = brandTokensCatalog.load();
+    cachedBrandTokens = loadBrandTokensAtPath(resolveBrandTokensPath());
   }
   return cachedBrandTokens;
 }

@@ -7,11 +7,12 @@ import {
   webThemePackToCssVars,
   type WebThemePack,
 } from '@agent/core/web-design-system';
+import { loadBrandTokensAtPath } from '@agent/core/brand-tokens';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-type Palette = Record<string, string>;
+type Palette = Record<string, string | undefined>;
 
 type ContrastPair = {
   background: string;
@@ -182,9 +183,7 @@ function checkDerivedWebThemePacks(): string[] {
 }
 
 export function checkDesignContrast(): string[] {
-  const brandTokens = parseJson<{ tokens: { colors: { light: Palette; dark: Palette } } }>(
-    pathResolver.rootResolve('knowledge/public/design-patterns/brand-tokens/kyberion.json')
-  );
+  const brandTokens = loadBrandTokensAtPath();
   const themes = parseJson<{ default_theme: string; themes: Record<string, { colors: Palette }> }>(
     pathResolver.rootResolve('knowledge/public/design-patterns/media-templates/themes.json')
   );
