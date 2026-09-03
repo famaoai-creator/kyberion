@@ -176,6 +176,17 @@ export function validateArtifactBundle(value: unknown): value is ArtifactBundle 
   return validateConsistency(bundle).length === 0;
 }
 
+export function writeArtifactBundleAtPath(filePath: string, bundle: ArtifactBundle): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = artifactBundleCatalog(safePath).validate(bundle, safePath);
+  const consistencyErrors = validateConsistency(validated);
+  if (consistencyErrors.length > 0) {
+    throw new Error(`Invalid artifact bundle: ${consistencyErrors.join('; ')}`);
+  }
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2));
+  return safePath;
+}
+
 export function saveArtifactBundle(bundle: ArtifactBundle, missionPath?: string): string {
   if (!validateArtifactBundle(bundle)) {
     const schemaErrors = (ensureValidator().errors ?? []).map(
@@ -192,11 +203,7 @@ export function saveArtifactBundle(bundle: ArtifactBundle, missionPath?: string)
   }
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   const filePath = bundleFilePath(dir, bundle.bundle_id);
-  safeWriteFile(
-    filePath,
-    JSON.stringify({ ...bundle, updated_at: nowIso() }, null, 2)
-  );
-  return filePath;
+  return writeArtifactBundleAtPath(filePath, { ...bundle, updated_at: nowIso() });
 }
 
 export function loadArtifactBundle(
