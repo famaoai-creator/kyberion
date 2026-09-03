@@ -9415,6 +9415,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/surface-dead-letter.schema.json",
+      "tier": "public",
+      "size": 3301,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/surface-dead-target.schema.json",
+      "tier": "public",
+      "size": 2153,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/surface-mission-proposal-state.schema.json",
       "tier": "public",
       "size": 1280,
