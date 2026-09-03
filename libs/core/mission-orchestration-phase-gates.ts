@@ -29,6 +29,7 @@ function safeMissionPath(missionId: string, relativePath: string, allowMissingLe
 export type MissionGateRecord = {
   mission_id?: string;
   gate_id?: string;
+  title?: string;
   verdict?: 'pass' | 'fail';
   reason?: string;
   reasons?: string[];
