@@ -15839,6 +15839,16 @@ SX-03／SX-10 のbrowser action trail復元・export経路を再監査し、永�
 検証: browser runtime **2 files / 44 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 829
+
+SX-03／SX-08／SX-10 のpeer tenant runtime migration再開経路を再監査し、`--plan`の内容parserは存在する一方で
+指定pathをscope検証する前に `readJson`へ渡していた残存を修正した。`pathResolver.rootResolve`と
+`assertSafeRepositoryPath`、regular-file確認をJSON parseより先に行い、外部・symlink pathを明示的なresource boundary errorとして
+拒否するようにした。既存のmigration plan shape検証、apply／quarantine semanticsは維持し、外部plan pathの回帰を追加した。
+
+検証: peer tenant migration **1 file / 4 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
