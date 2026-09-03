@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type {
@@ -27,6 +28,18 @@ export interface GraphRunArtifact {
   generated_at: string;
   nodes: GraphRunArtifactNode[];
   edges: GraphEdge[];
+}
+
+const GRAPH_RUN_ARTIFACT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/graph-run-artifact.schema.json'
+);
+
+function graphRunArtifactCatalog(filePath: string) {
+  return defineCatalog<GraphRunArtifact>({
+    id: 'graph-run-artifact',
+    path: filePath,
+    schema: GRAPH_RUN_ARTIFACT_SCHEMA_PATH,
+  });
 }
 
 export function createGraphRunArtifact<T>(
@@ -77,6 +90,7 @@ export function persistGraphRunArtifact(artifact: GraphRunArtifact, filePath?: s
   assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   artifact.artifact_path = target;
-  safeWriteFile(target, `${JSON.stringify(artifact, null, 2)}\n`);
+  const canonical = graphRunArtifactCatalog(target).validate(artifact, target);
+  safeWriteFile(target, `${JSON.stringify(canonical, null, 2)}\n`);
   return target;
 }
