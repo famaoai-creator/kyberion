@@ -113,6 +113,7 @@ describe('mission retrospective loop', () => {
       'mission-workitem-dispatch-manifest',
       'model-role-outcome',
       'model-performance-index',
+      'process-improvement-proposal',
     ]) {
       fs.copyFileSync(
         path.resolve(process.cwd(), `knowledge/product/schemas/${schemaName}.schema.json`),
@@ -363,6 +364,35 @@ describe('mission retrospective loop', () => {
     fs.appendFileSync(queuePath, `${JSON.stringify([])}\n${JSON.stringify({ proposal: 'bad' })}\n`);
     expect(mod.listProcessImprovementProposals()).toHaveLength(1);
     expect(mod.normalizeProcessImprovementProposal([])).toBeUndefined();
+  });
+
+  it('rewrites queued proposals through the canonical schema boundary', async () => {
+    backendPrompt.mockResolvedValue(
+      JSON.stringify({
+        proposals: [
+          {
+            kind: 'tooling',
+            target: 'queue',
+            proposal: 'queue schemaを適用する',
+            rationale: 'durable queue contract',
+            evidence: ['queue.jsonl'],
+          },
+        ],
+      })
+    );
+    const result = await mod.runMissionRetrospective(MISSION);
+    const queuePath = mod.processImprovementQueuePath();
+    const proposal = result.proposals[0];
+    fs.writeFileSync(
+      queuePath,
+      `${JSON.stringify({ $schema: 'https://example.invalid/proposal.json', ...proposal })}\n`
+    );
+
+    mod.decideProcessImprovementProposal(proposal.proposal_id, 'approved');
+
+    const persisted = JSON.parse(fs.readFileSync(queuePath, 'utf8').trim());
+    expect(persisted.$schema).toBeUndefined();
+    expect(persisted.status).toBe('approved');
   });
 
   it('does not promote dangerous LLM proposal responses', async () => {
