@@ -9,6 +9,7 @@ import {
   isConstantTimeEqual,
   normalizeGovernedCodeEnvelope,
 } from './cloudflare-os-control-plane.js';
+import { validatePersistedControlPlaneStateAtPath } from './cloudflare-os-control-plane-state.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 
@@ -68,6 +69,25 @@ const gadgetReadOperation = {
 };
 
 describe('Cloudflare OS adoption control plane', () => {
+  it('rejects unknown persisted state fields before publication', () => {
+    const statePath = pathResolver.sharedTmp('cloudflare-os-invalid-state-write-test.json');
+    expect(() =>
+      validatePersistedControlPlaneStateAtPath(statePath, {
+        version: 1,
+        held: [],
+        introductions: [],
+        observations: [],
+        autoRules: [],
+        capabilities: [],
+        threadCapabilities: {},
+        blueprints: [],
+        network: [],
+        gadgets: [],
+        unexpected: true,
+      })
+    ).toThrow(/additional properties|contains unknown fields/);
+  });
+
   it('accepts only an object envelope with an explicit value field', () => {
     expect(normalizeGovernedCodeEnvelope([])).toBeUndefined();
     expect(normalizeGovernedCodeEnvelope({})).toBeUndefined();

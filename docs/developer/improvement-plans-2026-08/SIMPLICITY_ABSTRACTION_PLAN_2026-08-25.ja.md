@@ -15038,6 +15038,19 @@ queueへ残らないようにする。request path boundary、runtime owner、re
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 759
+
+SX-03／SX-04／SX-08／SX-10 のCloudflare OS control-plane stateを再監査し、restore側は専用 schemaと
+persisted record parserを通過している一方、各状態遷移後のcontrol-plane state writeだけが検証なしでraw
+`safeWriteFile`されていたため修正した。state envelopeをpersist直前にschema validationと詳細 parserの
+二段階で確認し、未知 root fieldや不正な authority recordを durable projectionへ保存しない。held actionの
+executor除去、gadget contractの再構成、restore failure audit、approval／capability／tenant境界の既存
+semanticsは維持している。
+
+検証: Cloudflare OS control-plane **1 file / 23 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
