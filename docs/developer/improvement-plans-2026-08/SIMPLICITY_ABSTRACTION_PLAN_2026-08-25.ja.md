@@ -13721,6 +13721,12 @@ SX-03／SX-04 のingest quota counterを再監査し、tenant別日次取込量�
 
 検証: ingest quota **1 file / 12 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 577
+
+SX-03／SX-04 のpipeline ADF参照を再監査し、sub-pipeline readerが任意の実ファイルをraw `readJson`と静的validatorで読み、catalogの実読込経路を共有していなかった残存を修正した。参照先パスに動的に結び付くcanonical catalog loaderへ移行し、既存のrepository／symlink／trust境界、ADF schema検証、循環参照検出と `Invalid pipeline ADF` エラー契約は維持している。テストのfoundation I/O mockもcanonical loaderの契約に合わせて補正した。
+
+検証: pipeline engine **1 file / 10 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

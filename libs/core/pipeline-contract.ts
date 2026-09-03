@@ -1,6 +1,5 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 export interface PipelineStepResult {
@@ -180,13 +179,25 @@ const pipelineAdfCatalog = defineCatalog<PipelineAdf>({
   schema: PIPELINE_ADF_SCHEMA_PATH,
 });
 
+function pipelineAdfCatalogAtPath(filePath: string) {
+  return defineCatalog<PipelineAdf>({
+    id: 'pipeline-adf',
+    path: filePath,
+    schema: PIPELINE_ADF_SCHEMA_PATH,
+  });
+}
+
+function invalidPipelineAdf(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  const details = message.replace(/^Invalid catalog pipeline-adf at [^:]+:\s*/u, '');
+  throw new Error(`Invalid pipeline ADF: ${details}`);
+}
+
 export function validatePipelineAdf(input: unknown): PipelineAdf {
   try {
     return pipelineAdfCatalog.validate(input, 'pipeline ADF');
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const details = message.replace(/^Invalid catalog pipeline-adf at [^:]+:\s*/u, '');
-    throw new Error(`Invalid pipeline ADF: ${details}`);
+    return invalidPipelineAdf(error);
   }
 }
 
@@ -196,7 +207,11 @@ export function loadPipelineAdfAtPath(filePath: string): PipelineAdf {
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[PIPELINE_ADF] pipeline must be a regular file: ${filePath}`);
   }
-  return validatePipelineAdf(readJson<unknown>(safeFilePath));
+  try {
+    return pipelineAdfCatalogAtPath(safeFilePath).load();
+  } catch (error) {
+    return invalidPipelineAdf(error);
+  }
 }
 
 export function derivePipelineStatus(results: PipelineStepResult[]): 'succeeded' | 'failed' {
