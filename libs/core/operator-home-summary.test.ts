@@ -14,6 +14,7 @@ const secureIo = vi.hoisted(() => ({
     fs.writeFileSync(filePath, data);
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   assertSafeRepositoryPath: (
     filePath: string,
     options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
@@ -113,6 +114,10 @@ describe('operator home summary', () => {
       path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
       schemaPath
     );
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/software-quality-report.schema.json'),
+      path.join(tmpRoot, 'knowledge/product/schemas/software-quality-report.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
   });
 
@@ -205,15 +210,21 @@ describe('operator home summary', () => {
     fs.writeFileSync(
       path.join(qualityDir, 'latest-quality-report.json'),
       JSON.stringify({
+        version: '1.0.0',
         report_id: 'QUALITY-RUN-1',
         project_id: 'project-1',
         subject_ref: 'git:abc',
+        generated_at: '2026-07-12T00:00:00.000Z',
+        gate_status: { dor: 'pass', acceptance_criteria: 'pass', dod: 'fail' },
+        coverage: { required: 1, covered: 1 },
+        execution: { planned: 1, failed: 1 },
+        defects: { candidates: 1, critical: 1 },
         recommendation: 'no_go',
+        residual_risks: ['Critical defect remains.'],
+        waiver_refs: [],
+        evidence_refs: ['trace:1'],
         human_decision: 'pending',
         accountable_human_id: 'human:owner',
-        generated_at: '2026-07-12T00:00:00.000Z',
-        residual_risks: ['Critical defect remains.'],
-        evidence_refs: ['trace:1'],
       })
     );
     const { collectOperatorHomeSummary } = await import('./operator-home-summary.js');
