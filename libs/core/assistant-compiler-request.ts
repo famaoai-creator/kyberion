@@ -1,6 +1,8 @@
 import type { ValidateFunction } from 'ajv';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { clamp } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
@@ -600,12 +602,13 @@ export function buildAssistantCompilerRequest(
 }
 
 export function writeAssistantCompilerRequest(request: AssistantCompilerRequest): string {
-  const validation = validateAssistantCompilerRequest(request);
-  if (!validation.valid) {
-    throw new Error(`Invalid assistant compiler request: ${validation.errors.join('; ')}`);
-  }
   const requestPath = getAssistantCompilerRequestPath(request.request_id);
-  safeWriteFile(requestPath, JSON.stringify(request, null, 2));
+  const validated = defineCatalog<AssistantCompilerRequest>({
+    id: 'assistant-compiler-request',
+    path: requestPath,
+    schema: REQUEST_SCHEMA_PATH,
+  }).validate(request, requestPath);
+  safeWriteFile(requestPath, JSON.stringify(validated, null, 2));
   return requestPath;
 }
 
@@ -622,11 +625,30 @@ export function writeAssistantCompilerResult(
   result: AssistantCompilerResult,
   outputPath?: string
 ): string {
-  const validation = validateAssistantCompilerResult(result);
-  if (!validation.valid) {
-    throw new Error(`Invalid assistant compiler result: ${validation.errors.join('; ')}`);
+  const defaultPath = getAssistantCompilerResultPath(result.request_id);
+  const targetPath = outputPath ? assertAssistantCompilerResultPath(outputPath) : defaultPath;
+  const validated = defineCatalog<AssistantCompilerResult>({
+    id: 'assistant-compiler-result',
+    path: targetPath,
+    schema: RESULT_SCHEMA_PATH,
+  }).validate(result, targetPath);
+  safeWriteFile(targetPath, JSON.stringify(validated, null, 2));
+  return targetPath;
+}
+
+function assertAssistantCompilerResultPath(outputPath: string): string {
+  const targetPath = assertSafeRepositoryPath(outputPath, { allowMissingLeaf: true });
+  const resultRoot = path.resolve(pathResolver.sharedTmp('assistant-compiler-results'));
+  const relative = path.relative(resultRoot, targetPath);
+  if (
+    !relative ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error(
+      '[ASSISTANT_COMPILER_RESULT_SCOPE] output path must remain inside the governed result store'
+    );
   }
-  const targetPath = outputPath || getAssistantCompilerResultPath(result.request_id);
-  safeWriteFile(targetPath, JSON.stringify(result, null, 2));
   return targetPath;
 }
