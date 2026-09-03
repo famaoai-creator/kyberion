@@ -18,6 +18,7 @@ import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { registerSuperNerveExecutor } from '@agent/core/super-nerve-execution-port';
 import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
+import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -140,13 +141,10 @@ export async function executeSuperPipeline(
       if (repaired) {
         logger.success(`  [NERVE] Repair successful. Retrying pipeline...`);
         try {
-          const repairedPipeline = readJson<{ steps?: unknown }>(
+          const repairedPipeline = loadPipelineAdfAtPath(
             path.resolve(pathResolver.rootResolve(pipelinePath))
           );
-          if (!Array.isArray(repairedPipeline.steps)) {
-            throw new Error('repaired pipeline does not contain a steps array');
-          }
-          steps = repairedPipeline.steps as SuperPipelineStep[];
+          steps = repairedPipeline.steps;
           normalizedSteps = steps.map(normalizeStep);
         } catch (reloadError) {
           logger.warn(
