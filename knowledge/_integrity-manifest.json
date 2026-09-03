@@ -6385,6 +6385,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/agent-performance-index.schema.json",
+      "tier": "public",
+      "size": 1075,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/agent-profile-index.schema.json",
       "tier": "public",
       "size": 1039,
@@ -8086,6 +8092,12 @@
       "path": "product/schemas/model-cost-registry.schema.json",
       "tier": "public",
       "size": 2128,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/model-performance-index.schema.json",
+      "tier": "public",
+      "size": 1318,
       "type": "json"
     },
     {
