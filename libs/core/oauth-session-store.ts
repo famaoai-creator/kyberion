@@ -2,7 +2,7 @@ import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import {
   assertSafeRepositoryPath,
@@ -46,6 +46,18 @@ const PERSISTED_OAUTH_SESSION_FIELDS = [
   'callbackStartedAt',
   'callbackExpiresAt',
 ] as const;
+
+const OAUTH_SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/oauth-session.schema.json'
+);
+
+function oauthSessionCatalogAtPath(filePath: string) {
+  return defineCatalog<PendingOAuthSession>({
+    id: 'oauth-session',
+    path: filePath,
+    schema: OAUTH_SESSION_SCHEMA_PATH,
+  });
+}
 
 function parsePersistedOAuthSession(
   value: unknown,
@@ -198,8 +210,9 @@ export function loadPendingOAuthSession(
     const filePath = serviceSessionPath(serviceId, state);
     if (!safeExistsSync(filePath)) return null;
     try {
+      if (!safeLstat(filePath).isFile()) return null;
       const session = parsePersistedOAuthSession(
-        readJson<unknown>(filePath),
+        oauthSessionCatalogAtPath(filePath).load(),
         `OAuth session ${filePath}`,
         serviceId,
         state
@@ -227,7 +240,7 @@ export function loadPendingOAuthSession(
     const filePath = assertSafeRepositoryPath(path.join(dir, files[0]));
     if (!safeLstat(filePath).isFile()) return null;
     const session = parsePersistedOAuthSession(
-      readJson<unknown>(filePath),
+      oauthSessionCatalogAtPath(filePath).load(),
       `OAuth session ${filePath}`,
       serviceId
     );
@@ -275,8 +288,9 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
           const filePath = assertSafeRepositoryPath(path.join(fullDir, fileName), {
             allowMissingLeaf: true,
           });
+          if (!safeLstat(filePath).isFile()) continue;
           const session = parsePersistedOAuthSession(
-            readJson<unknown>(filePath),
+            oauthSessionCatalogAtPath(filePath).load(),
             `OAuth session ${filePath}`
           );
           if (
