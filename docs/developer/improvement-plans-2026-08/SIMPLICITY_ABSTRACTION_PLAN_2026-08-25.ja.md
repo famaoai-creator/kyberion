@@ -15919,6 +15919,17 @@ repository／regular-file boundaryは維持し、parserとdaemon接続の回帰�
 検証: Nexus／Terminal runtime records **2 files / 5 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 837
+
+SX-03／SX-04／SX-08／SX-10 のbrowser actuator operator approval artifactを再監査し、承認完了時に既存JSONを
+任意の `Record` として展開していた残存を修正した。safe JSON parserと承認レコード専用parserでroot、request／session identity、
+status、message、continue file、timestamp、timeoutを検証し、session mismatchや不正artifactは新規終端状態へ閉じるようにした。
+完了時は検証済みの既知フィールドだけを再構成するため、未知フィールドの再流入を防ぐ。既存のpending／approved／expired／rejected
+semanticsとoperator continuation経路は維持し、dangerous key、型不正、timestamp不正、未知フィールド除去、完了書き込みの回帰を追加した。
+
+検証: browser approval parser **1 file / 3 tests passed**、browser actuator completion regression **1 test passed**、resource boundary **1 file / 5 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
