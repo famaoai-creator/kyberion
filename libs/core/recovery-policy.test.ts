@@ -84,7 +84,7 @@ describe('recovery-policy', () => {
     });
     const { createGovernedRetryOptionsBuilder } = await import('./recovery-policy.js');
     const buildRetryOptions = createGovernedRetryOptionsBuilder({
-      manifestPath: '/tmp/manifest-builder.json',
+      manifestPath: 'active/shared/tmp/recovery-policy-test/manifest-builder.json',
       defaults: { maxRetries: 2, initialDelayMs: 500 },
       fallbackCategories: ['timeout'],
     });
@@ -107,7 +107,7 @@ describe('recovery-policy', () => {
     });
     const { buildGovernedRetryOptions } = await import('./recovery-policy.js');
     const options = buildGovernedRetryOptions({
-      manifestPath: '/tmp/manifest-first.json',
+      manifestPath: 'active/shared/tmp/recovery-policy-test/manifest-first.json',
       defaults: { maxRetries: 2, initialDelayMs: 500, maxDelayMs: 1000, factor: 2, jitter: true },
       override: { maxRetries: 1 },
     });
@@ -127,7 +127,7 @@ describe('recovery-policy', () => {
     });
     const { buildGovernedRetryOptions } = await import('./recovery-policy.js');
     const options = buildGovernedRetryOptions({
-      manifestPath: '/tmp/manifest-second.json',
+      manifestPath: 'active/shared/tmp/recovery-policy-test/manifest-second.json',
       defaults: { maxRetries: 1 },
       fallbackCategories: ['resource_unavailable'],
     });

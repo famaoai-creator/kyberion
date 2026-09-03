@@ -3,6 +3,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promoteBrowserProcedure } from './browser-procedure-promotion.js';
 import * as secureIo from './secure-io.js';
 import * as foundationJson from './foundation/json.js';
+import { getFoundationIo, registerFoundationIo } from './foundation/io.js';
+
+// defineCatalog reads presence through FoundationIo rather than secure-io's
+// exports directly, so spying on secureIo.safeExistsSync alone does not
+// reach the catalog's exists()/stat() checks — the registered io object
+// captured a direct reference to the real function at module load. Patch
+// the live registration instead, and restore it after each test.
+function overrideFoundationIoExists(matchesRecording: (filePath: string) => boolean): void {
+  const original = getFoundationIo();
+  registerFoundationIo({
+    ...original,
+    exists: (filePath) => (matchesRecording(filePath) ? true : original.exists(filePath)),
+    stat: (filePath) =>
+      matchesRecording(filePath) ? { mtimeMs: 1, size: 1 } : original.stat(filePath),
+  });
+}
 
 const recording = {
   schema_version: 'browser-recording.v1',
@@ -42,7 +58,12 @@ const recording = {
 };
 
 describe('promoteBrowserProcedure', () => {
-  afterEach(() => vi.restoreAllMocks());
+  const originalFoundationIo = getFoundationIo();
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    registerFoundationIo(originalFoundationIo);
+  });
 
   it('promotes an approved personal recording without writing the public catalog', () => {
     const actualRead = secureIo.safeReadFile;
@@ -53,7 +74,12 @@ describe('promoteBrowserProcedure', () => {
       if (filePath.includes('browser-procedures.json')) throw new Error('ENOENT');
       return actualRead(filePath, options);
     });
-    vi.spyOn(secureIo, 'safeExistsSync').mockReturnValue(false);
+    overrideFoundationIoExists((filePath) =>
+      filePath.includes('browser-recordings/REC-personal-1.json')
+    );
+    vi.spyOn(secureIo, 'safeExistsSync').mockImplementation((filePath) =>
+      filePath.includes('browser-recordings/REC-personal-1.json')
+    );
     vi.spyOn(secureIo, 'loadJson').mockImplementation((filePath) => {
       if (filePath.includes('browser-recordings/REC-personal-1.json')) return recording;
       return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
@@ -119,6 +145,13 @@ describe('promoteBrowserProcedure', () => {
       }
       return actualLstat(filePath);
     });
+    overrideFoundationIoExists((filePath) =>
+      filePath.includes('browser-recordings/REC-personal-1.json')
+    );
+    const actualExists = secureIo.safeExistsSync;
+    vi.spyOn(secureIo, 'safeExistsSync').mockImplementation((filePath) =>
+      filePath.includes('browser-recordings/REC-personal-1.json') ? true : actualExists(filePath)
+    );
     expect(() =>
       promoteBrowserProcedure({
         recordingRef: 'knowledge/personal/browser-recordings/REC-personal-1.json',

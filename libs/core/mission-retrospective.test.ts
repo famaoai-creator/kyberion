@@ -39,6 +39,7 @@ const realFsSecureIo = vi.hoisted(() => ({
     fs.appendFileSync(filePath, data, 'utf8');
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string, options?: { recursive?: boolean }) =>
     fs.mkdirSync(dirPath, { recursive: options?.recursive !== false }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
@@ -104,6 +105,20 @@ describe('mission retrospective loop', () => {
       path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
       schemaPath
     );
+    // agent-performance-index.ts records outcomes through governed catalogs;
+    // mission-retrospective.ts reads the dispatch manifest through one too.
+    for (const schemaName of [
+      'agent-role-outcome',
+      'agent-performance-index',
+      'mission-workitem-dispatch-manifest',
+      'model-role-outcome',
+      'model-performance-index',
+    ]) {
+      fs.copyFileSync(
+        path.resolve(process.cwd(), `knowledge/product/schemas/${schemaName}.schema.json`),
+        path.join(tmpRoot, `knowledge/product/schemas/${schemaName}.schema.json`)
+      );
+    }
     process.env.KYBERION_ROOT = tmpRoot;
 
     fs.writeFileSync(
@@ -364,6 +379,7 @@ describe('mission retrospective loop', () => {
     fs.writeFileSync(
       path.join(missionDir, 'evidence', 'workitem-dispatch-manifest.json'),
       JSON.stringify({
+        mission_id: MISSION,
         records: Array.from({ length: 6 }, (_, index) => ({
           item_id: `witem-${index}`,
           team_role: 'implementer',

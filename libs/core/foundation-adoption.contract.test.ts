@@ -34,7 +34,13 @@ describe('foundation schema compiler adoption', () => {
       const source = String(
         safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' })
       );
-      expect(source, relativePath).toContain('compileSchema');
+      // `defineCatalog` (foundation/governed-catalog.ts) is the newer, higher-level
+      // boundary built on top of compileSchema — a module fully migrated onto it
+      // no longer calls compileSchema directly, so either signals adoption.
+      expect(
+        source.includes('compileSchema') || source.includes('defineCatalog'),
+        relativePath
+      ).toBe(true);
       expect(source, relativePath).not.toContain('compileSchemaFromPath');
       expect(source, relativePath).not.toContain("from 'ajv-formats'");
     }

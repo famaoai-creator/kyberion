@@ -37,12 +37,15 @@ vi.mock('./path-resolver.js', () => ({
     rootResolve: (p: string) => `/repo/${p}`,
     rootDir: () => '/repo',
     shared: (p = '') => `/repo/active/shared/${p}`,
+    knowledge: (p = '') => `/repo/knowledge/${p}`,
     resolve: (p: string) => p,
   },
 }));
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (p: string) => p,
   safeExistsSync: (p: string) => files.has(p),
+  safeLstat: () => ({ isFile: () => true, isSymbolicLink: () => false }),
   safeReadFile: (p: string) => {
     if (!files.has(p)) throw new Error('ENOENT');
     return files.get(p)!;

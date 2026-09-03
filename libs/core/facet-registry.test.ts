@@ -42,7 +42,9 @@ describe('facet-registry', () => {
           pluginId: 'pack-one',
           trust: 'official',
           trustReason: 'test',
-          resolvedSourcePath: pluginRoot,
+          // KD-06: trust is re-derived from resolvedSourcePath on every read, so
+          // this must resolve inside the repo's own plugins/ tree to stay 'official'.
+          resolvedSourcePath: path.join(pathResolver.rootDir(), 'plugins', 'pack-one'),
           managedPath: pluginRoot,
           manifest: {
             pluginId: 'pack-one',
@@ -86,7 +88,7 @@ describe('facet-registry', () => {
           pluginId: 'pack-one',
           trust: 'official',
           trustReason: 'test',
-          resolvedSourcePath: pluginRoot,
+          resolvedSourcePath: path.join(pathResolver.rootDir(), 'plugins', 'pack-one'),
           managedPath: pluginRoot,
           manifest: {
             pluginId: 'pack-one',

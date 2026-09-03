@@ -104,6 +104,11 @@ describe('purgeMissions (AL-01)', () => {
       path.join(REPO_ROOT, 'knowledge/product/schemas', 'mission-lifecycle-policy.schema.json'),
       path.join(tmpRoot, 'knowledge/product/schemas/mission-lifecycle-policy.schema.json')
     );
+    // ops-alert.ts logs alerts through the governed ops-alert-log catalog.
+    fs.copyFileSync(
+      path.join(REPO_ROOT, 'knowledge/product/schemas', 'ops-alert-log-record.schema.json'),
+      path.join(tmpRoot, 'knowledge/product/schemas/ops-alert-log-record.schema.json')
+    );
 
     mod = await import('./mission-maintenance.js');
   });
