@@ -152,4 +152,21 @@ describe('ShareGrantLiveSessionRegistry', () => {
       safeRmSync(storePath, { force: true });
     }
   });
+
+  it('rejects unknown persisted state fields at the catalog boundary', () => {
+    const storePath = 'active/shared/tmp/os13-unknown-live-session-state.json';
+    try {
+      safeWriteFile(
+        storePath,
+        JSON.stringify({ version: 1, sessions: [], revokedScopes: [], unexpected: true }),
+        { encoding: 'utf8', mkdir: true }
+      );
+
+      expect(() => new ShareGrantLiveSessionRegistry({ storePath, persist: true })).toThrow(
+        ShareGrantLiveSessionValidationError
+      );
+    } finally {
+      safeRmSync(storePath, { force: true });
+    }
+  });
 });

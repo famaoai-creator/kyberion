@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/share-grant-live-session-state.schema.json",
+  "title": "Share grant live session state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "sessions", "revokedScopes"],
+  "properties": {
+    "version": { "const": 1 },
+    "sessions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/session" }
+    },
+    "revokedScopes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sessionId", "linkId", "resourceRef", "connectedAt"],
+      "properties": {
+        "sessionId": { "type": "string", "minLength": 1 },
+        "linkId": { "type": "string", "minLength": 1 },
+        "resourceRef": { "type": "string", "minLength": 1 },
+        "connectedAt": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
