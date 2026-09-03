@@ -3,6 +3,10 @@ import { logger } from '@agent/core/core';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
+  loadSoakRestartStateAtPath,
+  writeSoakRestartStateAtPath,
+} from '@agent/core/soak-restart-state';
+import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
@@ -10,7 +14,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine, nowIso, readJson } from '@agent/core/foundation';
+import { appendJsonLine, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface RestartE2EReport {
@@ -52,10 +56,7 @@ function writeBootstrapState(root: string): RestartE2EReport['bootstrap'] {
     journalPath,
     JSON.stringify({ phase: 'bootstrap', entries: ['boot'], complete: false }, null, 2)
   );
-  safeWriteFile(
-    statePath,
-    JSON.stringify({ healthy: true, resumed: false, phase: 'bootstrap' }, null, 2)
-  );
+  writeSoakRestartStateAtPath(statePath, { healthy: true, resumed: false, phase: 'bootstrap' });
   return {
     pid: process.pid,
     heartbeat_path: heartbeatPath,
@@ -67,9 +68,7 @@ function writeResumeState(root: string): RestartE2EReport['resume'] & { restored
   const heartbeatPath = safeSoakPath(root, 'daemon-heartbeat.json');
   const journalPath = safeSoakPath(root, 'mission-journal.json');
   const statePath = safeSoakPath(root, 'provider-health.json');
-  const existing = safeExistsSync(statePath)
-    ? readJson<{ phase?: string; resumed?: boolean; restored_from?: string }>(statePath)
-    : {};
+  const existing = safeExistsSync(statePath) ? loadSoakRestartStateAtPath(statePath) : undefined;
   safeWriteFile(
     heartbeatPath,
     JSON.stringify({ pid: process.pid, phase: 'resume', alive: true, ts: nowIso() }, null, 2)
@@ -87,14 +86,12 @@ function writeResumeState(root: string): RestartE2EReport['resume'] & { restored
       2
     )
   );
-  safeWriteFile(
-    statePath,
-    JSON.stringify(
-      { healthy: true, resumed: true, phase: 'resume', restored_from: existing?.phase || null },
-      null,
-      2
-    )
-  );
+  writeSoakRestartStateAtPath(statePath, {
+    healthy: true,
+    resumed: true,
+    phase: 'resume',
+    restored_from: existing?.phase || null,
+  });
   return {
     pid: process.pid,
     state_path: statePath,
@@ -231,7 +228,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
   if (!safeLstat(statePath).isFile()) {
     throw new Error(`Soak restart state must be a regular file: ${statePath}`);
   }
-  const restored = readJson<{ resumed?: boolean; restored_from?: string }>(statePath);
+  const restored = loadSoakRestartStateAtPath(statePath);
   return {
     timestamp: nowIso(),
     root: safeRoot,

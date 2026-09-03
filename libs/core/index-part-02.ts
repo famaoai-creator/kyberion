@@ -82,6 +82,8 @@ export * from './org-chart.js';
 
 export * from './daemon-heartbeat.js';
 
+export * from './soak-restart-state.js';
+
 export * from './ops-alert.js';
 
 export * from './health-degradation.js';
