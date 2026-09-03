@@ -13739,6 +13739,12 @@ SX-03／SX-04 のaudio device leaseを再監査し、stale lease判定がraw `re
 
 検証: audio device lease **1 file / 4 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 580
+
+SX-03／SX-04 のvoice selection preferencesを再監査し、active profileの音声選択をraw `readJsonIfPresent`と局所parserで読み、selection schema・regular-file境界を共有していなかった残存を修正した。`voice-selection-preferences.schema.json`とprofile pathに結び付くcanonical loaderを追加し、selectionのload／saveをstrict schemaへ統合した。不正・未知フィールド・directory stateは既存どおり無効な選択としてdefault／needs-setup側へフォールバックし、STT backend aliasの正規化、TTS／STT availability gate、profile path semanticsは維持している。
+
+検証: voice selection preferences **1 file / 2 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
