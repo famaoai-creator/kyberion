@@ -32,6 +32,9 @@ export interface CampaignBrief {
 const CAMPAIGN_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/campaign-brief.schema.json'
 );
+const CAMPAIGN_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/campaign-manifest.schema.json'
+);
 
 /** Load a persisted campaign brief through its canonical schema boundary. */
 export function loadCampaignBriefAtPath(filePath: string): CampaignBrief {
@@ -70,6 +73,18 @@ export interface CampaignManifest {
     detail?: string;
   }>;
   generated_by: string;
+}
+
+/** Validate the execution manifest before a campaign runner persists it. */
+export function validateCampaignManifest(
+  value: unknown,
+  sourcePath = 'campaign-manifest'
+): CampaignManifest {
+  return defineCatalog<CampaignManifest>({
+    id: 'campaign-manifest',
+    path: sourcePath,
+    schema: CAMPAIGN_MANIFEST_SCHEMA_PATH,
+  }).validate(value, sourcePath);
 }
 
 export interface CampaignPlan {
