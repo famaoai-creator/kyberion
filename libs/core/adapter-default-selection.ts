@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 import {
   getMediaBackendRegistry,
@@ -12,10 +13,10 @@ import {
   type AdapterDefaultKey,
   type AdapterDefaultPreferences,
 } from './adapter-default-preferences.js';
-import { readJsonIfPresent } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from './secure-io.js';
 import { getServiceRuntimeRegistry } from './service-runtime-registry.js';
 import { listToolRuntimes, getToolRuntimeRegistry } from './tool-runtime-registry.js';
 import { listVadBackends, resolveVadBackend } from './vad-registry.js';
@@ -64,15 +65,28 @@ function selectionPath(): string {
   );
 }
 
+const ADAPTER_DEFAULT_PREFERENCES_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/adapter-default-preferences.schema.json'
+);
+
+const adapterDefaultPreferencesCatalog = defineCatalog<AdapterDefaultPreferences>({
+  id: 'adapter-default-preferences',
+  path: selectionPath,
+  schema: ADAPTER_DEFAULT_PREFERENCES_SCHEMA_PATH,
+});
+
 function isAdapterDefaultKey(value: string): value is AdapterDefaultKey {
   return (ADAPTER_DEFAULT_KEYS as readonly string[]).includes(value);
 }
 
 function loadPersistedPreferences(): AdapterDefaultPreferences {
   const filePath = selectionPath();
-  const parsed = readJsonIfPresent<
-    Partial<AdapterDefaultPreferences> & { defaults?: Record<string, unknown> }
-  >(filePath);
+  let parsed: AdapterDefaultPreferences | null = null;
+  try {
+    if (safeLstat(filePath).isFile()) parsed = adapterDefaultPreferencesCatalog.load();
+  } catch {
+    parsed = null;
+  }
   if (!parsed) {
     return setAdapterDefaultPreferences({ version: '1.0.0', defaults: {} });
   }
