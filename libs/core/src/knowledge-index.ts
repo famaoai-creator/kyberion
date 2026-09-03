@@ -27,6 +27,12 @@ import {
   type KnowledgeRankingMetadata,
 } from '../ranking-signals.js';
 import { loadKnowledgeUsageAggregateAtPath } from '../knowledge-usage-aggregate.js';
+import {
+  loadKnowledgeIndexCacheAtPath,
+  writeKnowledgeIndexCacheAtPath,
+  type KnowledgeIndexCache,
+  type KnowledgeIndexCacheEntry,
+} from '../knowledge-index-cache.js';
 import { physicalScopedPath } from '../physical-namespace.js';
 import type { ScopeContext } from '../scope-context.js';
 import { currentScope } from '../scope-context.js';
@@ -311,18 +317,8 @@ export function clearKnowledgeEmbedCache(): void {
 
 // ─── Disk-cache helpers ───────────────────────────────────────────────────────
 
-interface DiskCacheEntry {
-  source: string;
-  textHash: string;
-  vector: number[];
-}
-
-interface DiskCache {
-  scopeHash: string;
-  model: string;
-  builtAt: string;
-  entries: DiskCacheEntry[];
-}
+type DiskCacheEntry = KnowledgeIndexCacheEntry;
+type DiskCache = KnowledgeIndexCache;
 
 export function computeScopeHash(scope: KnowledgeScope, modelName?: string): string {
   const key = JSON.stringify({
@@ -452,19 +448,15 @@ export function enforceKnowledgeCacheBudget(): void {
 function loadDiskCache(scopeHash: string): Map<string, { textHash: string; vector: Float32Array }> {
   const result = new Map<string, { textHash: string; vector: Float32Array }>();
   const filePath = cacheFilePath(scopeHash);
-  if (!safeExistsSync(filePath)) return result;
-  try {
-    const cache = readJson<DiskCache>(filePath);
-    for (const entry of cache.entries) {
-      result.set(entry.source, {
-        textHash: entry.textHash,
-        vector: new Float32Array(entry.vector),
-      });
-    }
-    touchScopeUsage(scopeHash);
-  } catch {
-    // Corrupt or unreadable cache — ignore, will rebuild
+  const cache = loadKnowledgeIndexCacheAtPath(filePath);
+  if (!cache) return result;
+  for (const entry of cache.entries) {
+    result.set(entry.source, {
+      textHash: entry.textHash,
+      vector: new Float32Array(entry.vector),
+    });
   }
+  touchScopeUsage(scopeHash);
   return result;
 }
 
@@ -479,7 +471,7 @@ function saveDiskCache(scopeHash: string, modelName: string, entries: DiskCacheE
       builtAt: nowIso(),
       entries,
     };
-    safeWriteFile(filePath, JSON.stringify(cache));
+    writeKnowledgeIndexCacheAtPath(filePath, cache);
     touchScopeUsage(scopeHash);
     enforceKnowledgeCacheBudget();
   } catch {
