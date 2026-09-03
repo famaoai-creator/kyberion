@@ -15,6 +15,19 @@ vi.mock('../foundation/json.js', () => ({
   readJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
 }));
 
+vi.mock('../foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+    loadJsonIfPresent: <T>(filePath: string) =>
+      fs.existsSync(filePath) ? (JSON.parse(fs.readFileSync(filePath, 'utf8')) as T) : null,
+    appendFile: (filePath: string, content: string) => fs.appendFileSync(filePath, content),
+    exists: (filePath: string) => fs.existsSync(filePath),
+    readFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: (filePath: string, content: string) => fs.writeFileSync(filePath, content),
+  }),
+}));
+
 vi.mock('../core.js', () => ({
   logger: {
     info: vi.fn(),
