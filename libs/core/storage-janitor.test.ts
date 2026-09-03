@@ -64,7 +64,7 @@ vi.mock('./foundation/io.js', () => ({
 let tmpDir: string;
 let logsDir: string;
 let dataVaultDir: string;
-const pathResolverMock = vi.hoisted(() => ({ rootDir: '' }));
+const pathResolverMock = vi.hoisted(() => ({ rootDir: '', repoRoot: process.cwd() }));
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 vi.mock('./path-resolver.js', () => ({
@@ -79,6 +79,7 @@ vi.mock('./path-resolver.js', () => ({
     return path.join(base, sub);
   },
   sharedLogsAudit: (sub = '') => path.join(path.dirname(tmpDir), 'logs', 'audit', sub),
+  knowledge: (sub = '') => path.join(pathResolverMock.repoRoot, 'knowledge', sub),
   // Repo root of the temp fixture: tmpDir is <root>/active/shared/tmp, so
   // repo-relative paths ('active/shared/...', 'active/archive/.trash/...')
   // resolve exactly as they do in the real tree.
@@ -100,6 +101,8 @@ import {
   runJanitor,
   runJanitorIfStale,
   readJanitorLastRunMs,
+  readJanitorLastSubmissionMs,
+  writeJanitorSubmissionMarker,
   listUncoveredRuntimeDirs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_TRASH_GRACE_DAYS,
@@ -866,6 +869,34 @@ describe('storage-janitor', () => {
       const report = runJanitorIfStale({ dryRun: true });
       expect(report).not.toBeNull();
       expect(readJanitorLastRunMs()).toBeNull();
+    });
+
+    it('validates janitor submission markers and rejects malformed or non-file state', () => {
+      expect(readJanitorLastSubmissionMs()).toBeNull();
+
+      writeJanitorSubmissionMarker();
+      expect(readJanitorLastSubmissionMs()).not.toBeNull();
+
+      const markerPath = path.join(
+        path.dirname(tmpDir),
+        'runtime',
+        'state',
+        'janitor-last-submit.json'
+      );
+      fs.writeFileSync(
+        markerPath,
+        JSON.stringify({
+          submitted_at: new Date().toISOString(),
+          pipeline_id: 'storage-janitor',
+          dry_run: false,
+          unexpected: true,
+        })
+      );
+      expect(readJanitorLastSubmissionMs()).toBeNull();
+
+      fs.rmSync(markerPath, { force: true });
+      fs.mkdirSync(markerPath, { recursive: true });
+      expect(readJanitorLastSubmissionMs()).toBeNull();
     });
   });
 });
