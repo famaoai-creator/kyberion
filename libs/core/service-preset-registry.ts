@@ -2,7 +2,6 @@ import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { loadServiceEndpointsCatalog } from './service-binding.js';
@@ -23,6 +22,10 @@ export interface ServicePresetRecord {
 
 export interface ServicePresetsCatalog {
   services: Record<string, ServicePresetRecord>;
+}
+
+interface PersistedServicePresetRecord extends Omit<ServicePresetRecord, 'service_id'> {
+  service_id?: string;
 }
 
 const DEFAULT_SERVICE_PRESETS_DIR = pathResolver.knowledge('product/orchestration/service-presets');
@@ -47,27 +50,23 @@ export function loadServicePresetAtPath(
   const safePath = assertSafeRepositoryPath(pathResolver.rootResolve(presetPath), {
     allowMissingLeaf: false,
   });
-  const catalog = defineCatalog<ServicePresetRecord>({
+  const catalog = defineCatalog<PersistedServicePresetRecord>({
     id: 'service-preset',
     path: safePath,
     schema: SERVICE_PRESETS_SCHEMA_PATH,
   });
   try {
     const normalizedExpected = expectedServiceId?.trim();
-    const raw = normalizedExpected ? readJson<unknown>(safePath) : undefined;
-    const rawRecord =
-      raw && typeof raw === 'object' && !Array.isArray(raw)
-        ? (raw as Record<string, unknown>)
-        : undefined;
-    const candidate =
-      normalizedExpected && rawRecord
-        ? {
-            ...rawRecord,
-            service_id:
-              rawRecord.service_id === undefined ? normalizedExpected : rawRecord.service_id,
-          }
-        : undefined;
-    const preset = candidate ? catalog.validate(candidate, safePath) : catalog.load();
+    const loaded = catalog.load();
+    const resolvedServiceId = loaded.service_id || normalizedExpected;
+    if (!resolvedServiceId) {
+      throw new Error('service preset must define service_id');
+    }
+    const preset: ServicePresetRecord = {
+      ...loaded,
+      operations: loaded.operations,
+      service_id: resolvedServiceId,
+    };
     if (
       normalizedExpected &&
       preset.service_id.trim().toLowerCase() !== normalizedExpected.toLowerCase()

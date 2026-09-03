@@ -1,10 +1,15 @@
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
   getServicePresetRecord,
+  loadServicePresetAtPath,
   loadServicePresetsCatalog,
   resolveServicePresetPath,
 } from './service-preset-registry.js';
+import { safeMkdir, safeWriteFile } from './secure-io.js';
+
+const TMP_ROOT = path.join(process.cwd(), 'active/shared/tmp/service-preset-registry-test');
 
 describe('service-preset-registry', () => {
   it('loads the canonical service presets directory', () => {
@@ -56,5 +61,15 @@ describe('service-preset-registry', () => {
     );
     expect(preset?.service_id).toBe('voice');
     expect(preset?.operations).toHaveProperty('speak_local');
+  });
+
+  it('binds a legacy explicit preset without service_id through the canonical loader', () => {
+    safeMkdir(TMP_ROOT, { recursive: true });
+    const presetPath = path.join(TMP_ROOT, 'legacy-service.json');
+    safeWriteFile(presetPath, JSON.stringify({ operations: {} }, null, 2));
+
+    const preset = loadServicePresetAtPath(presetPath, 'legacy-service');
+
+    expect(preset.service_id).toBe('legacy-service');
   });
 });
