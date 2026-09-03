@@ -1,8 +1,14 @@
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -19,6 +25,9 @@ export interface AdhocRunTally {
 }
 
 const LEDGER_RELATIVE_PATH = 'active/shared/runtime/feedback-loop/adhoc-pipeline-runs.json';
+const LEDGER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/adhoc-pipeline-run-ledger.schema.json'
+);
 const MAX_ENTRIES = 200;
 export const PROMOTION_CANDIDATE_MIN_RUNS = 3;
 
@@ -38,12 +47,27 @@ function candidatePath(relativePath: string): string | null {
   }
 }
 
+function ledgerCatalog(filePath: string) {
+  return defineCatalog<AdhocRunTally[]>({
+    id: 'adhoc-pipeline-run-ledger',
+    path: filePath,
+    schema: LEDGER_SCHEMA_PATH,
+  });
+}
+
+export function loadAdhocRunLedgerAtPath(filePath: string): AdhocRunTally[] {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[PROMOTION_CANDIDATES] ledger must be a regular file: ${filePath}`);
+  }
+  return ledgerCatalog(safeFilePath).load();
+}
+
 function readLedger(): AdhocRunTally[] {
   try {
     const filePath = ledgerPath();
     if (!safeExistsSync(filePath)) return [];
-    const parsed = readJson<unknown>(filePath);
-    return Array.isArray(parsed) ? parsed : [];
+    return loadAdhocRunLedgerAtPath(filePath);
   } catch {
     return [];
   }
@@ -72,7 +96,8 @@ export function recordAdhocPipelineRun(relativePath: string): number {
     const trimmed = entries
       .sort((left, right) => right.last_at.localeCompare(left.last_at))
       .slice(0, MAX_ENTRIES);
-    safeWriteFile(filePath, `${JSON.stringify(trimmed, null, 2)}\n`);
+    const validated = ledgerCatalog(filePath).validate(trimmed, filePath);
+    safeWriteFile(filePath, `${JSON.stringify(validated, null, 2)}\n`);
     return count;
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
