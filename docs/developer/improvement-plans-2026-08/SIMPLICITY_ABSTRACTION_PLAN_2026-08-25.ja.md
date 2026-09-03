@@ -14123,6 +14123,12 @@ SX-03／SX-04 のmodel performance indexを再監査し、集計済みindexはca
 
 検証: model performance index **1 file / 8 tests passed**、knowledge index生成、対象lint、typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 644
+
+SX-03／SX-04 のsecurity quarantineを再監査し、strict-screened contentのJSONLが型定義とJSON parseだけで一覧・operator reviewへ入り、schema・regular-file境界を共有していない残存を修正した。quarantine record専用schemaとpath-bound canonical catalogを追加し、record／list双方で同じschema検証とregular-file検査を行うようにした。schema-invalid行の既存skip、content truncation／security taint、repository内quarantine path、rotation semanticsは維持し、rotationのサイズ判定は毎回の全量readからstatベースへ変更した。
+
+検証: security-screen quarantine **1 file / 30 tests passed**、対象lint、typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

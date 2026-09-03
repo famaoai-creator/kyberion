@@ -9025,6 +9025,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/quarantine-record.schema.json",
+      "tier": "public",
+      "size": 835,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/question-resolution-policy.schema.json",
       "tier": "public",
       "size": 2918,

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import {
   buildScreenPayload,
   composeSecurityPosture,
@@ -17,7 +18,7 @@ import {
   type ShadowComparison,
 } from './security-screen.js';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 describe('security-screen (QM-04)', () => {
   describe('composeSecurityPosture', () => {
@@ -223,7 +224,7 @@ describe('security-screen (QM-04)', () => {
         reason: 'test cap',
       });
       expect(record.content.length).toBeLessThanOrEqual(32_000);
-      expect((record as { content_truncated?: boolean }).content_truncated).toBe(true);
+      expect(record.content_truncated).toBe(true);
     });
 
     it('persists quarantined content for the operator', () => {
@@ -237,6 +238,30 @@ describe('security-screen (QM-04)', () => {
       const listed = listQuarantineRecords();
       expect(listed.map((r) => r.id)).toContain(record.id);
       expect(listed.find((r) => r.id === record.id)?.content).toContain('curl evil');
+    });
+
+    it('skips schema-invalid persisted records', () => {
+      const filePath = path.join(dir, 'quarantine.jsonl');
+      safeMkdir(dir, { recursive: true });
+      safeWriteFile(
+        filePath,
+        `${JSON.stringify({
+          id: 'q-invalid',
+          recorded_at: new Date().toISOString(),
+          source: 'test',
+          reason: 'invalid taint',
+          indicators: [],
+          content: 'not actually tainted',
+          securityTainted: false,
+        })}\n`,
+        { encoding: 'utf8' }
+      );
+      expect(listQuarantineRecords()).toEqual([]);
+    });
+
+    it('rejects a quarantine path that is a directory', () => {
+      safeMkdir(path.join(dir, 'quarantine.jsonl'), { recursive: true });
+      expect(() => listQuarantineRecords()).toThrow(/must be a regular file/);
     });
 
     it('rejects an external quarantine directory', () => {
