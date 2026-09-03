@@ -1,29 +1,44 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { actuatorModuleLoader, executeSuperPipeline } from './index.js';
 
-const { attemptAutonomousRepairMock, readJsonMock } = vi.hoisted(() => ({
+const { attemptAutonomousRepairMock, loadPipelineAdfAtPathMock } = vi.hoisted(() => ({
   attemptAutonomousRepairMock: vi.fn(),
-  readJsonMock: (filePath: string) =>
-    JSON.parse(
-      String(
-        String(filePath).includes('retryable')
-          ? JSON.stringify({
-              steps: [
-                {
-                  op: 'network:fetch',
-                  params: { url: 'https://repaired.example.com' },
-                },
-              ],
-            })
-          : String(filePath).includes('macro')
-            ? JSON.stringify({ steps: [{ op: 'system:log', params: { message: 'from macro' } }] })
-            : ''
-      )
-    ),
+  loadPipelineAdfAtPathMock: vi.fn((filePath: string) => {
+    if (String(filePath).includes('retryable')) {
+      return {
+        steps: [
+          {
+            op: 'network:fetch',
+            params: { url: 'https://repaired.example.com' },
+          },
+        ],
+      };
+    }
+    throw new Error(`unexpected pipeline path: ${filePath}`);
+  }),
 }));
+
+const readJsonMock = vi.hoisted(() =>
+  vi.fn((filePath: string) => {
+    if (String(filePath).includes('macro')) {
+      return { steps: [{ op: 'system:log', params: { message: 'from macro' } }] };
+    }
+    throw new Error(`unexpected JSON path: ${filePath}`);
+  })
+);
 
 vi.mock('@agent/core/autonomous-repair', () => ({
   attemptAutonomousRepair: attemptAutonomousRepairMock,
+}));
+
+vi.mock('@agent/core/pipeline-contract', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/pipeline-contract')>()),
+  loadPipelineAdfAtPath: loadPipelineAdfAtPathMock,
+}));
+
+vi.mock('@agent/core/foundation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
+  readJson: readJsonMock,
 }));
 
 vi.mock('@agent/core/core', async (importOriginal) => {
@@ -38,11 +53,6 @@ vi.mock('@agent/core/core', async (importOriginal) => {
     },
   };
 });
-
-vi.mock('@agent/core/foundation', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
-  readJson: vi.fn(readJsonMock),
-}));
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
@@ -60,6 +70,18 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
 describe('super-nerve engine', () => {
   beforeEach(async () => {
     attemptAutonomousRepairMock.mockReset().mockResolvedValue(false);
+    loadPipelineAdfAtPathMock.mockReset().mockImplementation((filePath: string) => ({
+      steps: [
+        {
+          op: 'network:fetch',
+          params: {
+            url: String(filePath).includes('retryable')
+              ? 'https://repaired.example.com'
+              : 'https://unexpected.example.com',
+          },
+        },
+      ],
+    }));
     const { safeExec, safeReadFile } = await import('@agent/core/secure-io');
     vi.mocked(safeExec).mockReturnValue('');
     vi.mocked(safeReadFile).mockImplementation((filePath: string) =>
@@ -200,6 +222,43 @@ describe('super-nerve engine', () => {
       })
     );
     expect(seenUrls).toEqual(['https://example.com', 'https://repaired.example.com']);
+  });
+
+  it('does not retry when a repaired pipeline fails the canonical ADF loader', async () => {
+    attemptAutonomousRepairMock.mockResolvedValue(true);
+    loadPipelineAdfAtPathMock.mockImplementationOnce(() => {
+      throw new Error('Invalid pipeline ADF: repaired step is malformed');
+    });
+    let dispatchCount = 0;
+    vi.mocked(actuatorModuleLoader.load).mockImplementation(async () => ({
+      handleAction: async (input: {
+        steps: Array<{ op: string }>;
+        context: Record<string, unknown>;
+      }) => {
+        dispatchCount += 1;
+        return {
+          status: 'failed',
+          results: [
+            {
+              op: input.steps[0]?.op,
+              status: 'failed',
+              error: 'operation returned no data',
+            },
+          ],
+          context: input.context,
+        };
+      },
+    }));
+
+    const result = await executeSuperPipeline(
+      [{ op: 'network:fetch', params: { url: 'https://example.com' } }],
+      {},
+      { pipelinePath: 'pipelines/retryable.json', trustResolved: true }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(loadPipelineAdfAtPathMock).toHaveBeenCalledTimes(1);
+    expect(dispatchCount).toBe(1);
   });
 
   it('dispatches actuator ops in-process and merges the returned context', async () => {
