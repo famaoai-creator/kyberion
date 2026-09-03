@@ -7351,6 +7351,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/injection-signal.schema.json",
+      "tier": "public",
+      "size": 511,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/install-script-allowlist.schema.json",
       "tier": "public",
       "size": 751,
