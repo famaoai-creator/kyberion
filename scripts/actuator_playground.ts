@@ -14,7 +14,12 @@ import { pathResolver } from '@agent/core/path-resolver';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as path from 'node:path';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import {
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  stripSharedScriptFlags,
+} from './lib/harness.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './lib/json-input.js';
 
 const rl = readline.createInterface({
@@ -60,8 +65,37 @@ export function parsePlaygroundParams(raw: string, label = '--params'): Record<s
   return parseSafeJsonObjectInput(raw, label) || {};
 }
 
-async function runPlayground(args: string[]) {
-  console.log(chalk.bold.cyan('\n🛠️  [KYBERION] Actuator Playground CLI\n'));
+export function buildPlaygroundPayload(
+  operation: string,
+  params: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    action: operation,
+    op: operation,
+    params,
+  };
+}
+
+interface PlaygroundRunOptions {
+  dryRun?: boolean;
+  check?: boolean;
+  json?: boolean;
+  quiet?: boolean;
+}
+
+async function runPlayground(
+  args: string[],
+  options: PlaygroundRunOptions = {}
+): Promise<Record<string, unknown> | undefined> {
+  const machineOutput = options.json === true || options.dryRun === true || options.check === true;
+  const log = (...values: unknown[]) => {
+    if (!machineOutput && !options.quiet) console.log(...values);
+  };
+  const logError = (...values: unknown[]) => {
+    if (!machineOutput && !options.quiet) console.error(...values);
+  };
+
+  log(chalk.bold.cyan('\n🛠️  [KYBERION] Actuator Playground CLI\n'));
 
   // 1. Scan available actuators
   const actuatorsDir = assertSafeRepositoryPath(pathResolver.rootResolve('libs/actuators'));
@@ -94,7 +128,7 @@ async function runPlayground(args: string[]) {
   }
 
   if (actuators.length === 0) {
-    console.log(chalk.red('❌ No valid actuators with manifest.json found in libs/actuators/'));
+    logError(chalk.red('❌ No valid actuators with manifest.json found in libs/actuators/'));
     rl.close();
     throw new ScriptExitError(1, 'No valid actuators with manifest.json found');
   }
@@ -111,18 +145,25 @@ async function runPlayground(args: string[]) {
 
   // 3. Actuator Selection Wizard
   if (!selectedActuator) {
-    console.log(chalk.white('Available Actuators:'));
+    if (machineOutput) {
+      rl.close();
+      throw new ScriptExitError(
+        1,
+        'Machine mode requires --actuator, --op, and --params; omit them only for interactive mode.'
+      );
+    }
+    log(chalk.white('Available Actuators:'));
     actuators.forEach((act, idx) => {
-      console.log(
+      log(
         `  ${chalk.bold.cyan(idx + 1)}. ${chalk.bold(act.manifest.actuator_id)} (v${act.manifest.version})`
       );
-      console.log(`     ${chalk.gray(act.manifest.description)}`);
+      log(`     ${chalk.gray(act.manifest.description)}`);
     });
 
     const choiceStr = await question(chalk.bold.blue('\nSelect an Actuator by number: '));
     const idx = parseInt(choiceStr, 10) - 1;
     if (isNaN(idx) || idx < 0 || idx >= actuators.length) {
-      console.error(chalk.red('\n❌ Invalid selection.'));
+      logError(chalk.red('\n❌ Invalid selection.'));
       rl.close();
       throw new ScriptExitError(1, 'Invalid actuator selection');
     }
@@ -130,7 +171,7 @@ async function runPlayground(args: string[]) {
   }
 
   const manifest = selectedActuator.manifest;
-  console.log(chalk.green(`\n✓ Selected Actuator: ${chalk.bold(manifest.actuator_id)}`));
+  log(chalk.green(`\n✓ Selected Actuator: ${chalk.bold(manifest.actuator_id)}`));
 
   // 4. Operation Selection Wizard
   const ops = manifest.capabilities || [];
@@ -138,21 +179,25 @@ async function runPlayground(args: string[]) {
 
   if (!selectedOpObj) {
     if (ops.length === 0) {
-      console.error(chalk.red(`\n❌ Actuator '${manifest.actuator_id}' defines no capabilities.`));
+      logError(chalk.red(`\n❌ Actuator '${manifest.actuator_id}' defines no capabilities.`));
       rl.close();
       throw new ScriptExitError(1, `Actuator '${manifest.actuator_id}' defines no capabilities`);
     }
+    if (machineOutput) {
+      rl.close();
+      throw new ScriptExitError(1, 'Machine mode requires --op for the selected actuator.');
+    }
 
-    console.log(chalk.white('\nAvailable Operations (ops):'));
+    log(chalk.white('\nAvailable Operations (ops):'));
     ops.forEach((opObj, idx) => {
       const desc = opObj.description ? ` - ${opObj.description}` : '';
-      console.log(`  ${chalk.bold.cyan(idx + 1)}. ${chalk.bold(opObj.op)}${chalk.gray(desc)}`);
+      log(`  ${chalk.bold.cyan(idx + 1)}. ${chalk.bold(opObj.op)}${chalk.gray(desc)}`);
     });
 
     const choiceStr = await question(chalk.bold.blue('\nSelect an Operation by number: '));
     const idx = parseInt(choiceStr, 10) - 1;
     if (isNaN(idx) || idx < 0 || idx >= ops.length) {
-      console.error(chalk.red('\n❌ Invalid selection.'));
+      logError(chalk.red('\n❌ Invalid selection.'));
       rl.close();
       throw new ScriptExitError(1, 'Invalid operation selection');
     }
@@ -160,7 +205,7 @@ async function runPlayground(args: string[]) {
   }
 
   const op = selectedOpObj.op;
-  console.log(chalk.green(`✓ Selected Operation: ${chalk.bold(op)}`));
+  log(chalk.green(`✓ Selected Operation: ${chalk.bold(op)}`));
 
   // 5. Parameter Gathering Wizard
   let paramsObject: Record<string, any> = {};
@@ -169,19 +214,23 @@ async function runPlayground(args: string[]) {
     try {
       paramsObject = parsePlaygroundParams(rawParamsStr);
     } catch (err: any) {
-      console.error(chalk.red(`\n❌ Failed to parse --params JSON: ${err.message}`));
+      logError(chalk.red(`\n❌ Failed to parse --params JSON: ${err.message}`));
       rl.close();
       throw new ScriptExitError(1, `Failed to parse --params JSON: ${err.message}`);
     }
   } else {
-    console.log(chalk.white('\nHow would you like to provide the operation parameters?'));
-    console.log(chalk.cyan('  1. Interactive Wizard (key-value prompting)'));
-    console.log(chalk.cyan('  2. Paste Raw JSON block'));
+    if (machineOutput) {
+      rl.close();
+      throw new ScriptExitError(1, 'Machine mode requires --params with a JSON object.');
+    }
+    log(chalk.white('\nHow would you like to provide the operation parameters?'));
+    log(chalk.cyan('  1. Interactive Wizard (key-value prompting)'));
+    log(chalk.cyan('  2. Paste Raw JSON block'));
 
     const methodChoice = await question(chalk.bold.blue('\nChoose method (1 or 2): '));
 
     if (methodChoice === '2') {
-      console.log(
+      log(
         chalk.yellow(
           '\nPaste the full JSON value for "params" (e.g. {"channel": "slack", "text": "hello"}):'
         )
@@ -190,14 +239,12 @@ async function runPlayground(args: string[]) {
       try {
         paramsObject = parsePlaygroundParams(jsonStr, 'params');
       } catch (err: any) {
-        console.error(chalk.red(`❌ Invalid JSON block: ${err.message}`));
+        logError(chalk.red(`❌ Invalid JSON block: ${err.message}`));
         rl.close();
         throw new ScriptExitError(1, `Invalid JSON block: ${err.message}`);
       }
     } else {
-      console.log(
-        chalk.yellow('\nEnter parameter key-value pairs one by one. Leave key empty to finish.')
-      );
+      log(chalk.yellow('\nEnter parameter key-value pairs one by one. Leave key empty to finish.'));
       while (true) {
         const key = await question(chalk.bold.magenta('\nParameter Key: '));
         if (!key) break;
@@ -209,24 +256,39 @@ async function runPlayground(args: string[]) {
 
   // 6. Construct Payload
   // Include both 'op' and 'action' for seamless compatibility across different actuator conventions
-  const payload = {
-    action: op,
-    op: op,
-    params: paramsObject,
-  };
+  const payload = buildPlaygroundPayload(op, paramsObject);
+
+  if (options.dryRun === true || options.check === true) {
+    rl.close();
+    return {
+      ok: true,
+      mode: options.check === true ? 'check' : 'dry-run',
+      actuator_id: manifest.actuator_id,
+      operation: op,
+      payload,
+    };
+  }
 
   // 7. Write to temp file inside active/shared/tmp/
   const tempDir = pathResolver.sharedTmp('actuator-playground');
-  const tempPath = path.join(tempDir, `input-${manifest.actuator_id}-${Date.now()}.json`);
+  const tempPath = assertSafeRepositoryPath(
+    path.join(tempDir, `input-${manifest.actuator_id}-${Date.now()}.json`),
+    { allowMissingLeaf: true }
+  );
 
-  console.log(chalk.white(`\nWriting payload to temporary file: ${chalk.bold(tempPath)}...`));
+  log(chalk.white(`\nWriting payload to temporary file: ${chalk.bold(tempPath)}...`));
   safeWriteFile(tempPath, JSON.stringify(payload, null, 2), { mkdir: true });
 
   // 8. Find executable path
   // Standard compile target paths
   const distDir = pathResolver.rootResolve('dist/libs/actuators');
-  const execPath1 = path.join(distDir, manifest.actuator_id, 'src/index.js');
-  const execPath2 = path.join(distDir, manifest.actuator_id, 'index.js');
+  const execPath1 = assertSafeRepositoryPath(
+    path.join(distDir, manifest.actuator_id, 'src/index.js'),
+    { allowMissingLeaf: true }
+  );
+  const execPath2 = assertSafeRepositoryPath(path.join(distDir, manifest.actuator_id, 'index.js'), {
+    allowMissingLeaf: true,
+  });
 
   let execPath = '';
   if (safeExistsSync(execPath1)) {
@@ -234,12 +296,12 @@ async function runPlayground(args: string[]) {
   } else if (safeExistsSync(execPath2)) {
     execPath = execPath2;
   } else {
-    console.log(
+    log(
       chalk.yellow(
         `\n⚠️  Could not find compiled JavaScript under dist/libs/actuators/${manifest.actuator_id}.`
       )
     );
-    console.log(chalk.white('Attempting to compile actuators monorepo-wide first...'));
+    log(chalk.white('Attempting to compile actuators monorepo-wide first...'));
     try {
       safeExec('pnpm', ['run', 'build:actuators'], { cwd: pathResolver.rootDir() });
       if (safeExistsSync(execPath1)) {
@@ -248,38 +310,46 @@ async function runPlayground(args: string[]) {
         execPath = execPath2;
       }
     } catch (err: any) {
-      console.error(chalk.red(`❌ Compilation failed: ${err.message}`));
+      logError(chalk.red(`❌ Compilation failed: ${err.message}`));
     }
   }
 
   if (!execPath) {
-    console.error(
-      chalk.red(`\n❌ Executable not found. Make sure the actuator is built successfully.`)
-    );
+    logError(chalk.red(`\n❌ Executable not found. Make sure the actuator is built successfully.`));
     rl.close();
     throw new ScriptExitError(1, 'Actuator executable not found');
   }
 
   // 9. Execute Actuator
-  console.log(chalk.bold.yellow(`\n⚡ Executing [${manifest.actuator_id}] with command:`));
-  console.log(chalk.gray(`node ${execPath} --input ${tempPath}\n`));
+  log(chalk.bold.yellow(`\n⚡ Executing [${manifest.actuator_id}] with command:`));
+  log(chalk.gray(`node ${execPath} --input ${tempPath}\n`));
 
   try {
     const stdout = safeExec('node', [execPath, '--input', tempPath], {
       cwd: pathResolver.rootDir(),
     });
-    console.log(chalk.bold.green('🎉 Execution completed successfully! Result output:'));
-    console.log(chalk.white(stdout.trim()));
+    log(chalk.bold.green('🎉 Execution completed successfully! Result output:'));
+    log(chalk.white(stdout.trim()));
+    rl.close();
+    return {
+      ok: true,
+      mode: 'execute',
+      actuator_id: manifest.actuator_id,
+      operation: op,
+      input_path: tempPath,
+      executable_path: execPath,
+      stdout: stdout.trim(),
+    };
   } catch (err: any) {
-    console.error(chalk.bold.red('\n❌ Execution error encountered:'));
-    console.error(chalk.red(err.message));
+    logError(chalk.bold.red('\n❌ Execution error encountered:'));
+    logError(chalk.red(err.message));
     if (err.stdout) {
-      console.error(chalk.yellow('\nStdout:'));
-      console.error(chalk.white(err.stdout.toString().trim()));
+      logError(chalk.yellow('\nStdout:'));
+      logError(chalk.white(err.stdout.toString().trim()));
     }
     if (err.stderr) {
-      console.error(chalk.yellow('\nStderr:'));
-      console.error(chalk.red(err.stderr.toString().trim()));
+      logError(chalk.yellow('\nStderr:'));
+      logError(chalk.red(err.stderr.toString().trim()));
     }
   }
 
@@ -288,8 +358,12 @@ async function runPlayground(args: string[]) {
 
 const script = defineScript({
   name: 'actuator:playground',
-  flags: [],
-  run: ({ argv }) => runPlayground(argv),
+  flags: ['json', 'dry-run', 'check', 'quiet'],
+  run: ({ argv, dryRun, check, json, quiet, print }) =>
+    runPlayground(stripSharedScriptFlags(argv), { dryRun, check, json, quiet }).then((result) => {
+      if (result && (json || dryRun || check)) print(result);
+      return result;
+    }),
 });
 if (
   isDirectScript(import.meta.url, 'actuator_playground.ts') ||
