@@ -2,12 +2,17 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { readJson } from './foundation/json.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeUnlinkSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveClaudeCliFallbackCandidates } from './claude-cli-resolution.js';
 
@@ -38,10 +43,21 @@ let cacheTimestamp = 0;
 const CACHE_TTL = 300000; // 5 min
 
 const DISK_CACHE_PATH = pathResolver.rootResolve('active/shared/runtime/provider-cache.json');
+const PROVIDER_DISCOVERY_CACHE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/provider-discovery-cache.schema.json'
+);
 
 export interface ProviderDiscoveryCache {
   ts: number;
   providers: ProviderInfo[];
+}
+
+function providerDiscoveryCacheCatalogAtPath(filePath: string) {
+  return defineCatalog<ProviderDiscoveryCache>({
+    id: 'provider-discovery-cache',
+    path: filePath,
+    schema: PROVIDER_DISCOVERY_CACHE_SCHEMA_PATH,
+  });
 }
 
 function assertExactKeys(
@@ -141,7 +157,10 @@ export function parseProviderDiscoveryCache(value: unknown): ProviderDiscoveryCa
 function readDiskCache(): ProviderInfo[] | null {
   try {
     if (!safeExistsSync(DISK_CACHE_PATH)) return null;
-    const parsed = parseProviderDiscoveryCache(readJson<unknown>(DISK_CACHE_PATH));
+    if (!safeLstat(DISK_CACHE_PATH).isFile()) return null;
+    const parsed = parseProviderDiscoveryCache(
+      providerDiscoveryCacheCatalogAtPath(DISK_CACHE_PATH).load()
+    );
     if (Date.now() - parsed.ts < CACHE_TTL) return parsed.providers;
   } catch {
     /* cache miss — non-fatal */
@@ -153,7 +172,11 @@ function writeDiskCache(providers: ProviderInfo[]): void {
   try {
     const dir = path.dirname(DISK_CACHE_PATH);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(DISK_CACHE_PATH, JSON.stringify({ ts: Date.now(), providers }), {
+    const validated = providerDiscoveryCacheCatalogAtPath(DISK_CACHE_PATH).validate(
+      { ts: Date.now(), providers },
+      DISK_CACHE_PATH
+    );
+    safeWriteFile(DISK_CACHE_PATH, JSON.stringify(validated), {
       encoding: 'utf8',
     });
   } catch {
