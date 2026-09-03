@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { formatDateTime, resolveTimeZone } from '@agent/core/format';
 import { resolveMissionJournalPolicy } from '@agent/core/mission-journal-policy';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -152,7 +153,7 @@ export function scanMissions(
           allowMissingLeaf: true,
         });
         if (!safeExistsSync(statePath)) continue;
-        const mission = normalizeMission(readJson<unknown>(statePath));
+        const mission = normalizeMission(loadStateAtPath(statePath));
         if (!mission) continue;
         if (tenantSlug && (mission.tenant_slug || mission.scope?.tenant_slug) !== tenantSlug) {
           continue;
