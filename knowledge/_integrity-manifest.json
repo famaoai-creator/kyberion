@@ -8149,6 +8149,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-orchestration-journal-entry.schema.json",
+      "tier": "public",
+      "size": 2820,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-orchestration-payload-envelope.schema.json",
       "tier": "public",
       "size": 511,
