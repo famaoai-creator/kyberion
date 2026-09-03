@@ -15650,6 +15650,18 @@ SX-03／SX-08／SX-10 のDALL-E画像生成外部応答を再監査し、`data[0
 この追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、
 SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 811
+
+SX-03／SX-08／SX-10 のOpenAI-compatible chat completion responseを再監査し、safe JSON parse後も
+`choices`／`message`／content parts／tool callsを型アサーションだけで下流へ渡していた残存を修正した。root／error envelope、
+chat role、string・null・text/image content、function tool callの各shapeをcanonical parserで検証・再構成し、malformed
+responseはprompt／tool execution前にfail-closedとした。既存のtool loop、structured reasoning、streaming、error message、
+provider共通のrequest／egress semanticsは維持し、primitive・malformed message／tool call・dangerous keyの回帰を追加した。
+
+検証: OpenAI-compatible backend **1 file / 16 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateは
+この追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、
+SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
