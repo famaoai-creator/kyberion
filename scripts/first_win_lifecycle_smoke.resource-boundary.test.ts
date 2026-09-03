@@ -31,6 +31,16 @@ describe('first-win lifecycle resource boundary', () => {
     expect(source).not.toContain('JSON.parse(');
   });
 
+  it('uses the canonical pipeline loader for the schedule contract', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/first_win_lifecycle_smoke.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('loadPipelineAdfAtPath(');
+    expect(source).not.toContain('readJson<{ schedule?:');
+  });
+
   it('rejects repository-external identity resources', () => {
     expect(() => resolveFirstWinResourcePath('/tmp/first-win-identity.json')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
