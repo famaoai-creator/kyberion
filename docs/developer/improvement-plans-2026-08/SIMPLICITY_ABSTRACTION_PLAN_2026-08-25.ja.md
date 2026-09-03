@@ -14423,6 +14423,12 @@ SX-03／SX-04／KP-02 のfrontmatter exclusion manifestを再監査し、knowled
 
 検証: frontmatter exclusions／knowledge index generator **2 files / 6 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、knowledge index再生成、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 694
+
+SX-03／SX-04 のprocess-definition registryを再監査し、registry本体はschema-boundでも、登録済みworkflow／scenario sourceの監査読込だけraw JSON readerとobject shape判定に残っていた残存を修正した。3つの既知JSON source IDに対応する既存schemaをcanonical catalogへ接続し、監査時もrepository／regular-file／schema境界を通過したsourceだけを件数比較へ渡すようにした。missing source・directory sourceの監査、expected count／consumer pathの検証、path escape拒否の既存semanticsは維持している。
+
+検証: process-definition registry **1 file / 5 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
