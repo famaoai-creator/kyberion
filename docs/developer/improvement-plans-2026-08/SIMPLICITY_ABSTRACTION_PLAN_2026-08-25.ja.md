@@ -14555,6 +14555,12 @@ SX-03／SX-04／AR-02 のwisdom forwarder checkerを再監査し、canonical tar
 
 検証: wisdom forwarder checker **1 file / 2 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 716
+
+SX-03／SX-04 のgovernance rulesにおけるsurface directory整合性チェックを再監査し、`knowledge/product/governance/surfaces/*.json`をraw `readJson`とローカル型で再検証していた残存を修正した。既存`loadSurfaceManifest`へ接続し、runtime surface schema、regular-file、1 surface制約を共有した。snapshot／directoryのID・内容比較と、malformed JSONを検出する既存governance check semanticsは維持している。
+
+検証: governance rules **2 files / 4 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

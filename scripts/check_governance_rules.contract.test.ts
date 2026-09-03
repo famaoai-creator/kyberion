@@ -11,5 +11,6 @@ describe('governance rules snapshot loader boundary', () => {
     expect(source).toContain('defineCatalog<{');
     expect(source).toContain('voiceEngineRegistrySnapshotCatalog.load()');
     expect(source).toContain("id: 'voice-engine-registry-snapshot'");
+    expect(source).toContain('loadSurfaceManifest(');
   });
 });
