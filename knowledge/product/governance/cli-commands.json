@@ -1316,6 +1316,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.review.stamp",
+      "module": "scripts/report-review/stamp.ts",
+      "command": "review stamp",
+      "noun": "review",
+      "verb": "stamp",
+      "audience": "operator"
+    },
+    {
       "id": "script.model.feedback",
       "module": "scripts/model_feedback.ts",
       "command": "model feedback",
