@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
-import { loadTaskScenario, parseTaskRecord, validateTaskScenario } from './lib/task-scenario.js';
+import {
+  loadTaskRecord,
+  loadTaskScenario,
+  parseTaskRecord,
+  validateTaskScenario,
+} from './lib/task-scenario.js';
 
 const validScenario = {
   id: 'daily-report',
@@ -61,6 +66,12 @@ describe('TaskScenario persisted loader', () => {
 });
 
 describe('TaskScenario record boundary', () => {
+  it('rejects an external persisted record path before reading it', () => {
+    expect(() => loadTaskRecord('/tmp/external-task-record.json', 'TaskScenario profile')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
   it('accepts object answers and profiles', () => {
     expect(parseTaskRecord({ audience: 'operators' }, 'TaskScenario answers')).toEqual({
       audience: 'operators',

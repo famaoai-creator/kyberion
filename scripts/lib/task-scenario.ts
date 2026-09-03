@@ -66,5 +66,9 @@ export function parseTaskRecord(value: unknown, label: string): Record<string, u
 }
 
 export function loadTaskRecord(filePath: string, label: string): Record<string, unknown> {
-  return parseTaskRecord(readJson<unknown>(filePath), label);
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeExistsSync(safeFilePath) || !safeLstat(safeFilePath).isFile()) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return parseTaskRecord(readJson<unknown>(safeFilePath), label);
 }
