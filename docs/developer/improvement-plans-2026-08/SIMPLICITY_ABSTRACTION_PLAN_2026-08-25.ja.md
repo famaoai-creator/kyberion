@@ -13841,6 +13841,12 @@ SX-03／SX-04 のservice connection fallbackを再監査し、customer overlay�
 
 検証: service-engine helpers **1 file / 5 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 597
+
+SX-03／SX-04 のsurface identity readerを再監査し、Presence Studio と Computer Surface が共通の sovereign parser を利用しながら、`agent-identity.json` の persisted read だけは各 server の raw `readJson` に分散していた残存を修正した。拡張可能な `personal-agent-identity.schema.json` と path-bound canonical loader を追加し、両 surface の agent identity projection を同じ repository／regular-file／schema 境界へ統合した。既存の unknown field 除外、malformed／directory／symlink fallback、personal tier の認証・表示 semantics は維持している。
+
+検証: personal identity state／Presence Studio／Computer Surface **4 files / 2 focused loader tests**、対象 typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

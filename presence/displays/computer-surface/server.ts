@@ -13,10 +13,12 @@ import {
 import type { A2UIMessage } from '@agent/core/a2ui';
 import { parseIntentResolutionContract } from '@agent/core/intent-resolution-contract';
 import {
+  loadPersonalAgentIdentityAtPath,
+  loadPersonalIdentityAtPath,
   parsePersonalAgentIdentity,
   parsePersonalSovereignIdentity,
 } from '@agent/core/personal-identity-reader';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -240,10 +242,10 @@ app.get('/api/identity', (req, res) => {
       const safeAgentPath = resolveExistingIdentityFile(agentPath);
       const safeVisionPath = resolveExistingIdentityFile(visionPath);
       const sovereign = safeIdPath
-        ? parsePersonalSovereignIdentity(readJson<unknown>(safeIdPath))
+        ? parsePersonalSovereignIdentity(loadPersonalIdentityAtPath(safeIdPath))
         : null;
       const agent = safeAgentPath
-        ? parsePersonalAgentIdentity(readJson<unknown>(safeAgentPath))
+        ? parsePersonalAgentIdentity(loadPersonalAgentIdentityAtPath(safeAgentPath))
         : null;
       const visionRaw = safeVisionPath
         ? (safeReadFile(safeVisionPath, { encoding: 'utf8' }) as string)
