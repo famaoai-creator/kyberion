@@ -177,6 +177,7 @@ export function emitIntentSnapshot(
 
   const previous = latestSnapshot(params.missionId);
   const validatedSnapshot = snapshotCatalog(snapFile).validate(snapshot, snapFile);
+  safeMkdir(path.dirname(snapFile), { recursive: true });
   appendJsonLine(snapFile, validatedSnapshot);
 
   let delta: IntentDelta | null = null;
