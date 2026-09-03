@@ -76,11 +76,16 @@ export function saveContextualIntentMemory(
   scope?: ScopeContext
 ): void {
   const filePath = memoryPath(scope);
+  const validated = defineCatalog<ContextualIntentMemory>({
+    id: 'contextual-intent-memory',
+    path: filePath,
+    schema: CONTEXTUAL_INTENT_MEMORY_SCHEMA_PATH,
+  }).validate(memory, filePath);
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) {
     safeMkdir(dir, { recursive: true });
   }
-  safeWriteFile(filePath, JSON.stringify(memory, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
 }
 
 export function resolveDefaultScheduleSource(scope?: ScopeContext): {
