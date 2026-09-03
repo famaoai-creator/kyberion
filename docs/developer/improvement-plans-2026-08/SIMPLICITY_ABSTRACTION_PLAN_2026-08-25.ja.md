@@ -15151,6 +15151,18 @@ catalogで検証して不正なcalendar source等を durable memoryへ残さな�
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 768
+
+SX-03／SX-04／SX-10／SX-11 のAI-DLC phase stateを再監査し、mission evidence loaderは専用
+`aidlc-phase-state.schema.json`とmission scope checkへ接続済みである一方、`saveAiDlcPhaseState`だけが
+schemaなし raw writeだったため修正した。phase／attempts／gate result／failure contextの既存遷移と
+circuit-breaker semanticsを維持し、mission evidenceへ保存する直前に同じcatalogで検証して不正なphase stateを
+残さない。mission id path boundaryとresume flowは変更していない。
+
+検証: AI-DLC phase state **1 file / 9 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
+state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
