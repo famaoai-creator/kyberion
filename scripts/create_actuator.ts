@@ -21,8 +21,13 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
-import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -56,6 +61,15 @@ export interface ActuatorScaffoldResult {
   files: string[];
   name: string;
   description: string;
+}
+
+export interface ActuatorScaffoldPreview extends ActuatorScaffoldResult {
+  files_to_write: string[];
+}
+
+export interface ActuatorScaffoldMachineResult extends ActuatorScaffoldPreview {
+  ok: true;
+  mode: 'check' | 'dry-run';
 }
 
 function buildManifest(fullName: string, description: string, name: string): string {
@@ -223,7 +237,10 @@ Register any required secrets via \`secret:set\` before running:
 `;
 }
 
-export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorScaffoldResult {
+function buildActuatorScaffoldPlan(input: ActuatorScaffoldInput): {
+  result: ActuatorScaffoldResult;
+  files: Array<{ path: string; content: string }>;
+} {
   const rawName = input.name.trim();
   if (!rawName) {
     throw new Error('Missing actuator name');
@@ -236,45 +253,73 @@ export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorSc
   const description = input.description?.trim() || `${pascalName} actuator for Kyberion`;
   const rootDir = input.rootDir || ROOT;
   const outDir = path.join(rootDir, 'libs', 'actuators', fullName);
+  const safeOutDir = assertSafeRepositoryPath(outDir, {
+    allowMissingLeaf: true,
+    rootDir,
+  });
 
-  if (safeExistsSync(outDir)) {
+  if (safeExistsSync(safeOutDir)) {
     throw new Error(`Directory already exists: ${outDir}`);
   }
 
-  safeMkdir(path.join(outDir, 'src'));
-  safeMkdir(path.join(outDir, 'examples'));
-  safeMkdir(path.join(outDir, 'schemas'));
-
-  safeWriteFile(
-    path.join(outDir, 'manifest.json'),
-    `${buildManifest(fullName, description, name)}\n`
-  );
-  safeWriteFile(
-    path.join(outDir, 'package.json'),
-    `${buildPackage(description, name, fullName)}\n`
-  );
-  safeWriteFile(path.join(outDir, 'src', 'index.ts'), buildIndexTs(fullName, pascalName, name));
-  safeWriteFile(
-    path.join(outDir, 'schemas', `${name}-action.schema.json`),
-    `${buildSchema(pascalName)}\n`
-  );
-  safeWriteFile(
-    path.join(outDir, 'examples', 'README.md'),
-    buildExamplesReadme(pascalName, name, envName)
-  );
+  const files = [
+    {
+      path: path.join(safeOutDir, 'manifest.json'),
+      content: `${buildManifest(fullName, description, name)}\n`,
+    },
+    {
+      path: path.join(safeOutDir, 'package.json'),
+      content: `${buildPackage(description, name, fullName)}\n`,
+    },
+    {
+      path: path.join(safeOutDir, 'src', 'index.ts'),
+      content: buildIndexTs(fullName, pascalName, name),
+    },
+    {
+      path: path.join(safeOutDir, 'schemas', `${name}-action.schema.json`),
+      content: `${buildSchema(pascalName)}\n`,
+    },
+    {
+      path: path.join(safeOutDir, 'examples', 'README.md'),
+      content: buildExamplesReadme(pascalName, name, envName),
+    },
+  ].map((file) => ({
+    ...file,
+    path: assertSafeRepositoryPath(file.path, { allowMissingLeaf: true, rootDir }),
+  }));
 
   return {
-    outDir,
-    files: [
-      'manifest.json',
-      'package.json',
-      'src/index.ts',
-      `knowledge/product/schemas/${name}-action.schema.json`,
-      'examples/README.md',
-    ],
-    name: fullName,
-    description,
+    result: {
+      outDir: safeOutDir,
+      files: [
+        'manifest.json',
+        'package.json',
+        'src/index.ts',
+        `knowledge/product/schemas/${name}-action.schema.json`,
+        'examples/README.md',
+      ],
+      name: fullName,
+      description,
+    },
+    files,
   };
+}
+
+export function previewActuatorScaffold(input: ActuatorScaffoldInput): ActuatorScaffoldPreview {
+  const plan = buildActuatorScaffoldPlan(input);
+  return {
+    ...plan.result,
+    files_to_write: plan.files.map((file) => file.path),
+  };
+}
+
+export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorScaffoldResult {
+  const plan = buildActuatorScaffoldPlan(input);
+  for (const file of plan.files) {
+    safeMkdir(path.dirname(file.path), { recursive: true });
+    safeWriteFile(file.path, file.content);
+  }
+  return plan.result;
 }
 
 function parseCliArgs(args: string[]): ActuatorScaffoldInput {
@@ -295,27 +340,49 @@ function parseCliArgs(args: string[]): ActuatorScaffoldInput {
   };
 }
 
-async function main(args: string[]): Promise<void> {
-  const scaffold = createActuatorScaffold(parseCliArgs(args));
-  logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
-  console.log('  Files created:');
-  for (const file of scaffold.files) {
-    console.log(`    ${file}`);
+async function main(
+  args: string[],
+  options: { dryRun?: boolean; check?: boolean; json?: boolean; quiet?: boolean } = {}
+): Promise<ActuatorScaffoldResult | ActuatorScaffoldMachineResult> {
+  const input = parseCliArgs(args);
+  const machineOutput =
+    options.json === true ||
+    options.dryRun === true ||
+    options.check === true ||
+    options.quiet === true;
+  if (options.dryRun === true || options.check === true) {
+    return {
+      ok: true,
+      ...previewActuatorScaffold(input),
+      mode: options.check === true ? 'check' : 'dry-run',
+    };
   }
-  console.log('\nNext steps:');
-  console.log('  1. Implement the actuator-specific op logic in src/index.ts');
-  console.log('  2. Replace the schema stub with the real contract');
-  console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
-  console.log('  4. Run: pnpm build');
-  console.log(
-    '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm generate:op-registry -- --check verifies drift)'
-  );
+
+  const scaffold = createActuatorScaffold(input);
+  if (!machineOutput) {
+    logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
+    console.log('  Files created:');
+    for (const file of scaffold.files) console.log(`    ${file}`);
+    console.log('\nNext steps:');
+    console.log('  1. Implement the actuator-specific op logic in src/index.ts');
+    console.log('  2. Replace the schema stub with the real contract');
+    console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
+    console.log('  4. Run: pnpm build');
+    console.log(
+      '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm generate:op-registry -- --check verifies drift)'
+    );
+  }
+  return scaffold;
 }
 
 const script = defineScript({
   name: 'create:actuator',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json', 'dry-run', 'check', 'quiet'],
+  run: ({ argv, dryRun, check, json, quiet, print }) =>
+    main(stripSharedScriptFlags(argv), { dryRun, check, json, quiet }).then((result) => {
+      if (json || dryRun || check) print(result);
+      return result;
+    }),
 });
 if (
   isDirectScript(import.meta.url, 'create_actuator.ts') ||
