@@ -181,6 +181,34 @@ describe('openai-compatible-backend', () => {
     expect(firstBody.messages[1].content).not.toContain('sk-test-1234567890abcdef');
   });
 
+  it('rejects malformed chat completion message and tool-call shapes', async () => {
+    for (const payload of [
+      [],
+      { choices: [{ message: { role: 'assistant', content: 42 } }] },
+      { choices: [{ message: { role: 'assistant', content: 'ok', tool_calls: [{}] } }] },
+      { choices: [{ message: { role: 'assistant', content: [{ type: 'text' }] } }] },
+      { choices: [{ message: { role: 'assistant', content: 'ok', nested: { constructor: {} } } }] },
+    ]) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        )
+      );
+      const backend = new OpenAiCompatibleBackend({
+        baseURL: 'http://127.0.0.1:11434/v1',
+        apiKey: 'not-needed',
+        model: 'llama3',
+      });
+      await expect(backend.prompt('malformed response')).rejects.toThrow(
+        'invalid chat completion response'
+      );
+    }
+  });
+
   it('rejects model file tools that traverse a symbolic link', async () => {
     const tempDir = fs.mkdtempSync(path.join(process.cwd(), 'active/shared/tmp/openai-tool-'));
     const targetDir = path.join(tempDir, 'target');

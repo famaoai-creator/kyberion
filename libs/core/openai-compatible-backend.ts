@@ -1,5 +1,5 @@
 import { logger } from './core.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExec,
@@ -152,6 +152,123 @@ interface ChatCompletionResponse {
   error?: {
     message?: string;
   };
+}
+
+const CHAT_ROLES = new Set<ChatRole>(['system', 'user', 'assistant', 'tool']);
+
+function parseChatMessage(value: unknown, label: string): ChatMessage | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, label);
+    if (typeof record.role !== 'string' || !CHAT_ROLES.has(record.role as ChatRole)) return null;
+
+    let content: ChatMessageContent | undefined;
+    if (record.content === null || record.content === undefined) {
+      content = record.content as null | undefined;
+    } else if (typeof record.content === 'string') {
+      content = record.content;
+    } else if (Array.isArray(record.content)) {
+      const parts: ChatContentPart[] = [];
+      for (const [index, part] of record.content.entries()) {
+        const parsedPart = parseSafeJsonObjectValue(part, `${label}.content[${index}]`);
+        if (parsedPart.type === 'text' && typeof parsedPart.text === 'string') {
+          parts.push({ type: 'text', text: parsedPart.text });
+          continue;
+        }
+        if (parsedPart.type === 'image_url') {
+          const imageUrl = parseSafeJsonObjectValue(
+            parsedPart.image_url,
+            `${label}.content[${index}].image_url`
+          );
+          if (
+            typeof imageUrl.url === 'string' &&
+            (imageUrl.detail === undefined ||
+              imageUrl.detail === 'auto' ||
+              imageUrl.detail === 'low' ||
+              imageUrl.detail === 'high')
+          ) {
+            parts.push({
+              type: 'image_url',
+              image_url: {
+                url: imageUrl.url,
+                ...(imageUrl.detail !== undefined
+                  ? { detail: imageUrl.detail as 'auto' | 'low' | 'high' }
+                  : {}),
+              },
+            });
+            continue;
+          }
+        }
+        return null;
+      }
+      content = parts;
+    } else {
+      return null;
+    }
+
+    let toolCalls: ChatMessage['tool_calls'];
+    if (record.tool_calls !== undefined) {
+      if (!Array.isArray(record.tool_calls)) return null;
+      toolCalls = [];
+      for (const [index, call] of record.tool_calls.entries()) {
+        const parsedCall = parseSafeJsonObjectValue(call, `${label}.tool_calls[${index}]`);
+        const fn = parseSafeJsonObjectValue(
+          parsedCall.function,
+          `${label}.tool_calls[${index}].function`
+        );
+        if (
+          typeof parsedCall.id !== 'string' ||
+          parsedCall.type !== 'function' ||
+          typeof fn.name !== 'string' ||
+          typeof fn.arguments !== 'string'
+        ) {
+          return null;
+        }
+        toolCalls.push({
+          id: parsedCall.id,
+          type: 'function',
+          function: { name: fn.name, arguments: fn.arguments },
+        });
+      }
+    }
+
+    return {
+      role: record.role as ChatRole,
+      ...(content !== undefined ? { content } : {}),
+      ...(toolCalls !== undefined ? { tool_calls: toolCalls } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseChatCompletionPayload(value: unknown): ChatCompletionResponse | null {
+  try {
+    const root = parseSafeJsonObjectValue(value, 'OpenAI-compatible response');
+    let error: ChatCompletionResponse['error'];
+    if (root.error !== undefined) {
+      const parsedError = parseSafeJsonObjectValue(root.error, 'OpenAI-compatible response.error');
+      if (typeof parsedError.message !== 'string') return null;
+      error = { message: parsedError.message };
+    }
+    if (root.choices === undefined) return error ? { choices: [], error } : null;
+    if (!Array.isArray(root.choices)) return null;
+    const choices: ChatCompletionResponse['choices'] = [];
+    for (const [index, choice] of root.choices.entries()) {
+      const parsedChoice = parseSafeJsonObjectValue(
+        choice,
+        `OpenAI-compatible response.choices[${index}]`
+      );
+      const message = parseChatMessage(
+        parsedChoice.message,
+        `OpenAI-compatible response.choices[${index}].message`
+      );
+      if (!message) return null;
+      choices.push({ message });
+    }
+    return { choices, ...(error ? { error } : {}) };
+  } catch {
+    return null;
+  }
 }
 
 function normalizeBaseUrl(baseURL: string, providerPreset?: LocalLlmProviderPreset): string {
@@ -597,7 +714,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     });
 
     const text = await response.text();
-    const parsed = safeJsonParse(text) as ChatCompletionResponse | null;
+    const parsed = parseChatCompletionPayload(safeJsonParse(text));
     if (!response.ok) {
       const message = parsed?.error?.message || text || `HTTP ${response.status}`;
       throw new Error(`[openai-compatible] chat completion failed: ${message}`);
