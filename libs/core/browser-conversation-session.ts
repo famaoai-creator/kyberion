@@ -898,13 +898,16 @@ export function validateBrowserConversationFeedback(
 }
 
 export function saveBrowserConversationSession(session: BrowserConversationSession): string {
-  const result = validateBrowserConversationSession(session);
-  if (!result.valid) {
-    throw new Error(`Invalid browser conversation session: ${result.errors.join('; ')}`);
-  }
   if (!safeExistsSync(SESSION_DIR)) safeMkdir(SESSION_DIR, { recursive: true });
   const filePath = sessionPath(session.session_id);
-  safeWriteFile(filePath, JSON.stringify(session, null, 2));
+  let canonical: BrowserConversationSession;
+  try {
+    canonical = browserConversationSessionCatalog(filePath).validate(session, filePath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid browser conversation session: ${message}`);
+  }
+  safeWriteFile(filePath, JSON.stringify(canonical, null, 2));
   return filePath;
 }
 
