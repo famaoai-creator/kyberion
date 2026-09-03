@@ -72,6 +72,53 @@ describe('tenant activation', () => {
     );
   });
 
+  it('fails closed when the organization context binding is schema-invalid or a directory', () => {
+    seed();
+    const bindingPath = path.join(
+      rootDir,
+      'customer',
+      'acme-ai',
+      'onboarding',
+      'organization-context.json'
+    );
+    safeWriteFile(
+      bindingPath,
+      JSON.stringify({
+        version: '1.0.0',
+        kind: 'onboarding_context_binding',
+        customer_slug: 'acme-ai',
+        tenant_slug: 'acme-prod',
+        organization_id: 'org-acme-ai',
+        tier: 'confidential',
+        owner_id: 'human:founder',
+        status: 'active',
+        default_service_ids: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        unexpected: true,
+      })
+    );
+    expect(
+      resolveTenantActivation({
+        customerSlug: 'acme-ai',
+        tenantSlug: 'acme-prod',
+        organizationId: 'org-acme-ai',
+        rootDir,
+      }).record.checks.context_binding
+    ).toBe(false);
+
+    safeRmSync(bindingPath, { recursive: true, force: true });
+    safeMkdir(bindingPath, { recursive: true });
+    expect(
+      resolveTenantActivation({
+        customerSlug: 'acme-ai',
+        tenantSlug: 'acme-prod',
+        organizationId: 'org-acme-ai',
+        rootDir,
+      }).record.checks.context_binding
+    ).toBe(false);
+  });
+
   it('activates only after all explicit probes and human acceptance pass', () => {
     seed();
     const record = applyTenantActivation({
