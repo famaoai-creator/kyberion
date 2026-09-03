@@ -9,17 +9,34 @@ const {
   mockSafeExistsSync,
   mockSafeReaddir,
   mockSafeReadFile,
+  mockSafeLstat,
   mockAssertSafeRepositoryPath,
   mockReadJson,
   mockWriteGovernedArtifactJson,
   mockEnsureGovernedArtifactDir,
+  mockValidateCoworkArtifactPacket,
+  mockLoadCoworkArtifactPacketAtPath,
   capturedWrites,
 } = vi.hoisted(() => {
   const capturedWrites: Map<string, unknown> = new Map();
+  const hasInvalidArtifacts = (packet: unknown): boolean => {
+    if (!packet || typeof packet !== 'object' || !('artifacts' in packet)) return false;
+    const artifacts = packet.artifacts;
+    return (
+      Array.isArray(artifacts) &&
+      artifacts.some((artifact) => {
+        if (!artifact || typeof artifact !== 'object') return true;
+        const path = 'path' in artifact ? artifact.path : undefined;
+        const content = 'content' in artifact ? artifact.content : undefined;
+        return typeof path !== 'string' && typeof content !== 'string';
+      })
+    );
+  };
   return {
     mockSafeExistsSync: vi.fn().mockReturnValue(true),
     mockSafeReaddir: vi.fn(),
     mockSafeReadFile: vi.fn(),
+    mockSafeLstat: vi.fn(() => ({ isFile: () => true })),
     mockAssertSafeRepositoryPath: vi.fn((filePath: string) => filePath),
     mockReadJson: vi.fn((filePath: string) => JSON.parse(String(mockSafeReadFile(filePath)))),
     mockWriteGovernedArtifactJson: vi.fn((role: string, logicalPath: string, value: unknown) => {
@@ -27,6 +44,15 @@ const {
       return '/mocked/path';
     }),
     mockEnsureGovernedArtifactDir: vi.fn().mockReturnValue('/mocked/dir'),
+    mockValidateCoworkArtifactPacket: vi.fn((packet: unknown) => {
+      if (hasInvalidArtifacts(packet)) throw new Error('invalid cowork packet');
+      return packet;
+    }),
+    mockLoadCoworkArtifactPacketAtPath: vi.fn((filePath: string) => {
+      const packet = mockReadJson(filePath);
+      if (hasInvalidArtifacts(packet)) throw new Error('invalid cowork packet');
+      return packet;
+    }),
     capturedWrites,
   };
 });
@@ -36,6 +62,7 @@ vi.mock('./secure-io.js', () => ({
   safeExistsSync: mockSafeExistsSync,
   safeReaddir: mockSafeReaddir,
   safeReadFile: mockSafeReadFile,
+  safeLstat: mockSafeLstat,
   safeWriteFile: vi.fn(),
   safeMkdir: vi.fn(),
   safeAppendFileSync: vi.fn(),
@@ -47,11 +74,24 @@ vi.mock('./foundation/json.js', () => ({
   readJson: mockReadJson,
 }));
 
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    exists: (filePath: string) => mockSafeExistsSync(filePath),
+    readFile: (filePath: string) => String(mockSafeReadFile(filePath) || ''),
+    stat: () => ({ mtimeMs: 1, size: 1 }),
+  }),
+}));
+
 vi.mock('./artifact-store.js', () => ({
   writeGovernedArtifactJson: mockWriteGovernedArtifactJson,
   ensureGovernedArtifactDir: mockEnsureGovernedArtifactDir,
   resolveGovernedArtifactPath: vi.fn((p: string) => `/repo/${p}`),
   isGovernedArtifactPath: vi.fn(() => true),
+}));
+
+vi.mock('./cowork-artifact-packet.js', () => ({
+  validateCoworkArtifactPacket: mockValidateCoworkArtifactPacket,
+  loadCoworkArtifactPacketAtPath: mockLoadCoworkArtifactPacketAtPath,
 }));
 
 vi.mock('./path-resolver.js', () => ({
@@ -196,6 +236,21 @@ describe('cowork-surface', () => {
       const result = listCoworkOutbox();
       expect(result).toHaveLength(1);
       expect(result[0].delivery_id).toBe('COWORK-G');
+    });
+
+    it('スキーマ不正のファイルをスキップする', () => {
+      mockSafeReaddir.mockReturnValue(['invalid.json']);
+      mockSafeReadFile.mockReturnValue(
+        JSON.stringify({
+          delivery_id: 'COWORK-I',
+          delivered_at: '2026-06-22T01:00:00Z',
+          title: 'Invalid',
+          summary: 's',
+          artifacts: [{ content_type: 'text/plain' }],
+        })
+      );
+
+      expect(listCoworkOutbox()).toEqual([]);
     });
 
     it('path boundary に違反する outbox entry をスキップする', () => {
