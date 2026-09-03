@@ -15198,6 +15198,18 @@ payloadを保存する。governed catalog metadataが永続化内容へ不用意
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 772
+
+SX-03／SX-04／SX-06／SX-08 のexternal service registryを再監査し、runtime registry saveはschema
+validationを実行していたものの、catalogの戻り値を捨てて元のregistryをraw writeしていたため修正した。
+public／personal／runtimeの3層merge、service registration／stats更新、provider URL resolutionの既存責務を
+維持し、path-bound writerが検証済みのcanonical registryを保存する。governed catalog metadataがruntime
+artifactへ不用意に残らない回帰も追加した。
+
+検証: external service registry **1 file / 4 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
