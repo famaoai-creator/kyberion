@@ -7201,6 +7201,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/eval-harness-table.schema.json",
+      "tier": "public",
+      "size": 1040,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/evidence-chain-registry.schema.json",
       "tier": "public",
       "size": 1513,
