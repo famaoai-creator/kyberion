@@ -10471,6 +10471,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/writer-lease.schema.json",
+      "tier": "public",
+      "size": 478,
+      "type": "json"
+    },
+    {
       "path": "product/task-scenarios/aws-cost-estimate-from-vendor-docs.json",
       "tier": "public",
       "size": 2592,
