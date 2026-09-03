@@ -992,11 +992,15 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
 
 const JANITOR_MARKER_SUBPATH = 'runtime/state/janitor-last-run.json';
 const JANITOR_SUBMIT_MARKER_SUBPATH = 'runtime/state/janitor-last-submit.json';
+const SCHEDULER_ALERT_MARKER_SUBPATH = 'runtime/state/scheduler-ops-alert-days.json';
 const JANITOR_LAST_RUN_SCHEMA_PATH = knowledge(
   'product/schemas/janitor-last-run-marker.schema.json'
 );
 const JANITOR_SUBMISSION_SCHEMA_PATH = knowledge(
   'product/schemas/janitor-submission-marker.schema.json'
+);
+const SCHEDULER_ALERT_SCHEMA_PATH = knowledge(
+  'product/schemas/scheduler-ops-alert-days.schema.json'
 );
 
 type JanitorLastRunMarker = { completed_at: string; errors: number };
@@ -1005,6 +1009,7 @@ type JanitorSubmissionMarker = {
   pipeline_id: 'storage-janitor';
   dry_run: false;
 };
+export type SchedulerOpsAlertDays = Record<string, string>;
 
 function janitorLastRunCatalog(filePath: string) {
   return defineCatalog<JanitorLastRunMarker>({
@@ -1019,6 +1024,14 @@ function janitorSubmissionCatalog(filePath: string) {
     id: 'janitor-submission-marker',
     path: filePath,
     schema: JANITOR_SUBMISSION_SCHEMA_PATH,
+  });
+}
+
+function schedulerAlertCatalog(filePath: string) {
+  return defineCatalog<SchedulerOpsAlertDays>({
+    id: 'scheduler-ops-alert-days',
+    path: filePath,
+    schema: SCHEDULER_ALERT_SCHEMA_PATH,
   });
 }
 
@@ -1052,6 +1065,27 @@ export function writeJanitorSubmissionMarker(): void {
   const markerPath = shared(JANITOR_SUBMIT_MARKER_SUBPATH);
   const marker = janitorSubmissionCatalog(markerPath).validate(
     { submitted_at: nowIso(), pipeline_id: 'storage-janitor', dry_run: false },
+    markerPath
+  );
+  safeWriteFile(markerPath, JSON.stringify(marker, null, 2));
+}
+
+export function readSchedulerOpsAlertDays(): SchedulerOpsAlertDays | null {
+  const markerPath = shared(SCHEDULER_ALERT_MARKER_SUBPATH);
+  if (!safeExistsSync(markerPath)) return null;
+  try {
+    if (!safeLstat(markerPath).isFile()) return null;
+    return schedulerAlertCatalog(markerPath).load();
+  } catch {
+    return null;
+  }
+}
+
+export function writeSchedulerOpsAlertDay(key: string, now = new Date()): void {
+  const markerPath = shared(SCHEDULER_ALERT_MARKER_SUBPATH);
+  const existing = readSchedulerOpsAlertDays() ?? {};
+  const marker = schedulerAlertCatalog(markerPath).validate(
+    { ...existing, [key]: now.toISOString().slice(0, 10) },
     markerPath
   );
   safeWriteFile(markerPath, JSON.stringify(marker, null, 2));

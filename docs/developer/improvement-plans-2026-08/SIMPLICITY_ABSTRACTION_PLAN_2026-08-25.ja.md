@@ -14183,6 +14183,12 @@ SX-03／SX-04／LC-01 のjanitor marker readerを再監査し、storage janitor�
 
 検証: janitor／baseline／doctor **3 files / 83 tests passed**、対象typecheck、lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 654
+
+SX-03／SX-04／LC-01b のscheduler ops-alert日次マーカーを再監査し、baselineが共有runtime stateを汎用JSONのraw stringとして読み、更新も局所実装していた残存を修正した。scheduler alert-day専用schemaと`storage-janitor`のcanonical reader／writerを追加し、UTC日付のkey/value契約、regular-file・symlink境界、不正／未知field時の安全側fallbackを共通化した。baselineのalert dedup判定と既存のscheduler／failed-schedule通知semanticsは維持している。
+
+検証: scheduler marker／baseline **2 files / 75 tests passed**、core package build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
