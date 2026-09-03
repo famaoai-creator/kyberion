@@ -13973,6 +13973,12 @@ SX-03／SX-04 のvoice consent readerを再監査し、meeting participationとm
 
 検証: voice consent／meeting participation／meeting actuator **focused tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 619
+
+SX-03／SX-04 のonboarding context readerを再監査し、organization bindingとfirst-work resolutionが既存schema validatorを持ちながら、実ファイルの入口だけraw `readJson`で読み込んでいた残存を修正した。両recordをcustom rootに対応するpath-bound canonical catalog loadへ統合し、regular-file境界と既存のschema error／missing fallbackを維持した。保存側の既存validator、customer／tenant／organization context binding、first-work routing semanticsは変更していない。
+
+検証: onboarding context **1 file / focused tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
