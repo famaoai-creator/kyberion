@@ -1473,6 +1473,8 @@ describe('system-actuator computer_interaction adapter', () => {
   it('persists pipeline context to rootDir-based context_path', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core/secure-io');
+    vi.mocked(core.safeExistsSync).mockReturnValue(true);
+    vi.spyOn(core, 'safeLstat').mockReturnValue({ isFile: () => true } as never);
     vi.mocked(core.safeReadFile).mockImplementation((filePath: string) =>
       String(filePath).includes('active/shared/tmp/input.json') ? '{"a":1}' : '{}'
     );
