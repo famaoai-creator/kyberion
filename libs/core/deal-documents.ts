@@ -94,6 +94,14 @@ const CONTRACT_REVIEW_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contract-review-record.schema.json'
 );
 
+function contractReviewCatalog(filePath: string) {
+  return defineCatalog<ContractReviewRecord>({
+    id: 'contract-review-record',
+    path: filePath,
+    schema: CONTRACT_REVIEW_SCHEMA_PATH,
+  });
+}
+
 export function loadContractReviewAtPath(
   filePath: string,
   tenantSlug: string,
@@ -104,11 +112,7 @@ export function loadContractReviewAtPath(
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`contract review record must be a regular file: ${filePath}`);
   }
-  const record = defineCatalog<ContractReviewRecord>({
-    id: 'contract-review-record',
-    path: safeFilePath,
-    schema: CONTRACT_REVIEW_SCHEMA_PATH,
-  }).load();
+  const record = contractReviewCatalog(safeFilePath).load();
   if (record.deal_id !== dealId || record.version !== version || tenantSlug.trim() === '') {
     throw new Error(
       `contract review record binding mismatch for ${tenantSlug}/${dealId} v${version}`
@@ -278,24 +282,21 @@ export function recordContractReview(input: {
   notes?: string;
 }): string {
   const dir = dealDocsDir(input.tenantSlug, input.dealId);
-  safeMkdir(dir, { recursive: true });
   const filePath = dealDocumentPath(dir, `contract-review-v${input.version}.json`);
-  safeWriteFile(
-    filePath,
-    JSON.stringify(
-      {
-        kind: 'contract-review-record',
-        deal_id: input.dealId,
-        version: input.version,
-        verdict: input.verdict,
-        reviewer: input.reviewer,
-        notes: input.notes || '',
-        reviewed_at: nowIso(),
-      },
-      null,
-      2
-    )
+  const record = contractReviewCatalog(filePath).validate(
+    {
+      kind: 'contract-review-record',
+      deal_id: input.dealId,
+      version: input.version,
+      verdict: input.verdict,
+      reviewer: input.reviewer,
+      notes: input.notes || '',
+      reviewed_at: nowIso(),
+    },
+    filePath
   );
+  safeMkdir(dir, { recursive: true });
+  safeWriteFile(filePath, JSON.stringify(record, null, 2));
   return filePath;
 }
 

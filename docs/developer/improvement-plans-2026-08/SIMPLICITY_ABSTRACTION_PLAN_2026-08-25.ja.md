@@ -14989,6 +14989,18 @@ provider discoveryの実行境界とcache miss semanticsは維持している。
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 755
+
+SX-03／SX-04／SX-08／E2E-06 のcontract review recordを再監査し、load側は専用schemaとdeal／version
+bindingを検証している一方、operator reviewの生成側だけがreviewer／version／verdict envelopeをraw
+`safeWriteFile`していたため修正した。既存`contract-review-record.schema.json`をpersist直前にも適用し、
+不完全なreviewをapproval gateの証跡として保存できないようにする。review verdict、exact deal/version
+binding、tenant path、contract送付前のapprove判定の既存semanticsは維持している。
+
+検証: deal documents **1 file / 4 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
+state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
