@@ -1,10 +1,11 @@
-import { readJson, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
+  safeLstat,
   safeExec,
   safeStat,
   safeReaddir,
@@ -63,6 +64,25 @@ function buildUnknownFileOpMessage(op: string): string {
   return buildUnknownActuatorOpError('file', op).message;
 }
 
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readFileContext(filePath: string): Record<string, unknown> {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`file context must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonObjectValue(
+    parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), 'file context'),
+    'file context'
+  );
+}
+
 /**
  * File-Actuator v2.1.1 [RESILIENT PIPELINE]
  * Strictly compliant with Layer 2 (Shield).
@@ -104,10 +124,7 @@ async function executePipeline(
     ? resolveFilePath(String(initialCtx.context_path), true)
     : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
-    const saved = await retry(
-      async () => readJson<Record<string, unknown>>(contextPath),
-      buildRetryOptions()
-    );
+    const saved = await retry(async () => readFileContext(contextPath), buildRetryOptions());
     ctx = { ...ctx, ...saved };
   }
   const result = await runAdfActuatorPipeline({
