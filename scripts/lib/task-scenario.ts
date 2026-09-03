@@ -1,6 +1,7 @@
 import type { ValidateFunction } from 'ajv';
-import { compileSchema, readJson } from '@agent/core/foundation';
+import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { parseSafeJsonObjectValue } from './json-input.js';
 
 export type TaskTrigger =
@@ -26,6 +27,14 @@ export type TaskScenario = {
 const TASK_SCENARIO_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/task-scenario.schema.json'
 );
+function taskScenarioCatalog(filePath: string) {
+  return defineCatalog<TaskScenario>({
+    id: 'task-scenario',
+    path: filePath,
+    schema: TASK_SCENARIO_SCHEMA_PATH,
+  });
+}
+
 let validateTaskScenarioSchema: ValidateFunction | null = null;
 
 function validator(): ValidateFunction {
@@ -45,7 +54,11 @@ export function validateTaskScenario(value: unknown): TaskScenario {
 }
 
 export function loadTaskScenario(filePath: string): TaskScenario {
-  return validateTaskScenario(readJson<unknown>(filePath));
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath) || !safeLstat(safeFilePath).isFile()) {
+    throw new Error(`TaskScenario must be a regular file: ${filePath}`);
+  }
+  return taskScenarioCatalog(safeFilePath).load();
 }
 
 export function parseTaskRecord(value: unknown, label: string): Record<string, unknown> {

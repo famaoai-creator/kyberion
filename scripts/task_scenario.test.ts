@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseTaskRecord, validateTaskScenario } from './lib/task-scenario.js';
+import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import { loadTaskScenario, parseTaskRecord, validateTaskScenario } from './lib/task-scenario.js';
 
 const validScenario = {
   id: 'daily-report',
@@ -29,6 +32,31 @@ describe('TaskScenario schema boundary', () => {
     { ...validScenario, first_run: { ...validScenario.first_run, questions: [] } },
   ])('rejects malformed scenario input: %j', (value) => {
     expect(() => validateTaskScenario(value)).toThrow('Invalid TaskScenario');
+  });
+});
+
+describe('TaskScenario persisted loader', () => {
+  const root = pathResolver.sharedTmp('task-scenario-loader-tests');
+
+  it('loads only schema-valid regular files through the path-bound catalog', () => {
+    safeMkdir(root, { recursive: true });
+    const validPath = path.join(root, 'valid.json');
+    const invalidPath = path.join(root, 'invalid.json');
+    const directoryPath = path.join(root, 'directory.json');
+    const linkPath = path.join(root, 'link.json');
+    safeWriteFile(validPath, `${JSON.stringify(validScenario)}\n`);
+    safeWriteFile(invalidPath, `${JSON.stringify({ ...validScenario, unexpected: true })}\n`);
+    safeMkdir(directoryPath, { recursive: true });
+    safeSymlinkSync(validPath, linkPath);
+
+    try {
+      expect(loadTaskScenario(validPath).id).toBe('daily-report');
+      expect(() => loadTaskScenario(invalidPath)).toThrow(/Invalid catalog task-scenario/);
+      expect(() => loadTaskScenario(directoryPath)).toThrow(/must be a regular file/);
+      expect(() => loadTaskScenario(linkPath)).toThrow(/must be a regular file|symbolic link/);
+    } finally {
+      safeRmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

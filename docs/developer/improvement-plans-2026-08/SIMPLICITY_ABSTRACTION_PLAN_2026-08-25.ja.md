@@ -14171,6 +14171,12 @@ SX-03／SX-04 の依存脆弱性scan／patch flowを再監査し、両scriptが�
 
 検証: dependency vulnerability ledger／scan／patch **4 files / 20 tests passed**、core package build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 652
+
+SX-03／SX-04 のTaskScenario readerを再監査し、既存の`task-scenario.schema.json`による値検証はあるものの、persisted scenarioの実ファイル入口がraw `readJson`に残り、list／init／run／smokeの各consumerがregular-file・symlink境界を個別に担っていた残存を修正した。scenario loadをpath-bound canonical catalogへ統合し、schema validation、repository path、regular-file境界を一つの共有入口へ寄せた。質問・trigger・profile output・approval boundaryの既存schemaとTaskScenario routing semanticsは維持している。
+
+検証: TaskScenario／list／run／smoke **5 files / 18 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
