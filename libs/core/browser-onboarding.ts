@@ -37,7 +37,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
-import { getToolRuntimePolicy } from './tool-runtime-policy.js';
+import { getToolRuntimePolicy, writeToolRuntimePolicyAtPath } from './tool-runtime-policy.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   getVoiceProfileRegistry,
@@ -337,7 +337,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
 
         const toolPath = onboardingPath('tool-runtime-policy.json');
         const baseToolPolicy = getToolRuntimePolicy();
-        writeJson(toolPath, {
+        writeToolRuntimePolicyAtPath(toolPath, {
           ...baseToolPolicy,
           version: '1.0.0',
           mode_preference: draft.tools.mode_preference,
