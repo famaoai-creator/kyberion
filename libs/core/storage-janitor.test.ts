@@ -94,6 +94,7 @@ import {
   scanTmp,
   rotateLogs,
   scanRuntime,
+  scanDataVault,
   sweepDelegationChildren,
   sweepTrash,
   restoreFromTrash,
@@ -111,6 +112,7 @@ import {
   TRASH_REPO_SUBPATH,
   type DelegationChildRecord,
 } from './storage-janitor.js';
+import { fetchWithVaultCache } from './data-vault.js';
 import {
   RETENTION_CATALOG_REPO_PATH,
   RETENTION_DAY_MS,
@@ -324,6 +326,29 @@ describe('storage-janitor', () => {
       const result = scanRuntime({ dryRun: false });
       expect(result.deleted).toContain(oldDelta);
       expect(fs.existsSync(oldDelta)).toBe(false);
+    });
+  });
+
+  describe('scanDataVault', () => {
+    it('deletes expired valid entries but leaves malformed entries untouched', async () => {
+      await fetchWithVaultCache('notion', 'expired', () => ({ value: 1 }), {
+        projectId: 'janitor-test',
+        ttlMs: 60_000,
+      });
+      const validFile = path.join(dataVaultDir, fs.readdirSync(dataVaultDir)[0]!);
+      const persisted = JSON.parse(fs.readFileSync(validFile, 'utf8')) as Record<string, unknown>;
+      persisted.expiresAt = new Date(Date.now() - 1_000).toISOString();
+      fs.writeFileSync(validFile, JSON.stringify(persisted));
+
+      const malformedFile = path.join(dataVaultDir, 'malformed.json');
+      writeFile(malformedFile, '{not-json');
+
+      const result = scanDataVault({ dryRun: false });
+
+      expect(result.deleted).toContain(validFile);
+      expect(fs.existsSync(validFile)).toBe(false);
+      expect(result.deleted).not.toContain(malformedFile);
+      expect(fs.existsSync(malformedFile)).toBe(true);
     });
   });
 

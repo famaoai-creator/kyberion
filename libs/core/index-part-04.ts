@@ -275,6 +275,7 @@ export {
   getVaultEntry,
   invalidateVaultEntry,
   listVaultEntries,
+  loadVaultEntryAtPath,
 } from './data-vault.js';
 
 export type {
