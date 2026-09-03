@@ -48,8 +48,10 @@ import { summarizeBackupStatus } from './backup.js';
 import { readJson, readTextFile } from '@agent/core/foundation';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
-import { parsePersonalSovereignIdentity } from '@agent/core/personal-identity-reader';
-import { loadPersonalIdentityAtPath } from '@agent/core/personal-identity-state';
+import {
+  parsePersonalSovereignIdentity,
+  loadPersonalIdentityAtPath,
+} from '@agent/core/personal-identity-reader';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 /**
