@@ -1,6 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { evaluateDegradation } from './health-degradation.js';
-import { evaluateRuntimeHealthTrends, type RuntimeHealthSample } from './runtime-health-history.js';
+import {
+  evaluateRuntimeHealthTrends,
+  loadRuntimeHealthSamples,
+  type RuntimeHealthSample,
+} from './runtime-health-history.js';
+import { pathResolver } from './path-resolver.js';
 
 const THRESHOLDS = {
   rss_growth_warning_ratio: 1.5,
@@ -63,5 +70,46 @@ describe('runtime health trends (OP-04)', () => {
     });
     expect(report.verdict).toBe('yellow');
     expect(report.findings[0].kind).toBe('rss_growth');
+  });
+
+  it('skips schema-invalid persisted samples before trend evaluation', () => {
+    const file = pathResolver.rootResolve('active/shared/runtime/health/runtime-health.jsonl');
+    const hadFile = fs.existsSync(file);
+    const original = hadFile ? fs.readFileSync(file) : undefined;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      `${JSON.stringify({
+        timestamp: '2026-07-12T00:00:00.000Z',
+        process_name: 'invalid',
+        rss_mb: -1,
+        heap_used_mb: 10,
+      })}\n` +
+        `${JSON.stringify(sample({ process_name: 'valid', timestamp: '2026-07-12T00:01:00.000Z' }))}\n`
+    );
+
+    try {
+      expect(
+        loadRuntimeHealthSamples(60 * 60 * 1000, Date.parse('2026-07-12T01:00:00.000Z'))
+      ).toEqual([sample({ process_name: 'valid', timestamp: '2026-07-12T00:01:00.000Z' })]);
+    } finally {
+      if (original !== undefined) fs.writeFileSync(file, original);
+      else fs.rmSync(file, { force: true });
+    }
+  });
+
+  it('rejects a runtime health history directory', () => {
+    const file = pathResolver.rootResolve('active/shared/runtime/health/runtime-health.jsonl');
+    const hadFile = fs.existsSync(file);
+    const original = hadFile && fs.statSync(file).isFile() ? fs.readFileSync(file) : undefined;
+    fs.rmSync(file, { recursive: true, force: true });
+    fs.mkdirSync(file, { recursive: true });
+
+    try {
+      expect(() => loadRuntimeHealthSamples(60_000)).toThrow(/must be a regular file/);
+    } finally {
+      fs.rmSync(file, { recursive: true, force: true });
+      if (original !== undefined) fs.writeFileSync(file, original);
+    }
   });
 });
