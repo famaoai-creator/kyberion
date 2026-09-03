@@ -69,6 +69,9 @@ describe('onboarding_apply', () => {
     expect(() => parseApplyInput({ ...FIXTURE_INPUT, tutorial: { mode: 'unknown' } })).toThrow(
       'tutorial.mode'
     );
+    expect(() => parseApplyInput({ ...FIXTURE_INPUT, unexpected: true })).toThrow(
+      /Invalid catalog onboarding-apply-input/u
+    );
   });
 
   it('accepts a catalog reasoning_backend and rejects unknown ones (LC-05)', () => {
@@ -194,5 +197,7 @@ describe('onboarding_apply', () => {
     expect(script).toContain("path.join(onboardingRoot(), 'tutorial-plan.md')");
     expect(script).toContain('statePath()');
     expect(script).toContain('summaryPath()');
+    expect(script).toContain('loadOnboardingApplyInputAtPath');
+    expect(script).not.toContain('readJson');
   });
 });

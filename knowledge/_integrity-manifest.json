@@ -8509,6 +8509,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/onboarding-apply-input.schema.json",
+      "tier": "public",
+      "size": 2138,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/onboarding-context-binding.schema.json",
       "tier": "public",
       "size": 1719,
