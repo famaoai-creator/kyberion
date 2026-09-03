@@ -1,5 +1,5 @@
-import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { safeExec, safeMkdir, safeExistsSync, safeReadFile } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { safeExec } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
 import {
@@ -7,8 +7,13 @@ import {
   notifyOperatorSync,
   resolveOperatorNotificationRoute,
 } from './operator-notifications.js';
-import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import {
+  appendOpsAlertLogRecord,
+  readOpsAlertLogText,
+  resolveOpsAlertLogPath,
+  validateOpsAlertLogRecord,
+} from './ops-alert-log.js';
 
 export type OpsAlertSeverity = 'info' | 'warning' | 'critical';
 
@@ -83,11 +88,6 @@ export function resolveOpsAlertChannelStatus(
   };
 }
 
-function ensureParent(filePath: string): void {
-  const dir = path.dirname(filePath);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-}
-
 function postOpsAlertWebhook(payload: string, webhookUrl: string): void {
   safeExec(
     'curl',
@@ -119,7 +119,7 @@ function recordUndeliveredOpsAlert(
   // Keep the delivery failure in the same append-only queue consumed by
   // `ops:alerts --redeliver`. The original ops_alert record remains the audit
   // event; this companion record is the retryable delivery envelope.
-  appendJsonLine(alertLogPath, {
+  appendOpsAlertLogRecord(alertLogPath, {
     ts: timestamp,
     kind: 'operator_notification_undelivered',
     event: 'ops_alert',
@@ -143,20 +143,18 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
   const suppressed = prior !== undefined && now.getTime() - prior < minIntervalMs;
   const id = `${timestamp.replace(/[:.]/g, '-')}-${key.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
   const alertLogPath = options.alertLogPath ?? defaultAlertLogPath();
-  ensureParent(alertLogPath);
-
   const record = {
     id,
     timestamp,
     suppressed,
     ...input,
   };
-  appendJsonLine(alertLogPath, record);
+  const recordedPath = appendOpsAlertLogRecord(alertLogPath, record);
 
   if (suppressed) {
     return {
       id,
-      recorded_path: alertLogPath,
+      recorded_path: recordedPath,
       webhook_attempted: false,
       webhook_delivered: false,
       operator_attempted: false,
@@ -180,7 +178,7 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
       });
       return {
         id,
-        recorded_path: alertLogPath,
+        recorded_path: recordedPath,
         webhook_attempted: false,
         webhook_delivered: false,
         operator_attempted: true,
@@ -191,7 +189,7 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
     if (operatorRoute === 'mute') {
       return {
         id,
-        recorded_path: alertLogPath,
+        recorded_path: recordedPath,
         webhook_attempted: false,
         webhook_delivered: false,
         operator_attempted: false,
@@ -202,7 +200,7 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
     recordUndeliveredOpsAlert(alertLogPath, input, id, timestamp, 'no_channel_configured');
     return {
       id,
-      recorded_path: alertLogPath,
+      recorded_path: recordedPath,
       webhook_attempted: false,
       webhook_delivered: false,
       operator_attempted: false,
@@ -215,7 +213,7 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
     postOpsAlertWebhook(renderWebhookPayload(input, id, timestamp), webhookUrl);
     return {
       id,
-      recorded_path: alertLogPath,
+      recorded_path: recordedPath,
       webhook_attempted: true,
       webhook_delivered: true,
       operator_attempted: false,
@@ -234,7 +232,7 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
     );
     return {
       id,
-      recorded_path: alertLogPath,
+      recorded_path: recordedPath,
       webhook_attempted: true,
       webhook_delivered: false,
       operator_attempted: false,
@@ -291,18 +289,19 @@ function classifyOpsAlertRecord(raw: Record<string, unknown>): OpsAlertLogRecord
   return 'unknown';
 }
 
-export function parseOpsAlertLog(rawContent: string): ParsedOpsAlertRecord[] {
+export function parseOpsAlertLog(
+  rawContent: string,
+  sourcePath = '<memory>'
+): ParsedOpsAlertRecord[] {
   const records: ParsedOpsAlertRecord[] = [];
+  const recordCatalogPath = sourcePath === '<memory>' ? defaultAlertLogPath() : sourcePath;
   for (const line of rawContent.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     let raw: Record<string, unknown>;
     try {
       const parsed = parseSafeJsonInput(trimmed, 'ops alert log entry');
-      raw =
-        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-          ? (parsed as Record<string, unknown>)
-          : { value: parsed };
+      raw = validateOpsAlertLogRecord(parsed, recordCatalogPath);
     } catch {
       records.push({
         ref: fingerprintOpsAlertLine(trimmed),
@@ -326,9 +325,9 @@ export function parseOpsAlertLog(rawContent: string): ParsedOpsAlertRecord[] {
 }
 
 export function readOpsAlertLogRecords(alertLogPath?: string): ParsedOpsAlertRecord[] {
-  const filePath = alertLogPath ?? defaultAlertLogPath();
-  if (!safeExistsSync(filePath)) return [];
-  return parseOpsAlertLog(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  const loaded = readOpsAlertLogText(alertLogPath ?? defaultAlertLogPath());
+  if (!loaded) return [];
+  return parseOpsAlertLog(loaded.text, loaded.path);
 }
 
 interface UndeliveredClassification {
@@ -499,14 +498,13 @@ export function acknowledgeOpsAlerts(
   const outstanding = selectOutstandingUndeliveredOpsAlerts(
     readOpsAlertLogRecords(alertLogPath)
   ).filter((record) => record.timestampMs !== null && record.timestampMs <= beforeMs);
-  ensureParent(alertLogPath);
-  appendJsonLine(alertLogPath, {
+  const recordedPath = appendOpsAlertLogRecord(alertLogPath, {
     ts: now.toISOString(),
     kind: 'ops_alert_ack',
     before,
     acked_count: outstanding.length,
   });
-  return { acked_count: outstanding.length, before, recorded_path: alertLogPath };
+  return { acked_count: outstanding.length, before, recorded_path: recordedPath };
 }
 
 export interface OpsAlertRedeliveryOutcome {
@@ -554,7 +552,7 @@ export function redeliverUndeliveredOpsAlerts(
     typeof options.limit === 'number' && options.limit >= 0
       ? outstanding.slice(0, options.limit)
       : outstanding;
-  ensureParent(alertLogPath);
+  const recordedPath = resolveOpsAlertLogPath(alertLogPath);
   const outcomes: OpsAlertRedeliveryOutcome[] = [];
   for (const record of batch) {
     const title = typeof record.raw.title === 'string' ? record.raw.title : '(untitled)';
@@ -573,7 +571,7 @@ export function redeliverUndeliveredOpsAlerts(
       delivered = false;
       errorMessage = error instanceof Error ? error.message : String(error);
     }
-    appendJsonLine(alertLogPath, {
+    appendOpsAlertLogRecord(alertLogPath, {
       ts: now.toISOString(),
       kind: 'ops_alert_redelivery',
       ref: record.ref,
@@ -594,6 +592,6 @@ export function redeliverUndeliveredOpsAlerts(
     delivered: deliveredCount,
     failed: outcomes.length - deliveredCount,
     outcomes,
-    recorded_path: alertLogPath,
+    recorded_path: recordedPath,
   };
 }
