@@ -7993,6 +7993,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/migration-state.schema.json",
+      "tier": "public",
+      "size": 365,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-brief.schema.json",
       "tier": "public",
       "size": 2661,
