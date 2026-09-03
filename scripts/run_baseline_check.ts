@@ -3,14 +3,13 @@ import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
 import { validateService } from '@agent/core/service-validator';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeReaddir,
   safeReadFile,
-  safeWriteFile,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
 import { withExecutionContext } from '@agent/core/authority';
@@ -66,6 +65,11 @@ import {
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
+import {
+  loadBaselineCache,
+  storeBaselineCache,
+  type BaselineCacheSnapshot,
+} from '@agent/core/baseline-check-cache';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -74,7 +78,6 @@ type ReadinessRule = {
 };
 
 const BASELINE_CACHE_TTL_MS = 60 * 60 * 1000;
-const BASELINE_CACHE_DIR = 'runtime/baseline-check-cache';
 const JANITOR_MAINTENANCE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // AL-01: janitor liveness observation. The maintenance fallback above only
@@ -342,61 +345,11 @@ export function shouldEmitDailyOpsAlert(
 
 let baselineConfigDegraded = false;
 
-type CachedEnvelope<T> = {
-  computed_at: string;
-  ttl_ms: number;
-  value: T;
-};
-
-type CachedSnapshot<T> = {
-  value: T;
-  cached: boolean;
-  age_ms?: number;
-};
-
 export type BaselineMaintenanceState = {
   submitted: boolean;
   pending: boolean;
   reason: string | null;
 };
-
-function cachePath(name: string): string {
-  return pathResolver.shared(`${BASELINE_CACHE_DIR}/${name}.json`);
-}
-
-function loadCachedSnapshot<T>(name: string): CachedSnapshot<T> | null {
-  const path = cachePath(name);
-  if (!safeExistsSync(path)) return null;
-  try {
-    const parsed = readJson<CachedEnvelope<T>>(path);
-    const computedAt = new Date(parsed.computed_at).getTime();
-    if (!Number.isFinite(computedAt)) return null;
-    const ageMs = Date.now() - computedAt;
-    if (ageMs > parsed.ttl_ms) return null;
-    return {
-      value: parsed.value,
-      cached: true,
-      age_ms: ageMs,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function storeCachedSnapshot<T>(name: string, value: T, ttlMs: number): void {
-  safeWriteFile(
-    cachePath(name),
-    JSON.stringify(
-      {
-        computed_at: nowIso(),
-        ttl_ms: ttlMs,
-        value,
-      } satisfies CachedEnvelope<T>,
-      null,
-      2
-    )
-  );
-}
 
 function loadConnectionReadinessConfig(): {
   requiredServices: Record<string, ReadinessRule>;
@@ -518,19 +471,23 @@ function checkServiceConnectionReadiness(
 }
 
 function getCachedTenantDrift() {
-  const cached = loadCachedSnapshot<ReturnType<typeof scanTenantDrift>>('tenant-drift');
+  const cached = loadBaselineCache<ReturnType<typeof scanTenantDrift>>('tenant-drift');
   if (cached) return cached;
   const value = scanTenantDrift();
-  storeCachedSnapshot('tenant-drift', value, BASELINE_CACHE_TTL_MS);
-  return { value, cached: false } satisfies CachedSnapshot<ReturnType<typeof scanTenantDrift>>;
+  storeBaselineCache('tenant-drift', value, BASELINE_CACHE_TTL_MS);
+  return { value, cached: false } satisfies BaselineCacheSnapshot<
+    ReturnType<typeof scanTenantDrift>
+  >;
 }
 
 function getCachedCoworkHealth() {
-  const cached = loadCachedSnapshot<ReturnType<typeof runCoworkHealthCheck>>('cowork-health');
+  const cached = loadBaselineCache<ReturnType<typeof runCoworkHealthCheck>>('cowork-health');
   if (cached) return cached;
   const value = runCoworkHealthCheck();
-  storeCachedSnapshot('cowork-health', value, BASELINE_CACHE_TTL_MS);
-  return { value, cached: false } satisfies CachedSnapshot<ReturnType<typeof runCoworkHealthCheck>>;
+  storeBaselineCache('cowork-health', value, BASELINE_CACHE_TTL_MS);
+  return { value, cached: false } satisfies BaselineCacheSnapshot<
+    ReturnType<typeof runCoworkHealthCheck>
+  >;
 }
 
 function readJanitorLastSubmissionMs(): number | null {
