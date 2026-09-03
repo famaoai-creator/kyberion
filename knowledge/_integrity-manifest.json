@@ -8263,6 +8263,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/model-role-feedback.schema.json",
+      "tier": "public",
+      "size": 811,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/model-role-outcome.schema.json",
+      "tier": "public",
+      "size": 701,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/modeling-pipeline.schema.json",
       "tier": "public",
       "size": 1366,
