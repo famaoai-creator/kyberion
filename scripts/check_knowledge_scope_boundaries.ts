@@ -1,7 +1,7 @@
 /** KS-16: semantic static checks for knowledge scope choke points. */
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { readJsonIfPresent } from '@agent/core/foundation';
+import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge-scope-check-policy';
 import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -18,20 +18,14 @@ const DEFAULT_CONFIG: KnowledgeScopeCheckConfig = { max_direct_tenant_env_reads:
 const CONFIG_PATH = path.join(root, 'knowledge/product/governance/knowledge-scope-check.json');
 
 function loadConfig(): KnowledgeScopeCheckConfig {
-  const parsed = readJsonIfPresent<Partial<KnowledgeScopeCheckConfig>>(CONFIG_PATH);
+  const parsed = loadKnowledgeScopeCheckPolicy(CONFIG_PATH);
   if (!parsed) return DEFAULT_CONFIG;
-  try {
-    return {
-      ...DEFAULT_CONFIG,
-      ...parsed,
-      max_direct_tenant_env_reads:
-        typeof parsed.max_direct_tenant_env_reads === 'number'
-          ? parsed.max_direct_tenant_env_reads
-          : DEFAULT_CONFIG.max_direct_tenant_env_reads,
-    };
-  } catch {
-    return DEFAULT_CONFIG;
-  }
+  return {
+    ...DEFAULT_CONFIG,
+    max_direct_tenant_env_reads: parsed.max_direct_tenant_env_reads,
+    confidential_scope_allowlist: parsed.confidential_scope_allowlist,
+    scoped_runtime_writer_files: parsed.scoped_runtime_writer_files,
+  };
 }
 
 function removeComments(source: string): string {

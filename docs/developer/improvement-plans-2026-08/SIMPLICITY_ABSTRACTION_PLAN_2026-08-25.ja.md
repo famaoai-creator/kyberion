@@ -14219,6 +14219,12 @@ SX-03／SX-04 のCLI mission context bannerを再監査し、scope解決済み�
 
 検証: CLI mission scope／banner **1 file / 2 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 660
+
+SX-03／SX-04 のknowledge scope policy readerを再監査し、health監視とscope checkerが同じ`knowledge-scope-check.json`をそれぞれ汎用JSON readerと局所shape判定で読み込んでいた残存を修正した。既存の`knowledge-scope-check.schema.json`に接続するcore canonical catalog loaderを追加し、両consumerのpolicy読込、regular-file／symlink境界、不正時の既存default fallbackを共有化した。scope violation検出とlegacy quarantine TTLの既存semanticsは維持している。
+
+検証: knowledge scope policy／health／checker **4 files / 10 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
