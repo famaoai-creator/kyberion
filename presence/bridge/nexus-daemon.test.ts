@@ -15,6 +15,9 @@ describe('nexus daemon resource boundaries', () => {
     expect(source).toContain('Nexus JSON resource must be an existing regular file');
     expect(source).toContain('function isExistingRegularFile(filePath: string): boolean');
     expect(source).toContain('function parseNexusDispatchResult(value: unknown)');
+    expect(source).toContain('parseNexusBrainProfileRegistry(readNexusJson(safeRegistryPath))');
+    expect(source).toContain('parseNexusSessionMetadata(readNexusJson(metaPath))');
+    expect(source).toContain('parseNexusSessionResponse(readNexusJson(responsePath))');
     expect(source).toContain(
       `const result = parseNexusDispatchResult(
         parseSafeJsonInput(output, 'Nexus actuator response')
