@@ -1,9 +1,15 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { writeGovernedArtifactJson } from './artifact-store.js';
 import * as customerResolver from './customer-resolver.js';
@@ -17,6 +23,9 @@ import type {
 } from './channel-surface-types.js';
 
 const TEXT_MODAL_FIELDS: OnboardingField[] = ['name', 'primary_domain', 'vision'];
+const SLACK_ONBOARDING_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/slack-onboarding-state.schema.json'
+);
 
 function profileRoot(): string {
   return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
@@ -90,8 +99,19 @@ export function isEnvironmentInitialized(): boolean {
 
 function loadOnboardingState(channel: string, threadTs: string): OnboardingState | null {
   const resolved = pathResolver.resolve(onboardingStateLogicalPath(channel, threadTs));
-  if (!safeExistsSync(resolved)) return null;
-  return readJson<OnboardingState>(resolved);
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeResolved) || !safeLstat(safeResolved).isFile()) return null;
+  const state = defineCatalog<OnboardingState>({
+    id: 'slack-onboarding-state',
+    path: safeResolved,
+    schema: SLACK_ONBOARDING_STATE_SCHEMA_PATH,
+  }).load();
+  if (state.channel !== channel || state.threadTs !== threadTs) {
+    throw new Error(
+      `[SLACK_ONBOARDING_SCOPE_MISMATCH] state belongs to ${state.channel}/${state.threadTs}, expected ${channel}/${threadTs}`
+    );
+  }
+  return state;
 }
 
 export function getSlackOnboardingState(channel: string, threadTs: string): OnboardingState | null {
