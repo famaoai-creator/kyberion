@@ -247,6 +247,10 @@
       "types": "./dist/knowledge-taxonomy.d.ts",
       "default": "./dist/knowledge-taxonomy.js"
     },
+    "./volatile-knowledge": {
+      "types": "./dist/volatile-knowledge.d.ts",
+      "default": "./dist/volatile-knowledge.js"
+    },
     "./knowledge-usage-aggregate": {
       "types": "./dist/knowledge-usage-aggregate.d.ts",
       "default": "./dist/knowledge-usage-aggregate.js"

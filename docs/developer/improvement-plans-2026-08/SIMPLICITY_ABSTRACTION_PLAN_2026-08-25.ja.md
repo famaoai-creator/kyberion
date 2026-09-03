@@ -14441,6 +14441,12 @@ SX-03／SX-04 のmission completion memory promotionを再監査し、volatile m
 
 検証: mission lifecycle completion／volatile sidecar **1 file / 27 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 697
+
+SX-03／SX-04 のworking-memory sidecarを再監査し、actuator内にvolatile sidecarの型・時刻／条件検証・path導出・persisted readの手書き実装が残り、mission completion側にも別loaderが存在していた残存を修正した。coreの`volatile-knowledge` canonical loader／writerへ型とschema検証を集約し、actuatorのload／GC／index／writeとmission promotionを同じrepository／regular-file／schema boundaryへ統合した。既存のmalformed sidecar fail-closed、missing sidecar no-op、promotion／GC／rollover semanticsは維持している。
+
+検証: working-memory actuator **10 tests passed**、mission lifecycle **27 tests passed**、core／actuator build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
