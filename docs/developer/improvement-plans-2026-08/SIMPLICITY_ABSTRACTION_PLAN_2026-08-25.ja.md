@@ -14916,6 +14916,18 @@ content hash、期限切れ、filename binding、malformed entryのfail-closed s
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
 state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 749
+
+SX-03／SX-04／SX-08 のsecret bridge永続化を再監査し、OS keychain metadata registryと明示的に許可された
+file-secret fallbackがraw JSON helper／raw writeに残っていたため修正した。`keychain-registry.schema.json`
+と`file-secrets.schema.json`を追加し、service／account／timestamp metadataとservice-account secret mapの
+構造をread／write双方で`defineCatalog`検証する。provider選択、plaintext fallbackの警告、0600／0700
+permission、symlink拒否、秘密値をログへ出さない既存semanticsは維持している。
+
+検証: secret bridge **1 file / 6 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
+state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
