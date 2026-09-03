@@ -1,4 +1,4 @@
-import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 /**
  * scripts/refactor/mission-maintenance.ts
  * Maintenance and recovery operations for missions.
@@ -84,11 +84,13 @@ interface MissionFlightRecorder {
 const MISSION_FLIGHT_RECORDER_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-flight-recorder.schema.json'
 );
-const missionFlightRecorderCatalog = defineCatalog<MissionFlightRecorder>({
-  id: 'mission-flight-recorder',
-  path: MISSION_FLIGHT_RECORDER_SCHEMA_PATH,
-  schema: MISSION_FLIGHT_RECORDER_SCHEMA_PATH,
-});
+function missionFlightRecorderCatalogAtPath(filePath: string) {
+  return defineCatalog<MissionFlightRecorder>({
+    id: 'mission-flight-recorder',
+    path: filePath,
+    schema: MISSION_FLIGHT_RECORDER_SCHEMA_PATH,
+  });
+}
 
 /** Load the human-facing flight recorder through schema and regular-file checks. */
 export function loadMissionFlightRecorderAtPath(filePath: string): MissionFlightRecorder {
@@ -96,7 +98,7 @@ export function loadMissionFlightRecorderAtPath(filePath: string): MissionFlight
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[MISSION_FLIGHT_RECORDER] record must be a regular file: ${filePath}`);
   }
-  return missionFlightRecorderCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  return missionFlightRecorderCatalogAtPath(safeFilePath).load();
 }
 
 function isPathInside(parent: string, candidate: string): boolean {
@@ -585,7 +587,7 @@ export async function recordTask(
 
   const safeMissionDir = safeMissionRoot(missionDir);
   const flightRecorderPath = safeMissionArtifactPath(safeMissionDir, 'LATEST_TASK.json');
-  const flightRecorder = missionFlightRecorderCatalog.validate(
+  const flightRecorder = missionFlightRecorderCatalogAtPath(flightRecorderPath).validate(
     {
       ts: nowIso(),
       description,
