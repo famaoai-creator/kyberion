@@ -19,7 +19,7 @@ import {
   validateBrowserConversationSession,
 } from './browser-conversation-session.js';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync, safeWriteFile, safeMkdir } from './secure-io.js';
+import { safeReadFile, safeRmSync, safeWriteFile, safeMkdir } from './secure-io.js';
 
 describe('browser conversation session helpers', () => {
   const sessionDir = pathResolver.shared('runtime/browser/conversation-sessions');
@@ -66,7 +66,13 @@ describe('browser conversation session helpers', () => {
       },
     });
 
-    saveBrowserConversationSession(session);
+    saveBrowserConversationSession({
+      ...session,
+      $schema: 'https://kyberion.local/schemas/browser-conversation-session.schema.json',
+    } as typeof session);
+    expect(
+      JSON.parse(String(safeReadFile(`${sessionDir}/BRS-TEST-1.json`))).$schema
+    ).toBeUndefined();
     const loaded = loadBrowserConversationSession('BRS-TEST-1');
 
     expect(loaded?.session_id).toBe('BRS-TEST-1');
