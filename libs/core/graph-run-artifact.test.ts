@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { safeReadFile, safeRmSync } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import { createAgentCollaborationEvent } from './agent-collaboration-events.js';
 import { composeAgentCollaborationProjection } from './agent-collaboration-projection.js';
 import { deriveExecutionGraph } from './graph-scheduler.js';
@@ -59,5 +61,22 @@ describe('graph run artifact', () => {
     expect(() => persistGraphRunArtifact(artifact, '/tmp/graph-run-artifact.json')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
     );
+  });
+
+  it('persists the catalog canonical payload', () => {
+    const artifact = {
+      ...createGraphRunArtifact({ nodes: [], edges: [] } as never, 'run-canonical'),
+      $schema: 'https://example.invalid/graph-run-artifact.json',
+    } as ReturnType<typeof createGraphRunArtifact> & { $schema: string };
+    const target = pathResolver.sharedTmp('graph-run-artifact-canonical.json');
+
+    try {
+      persistGraphRunArtifact(artifact, target);
+      const persisted = JSON.parse(String(safeReadFile(target, { encoding: 'utf8' })));
+      expect(persisted.$schema).toBeUndefined();
+      expect(persisted.artifact_path).toBe(target);
+    } finally {
+      safeRmSync(target);
+    }
   });
 });
