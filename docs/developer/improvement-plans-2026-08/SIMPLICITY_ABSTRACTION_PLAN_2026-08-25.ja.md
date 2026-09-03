@@ -14309,6 +14309,12 @@ SX-03／SX-04 のMission Working Memoryを再監査し、missionごとの`.mwm-e
 
 検証: mission working memory／worker compaction **16 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`、knowledge index再生成、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 675
+
+SX-03／SX-04 のavatar registration identity readerを再監査し、既存の`personal-identity.schema.json`とcanonical loaderがあるにもかかわらず、更新対象の`my-identity.json`だけraw `readJson`と局所object判定へ分岐していた残存を修正した。`loadPersonalIdentityAtPath`へ接続し、repository／regular-file／object schema boundaryを共有してからavatar metadataを更新するようにした。新規identity作成、avatar copy、profile field更新、既存のエラーメッセージと書込みsemanticsは維持している。
+
+検証: avatar registration／personal identity **8 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

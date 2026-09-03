@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { loadPersonalIdentityAtPath } from '@agent/core/personal-identity-state';
 import {
   assertSafeRepositoryPath,
   safeCopyFileSync,
@@ -8,7 +9,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { isRecord, nowIso, readJson } from '@agent/core/foundation';
+import { isRecord, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export function normalizeIdentityRecord(value: unknown): Record<string, unknown> | null {
@@ -103,8 +104,7 @@ function main(argv: string[]) {
       throw new Error(`Identity file must be a regular file: ${identityJsonPath}`);
     }
     try {
-      const identityValue = readJson<unknown>(identityJsonPath);
-      const identity = normalizeIdentityRecord(identityValue);
+      const identity = loadPersonalIdentityAtPath(identityJsonPath);
       if (!identity) {
         throw new Error('identity JSON root must be an object');
       }
