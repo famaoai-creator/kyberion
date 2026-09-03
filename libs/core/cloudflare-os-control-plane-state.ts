@@ -1,4 +1,7 @@
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import type {
   AutoApproveRule,
   BlueprintContract,
@@ -30,6 +33,27 @@ export interface PersistedControlPlaneState {
 interface PersistedGadget {
   manifest: GadgetManifest;
   operations: Array<GadgetOperationDescriptor & { governedCode: string }>;
+}
+
+const CONTROL_PLANE_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/cloudflare-os-control-plane-state.schema.json'
+);
+
+function controlPlaneStateCatalogAtPath(filePath: string) {
+  return defineCatalog<Record<string, unknown>>({
+    id: 'cloudflare-os-control-plane-state',
+    path: filePath,
+    schema: CONTROL_PLANE_STATE_SCHEMA_PATH,
+  });
+}
+
+/** Load and fully validate a persisted control-plane projection. */
+export function loadPersistedControlPlaneStateAtPath(
+  filePath: string
+): PersistedControlPlaneState | null {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+  return parsePersistedControlPlaneState(controlPlaneStateCatalogAtPath(safePath).load());
 }
 
 type PersistedRecord = Record<string, unknown>;

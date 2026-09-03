@@ -13817,6 +13817,12 @@ SX-03／SX-04 のCowork health sync-state readerを再監査し、既存の `cow
 
 検証: Cowork health check **1 file / 11 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 593
+
+SX-03／SX-04 のCloudflare OS control-plane persisted stateを再監査し、restore／observation refreshの2経路が詳細domain parserの前段でraw `readJson`を重複使用していた残存を修正した。control-plane stateのroot schemaとpath-bound catalog loaderをstate moduleへ集約し、完全検証済みprojectionだけをrestore／refreshへ渡すよう統合した。不正JSON・未知root field・不正nested record・非regular fileのfail-closed、executor再hydration制約、observation refresh semanticsは維持している。
+
+検証: Cloudflare OS control-plane **1 file / 22 tests passed**、knowledge index同期。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

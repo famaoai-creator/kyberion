@@ -4,10 +4,9 @@ import { auditChain } from './audit-chain.js';
 import { computeApprovalPayloadHash } from './approval-store.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
-  parsePersistedControlPlaneState,
+  loadPersistedControlPlaneStateAtPath,
   type PersistedControlPlaneState,
 } from './cloudflare-os-control-plane-state.js';
 import { isRecord } from './foundation/text.js';
@@ -1171,7 +1170,8 @@ export class CloudflareOsControlPlane {
   private restoreState(): void {
     if (!safeExistsSync(this.statePath)) return;
     try {
-      const state = parsePersistedControlPlaneState(readJson<unknown>(this.statePath));
+      const state = loadPersistedControlPlaneStateAtPath(this.statePath);
+      if (!state) return;
       for (const raw of state.held || []) {
         const record = raw as unknown as HeldActionRecord;
         record.apply = () => {
@@ -1232,7 +1232,8 @@ export class CloudflareOsControlPlane {
   private refreshPersistedObservations(): void {
     if (!this.persist || !safeExistsSync(this.statePath)) return;
     try {
-      const state = parsePersistedControlPlaneState(readJson<unknown>(this.statePath));
+      const state = loadPersistedControlPlaneStateAtPath(this.statePath);
+      if (!state) return;
       this.observations.splice(0, this.observations.length, ...state.observations);
     } catch (error) {
       if (this.auditRestoreFailures) {
