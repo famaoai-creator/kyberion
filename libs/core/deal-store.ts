@@ -1,4 +1,4 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
@@ -76,11 +76,13 @@ export interface DealRecord {
 
 const DEAL_SCHEMA_PATH = pathResolver.knowledge('product/schemas/deal-record.schema.json');
 
-const dealCatalog = defineCatalog<DealRecord>({
-  id: 'deal-record',
-  path: DEAL_SCHEMA_PATH,
-  schema: DEAL_SCHEMA_PATH,
-});
+function dealCatalogAtPath(filePath: string) {
+  return defineCatalog<DealRecord>({
+    id: 'deal-record',
+    path: filePath,
+    schema: DEAL_SCHEMA_PATH,
+  });
+}
 
 function dealsDir(tenantSlug: string): string {
   if (!isValidTenantSlug(tenantSlug)) {
@@ -121,7 +123,7 @@ function appendDealLog(tenantSlug: string, event: Record<string, unknown>): void
 
 function writeDeal(deal: DealRecord): DealRecord {
   const filePath = dealPath(deal.tenant_slug, deal.deal_id);
-  const validated = validateDealRecord(dealCatalog.validate(deal, filePath));
+  const validated = validateDealRecord(dealCatalogAtPath(filePath).validate(deal, filePath));
   safeMkdir(dealsDir(deal.tenant_slug), { recursive: true });
   safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return validated;
@@ -145,9 +147,7 @@ export function loadDealAtPath(filePath: string, tenantSlug: string, dealId: str
   if (path.resolve(safeFilePath) !== path.resolve(expectedPath)) {
     throw new Error(`[DEAL_SCOPE] deal path does not match tenant/deal binding: ${filePath}`);
   }
-  const deal = validateDealRecord(
-    dealCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath)
-  );
+  const deal = validateDealRecord(dealCatalogAtPath(safeFilePath).load());
   if (deal.tenant_slug !== tenantSlug || deal.deal_id !== dealId) {
     throw new Error(`[DEAL_SCOPE] deal record binding mismatch: expected ${tenantSlug}/${dealId}`);
   }
