@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -52,6 +51,14 @@ const distillCandidateRecordCatalog = defineCatalog<DistillCandidateRecord>({
   path: DISTILL_DIR,
   schema: SCHEMA_PATH,
 });
+
+function distillCandidateRecordCatalogAtPath(filePath: string) {
+  return defineCatalog<DistillCandidateRecord>({
+    id: 'distill-candidate-record',
+    path: filePath,
+    schema: SCHEMA_PATH,
+  });
+}
 
 let distillCandidateListCache: {
   fingerprint: string;
@@ -116,7 +123,10 @@ export function loadDistillCandidateRecord(candidateId: string): DistillCandidat
   try {
     const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safeFilePath)) return null;
-    return distillCandidateRecordCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+    if (!safeLstat(safeFilePath).isFile()) {
+      throw new Error(`[DISTILL_CANDIDATE] record must be a regular file: ${filePath}`);
+    }
+    return distillCandidateRecordCatalogAtPath(safeFilePath).load();
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
     throw error;
