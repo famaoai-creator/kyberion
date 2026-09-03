@@ -34,6 +34,7 @@ import {
   isServiceConnectionReady,
   loadServiceConnectionReadinessConfig,
 } from '@agent/core/service-connection-readiness';
+import { loadServiceConnectionAtPath } from '@agent/core/service-engine-helpers';
 import { loadPersistedTrustLedger } from '@agent/core/trust-engine';
 import { loadSkillIndex } from '@agent/core/skill-index';
 import { loadStateAtPath } from '@agent/core/mission-state';
@@ -317,6 +318,14 @@ function readJsonIfExists<T>(logicalPath: string): T | null {
   }
 }
 
+function readConnectionIfExists(filePath: string): Record<string, unknown> | null {
+  try {
+    return loadServiceConnectionAtPath(filePath);
+  } catch {
+    return null;
+  }
+}
+
 export function readProviderCapabilitySnapshot(
   filePath: string
 ): ProviderCapabilitySnapshot | null {
@@ -382,7 +391,7 @@ function readConnectionReview() {
 
   const services = files.map((file) => {
     const serviceId = path.basename(file, '.json');
-    const record = readJsonIfExists<Record<string, unknown>>(file);
+    const record = readConnectionIfExists(file);
     const requirements = readiness?.required_services?.[serviceId]?.required_keys_any || [];
     const status = !record
       ? 'pending'
@@ -660,7 +669,7 @@ function drawOnboardingHome() {
   const serviceMap = new Map<string, Record<string, unknown>>();
   for (const file of connectionFiles) {
     const serviceId = path.basename(file, '.json');
-    const payload = readJsonIfExists<Record<string, unknown>>(file);
+    const payload = readConnectionIfExists(file);
     if (payload) serviceMap.set(serviceId, payload);
   }
 
