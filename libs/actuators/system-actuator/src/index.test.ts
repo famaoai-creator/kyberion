@@ -1387,13 +1387,17 @@ describe('system-actuator reconcile admission', () => {
   it('rejects a malformed persisted reconcile strategy before executing a step', async () => {
     const secureIo = await import('@agent/core/secure-io');
     vi.mocked(secureIo.safeExistsSync).mockReturnValue(true);
+    vi.spyOn(secureIo, 'safeLstat').mockReturnValue({ isFile: () => true } as never);
     vi.mocked(secureIo.safeReadFile).mockReturnValue(
       JSON.stringify({ strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }] })
     );
 
     const { handleAction } = await import('./index');
     await expect(
-      handleAction({ action: 'reconcile', strategy_path: 'strategy.json' })
+      handleAction({
+        action: 'reconcile',
+        strategy_path: 'libs/actuators/system-actuator/manifest.json',
+      })
     ).rejects.toThrow('system strategy.strategies[0].pipeline[0].params must be a JSON object');
     expect(testCore.safeExec).not.toHaveBeenCalled();
   });
