@@ -99,6 +99,10 @@ export type { OnErrorConfig, RefParams } from './src/pipeline-engine.js';
 export * from './channel-surface.js';
 
 export * from './cowork-surface.js';
+export {
+  loadCoworkArtifactPacketAtPath,
+  validateCoworkArtifactPacket,
+} from './cowork-artifact-packet.js';
 
 export * from './cowork-knowledge-bridge.js';
 
