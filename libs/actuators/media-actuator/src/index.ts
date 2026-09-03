@@ -1,7 +1,10 @@
-import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { handleMediaAction, type MediaAction } from './media-pipeline-helpers.js';
-import { runActuatorCli } from '@agent/core/cli-utils';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { opCapture } from './media-action-capture.js';
 import { opTransform } from './media-action-transform.js';
 import { opApply } from './media-action-apply.js';
@@ -17,16 +20,13 @@ async function handleAction(input: MediaAction) {
 const main = async () => {
   await runActuatorCli({
     name: 'media-actuator',
-    args: process.argv,
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/media-actuator/src/index.ts')) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'media-actuator');
 }
 
 export { handleAction };

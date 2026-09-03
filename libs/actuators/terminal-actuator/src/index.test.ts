@@ -76,6 +76,7 @@ vi.mock('@agent/core/platform-command-adapters', () => ({
 vi.mock('@agent/core/path-resolver', () => ({
   rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
   rootResolve: vi.fn((value: string) => value),
+  knowledge: vi.fn((value: string) => `/tmp/terminal-actuator-test/knowledge/${value}`),
   pathResolver: {
     rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
     rootResolve: vi.fn((value: string) => value),
