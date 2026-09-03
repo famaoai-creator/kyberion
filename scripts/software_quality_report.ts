@@ -4,18 +4,12 @@ import * as path from 'node:path';
 import {
   buildSoftwareQualityReport,
   createDefectCandidates,
-  parseSoftwareQualityContract,
-  parseTestExecutionRecord,
-  parseTestInventory,
+  loadSoftwareQualityContractAtPath,
+  loadTestExecutionRecordAtPath,
+  loadTestInventoryAtPath,
 } from '@agent/core/software-quality';
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  assertSafeRepositoryPath,
-  safeLstat,
-  safeMkdir,
-  safeWriteFile,
-} from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface SoftwareQualityReportInput {
@@ -31,13 +25,6 @@ export interface SoftwareQualityReportInput {
 
 export function resolveQualityArtifactPath(filePath: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(pathResolver.resolve(filePath), { allowMissingLeaf });
-}
-
-function requireQualityInput(filePath: string, label: string): string {
-  if (!safeLstat(filePath).isFile()) {
-    throw new Error(`${label} must be a regular file: ${filePath}`);
-  }
-  return filePath;
 }
 
 function writeJson(filePath: string, value: unknown): void {
@@ -56,18 +43,9 @@ export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInp
   const inventoryPath = resolveQualityArtifactPath(input.inventoryPath);
   const executionPath = resolveQualityArtifactPath(input.executionPath);
   const outputPath = resolveQualityArtifactPath(input.outputPath, true);
-  const contract = parseSoftwareQualityContract(
-    readJson<unknown>(requireQualityInput(contractPath, 'contract'))
-  );
-  const inventory = parseTestInventory(
-    readJson<unknown>(requireQualityInput(inventoryPath, 'inventory'))
-  );
-  const execution = parseTestExecutionRecord(
-    readJson<unknown>(requireQualityInput(executionPath, 'execution'))
-  );
-  if (!contract) throw new Error('contract must match software-quality-contract schema');
-  if (!inventory) throw new Error('inventory must match test-inventory schema');
-  if (!execution) throw new Error('execution must match test-execution-record schema');
+  const contract = loadSoftwareQualityContractAtPath(contractPath);
+  const inventory = loadTestInventoryAtPath(inventoryPath);
+  const execution = loadTestExecutionRecordAtPath(executionPath);
   const summary = buildSoftwareQualityReport({
     contract,
     inventory,

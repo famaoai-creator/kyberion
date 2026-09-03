@@ -9519,7 +9519,7 @@
     {
       "path": "product/schemas/software-quality-contract.schema.json",
       "tier": "public",
-      "size": 3278,
+      "size": 3312,
       "type": "json"
     },
     {

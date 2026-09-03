@@ -1,4 +1,7 @@
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
 export type QualityCheckStatus = 'pending' | 'passed' | 'failed' | 'waived';
 
@@ -104,6 +107,45 @@ export interface TestExecutionRecord {
   started_at?: string;
   finished_at?: string;
   results: TestExecutionResult[];
+}
+
+const QUALITY_INPUT_SCHEMAS = {
+  contract: pathResolver.knowledge('product/schemas/software-quality-contract.schema.json'),
+  inventory: pathResolver.knowledge('product/schemas/test-inventory.schema.json'),
+  execution: pathResolver.knowledge('product/schemas/test-execution-record.schema.json'),
+} as const;
+
+function loadQualityInputAtPath<T>(
+  filePath: string,
+  kind: keyof typeof QUALITY_INPUT_SCHEMAS,
+  parse: (value: unknown) => T | null
+): T {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`Software quality ${kind} must be a regular file: ${safePath}`);
+  }
+  const value = defineCatalog<unknown>({
+    id: `software-quality-${kind}`,
+    path: safePath,
+    schema: QUALITY_INPUT_SCHEMAS[kind],
+  }).load();
+  const parsed = parse(value);
+  if (!parsed) {
+    throw new Error(`Invalid software quality ${kind}: ${safePath}`);
+  }
+  return parsed;
+}
+
+export function loadSoftwareQualityContractAtPath(filePath: string): SoftwareQualityContract {
+  return loadQualityInputAtPath(filePath, 'contract', parseSoftwareQualityContract);
+}
+
+export function loadTestInventoryAtPath(filePath: string): TestInventory {
+  return loadQualityInputAtPath(filePath, 'inventory', parseTestInventory);
+}
+
+export function loadTestExecutionRecordAtPath(filePath: string): TestExecutionRecord {
+  return loadQualityInputAtPath(filePath, 'execution', parseTestExecutionRecord);
 }
 
 const QUALITY_CHECK_STATUSES = new Set<QualityCheckStatus>([
