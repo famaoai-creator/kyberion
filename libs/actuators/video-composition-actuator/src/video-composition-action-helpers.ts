@@ -2,7 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { authorSceneCompositions } from '@agent/core/video-scene-composition';
 import { generateVideoMotionDirection } from '@agent/core/video-motion-direction';
 import { generateVideoVisualDirection } from '@agent/core/video-visual-direction';
-import { nowIso, readJsonIfPresent } from '@agent/core/foundation';
+import { defineCatalog, nowIso, type GovernedCatalog } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -162,6 +162,28 @@ interface VideoCompositionJobTicket {
   diagnostics?: VideoCompositionJobDiagnostics | null;
 }
 
+const VIDEO_COMPOSITION_JOB_TICKET_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/video-composition-job-ticket.schema.json'
+);
+const videoCompositionJobTicketCatalogs = new Map<
+  string,
+  GovernedCatalog<VideoCompositionJobTicket>
+>();
+
+function videoCompositionJobTicketCatalogAtPath(
+  ticketPath: string
+): GovernedCatalog<VideoCompositionJobTicket> {
+  const existing = videoCompositionJobTicketCatalogs.get(ticketPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<VideoCompositionJobTicket>({
+    id: 'video-composition-job-ticket',
+    path: ticketPath,
+    schema: VIDEO_COMPOSITION_JOB_TICKET_SCHEMA_PATH,
+  });
+  videoCompositionJobTicketCatalogs.set(ticketPath, catalog);
+  return catalog;
+}
+
 const DETACHED_WORKER_SCRIPT = pathResolver.rootResolve(
   'dist/libs/actuators/video-composition-actuator/src/index.js'
 );
@@ -177,11 +199,22 @@ function writeVideoCompositionJobTicket(
   ticket: VideoCompositionJobTicket
 ): void {
   safeMkdir(path.dirname(ticketPath), { recursive: true });
-  safeWriteFile(ticketPath, JSON.stringify(ticket, null, 2));
+  const validated = videoCompositionJobTicketCatalogAtPath(ticketPath).validate(ticket, ticketPath);
+  safeWriteFile(ticketPath, JSON.stringify(validated, null, 2));
 }
 
 function readVideoCompositionJobTicket(ticketPath: string): VideoCompositionJobTicket | null {
-  return readJsonIfPresent<VideoCompositionJobTicket>(ticketPath);
+  try {
+    return videoCompositionJobTicketCatalogAtPath(ticketPath).load();
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith('Catalog video-composition-job-ticket is missing:')
+    ) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function spawnDetachedVideoCompositionWorker(inputPath: string): ChildProcess | null {

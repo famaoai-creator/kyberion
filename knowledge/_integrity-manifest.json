@@ -10123,6 +10123,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/video-composition-job-ticket.schema.json",
+      "tier": "public",
+      "size": 2500,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/video-composition-template-registry.schema.json",
       "tier": "public",
       "size": 1725,
