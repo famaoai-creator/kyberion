@@ -14135,6 +14135,12 @@ SX-03／SX-04 のops-alert JSONLを再監査し、運用アラート、undeliver
 
 検証: ops-alert／operator-notifications **2 files / 23 tests passed**、Virtual Officeのschema-valid alert projection focused test **1 passed**、対象lint、typecheck、Prettier、`git diff --check`。全Virtual Office suiteには今回の変更を外した状態でも再現する既存deal fixture失敗2件が残る。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 646
+
+SX-03／SX-04 のpipeline run journalを再監査し、payloadはevent kernelで検証されている一方、永続envelopeはlegacy migration後の手書きshape判定に残り、v3の未知top-level fieldをmigrationで捨てられる残存を修正した。pipeline journal event専用schemaとpath-bound canonical catalogを追加し、append前とresume前のenvelopeを検証し、v3 raw recordはmigration前にも未知fieldを拒否するようにした。v1／v2のlegacy alias migration、sequence／run binding、payload／restore projection、corrupt journalのfail-closed semanticsは維持している。
+
+検証: pipeline run journal **1 file / 8 tests passed**、対象lint、typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
