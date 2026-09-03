@@ -70,13 +70,11 @@ describe('grok-api-backend', () => {
   });
 
   it('inlines validated image attachments using the OpenAI vision message shape', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ choices: [{ message: { content: 'A Kyberion mark.' } }] }), {
-          status: 200,
-        })
-      );
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: 'A Kyberion mark.' } }] }), {
+        status: 200,
+      })
+    );
     vi.stubGlobal('fetch', fetchMock);
     const backend = buildGrokApiBackendFromEnv({ XAI_API_KEY: 'xai-test-key' });
 
@@ -120,5 +118,27 @@ describe('grok-api-backend', () => {
     });
     expect(probe.available).toBe(false);
     expect(probe.reason).toMatch(/grok-4\.6/);
+  });
+
+  it('rejects a primitive or array models response before projecting model ids', async () => {
+    for (const payload of [null, [], 'models']) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload))));
+      const probe = await probeGrokApiBackendAvailability({ XAI_API_KEY: 'xai-test-key' });
+      expect(probe.available).toBe(false);
+      expect(probe.reason).toContain('malformed');
+    }
+  });
+
+  it('rejects dangerous and malformed model entries fail-closed', async () => {
+    for (const payload of [
+      { data: [{ id: 'grok-4.6', constructor: {} }] },
+      { data: [{ id: 42 }] },
+      { data: ['grok-4.6'] },
+    ]) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload))));
+      const probe = await probeGrokApiBackendAvailability({ XAI_API_KEY: 'xai-test-key' });
+      expect(probe.available).toBe(false);
+      expect(probe.reason).toContain('malformed');
+    }
   });
 });
