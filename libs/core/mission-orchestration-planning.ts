@@ -4,7 +4,6 @@ import { logger } from './core.js';
 import { emitChannelSurfaceEvent } from './surface-artifact-store.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import { missionDir, rootDir } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { reportProviderTemporarilyUnhealthy } from './provider-health-registry.js';
 import { agentRegistry } from './agent-registry.js';
@@ -23,6 +22,7 @@ import {
 } from './mission-planning-packet.js';
 import { extractPlanningPacketBlocks } from './planning-packet-contract.js';
 import { evaluateMissionGate } from './mission-gate-engine.js';
+import { loadMissionGateRecordAtPath } from './mission-orchestration-phase-gates.js';
 import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 import { payloadSurface, type SlackPayload } from './mission-orchestration-worker-contracts.js';
 import type { PlanningPacket } from './channel-surface.js';
@@ -107,7 +107,7 @@ async function recordPlanningPacketGate(input: {
     evidenceDir: `${missionDir(input.missionId, 'public')}/gates`,
   });
   if (evaluation.evidence_path) {
-    const current = readJson<Record<string, unknown>>(evaluation.evidence_path);
+    const current = loadMissionGateRecordAtPath(evaluation.evidence_path, input.missionId);
     writeProvisionedJson({
       missionId: input.missionId,
       filePath: evaluation.evidence_path,
