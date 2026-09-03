@@ -8,11 +8,12 @@ import {
   readKnowledgeScopeHealthCount,
   writeKnowledgeScopeHealthCount,
 } from '@agent/core/knowledge-scope-health-history';
+import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge-scope-check-policy';
 import { safeExistsSync, safeStat } from '@agent/core/secure-io';
 import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { withExecutionContext } from '@agent/core/authority';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type HealthRow = {
@@ -73,17 +74,7 @@ export function evaluateLegacyQuarantine(
 
 function legacyQuarantineTtlDays(): number {
   const policyPath = pathResolver.knowledge('product/governance/knowledge-scope-check.json');
-  try {
-    const parsed = readJson<{
-      legacy_quarantine_ttl_days?: unknown;
-    }>(policyPath);
-    return typeof parsed.legacy_quarantine_ttl_days === 'number' &&
-      parsed.legacy_quarantine_ttl_days >= 0
-      ? parsed.legacy_quarantine_ttl_days
-      : 14;
-  } catch {
-    return 14;
-  }
+  return loadKnowledgeScopeCheckPolicy(policyPath)?.legacy_quarantine_ttl_days ?? 14;
 }
 
 function healthHistoryPath(): string {
