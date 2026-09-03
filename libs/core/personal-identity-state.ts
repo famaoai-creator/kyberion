@@ -1,6 +1,6 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 
 const PERSONAL_IDENTITY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/personal-identity.schema.json'
@@ -50,4 +50,30 @@ export function loadPersonalAgentIdentityAtPath(filePath: string): Record<string
   return loadIdentityCatalogAtPath(filePath, (safePath) =>
     personalAgentIdentityCatalogAtPath(safePath).load()
   );
+}
+
+export function writePersonalIdentityAtPath(
+  filePath: string,
+  identity: Record<string, unknown>
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = personalIdentityCatalogAtPath(safePath).validate(identity, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2) + '\n', {
+    mkdir: true,
+    encoding: 'utf8',
+  });
+  return safePath;
+}
+
+export function writePersonalAgentIdentityAtPath(
+  filePath: string,
+  identity: Record<string, unknown>
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = personalAgentIdentityCatalogAtPath(safePath).validate(identity, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2) + '\n', {
+    mkdir: true,
+    encoding: 'utf8',
+  });
+  return safePath;
 }
