@@ -15734,6 +15734,15 @@ production `process.argv` 直読は helperを含めて **0件**となった。
 
 検証: file／process／meeting actuator **3 files / 49 tests passed**、対象ESLint、root typecheck、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。SX-03 の追加script／state loader、SX-04 の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 819
+
+SX-05 の細粒度 verb registry を再監査し、ハーネス化済みの offline review stamp が個別 script からしか発見できない残存を
+修正した。`knowledge/product/governance/cli-commands.json` に `review stamp` を module-backed operator command として追加し、
+既存の `--remove`／`--dry-run`／`--check`／`--json` 契約をそのまま governed `kyberion` 入口から利用できるようにした。
+常駐して終了しない review server は一回実行用の script registryへ誤登録せず、既存の直接起動経路を維持した。
+
+検証: CLI manifest gate **1 gate passed**、CLI manifest／Kyberion **2 files / 31 tests passed**、実機 `pnpm exec tsx scripts/kyberion.ts review stamp presence/displays/presence-studio/static/onboarding.html --dry-run --json`（`ok: true`、対象HTML未変更）、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。SX-03 の追加script／state loader、SX-04 の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
