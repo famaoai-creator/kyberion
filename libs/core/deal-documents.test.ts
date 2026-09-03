@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { loadContractReviewAtPath, recordContractReview } from './deal-documents.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const TENANT = 'deal-review-loader-test';
 const DEAL_ID = 'DEAL-REVIEW-001';
@@ -58,6 +58,24 @@ describe('deal document contract review loader', () => {
     expect(() => loadContractReviewAtPath(filePath, TENANT, DEAL_ID, 2)).toThrow(
       'binding mismatch'
     );
+  });
+
+  it('rejects an invalid review before persisting it', () => {
+    const filePath = pathResolver.rootResolve(
+      `customer/${TENANT}/deals/${DEAL_ID}/contract-review-v1.json`
+    );
+    expect(() =>
+      withExecutionContext('mission_controller', () =>
+        recordContractReview({
+          tenantSlug: TENANT,
+          dealId: DEAL_ID,
+          version: 1,
+          verdict: 'approve',
+          reviewer: '',
+        })
+      )
+    ).toThrow(/Invalid catalog contract-review-record/);
+    expect(safeExistsSync(filePath)).toBe(false);
   });
 
   it('rejects a directory at the review record path', () => {
