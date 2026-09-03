@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/meeting-attendees.schema.json",
+  "title": "Meeting attendees",
+  "description": "Validated participant input for the meeting orchestrator.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name"],
+    "properties": {
+      "name": { "type": "string", "minLength": 1 },
+      "person_slug": { "type": "string", "minLength": 1 },
+      "channel_handle": { "type": "string", "minLength": 1 },
+      "role_hint": {
+        "type": "string",
+        "enum": ["planner", "facilitator", "scribe", "executor", "decision_maker", "tracker"]
+      }
+    }
+  }
+}
