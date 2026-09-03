@@ -25,6 +25,7 @@ const DESIGN_FILE = 'design-spec.json';
 const TEST_PLAN_FILE = 'test-plan.json';
 const TASK_PLAN_FILE = 'task-plan.json';
 const DESIGN_SCHEMA_PATH = pathResolver.knowledge('product/schemas/design-spec.schema.json');
+const TEST_PLAN_SCHEMA_PATH = pathResolver.knowledge('product/schemas/test-plan.schema.json');
 const TASK_PLAN_SCHEMA_PATH = pathResolver.knowledge('product/schemas/task-plan.schema.json');
 
 export interface DesignSpec extends ExtractedDesignSpec {
@@ -145,7 +146,7 @@ export interface SaveTestPlanParams {
 }
 
 export function readTestPlan(missionId: string): TestPlan | null {
-  return readArtifact<TestPlan>(missionId, TEST_PLAN_FILE);
+  return readArtifact<TestPlan>(missionId, TEST_PLAN_FILE, TEST_PLAN_SCHEMA_PATH);
 }
 
 export function saveTestPlan(params: SaveTestPlanParams): TestPlan {
@@ -159,7 +160,7 @@ export function saveTestPlan(params: SaveTestPlanParams): TestPlan {
     generated_at: nowIso(),
     ...(params.generatedBy ? { generated_by: params.generatedBy } : {}),
   };
-  writeArtifact(params.missionId, TEST_PLAN_FILE, plan);
+  writeArtifact(params.missionId, TEST_PLAN_FILE, plan, TEST_PLAN_SCHEMA_PATH);
   return plan;
 }
 

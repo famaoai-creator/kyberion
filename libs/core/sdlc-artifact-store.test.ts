@@ -246,6 +246,24 @@ describe('sdlc-artifact-store', () => {
       expect(gate.passed).toBe(false);
       expect(gate.reasons[0]).toContain('FR-2');
     });
+
+    it('persists and reads test plans through the governed schema', () => {
+      const saved = saveTestPlan({
+        missionId: 'MSN-T-CANONICAL',
+        projectName: 'Canonical Project',
+        extracted: {
+          ...testExtracted,
+          $schema: 'governance-metadata',
+        } as unknown as typeof testExtracted,
+      });
+
+      const persisted = JSON.parse(
+        String(safeReadFile(path.join(tmpDir, 'test-plan.json'), { encoding: 'utf8' }))
+      ) as Record<string, unknown>;
+      expect(saved).toHaveProperty('app_id', 'sample-app');
+      expect(persisted).not.toHaveProperty('$schema');
+      expect(readTestPlan('MSN-T-CANONICAL')?.cases).toHaveLength(1);
+    });
   });
 
   describe('task plan', () => {
