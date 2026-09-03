@@ -79,7 +79,35 @@ describe('agent-runtime-supervisor', () => {
     );
     try {
       expect(() => loadMissionTeamPrewarmRequest(requestPath)).toThrow(
-        '[AGENT_RUNTIME_REQUEST_INVALID] team_roles must be an array of non-empty strings'
+        /Invalid catalog agent-runtime-ensure-request/
+      );
+    } finally {
+      safeRmSync(requestPath, { force: true });
+    }
+  });
+
+  it('rejects unknown persisted scope fields at the catalog boundary', async () => {
+    const { getAgentRuntimeEnsureRequestPath, loadMissionTeamPrewarmRequest } =
+      await import('./agent-runtime-supervisor.js');
+    const requestPath = getAgentRuntimeEnsureRequestPath(`AR-SCOPE-${process.pid}`);
+    safeWriteFile(
+      requestPath,
+      JSON.stringify({
+        request_id: path.basename(requestPath, '.json'),
+        mission_id: 'MSN-PREWARM',
+        scope: {
+          scope_kind: 'mission',
+          tier: 'public',
+          mission_id: 'MSN-PREWARM',
+          tenant: 'unexpected',
+        },
+        requested_by: 'test',
+        created_at: '2026-09-03T00:00:00.000Z',
+      })
+    );
+    try {
+      expect(() => loadMissionTeamPrewarmRequest(requestPath)).toThrow(
+        /Invalid catalog agent-runtime-ensure-request/
       );
     } finally {
       safeRmSync(requestPath, { force: true });
