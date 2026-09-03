@@ -1,5 +1,5 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 
 import { collectTraceFeed } from './trace-feed';
@@ -40,6 +40,31 @@ const TRACE_WINDOW_MS = 60 * 60 * 1000;
 const RED_ERROR_RATE = 0.5;
 const RED_MIN_SAMPLES = 5;
 
+function parseProviderDemotion(value: unknown): ProviderDemotionStatus | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'provider demotion');
+    const provider = record.provider;
+    const instance = record.instance;
+    const until = record.until;
+    const reason = record.reason;
+    if (
+      typeof provider !== 'string' ||
+      provider.trim() === '' ||
+      typeof instance !== 'string' ||
+      instance.trim() === '' ||
+      typeof reason !== 'string' ||
+      reason.trim() === '' ||
+      typeof until !== 'number' ||
+      !Number.isFinite(until)
+    ) {
+      return null;
+    }
+    return { provider, instance, until, reason };
+  } catch {
+    return null;
+  }
+}
+
 export function collectProviderDemotions(
   now: number = Date.now(),
   statePath: string = pathResolver.active('shared/runtime/provider-health.json')
@@ -47,10 +72,11 @@ export function collectProviderDemotions(
   try {
     const safePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
-    const parsed = readJson<{ demotions?: ProviderDemotionStatus[] }>(safePath);
-    return (parsed.demotions || []).filter(
-      (entry) => entry?.provider && Number.isFinite(entry.until) && entry.until > now
-    );
+    const parsed = parseSafeJsonObjectValue(readJson<unknown>(safePath), 'provider health state');
+    if (!Array.isArray(parsed.demotions)) return [];
+    return parsed.demotions
+      .map(parseProviderDemotion)
+      .filter((entry): entry is ProviderDemotionStatus => entry !== null && entry.until > now);
   } catch {
     return [];
   }

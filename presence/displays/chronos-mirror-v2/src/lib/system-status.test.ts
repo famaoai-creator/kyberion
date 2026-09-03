@@ -41,6 +41,29 @@ describe('collectProviderDemotions', () => {
     expect(collectProviderDemotions(T0, statePath)).toEqual([]);
   });
 
+  it('fails closed for unsafe or incorrectly typed demotion records', () => {
+    const dir = pathResolver.sharedTmp(`system-status-tests/${Date.now()}-unsafe`);
+    safeMkdir(dir, { recursive: true });
+    const statePath = path.join(dir, 'provider-health.json');
+    safeWriteFile(
+      statePath,
+      JSON.stringify({
+        demotions: [
+          {
+            provider: 'codex',
+            instance: 'default',
+            until: T0 + 60_000,
+            reason: 'rate_limited',
+            ['__proto__']: { poisoned: true },
+          },
+          { provider: 'gemini', instance: 7, until: T0 + 60_000, reason: 'invalid' },
+        ],
+      })
+    );
+
+    expect(collectProviderDemotions(T0, statePath)).toEqual([]);
+  });
+
   it('does not follow a symlinked provider health state file', () => {
     const dir = pathResolver.sharedTmp(`system-status-tests/${Date.now()}-linked`);
     safeMkdir(dir, { recursive: true });
