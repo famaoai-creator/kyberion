@@ -8,6 +8,7 @@ import {
   readJsonFileSafe,
   writeFocusedMissionId,
 } from './mission-state.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 
 const rootDir = pathResolver.sharedTmp('mission-state-loader-test');
@@ -83,5 +84,15 @@ describe('mission-state loader', () => {
     safeWriteFile(target, JSON.stringify({ mission_id: missionId, ts: 'now', unexpected: true }));
 
     expect(readFocusedMissionId(target)).toBeNull();
+  });
+
+  it('rejects an invalid mission state before persisting it', () => {
+    const target = `${rootDir}/invalid-mission-state.json`;
+    expect(() =>
+      writeMissionStateAtPath(target, {
+        mission_id: missionId,
+        status: 'active',
+      } as unknown as Parameters<typeof writeMissionStateAtPath>[1])
+    ).toThrow(/Invalid catalog mission-state/);
   });
 });
