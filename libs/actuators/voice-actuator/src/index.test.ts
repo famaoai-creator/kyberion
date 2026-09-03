@@ -497,7 +497,8 @@ vi.mock('node:crypto', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/foundation', () => ({
+vi.mock('@agent/core/foundation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
   compileSchema: mocks.compileSchemaFromPath,
   getRegisteredEnvText: (name: string) => process.env[name],
   nowIso: vi.fn(() => '2026-01-01T00:00:00.000Z'),
