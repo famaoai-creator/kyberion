@@ -14766,6 +14766,19 @@ shutdown policyの意味検証とmissing／malformed stateの既存semanticsは�
 境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了
 である。
 
+## 2026-09-04 再レビュー修正 737
+
+SX-03／SX-04 のenvironment capability setup receiptを再監査し、manifestはgoverned catalogへ移行済みで
+ある一方、bootstrapが生成するreceiptだけがraw `readJson`／schemaなしwriteに残っていたため修正した。
+専用`environment-setup-receipt.schema.json`とcatalog loader／write validationを追加し、receiptの既知
+envelope fieldと未知field拒否を共有した。`verifyReady`がmalformedなtimestamp／arrayを個別のreadiness
+failureとして報告する既存semantics、mission／shared receipt path、欠損時のfail-closedは維持している。
+
+検証: environment capability **1 file / 37 tests passed**、core build、root typecheck、対象lint、
+Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure
+mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了
+である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

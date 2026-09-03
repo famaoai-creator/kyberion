@@ -500,6 +500,24 @@ describe('verifyReady', () => {
     delete process.env.PROBE_VERIFY_READY;
   });
 
+  it('rejects receipts with unknown persisted fields', async () => {
+    process.env.PROBE_VERIFY_READY = 'set';
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-manifest-i4',
+      version: 'test',
+      capabilities: [],
+    };
+    await bootstrapManifest(manifest, { mission_id: FIX_MISSION, apply: true });
+    const receipt = JSON.parse(fs.readFileSync(receiptPath(manifest.manifest_id), 'utf8'));
+    receipt.unexpected = true;
+    fs.writeFileSync(receiptPath(manifest.manifest_id), JSON.stringify(receipt, null, 2));
+
+    const report = verifyReady(manifest, { mission_id: FIX_MISSION });
+    expect(report.ready).toBe(false);
+    expect(report.missing).toHaveLength(0);
+    delete process.env.PROBE_VERIFY_READY;
+  });
+
   it('blocks on required unsatisfied capabilities but not optional ones', async () => {
     delete process.env.PROBE_VERIFY_REQUIRED_MISSING;
     delete process.env.PROBE_VERIFY_OPTIONAL_MISSING;
