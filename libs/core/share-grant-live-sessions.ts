@@ -1,6 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { safeExistsSync, safeFsyncFile, safeWriteFile } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
 import type {
@@ -52,6 +52,17 @@ function requiredTimestamp(value: unknown, label: string): string {
 
 const LIVE_SESSION_STATE_FIELDS = ['version', 'sessions', 'revokedScopes'] as const;
 const LIVE_SESSION_FIELDS = ['sessionId', 'linkId', 'resourceRef', 'connectedAt'] as const;
+const LIVE_SESSION_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/share-grant-live-session-state.schema.json'
+);
+
+function liveSessionStateCatalog(filePath: string) {
+  return defineCatalog<PersistedLiveSessionState>({
+    id: 'share-grant-live-session-state',
+    path: filePath,
+    schema: LIVE_SESSION_STATE_SCHEMA_PATH,
+  });
+}
 
 function parsePersistedLiveSessionState(value: unknown): PersistedLiveSessionState {
   const root = parseSafeJsonObjectValue(value, 'live-session state');
@@ -217,7 +228,7 @@ export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvict
     if (!safeExistsSync(this.#storePath)) return;
     let parsed: PersistedLiveSessionState;
     try {
-      parsed = parsePersistedLiveSessionState(readJson<unknown>(this.#storePath));
+      parsed = parsePersistedLiveSessionState(liveSessionStateCatalog(this.#storePath).load());
     } catch (error) {
       if (error instanceof ShareGrantLiveSessionValidationError) throw error;
       throw new ShareGrantLiveSessionValidationError(
@@ -245,19 +256,18 @@ export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvict
   }
 
   #persistState(): void {
-    safeWriteFile(
-      this.#storePath,
-      `${JSON.stringify(
-        {
-          version: 1,
-          sessions: [...this.#sessions.values()],
-          revokedScopes: [...this.#revokedScopes],
-        } satisfies PersistedLiveSessionState,
-        null,
-        2
-      )}\n`,
-      { encoding: 'utf8', mkdir: true }
+    const state = liveSessionStateCatalog(this.#storePath).validate(
+      {
+        version: 1,
+        sessions: [...this.#sessions.values()],
+        revokedScopes: [...this.#revokedScopes],
+      } satisfies PersistedLiveSessionState,
+      this.#storePath
     );
+    safeWriteFile(this.#storePath, `${JSON.stringify(state, null, 2)}\n`, {
+      encoding: 'utf8',
+      mkdir: true,
+    });
     safeFsyncFile(this.#storePath);
   }
 }
