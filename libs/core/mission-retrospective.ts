@@ -625,8 +625,11 @@ export async function runMissionRetrospective(
     const recordedAt = nowIso();
     recordAgentRoleOutcomes(
       stats.item_outcomes.map((outcome) => ({
-        ...outcome,
         mission_id: missionId,
+        task_id: outcome.task_id,
+        team_role: outcome.team_role,
+        assignee: outcome.assignee,
+        final_status: outcome.final_status,
         recorded_at: recordedAt,
       }))
     );
