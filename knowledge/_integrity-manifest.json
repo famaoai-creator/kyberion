@@ -9207,7 +9207,7 @@
     {
       "path": "product/schemas/service-presets.schema.json",
       "tier": "public",
-      "size": 3325,
+      "size": 3311,
       "type": "json"
     },
     {
