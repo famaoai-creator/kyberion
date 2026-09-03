@@ -739,6 +739,10 @@
       "types": "./dist/knowledge-scope-health-history.d.ts",
       "default": "./dist/knowledge-scope-health-history.js"
     },
+    "./knowledge-scope-check-policy": {
+      "types": "./dist/knowledge-scope-check-policy.d.ts",
+      "default": "./dist/knowledge-scope-check-policy.js"
+    },
     "./nhi-lifecycle-governance": {
       "types": "./dist/nhi-lifecycle-governance.d.ts",
       "default": "./dist/nhi-lifecycle-governance.js"
