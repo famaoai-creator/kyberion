@@ -15,17 +15,14 @@
 
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
+import { readMigrationState, writeMigrationState } from '@agent/core/migration-state';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
-  safeLstat,
-  safeMkdir,
   safeReaddir,
   safeStat,
-  safeWriteFile,
 } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -36,10 +33,6 @@ interface MigrationModule {
   introduced_in?: string;
   migrate?: (opts: { dryRun: boolean }) => Promise<void> | void;
   rollback?: (opts: { dryRun: boolean }) => Promise<void> | void;
-}
-
-interface MigrationState {
-  applied: string[];
 }
 
 interface RunnerOptions {
@@ -81,37 +74,6 @@ function listMigrationFiles(dir: string): string[] {
     entries.push(filePath);
   }
   return entries.sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
-}
-
-function readState(statePath: string): MigrationState {
-  if (!safeExistsSync(statePath)) return { applied: [] };
-  if (!safeLstat(statePath).isFile()) {
-    throw new Error(`Migration state must be a regular file: ${statePath}`);
-  }
-  try {
-    const parsed = parseSafeJsonObjectValue(readJson<unknown>(statePath), 'migration state');
-    const keys = Object.keys(parsed);
-    if (keys.some((key) => key !== 'applied') || !Array.isArray(parsed.applied)) {
-      return { applied: [] };
-    }
-    const applied = parsed.applied;
-    if (
-      applied.some((value) => typeof value !== 'string' || value.trim().length === 0) ||
-      new Set(applied).size !== applied.length
-    ) {
-      return { applied: [] };
-    }
-    return { applied: [...applied] };
-  } catch (err: any) {
-    throw new Error(`Failed to read migration state at ${statePath}: ${err?.message ?? err}`);
-  }
-}
-
-function writeState(statePath: string, state: MigrationState): void {
-  safeMkdir(path.dirname(statePath), { recursive: true });
-  safeWriteFile(statePath, `${JSON.stringify({ applied: state.applied }, null, 2)}\n`, {
-    encoding: 'utf8',
-  });
 }
 
 async function loadMigrationModule(filePath: string): Promise<MigrationModule> {
@@ -157,7 +119,7 @@ export async function runMigrations(
   const migrationDir = assertSafeRepositoryPath(opts.dir, { allowMissingLeaf: true });
   const statePath = assertSafeRepositoryPath(opts.statePath, { allowMissingLeaf: true });
   const files = listMigrationFiles(migrationDir);
-  const state = readState(statePath);
+  const state = readMigrationState(statePath);
   const applied = new Set(state.applied);
   const pendingFiles = files.filter((file) => !applied.has(migrationIdFromFile(file)));
   const pending = pendingFiles.map(migrationIdFromFile);
@@ -186,7 +148,7 @@ export async function runMigrations(
     await rollbackMigration(targetFile, opts.dryRun);
     if (!opts.dryRun) {
       state.applied = state.applied.filter((id) => id !== latestAppliedId);
-      writeState(statePath, state);
+      writeMigrationState(statePath, state);
     }
     return { applied: state.applied, pending };
   }
@@ -200,7 +162,7 @@ export async function runMigrations(
     const migration = await runMigration(file, opts.dryRun);
     if (!opts.dryRun) {
       state.applied.push(migration.id);
-      writeState(statePath, state);
+      writeMigrationState(statePath, state);
     }
   }
 
@@ -247,4 +209,9 @@ if (
   })();
 }
 
-export { main as runMigrationsCli, listMigrationFiles, readState, writeState };
+export {
+  main as runMigrationsCli,
+  listMigrationFiles,
+  readMigrationState as readState,
+  writeMigrationState as writeState,
+};
