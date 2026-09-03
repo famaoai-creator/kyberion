@@ -12,6 +12,7 @@ import {
 import {
   loadServiceRecordingAtPath,
   serviceRecordingContentHash,
+  validateServiceRecording,
   type ServiceRecording,
 } from '@agent/core/service-recording';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
@@ -214,6 +215,10 @@ function review(args: Record<string, string>): CommandResult {
   };
   if (status === 'approved') {
     updated.review.content_hash = serviceRecordingContentHash(updated);
+  }
+  const validation = validateServiceRecording(updated);
+  if (!validation.value) {
+    throw new Error(`Invalid service recording review: ${validation.errors.join('; ')}`);
   }
   withExecutionContext('surface_runtime', () =>
     safeWriteFile(loaded.absolute, `${JSON.stringify(updated, null, 2)}\n`)
