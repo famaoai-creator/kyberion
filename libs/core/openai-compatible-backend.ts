@@ -271,6 +271,24 @@ function parseChatCompletionPayload(value: unknown): ChatCompletionResponse | nu
   }
 }
 
+function parseChatCompletionDelta(value: unknown): string | null {
+  try {
+    const root = parseSafeJsonObjectValue(value, 'OpenAI-compatible streaming response');
+    if (!Array.isArray(root.choices) || !root.choices[0]) return null;
+    const choice = parseSafeJsonObjectValue(
+      root.choices[0],
+      'OpenAI-compatible streaming response.choices[0]'
+    );
+    const delta = parseSafeJsonObjectValue(
+      choice.delta,
+      'OpenAI-compatible streaming response.choices[0].delta'
+    );
+    return typeof delta.content === 'string' ? delta.content : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeBaseUrl(baseURL: string, providerPreset?: LocalLlmProviderPreset): string {
   let trimmed = baseURL.trim();
   if (!trimmed) throw new Error('Missing baseURL for OpenAI-compatible backend');
@@ -758,7 +776,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     });
     if (!response.ok) {
       const text = await response.text();
-      const parsed = safeJsonParse(text) as ChatCompletionResponse | null;
+      const parsed = parseChatCompletionPayload(safeJsonParse(text));
       throw new Error(
         `[openai-compatible] streaming chat completion failed: ${parsed?.error?.message || text || `HTTP ${response.status}`}`
       );
@@ -773,11 +791,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       if (!trimmed.startsWith('data:')) return null;
       const data = trimmed.slice(5).trim();
       if (!data || data === '[DONE]') return null;
-      const parsed = safeJsonParse(data) as {
-        choices?: Array<{ delta?: { content?: unknown } }>;
-      } | null;
-      const content = parsed?.choices?.[0]?.delta?.content;
-      return typeof content === 'string' ? content : null;
+      return parseChatCompletionDelta(safeJsonParse(data));
     };
 
     for (;;) {
@@ -800,7 +814,15 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     if (!this.toolsEnabled || !this.allowedTools.has(name as ReasoningToolName)) {
       return `Error: Tool ${name} is not enabled for this reasoning route.`;
     }
-    const args = (safeJsonParse(rawArguments) as Record<string, unknown>) || {};
+    let args: Record<string, unknown>;
+    try {
+      args = parseSafeJsonObjectValue(
+        safeJsonParse(rawArguments),
+        `OpenAI-compatible tool '${name}' arguments`
+      );
+    } catch {
+      return `Error: Tool ${name} arguments must be a JSON object.`;
+    }
     logger.info(`[LOCAL_LLM] Tool Call: ${name}(${JSON.stringify(redactSensitiveObject(args))})`);
 
     try {
