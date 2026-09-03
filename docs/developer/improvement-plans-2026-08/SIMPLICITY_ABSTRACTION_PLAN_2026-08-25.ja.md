@@ -15163,6 +15163,18 @@ circuit-breaker semanticsを維持し、mission evidenceへ保存する直前に
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
 state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 769
+
+SX-03／SX-04／SX-10／SX-11 のmission state persistenceを再監査し、mission state readは専用
+`mission-state.schema.json`へ接続済みで、save側にもAJVの事前検証はある一方、writer lease内の最終 writeだけが
+catalogなしの raw JSON 保存だったため修正した。mission stateのtier／lifecycle／git checkpoint／historyの既存
+責務とwriter lease／lockを維持し、最終保存 payloadをread側と同じcatalogで検証する。mission path boundary、
+focused mission pointer、repair readの既存semanticsは変更していない。
+
+検証: mission state loader **1 file / 6 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
+state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

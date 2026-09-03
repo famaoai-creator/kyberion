@@ -29,7 +29,7 @@ import { resolveActiveProfileRoot } from './profile-root.js';
 import { hasAuthority } from './governance.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
 import { loadMissionManagementConfig } from './mission-management-config.js';
-import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadMissionStateAtPath, writeMissionStateAtPath } from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
 const MISSION_FOCUS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-focus.schema.json'
@@ -322,7 +322,7 @@ export async function saveState(
     const statePath = assertSafeRepositoryPath(path.join(safeDir, 'mission-state.json'), {
       allowMissingLeaf: true,
     });
-    safeWriteFile(statePath, JSON.stringify(state, null, 2));
+    writeMissionStateAtPath(statePath, state);
   };
 
   const leasePath = assertSafeRepositoryPath(
