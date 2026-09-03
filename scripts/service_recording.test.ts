@@ -11,6 +11,7 @@ describe('service recording entrypoint', () => {
 
     expect(source).toContain('runServiceRecording = defineScript');
     expect(source).toContain('print(result.value)');
+    expect(source).toContain('validateServiceRecording(updated)');
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('process.exitCode');
   });
