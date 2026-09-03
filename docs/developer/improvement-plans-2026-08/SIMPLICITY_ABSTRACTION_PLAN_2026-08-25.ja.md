@@ -14033,6 +14033,12 @@ SX-03／SX-04 のdelegated task resumable record readerを再監査し、child s
 
 検証: delegated task observability **1 file / 21 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 629
+
+SX-03／SX-04 のtenant activationが参照するorganization context binding readerを再監査し、onboarding schemaを持つ同一の永続bindingがtenant activation側だけraw `readJson`と最小shape predicateで読まれる二重経路を修正した。既存のonboarding context binding schemaをpath-bound canonical catalogへ接続し、regular-file境界とinvalid／directory時のcontext binding false semanticsを適用した。tenant／organization／tier binding、accountable humanの推定、activation probe gateの既存semanticsは維持している。
+
+検証: tenant activation **1 file / 7 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
