@@ -7,12 +7,7 @@ import {
   loadTeamRoleIndex as loadGovernedTeamRoleIndex,
 } from '@agent/core/mission-team-index';
 import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
-import {
-  defineCatalog,
-  nowIso,
-  readJson as readFoundationJson,
-  type GovernedCatalog,
-} from '@agent/core/foundation';
+import { defineCatalog, nowIso, type GovernedCatalog } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
@@ -350,10 +345,6 @@ function unique(values: string[]): string[] {
   );
 }
 
-function readJsonIfExists<T>(filePath: string): T | null {
-  return safeExistsSync(filePath) ? readFoundationJson<T>(filePath) : null;
-}
-
 function roleAuthorityMapCatalog(filePath: string): GovernedCatalog<RoleAuthorityMap> {
   const existing = roleAuthorityMapCatalogs.get(filePath);
   if (existing) return existing;
@@ -445,10 +436,7 @@ function resolveAuthorityRoleRecord(
   authorityRoleId: string,
   input: OrgRoleCreateOptions
 ): AuthorityRoleRecord {
-  const authorityDir = path.join(rootDir, 'knowledge', 'product', 'governance', 'authority-roles');
-  const existing = readJsonIfExists<AuthorityRoleRecord>(
-    path.join(authorityDir, `${authorityRoleId}.json`)
-  );
+  const existing = loadAuthorityRoleDirectory(rootDir)[authorityRoleId];
   const template = resolveDomainTemplate(input.domain);
 
   const writeScopes = unique([
