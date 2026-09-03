@@ -15256,6 +15256,18 @@ preferences payloadを保存する。catalog metadataがpersonal artifactへ残�
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 777
+
+SX-03／SX-04／SX-08 のrequirements draft storeを再監査し、保存前にcatalog validationは実行していたものの、
+戻り値を捨てて元のdraftをraw writeしていた save／customer signoff の2経路を修正した。mission evidence path、
+version bump、再抽出時のsignoff無効化、requirements／customer signoff gateの既存semanticsは維持し、path-bound
+writerが検証済みのcanonical draft payloadを保存して返す。catalog metadataがmission evidenceへ残らない回帰も
+追加した。
+
+検証: requirements draft store **1 file / 16 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

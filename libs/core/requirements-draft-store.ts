@@ -75,6 +75,19 @@ function requirementsDraftCatalog(filePath: string) {
   });
 }
 
+export function writeRequirementsDraftAtPath(
+  filePath: string,
+  draft: RequirementsDraft
+): RequirementsDraft {
+  const safeFile = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = requirementsDraftCatalog(safeFile).validate(draft, safeFile);
+  safeWriteFile(safeFile, `${JSON.stringify(validated, null, 2)}\n`, {
+    encoding: 'utf8',
+    mkdir: true,
+  });
+  return validated;
+}
+
 export function readRequirementsDraft(missionId: string): RequirementsDraft | null {
   const file = draftPath(missionId);
   if (!file || !safeExistsSync(file)) return null;
@@ -120,9 +133,7 @@ export function saveRequirementsDraft(params: SaveRequirementsDraftParams): Requ
       `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`
     );
   }
-  requirementsDraftCatalog(file).validate(draft, file);
-  safeWriteFile(file, `${JSON.stringify(draft, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
-  return draft;
+  return writeRequirementsDraftAtPath(file, draft);
 }
 
 function bumpVersion(previous?: string): string {
@@ -160,9 +171,7 @@ export function recordCustomerSignoff(params: RecordSignoffParams): Requirements
       `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`
     );
   }
-  requirementsDraftCatalog(file).validate(existing, file);
-  safeWriteFile(file, `${JSON.stringify(existing, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
-  return existing;
+  return writeRequirementsDraftAtPath(file, existing);
 }
 
 // ----- Gate evaluators --------------------------------------------------
