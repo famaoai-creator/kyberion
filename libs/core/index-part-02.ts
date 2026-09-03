@@ -73,6 +73,7 @@ export * from './frontmatter-exclusions.js';
 export * from './knowledge-usage-aggregate.js';
 
 export * from './knowledge-taxonomy.js';
+export * from './volatile-knowledge.js';
 
 export * from './financial-model.js';
 

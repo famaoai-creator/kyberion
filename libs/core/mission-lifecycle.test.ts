@@ -222,7 +222,7 @@ describe('mission lifecycle finish gate', () => {
     expect(() => {
       safeWriteFile(sidecarPath, JSON.stringify({ ...updated, unexpected: true }));
       updateMissionMemorySidecar(markdownPath, 'candidate-2');
-    }).toThrow(/Invalid catalog volatile-knowledge-sidecar/);
+    }).toThrow(/Invalid volatile knowledge sidecar/);
   });
 
   it('rejects external and symlinked mission paths before reading lifecycle artifacts', () => {

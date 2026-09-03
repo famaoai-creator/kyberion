@@ -6,7 +6,6 @@
 import * as path from 'node:path';
 import { createActuatorTrace } from './actuator-trace.js';
 import * as customerResolver from './customer-resolver.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
@@ -21,6 +20,11 @@ import {
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
+import {
+  loadVolatileSidecarAtPath,
+  saveVolatileSidecarAtPath,
+  volatileSidecarPath,
+} from './volatile-knowledge.js';
 import {
   evaluateArtifactReviews,
   hashArtifactForReview,
@@ -318,20 +322,6 @@ export function publishMeetingDeliverablesIfNeeded(input: {
   );
 }
 
-function sidecarPathForMarkdown(mdPath: string): string {
-  return mdPath.endsWith('.md')
-    ? mdPath.slice(0, -3) + '.volatile.json'
-    : `${mdPath}.volatile.json`;
-}
-
-function volatileSidecarCatalog(sidecarPath: string) {
-  return defineCatalog<Record<string, unknown>>({
-    id: 'volatile-knowledge-sidecar',
-    path: sidecarPath,
-    schema: pathResolver.knowledge('product/schemas/volatile-knowledge.schema.json'),
-  });
-}
-
 export function extractPromotableMissionMemory(raw: string): string | null {
   const lines = raw.split(/\r?\n/u);
   const collected: string[] = [];
@@ -356,25 +346,19 @@ export function extractPromotableMissionMemory(raw: string): string | null {
 
 export function updateMissionMemorySidecar(mdPath: string, candidateId: string): void {
   const safeMarkdownPath = assertSafeRepositoryPath(mdPath, { allowMissingLeaf: true });
-  const sidecarPath = assertSafeRepositoryPath(sidecarPathForMarkdown(safeMarkdownPath), {
-    allowMissingLeaf: true,
-  });
+  const sidecarPath = volatileSidecarPath(safeMarkdownPath);
   if (!safeExistsSync(sidecarPath)) return;
   if (!safeStat(sidecarPath).isFile()) {
     throw new Error(`Volatile knowledge sidecar must be a regular file: ${sidecarPath}`);
   }
-  const sidecarCatalog = volatileSidecarCatalog(sidecarPath);
-  const sidecar = sidecarCatalog.load();
-  const updated = sidecarCatalog.validate(
-    {
-      ...sidecar,
-      promotion_candidate_id: candidateId,
-      status: 'promoted',
-      updated_at: nowIso(),
-    },
-    sidecarPath
-  );
-  safeWriteFile(sidecarPath, JSON.stringify(updated, null, 2));
+  const sidecar = loadVolatileSidecarAtPath(sidecarPath);
+  if (!sidecar) throw new Error(`Invalid volatile knowledge sidecar at ${sidecarPath}`);
+  saveVolatileSidecarAtPath(sidecarPath, {
+    ...sidecar,
+    promotion_candidate_id: candidateId,
+    status: 'promoted',
+    updated_at: nowIso(),
+  });
 }
 
 export function readMissionNextTasks(missionDir: string): Array<Record<string, unknown>> {
