@@ -24,6 +24,18 @@ function seedPolicyFile(root: string): void {
   const target = path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'), target);
+  const schemaTarget = path.join(
+    root,
+    'knowledge',
+    'product',
+    'schemas',
+    'scoped-artifact-index-entry.schema.json'
+  );
+  fs.mkdirSync(path.dirname(schemaTarget), { recursive: true });
+  fs.copyFileSync(
+    path.join(REPO_ROOT, 'knowledge/product/schemas/scoped-artifact-index-entry.schema.json'),
+    schemaTarget
+  );
 }
 
 function readIndex(indexAbsPath: string): Array<Record<string, unknown>> {
@@ -277,8 +289,18 @@ describe('writeScopedArtifact (AL-02)', () => {
       })}\n`
     );
 
-    expect(() => store.readScopedArtifactIndex({ mission: 'M-AL02-D' })).toThrow(
-      'written_at is invalid'
+    expect(() => store.readScopedArtifactIndex({ mission: 'M-AL02-D' })).toThrow(/written_at/);
+  });
+
+  it('rejects an artifact index path that is a directory', () => {
+    const indexPath = path.join(
+      tmpRoot,
+      'active/missions/M-AL02-E/artifacts/artifacts-index.jsonl'
+    );
+    fs.mkdirSync(indexPath, { recursive: true });
+
+    expect(() => store.readScopedArtifactIndex({ mission: 'M-AL02-E' })).toThrow(
+      /must be a regular file/
     );
   });
 });

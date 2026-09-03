@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mission-closure-audit-record.schema.json",
+  "title": "Mission Closure Audit Record",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "event": { "const": "MISSION_ARTIFACTS_CLOSED" },
+        "mission": { "type": "string", "minLength": 1 },
+        "mission_dir": { "type": "string", "minLength": 1 },
+        "deleted_directories": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "deleted_index_entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "artifact_class": { "enum": ["cache", "tmp"] }
+            },
+            "required": ["path", "artifact_class"]
+          }
+        },
+        "kept_index_entries": { "type": "integer", "minimum": 0 },
+        "bundle": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": ["bundled", "already_bundled", "no_git", "failed"]
+            },
+            "bundle_path": { "type": "string", "minLength": 1 },
+            "error": { "type": "string", "minLength": 1 }
+          },
+          "required": ["status"]
+        },
+        "retired_identities": { "type": "integer", "minimum": 0 },
+        "policy_ref": { "type": "string", "minLength": 1 },
+        "policy_classes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["cache", "tmp"] }
+        },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "required": [
+        "ts",
+        "event",
+        "mission",
+        "mission_dir",
+        "deleted_directories",
+        "deleted_index_entries",
+        "kept_index_entries",
+        "bundle",
+        "retired_identities",
+        "policy_ref",
+        "policy_classes",
+        "reason"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "event": { "const": "MISSION_TASK_ARTIFACTS_CLOSED" },
+        "mission": { "type": "string", "minLength": 1 },
+        "task": { "type": "string", "minLength": 1 },
+        "deleted_directories": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "deleted_index_entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "artifact_class": { "enum": ["cache", "tmp"] }
+            },
+            "required": ["path", "artifact_class"]
+          }
+        },
+        "policy_ref": { "type": "string", "minLength": 1 },
+        "policy_classes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["cache", "tmp"] }
+        },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "required": [
+        "ts",
+        "event",
+        "mission",
+        "task",
+        "deleted_directories",
+        "deleted_index_entries",
+        "policy_ref",
+        "policy_classes",
+        "reason"
+      ]
+    }
+  ]
+}

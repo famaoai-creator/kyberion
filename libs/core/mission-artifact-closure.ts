@@ -1,5 +1,6 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 /**
  * AL-03: mission finish / task completion artifact closure.
  *
@@ -33,6 +34,7 @@ import {
   assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -43,8 +45,10 @@ import {
   type RetentionArtifactClass,
 } from './storage-retention-catalog.js';
 import {
+  ensureRegularScopedArtifactIndex,
   SCOPED_ARTIFACT_INDEX_FILENAME,
   parseScopedArtifactIndexEntry,
+  scopedArtifactIndexCatalog,
   scopedTaskArtifactDirName,
   type ScopedArtifactIndexEntry,
 } from './artifact-store.js';
@@ -64,6 +68,24 @@ export const MISSION_CLOSURE_MARKER_RELPATH = 'evidence/mission-closure.json';
 
 /** Where the per-mission git history is preserved before `.git` removal. */
 export const MISSION_REPO_BUNDLE_RELPATH = 'evidence/mission-repo.bundle';
+
+const MISSION_CLOSURE_AUDIT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-closure-audit-record.schema.json'
+);
+
+function closureAuditCatalog(filePath: string): GovernedCatalog<Record<string, unknown>> {
+  return defineCatalog<Record<string, unknown>>({
+    id: 'mission-closure-audit-record',
+    path: filePath,
+    schema: MISSION_CLOSURE_AUDIT_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularClosureAuditFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[mission-artifact-closure] audit must be a regular file: ${filePath}`);
+  }
+}
 
 export interface MissionClosureBundleOutcome {
   /**
@@ -140,13 +162,18 @@ function isPathInside(parent: string, candidate: string): boolean {
 
 function readIndexLines(indexPath: string): IndexLine[] {
   if (!safeExistsSync(indexPath)) return [];
+  ensureRegularScopedArtifactIndex(indexPath);
+  const catalog = scopedArtifactIndexCatalog(indexPath);
   return String(safeReadFile(indexPath, { encoding: 'utf8' }))
     .split('\n')
     .filter((line) => line.trim().length > 0)
-    .map((raw) => {
+    .map((raw, index) => {
       try {
         const parsed = parseScopedArtifactIndexEntry(
-          parseSafeJsonInput(raw, 'scoped artifact index entry')
+          catalog.validate(
+            parseSafeJsonInput(raw, 'scoped artifact index entry'),
+            `${indexPath}:${index + 1}`
+          )
         );
         return { raw, parsed };
       } catch {
@@ -185,6 +212,8 @@ function appendClosureAudit(record: Record<string, unknown>): string | undefined
   try {
     const auditPath = pathResolver.sharedLogsAudit(MISSION_CLOSURE_AUDIT_FILENAME);
     safeMkdir(path.dirname(auditPath), { recursive: true });
+    ensureRegularClosureAuditFile(auditPath);
+    closureAuditCatalog(auditPath).validate(record, auditPath);
     appendJsonLine(auditPath, record);
     return auditPath;
   } catch (err) {
