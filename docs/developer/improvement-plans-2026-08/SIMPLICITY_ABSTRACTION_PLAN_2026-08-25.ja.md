@@ -13907,6 +13907,12 @@ SX-03／SX-04 のAgent Runtime Supervisor prewarm request readerを再監査し�
 
 検証: agent runtime supervisor **1 test file / 11 tests passed**、対象 typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 608
+
+SX-03／SX-04 のpresentation slide pattern pack readerを再監査し、default／custom packが既存schemaを検証せずraw JSONとしてpattern selectionへ渡っていた残存を修正した。既存 `slide-pattern-pack.schema.json` を利用するcatalog loaderとregular-file／repository path境界へ統合し、不正root／directory／symlink packを選択処理前に拒否するようにした。in-memory packによる選択、pattern scoring、generic layout fallbackの既存semanticsは維持している。
+
+検証: presentation slide pattern **1 test file / 6 tests passed**、対象 typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

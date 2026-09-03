@@ -1,6 +1,7 @@
 import { pathResolver } from './path-resolver.js';
 import type { PresentationDeckPurpose } from './presentation-preference-profile.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 export interface SlidePatternSlot {
   slot_id: string;
@@ -98,6 +99,9 @@ export interface SlidePatternDiagnostic {
 }
 
 const DEFAULT_PACK_PATH = 'knowledge/public/design-patterns/presentation/slide-pattern-pack.json';
+const SLIDE_PATTERN_PACK_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/slide-pattern-pack.schema.json'
+);
 const GENERIC_LAYOUT_KEYS = new Set(['title-body', 'doc-contents']);
 const COMPARISON_PATTERN_IDS = new Set([
   'problem-solution',
@@ -119,7 +123,15 @@ function isGenericLayoutKey(layoutKey?: string | null): boolean {
 }
 
 function loadPackFromPath(packPath: string): SlidePatternPack {
-  return readJson<SlidePatternPack>(packPath);
+  const safePackPath = assertSafeRepositoryPath(packPath, { allowMissingLeaf: false });
+  if (!safeLstat(safePackPath).isFile()) {
+    throw new Error(`[SLIDE_PATTERN_PACK] pack must be a regular file: ${packPath}`);
+  }
+  return defineCatalog<SlidePatternPack>({
+    id: 'slide-pattern-pack',
+    path: safePackPath,
+    schema: SLIDE_PATTERN_PACK_SCHEMA_PATH,
+  }).load();
 }
 
 export function _resetSlidePatternPackCacheForTests(): void {
