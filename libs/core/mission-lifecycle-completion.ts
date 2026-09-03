@@ -9,6 +9,7 @@ import * as customerResolver from './customer-resolver.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeAppendFileSync,
@@ -38,6 +39,15 @@ import {
   loadMissionNextTaskObjectsAtPath,
   validateMissionNextTaskObjects,
 } from './mission-next-task-reader.js';
+
+const DELIVERY_PACK_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/delivery-pack.schema.json'
+);
+const deliveryPackCatalog = defineCatalog<Record<string, unknown>>({
+  id: 'delivery-pack',
+  path: DELIVERY_PACK_SCHEMA_PATH,
+  schema: DELIVERY_PACK_SCHEMA_PATH,
+});
 
 function safeMissionDir(missionDir: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(missionDir, { allowMissingLeaf });
@@ -289,12 +299,12 @@ export function publishMeetingDeliverablesIfNeeded(input: {
       ...copiedArtifacts.map((artifact) => `  - ${artifact.path} (${artifact.kind})`),
     ].join('\n')
   );
-  safeWriteFile(
-    assertSafeRepositoryPath(path.join(missionDeliverablesDir, 'delivery-pack.json'), {
-      allowMissingLeaf: true,
-    }),
-    JSON.stringify(pack, null, 2)
+  const deliveryPackPath = assertSafeRepositoryPath(
+    path.join(missionDeliverablesDir, 'delivery-pack.json'),
+    { allowMissingLeaf: true }
   );
+  const validatedPack = deliveryPackCatalog.validate(pack, deliveryPackPath);
+  safeWriteFile(deliveryPackPath, JSON.stringify(validatedPack, null, 2));
 
   const deliveryLogPath = assertSafeRepositoryPath(
     path.join(deliverablesRoot, 'delivery-log.jsonl'),
