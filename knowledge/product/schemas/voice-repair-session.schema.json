@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "voice-repair-session.schema.json",
+  "title": "Voice Repair Session",
+  "description": "Resumable voice sample repair state held in the governed temporary workspace.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "created_at",
+    "expires_at",
+    "request_id",
+    "sample_id",
+    "prompt_text",
+    "initial_recording",
+    "initial_transcript",
+    "verification",
+    "repair_attempts",
+    "replacements",
+    "next_action"
+  ],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "created_at": { "type": "string", "minLength": 1 },
+    "expires_at": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "sample_id": { "type": "string", "minLength": 1 },
+    "prompt_text": { "type": "string", "minLength": 1 },
+    "initial_recording": { "type": "object", "additionalProperties": true },
+    "initial_transcript": { "type": "object", "additionalProperties": true },
+    "verification": { "type": "object", "additionalProperties": true },
+    "repair_attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["segment_id", "attempt", "status"],
+        "properties": {
+          "segment_id": { "type": "string", "minLength": 1 },
+          "attempt": { "type": "integer", "minimum": 1 },
+          "status": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "replacements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["start_sec", "end_sec", "path", "segment_id"],
+        "properties": {
+          "start_sec": { "type": "number", "minimum": 0 },
+          "end_sec": { "type": "number", "exclusiveMinimum": 0 },
+          "path": { "type": "string", "minLength": 1 },
+          "segment_id": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "next_action": { "type": "string", "minLength": 1 }
+  }
+}

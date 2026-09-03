@@ -14609,6 +14609,19 @@ SX-03／SX-04 の`organization role create`における既存authority role読�
 
 検証: organization role **3 tests passed**、対象lint、`git diff --check`。canonical full gateはこの追記後に実行する。今回の変更と無関係な`check-governance-directory-consistency.ts`の作業ツリー変更は保持し、コミット対象外とする。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 725
+
+SX-03／SX-04 のvoice actuator再開用`session.json`を再監査し、音声修復セッションが局所の
+`readJson`と型パーサー、schemaなしの`safeWriteFile`へ分岐していた残存を修正した。専用
+`voice-repair-session.schema.json`と`defineCatalog`境界を追加し、resume時の読込とrepair
+session作成時の書込前検証を同じrepository／schema boundaryへ統合した。既存の音声修復の
+segment判定、request／sample／prompt照合、期限切れcleanup、malformed時のfail-closed
+semanticsは維持している。
+
+検証: voice actuator **2 files / 22 tests passed**、voice actuator package build、root
+typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

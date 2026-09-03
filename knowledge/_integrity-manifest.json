@@ -10237,6 +10237,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/voice-repair-session.schema.json",
+      "tier": "public",
+      "size": 2082,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/voice-runtime-policy.schema.json",
       "tier": "public",
       "size": 2394,
