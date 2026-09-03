@@ -1,6 +1,9 @@
-import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { createStandardYargs } from '@agent/core/cli-utils';
+import {
+  createStandardYargs,
+  currentProcessArgv,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { readJson } from '@agent/core/foundation';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
@@ -176,7 +179,7 @@ function isProcessRunning(pid: number): boolean {
 }
 
 const main = async () => {
-  const argv = await createStandardYargs(process.argv)
+  const argv = await createStandardYargs(currentProcessArgv())
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
@@ -189,8 +192,5 @@ const main = async () => {
 if (
   isDirectEntry(import.meta.url, 'libs/actuators/process-actuator/src/process-actuator-helpers.ts')
 ) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'process-actuator');
 }
