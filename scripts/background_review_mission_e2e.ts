@@ -43,8 +43,8 @@ import {
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
 import type { EventScope } from '@agent/core/event-scope';
-import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -225,8 +225,8 @@ async function main(argv: string[]): Promise<void> {
     if (!safeLstat(safeTargetPath).isFile()) {
       throw new Error(`Mission pipeline target must be a regular file: ${safeTargetPath}`);
     }
-    const patched = readJson<{ steps?: unknown[] }>(safeTargetPath);
-    if (patched.steps?.length !== 2) throw new Error('Mission E2E patch was not applied.');
+    const patched = loadPipelineAdfAtPath(safeTargetPath);
+    if (patched.steps.length !== 2) throw new Error('Mission E2E patch was not applied.');
 
     process.stdout.write(
       `${JSON.stringify(
