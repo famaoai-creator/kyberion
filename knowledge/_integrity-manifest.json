@@ -7003,6 +7003,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/deliverable-inbox-entry.schema.json",
+      "tier": "public",
+      "size": 3678,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/delivery-pack.schema.json",
       "tier": "public",
       "size": 1429,

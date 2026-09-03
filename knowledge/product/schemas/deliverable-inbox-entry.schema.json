@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "deliverable-inbox-entry.schema.json",
+  "title": "Deliverable inbox entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entry_id",
+    "title",
+    "artifact_paths",
+    "summary",
+    "created_at",
+    "updated_at",
+    "status"
+  ],
+  "properties": {
+    "entry_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "artifact_paths": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "summary": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "enum": ["unread", "read", "accepted", "rejected", "changes_requested"]
+    },
+    "tenant_slug": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string", "minLength": 1 },
+    "verdict_note": { "type": "string", "minLength": 1 },
+    "verdict_reason_category": {
+      "enum": ["incorrect_content", "wrong_direction", "quality", "scope", "other"]
+    },
+    "reviewed_by": { "type": "string", "minLength": 1 },
+    "acceptance_receipt": { "$ref": "#/$defs/acceptance_receipt" },
+    "delivery_receipt": { "$ref": "#/$defs/delivery_receipt" },
+    "role_sections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/role_section" }
+    },
+    "integrated_summary": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "role_section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "summary", "evidence_refs"],
+      "properties": {
+        "role": { "enum": ["implementer", "reviewer", "orchestrator"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "acceptance_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_id",
+        "actor_id",
+        "actor_type",
+        "authenticated",
+        "auth_method",
+        "artifact_digest",
+        "responsibility_statement",
+        "accepted_at"
+      ],
+      "properties": {
+        "receipt_id": { "type": "string", "minLength": 1 },
+        "actor_id": { "type": "string", "minLength": 1 },
+        "actor_type": { "const": "human" },
+        "authenticated": { "const": true },
+        "auth_method": { "enum": ["surface_session", "totp", "passkey"] },
+        "artifact_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "responsibility_statement": { "type": "string", "minLength": 1 },
+        "accepted_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "delivery_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_id",
+        "actor_id",
+        "actor_type",
+        "authenticated",
+        "auth_method",
+        "artifact_digest",
+        "destination",
+        "delivered_at"
+      ],
+      "properties": {
+        "receipt_id": { "type": "string", "minLength": 1 },
+        "actor_id": { "type": "string", "minLength": 1 },
+        "actor_type": { "const": "human" },
+        "authenticated": { "const": true },
+        "auth_method": { "enum": ["surface_session", "totp", "passkey"] },
+        "artifact_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "destination": { "type": "string", "minLength": 1 },
+        "delivered_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
