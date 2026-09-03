@@ -14,6 +14,7 @@ import {
   generateKnowledgeCurationReport,
   knowledgeCurationArchiveHistoryPath,
   knowledgeCurationReportPath,
+  loadKnowledgeCurationArchiveHistoryAtPath,
   loadCurationSloConfig,
   knowledgeCurationSloConfigPath,
   renderCurationReportMarkdown,
@@ -130,6 +131,28 @@ describe('computeCurationReport — low-yield hints', () => {
       '/active/shared/runtime/feedback-loop/tenants/tenant-a/curation-archive-history.json'
     );
     expect(tenantPath).not.toBe(pathResolver.rootResolve(archiveHistoryPathOverride));
+  });
+
+  it('rejects malformed archive history through the canonical schema', () => {
+    const historyPath = pathResolver.rootResolve(archiveHistoryPathOverride);
+    safeMkdir(path.dirname(historyPath), { recursive: true });
+    safeWriteFile(
+      historyPath,
+      JSON.stringify([
+        {
+          key: 'unscoped:knowledge/foo.md',
+          document_path: 'knowledge/foo.md',
+          consecutive_weeks: 1,
+          first_observed_at: NOW.toISOString(),
+          last_observed_at: NOW.toISOString(),
+          last_week: '2026-07-20',
+          unexpected: true,
+        },
+      ])
+    );
+    expect(() => loadKnowledgeCurationArchiveHistoryAtPath(historyPath)).toThrow(
+      /Invalid catalog knowledge-curation-archive-history/u
+    );
   });
 
   it('flags a document delivered >= threshold times with zero recorded uses', () => {

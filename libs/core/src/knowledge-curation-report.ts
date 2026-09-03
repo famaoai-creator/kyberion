@@ -26,7 +26,6 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
-import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -35,6 +34,7 @@ import {
   safeReaddir,
   safeReadFile,
   safeStat,
+  safeLstat,
   safeWriteFile,
 } from '../secure-io.js';
 import { loadKnowledgeUsageAggregate } from './knowledge-feedback-loop.js';
@@ -149,6 +149,18 @@ type ArchiveHistoryEntry = {
   last_week: string;
 };
 
+const ARCHIVE_HISTORY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-curation-archive-history.schema.json'
+);
+
+function archiveHistoryCatalogAtPath(filePath: string) {
+  return defineCatalog<ArchiveHistoryEntry[]>({
+    id: 'knowledge-curation-archive-history',
+    path: filePath,
+    schema: ARCHIVE_HISTORY_SCHEMA_PATH,
+  });
+}
+
 function sloConfigPath(): string {
   const override = getRegisteredEnvText('KYBERION_CURATION_SLO_CONFIG_PATH')?.trim();
   return safeCurationOverridePath(
@@ -214,6 +226,15 @@ export function knowledgeCurationArchiveHistoryPath(tenantSlug?: string): string
   return archiveHistoryPath(tenantSlug);
 }
 
+/** Load one curation archive-history file through its schema and path boundary. */
+export function loadKnowledgeCurationArchiveHistoryAtPath(filePath: string): ArchiveHistoryEntry[] {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`[CURATION_ARCHIVE_HISTORY_FILE] history must be a regular file: ${filePath}`);
+  }
+  return archiveHistoryCatalogAtPath(safePath).load();
+}
+
 function weekKey(now: Date): string {
   const day = now.getUTCDay();
   const mondayOffset = day === 0 ? -6 : 1 - day;
@@ -225,15 +246,7 @@ function readArchiveHistory(tenantSlug?: string): ArchiveHistoryEntry[] {
   const filePath = archiveHistoryPath(tenantSlug);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = readJson<unknown>(filePath);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (entry): entry is ArchiveHistoryEntry =>
-        Boolean(entry) &&
-        typeof entry === 'object' &&
-        typeof (entry as ArchiveHistoryEntry).key === 'string' &&
-        typeof (entry as ArchiveHistoryEntry).last_week === 'string'
-    );
+    return loadKnowledgeCurationArchiveHistoryAtPath(filePath);
   } catch {
     return [];
   }
@@ -331,7 +344,11 @@ function observeArchiveHistory(
     const historyPath = archiveHistoryPath(tenantSlug);
     const parent = path.dirname(historyPath);
     if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
-    safeWriteFile(historyPath, JSON.stringify([...nextHistory.values()], null, 2) + '\n');
+    const validated = archiveHistoryCatalogAtPath(historyPath).validate(
+      [...nextHistory.values()],
+      historyPath
+    );
+    safeWriteFile(historyPath, JSON.stringify(validated, null, 2) + '\n');
     advisories.push(...archiveCandidatesFromReport(scopedReport, now, history));
   }
   return advisories;
