@@ -2,7 +2,6 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
@@ -306,7 +305,12 @@ export function loadServiceRuntimeStateAtPath(
   if (!safeLstat(safeStatePath).isFile()) {
     throw new Error(`[SERVICE_RUNTIME_STATE] state must be a regular file: ${statePath}`);
   }
-  return parseServiceRuntimeState(readJson<unknown>(safeStatePath), safeStatePath, serviceId);
+  const value = defineCatalog<ServiceRuntimeState>({
+    id: 'service-runtime-state',
+    path: safeStatePath,
+    schema: SERVICE_RUNTIME_STATE_SCHEMA_PATH,
+  }).load();
+  return parseServiceRuntimeState(value, safeStatePath, serviceId);
 }
 
 function loadStateFromPath(statePath: string, serviceId: string): ServiceRuntimeState | null {
