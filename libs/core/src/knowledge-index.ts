@@ -26,6 +26,7 @@ import {
   loadKnowledgeRankingWeights,
   type KnowledgeRankingMetadata,
 } from '../ranking-signals.js';
+import { loadKnowledgeUsageAggregateAtPath } from '../knowledge-usage-aggregate.js';
 import { physicalScopedPath } from '../physical-namespace.js';
 import type { ScopeContext } from '../scope-context.js';
 import { currentScope } from '../scope-context.js';
@@ -188,18 +189,11 @@ function loadUsageYieldValues(scope?: ScopeContext): Map<string, number> {
   const filePath = usageAggregatePath(scope);
   if (!filePath || !safeExistsSync(filePath)) return values;
   try {
-    const entries = readJson<unknown>(filePath);
-    if (!Array.isArray(entries)) return values;
+    const entries = loadKnowledgeUsageAggregateAtPath(filePath);
     for (const entry of entries) {
-      if (!entry || typeof entry !== 'object') continue;
-      const row = entry as {
-        document_path?: unknown;
-        used_count?: unknown;
-        not_used_count?: unknown;
-      };
-      if (typeof row.document_path !== 'string') continue;
-      const used = typeof row.used_count === 'number' ? row.used_count : 0;
-      const notUsed = typeof row.not_used_count === 'number' ? row.not_used_count : 0;
+      const row = entry;
+      const used = row.used_count;
+      const notUsed = row.not_used_count;
       if (used + notUsed > 0) values.set(row.document_path, used / (used + notUsed));
     }
   } catch {
