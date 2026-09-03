@@ -28,6 +28,7 @@ import {
   readRequirementsDraft,
   recordCustomerSignoff,
   saveRequirementsDraft,
+  writeRequirementsDraftAtPath,
 } from './requirements-draft-store.js';
 import type { ExtractedRequirements } from './reasoning-backend.js';
 
@@ -158,6 +159,22 @@ describe('requirements-draft-store', () => {
         })
       ).toThrow(/no draft found/);
     });
+  });
+
+  it('persists the catalog-normalized draft payload', () => {
+    const file = path.join(tmpDir, 'normalized-requirements-draft.json');
+    const draft = {
+      version: 'v1',
+      project_name: 'X',
+      functional_requirements: sampleExtracted.functional_requirements,
+      generated_at: '2026-09-04T00:00:00.000Z',
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof writeRequirementsDraftAtPath>[1];
+
+    const persisted = writeRequirementsDraftAtPath(file, draft);
+
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).not.toHaveProperty('$schema');
   });
 
   describe('evaluateRequirementsCompletenessGate', () => {
