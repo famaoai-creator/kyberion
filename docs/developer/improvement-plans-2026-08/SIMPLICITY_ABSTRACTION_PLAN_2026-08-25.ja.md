@@ -14531,6 +14531,12 @@ SX-03／SX-04／LC-02 のpipeline promotion sourceを再監査し、入力path�
 
 検証: pipeline promotion resource boundary **1 file / 4 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 712
+
+SX-03／SX-04 の`register_workflow --apply`を再監査し、request自体は`defineCatalog`で検証済みでも、mission workflow／standard intents／ontology／routing／gate profiles／governance bodiesの6つの更新先をraw `readFoundationJson`／`safeWriteFile`で読み書きしていた残存を修正した。各既存schemaを持つ`defineCatalog`へ統合し、load時のschema境界とgeneration-bound publishを共有化して、競合更新を検出できる governed write にした。proposal bundleの生成と既存のidempotent upsert／任意セクション semanticsは維持している。
+
+検証: register workflow contract **1 test passed**、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
