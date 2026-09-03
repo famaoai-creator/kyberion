@@ -156,8 +156,8 @@ export function saveScheduleRegistry(
       pipelinePath: normalizeScheduledPipelinePath(schedule.pipelinePath, options.rootDir),
     })),
   };
-  registryCatalog(options).validate(normalizedRegistry, registryPath(options));
-  safeWriteFile(registryPath(options), JSON.stringify(normalizedRegistry, null, 2));
+  const validated = registryCatalog(options).validate(normalizedRegistry, registryPath(options));
+  safeWriteFile(registryPath(options), JSON.stringify(validated, null, 2));
   logger.info(
     `[PIPELINE-SCHEDULER] Registry saved with ${normalizedRegistry.schedules.length} schedule(s)`
   );
