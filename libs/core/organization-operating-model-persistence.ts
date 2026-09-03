@@ -305,15 +305,18 @@ export function saveValidated<T>(
   filePath: string,
   label: string
 ): string {
-  const validator = validatorFor(schemaPath);
-  if (!validator(record)) throw new Error(`Invalid ${label}: ${validationErrors(validator)}`);
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (safeExistsSync(safeFilePath) && !safeLstat(safeFilePath).isFile()) {
     throw new Error(`[ORGANIZATION_RECORD] ${label} must be a regular file: ${filePath}`);
   }
+  const validated = defineCatalog<T>({
+    id: `organization-${label}`,
+    path: safeFilePath,
+    schema: schemaPath,
+  }).validate(record, safeFilePath);
   const parent = path.dirname(safeFilePath);
   if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
-  safeWriteFile(safeFilePath, JSON.stringify(record, null, 2), { encoding: 'utf8' });
+  safeWriteFile(safeFilePath, JSON.stringify(validated, null, 2), { encoding: 'utf8' });
   return safeFilePath;
 }
 
