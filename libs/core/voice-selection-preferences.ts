@@ -1,10 +1,16 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJsonIfPresent } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { getVoiceProfileRecord } from './voice-profile-registry.js';
 import {
   getVoiceEngineRegistry,
@@ -75,6 +81,18 @@ const DEFAULT_PREFERENCES: VoiceSelectionPreferences = {
   stt_backend: 'auto',
 };
 
+const VOICE_SELECTION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-selection-preferences.schema.json'
+);
+
+function voiceSelectionCatalogAtPath(filePath: string) {
+  return defineCatalog<VoiceSelectionPreferences>({
+    id: 'voice-selection-preferences',
+    path: filePath,
+    schema: VOICE_SELECTION_SCHEMA_PATH,
+  });
+}
+
 function selectionPath(): string {
   return assertSafeRepositoryPath(
     path.join(resolveActiveProfileRoot(), 'onboarding', 'voice-selection.json'),
@@ -84,9 +102,10 @@ function selectionPath(): string {
 
 function readPreferences(): VoiceSelectionPreferences | null {
   const filePath = selectionPath();
-  const parsed = readJsonIfPresent<Partial<VoiceSelectionPreferences>>(filePath);
-  if (!parsed) return null;
+  if (!safeExistsSync(filePath)) return null;
   try {
+    if (!safeLstat(filePath).isFile()) return null;
+    const parsed = voiceSelectionCatalogAtPath(filePath).load();
     const backend = parseVoiceSttBackend(parsed.stt_backend);
     if (typeof parsed.tts_engine_id !== 'string' || !parsed.tts_engine_id.trim()) return null;
     return {
@@ -261,6 +280,10 @@ export function getVoiceSelectionSnapshot(): VoiceSelectionSnapshot {
   };
 }
 
+export function loadVoiceSelectionPreferences(): VoiceSelectionPreferences | null {
+  return readPreferences();
+}
+
 export function saveVoiceSelectionPreferences(input: {
   tts_engine_id?: unknown;
   stt_backend?: unknown;
@@ -286,18 +309,15 @@ export function saveVoiceSelectionPreferences(input: {
 
   const filePath = selectionPath();
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(
-    filePath,
-    JSON.stringify(
-      {
-        version: '1.0.0',
-        tts_engine_id: nextTts,
-        stt_backend: nextStt,
-        updated_at: nowIso(),
-      },
-      null,
-      2
-    )
+  const validated = voiceSelectionCatalogAtPath(filePath).validate(
+    {
+      version: '1.0.0',
+      tts_engine_id: nextTts,
+      stt_backend: nextStt,
+      updated_at: nowIso(),
+    },
+    filePath
   );
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return getVoiceSelectionSnapshot();
 }

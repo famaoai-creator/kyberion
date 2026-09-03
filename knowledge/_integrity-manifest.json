@@ -9787,6 +9787,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/voice-selection-preferences.schema.json",
+      "tier": "public",
+      "size": 821,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/voice-task-profile-catalog.schema.json",
       "tier": "public",
       "size": 2865,
