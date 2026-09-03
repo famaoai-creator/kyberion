@@ -170,6 +170,8 @@ export * from './channel-registry.js';
 
 export * from './creative-design-resolver.js';
 
+export * from './brand-tokens.js';
+
 export * from './campaign-suite.js';
 
 export * from './config-mission.js';
