@@ -14207,6 +14207,12 @@ SX-03 の`run_migrations` state loaderを再監査し、`applied`配列のregula
 
 検証: migration runner **1 file / 6 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 658
+
+SX-03 のknowledge scope health historyを再監査し、legacy unscoped file countのpersisted JSONがscript内の型キャスト、regular-file検査、局所read／writeに残っていた残存を修正した。history専用schemaとcore canonical reader／writerを追加し、count／generated_at契約、malformed／unknown field／directory stateの安全側fallback、`--alert`時だけpersistする既存semanticsを維持した。tenant scope health reportとlegacy quarantine判定の責務は変更していない。
+
+検証: knowledge scope health history **3 files / 7 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

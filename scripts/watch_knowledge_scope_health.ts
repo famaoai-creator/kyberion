@@ -5,12 +5,10 @@ import { buildTenantKnowledgeScopeSet } from '@agent/core/tenant-knowledge-retri
 import { listTenantProfileSlugs, resolveTenant } from '@agent/core/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
-  safeMkdir,
-  safeWriteFile,
-  safeExistsSync,
-  safeLstat,
-  safeStat,
-} from '@agent/core/secure-io';
+  readKnowledgeScopeHealthCount,
+  writeKnowledgeScopeHealthCount,
+} from '@agent/core/knowledge-scope-health-history';
+import { safeExistsSync, safeStat } from '@agent/core/secure-io';
 import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { withExecutionContext } from '@agent/core/authority';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -115,30 +113,11 @@ function listLegacyUnscopedFiles(): LegacyUnscopedFile[] {
 }
 
 function readPriorLegacyCount(): number | undefined {
-  const filePath = healthHistoryPath();
-  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return undefined;
-  try {
-    const value = readJson<{
-      legacy_unscoped_file_count?: unknown;
-    }>(filePath);
-    return typeof value.legacy_unscoped_file_count === 'number'
-      ? value.legacy_unscoped_file_count
-      : undefined;
-  } catch {
-    return undefined;
-  }
+  return readKnowledgeScopeHealthCount(healthHistoryPath());
 }
 
 function persistLegacyCount(count: number, generatedAt: string): void {
-  const filePath = healthHistoryPath();
-  const parent = path.dirname(filePath);
-  if (!safeExistsSync(parent)) {
-    safeMkdir(parent, { recursive: true });
-  }
-  safeWriteFile(
-    filePath,
-    JSON.stringify({ generated_at: generatedAt, legacy_unscoped_file_count: count }, null, 2) + '\n'
-  );
+  writeKnowledgeScopeHealthCount(healthHistoryPath(), count, generatedAt);
 }
 
 function scanRows(): HealthRow[] {
