@@ -1,4 +1,11 @@
-import { clamp, defineCatalog, nowIso, readJson, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  clamp,
+  defineCatalog,
+  isRecord,
+  nowIso,
+  readJson,
+  parseSafeJsonInput,
+} from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -86,6 +93,7 @@ interface BrowserRecordedAction {
   selector?: string;
   text?: string;
   key?: string;
+  fallback_strategy?: string;
   element_name?: string;
   element_role?: string | null;
   content_excerpt?: string;
@@ -531,11 +539,123 @@ function saveBrowserSessionMetadata(filePath: string, metadata: BrowserSessionMe
 function trailPath(sessionId: string): string {
   return browserSessionArtifactPath(BROWSER_ACTION_TRAIL_DIR, sessionId, '.json');
 }
+
+function optionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return value === undefined ? undefined : typeof value === 'string' ? value : undefined;
+}
+
+function parseRecordedAction(value: unknown): BrowserRecordedAction | null {
+  if (!isRecord(value)) return null;
+
+  const kind = value.kind;
+  const op = optionalString(value, 'op');
+  const ts = optionalString(value, 'ts');
+  if (
+    (kind !== 'control' && kind !== 'capture' && kind !== 'apply') ||
+    !op?.trim() ||
+    !ts?.trim() ||
+    !Number.isFinite(Date.parse(ts))
+  ) {
+    return null;
+  }
+
+  const classification = value.classification;
+  const resumeStatus = value.resume_status;
+  if (
+    classification !== undefined &&
+    classification !== 'user_input' &&
+    classification !== 'secret_ref'
+  ) {
+    return null;
+  }
+  if (
+    resumeStatus !== undefined &&
+    resumeStatus !== 'pending' &&
+    resumeStatus !== 'approved' &&
+    resumeStatus !== 'rejected' &&
+    resumeStatus !== 'expired'
+  ) {
+    return null;
+  }
+
+  const stringFields = [
+    'tab_id',
+    'url',
+    'title',
+    'ref',
+    'selector',
+    'text',
+    'key',
+    'element_name',
+    'content_excerpt',
+    'secret_ref',
+    'approval_request_id',
+    'fallback_strategy',
+  ];
+  for (const field of stringFields) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return null;
+  }
+  if (
+    value.element_role !== undefined &&
+    value.element_role !== null &&
+    typeof value.element_role !== 'string'
+  ) {
+    return null;
+  }
+  if (value.redacted !== undefined && typeof value.redacted !== 'boolean') return null;
+
+  return {
+    kind,
+    op,
+    ts,
+    ...(optionalString(value, 'tab_id') !== undefined ? { tab_id: value.tab_id as string } : {}),
+    ...(optionalString(value, 'url') !== undefined ? { url: value.url as string } : {}),
+    ...(optionalString(value, 'title') !== undefined ? { title: value.title as string } : {}),
+    ...(optionalString(value, 'ref') !== undefined ? { ref: value.ref as string } : {}),
+    ...(optionalString(value, 'selector') !== undefined
+      ? { selector: value.selector as string }
+      : {}),
+    ...(optionalString(value, 'text') !== undefined ? { text: value.text as string } : {}),
+    ...(optionalString(value, 'key') !== undefined ? { key: value.key as string } : {}),
+    ...(optionalString(value, 'fallback_strategy') !== undefined
+      ? { fallback_strategy: value.fallback_strategy as string }
+      : {}),
+    ...(optionalString(value, 'element_name') !== undefined
+      ? { element_name: value.element_name as string }
+      : {}),
+    ...(value.element_role !== undefined
+      ? { element_role: value.element_role as string | null }
+      : {}),
+    ...(optionalString(value, 'content_excerpt') !== undefined
+      ? { content_excerpt: value.content_excerpt as string }
+      : {}),
+    ...(classification !== undefined ? { classification } : {}),
+    ...(optionalString(value, 'secret_ref') !== undefined
+      ? { secret_ref: value.secret_ref as string }
+      : {}),
+    ...(value.redacted !== undefined ? { redacted: value.redacted as boolean } : {}),
+    ...(optionalString(value, 'approval_request_id') !== undefined
+      ? { approval_request_id: value.approval_request_id as string }
+      : {}),
+    ...(resumeStatus !== undefined ? { resume_status: resumeStatus } : {}),
+  };
+}
+
+function parseRecordedActions(value: unknown): BrowserRecordedAction[] {
+  return Array.isArray(value)
+    ? value.flatMap((entry) => {
+        const parsed = parseRecordedAction(entry);
+        return parsed ? [parsed] : [];
+      })
+    : [];
+}
+
 function saveBrowserActionTrail(sessionId: string, trail: unknown[]): string {
   const safeDirectory = safeBrowserRuntimePath(BROWSER_ACTION_TRAIL_DIR);
   if (!safeExistsSync(safeDirectory)) safeMkdir(safeDirectory, { recursive: true });
   const filePath = trailPath(sessionId);
-  safeWriteFile(filePath, JSON.stringify(Array.isArray(trail) ? trail.slice(-200) : [], null, 2));
+  safeWriteFile(filePath, JSON.stringify(parseRecordedActions(trail).slice(-200), null, 2));
   return filePath;
 }
 function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
@@ -543,7 +663,7 @@ function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
   if (!isExistingRegularFile(filePath)) return [];
   try {
     const value = readJson<unknown>(filePath);
-    return Array.isArray(value) ? value.slice(-200) : [];
+    return parseRecordedActions(value).slice(-200);
   } catch {
     return [];
   }
@@ -866,7 +986,7 @@ function findSnapshotElement(ctx: any, ref: string): BrowserSnapshotElement | un
 }
 
 function recordBrowserAction(ctx: any, action: Omit<BrowserRecordedAction, 'ts'>): any {
-  const trail = Array.isArray(ctx?.action_trail) ? ctx.action_trail : [];
+  const trail = parseRecordedActions(ctx?.action_trail);
   const sensitive =
     action.classification === 'secret_ref' ||
     action.op === 'fill_secret_ref' ||
@@ -890,8 +1010,7 @@ function recordBrowserAction(ctx: any, action: Omit<BrowserRecordedAction, 'ts'>
 
 function readRecordedActions(ctx: any, from?: string): BrowserRecordedAction[] {
   const candidate = from ? ctx?.[from] : ctx?.action_trail;
-  if (!Array.isArray(candidate)) return [];
-  return candidate as BrowserRecordedAction[];
+  return parseRecordedActions(candidate);
 }
 
 function renderPlaywrightSkeleton(
@@ -935,7 +1054,7 @@ function renderPlaywrightSkeleton(
     return validateOpInput('browser', op, input);
   };
 
-  for (const action of trail) {
+  for (const action of parseRecordedActions(trail)) {
     const op = normalizeBrowserPipelineOp(action.op);
     const validation = validateRecordedAction(op, action);
     if (!validation.valid) {
@@ -1073,7 +1192,7 @@ function renderPlaywrightSkeleton(
 
 function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): BrowserAction {
   const steps: PipelineStep[] = [];
-  for (const action of trail) {
+  for (const action of parseRecordedActions(trail)) {
     const op = normalizeBrowserPipelineOp(action.op);
     const contract = getOpInputContract('browser', op);
     const properties = contract?.schema?.properties;

@@ -47,4 +47,45 @@ describe('browser runtime resource boundary', () => {
 
     expect(browserRuntimeHelpers.loadBrowserSessionMetadata(metadataPath)).toBeNull();
   });
+
+  it('filters malformed persisted action trail records and strips unknown fields', () => {
+    const trailPath = browserRuntimeHelpers.saveBrowserActionTrail('boundary-test', [
+      {
+        kind: 'apply',
+        op: 'click',
+        selector: '#submit',
+        ts: new Date().toISOString(),
+        unexpected: { constructor: { polluted: true } },
+      },
+      { kind: 'apply', op: 'fill', selector: '#name', ts: 'not-a-date' },
+      { kind: 'apply', op: 'press', selector: '#submit', ts: new Date().toISOString(), key: 13 },
+    ]);
+
+    try {
+      expect(browserRuntimeHelpers.loadBrowserActionTrail('boundary-test')).toEqual([
+        expect.objectContaining({ kind: 'apply', op: 'click', selector: '#submit' }),
+      ]);
+      expect(
+        (
+          browserRuntimeHelpers.loadBrowserActionTrail('boundary-test')[0] as Record<
+            string,
+            unknown
+          >
+        ).unexpected
+      ).toBeUndefined();
+    } finally {
+      safeRmSync(trailPath, { force: true });
+    }
+  });
+
+  it('filters malformed in-memory action trail records before export', () => {
+    expect(
+      browserRuntimeHelpers.readRecordedActions({
+        action_trail: [
+          { kind: 'capture', op: 'snapshot', ts: new Date().toISOString() },
+          { kind: 'capture', op: 'content', ts: 123 },
+        ],
+      })
+    ).toHaveLength(1);
+  });
 });
