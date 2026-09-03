@@ -4,12 +4,11 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
-  safeLstat,
   safeWriteFile,
   safeExec,
 } from '@agent/core/secure-io';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
-import { parseServicePidRegistry } from '@agent/core/service-pid-registry';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import { loadServicePidRegistryAtPath } from '@agent/core/service-pid-registry';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const PID_FILE = pathResolver.shared('services-pids.json');
@@ -37,9 +36,7 @@ function isRunningPid(pid: unknown): pid is number {
 function loadPidMap(): Record<string, number> {
   if (!safeExistsSync(PID_FILE)) return {};
   try {
-    const safePidFile = assertSafeRepositoryPath(PID_FILE);
-    if (!safeLstat(safePidFile).isFile()) return {};
-    const parsed = parseServicePidRegistry(readJson<unknown>(safePidFile));
+    const parsed = loadServicePidRegistryAtPath(PID_FILE);
     if (!parsed) return {};
     return Object.fromEntries(Object.entries(parsed).filter(([, pid]) => isRunningPid(pid)));
   } catch {
