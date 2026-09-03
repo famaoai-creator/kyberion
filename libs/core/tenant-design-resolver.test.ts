@@ -159,6 +159,14 @@ describe('tenant-design-resolver', () => {
     expect(loadTenantDesignThemeOverlay(rootDir, themePath, designDir)).toBeNull();
   });
 
+  it('fails closed when a tenant design artifact is a directory', () => {
+    const designDir = path.join(rootDir, 'knowledge/confidential/client-a/design');
+    const overridePath = path.join(designDir, 'tenant-override.json');
+    safeMkdir(overridePath, { recursive: true });
+
+    expect(loadTenantDesignOverride(rootDir, overridePath, designDir)).toBeNull();
+  });
+
   it('falls back to default when no tenant override matches', () => {
     const result = resolveTenantDesign({
       rootDir,

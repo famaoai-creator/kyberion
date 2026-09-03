@@ -1,8 +1,7 @@
 import * as path from 'node:path';
-import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 export interface TenantDesignOverride {
   [key: string]: unknown;
@@ -28,8 +27,28 @@ export interface TenantDesignThemeOverlay {
   layout_template_id?: string;
 }
 
-let validateOverride: ReturnType<typeof compileSchema<TenantDesignOverride>> | undefined;
-let validateThemeOverlay: ReturnType<typeof compileSchema<TenantDesignThemeOverlay>> | undefined;
+const TENANT_DESIGN_OVERRIDE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tenant-design-override.schema.json'
+);
+const TENANT_DESIGN_THEME_OVERLAY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tenant-design-theme-overlay.schema.json'
+);
+
+function tenantDesignOverrideCatalog(filePath: string) {
+  return defineCatalog<TenantDesignOverride>({
+    id: 'tenant-design-override',
+    path: filePath,
+    schema: TENANT_DESIGN_OVERRIDE_SCHEMA_PATH,
+  });
+}
+
+function tenantDesignThemeOverlayCatalog(filePath: string) {
+  return defineCatalog<TenantDesignThemeOverlay>({
+    id: 'tenant-design-theme-overlay',
+    path: filePath,
+    schema: TENANT_DESIGN_THEME_OVERLAY_SCHEMA_PATH,
+  });
+}
 
 function isWithinRoot(filePath: string, rootDir: string): boolean {
   const relative = path.relative(path.resolve(rootDir), path.resolve(filePath));
@@ -44,13 +63,9 @@ export function loadTenantDesignOverride(
 ): TenantDesignOverride | null {
   if (!isWithinRoot(filePath, allowedRootDir)) return null;
   try {
-    const safePath = assertSafeRepositoryPath(filePath);
-    validateOverride ||= compileSchema<TenantDesignOverride>(
-      pathResolver.rootResolve('knowledge/product/schemas/tenant-design-override.schema.json')
-    );
-    const value = readJson<unknown>(safePath);
-    if (!validateOverride(value)) return null;
-    return value as TenantDesignOverride;
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+    if (!safeLstat(safePath).isFile()) return null;
+    return tenantDesignOverrideCatalog(safePath).load();
   } catch {
     return null;
   }
@@ -64,13 +79,9 @@ export function loadTenantDesignThemeOverlay(
 ): TenantDesignThemeOverlay | null {
   if (!isWithinRoot(filePath, allowedRootDir)) return null;
   try {
-    const safePath = assertSafeRepositoryPath(filePath);
-    validateThemeOverlay ||= compileSchema<TenantDesignThemeOverlay>(
-      pathResolver.rootResolve('knowledge/product/schemas/tenant-design-theme-overlay.schema.json')
-    );
-    const value = readJson<unknown>(safePath);
-    if (!validateThemeOverlay(value)) return null;
-    return value as TenantDesignThemeOverlay;
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+    if (!safeLstat(safePath).isFile()) return null;
+    return tenantDesignThemeOverlayCatalog(safePath).load();
   } catch {
     return null;
   }
