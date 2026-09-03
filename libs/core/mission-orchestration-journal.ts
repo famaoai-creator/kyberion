@@ -73,11 +73,22 @@ export interface ProvisionedEntryRecord {
 const PROVISIONED_ENTRY_RECORD_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-provisioned-entry-record.schema.json'
 );
+const PROVISIONED_ENTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-provisioned-entry.schema.json'
+);
 const provisionedEntryRecordCatalog = defineCatalog<ProvisionedEntryRecord>({
   id: 'mission-provisioned-entry-record',
   path: PROVISIONED_ENTRY_RECORD_SCHEMA_PATH,
   schema: PROVISIONED_ENTRY_RECORD_SCHEMA_PATH,
 });
+
+function provisionedEntryCatalog(sourcePath: string) {
+  return defineCatalog<ProvisionedEntry>({
+    id: 'mission-provisioned-entry',
+    path: sourcePath,
+    schema: PROVISIONED_ENTRY_SCHEMA_PATH,
+  });
+}
 
 export interface MissionOrchestrationJournalEntry {
   ts: string;
@@ -266,7 +277,11 @@ export function verifyProvisionedEntry<TContent>(
   provisioned: ProvisionedEntry<TContent>,
   persisted: unknown
 ): asserts persisted is PersistedProvisionedEntry<TContent> {
-  const candidate = persisted as Partial<PersistedProvisionedEntry<TContent>> | null;
+  const validated = provisionedEntryCatalog('provisioned-entry').validate(
+    persisted,
+    'provisioned-entry'
+  );
+  const candidate = validated as Partial<PersistedProvisionedEntry<TContent>> | null;
   if (
     !candidate ||
     candidate.id !== provisioned.id ||
@@ -287,7 +302,8 @@ export function writeProvisionedEntry<TContent>(
   provisioned: ProvisionedEntry<TContent>
 ): PersistedProvisionedEntry<TContent> {
   const safeFilePath = artifactPath(filePath);
-  safeWriteFile(safeFilePath, `${JSON.stringify(provisioned, null, 2)}\n`);
+  const validated = provisionedEntryCatalog(safeFilePath).validate(provisioned, safeFilePath);
+  safeWriteFile(safeFilePath, `${JSON.stringify(validated, null, 2)}\n`);
   return readProvisionedEntry(safeFilePath, provisioned);
 }
 
