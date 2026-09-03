@@ -23,12 +23,13 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { currentScope } from '@agent/core/scope-context';
 import {
   assertSafeRepositoryPath,
-  safeReaddir,
-  safeReadFile,
   safeExistsSync,
   safeLstat,
+  safeReaddir,
+  safeReadFile,
   safeStat,
 } from '@agent/core/secure-io';
+import { loadKnowledgeTaxonomy, type KnowledgeTaxonomy } from '@agent/core/knowledge-taxonomy';
 import {
   scopeAffinityScore,
   docAuthorityScore,
@@ -99,23 +100,6 @@ interface ScoredEntry extends KnowledgeEntry {
   };
 }
 
-interface TaxonomyManifest {
-  kinds?: Record<
-    string,
-    {
-      default_authority?: string;
-      default_scope?: string;
-    }
-  >;
-  directory_defaults?: Array<{
-    path_prefix: string;
-    kind: string;
-    authority: string;
-    scope: string;
-  }>;
-  retrieval_priority?: Record<string, string[]>;
-}
-
 export interface KnowledgeScanStats {
   scanned_files: number;
   in_scope_files: number;
@@ -149,22 +133,20 @@ export function normalizeRankingWeights(
   return normalized;
 }
 
-let cachedTaxonomy: TaxonomyManifest | null = null;
+let cachedTaxonomy: KnowledgeTaxonomy | null = null;
 
-function loadTaxonomy(): TaxonomyManifest {
+function loadTaxonomy(): KnowledgeTaxonomy {
   if (cachedTaxonomy) return cachedTaxonomy;
-  const taxonomyPath = pathResolver.knowledge('product/governance/knowledge-taxonomy.json');
-  if (!safeExistsSync(taxonomyPath)) {
-    cachedTaxonomy = {};
-    return cachedTaxonomy;
-  }
-
   try {
-    const safeTaxonomyPath = assertSafeRepositoryPath(taxonomyPath);
-    if (!safeLstat(safeTaxonomyPath).isFile()) throw new Error('taxonomy is not a regular file');
-    cachedTaxonomy = readJson<TaxonomyManifest>(safeTaxonomyPath);
+    cachedTaxonomy = loadKnowledgeTaxonomy();
   } catch (_) {
-    cachedTaxonomy = {};
+    cachedTaxonomy = {
+      version: 'fallback',
+      kinds: {},
+      directory_defaults: [],
+      overlay_precedence: [],
+      retrieval_priority: {},
+    };
   }
 
   return cachedTaxonomy;
