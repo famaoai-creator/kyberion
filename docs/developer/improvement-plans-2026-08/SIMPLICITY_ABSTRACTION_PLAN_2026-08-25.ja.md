@@ -13775,6 +13775,12 @@ SX-03／SX-04 のprovider discovery disk cacheを再監査し、provider probe�
 
 検証: provider discovery **1 file / 2 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 586
+
+SX-03／SX-04 のuser preference adapterを再監査し、個人設定JSONをraw `readJson`で読み、schema・regular-file境界を共有していなかった残存を修正した。拡張可能な任意キー／ネスト値を維持する `user-preferences.schema.json` とpath-bound canonical loaderを追加し、読み書き双方をcatalog検証へ統合した。不正root・非regular fileは既存どおりdefault／falseへfail-closedし、prototype pollution防止とskill向けadapter semanticsは維持している。
+
+検証: user preference adapter **2 files / 10 tests passed**、knowledge index同期。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
