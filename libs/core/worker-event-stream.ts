@@ -14,9 +14,10 @@ import * as path from 'node:path';
 
 import { z } from 'zod';
 import { logger } from './core.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
-import { assertSafeRepositoryPath, safeMkdir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { currentTriggerDeliveryId } from './trigger-correlation.js';
 import { redactCollaborationMetadata } from './agent-collaboration-events.js';
 
@@ -128,6 +129,24 @@ export type WorkerEventEnvelope<K extends WorkerEventType = WorkerEventType> = O
 
 export type WorkerEventListener = (event: WorkerEventEnvelope) => void;
 
+const WORKER_EVENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/worker-event-envelope.schema.json'
+);
+
+function workerEventCatalog(filePath: string): GovernedCatalog<WorkerEventEnvelope> {
+  return defineCatalog<WorkerEventEnvelope>({
+    id: 'worker-event-envelope',
+    path: filePath,
+    schema: WORKER_EVENT_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularWorkerEventFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[worker-event-stream] event log must be a regular file: ${filePath}`);
+  }
+}
+
 export class WorkerEventStream {
   private readonly listeners = new Set<WorkerEventListener>();
   private seq = 0;
@@ -191,20 +210,22 @@ export class WorkerEventStream {
 /** Append every envelope to a jsonl file; returns the detach function. */
 export function attachJsonlRecorder(stream: WorkerEventStream, filePath: string): () => void {
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const catalog = workerEventCatalog(safeFilePath);
   return stream.subscribe((event) => {
-    appendJsonLine(safeFilePath, event);
+    ensureRegularWorkerEventFile(safeFilePath);
+    appendJsonLine(safeFilePath, catalog.validate(event, safeFilePath));
   });
 }
 
 /** Parse a recorded jsonl file back into validated envelopes (replay). */
 export function readWorkerEventStreamJsonl(filePath: string): WorkerEventEnvelope[] {
-  return readJsonLines<WorkerEventEnvelope>(
-    assertSafeRepositoryPath(filePath, { allowMissingLeaf: true }),
-    {
-      onMalformed: 'skip',
-      map: (value) => workerEventEnvelopeSchema.parse(value),
-    }
-  ).filter((event) => Boolean(event));
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  ensureRegularWorkerEventFile(safeFilePath);
+  const catalog = workerEventCatalog(safeFilePath);
+  return readJsonLines<WorkerEventEnvelope>(safeFilePath, {
+    onMalformed: 'skip',
+    map: (value, lineNumber) => catalog.validate(value, `${safeFilePath}:${lineNumber}`),
+  }).filter((event) => Boolean(event));
 }
 
 const GLOBAL_KEY = Symbol.for('kyberion.workerEventStream');
