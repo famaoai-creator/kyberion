@@ -21,7 +21,7 @@ import {
   safeLstat,
   safeMkdir,
 } from '@agent/core/secure-io';
-import { appendJsonLine, nowIso, readJson } from '@agent/core/foundation';
+import { appendJsonLine, defineCatalog, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { evaluateResolvedFacetFixtures } from './eval_facets.js';
 
@@ -127,6 +127,17 @@ export interface RunEvalHarnessTableOptions {
 // root-level `.eval/` directory and arbitrary shared subdirectories are
 // intentionally rejected by secure-io policy.
 const DEFAULT_RUN_PATH = pathResolver.sharedTmp('eval/runs.jsonl');
+const EVAL_HARNESS_TABLE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/eval-harness-table.schema.json'
+);
+
+function evalHarnessTableCatalogAtPath(filePath: string) {
+  return defineCatalog<EvalHarnessConfiguration[]>({
+    id: 'eval-harness-table',
+    path: filePath,
+    schema: EVAL_HARNESS_TABLE_SCHEMA_PATH,
+  });
+}
 
 function hash(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -388,14 +399,13 @@ export function loadEvalHarnessTable(
   if (!safeLstat(safePath).isFile()) {
     throw new Error(`[EVAL_HARNESS_CONFIG] table must be a regular file: ${filePath}`);
   }
-  let parsed: unknown;
+  let table: EvalHarnessConfiguration[];
   try {
-    parsed = readJson<unknown>(safePath);
+    table = evalHarnessTableCatalogAtPath(safePath).load();
   } catch {
-    throw new Error(`[EVAL_HARNESS_CONFIG] invalid table JSON: ${filePath}`);
+    throw new Error(`[EVAL_HARNESS_CONFIG] invalid table or schema: ${filePath}`);
   }
-  if (!Array.isArray(parsed)) throw new Error('[EVAL_HARNESS_CONFIG] table root must be an array.');
-  return parsed as EvalHarnessConfiguration[];
+  return validateTable(table);
 }
 
 export async function main(argv: string[] = []): Promise<number> {
