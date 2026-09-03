@@ -10,16 +10,21 @@ import * as customerResolver from '@agent/core/customer-resolver';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { currentScope } from '@agent/core/scope-context';
 import { loadIntentContractMemorySnapshot } from '@agent/core/intent-contract-learning';
+import {
+  loadIntentDeltasAtPath,
+  loadIntentSnapshotsAtPath,
+} from '@agent/core/intent-snapshot-store';
 import { renderStatus, resolveVocabularyLocale } from '@agent/core/ux-vocabulary';
 import { resolveLocale } from '@agent/core/locale';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
-import { readJsonIfPresent, readJsonLines } from '@agent/core/foundation';
+import { readJsonLines } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { validateTraceReplay } from '@agent/core/trace-schema';
 import type { AuditEntry } from '@agent/core/audit-chain';
 import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
+import type { IntentDelta, IntentSnapshot } from '@agent/core/intent-delta';
 import type { Trace } from '@agent/core/src/trace';
-import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
+import { listMissionsInSearchDirs, loadState, loadStateAtPath } from './refactor/mission-state.js';
 import type { MissionState } from './refactor/mission-types.js';
 
 type IntentTraceSource = 'mission' | 'snapshot' | 'delta' | 'memory' | 'trace' | 'audit';
@@ -43,13 +48,13 @@ interface IntentTraceMissionHit {
 interface IntentTraceSnapshotHit {
   missionId: string;
   filePath: string;
-  snapshot: Record<string, any>;
+  snapshot: IntentSnapshot;
 }
 
 interface IntentTraceDeltaHit {
   missionId: string;
   filePath: string;
-  delta: Record<string, any>;
+  delta: IntentDelta;
 }
 
 interface IntentTraceTraceHit {
@@ -276,7 +281,7 @@ function loadSnapshotEntries(
   if (!evidencePath) return [];
   const snapshotFile = safeIntentPath(path.join(evidencePath, 'intent-snapshots.jsonl'));
   if (!snapshotFile) return [];
-  return safeJsonLines(snapshotFile).map((snapshot) => ({
+  return loadIntentSnapshotsAtPath(snapshotFile).map((snapshot) => ({
     missionId,
     filePath: snapshotFile,
     snapshot,
@@ -287,7 +292,7 @@ function loadDeltaEntries(missionId: string, evidencePath: string | null): Inten
   if (!evidencePath) return [];
   const deltaFile = safeIntentPath(path.join(evidencePath, 'intent-deltas.jsonl'));
   if (!deltaFile) return [];
-  return safeJsonLines(deltaFile).map((delta) => ({
+  return loadIntentDeltasAtPath(deltaFile).map((delta) => ({
     missionId,
     filePath: deltaFile,
     delta,
@@ -377,7 +382,7 @@ function collectMissionHits(
         (() => {
           const statePath = safeIntentPath(path.join(safeMissionPath, 'mission-state.json'));
           if (!statePath) return null;
-          return readJsonIfPresent<MissionState>(statePath);
+          return loadStateAtPath(statePath);
         })();
       if (!state) return null;
       const correlationIds = extractMissionCorrelationIds(state);

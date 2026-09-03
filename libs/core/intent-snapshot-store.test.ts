@@ -4,6 +4,8 @@ import * as path from 'node:path';
 import {
   emitIntentSnapshot,
   evaluateIntentDriftGate,
+  loadIntentDeltasAtPath,
+  loadIntentSnapshotsAtPath,
   latestSnapshot,
   listSnapshots,
   mapStageToLoopPhase,
@@ -138,6 +140,43 @@ describe('intent-snapshot-store', () => {
     safeRmSync(snapshotFile, { force: true });
     safeMkdir(snapshotFile, { recursive: true });
     expect(() => listSnapshots('MSN-DIRECTORY')).toThrow('regular file');
+  });
+
+  it('loads explicit report paths through schemas while skipping malformed lines', () => {
+    const snapshotFile = path.join(tmpDir, 'report-snapshots.jsonl');
+    const deltaFile = path.join(tmpDir, 'report-deltas.jsonl');
+    safeWriteFile(
+      snapshotFile,
+      [
+        JSON.stringify({
+          snapshot_id: 'snap-report',
+          mission_id: 'MSN-REPORT',
+          stage: 'intake',
+          kind: 'origin',
+          created_at: '2026-09-03T00:00:00.000Z',
+          source: 'user_prompt',
+          intent: { goal: 'report intent' },
+        }),
+        '{malformed',
+        JSON.stringify({ snapshot_id: 'schema-invalid' }),
+      ].join('\n') + '\n'
+    );
+    safeWriteFile(
+      deltaFile,
+      JSON.stringify({
+        delta_id: 'delta-report',
+        mission_id: 'MSN-REPORT',
+        from_snapshot: 'snap-report',
+        to_snapshot: 'snap-report-2',
+        computed_at: '2026-09-03T00:01:00.000Z',
+        changes: { goal_changed: false, goal_similarity: 1 },
+        drift_score: 0,
+        drift_verdict: 'none',
+      }) + '\n'
+    );
+
+    expect(loadIntentSnapshotsAtPath(snapshotFile)).toHaveLength(1);
+    expect(loadIntentDeltasAtPath(deltaFile)).toHaveLength(1);
   });
 
   describe('evaluateIntentDriftGate', () => {
