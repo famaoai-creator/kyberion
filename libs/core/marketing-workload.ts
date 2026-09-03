@@ -61,6 +61,23 @@ export interface MarketingReviewPackage {
   artifacts: Array<{ name: string; path: string; sha256: string }>;
 }
 
+export interface MarketingReviewAggregation {
+  run_id: string;
+  risk_level: MarketingRiskLevel;
+  gate: GateResult;
+  reviews: MarketingReview[];
+  blocking_findings: Array<{
+    review_id: string;
+    severity: 'blocking';
+    category: string;
+    description: string;
+    required_action?: string;
+    location?: Record<string, string>;
+  }>;
+  ready_for_approval: boolean;
+  evidence: string[];
+}
+
 export interface PublicationApproval {
   approval_id: string;
   mission_id: string;
@@ -159,6 +176,9 @@ const MARKETING_REVIEW_SCHEMA_PATH = pathResolver.knowledge(
 const MARKETING_REVIEW_PACKAGE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/marketing-review-package.schema.json'
 );
+const MARKETING_REVIEW_AGGREGATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-review-aggregation.schema.json'
+);
 const PUBLICATION_VERIFICATION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/publication-verification.schema.json'
 );
@@ -233,6 +253,18 @@ export function loadMarketingReviewPackageAtPath(filePath: string): MarketingRev
 export function loadMarketingReviewAtPath(filePath: string): MarketingReview {
   const safeFilePath = requireRegularMarketingFile(filePath, 'review');
   return marketingReviewCatalogAtPath(safeFilePath).load();
+}
+
+/** Validate the persisted result produced by marketing review aggregation. */
+export function validateMarketingReviewAggregation(
+  value: unknown,
+  sourcePath = 'marketing-review-aggregation'
+): MarketingReviewAggregation {
+  return defineCatalog<MarketingReviewAggregation>({
+    id: 'marketing-review-aggregation',
+    path: sourcePath,
+    schema: MARKETING_REVIEW_AGGREGATION_SCHEMA_PATH,
+  }).validate(value, sourcePath);
 }
 
 export function scanMarketingTextForSensitiveData(

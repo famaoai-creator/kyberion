@@ -12,6 +12,7 @@ import {
   validateMarketingImageArtifact,
   validateMarketingTextArtifact,
   validateMarketingCompletionEvidence,
+  validateMarketingReviewAggregation,
   validatePublicationVerification,
   validatePublicationApproval,
   validatePublicationClassification,
@@ -160,6 +161,27 @@ describe('marketing workload gates', () => {
 
     expect(() => validatePublicationVerification({ ...verification, unexpected: true })).toThrow(
       'Invalid catalog publication-verification'
+    );
+  });
+
+  it('rejects unknown marketing review aggregation fields', () => {
+    const result = {
+      run_id: 'run-001',
+      risk_level: 1 as const,
+      gate: {
+        gate_id: 'G4' as const,
+        status: 'passed' as const,
+        reasons: [],
+        evidence: ['G4:validated'],
+      },
+      reviews: [],
+      blocking_findings: [],
+      ready_for_approval: true,
+      evidence: ['review.json'],
+    };
+
+    expect(() => validateMarketingReviewAggregation({ ...result, unexpected: true })).toThrow(
+      'Invalid catalog marketing-review-aggregation'
     );
   });
 

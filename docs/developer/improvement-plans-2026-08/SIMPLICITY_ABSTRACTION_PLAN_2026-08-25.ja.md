@@ -14880,6 +14880,18 @@ root typecheck、対象lint、Prettier、`git diff --check`。canonical full gat
 ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、
 SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 746
+
+SX-03／SX-04／SX-06 のmarketing review aggregation結果を再監査し、package／review inputは既に
+catalog-boundである一方、集約されたG4 gate、blocking findings、review evidenceの出力だけが専用schema
+なしのraw `safeWriteFile`に残っていたため修正した。`marketing-review-aggregation.schema.json`とcore
+validatorを追加し、review結果をpersistする直前にrun／risk／gate／review／evidence envelopeを検証する。
+approval準備判定、artifact hash drift、blocking finding、CLI failure semanticsは維持している。
+
+検証: marketing workload／review aggregation **2 files / 35 tests passed**、root typecheck、対象lint、
+Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock
+境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

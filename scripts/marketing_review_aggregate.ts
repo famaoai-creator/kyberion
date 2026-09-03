@@ -4,6 +4,7 @@ import {
   loadMarketingReviewPackageAtPath,
   requiredMarketingControls,
   sha256,
+  validateMarketingReviewAggregation,
   type ArtifactBinding,
   type MarketingReviewPackage,
 } from '@agent/core/marketing-workload';
@@ -94,7 +95,8 @@ export function runMarketingReviewAggregation(input: {
     ready_for_approval: gate.status === 'passed',
     evidence: input.reviewPaths,
   };
-  safeWriteFile(outputPath, JSON.stringify(result, null, 2));
+  const validatedResult = validateMarketingReviewAggregation(result, outputPath);
+  safeWriteFile(outputPath, JSON.stringify(validatedResult, null, 2));
   return { ready_for_approval: result.ready_for_approval, output_path: outputPath };
 }
 
