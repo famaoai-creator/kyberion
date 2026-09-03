@@ -14011,7 +14011,7 @@ SX-03／SX-04 のadapter default preferences readerを再監査し、active prof
 
 ## 2026-09-03 再レビュー修正 625
 
-SX-03／SX-04 のsurface coordination async request／notification readerを再監査し、scope filteringとquarantineの直前までraw JSON＋手書きpredicateを通していた残存を修正した。async request／notification専用schemaとregular-file付きpath-bound canonical loaderへ統合し、surface binding、persisted scope検証、single lookupのnull fallback、aggregate listingのquarantine semanticsを維持した。outboxの既存schema loaderも同じregular-file共通境界へ寄せた。
+SX-03／SX-04 のsurface coordination async request／notification／dead-letter／dead-target readerを再監査し、scope filteringとquarantineの直前までraw JSON＋手書きpredicateを通していた残存を修正した。4種のpersisted recordを専用schemaとregular-file付きpath-bound canonical loaderへ統合し、surface binding、persisted scope検証、single lookupのnull fallback、aggregate listingのquarantine、operator replay／dead-target semanticsを維持した。outboxの既存schema loaderも同じregular-file共通境界へ寄せ、重複predicateを削除した。
 
 検証: surface async／coordination **2 files / 15 focused tests passed**、knowledge index生成、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
