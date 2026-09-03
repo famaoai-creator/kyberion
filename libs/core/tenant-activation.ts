@@ -4,8 +4,15 @@ import { resolveTenant } from './tenant-registry.js';
 import { loadOrganizationOperationalState } from './organization-operating-model.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
 import { isRecord } from './foundation/text.js';
 
@@ -61,6 +68,18 @@ export interface TenantActivationRecord {
   created_at: string;
   updated_at: string;
   activated_at?: string;
+}
+
+const TENANT_ACTIVATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tenant-activation.schema.json'
+);
+
+function tenantActivationCatalog(filePath: string) {
+  return defineCatalog<TenantActivationRecord>({
+    id: 'tenant-activation',
+    path: filePath,
+    schema: TENANT_ACTIVATION_SCHEMA_PATH,
+  });
 }
 
 export interface TenantActivationScope {
@@ -291,7 +310,9 @@ export function loadTenantActivation(
   for (const filePath of candidates) {
     if (!safeExistsSync(filePath)) continue;
     try {
-      const value = readJson<unknown>(filePath);
+      const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+      if (!safeLstat(safeFilePath).isFile()) continue;
+      const value = tenantActivationCatalog(safeFilePath).load();
       if (
         !isTenantActivationRecord(value) ||
         value.customer_slug !== input.customerSlug ||
