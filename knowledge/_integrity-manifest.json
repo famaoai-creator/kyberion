@@ -8593,6 +8593,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/personal-identity.schema.json",
+      "tier": "public",
+      "size": 347,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/pfc-state.schema.json",
       "tier": "public",
       "size": 691,
