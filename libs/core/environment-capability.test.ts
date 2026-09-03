@@ -585,6 +585,29 @@ describe('loadEnvironmentManifest', () => {
       fs.rmSync(link, { force: true });
     }
   });
+
+  it('rejects schema-invalid and non-regular manifest files before use', () => {
+    const dir = path.join(ROOT, 'knowledge/product/governance/environment-manifests');
+    const invalid = path.join(dir, 'unit-test-schema-invalid.json');
+    const directory = path.join(dir, 'unit-test-directory.json');
+    const source = JSON.parse(
+      fs.readFileSync(path.join(dir, 'reasoning-backend.json'), 'utf8')
+    ) as Record<string, unknown>;
+    source.unexpected = true;
+    fs.writeFileSync(invalid, JSON.stringify(source));
+    fs.mkdirSync(directory, { recursive: true });
+    try {
+      expect(() => loadEnvironmentManifest('unit-test-schema-invalid')).toThrow(
+        /Invalid catalog environment-capability-manifest/
+      );
+      expect(() => loadEnvironmentManifest('unit-test-directory')).toThrow(
+        /must be a regular file/
+      );
+    } finally {
+      fs.rmSync(invalid, { force: true });
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('manifest signing (SA-02)', () => {

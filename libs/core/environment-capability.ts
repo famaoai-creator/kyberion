@@ -25,6 +25,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import {
@@ -33,12 +34,10 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 /* ------------------------------------------------------------------ *
  * Types                                                              *
@@ -697,6 +696,9 @@ function readReceipt(manifestId: string, missionId?: string): SetupReceipt | nul
  * ------------------------------------------------------------------ */
 
 const DEFAULT_MANIFEST_DIR = 'knowledge/product/governance/environment-manifests';
+const MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/environment-capability-manifest.schema.json'
+);
 
 function governedManifestDir(): string {
   const dir = pathResolver.rootResolve(DEFAULT_MANIFEST_DIR);
@@ -787,47 +789,12 @@ function enforceManifestSignature(manifest: EnvironmentManifest): void {
   }
 }
 
-function parseEnvironmentManifest(raw: string, expectedId: string): EnvironmentManifest {
-  const value: unknown = parseSafeJsonInput(raw, 'environment manifest');
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('[environment-capability] manifest must be a JSON object');
-  }
-  const candidate = value as Record<string, unknown>;
-  if (candidate.manifest_id !== expectedId || typeof candidate.version !== 'string') {
-    throw new Error('[environment-capability] manifest id/version is invalid');
-  }
-  if (!Array.isArray(candidate.capabilities)) {
-    throw new Error('[environment-capability] manifest capabilities must be an array');
-  }
-  for (const [index, capability] of candidate.capabilities.entries()) {
-    if (!capability || typeof capability !== 'object' || Array.isArray(capability)) {
-      throw new Error(`[environment-capability] capability ${index} must be an object`);
-    }
-    const cap = capability as Record<string, unknown>;
-    if (
-      typeof cap.capability_id !== 'string' ||
-      typeof cap.kind !== 'string' ||
-      typeof cap.description !== 'string' ||
-      !Array.isArray(cap.required_for) ||
-      !cap.required_for.every((item) => typeof item === 'string') ||
-      !cap.probe ||
-      typeof cap.probe !== 'object' ||
-      Array.isArray(cap.probe)
-    ) {
-      throw new Error(`[environment-capability] capability ${index} has an invalid schema`);
-    }
-    const probe = cap.probe as Record<string, unknown>;
-    if (!['command', 'module', 'env', 'mission-evidence', 'probe'].includes(String(probe.kind))) {
-      throw new Error(`[environment-capability] capability ${index} has an invalid probe kind`);
-    }
-    if (probe.kind === 'command' && typeof probe.command !== 'string') {
-      throw new Error(`[environment-capability] capability ${index} command probe is invalid`);
-    }
-    if (probe.kind === 'module' && typeof probe.specifier !== 'string') {
-      throw new Error(`[environment-capability] capability ${index} module probe is invalid`);
-    }
-  }
-  return value as EnvironmentManifest;
+function environmentManifestCatalog(filePath: string): GovernedCatalog<EnvironmentManifest> {
+  return defineCatalog<EnvironmentManifest>({
+    id: 'environment-capability-manifest',
+    path: filePath,
+    schema: MANIFEST_SCHEMA_PATH,
+  });
 }
 
 /**
@@ -856,7 +823,10 @@ export function listEnvironmentManifestIds(): string[] {
   return ids.sort();
 }
 
-export function loadEnvironmentManifest(manifestIdOrPath: string): EnvironmentManifest {
+function loadEnvironmentManifestRecord(
+  manifestIdOrPath: string,
+  enforceSignatureAfterLoad: boolean
+): EnvironmentManifest {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(manifestIdOrPath)) {
     throw new Error('[environment-capability] manifest must be referenced by id, not by path');
   }
@@ -867,15 +837,29 @@ export function loadEnvironmentManifest(manifestIdOrPath: string): EnvironmentMa
   const abs = path.join(dir, `${manifestId}.json`);
   if (safeExistsSync(abs)) {
     assertNoSymlinkPath(abs, dir);
-    const manifest = parseEnvironmentManifest(
-      safeReadFile(abs, { encoding: 'utf8' }) as string,
-      manifestId
-    );
-    enforceManifestSignature(manifest);
-    _trustedExecutableManifests.add(manifest);
+    if (!safeLstat(abs).isFile()) {
+      throw new Error('[environment-capability] manifest must be a regular file');
+    }
+    const manifest = environmentManifestCatalog(abs).load();
+    if (manifest.manifest_id !== manifestId) {
+      throw new Error('[environment-capability] manifest id does not match its filename');
+    }
+    if (enforceSignatureAfterLoad) {
+      enforceManifestSignature(manifest);
+      _trustedExecutableManifests.add(manifest);
+    }
     return manifest;
   }
   throw new Error(`[environment-capability] manifest not found: ${manifestIdOrPath}`);
+}
+
+export function loadEnvironmentManifest(manifestIdOrPath: string): EnvironmentManifest {
+  return loadEnvironmentManifestRecord(manifestIdOrPath, true);
+}
+
+/** Schema-valid manifest load for the signing ceremony before signature enforcement. */
+export function loadEnvironmentManifestForSigning(manifestIdOrPath: string): EnvironmentManifest {
+  return loadEnvironmentManifestRecord(manifestIdOrPath, false);
 }
 
 /* ------------------------------------------------------------------ *
