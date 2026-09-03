@@ -74,6 +74,13 @@ function seedSecurityPolicyApproval(root: string, id: string): void {
 }
 
 describe('org role create', () => {
+  it('resolves existing authority roles through the governed directory loader', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'scripts', 'org.ts'), 'utf8');
+
+    expect(source).toContain('loadAuthorityRoleDirectory(rootDir)[authorityRoleId]');
+    expect(source).not.toContain('readJsonIfExists');
+  });
+
   it('creates aligned authority, team, policy, and role docs', () => {
     const tempRoot = makeTempRoot();
     const repoRoot = process.cwd();
