@@ -90,8 +90,14 @@ export function writeRequirementsDraftAtPath(
 
 export function readRequirementsDraft(missionId: string): RequirementsDraft | null {
   const file = draftPath(missionId);
-  if (!file || !safeExistsSync(file)) return null;
-  return requirementsDraftCatalog(file).load();
+  return file ? readRequirementsDraftAtPath(file) : null;
+}
+
+/** Load an explicitly supplied draft through the same schema boundary as the mission artifact. */
+export function readRequirementsDraftAtPath(filePath: string): RequirementsDraft | null {
+  const safeFile = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFile)) return null;
+  return requirementsDraftCatalog(safeFile).load();
 }
 
 export interface SaveRequirementsDraftParams {
