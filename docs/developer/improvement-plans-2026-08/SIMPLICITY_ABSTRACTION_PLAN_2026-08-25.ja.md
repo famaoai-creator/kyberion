@@ -14267,6 +14267,12 @@ SX-03／SX-10 のcontrol-plane catalogを再監査し、artifact library index�
 
 検証: control-plane／media catalog **6 files / 21 tests passed**、actuator build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 668
+
+SX-03／SX-04 のcapability assimilationを再監査し、`registry_manager`がadapter payloadとharness／gateway registryをfoundationのraw `readJson`で読み、各registry schemaと入力profile schemaを共有していない残存を修正した。harness capability entry、gateway adapter profile、harness／gateway registryそれぞれのschema-bound loaderとregistry write前validationを追加し、不正・unknown field・非regular fileを登録処理へ進めないようにした。既存のtier path、gateway artifact copy、capability upsert、pipeline呼出しと登録結果のsemanticsは維持している。
+
+検証: registry manager loader **1 file / 3 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

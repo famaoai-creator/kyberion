@@ -7375,6 +7375,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/harness-capability-entry.schema.json",
+      "tier": "public",
+      "size": 2860,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/harness-capability-registry.schema.json",
       "tier": "public",
       "size": 3643,
