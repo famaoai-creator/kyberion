@@ -1,7 +1,10 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { loadBrowserOnboardingStateAtPath } from './browser-onboarding-state.js';
+import {
+  loadBrowserOnboardingStateAtPath,
+  writeBrowserOnboardingStateAtPath,
+} from './browser-onboarding-state.js';
 import {
   safeMkdir,
   safeRmSync,
@@ -34,6 +37,19 @@ describe('browser onboarding state loader', () => {
         status: 'complete',
         identity: { name: 'operator' },
       });
+    });
+  });
+
+  it('rejects an incomplete receipt before persisting it', () => {
+    withExecutionContext('mission_controller', () => {
+      const filePath = path.join(fixtureRoot, 'invalid-state.json');
+      expect(() =>
+        writeBrowserOnboardingStateAtPath(filePath, {
+          version: '1.0.0',
+          status: 'draft',
+          applied_at: '2026-09-03T00:00:00.000Z',
+        })
+      ).toThrow(/Invalid catalog browser-onboarding-state/);
     });
   });
 
