@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver, sharedTmp } from './path-resolver.js';
 import { logger } from './core.js';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import {
@@ -135,7 +134,7 @@ export function loadIntentGoalHandoffAtPath(filePath: string): IntentGoalHandoff
     id: 'intent-goal-handoff',
     path: safeFilePath,
     schema: HANDOFF_SCHEMA_PATH,
-  }).validate(readJson<unknown>(safeFilePath), safeFilePath);
+  }).load();
   const parsed = parseIntentGoalHandoff(validated);
   if (!parsed) {
     throw new Error(`[INTENT_HANDOFF] invalid handoff payload: ${filePath}`);

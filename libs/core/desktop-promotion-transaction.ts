@@ -1,6 +1,5 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -90,7 +89,11 @@ export function loadDesktopPromotionTransactionAtPath(
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[DESKTOP_PROMOTION] transaction must be a regular file: ${filePath}`);
   }
-  const marker = transactionCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  const marker = defineCatalog<DesktopPromotionTransaction>({
+    id: 'desktop-promotion-transaction',
+    path: safeFilePath,
+    schema: TRANSACTION_SCHEMA_PATH,
+  }).load();
   if (expectedProcedureId !== undefined && marker.procedure_id !== expectedProcedureId) {
     throw new Error(
       `[DESKTOP_PROMOTION_SCOPE_MISMATCH] transaction belongs to ${marker.procedure_id}, expected ${expectedProcedureId}`
@@ -104,7 +107,11 @@ function loadDesktopPromotionLockAtPath(filePath: string): DesktopPromotionLock 
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[DESKTOP_PROMOTION] lock must be a regular file: ${filePath}`);
   }
-  return lockCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  return defineCatalog<DesktopPromotionLock>({
+    id: 'desktop-promotion-lock',
+    path: safeFilePath,
+    schema: LOCK_SCHEMA_PATH,
+  }).load();
 }
 
 function readMarker(procedureId: string): DesktopPromotionTransaction | null {
