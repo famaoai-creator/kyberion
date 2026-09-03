@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { loadBrandTokensAtPath, type BrandTokens } from './brand-tokens.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
@@ -158,23 +159,21 @@ export interface ResolveCreativeDesignInput {
   tone?: number;
 }
 
-interface BrandTokensFile {
-  brand_name?: string;
-  tokens?: {
-    colors?: Record<CreativeDesignMode, Record<string, string>>;
-    fonts?: { sans?: string; mono?: string; heading?: string; body?: string };
+type CreativeBrandTokens = Omit<BrandTokens, 'tokens'> & {
+  tokens: BrandTokens['tokens'] & {
+    fonts: BrandTokens['tokens']['fonts'] & {
+      heading?: string;
+      body?: string;
+    };
     typography?: Partial<CreativeDesignTypography>;
     spacing?: Partial<CreativeDesignSpacing>;
     constraints?: Partial<CreativeDesignConstraints>;
   };
-}
+};
 
 const BRAND_TOKENS_PATH = 'public/design-patterns/brand-tokens/kyberion.json';
 const MEDIA_DESIGN_SYSTEMS_PATH =
   'public/design-patterns/media-templates/media-design-systems.json';
-const BRAND_TOKENS_SCHEMA_PATH = pathResolver.rootResolve(
-  'knowledge/product/schemas/brand-tokens.schema.json'
-);
 const MEDIA_DESIGN_SYSTEMS_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/media-design-systems.schema.json'
 );
@@ -397,12 +396,6 @@ const DEFAULT_STYLE_PACK_BASE = {
   music: { mood: 'focused and forward-moving', bpm_range: [90, 120] as [number, number] },
 };
 
-const brandTokensCatalog = defineCatalog<BrandTokensFile>({
-  id: 'brand-tokens',
-  path: () => pathResolver.knowledge(BRAND_TOKENS_PATH),
-  schema: BRAND_TOKENS_SCHEMA_PATH,
-});
-
 const mediaDesignSystemsCatalog = defineCatalog<MediaDesignSystemsFile>({
   id: 'media-design-systems',
   path: () => pathResolver.knowledge(MEDIA_DESIGN_SYSTEMS_PATH),
@@ -427,16 +420,26 @@ function loadBrandTokens(mode: CreativeDesignMode): {
   constraints: CreativeDesignConstraints;
   brandName: string;
 } {
-  const parsed = loadDesignCatalog(brandTokensCatalog);
-  const rawColors = parsed?.tokens?.colors?.[mode] || {};
+  const parsed = (() => {
+    try {
+      const filePath = assertSafeRepositoryPath(pathResolver.knowledge(BRAND_TOKENS_PATH), {
+        allowMissingLeaf: false,
+      });
+      if (!safeLstat(filePath).isFile()) return null;
+      return loadBrandTokensAtPath(filePath) as CreativeBrandTokens;
+    } catch {
+      return null;
+    }
+  })();
+  const rawColors = parsed?.tokens?.colors?.[mode];
   const fallback = FALLBACK_COLORS[mode];
   const colors: CreativeDesignColors = {
-    primary: normalizeCssToken(rawColors.primary, fallback.primary),
-    secondary: normalizeCssToken(rawColors.secondary, fallback.secondary),
-    accent: normalizeCssToken(rawColors.accent, fallback.accent),
-    background: normalizeCssToken(rawColors.bg_main || rawColors.background, fallback.background),
-    text: normalizeCssToken(rawColors.text_primary || rawColors.text, fallback.text),
-    warning: normalizeCssToken(rawColors.warning, fallback.warning),
+    primary: normalizeCssToken(rawColors?.primary, fallback.primary),
+    secondary: normalizeCssToken(rawColors?.secondary, fallback.secondary),
+    accent: normalizeCssToken(rawColors?.accent, fallback.accent),
+    background: normalizeCssToken(rawColors?.bg_main, fallback.background),
+    text: normalizeCssToken(rawColors?.text_primary, fallback.text),
+    warning: normalizeCssToken(rawColors?.warning, fallback.warning),
   };
   const sans = String(parsed?.tokens?.fonts?.sans || FALLBACK_FONTS.sans);
   // MP-01: heading and body are distinct roles. They still default to the
