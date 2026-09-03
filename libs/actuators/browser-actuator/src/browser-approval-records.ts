@@ -1,4 +1,4 @@
-import { parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 
 export type BrowserOperatorApprovalStatus = 'pending' | 'approved' | 'expired' | 'rejected';
 
@@ -76,4 +76,28 @@ export function parseBrowserOperatorApprovalRecord(
     ...(timeoutMs !== undefined ? { timeout_ms: timeoutMs } : {}),
     ...(completedAt !== undefined ? { completed_at: completedAt } : {}),
   };
+}
+
+/** Complete an approval only after validating the persisted request identity. */
+export function completeBrowserOperatorApproval(
+  raw: string | undefined,
+  sessionId: string,
+  status: Exclude<BrowserOperatorApprovalStatus, 'pending'>,
+  completedAt: string
+):
+  | BrowserOperatorApprovalRecord
+  | { status: Exclude<BrowserOperatorApprovalStatus, 'pending'>; completed_at: string } {
+  try {
+    const record =
+      raw === undefined
+        ? undefined
+        : parseBrowserOperatorApprovalRecord(
+            parseSafeJsonInput(raw, `browser operator approval ${sessionId}`),
+            `browser operator approval ${sessionId}`
+          );
+    if (record?.session_id === sessionId) return { ...record, status, completed_at: completedAt };
+  } catch {
+    // A corrupt approval artifact is replaced with a fresh terminal state.
+  }
+  return { status, completed_at: completedAt };
 }
