@@ -1,4 +1,5 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -11,6 +12,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
@@ -152,6 +154,18 @@ function recordPath(delegationId: string): string {
   return assertSafeRepositoryPath(path.join(resolveStoreDir(), `${safeId}.json`), {
     allowMissingLeaf: true,
   });
+}
+
+const DELEGATED_TASK_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/delegated-task-record.schema.json'
+);
+
+function loadDelegatedTaskRecordCatalog(filePath: string): DelegatedTaskRecord {
+  return defineCatalog<DelegatedTaskRecord>({
+    id: 'delegated-task-record',
+    path: filePath,
+    schema: DELEGATED_TASK_RECORD_SCHEMA_PATH,
+  }).load();
 }
 
 function childInboxPath(childSessionId: string): string {
@@ -765,9 +779,8 @@ export function createDelegationHandle(input: {
 export function loadDelegatedTaskRecord(delegationId: string): DelegatedTaskRecord | null {
   try {
     const filePath = recordPath(delegationId);
-    if (!safeExistsSync(filePath)) return null;
-    const parsed = readJson<DelegatedTaskRecord>(filePath);
-    return parsed && typeof parsed.delegation_id === 'string' ? parsed : null;
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
+    return loadDelegatedTaskRecordCatalog(filePath);
   } catch {
     return null;
   }
