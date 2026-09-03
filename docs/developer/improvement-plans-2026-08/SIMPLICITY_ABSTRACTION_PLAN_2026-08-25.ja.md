@@ -13607,6 +13607,12 @@ SX-03／SX-04／SX-09 のwork-item dispatch manifestを再監査し、dispatch�
 
 検証: work-item dispatch manifest／context projection **2 files / 57 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 558
+
+SX-03／SX-04／SX-09 のbrowser conversation sessionに紐づくpersisted artifactを再監査し、browser snapshot／runtime session metadataをraw `readJson`と局所parserだけで読み、actuatorの実保存形・regular-file境界・未知フィールド契約を共有していなかった残存を修正した。`browser-session-snapshot.schema.json`／`browser-runtime-session.schema.json`とcanonical loaderを追加し、snapshot／runtime sessionの両読込をstrict schema、regular-file境界へ統合した。actuatorが保存するviewport・focused reference・DOM属性・lease／tab／trace metadataを契約へ含め、会話側では従来どおり必要なtarget／runtime項目だけを投影する。不正・directory artifactはtarget resolution／bootstrapへ進まずfail-closedし、session_id binding、CDP port validation、refresh／bootstrap semanticsは維持している。
+
+検証: browser conversation session **1 file / 17 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
