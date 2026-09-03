@@ -12,6 +12,7 @@ import {
   validateMarketingImageArtifact,
   validateMarketingTextArtifact,
   validateMarketingCompletionEvidence,
+  validatePublicationVerification,
   validatePublicationApproval,
   validatePublicationClassification,
   validateVideoTechnicalArtifacts,
@@ -139,6 +140,26 @@ describe('marketing workload gates', () => {
         'thumbnail is missing',
         'CTA URL is invalid',
       ])
+    );
+  });
+
+  it('rejects unknown publication verification fields', () => {
+    const verification = {
+      gate_id: 'G6' as const,
+      status: 'passed' as const,
+      reasons: [],
+      evidence: ['dry-run:not-a-publication'],
+      approval_id: 'approval-001',
+      shared_approval_request_id: 'request-001',
+      artifact_hashes: { video: artifact },
+      sensitive_data_scan: { pii_findings: [], secret_findings: [], passed: true },
+      rendered_artifact: 'active/shared/exports/preview.html',
+      network_access: false as const,
+      counts_as_publication: false as const,
+    };
+
+    expect(() => validatePublicationVerification({ ...verification, unexpected: true })).toThrow(
+      'Invalid catalog publication-verification'
     );
   });
 

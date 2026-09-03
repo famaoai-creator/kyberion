@@ -6,6 +6,7 @@ import {
   requiredMarketingControls,
   scanMarketingTextForSensitiveData,
   sha256,
+  validatePublicationVerification,
   validatePublicationApproval,
   validateSharedPublicationApproval,
   type ArtifactBinding,
@@ -174,23 +175,20 @@ export function runMarketingPublishDryRun(input: {
     thumbnail_set: Boolean(artifacts.thumbnail),
     dry_run: true,
   });
-  safeWriteFile(
-    verificationPath,
-    JSON.stringify(
-      {
-        ...verification,
-        approval_id: approval.approval_id,
-        shared_approval_request_id: sharedApprovalRequest.id,
-        artifact_hashes: artifacts,
-        sensitive_data_scan: sensitiveDataScan,
-        rendered_artifact: previewPath,
-        network_access: false,
-        counts_as_publication: false,
-      },
-      null,
-      2
-    )
+  const verificationArtifact = validatePublicationVerification(
+    {
+      ...verification,
+      approval_id: approval.approval_id,
+      shared_approval_request_id: sharedApprovalRequest.id,
+      artifact_hashes: artifacts,
+      sensitive_data_scan: sensitiveDataScan,
+      rendered_artifact: previewPath,
+      network_access: false,
+      counts_as_publication: false,
+    },
+    verificationPath
   );
+  safeWriteFile(verificationPath, JSON.stringify(verificationArtifact, null, 2));
   if (verification.status !== 'passed') {
     throw new Error(`Publication verification failed: ${verification.reasons.join('; ')}`);
   }
