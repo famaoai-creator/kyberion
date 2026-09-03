@@ -14483,6 +14483,12 @@ SX-03／SX-04 のknowledge index cache usage sidecarを再監査し、`ki-usage.
 
 検証: knowledge index usage／cache budget **8 tests passed**、knowledge index再生成、core build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 704
+
+SX-03／SX-04 のmission LLM user-tools readerを再監査し、`my-identity.json`のrepository境界とidentity schemaを既存canonical loaderへ接続せず、module内のraw JSON readerと局所型キャストで`llm_tools`を取得していた残存を修正した。`loadPersonalIdentityAtPath`へ統合し、malformed／directory／symlink identityは安全側の空設定へ落とし、`llm_tools`のobject projectionだけを維持する。既存のcustomer overlay優先、profile resolution、command availabilityのsemanticsは維持している。
+
+検証: mission LLM／personal identity **10 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

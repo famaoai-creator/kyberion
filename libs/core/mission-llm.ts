@@ -7,13 +7,13 @@ import { type ZodType } from 'zod';
 import * as customerResolver from './customer-resolver.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import * as pathResolver from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeExec } from './secure-io.js';
+import { safeExec } from './secure-io.js';
 import { runCodexCliQuery } from './codex-cli-query.js';
 import { runGeminiCliQuery } from './gemini-cli-backend.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
+import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 
 export interface LlmProfile {
@@ -142,14 +142,11 @@ export function loadUserLlmTools(): UserLlmTools {
   const identityPath =
     customerResolver.customerRoot('my-identity.json') ??
     pathResolver.knowledge('personal/my-identity.json');
-  try {
-    const safeIdentityPath = assertSafeRepositoryPath(identityPath, { allowMissingLeaf: true });
-    if (!safeExistsSync(safeIdentityPath)) return {};
-    const identity = readJson<{ llm_tools?: UserLlmTools }>(safeIdentityPath);
-    return identity.llm_tools || {};
-  } catch (_) {
-    return {};
-  }
+  const identity = loadPersonalIdentityAtPath(identityPath);
+  const llmTools = identity?.llm_tools;
+  return llmTools && typeof llmTools === 'object' && !Array.isArray(llmTools)
+    ? (llmTools as UserLlmTools)
+    : {};
 }
 
 export function isToolAvailable(command: string, userTools: UserLlmTools): boolean {
