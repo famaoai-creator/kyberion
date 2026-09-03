@@ -237,4 +237,22 @@ describe('reconcile ops (LE-03)', () => {
       summary_line: '[UNHANDLED-INTENT] unreconciled=0 top=none',
     });
   });
+
+  it('persists the catalog-normalized unhandled intent registry', async () => {
+    const { writeUnhandledIntentRegistryAtPath } = await import('./unhandled-intent-registry.js');
+    const registryPath = path.join(tmpRoot, 'active', 'shared', 'tmp', 'normalized.json');
+    writeUnhandledIntentRegistryAtPath(registryPath, {
+      version: '1.0.0',
+      entries: [],
+      $schema: 'governance-metadata',
+    } as unknown as {
+      version: '1.0.0';
+      entries: [];
+    });
+
+    expect(JSON.parse(fs.readFileSync(registryPath, 'utf8'))).toEqual({
+      version: '1.0.0',
+      entries: [],
+    });
+  });
 });
