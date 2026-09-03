@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/personal-identity.schema.json",
+  "title": "Personal Identity",
+  "description": "Persisted operator identity. Consumers apply their own bounded projection to the extensible onboarding record.",
+  "type": "object",
+  "additionalProperties": true
+}
