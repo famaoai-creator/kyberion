@@ -13,6 +13,7 @@ import { applyTenantActivation } from './tenant-activation.js';
 import { loadProjectRecord } from './project-registry.js';
 import {
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeRmSync,
   safeUnlinkSync,
@@ -228,6 +229,20 @@ describe('onboarding context binding', () => {
       tenant_slug: 'acme-prod',
       work_shape: 'routine_operation',
     });
+  });
+
+  it('fails closed when an onboarding binding is a directory instead of a record', () => {
+    seedFixture();
+    safeMkdir(path.join(rootDir, 'customer/acme-ai/onboarding/organization-context.json'), {
+      recursive: true,
+    });
+
+    expect(() => loadOnboardingContextBinding('acme-ai', rootDir)).toThrow(/regular file/);
+    expect(
+      safeLstat(
+        path.join(rootDir, 'customer/acme-ai/onboarding/organization-context.json')
+      ).isDirectory()
+    ).toBe(true);
   });
 
   it('bootstraps a project entirely under the supplied root', () => {
