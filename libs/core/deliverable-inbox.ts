@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { readJsonLines } from './foundation/json.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
@@ -9,6 +10,8 @@ import type { RejectionReasonCategory } from './rejection-reason.js';
 import {
   assertSafeRepositoryPath,
   safeCreateExclusiveFileSync,
+  safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeUnlinkSync,
@@ -83,6 +86,9 @@ export interface DeliverableInboxQuery {
 const INBOX_PATH = pathResolver.shared(path.join('inbox', 'entries.jsonl'));
 const INBOX_LOCK_PATH = `${INBOX_PATH}.lock`;
 const LOCK_TIMEOUT_MS = 5000;
+const INBOX_ENTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/deliverable-inbox-entry.schema.json'
+);
 
 function inboxPath(): string {
   return assertSafeRepositoryPath(INBOX_PATH, { allowMissingLeaf: true });
@@ -95,6 +101,14 @@ function inboxLockPath(): string {
 function ensureInboxDir(): void {
   const filePath = inboxPath();
   safeMkdir(path.dirname(filePath), { recursive: true });
+}
+
+function inboxEntryCatalog(filePath: string): GovernedCatalog<DeliverableInboxEntry> {
+  return defineCatalog<DeliverableInboxEntry>({
+    id: 'deliverable-inbox-entry',
+    path: filePath,
+    schema: INBOX_ENTRY_SCHEMA_PATH,
+  });
 }
 
 function sleepSync(ms: number): void {
@@ -167,29 +181,49 @@ function withInboxLock<T>(fn: () => T): T {
 }
 
 function normalizeEntry(value: unknown): DeliverableInboxEntry | null {
-  if (!value || typeof value !== 'object') return null;
-  const parsed = value as DeliverableInboxEntry;
+  if (!isRecord(value)) return null;
+  const parsed = { ...value } as Partial<DeliverableInboxEntry>;
   if (typeof parsed.entry_id !== 'string') return null;
-  if (!Array.isArray(parsed.artifact_paths)) parsed.artifact_paths = [];
-  if (typeof parsed.status !== 'string') parsed.status = 'unread';
-  if (typeof parsed.created_at !== 'string') parsed.created_at = nowIso();
-  if (typeof parsed.updated_at !== 'string') parsed.updated_at = parsed.created_at;
-  if (typeof parsed.title !== 'string') parsed.title = parsed.entry_id;
-  if (typeof parsed.summary !== 'string') parsed.summary = '';
-  return parsed;
+  return parsed as DeliverableInboxEntry;
 }
 
 function readInboxEntries(): DeliverableInboxEntry[] {
+  const filePath = inboxPath();
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[DELIVERABLE_INBOX] entries must be a regular file: ${filePath}`);
+  }
+  const catalog = inboxEntryCatalog(filePath);
   return readJsonLines<DeliverableInboxEntry | null>(inboxPath(), {
-    onMalformed: 'skip',
-    map: normalizeEntry,
+    onMalformed: (error) => {
+      if (
+        error instanceof Error &&
+        (error.message.startsWith('Invalid catalog deliverable-inbox-entry') ||
+          error.message.startsWith('[DELIVERABLE_INBOX]'))
+      ) {
+        throw error;
+      }
+    },
+    map: (value, lineNumber) => {
+      const normalized = normalizeEntry(value);
+      if (!normalized) return null;
+      const entry = catalog.validate(normalized, `${filePath}:${lineNumber}`);
+      validateDeliverableRoleSections(entry);
+      return entry;
+    },
   }).filter((entry): entry is DeliverableInboxEntry => Boolean(entry));
 }
 
 function writeInboxEntries(entries: DeliverableInboxEntry[]): void {
   ensureInboxDir();
-  const serialized = entries.map((entry) => JSON.stringify(entry)).join('\n');
-  safeWriteFile(inboxPath(), serialized ? `${serialized}\n` : '');
+  const filePath = inboxPath();
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[DELIVERABLE_INBOX] entries must be a regular file: ${filePath}`);
+  }
+  const catalog = inboxEntryCatalog(filePath);
+  const serialized = entries
+    .map((entry) => JSON.stringify(catalog.validate(entry, filePath)))
+    .join('\n');
+  safeWriteFile(filePath, serialized ? `${serialized}\n` : '');
 }
 
 function normalizeStatusFilter(
