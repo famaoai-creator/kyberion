@@ -9505,6 +9505,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/slack-mission-kickoff-input.schema.json",
+      "tier": "public",
+      "size": 606,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/slack-onboarding-state.schema.json",
       "tier": "public",
       "size": 1151,
