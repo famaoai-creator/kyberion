@@ -7693,6 +7693,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/knowledge-index-cache.schema.json",
+      "tier": "public",
+      "size": 885,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/knowledge-package.schema.json",
       "tier": "public",
       "size": 2752,
