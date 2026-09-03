@@ -1,6 +1,10 @@
-import { appendJsonLine, nowIso, readJson } from '@agent/core/foundation';
+import { appendJsonLine, nowIso } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
+import {
+  loadPersonalAgentIdentityAtPath,
+  loadPersonalIdentityAtPath,
+} from '@agent/core/personal-identity-reader';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import {
@@ -102,10 +106,10 @@ presenceStudioData.app.get('/api/identity', (_req, res) => {
       const safeAgentPath = presenceStudioData.resolveSafeExistingFile(agentPath);
       const safeVisionPath = presenceStudioData.resolveSafeExistingFile(visionPath);
       const sovereign = safeIdPath
-        ? parsePresenceStudioSovereignIdentity(readJson<unknown>(safeIdPath))
+        ? parsePresenceStudioSovereignIdentity(loadPersonalIdentityAtPath(safeIdPath))
         : null;
       const agent = safeAgentPath
-        ? parsePresenceStudioAgentIdentity(readJson<unknown>(safeAgentPath))
+        ? parsePresenceStudioAgentIdentity(loadPersonalAgentIdentityAtPath(safeAgentPath))
         : null;
       const visionRaw = safeVisionPath
         ? (safeReadFile(safeVisionPath, { encoding: 'utf8' }) as string)
