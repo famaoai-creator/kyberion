@@ -9181,9 +9181,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/project-operational-mission-link.schema.json",
+      "tier": "public",
+      "size": 1048,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/project-operational-state.schema.json",
       "tier": "public",
       "size": 2620,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/project-operational-track-state.schema.json",
+      "tier": "public",
+      "size": 1170,
       "type": "json"
     },
     {
