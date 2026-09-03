@@ -12,7 +12,8 @@ import { nowIso } from './foundation/time.js';
 
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { findMissionPath, missionDir } from './path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 import { escapeXml } from './text-escaping.js';
 import { withLock } from './src/lock-utils.js';
@@ -51,6 +52,18 @@ export type AgentInputQueueWorkerHandler = (wake: AgentInputQueueWake) => Promis
 type AgentInputQueueRecord =
   | { kind: 'enqueued'; entry: AgentInputQueueEntry; recorded_at: string }
   | { kind: 'consumed' | 'cancelled'; entry_id: string; recorded_at: string };
+
+const QUEUE_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-input-queue-record.schema.json'
+);
+
+function queueRecordCatalog(filePath: string) {
+  return defineCatalog<AgentInputQueueRecord>({
+    id: 'agent-input-queue-record',
+    path: filePath,
+    schema: QUEUE_RECORD_SCHEMA_PATH,
+  });
+}
 
 export interface AgentInputQueueOptions {
   missionId: string;
@@ -189,11 +202,16 @@ function scopeMatches(
   );
 }
 
-function parseRecord(parsed: unknown, lineNumber: number): AgentInputQueueRecord {
+function parseRecord(
+  parsed: unknown,
+  lineNumber: number,
+  catalog: GovernedCatalog<AgentInputQueueRecord>
+): AgentInputQueueRecord {
+  const validated = catalog.validate(parsed, `${catalog.path()}:${lineNumber}`);
   if (!parsed || typeof parsed !== 'object') {
     throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] invalid record:${lineNumber}`);
   }
-  const record = parsed as Partial<AgentInputQueueRecord>;
+  const record = validated as Partial<AgentInputQueueRecord>;
   if (record.kind === 'enqueued' && record.entry && typeof record.recorded_at === 'string') {
     const entry = record.entry as Partial<AgentInputQueueEntry>;
     if (
@@ -272,6 +290,11 @@ function reduceDurableRecords(records: AgentInputQueueRecord[]): {
   return { active, consumed, cleared };
 }
 
+function appendDurableRecord(filePath: string, record: AgentInputQueueRecord): void {
+  const validated = queueRecordCatalog(filePath).validate(record, filePath);
+  appendJsonLine(filePath, validated);
+}
+
 export class AgentInputQueue {
   private readonly missionId: string;
   private readonly queuePath: string;
@@ -312,7 +335,7 @@ export class AgentInputQueue {
     }
     await withLock(this.lockId, async () => {
       safeMkdir(path.dirname(this.queuePath), { recursive: true });
-      appendJsonLine(this.queuePath, {
+      appendDurableRecord(this.queuePath, {
         kind: 'enqueued',
         entry,
         recorded_at: nowIso(),
@@ -349,7 +372,7 @@ export class AgentInputQueue {
         .filter((entry) => entry.delivery === 'next_run' && scopeMatches(entry.scope, scope))
         .slice(0, limit);
       for (const entry of entries) {
-        appendJsonLine(this.queuePath, {
+        appendDurableRecord(this.queuePath, {
           kind: 'consumed',
           entry_id: entry.id,
           recorded_at: nowIso(),
@@ -413,7 +436,7 @@ export class AgentInputQueue {
     return withLock(this.lockId, async () => {
       const state = this.readDurableState();
       if (state.active.has(id)) {
-        appendJsonLine(this.queuePath, {
+        appendDurableRecord(this.queuePath, {
           kind: 'cancelled',
           entry_id: id,
           recorded_at: nowIso(),
@@ -429,9 +452,10 @@ export class AgentInputQueue {
     if (!safeExistsSync(this.queuePath)) {
       return { active: new Map(), consumed: new Set(), cleared: new Set() };
     }
+    const catalog = queueRecordCatalog(this.queuePath);
     return reduceDurableRecords(
       readJsonLines<AgentInputQueueRecord>(this.queuePath, {
-        map: (value, lineNumber) => parseRecord(value, lineNumber),
+        map: (value, lineNumber) => parseRecord(value, lineNumber, catalog),
         onMalformed: (error, lineNumber) => {
           if (error instanceof Error && error.message.startsWith('[AGENT_INPUT_QUEUE')) {
             throw error;
