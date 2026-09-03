@@ -4,7 +4,10 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { previewPipeline } from './src/pipeline-preview.js';
-import { buildProductivityTaskPlan } from './productivity-task-plan.js';
+import {
+  buildProductivityTaskPlan,
+  validateProductivityTaskPlan,
+} from './productivity-task-plan.js';
 
 const Ajv = AjvModule;
 
@@ -56,6 +59,14 @@ describe('productivity-task-plan', () => {
 
     expect(validate(plan), JSON.stringify(validate.errors || [])).toBe(true);
     expect(validate(example), JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('rejects unknown fields at the governed persistence boundary', () => {
+    const plan = buildProductivityTaskPlan('明日のカレンダーの空き時間を確認して');
+
+    expect(() =>
+      validateProductivityTaskPlan({ ...plan, unexpected: true }, 'test-plan.json')
+    ).toThrow(/Invalid catalog productivity-task-plan at test-plan\.json/);
   });
 
   it('provides a valid dry-run pipeline with no external actuator steps', () => {
