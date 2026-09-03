@@ -1,7 +1,7 @@
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import * as nodePath from 'node:path';
 import { createLogger } from './logger.js';
 const logger = createLogger('unclassified-error-registry');
@@ -29,14 +29,6 @@ const REGISTRY_RELATIVE = nodePath.join(
 );
 const EXCERPT_LEN = 200;
 
-const registryCatalog = defineCatalog<UnclassifiedErrorRegistry>({
-  id: 'unclassified-error-registry',
-  path: registryPath,
-  schema: pathResolver.knowledge('product/schemas/unclassified-error-registry.schema.json'),
-  fallback: { version: '1.0.0', entries: [] },
-  fallbackOnInvalid: true,
-});
-
 // In-process cooldown: skip disk write if the same excerpt was recorded within 60 s.
 const _recentWrites = new Map<string, number>();
 const COOLDOWN_MS = 60_000;
@@ -45,9 +37,23 @@ function registryPath(): string {
   return nodePath.join(pathResolver.rootDir(), REGISTRY_RELATIVE);
 }
 
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/unclassified-error-registry.schema.json'
+);
+
+function registryCatalogAtPath(filePath: string) {
+  return defineCatalog<UnclassifiedErrorRegistry>({
+    id: 'unclassified-error-registry',
+    path: filePath,
+    schema: REGISTRY_SCHEMA_PATH,
+    fallback: { version: '1.0.0', entries: [] },
+    fallbackOnInvalid: true,
+  });
+}
+
 function readRegistry(): UnclassifiedErrorRegistry {
   try {
-    return registryCatalog.load();
+    return registryCatalogAtPath(registryPath()).load();
   } catch {
     return { version: '1.0.0', entries: [] };
   }
@@ -55,11 +61,22 @@ function readRegistry(): UnclassifiedErrorRegistry {
 
 function writeRegistry(registry: UnclassifiedErrorRegistry): void {
   try {
-    registryCatalog.validate(registry, registryPath());
-    safeWriteFile(registryPath(), JSON.stringify(registry, null, 2));
+    writeUnclassifiedErrorRegistryAtPath(registryPath(), registry);
   } catch {
     /* observability must never break the caller */
   }
+}
+
+export function writeUnclassifiedErrorRegistryAtPath(
+  filePath: string,
+  registry: UnclassifiedErrorRegistry
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = registryCatalogAtPath(safePath).validate(registry, safePath);
+  const dir = nodePath.dirname(safePath);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2));
+  return safePath;
 }
 
 /**

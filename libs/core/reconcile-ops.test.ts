@@ -255,4 +255,23 @@ describe('reconcile ops (LE-03)', () => {
       entries: [],
     });
   });
+
+  it('persists the catalog-normalized unclassified error registry', async () => {
+    const { writeUnclassifiedErrorRegistryAtPath } =
+      await import('./unclassified-error-registry.js');
+    const registryPath = path.join(tmpRoot, 'active', 'shared', 'tmp', 'normalized-errors.json');
+    writeUnclassifiedErrorRegistryAtPath(registryPath, {
+      version: '1.0.0',
+      entries: [],
+      $schema: 'governance-metadata',
+    } as unknown as {
+      version: '1.0.0';
+      entries: [];
+    });
+
+    expect(JSON.parse(fs.readFileSync(registryPath, 'utf8'))).toEqual({
+      version: '1.0.0',
+      entries: [],
+    });
+  });
 });
