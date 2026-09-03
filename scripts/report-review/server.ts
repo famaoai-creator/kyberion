@@ -29,7 +29,26 @@ import { createReportReviewContext, reviewReceiptLogicalPath } from './context.j
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
-async function main(args: string[] = []): Promise<void> {
+export interface ReportReviewServerResult {
+  ok: boolean;
+  mode: 'apply' | 'dry-run' | 'check';
+  target: string;
+  port: number;
+  url: string;
+  artifact_ref: string;
+  scope: ReturnType<typeof createReportReviewContext>['scope'];
+  listening: boolean;
+}
+
+async function main(
+  args: string[] = [],
+  options: {
+    dryRun?: boolean;
+    check?: boolean;
+    json?: boolean;
+    print?: (value: unknown) => void;
+  } = {}
+): Promise<ReportReviewServerResult | undefined> {
   const target = args[0];
   const positionalPort = args[1] && !args[1].startsWith('--') ? args[1] : undefined;
   const option = (flag: string): string | undefined => {
@@ -64,6 +83,27 @@ async function main(args: string[] = []): Promise<void> {
     project_id: option('--project-id'),
     mission_id: option('--mission-id'),
   });
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new ScriptExitError(1, `invalid port: ${port}`);
+
+  const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
+  const url = `http://127.0.0.1:${port}/`;
+  const preview: ReportReviewServerResult = {
+    ok: true,
+    mode,
+    target,
+    port,
+    url,
+    artifact_ref: reviewContext.artifact_ref,
+    scope: reviewContext.scope,
+    listening: false,
+  };
+  const print = options.print ?? console.log;
+  if (options.dryRun || options.check) {
+    if (options.json || options.dryRun || options.check) print(preview);
+    else print(`${mode}: would serve ${target} at ${url}`);
+    return preview;
+  }
 
   const TOKEN = randomBytes(16).toString('hex');
   const CFG_OPEN = '<!--RV-SAVE-CONFIG-->';
@@ -204,14 +244,18 @@ async function main(args: string[] = []): Promise<void> {
       });
       return;
     }
-    console.log(`Report review server → http://127.0.0.1:${port}/`);
-    console.log(`  target : ${target}`);
-    console.log(`  artifact: ${reviewContext.artifact_ref}`);
-    console.log(
-      `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
-    );
-    console.log(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
-    console.log('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
+    if (options.json) {
+      print({ ...preview, listening: true });
+    } else {
+      print(`Report review server → ${url}`);
+      print(`  target : ${target}`);
+      print(`  artifact: ${reviewContext.artifact_ref}`);
+      print(
+        `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
+      );
+      print(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
+      print('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
+    }
   });
 
   let stopping = false;
@@ -237,12 +281,13 @@ async function main(args: string[] = []): Promise<void> {
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
+  return { ...preview, listening: true };
 }
 
 export const runReportReviewServer = defineScript({
   name: 'report-review:server',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json', 'dry-run', 'check', 'quiet'],
+  run: ({ argv, dryRun, check, json, print }) => main(argv, { dryRun, check, json, print }),
 });
 
 if (isDirectScript(import.meta.url, 'server.ts') || isDirectScript(import.meta.url, 'server.js'))
