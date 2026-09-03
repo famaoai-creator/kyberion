@@ -22,6 +22,7 @@ import { MetricsCollector, resolveCostRates } from './metrics.js';
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import type { MissionState } from './mission-types.js';
 
 function safeMissionRoot(missionPath: string): string {
@@ -433,18 +434,15 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     (event) => String(event.event || '') === 'dispatch_started'
   ).length;
 
-  const dispatchManifest = readMissionJsonIfPresent<{
-    records?: Array<{
-      item_id?: string;
-      team_role?: string;
-      assignee_peer_id?: string;
-      provider?: string;
-      model_id?: string;
-      work_item_status_after?: string;
-      notes?: string[];
-      response_excerpt?: string;
-    }>;
-  }>(missionPath, 'evidence/workitem-dispatch-manifest.json');
+  const dispatchManifest = (() => {
+    try {
+      return loadMissionWorkItemDispatchManifestAtPath(
+        safeMissionArtifactPath(missionPath, 'evidence/workitem-dispatch-manifest.json')
+      );
+    } catch {
+      return null;
+    }
+  })();
   for (const record of dispatchManifest?.records || []) {
     const notes = Array.isArray(record.notes) ? record.notes.map(String) : [];
     if (record.team_role && record.assignee_peer_id) {

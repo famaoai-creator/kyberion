@@ -51,6 +51,7 @@ import { evaluateEgressPolicy } from './egress-policy.js';
 import { reasoningBackendEndpoint } from './reasoning-egress-scope.js';
 import { readJsonFile as readJsonFileFromDispatchIO } from './mission-dispatch-io.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import type { ReasoningCallOptions } from './reasoning-backend.js';
 import {
   resolveMissionExecutionSurface,
@@ -172,6 +173,7 @@ export interface MissionWorkItemDispatchRecord {
   reviewer_path?: string;
   reviewer_excerpt?: string;
   reviewer_notes?: string[];
+  written_at?: string;
   artifact_review_receipt?: string;
   drift_watchdog?: Record<string, unknown>;
   drift_watchdog_summary?: string;
@@ -613,8 +615,7 @@ export function readManifest(missionPath: string): MissionWorkItemDispatchManife
   const path = manifestPath(missionPath);
   if (!safeExistsSync(path)) return null;
   try {
-    const parsed = readJsonFileFromDispatchIO<MissionWorkItemDispatchManifest>(path);
-    return parsed && typeof parsed === 'object' ? parsed : null;
+    return loadMissionWorkItemDispatchManifestAtPath(path);
   } catch (_) {
     return null;
   }
