@@ -280,6 +280,19 @@ describe('AL-04 mission runtime residue GC', () => {
     expect(fs.existsSync(abs('active/shared/runtime/artifacts/ART-MINE.json'))).toBe(true);
   });
 
+  it('fails closed for residue records containing dangerous JSON keys', () => {
+    writeJson(abs('active/shared/runtime/artifacts/ART-DANGEROUS.json'), {
+      artifact_id: 'ART-DANGEROUS',
+      mission_id: MISSION_ID,
+      ['__proto__']: { poisoned: true },
+    });
+
+    expect(gcMissionRuntimeResidue({ missionId: MISSION_ID, dryRun: true })).toMatchObject({
+      status: 'noop',
+      candidates: [],
+    });
+  });
+
   it('soft-deletes the residue, audits each removal, and stays idempotent', () => {
     seedResidue();
     const result = gcMissionRuntimeResidue({ missionId: MISSION_ID });

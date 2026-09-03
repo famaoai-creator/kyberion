@@ -29,7 +29,7 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import {
@@ -94,8 +94,8 @@ function readJsonRecord(filePath: string): Record<string, unknown> | null {
   try {
     const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath)) return null;
-    const parsed = readJson<unknown>(safePath);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    if (!safeStat(safePath).isFile()) return null;
+    return parseSafeJsonObjectValue(readJson<unknown>(safePath), `scope record ${filePath}`);
   } catch {
     return null;
   }
