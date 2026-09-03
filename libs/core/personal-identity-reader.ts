@@ -1,4 +1,8 @@
 import { z } from 'zod';
+export {
+  loadPersonalAgentIdentityAtPath,
+  loadPersonalIdentityAtPath,
+} from './personal-identity-state.js';
 
 const sovereignIdentitySchema = z
   .object({ name: z.string().trim().max(200).optional() })

@@ -5,6 +5,9 @@ import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io
 const PERSONAL_IDENTITY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/personal-identity.schema.json'
 );
+const PERSONAL_AGENT_IDENTITY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/personal-agent-identity.schema.json'
+);
 
 function personalIdentityCatalogAtPath(filePath: string) {
   return defineCatalog<Record<string, unknown>>({
@@ -14,13 +17,37 @@ function personalIdentityCatalogAtPath(filePath: string) {
   });
 }
 
-/** Load an onboarding identity only after repository and regular-file checks. */
-export function loadPersonalIdentityAtPath(filePath: string): Record<string, unknown> | null {
+function personalAgentIdentityCatalogAtPath(filePath: string) {
+  return defineCatalog<Record<string, unknown>>({
+    id: 'personal-agent-identity',
+    path: filePath,
+    schema: PERSONAL_AGENT_IDENTITY_SCHEMA_PATH,
+  });
+}
+
+function loadIdentityCatalogAtPath(
+  filePath: string,
+  load: (safePath: string) => Record<string, unknown>
+): Record<string, unknown> | null {
   try {
     const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
-    return personalIdentityCatalogAtPath(safePath).load();
+    return load(safePath);
   } catch {
     return null;
   }
+}
+
+/** Load an onboarding identity only after repository and regular-file checks. */
+export function loadPersonalIdentityAtPath(filePath: string): Record<string, unknown> | null {
+  return loadIdentityCatalogAtPath(filePath, (safePath) =>
+    personalIdentityCatalogAtPath(safePath).load()
+  );
+}
+
+/** Load the persisted agent identity only after repository and regular-file checks. */
+export function loadPersonalAgentIdentityAtPath(filePath: string): Record<string, unknown> | null {
+  return loadIdentityCatalogAtPath(filePath, (safePath) =>
+    personalAgentIdentityCatalogAtPath(safePath).load()
+  );
 }
