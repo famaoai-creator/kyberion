@@ -25,6 +25,7 @@ import {
   scoreValidity,
   summarizeHeuristics,
   validateHeuristic,
+  writeHeuristicAtPath,
   type HeuristicEntry,
 } from './heuristic-feedback.js';
 
@@ -121,6 +122,17 @@ describe('heuristic-feedback', () => {
         })
       ).toThrow(/not found/);
     });
+  });
+
+  it('persists the catalog-normalized heuristic payload', () => {
+    const file = path.join(tmpDir, 'knowledge/confidential/heuristics', 'normalized.json');
+    const entry = seed({ id: 'normalized' });
+    entry.$schema = 'governance-metadata';
+
+    const persisted = writeHeuristicAtPath(file, entry);
+
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).not.toHaveProperty('$schema');
   });
 
   describe('read helpers', () => {

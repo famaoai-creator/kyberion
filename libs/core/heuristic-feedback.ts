@@ -130,6 +130,16 @@ export function listHeuristics(): HeuristicEntry[] {
   });
 }
 
+export function writeHeuristicAtPath(filePath: string, entry: HeuristicEntry): HeuristicEntry {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = heuristicCatalog(safePath).validate(entry, safePath);
+  safeWriteFile(safePath, `${JSON.stringify(validated, null, 2)}\n`, {
+    encoding: 'utf8',
+    mkdir: true,
+  });
+  return validated;
+}
+
 /**
  * Stamp a heuristic entry with its post-hoc validation. Idempotent:
  * re-validating an already-validated entry overwrites the validation
@@ -153,12 +163,7 @@ export function validateHeuristic(params: ValidateParams): HeuristicEntry {
     validation,
   };
   const filePath = heuristicFilePath(params.entryId);
-  heuristicCatalog(filePath).validate(updated, filePath);
-  safeWriteFile(filePath, `${JSON.stringify(updated, null, 2)}\n`, {
-    encoding: 'utf8',
-    mkdir: true,
-  });
-  return updated;
+  return writeHeuristicAtPath(filePath, updated);
 }
 
 export interface HeuristicReport {
