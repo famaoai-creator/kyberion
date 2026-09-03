@@ -7,7 +7,11 @@ import { logger } from './core.js';
 import { setRegisteredEnv } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
-import { getInjectionSignalPath, loadInjectionSignalAtPath } from './injection-signal.js';
+import {
+  getInjectionSignalPath,
+  loadInjectionSignalAtPath,
+  writeInjectionSignalAtPath,
+} from './injection-signal.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import type { MissionState } from './mission-types.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
@@ -207,28 +211,17 @@ export function setInjectionSuspected(suspected: boolean = true, scope: string =
 
     if (suspected) {
       if (!currentSignal.scopes.includes(scope)) currentSignal.scopes.push(scope);
-      safeWriteFile(
-        signalPath,
-        JSON.stringify(
-          {
-            injection_suspected: true,
-            scopes: currentSignal.scopes,
-            timestamp: nowIso(),
-          },
-          null,
-          2
-        )
-      );
+      writeInjectionSignalAtPath(signalPath, {
+        injection_suspected: true,
+        scopes: currentSignal.scopes,
+        timestamp: nowIso(),
+      });
     } else {
       currentSignal.scopes = currentSignal.scopes.filter((s: string) => s !== scope);
-      safeWriteFile(
-        signalPath,
-        JSON.stringify(
-          { injection_suspected: currentSignal.scopes.length > 0, scopes: currentSignal.scopes },
-          null,
-          2
-        )
-      );
+      writeInjectionSignalAtPath(signalPath, {
+        injection_suspected: currentSignal.scopes.length > 0,
+        scopes: currentSignal.scopes,
+      });
     }
   } catch {
     // ignore
