@@ -6973,6 +6973,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/delegated-task-record.schema.json",
+      "tier": "public",
+      "size": 3569,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/delivery-pack.schema.json",
       "tier": "public",
       "size": 1429,
