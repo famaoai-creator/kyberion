@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "surface-dead-target.schema.json",
+  "title": "Persisted surface dead target marker",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "surface": {
+      "type": "string",
+      "enum": [
+        "slack",
+        "chronos",
+        "presence",
+        "imessage",
+        "discord",
+        "telegram",
+        "cowork",
+        "cli",
+        "terminal"
+      ]
+    },
+    "channel": { "type": "string", "minLength": 1 },
+    "failure": { "$ref": "#/definitions/failure" },
+    "consecutive_failures": { "type": "integer", "minimum": 1 },
+    "marked_at": { "type": "string", "format": "date-time" },
+    "scope": { "$ref": "#/definitions/scope" }
+  },
+  "required": ["surface", "channel", "failure", "consecutive_failures", "marked_at"],
+  "definitions": {
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": ["too_long", "bad_format", "forbidden", "not_found", "rate_limited", "transient"]
+        },
+        "retryable": { "type": "boolean" },
+        "reason": { "type": "string", "minLength": 1 },
+        "retry_after_ms": { "type": "number", "minimum": 0 }
+      },
+      "required": ["kind", "retryable", "reason"]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope_kind": {
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string" },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "work_shape": { "type": "string" },
+        "customer_stance": { "type": "string" },
+        "viewer_principal": { "type": "string" },
+        "nhi_id": { "type": "string" }
+      },
+      "required": ["scope_kind", "tier"]
+    }
+  }
+}
