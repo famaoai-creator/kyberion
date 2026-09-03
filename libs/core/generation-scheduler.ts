@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import {
@@ -212,10 +211,7 @@ export function readGenerationSchedule(logicalPath: string): GenerationSchedule 
   if (!safeLstat(safePath).isFile()) {
     throw new Error(`[GENERATION_SCHEDULE] schedule must be a regular file: ${logicalPath}`);
   }
-  const schedule = generationScheduleCatalogAtPath(safePath).validate(
-    readJson<unknown>(safePath),
-    safePath
-  );
+  const schedule = generationScheduleCatalogAtPath(safePath).load();
   return normalizeGenerationSchedule(schedule);
 }
 
