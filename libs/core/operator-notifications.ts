@@ -6,7 +6,6 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
-  safeAppendFileSync,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -16,6 +15,7 @@ import { logger } from './core.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import { sendIMessage } from './imessage-bridge.js';
 import { currentTriggerDeliveryId } from './trigger-correlation.js';
+import { appendOpsAlertLogRecord } from './ops-alert-log.js';
 
 /**
  * E2E-04 Task 2: the return path (Kyberion → operator).
@@ -236,17 +236,14 @@ function recordUndeliveredNotification(
       { allowMissingLeaf: true }
     );
     safeMkdir(path.dirname(logPath), { recursive: true });
-    safeAppendFileSync(
-      logPath,
-      `${JSON.stringify({
-        ts: nowIso(),
-        kind: 'operator_notification_undelivered',
-        event,
-        title: payload.title,
-        correlation_id: payload.correlation_id,
-        reason,
-      })}\n`
-    );
+    appendOpsAlertLogRecord(logPath, {
+      ts: nowIso(),
+      kind: 'operator_notification_undelivered',
+      event,
+      title: payload.title,
+      correlation_id: payload.correlation_id,
+      reason,
+    });
   } catch {
     // observability only — never throw from the notification path
   }
