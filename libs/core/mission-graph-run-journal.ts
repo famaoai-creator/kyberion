@@ -9,10 +9,14 @@ import { nowIso } from './foundation/time.js';
  * process stops between node completion and NEXT_TASKS persistence.
  */
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 import { withFencedWriterLeaseSync, writerLeaseResourceId } from './writer-lease.js';
 
 export const MISSION_GRAPH_RUN_JOURNAL_VERSION = 1;
+const JOURNAL_EVENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-graph-run-journal-event.schema.json'
+);
 
 export type MissionGraphRunEventType = 'graph_started' | 'node_state' | 'graph_finished';
 export type MissionGraphNodeState = 'completed' | 'rework' | 'blocked' | 'failed';
@@ -54,6 +58,14 @@ export interface MissionGraphRunJournalHandle {
   state(): MissionGraphRunJournalState;
 }
 
+function journalEventCatalog(filePath: string) {
+  return defineCatalog<MissionGraphRunJournalEvent>({
+    id: 'mission-graph-run-journal-event',
+    path: filePath,
+    schema: JOURNAL_EVENT_SCHEMA_PATH,
+  });
+}
+
 function safeSegment(value: string): string {
   const normalized = String(value || '').trim();
   const segment = normalized.replace(/[^a-zA-Z0-9._-]/gu, '_');
@@ -89,8 +101,9 @@ function appendEvent(
     timestamp: nowIso(),
     payload,
   };
-  appendJsonLine(filePath, envelope);
-  return envelope;
+  const validated = journalEventCatalog(filePath).validate(envelope, filePath);
+  appendJsonLine(filePath, validated);
+  return validated;
 }
 
 function appendFencedEvent(
@@ -114,7 +127,7 @@ function appendFencedEvent(
     fn: () => {
       const currentSequence = safeExistsSync(filePath)
         ? readJsonLines<MissionGraphRunJournalEvent>(filePath, {
-            map: (value) => parseEvent(value, missionId, runId),
+            map: (value) => parseEvent(value, missionId, runId, journalEventCatalog(filePath)),
           }).reduce((max, current) => Math.max(max, current.sequence), 0)
         : 0;
       return appendEvent(filePath, missionId, runId, currentSequence + 1, event, payload);
@@ -125,9 +138,13 @@ function appendFencedEvent(
 function parseEvent(
   value: unknown,
   expectedMissionId: string,
-  expectedRunId: string
+  expectedRunId: string,
+  catalog: GovernedCatalog<MissionGraphRunJournalEvent>
 ): MissionGraphRunJournalEvent {
-  const parsed = value as Partial<MissionGraphRunJournalEvent>;
+  const parsed = catalog.validate(
+    value,
+    `${catalog.path()}`
+  ) as Partial<MissionGraphRunJournalEvent>;
   if (
     parsed.version !== MISSION_GRAPH_RUN_JOURNAL_VERSION ||
     parsed.mission_id !== expectedMissionId.toUpperCase() ||
@@ -183,8 +200,9 @@ export function loadMissionGraphRunJournal(
   if (!safeExistsSync(filePath)) {
     throw new Error(`[MISSION_GRAPH_JOURNAL] run not found: ${normalizedRunId}`);
   }
+  const catalog = journalEventCatalog(filePath);
   const events = readJsonLines<MissionGraphRunJournalEvent>(filePath, {
-    map: (value) => parseEvent(value, normalizedMissionId, normalizedRunId),
+    map: (value) => parseEvent(value, normalizedMissionId, normalizedRunId, catalog),
   });
   let expectedSequence = 1;
   let taskIds: string[] = [];
