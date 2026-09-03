@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "surface-runtime-state.schema.json",
+  "title": "Persisted surface runtime state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "surfaces"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "surfaces": {
+      "type": "object",
+      "patternProperties": {
+        "^[A-Za-z0-9][A-Za-z0-9._-]*$": { "$ref": "#/$defs/surface" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "pid",
+        "resourceId",
+        "kind",
+        "command",
+        "args",
+        "cwd",
+        "logPath",
+        "startedAt",
+        "shutdownPolicy"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "pid": { "type": "integer", "minimum": 1 },
+        "resourceId": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["gateway", "ui", "service"] },
+        "command": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "cwd": { "type": "string", "minLength": 1 },
+        "logPath": { "type": "string", "minLength": 1 },
+        "startedAt": { "type": "string", "minLength": 1 },
+        "shutdownPolicy": {
+          "type": "string",
+          "enum": ["manual", "idle", "detached"]
+        },
+        "metadata": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}
