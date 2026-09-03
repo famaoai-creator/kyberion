@@ -21,14 +21,7 @@ import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { currentScope } from '@agent/core/scope-context';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReaddir,
-  safeReadFile,
-  safeStat,
-} from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir, safeReadFile, safeStat } from '@agent/core/secure-io';
 import { loadKnowledgeTaxonomy, type KnowledgeTaxonomy } from '@agent/core/knowledge-taxonomy';
 import {
   scopeAffinityScore,
@@ -39,9 +32,10 @@ import {
 } from '@agent/core/ranking-signals';
 import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from '@agent/core/knowledge-scope';
 import { loadKnowledgeUsageAggregate } from '@agent/core/src/knowledge-feedback-loop';
+import { loadAnalysisConfigAtPath } from '@agent/core/analysis-config';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import type { ScopeContext } from '@agent/core/scope-context';
-import { isRecord, readJson } from '@agent/core/foundation';
+import { isRecord } from '@agent/core/foundation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -411,7 +405,6 @@ export function scoreEntry(
 // Main
 // ---------------------------------------------------------------------------
 function loadWeights(scope?: ScopeContext): RankingWeights {
-  const configPath = pathResolver.knowledge('product/governance/analysis-config.json');
   const defaults: RankingWeights = {
     title: 10,
     id: 5,
@@ -425,12 +418,8 @@ function loadWeights(scope?: ScopeContext): RankingWeights {
     proximity: 1,
     usage_yield: 4,
   };
-  if (!safeExistsSync(configPath)) return { ...defaults, ...loadKnowledgeRankingWeights(scope) };
   try {
-    const safeConfigPath = assertSafeRepositoryPath(configPath);
-    if (!safeLstat(safeConfigPath).isFile())
-      throw new Error('analysis config is not a regular file');
-    const config = readJson<unknown>(safeConfigPath);
+    const config = loadAnalysisConfigAtPath();
     return {
       ...defaults,
       ...normalizeRankingWeights(config, defaults),
