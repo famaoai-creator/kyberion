@@ -6901,6 +6901,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/contract-review-record.schema.json",
+      "tier": "public",
+      "size": 710,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/corporate-design-adf.schema.json",
       "tier": "public",
       "size": 6841,
