@@ -90,6 +90,8 @@ export * from './onboarding-context.js';
 
 export * from './onboarding-state.js';
 
+export * from './onboarding-apply-input.js';
+
 export {
   loadMissionDistillMarkdownPolicyCatalog,
   resolveMissionDistillMarkdownPolicy,

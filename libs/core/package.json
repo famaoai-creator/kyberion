@@ -275,6 +275,10 @@
       "types": "./dist/onboarding-state.d.ts",
       "default": "./dist/onboarding-state.js"
     },
+    "./onboarding-apply-input": {
+      "types": "./dist/onboarding-apply-input.d.ts",
+      "default": "./dist/onboarding-apply-input.js"
+    },
     "./tenant-governance": {
       "types": "./dist/tenant-governance.d.ts",
       "default": "./dist/tenant-governance.js"

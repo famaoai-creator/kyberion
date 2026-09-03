@@ -19,11 +19,15 @@ import { withLock } from '@agent/core/src/lock-utils';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import {
+  loadOnboardingApplyInputAtPath,
+  validateOnboardingApplyInput,
+  type OnboardingApplyInput,
+} from '@agent/core/onboarding-apply-input';
+import {
   compileSchema,
   isRecord,
   nowIso,
   parseSafeJsonInput,
-  readJson,
   setRegisteredEnv,
 } from '@agent/core/foundation';
 import {
@@ -42,35 +46,7 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 
 const ONBOARDING_IDENTITY_EXAMPLE = 'knowledge/public/templates/onboarding/identity.example.json';
 
-interface ApplyInput {
-  identity: {
-    name: string;
-    language: string;
-    interaction_style: 'Senior Partner' | 'Concierge' | 'Minimalist';
-    primary_domain: string;
-    vision: string;
-    agent_id: string;
-    persona?: 'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst';
-  };
-  tenants?: Array<{
-    tenant_slug: string;
-    display_name: string;
-    assigned_role: string;
-    purpose?: string;
-  }>;
-  tutorial?: {
-    mode: 'simulate' | 'apply' | 'skipped';
-    summary?: string;
-  };
-  /**
-   * Optional backend id (or alias) from the canonical catalog
-   * (`knowledge/product/governance/reasoning-backend-policy.json`
-   * `allowed_modes`). When set, it is persisted to `.env.local` as
-   * `KYBERION_REASONING_BACKEND` — the non-interactive counterpart of the
-   * wizard's reasoning-phase selection (LC-05).
-   */
-  reasoning_backend?: string;
-}
+type ApplyInput = OnboardingApplyInput;
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
@@ -134,7 +110,7 @@ export async function readInput(file?: string): Promise<ApplyInput> {
         `identity file not found: ${file}. Copy ${ONBOARDING_IDENTITY_EXAMPLE} and retry, or use --dry-run first.`
       );
     }
-    return parseApplyInput(readJson<unknown>(safeFile));
+    return loadOnboardingApplyInputAtPath(safeFile);
   }
   // stdin fallback
   if (process.stdin.isTTY) {
@@ -151,7 +127,7 @@ export async function readInput(file?: string): Promise<ApplyInput> {
 
 export function parseApplyInput(value: unknown): ApplyInput {
   validateInput(value);
-  return value;
+  return validateOnboardingApplyInput(value);
 }
 
 export function validateInput(input: unknown): asserts input is ApplyInput {
@@ -462,7 +438,7 @@ export function buildApplySummary(
 
 /** Library entry used by governed pipelines; the CLI below remains a facade. */
 export async function applyOnboardingInput(input: ApplyInput) {
-  validateInput(input);
+  const validatedInput = parseApplyInput(input);
   const validateState = compileSchema(
     pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
   );
@@ -474,11 +450,11 @@ export async function applyOnboardingInput(input: ApplyInput) {
   const personaEnvPath = persistPersona(persona);
   setRegisteredEnv('KYBERION_PERSONA', persona);
   console.log(`Persisted KYBERION_PERSONA=${persona} to ${personaEnvPath}`);
-  await applyIdentity(input, now);
-  const tenantEntries = await applyTenants(input, now);
-  const tutorial = await applyTutorial(input, now);
-  if (input.reasoning_backend !== undefined) {
-    const backend = normalizeReasoningBackendChoice(input.reasoning_backend);
+  await applyIdentity(validatedInput, now);
+  const tenantEntries = await applyTenants(validatedInput, now);
+  const tutorial = await applyTutorial(validatedInput, now);
+  if (validatedInput.reasoning_backend !== undefined) {
+    const backend = normalizeReasoningBackendChoice(validatedInput.reasoning_backend);
     if (backend) {
       const envLocal = persistReasoningBackend(backend);
       setRegisteredEnv('KYBERION_REASONING_BACKEND', backend);
@@ -488,24 +464,24 @@ export async function applyOnboardingInput(input: ApplyInput) {
   const reasoning = await evaluateReasoningBackend(new Date(now));
   const runbookSkill = generateOnboardingRunbookSkill({
     profileRoot: profileRoot(),
-    identityName: input.identity.name,
-    agentId: input.identity.agent_id,
+    identityName: validatedInput.identity.name,
+    agentId: validatedInput.identity.agent_id,
     generatedAt: now,
   });
-  const state = buildState(input, now, tenantEntries, tutorial, reasoning);
+  const state = buildState(validatedInput, now, tenantEntries, tutorial, reasoning);
   if (!validateState(state)) {
     throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
   }
   await writeJson(statePath(), state, 'onboarding-state');
   await writeText(
     summaryPath(),
-    buildSummary(input, tenantEntries, tutorial, reasoning),
+    buildSummary(validatedInput, tenantEntries, tutorial, reasoning),
     'onboarding-summary'
   );
   return {
     status: 'complete' as const,
-    identity_name: input.identity.name,
-    agent_id: input.identity.agent_id,
+    identity_name: validatedInput.identity.name,
+    agent_id: validatedInput.identity.agent_id,
     tenants: tenantEntries.length,
     reasoning,
     state_path: statePath(),
