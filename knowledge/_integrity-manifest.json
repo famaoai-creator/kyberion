@@ -9283,6 +9283,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/slack-onboarding-state.schema.json",
+      "tier": "public",
+      "size": 1151,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/slide-layout-presets.schema.json",
       "tier": "public",
       "size": 842,
