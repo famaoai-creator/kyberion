@@ -747,6 +747,10 @@
       "types": "./dist/production-evidence-register.d.ts",
       "default": "./dist/production-evidence-register.js"
     },
+    "./tenant-registry-exceptions": {
+      "types": "./dist/tenant-registry-exceptions.d.ts",
+      "default": "./dist/tenant-registry-exceptions.js"
+    },
     "./nhi-lifecycle-governance": {
       "types": "./dist/nhi-lifecycle-governance.d.ts",
       "default": "./dist/nhi-lifecycle-governance.js"
