@@ -14363,6 +14363,12 @@ SX-03／SX-04 のknowledge curation archive historyを再監査し、tenant別�
 
 検証: knowledge curation report **22 tests passed**、root typecheck、core build、対象lint、Prettier、`git diff --check`、knowledge index再生成、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 684
+
+SX-03／SX-04 のnon-interactive onboarding apply入力を再監査し、`onboarding_apply.ts`がファイル入力をfoundationのraw JSON readerとscript内の型定義へ分岐させ、未知フィールドを共通契約で拒否していない残存を修正した。専用schema、coreのcanonical validator／path-bound loaderを追加し、CLIの`@file`入力とpipelineからのlibrary inputを同一契約へ統合した。tenant slug、persona、reasoning backendのcatalog照合、stdin fallback、既存の書込み・dry-run semanticsは維持している。
+
+検証: onboarding apply／resource boundary **12 tests passed**、root typecheck、core build、対象lint、Prettier、`git diff --check`、knowledge index再生成、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

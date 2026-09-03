@@ -29,4 +29,25 @@ describe('onboarding_apply resource boundary', () => {
 
     await expect(readInput(link)).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
   });
+
+  it('rejects schema-invalid identity input through the canonical loader', async () => {
+    const file = path.join(root, 'identity.json');
+    safeMkdir(root, { recursive: true });
+    safeWriteFile(
+      file,
+      JSON.stringify({
+        identity: {
+          name: 'Famao',
+          language: 'ja',
+          interaction_style: 'Minimalist',
+          primary_domain: 'operations',
+          vision: 'Validate first.',
+          agent_id: 'agent-001',
+        },
+        unexpected: true,
+      })
+    );
+
+    await expect(readInput(file)).rejects.toThrow(/Invalid catalog onboarding-apply-input/u);
+  });
 });
