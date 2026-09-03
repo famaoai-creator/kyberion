@@ -6403,6 +6403,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/agent-role-outcome.schema.json",
+      "tier": "public",
+      "size": 640,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/agent-routing-decision.schema.json",
       "tier": "public",
       "size": 1469,
