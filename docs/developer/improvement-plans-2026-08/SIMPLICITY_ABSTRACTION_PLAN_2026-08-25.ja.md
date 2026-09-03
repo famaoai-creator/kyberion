@@ -14940,6 +14940,18 @@ content、native JSON／text artifactの形、provision→record→write→verif
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 751
+
+SX-03／SX-04／SX-11 のmission `NEXT_TASKS.json` writeを再監査し、read側はmission scopeと既存のloose
+task schemaを通過していた一方、lifecycleのtask board更新だけがraw `safeWriteFile`へ分岐していたため
+修正した。共有task-object parser／catalog validatorをwrite前にも適用し、追加のtask fieldを保持したまま
+task_id／statusの既存形状検証と不正objectのfail-closedを統一する。mission task status、goal-gap upsert、
+completion／repair taskの既存semanticsは維持している。
+
+検証: mission lifecycle／task reader **2 files / 35 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
