@@ -14141,6 +14141,12 @@ SX-03／SX-04 のpipeline run journalを再監査し、payloadはevent kernelで
 
 検証: pipeline run journal **1 file / 8 tests passed**、対象lint、typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 647
+
+SX-03／SX-04 のtenant ingest asset ledgerを再監査し、dedup／lineage／staleness判定へ入るJSONLがdomain normalizerだけで読まれ、record schema・path-bound catalog・regular-file境界を共有していない残存を修正した。asset record専用schemaとpath-bound canonical catalogを追加し、append／read双方でschema validationとregular-file検査を行うようにした。malformed／schema-invalid行のskip、asset_idのsource由来検証、version lineage、tenant path／visibility、DA-08 freshness curationの既存semanticsは維持している。既存のDA-08 fixtureも正式なderiveAssetId契約へ合わせた。
+
+検証: ingest asset ledger／tenant ingest curation **2 files / 18 tests passed**、対象lint、typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
