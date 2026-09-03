@@ -9541,6 +9541,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/soak-restart-state.schema.json",
+      "tier": "public",
+      "size": 616,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/software-quality-contract.schema.json",
       "tier": "public",
       "size": 3312,
