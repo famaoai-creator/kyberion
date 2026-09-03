@@ -1,6 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
+import { defineCatalog, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { type VocabularyKey } from '@agent/core/t';
 import { CloudflareOsSurface } from '@agent/core/cloudflare-os-surface';
 import {
@@ -207,6 +207,29 @@ export interface BrowserSnapshotSummary {
 export interface PresenceBrowserRuntimeDataOptions {
   browserSessionDir?: string;
   browserSnapshotDir?: string;
+}
+
+const BROWSER_RUNTIME_SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-runtime-session-summary.schema.json'
+);
+const BROWSER_SNAPSHOT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-snapshot-summary.schema.json'
+);
+
+function loadBrowserRuntimeRecordAtPath(
+  filePath: string,
+  schemaPath: string,
+  catalogId: string
+): Record<string, unknown> {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`browser runtime record must be a regular file: ${filePath}`);
+  }
+  return defineCatalog<Record<string, unknown>>({
+    id: catalogId,
+    path: safePath,
+    schema: schemaPath,
+  }).load();
 }
 
 function optionalBrowserText(
@@ -909,7 +932,13 @@ export function listBrowserRuntimeSessions(
         try {
           const filePath = assertSafeRepositoryPath(path.join(safeDir, entry));
           if (!safeLstat(filePath).isFile()) return [];
-          const session = parseBrowserRuntimeSessionSummary(readJson<unknown>(filePath));
+          const session = parseBrowserRuntimeSessionSummary(
+            loadBrowserRuntimeRecordAtPath(
+              filePath,
+              BROWSER_RUNTIME_SESSION_SCHEMA_PATH,
+              'browser-runtime-session-summary'
+            )
+          );
           return session ? [session] : [];
         } catch {
           return [];
@@ -930,7 +959,13 @@ export function loadBrowserSnapshotSummary(
     const dir = options.browserSnapshotDir || pathResolver.shared('runtime/browser/snapshots');
     const filePath = assertSafeRepositoryPath(path.join(dir, `${sessionId}.json`));
     if (!safeLstat(filePath).isFile()) return null;
-    return parseBrowserSnapshotSummary(readJson<unknown>(filePath));
+    return parseBrowserSnapshotSummary(
+      loadBrowserRuntimeRecordAtPath(
+        filePath,
+        BROWSER_SNAPSHOT_SCHEMA_PATH,
+        'browser-snapshot-summary'
+      )
+    );
   } catch {
     return null;
   }
