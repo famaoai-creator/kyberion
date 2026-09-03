@@ -1,5 +1,6 @@
 import {
   readDesignSpec,
+  readDesignSpecAtPath,
   saveDesignSpec,
   evaluateArchitectureReadyGate,
   evaluateQaReadyGate,
@@ -9,12 +10,11 @@ import {
   evaluateCustomerSignoffGate,
   evaluateRequirementsCompletenessGate,
   readRequirementsDraft,
+  readRequirementsDraftAtPath,
   saveRequirementsDraft,
-  type RequirementsDraft,
 } from '@agent/core/requirements-draft-store';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { SoftwareQualityContract } from '@agent/core/software-quality';
 
@@ -50,7 +50,7 @@ export async function extractRequirements(input: ExtractRequirementsInput) {
   if (input.prior_draft_ref) {
     const priorAbs = resolveRepositoryInput(input.prior_draft_ref);
     if (safeExistsSync(priorAbs)) {
-      priorDraft = readJson<unknown>(priorAbs);
+      priorDraft = readRequirementsDraftAtPath(priorAbs);
     }
   }
 
@@ -105,9 +105,8 @@ export async function extractDesignSpec(input: {
     input.requirements_draft_path ??
     `active/missions/${input.mission_id}/evidence/requirements-draft.json`;
   const abs = resolveRepositoryInput(requirementsPath);
-  const requirementsDraft = safeExistsSync(abs)
-    ? readJson<unknown>(abs)
-    : readRequirementsDraft(input.mission_id);
+  const requirementsDraft =
+    readRequirementsDraftAtPath(abs) ?? readRequirementsDraft(input.mission_id);
   if (!requirementsDraft) {
     throw new Error(`[extract_design_spec] requirements draft not found at ${requirementsPath}`);
   }
@@ -143,19 +142,20 @@ export async function extractTestPlan(input: {
     throw new Error('[extract_test_plan] requires mission_id and project_name');
   }
   const backend = getReasoningBackend();
+  const requirementsDraftPath = input.requirements_draft_path
+    ? resolveRepositoryInput(input.requirements_draft_path)
+    : undefined;
   const requirementsDraft =
     readRequirementsDraft(input.mission_id) ??
-    (input.requirements_draft_path &&
-    safeExistsSync(resolveRepositoryInput(input.requirements_draft_path))
-      ? readJson<RequirementsDraft>(resolveRepositoryInput(input.requirements_draft_path))
-      : null);
+    (requirementsDraftPath ? readRequirementsDraftAtPath(requirementsDraftPath) : null);
   if (!requirementsDraft) throw new Error('[extract_test_plan] requirements draft not found');
 
+  const designSpecPath = input.design_spec_path
+    ? resolveRepositoryInput(input.design_spec_path)
+    : undefined;
   const designSpec =
     readDesignSpec(input.mission_id) ??
-    (input.design_spec_path && safeExistsSync(resolveRepositoryInput(input.design_spec_path))
-      ? readJson<unknown>(resolveRepositoryInput(input.design_spec_path))
-      : undefined);
+    (designSpecPath ? readDesignSpecAtPath(designSpecPath) : undefined);
   const extracted = await backend.extractTestPlan({
     requirementsDraft,
     designSpec,
