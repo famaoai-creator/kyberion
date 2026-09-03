@@ -1,4 +1,4 @@
-import { clamp, nowIso, readJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { clamp, defineCatalog, nowIso, readJson, parseSafeJsonInput } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -181,6 +181,9 @@ const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const BROWSER_SNAPSHOT_DIR = path.join(BROWSER_RUNTIME_DIR, 'snapshots');
 const BROWSER_ACTION_TRAIL_DIR = path.join(BROWSER_RUNTIME_DIR, 'action-trails');
 const BROWSER_APPROVAL_DIR = path.join(BROWSER_RUNTIME_DIR, 'approvals');
+const BROWSER_RUNTIME_SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-runtime-session.schema.json'
+);
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
 
 function safeBrowserRuntimePath(
@@ -366,7 +369,11 @@ function loadBrowserSessionMetadata(filePath: string): BrowserSessionMetadata | 
   const safePath = safeBrowserRuntimePath(filePath);
   if (!isExistingRegularFile(safePath)) return null;
   try {
-    return readJson<BrowserSessionMetadata>(safePath);
+    return defineCatalog<BrowserSessionMetadata>({
+      id: 'browser-runtime-session',
+      path: safePath,
+      schema: BROWSER_RUNTIME_SESSION_SCHEMA_PATH,
+    }).load();
   } catch {
     return null;
   }
