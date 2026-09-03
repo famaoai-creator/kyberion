@@ -3,11 +3,13 @@ import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
+  safeReadFile,
   safeWriteFile,
   safeExec,
   safeExistsSync,
+  safeLstat,
 } from '@agent/core/secure-io';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveDesktopLaunchAdapter } from '@agent/core/desktop-launch-adapter';
@@ -384,7 +386,16 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
       })
     : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
-    const saved = readJson<Record<string, unknown>>(contextPath);
+    if (!safeLstat(contextPath).isFile()) {
+      throw new Error(`system context must be an existing regular file: ${contextPath}`);
+    }
+    const saved = parseSafeJsonObjectValue(
+      parseSafeJsonInput(
+        String(safeReadFile(contextPath, { encoding: 'utf8' }) || ''),
+        'system context'
+      ),
+      'system context'
+    );
     ctx = { ...ctx, ...saved };
   }
 
