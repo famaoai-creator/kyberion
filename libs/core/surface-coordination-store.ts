@@ -237,7 +237,11 @@ export function loadSurfaceOutboxMessageAtPath(
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[SURFACE_OUTBOX] outbox record must be a regular file: ${filePath}`);
   }
-  const record = surfaceOutboxCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  const record = defineCatalog<SurfaceOutboxMessage>({
+    id: 'surface-outbox-message',
+    path: safeFilePath,
+    schema: SURFACE_OUTBOX_SCHEMA_PATH,
+  }).load();
   if (record.surface !== surface) {
     throw new Error(
       `[SURFACE_OUTBOX_SCOPE_MISMATCH] expected surface ${surface}, got ${record.surface}`
