@@ -13829,6 +13829,12 @@ SX-03／SX-04 のterminal bridge persisted readerを再監査し、ReflexTermina
 
 検証: terminal bridge **1 file / 3 tests passed**、knowledge index同期。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 595
+
+SX-03／SX-04 のprompt-injection signal readerを再監査し、`isInjectionSuspected` と `setInjectionSuspected` がscoped signal JSONをraw `readJson`で個別に読み、schema・regular-file境界を共有していなかった残存を修正した。`injection-signal.schema.json`とpath-bound canonical loaderを追加し、malformed signalをsuspicionの根拠にせず、更新時は安全な空signalへfail-closedする既存 semanticsを維持している。mission-state側の既存canonical loaderと環境変数優先順位も変更していない。
+
+検証: injection signal／untrusted content **1 file / 19 tests passed**、knowledge index同期。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

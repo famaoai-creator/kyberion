@@ -1,10 +1,28 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import type { MissionState } from './mission-types.js';
+
+interface InjectionSignal {
+  injection_suspected?: boolean;
+  scopes?: string[];
+  timestamp?: string;
+}
+
+const INJECTION_SIGNAL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/injection-signal.schema.json'
+);
+
+function injectionSignalCatalogAtPath(filePath: string) {
+  return defineCatalog<InjectionSignal>({
+    id: 'injection-signal',
+    path: filePath,
+    schema: INJECTION_SIGNAL_SCHEMA_PATH,
+  });
+}
 
 export function getInjectionSignalPath(): string {
   const missionId = (getRegisteredEnvText('MISSION_ID') || 'global').trim();
@@ -14,6 +32,17 @@ export function getInjectionSignalPath(): string {
   return assertSafeRepositoryPath(pathResolver.sharedTmp(`injection_suspected_${missionId}.json`), {
     allowMissingLeaf: true,
   });
+}
+
+/** Load the scoped injection signal through the governed catalog boundary. */
+export function loadInjectionSignalAtPath(filePath: string): InjectionSignal | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+    return injectionSignalCatalogAtPath(safePath).load();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -30,17 +59,10 @@ export function isInjectionSuspected(scope?: string): boolean {
   }
 
   const signalPath = getInjectionSignalPath();
-  if (safeExistsSync(signalPath)) {
-    try {
-      const parsed = readJson<{ injection_suspected?: unknown; scopes?: unknown }>(signalPath);
-      if (parsed.injection_suspected === true) {
-        const scopes = Array.isArray(parsed.scopes) ? parsed.scopes : ['global'];
-        if (!scope || scopes.includes('global') || scopes.includes(scope)) return true;
-      }
-    } catch {
-      // A malformed signal is not proof of suspicion; the scanner will still
-      // fail closed when it cannot produce a valid verdict.
-    }
+  const parsed = loadInjectionSignalAtPath(signalPath);
+  if (parsed?.injection_suspected === true) {
+    const scopes = parsed.scopes || ['global'];
+    if (!scope || scopes.includes('global') || scopes.includes(scope)) return true;
   }
 
   const missionId = getRegisteredEnvText('MISSION_ID');
