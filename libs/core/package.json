@@ -243,6 +243,10 @@
       "types": "./dist/knowledge-taxonomy.d.ts",
       "default": "./dist/knowledge-taxonomy.js"
     },
+    "./knowledge-usage-aggregate": {
+      "types": "./dist/knowledge-usage-aggregate.d.ts",
+      "default": "./dist/knowledge-usage-aggregate.js"
+    },
     "./ranking-signals": {
       "types": "./dist/ranking-signals.d.ts",
       "default": "./dist/ranking-signals.js"

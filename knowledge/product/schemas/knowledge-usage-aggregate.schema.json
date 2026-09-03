@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "knowledge-usage-aggregate.schema.json",
+  "title": "Knowledge Usage Aggregate",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "document_path",
+      "delivered_count",
+      "used_count",
+      "not_used_count",
+      "occurrences",
+      "last_seen"
+    ],
+    "properties": {
+      "document_path": { "type": "string", "minLength": 1 },
+      "scope_context_key": { "type": "string", "minLength": 1 },
+      "delivered_count": { "type": "integer", "minimum": 0 },
+      "used_count": { "type": "integer", "minimum": 0 },
+      "not_used_count": { "type": "integer", "minimum": 0 },
+      "occurrences": { "type": "integer", "minimum": 0 },
+      "last_seen": { "type": "string", "minLength": 1 }
+    }
+  }
+}

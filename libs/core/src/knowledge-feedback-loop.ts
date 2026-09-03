@@ -1,4 +1,4 @@
-import { appendJsonLine, readJson, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 /**
  * KP-05: knowledge delivery telemetry + task_result knowledge_feedback
@@ -29,12 +29,7 @@ import * as path from 'node:path';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -42,6 +37,13 @@ import {
 import type { TaskResultKnowledgeFeedback } from '../channel-surface-types.js';
 import { scopeContextKey, type ScopeContext } from '../scope-context.js';
 import { physicalScopedPath } from '../physical-namespace.js';
+import {
+  loadKnowledgeUsageAggregateAtPath,
+  writeKnowledgeUsageAggregateAtPath,
+  type KnowledgeUsageAggregateEntry,
+} from '../knowledge-usage-aggregate.js';
+
+export type { KnowledgeUsageAggregateEntry } from '../knowledge-usage-aggregate.js';
 
 export interface DeliveredKnowledgeRef {
   path: string;
@@ -58,17 +60,6 @@ export interface KnowledgeDeliveryRecord {
   refs: DeliveredKnowledgeRef[];
   scope_context?: ScopeContext;
   scope_disposition?: 'canonical' | 'unscoped-legacy';
-}
-
-export interface KnowledgeUsageAggregateEntry {
-  document_path: string;
-  scope_context_key?: string;
-  delivered_count: number;
-  used_count: number;
-  not_used_count: number;
-  /** Total number of delivery/feedback events that touched this path — mirrors KM-03's occurrences field. */
-  occurrences: number;
-  last_seen: string;
 }
 
 export interface HumanKnowledgeFeedback {
@@ -419,10 +410,8 @@ function normalizeTopicList(value: string[] | undefined): string[] {
 
 function loadUsageAggregate(scope?: ScopeContext): KnowledgeUsageAggregateEntry[] {
   const filePath = usageAggregatePath(scope);
-  if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = readJson<unknown>(filePath);
-    return Array.isArray(parsed) ? parsed : [];
+    return loadKnowledgeUsageAggregateAtPath(filePath);
   } catch {
     return [];
   }
@@ -430,9 +419,7 @@ function loadUsageAggregate(scope?: ScopeContext): KnowledgeUsageAggregateEntry[
 
 function saveUsageAggregate(entries: KnowledgeUsageAggregateEntry[], scope?: ScopeContext): void {
   const filePath = usageAggregatePath(scope);
-  const dir = path.dirname(filePath);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(entries, null, 2));
+  writeKnowledgeUsageAggregateAtPath(filePath, entries);
 }
 
 /**
