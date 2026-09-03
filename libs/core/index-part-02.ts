@@ -73,6 +73,8 @@ export * from './frontmatter-exclusions.js';
 export * from './knowledge-usage-aggregate.js';
 export * from './knowledge-index-cache.js';
 
+export * from './analysis-config.js';
+
 export * from './knowledge-taxonomy.js';
 export * from './volatile-knowledge.js';
 

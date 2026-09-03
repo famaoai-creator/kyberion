@@ -259,6 +259,10 @@
       "types": "./dist/knowledge-index-cache.d.ts",
       "default": "./dist/knowledge-index-cache.js"
     },
+    "./analysis-config": {
+      "types": "./dist/analysis-config.d.ts",
+      "default": "./dist/analysis-config.js"
+    },
     "./mission-workitem-dispatch-response": {
       "types": "./dist/mission-workitem-dispatch-response.d.ts",
       "default": "./dist/mission-workitem-dispatch-response.js"
