@@ -1,9 +1,36 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeSymlinkSync } from './secure-io.js';
-import { loadConnectionWithFallback, resolveTemplateValue } from './service-engine-helpers.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
+import {
+  loadConnectionWithFallback,
+  loadServiceConnectionAtPath,
+  resolveTemplateValue,
+} from './service-engine-helpers.js';
+
+const serviceConnectionPath = pathResolver.sharedTmp(
+  `service-connection-loader-${process.pid}.json`
+);
+
+afterEach(() => {
+  safeRmSync(serviceConnectionPath, { force: true });
+});
 
 describe('service-engine-helpers template path tokens', () => {
+  it('loads a service connection through the schema-bound catalog', () => {
+    safeWriteFile(serviceConnectionPath, JSON.stringify({ base_url: 'https://example.test' }));
+
+    expect(loadServiceConnectionAtPath(serviceConnectionPath)).toEqual({
+      base_url: 'https://example.test',
+    });
+  });
+
+  it('rejects a non-object service connection document', () => {
+    safeWriteFile(serviceConnectionPath, JSON.stringify([]));
+
+    expect(() => loadServiceConnectionAtPath(serviceConnectionPath)).toThrow(/Invalid catalog/);
+  });
+
   it('resolves whole-string path tokens inside template values', () => {
     expect(resolveTemplateValue('{{@shared:tmp/run.json}}', {})).toBe(
       pathResolver.shared('tmp/run.json')

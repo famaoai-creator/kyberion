@@ -635,6 +635,10 @@
       "types": "./dist/service-binding.d.ts",
       "default": "./dist/service-binding.js"
     },
+    "./service-engine-helpers": {
+      "types": "./dist/service-engine-helpers.d.ts",
+      "default": "./dist/service-engine-helpers.js"
+    },
     "./surface-runtime-router": {
       "types": "./dist/surface-runtime-router.d.ts",
       "default": "./dist/surface-runtime-router.js"

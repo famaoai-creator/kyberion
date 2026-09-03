@@ -36,6 +36,7 @@ describe('sovereign dashboard governance loaders', () => {
     expect(source).toContain('loadSkillIndex()');
     expect(source).toContain('loadSurfaceState(');
     expect(source).toContain('loadPersonalIdentityAtPath(');
+    expect(source).toContain('loadServiceConnectionAtPath(');
     expect(source).not.toContain('product/governance/service-connection-readiness.json');
     expect(source).not.toContain('personal/governance/agent-trust-scores.json');
     expect(source).not.toContain(
