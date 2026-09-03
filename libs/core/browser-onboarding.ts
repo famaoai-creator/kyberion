@@ -16,6 +16,7 @@ import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
 } from './personal-identity-state.js';
+import { loadOperatorProviderPreferencesAtPath } from './operator-provider-preferences.js';
 import {
   getLlmSelectionSnapshot,
   saveLlmSelectionPreferences,
@@ -460,7 +461,7 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
     'sovereign_concierge',
     () => {
       const providerConfig = loadProviderConfig();
-      const providerPreference = readJson<Record<string, unknown>>(
+      const providerPreference = loadOperatorProviderPreferencesAtPath(
         onboardingPath('provider-preferences.json')
       );
       const toolPreference = readJson<Record<string, unknown>>(
@@ -509,7 +510,7 @@ export function loadOperatorProviderPreferences(): {
   return withExecutionContext(
     'sovereign_concierge',
     () => {
-      const value = readJson<{ priority?: string[]; default_models?: Record<string, string> }>(
+      const value = loadOperatorProviderPreferencesAtPath(
         onboardingPath('provider-preferences.json')
       );
       if (!value?.priority?.length) return null;
