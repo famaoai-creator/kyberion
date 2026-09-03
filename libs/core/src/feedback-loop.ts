@@ -4,9 +4,15 @@
  * Implements the closed-loop between Phase 4 (Execution) and Phase 5 (Review/Distillation).
  */
 import { logger } from '../core.js';
-import { readJson } from '../foundation/json.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
-import { safeWriteFile, safeExistsSync, safeMkdir } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeWriteFile,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+} from '../secure-io.js';
 import * as path from 'path';
 import { pathResolver } from '../path-resolver.js';
 
@@ -19,6 +25,23 @@ import { sendOpsAlert } from '../ops-alert.js';
 import type { OpsAlertInput, OpsAlertOptions, OpsAlertReceipt } from '../ops-alert.js';
 
 const FEEDBACK_HINTS_DIR = pathResolver.shared('runtime/feedback-loop/hints');
+const FEEDBACK_HINTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/feedback-knowledge-hints.schema.json'
+);
+
+function feedbackHintsCatalogAtPath(filePath: string) {
+  return defineCatalog<KnowledgeHint[]>({
+    id: 'feedback-knowledge-hints',
+    path: filePath,
+    schema: FEEDBACK_HINTS_SCHEMA_PATH,
+  });
+}
+
+function omitUndefinedHintFields(hint: KnowledgeHint): KnowledgeHint {
+  return Object.fromEntries(
+    Object.entries(hint).filter(([, value]) => value !== undefined)
+  ) as KnowledgeHint;
+}
 
 function sanitizeSpanName(name: string): string {
   return name.replace(/[^\w:-]+/g, ' ').trim();
@@ -89,7 +112,7 @@ export function persistHints(hints: KnowledgeHint[], category: string = 'auto-le
 
   if (safeExistsSync(filePath)) {
     try {
-      existing = readJson<KnowledgeHint[]>(filePath);
+      existing = loadFeedbackHintsAtPath(filePath);
     } catch {
       /* start fresh */
     }
@@ -102,8 +125,9 @@ export function persistHints(hints: KnowledgeHint[], category: string = 'auto-le
   if (newHints.length === 0) return;
 
   // Keep max 100 auto-generated hints (rotate oldest)
-  const combined = [...existing, ...newHints].slice(-100);
-  safeWriteFile(filePath, JSON.stringify(combined, null, 2));
+  const combined = [...existing, ...newHints].slice(-100).map(omitUndefinedHintFields);
+  const validated = feedbackHintsCatalogAtPath(filePath).validate(combined, filePath);
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   logger.info(
     `[FEEDBACK] Persisted ${newHints.length} new hints to ${category}.json (total: ${combined.length})`
   );
@@ -117,11 +141,19 @@ export function readHintsByCategory(category: string): KnowledgeHint[] {
   const filePath = path.join(FEEDBACK_HINTS_DIR, `${sanitizeCategory(category)}.json`);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = readJson<unknown>(filePath);
-    return Array.isArray(parsed) ? parsed : [];
+    return loadFeedbackHintsAtPath(filePath);
   } catch {
     return [];
   }
+}
+
+/** Load one persisted feedback-hint category through its schema and path boundary. */
+export function loadFeedbackHintsAtPath(filePath: string): KnowledgeHint[] {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`[FEEDBACK_HINTS_FILE] hints must be a regular file: ${filePath}`);
+  }
+  return feedbackHintsCatalogAtPath(safePath).load();
 }
 
 /**
