@@ -161,6 +161,30 @@ describe('tenant activation', () => {
     ).toBe(false);
   });
 
+  it('does not treat a schema-invalid activation receipt as active', () => {
+    seed();
+    const receiptPath = path.join(
+      rootDir,
+      'customer',
+      'acme-ai',
+      'onboarding',
+      'tenant-activation',
+      'acme-prod',
+      'org-acme-ai',
+      'confidential',
+      'activation.json'
+    );
+    safeMkdir(path.dirname(receiptPath), { recursive: true });
+    safeWriteFile(receiptPath, JSON.stringify({ kind: 'tenant_activation' }));
+
+    expect(
+      isTenantActivationActive(
+        { customerSlug: 'acme-ai', tenantSlug: 'acme-prod', organizationId: 'org-acme-ai' },
+        rootDir
+      )
+    ).toBe(false);
+  });
+
   it('supports recoverable suspend, rollback, and resume transitions', () => {
     seed();
     const input = {
