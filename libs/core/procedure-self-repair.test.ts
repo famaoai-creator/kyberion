@@ -176,7 +176,15 @@ describe('saveProcedureDelta / loadProcedureDelta', () => {
       reason: 'ambiguity',
       created_at: '2026-06-24T00:00:00Z',
     };
-    vi.spyOn(secureIo, 'safeReadFile').mockReturnValue(JSON.stringify(delta));
+    vi.spyOn(secureIo, 'safeReadFile').mockImplementation((filePath) => {
+      if (String(filePath).includes('procedure-delta.schema.json')) {
+        return fs.readFileSync(
+          path.resolve('knowledge/product/schemas/procedure-delta.schema.json'),
+          'utf8'
+        );
+      }
+      return JSON.stringify(delta);
+    });
     const filePath = pathResolver.shared('runtime/procedure-deltas/p1/delta.json');
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, '{}');

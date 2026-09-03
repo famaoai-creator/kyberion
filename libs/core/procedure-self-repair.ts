@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
@@ -20,11 +19,13 @@ import { type ProcedureDelta } from './procedure-types.js';
 const DELTA_BASE = pathResolver.shared('runtime/procedure-deltas');
 const DELTA_SCHEMA_PATH = pathResolver.knowledge('product/schemas/procedure-delta.schema.json');
 
-const deltaCatalog = defineCatalog<ProcedureDelta>({
-  id: 'procedure-delta',
-  path: DELTA_SCHEMA_PATH,
-  schema: DELTA_SCHEMA_PATH,
-});
+function deltaCatalogAtPath(filePath: string) {
+  return defineCatalog<ProcedureDelta>({
+    id: 'procedure-delta',
+    path: filePath,
+    schema: DELTA_SCHEMA_PATH,
+  });
+}
 
 function deltaDir(procedureId: string): string {
   return `${DELTA_BASE}/${procedureId}`;
@@ -102,7 +103,7 @@ export function createProcedureDelta(input: {
 
 /** Persist a delta and return the file path. */
 export function saveProcedureDelta(delta: ProcedureDelta): string {
-  const validated = deltaCatalog.validate(delta, 'procedure delta');
+  const validated = deltaCatalogAtPath('procedure delta').validate(delta, 'procedure delta');
   const dir = deltaDir(validated.procedure_id);
   safeMkdir(dir, { recursive: true });
   const id = deltaId(validated.created_at);
@@ -179,7 +180,7 @@ export function loadProcedureDeltaAtPath(
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[PROCEDURE_DELTA] delta must be a regular file: ${filePath}`);
   }
-  const delta = deltaCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  const delta = deltaCatalogAtPath(safeFilePath).load();
   if (expectedProcedureId !== undefined && delta.procedure_id !== expectedProcedureId) {
     throw new Error(
       `[PROCEDURE_DELTA_SCOPE_MISMATCH] delta belongs to ${delta.procedure_id}, expected ${expectedProcedureId}`
