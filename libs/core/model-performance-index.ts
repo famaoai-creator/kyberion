@@ -1,13 +1,15 @@
-import {
-  appendJsonLine,
-  parseSafeJsonObjectValue,
-  readJson,
-  readJsonLines,
-} from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonObjectValue, readJsonLines } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { nowIso } from './foundation/time.js';
 
 /**
@@ -57,6 +59,17 @@ export interface ModelPerformanceIndex {
 const OUTCOMES_PATH = 'observability/retrospectives/model-role-outcomes.jsonl';
 const FEEDBACK_PATH = 'observability/retrospectives/model-role-feedback.jsonl';
 const INDEX_PATH = 'observability/retrospectives/model-performance.json';
+const INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-performance-index.schema.json'
+);
+
+function performanceIndexCatalog(filePath: string) {
+  return defineCatalog<ModelPerformanceIndex>({
+    id: 'model-performance-index',
+    path: filePath,
+    schema: INDEX_SCHEMA_PATH,
+  });
+}
 
 export const MODEL_PERFORMANCE_MIN_SAMPLES = 5;
 const MAX_MODEL_ID_LENGTH = 160;
@@ -313,7 +326,11 @@ export function rebuildModelPerformanceIndex(): Record<string, ModelRolePerforma
 
   const indexPath = modelPerformanceIndexPath();
   safeMkdir(path.dirname(indexPath), { recursive: true });
-  safeWriteFile(indexPath, JSON.stringify({ by_model_role: byKey }, null, 2));
+  const validated = performanceIndexCatalog(indexPath).validate(
+    { by_model_role: byKey },
+    indexPath
+  );
+  safeWriteFile(indexPath, JSON.stringify(validated, null, 2));
   return byKey;
 }
 
@@ -328,7 +345,17 @@ export function resetModelPerformanceIndexCache(): void {
 export function loadModelPerformanceIndex(): Record<string, ModelRolePerformance> {
   const indexPath = modelPerformanceIndexPath();
   if (!safeExistsSync(indexPath)) return {};
-  return parseModelPerformanceIndex(readJson<unknown>(indexPath)).by_model_role;
+  return loadModelPerformanceIndexAtPath(indexPath).by_model_role;
+}
+
+/** Load a model performance projection through the governed catalog boundary. */
+export function loadModelPerformanceIndexAtPath(filePath: string): ModelPerformanceIndex {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[MODEL_PERFORMANCE] index must be a regular file: ${filePath}`);
+  }
+  const indexed = performanceIndexCatalog(safeFilePath).load();
+  return parseModelPerformanceIndex(indexed);
 }
 
 export function getModelRolePerformance(
