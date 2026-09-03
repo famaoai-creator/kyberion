@@ -4,6 +4,7 @@ import {
   listServices,
   registerService,
   resolveProviderUrl,
+  writeExternalServiceRegistryAtPath,
 } from './external-service-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -59,5 +60,17 @@ describe('external-service-registry', () => {
       providerId: 'wttr-weather',
       url: 'https://wttr.in/Tokyo?lang=ja',
     });
+  });
+
+  it('persists the catalog-normalized runtime registry', () => {
+    writeExternalServiceRegistryAtPath(runtimePath, {
+      version: '1.0.0',
+      services: [],
+      $schema: 'https://example.test/schema.json',
+    } as unknown as Parameters<typeof writeExternalServiceRegistryAtPath>[1]);
+
+    expect(JSON.parse(String(safeReadFile(runtimePath, { encoding: 'utf8' })))).not.toHaveProperty(
+      '$schema'
+    );
   });
 });
