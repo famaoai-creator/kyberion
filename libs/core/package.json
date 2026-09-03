@@ -751,6 +751,10 @@
       "types": "./dist/tenant-registry-exceptions.d.ts",
       "default": "./dist/tenant-registry-exceptions.js"
     },
+    "./max-file-lines-config": {
+      "types": "./dist/max-file-lines-config.d.ts",
+      "default": "./dist/max-file-lines-config.js"
+    },
     "./nhi-lifecycle-governance": {
       "types": "./dist/nhi-lifecycle-governance.d.ts",
       "default": "./dist/nhi-lifecycle-governance.js"

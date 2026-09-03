@@ -14243,6 +14243,12 @@ SX-03／SX-04 のtenant registry exception readerを再監査し、tenant consis
 
 検証: tenant registry exceptions／consistency checker **2 files / 18 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 664
+
+SX-03／LC-02 のmax-file-lines policy readerを再監査し、CIのsource line budgetを決める既存schema付きconfigがscript内の汎用`readJson`に残っていたため修正した。`max-file-lines.schema.json`へ接続するcore canonical loaderを追加し、configのschema・repository path・regular-file／symlink境界を通過してからsource走査とexception判定へ渡すようにした。root走査、comment masking、exceptionの重複・存在・line budget判定、既存のCLI出力 semanticsは維持している。
+
+検証: max-file-lines loader／checker **1 file / 2 tests passed**、実CLI、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
