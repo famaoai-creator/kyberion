@@ -193,6 +193,53 @@ describe('checkIngestQuota — warn→block staging', () => {
     });
   });
 
+  it('does not adopt schema-invalid, cross-tenant, or non-file counters', () => {
+    const rootDir = path.join(fixtureRoot, `boundary-${randomUUID()}`);
+    const options = { rootDir, now: NOW, policy: { ...policy } };
+    const counterPath = ingestQuotaCounterPath('acme-corp', options);
+    safeMkdir(path.dirname(counterPath), { recursive: true });
+    const updatedAt = new Date(NOW).toISOString();
+
+    safeWriteFile(
+      counterPath,
+      JSON.stringify({
+        tenant_slug: 'acme-corp',
+        date: '2026-07-28',
+        files: 4,
+        bytes: 900,
+        updated_at: updatedAt,
+        unexpected: true,
+      })
+    );
+    expect(checkIngestQuota('acme-corp', { bytes: 1 }, options).usage).toEqual({
+      files: 0,
+      bytes: 0,
+    });
+
+    safeWriteFile(
+      counterPath,
+      JSON.stringify({
+        tenant_slug: 'other-co',
+        date: '2026-07-28',
+        files: 4,
+        bytes: 900,
+        updated_at: updatedAt,
+      })
+    );
+    expect(checkIngestQuota('acme-corp', { bytes: 1 }, options).usage).toEqual({
+      files: 0,
+      bytes: 0,
+    });
+
+    safeRmSync(counterPath, { force: true });
+    safeMkdir(counterPath, { recursive: true });
+    expect(checkIngestQuota('acme-corp', { bytes: 1 }, options).usage).toEqual({
+      files: 0,
+      bytes: 0,
+    });
+    safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
   it('rejects invalid tenant slugs (path safety)', () => {
     expect(() => checkIngestQuota('../escape', { bytes: 1 }, { rootDir: fixtureRoot })).toThrow(
       /invalid tenant slug/
