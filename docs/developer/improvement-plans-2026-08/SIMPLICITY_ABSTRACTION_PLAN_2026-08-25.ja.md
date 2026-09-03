@@ -14567,6 +14567,12 @@ SX-03／SX-04 のSovereign Dashboard接続情報表示を再監査し、active p
 
 検証: Sovereign Dashboard／service engine **2 files / 13 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 718
+
+SX-03／SX-04 のprocedure promotion catalog更新を再監査し、`procedures.json`をraw `readJson`で読み、compiled entry追加後にschemaを再検証せず保存していた残存を修正した。既存`readProcedureCatalog`のschema-bound／per-entry filteringと`validateProcedureCatalog`へ接続し、promotion前後のcatalog契約を共有した。未プロビジョン・読込不能catalogの空catalog bootstrap、procedure ID重複拒否、recording approval／audit semanticsは維持している。
+
+検証: procedure promotion resource boundary **1 test passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

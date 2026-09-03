@@ -10,5 +10,8 @@ describe('promote procedure resource boundaries', () => {
     );
     expect(source).toContain("parseSafeJsonInput(intentPhrasesRaw || '[]', '--intent-phrases')");
     expect(source).not.toContain('JSON.parse(intentPhrasesRaw)');
+    expect(source).toContain('readProcedureCatalog(catalogAbs)');
+    expect(source).toContain('validateProcedureCatalog(catalog, catalogAbs)');
+    expect(source).not.toContain('readJson<ProcedureCatalog>');
   });
 });
