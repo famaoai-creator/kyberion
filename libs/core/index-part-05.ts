@@ -46,6 +46,8 @@ export type {
 export {
   emitIntentSnapshot,
   evaluateIntentDriftGate,
+  loadIntentDeltasAtPath,
+  loadIntentSnapshotsAtPath,
   latestSnapshot,
   listSnapshots,
   mapStageToLoopPhase,

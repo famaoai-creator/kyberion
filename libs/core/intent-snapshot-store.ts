@@ -84,12 +84,17 @@ function scopeChangeCatalog(filePath: string) {
   });
 }
 
-function readJsonl<T>(filePath: string, catalog: GovernedCatalog<T>): T[] {
+function readJsonl<T>(
+  filePath: string,
+  catalog: GovernedCatalog<T>,
+  onMalformed: 'throw' | 'skip' = 'throw'
+): T[] {
   if (!safeExistsSync(filePath)) return [];
   if (!safeLstat(filePath).isFile()) {
     throw new Error(`[intent-snapshot-store] persisted record must be a regular file: ${filePath}`);
   }
   return readJsonLines<T>(filePath, {
+    onMalformed,
     map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
   });
 }
@@ -103,6 +108,18 @@ export function listSnapshots(missionId: string): IntentSnapshot[] {
   const file = snapshotPath(missionId);
   if (!file) return [];
   return readJsonl(file, snapshotCatalog(file));
+}
+
+/** Load report-facing snapshots from an explicit evidence path, skipping bad lines. */
+export function loadIntentSnapshotsAtPath(filePath: string): IntentSnapshot[] {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  return readJsonl(safePath, snapshotCatalog(safePath), 'skip');
+}
+
+/** Load report-facing deltas from an explicit evidence path, skipping bad lines. */
+export function loadIntentDeltasAtPath(filePath: string): IntentDelta[] {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  return readJsonl(safePath, deltaCatalog(safePath), 'skip');
 }
 
 export function latestSnapshot(missionId: string): IntentSnapshot | null {
