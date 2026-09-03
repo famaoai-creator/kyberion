@@ -7417,6 +7417,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/ingest-asset-record.schema.json",
+      "tier": "public",
+      "size": 1649,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/ingest-quota-counter.schema.json",
       "tier": "public",
       "size": 688,

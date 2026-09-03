@@ -277,9 +277,12 @@ describe('ingest-asset-ledger (DA-05)', () => {
   it('skips corrupt ledger lines instead of failing reads', () => {
     safeAppendFile(
       assetLedgerPath('acme-corp', options),
-      ['not-json', '[]', JSON.stringify({ ...makeRecord(), visible_to: ['acme-corp', 42] })].join(
-        '\n'
-      ) + '\n'
+      [
+        'not-json',
+        '[]',
+        JSON.stringify({ ...makeRecord(), visible_to: ['acme-corp', 42] }),
+        JSON.stringify({ ...makeRecord(), unexpected: true }),
+      ].join('\n') + '\n'
     );
     expect(readAssetLedger('acme-corp', options)).toHaveLength(4);
     expect(listAssets('acme-corp', options)).toHaveLength(2);
@@ -315,5 +318,19 @@ describe('ingest-asset-ledger (DA-05)', () => {
     const symlinkOptions = { rootDir: symlinkFixtureRoot, env: EMPTY_ENV };
     expect(() => assetLedgerPath('common', symlinkOptions)).toThrow('[RESOURCE_PATH_SYMLINK]');
     expect(() => readAssetLedger('common', symlinkOptions)).toThrow('[RESOURCE_PATH_SYMLINK]');
+  });
+
+  it('rejects a tenant ledger path that is a directory', () => {
+    const directoryRoot = path.join(
+      pathResolver.rootDir(),
+      'active/shared/tmp',
+      `ingest-ledger-directory-${randomUUID()}`
+    );
+    const ledger = assetLedgerPath('common', { rootDir: directoryRoot });
+    safeMkdir(ledger, { recursive: true });
+    expect(() => readAssetLedger('common', { rootDir: directoryRoot })).toThrow(
+      /ledger must be a regular file/
+    );
+    safeRmSync(directoryRoot, { recursive: true, force: true });
   });
 });

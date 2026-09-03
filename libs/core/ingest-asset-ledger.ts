@@ -25,9 +25,16 @@ import { isRecord } from './foundation/text.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReadFile,
+} from './secure-io.js';
 
 const SHA256_RE = /^[a-f0-9]{64}$/;
 
@@ -66,6 +73,24 @@ export interface IngestAssetRecord {
   /** Previous version ref ('{asset_id}@v{n}') or dedup-registry hash ref ('sha256:{hash}'). */
   supersedes?: string;
   status: IngestAssetStatus;
+}
+
+const INGEST_ASSET_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/ingest-asset-record.schema.json'
+);
+
+function ingestAssetCatalog(filePath: string): GovernedCatalog<IngestAssetRecord> {
+  return defineCatalog<IngestAssetRecord>({
+    id: 'ingest-asset-record',
+    path: filePath,
+    schema: INGEST_ASSET_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularAssetLedgerFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[ingest-asset-ledger] ledger must be a regular file: ${filePath}`);
+  }
 }
 
 /** Path seam mirroring TenantRegistryPathOptions (hermetic tests pass a fixture rootDir/env). */
@@ -287,14 +312,19 @@ export function readAssetLedger(
 ): IngestAssetRecord[] {
   const ledgerFile = assetLedgerPath(tenantSlug, options);
   if (!safeExistsSync(ledgerFile)) return [];
+  ensureRegularAssetLedgerFile(ledgerFile);
   const raw = String(safeReadFile(ledgerFile, { encoding: 'utf8' }) || '');
   const records: IngestAssetRecord[] = [];
-  for (const line of raw.split('\n')) {
+  const catalog = ingestAssetCatalog(ledgerFile);
+  for (const [index, line] of raw.split('\n').entries()) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
       const record = normalizeIngestAssetRecord(
-        parseSafeJsonInput(trimmed, 'ingest asset ledger record'),
+        catalog.validate(
+          parseSafeJsonInput(trimmed, 'ingest asset ledger record'),
+          `${ledgerFile}:${index + 1}`
+        ),
         options
       );
       if (record) records.push(record);
@@ -319,7 +349,8 @@ export function appendAssetRecord(
   assertTargetPath(record, options);
   const ledgerFile = assetLedgerPath(tenantSlug, options);
   safeMkdir(path.dirname(ledgerFile), { recursive: true });
-  appendJsonLine(ledgerFile, record);
+  ensureRegularAssetLedgerFile(ledgerFile);
+  appendJsonLine(ledgerFile, ingestAssetCatalog(ledgerFile).validate(record, ledgerFile));
   return record;
 }
 
