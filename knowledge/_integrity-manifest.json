@@ -9555,7 +9555,7 @@
     {
       "path": "product/schemas/tenant-activation.schema.json",
       "tier": "public",
-      "size": 3829,
+      "size": 3876,
       "type": "json"
     },
     {
