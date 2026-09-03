@@ -2,7 +2,6 @@
  * Adopt work completed outside dispatch-workitems without weakening the mission exit gate.
  */
 
-import type { ValidateFunction } from 'ajv';
 import * as nodePath from 'node:path';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import {
@@ -13,9 +12,8 @@ import {
   type ArtifactReviewReceipt,
 } from './artifact-review.js';
 import { auditChain } from './audit-chain.js';
-import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson as readFoundationJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { detectTier } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
@@ -158,15 +156,9 @@ interface ReconciledArtifactReview {
   receipt: ArtifactReviewReceipt;
 }
 
-let validateManifest: ValidateFunction | null = null;
-
-function getManifestValidator(): ValidateFunction {
-  if (validateManifest) return validateManifest;
-  validateManifest = compileSchema(
-    pathResolver.knowledge('product/schemas/mission-work-reconciliation.schema.json')
-  );
-  return validateManifest;
-}
+const MISSION_RECONCILIATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-work-reconciliation.schema.json'
+);
 
 function assertMissionControllerAuthority(): void {
   const identity = resolveIdentityContext();
@@ -262,14 +254,13 @@ function assertReconciliationApproval(
   return approval;
 }
 
-function readJson<T>(filePath: string, label: string): T {
+function loadManifest(filePath: string, label: string): MissionWorkReconciliationManifest {
   if (!safeExistsSync(filePath)) throw new Error(`${label} not found: ${filePath}`);
-  try {
-    return readFoundationJson<T>(filePath);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`${label} is not valid JSON: ${message}`);
-  }
+  return defineCatalog<MissionWorkReconciliationManifest>({
+    id: 'mission-work-reconciliation',
+    path: filePath,
+    schema: MISSION_RECONCILIATION_SCHEMA_PATH,
+  }).load();
 }
 
 /** Open the human approval request required before reconciliation can mutate a mission. */
@@ -283,11 +274,7 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
   if (!findMissionPath(missionId)) throw new Error(`Mission ${missionId} not found`);
   const manifestPath = resolveInsideRoot(input.manifestPath, 'manifest');
   const manifestRaw = safeReadFile(manifestPath) as Buffer;
-  const manifest = readJson<MissionWorkReconciliationManifest>(manifestPath, 'manifest');
-  const validator = getManifestValidator();
-  if (!validator(manifest)) {
-    throw new Error(`Invalid reconciliation manifest: ${formatSchemaErrors(validator)}`);
-  }
+  const manifest = loadManifest(manifestPath, 'manifest');
   if (manifest.mission_id.toUpperCase() !== missionId) {
     throw new Error(
       `Manifest mission_id ${manifest.mission_id} does not match requested mission ${missionId}`
@@ -360,12 +347,6 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
       effectBinding,
     },
   });
-}
-
-function formatSchemaErrors(validator: ValidateFunction): string {
-  return (validator.errors || [])
-    .map((error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`)
-    .join('; ');
 }
 
 function assertSourceCommit(manifest: MissionWorkReconciliationManifest): string {
@@ -869,11 +850,7 @@ export async function reconcileMissionExistingWork(input: {
 
   const manifestPath = resolveInsideRoot(input.manifestPath, 'manifest');
   const manifestRaw = safeReadFile(manifestPath) as Buffer;
-  const manifest = readJson<MissionWorkReconciliationManifest>(manifestPath, 'manifest');
-  const validator = getManifestValidator();
-  if (!validator(manifest)) {
-    throw new Error(`Invalid reconciliation manifest: ${formatSchemaErrors(validator)}`);
-  }
+  const manifest = loadManifest(manifestPath, 'manifest');
   if (manifest.mission_id.toUpperCase() !== missionId) {
     throw new Error(
       `Manifest mission_id ${manifest.mission_id} does not match requested mission ${missionId}`

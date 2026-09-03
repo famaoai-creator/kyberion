@@ -476,6 +476,25 @@ describe('mission existing work reconciliation', () => {
     expect(validate(example), JSON.stringify(validate.errors)).toBe(true);
   });
 
+  it('loads manifests through the governed catalog boundary', async () => {
+    prepareMission();
+    safeWriteFile(
+      manifestPath,
+      JSON.stringify({
+        ...buildManifest(),
+        $schema: 'https://kyberion.local/schemas/mission-work-reconciliation.schema.json',
+      })
+    );
+
+    const result = await reconcileMissionExistingWork({
+      missionId,
+      manifestPath,
+      dryRun: true,
+    });
+
+    expect(result.status).toBe('dry_run_ready');
+  });
+
   it('preflights without mutating mission tasks', async () => {
     prepareMission();
     writeManifest(buildManifest());
