@@ -1,7 +1,6 @@
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { randomUUID } from 'node:crypto';
@@ -11,6 +10,7 @@ import {
   assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
@@ -253,6 +253,12 @@ const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
 const SESSION_DIR = pathResolver.shared('runtime/browser/conversation-sessions');
 const BROWSER_SESSION_DIR = pathResolver.shared('runtime/browser/sessions');
 const BROWSER_SNAPSHOT_DIR = pathResolver.shared('runtime/browser/snapshots');
+const BROWSER_SNAPSHOT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-session-snapshot.schema.json'
+);
+const BROWSER_RUNTIME_SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-runtime-session.schema.json'
+);
 
 let sessionValidateFn: ValidateFunction | null = null;
 let commandValidateFn: ValidateFunction | null = null;
@@ -357,6 +363,46 @@ interface BrowserRuntimeSessionRecord {
   }>;
 }
 
+export function loadBrowserSnapshotAtPath(filePath: string): BrowserSnapshotRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath)) {
+    throw new Error(`[BROWSER_CONVERSATION_SESSION] snapshot is missing: ${filePath}`);
+  }
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[BROWSER_CONVERSATION_SESSION] snapshot must be a regular file: ${filePath}`);
+  }
+  return browserSnapshotCatalog(safeFilePath).load();
+}
+
+function browserSnapshotCatalog(filePath: string) {
+  return defineCatalog<BrowserSnapshotRecord>({
+    id: 'browser-session-snapshot',
+    path: filePath,
+    schema: BROWSER_SNAPSHOT_SCHEMA_PATH,
+  });
+}
+
+export function loadBrowserRuntimeSessionAtPath(filePath: string): BrowserRuntimeSessionRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath)) {
+    throw new Error(`[BROWSER_CONVERSATION_SESSION] runtime session is missing: ${filePath}`);
+  }
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(
+      `[BROWSER_CONVERSATION_SESSION] runtime session must be a regular file: ${filePath}`
+    );
+  }
+  return browserRuntimeSessionCatalog(safeFilePath).load();
+}
+
+function browserRuntimeSessionCatalog(filePath: string) {
+  return defineCatalog<BrowserRuntimeSessionRecord>({
+    id: 'browser-runtime-session',
+    path: filePath,
+    schema: BROWSER_RUNTIME_SESSION_SCHEMA_PATH,
+  });
+}
+
 function assertStringField(record: Record<string, unknown>, field: string, label: string): string {
   const value = record[field];
   if (typeof value !== 'string' || value.trim() === '') {
@@ -392,7 +438,18 @@ function parseBrowserSnapshotRecord(value: unknown, sessionId: string): BrowserS
   const record = parseSafeJsonObjectValue(value, label);
   assertAllowedFields(
     record,
-    ['session_id', 'tab_id', 'url', 'title', 'captured_at', 'element_count', 'elements'],
+    [
+      'session_id',
+      'tab_id',
+      'url',
+      'title',
+      'captured_at',
+      'element_count',
+      'viewport',
+      'focused_ref',
+      'ready_state',
+      'elements',
+    ],
     label
   );
   const parsedSessionId = assertStringField(record, 'session_id', label);
@@ -418,7 +475,26 @@ function parseBrowserSnapshotRecord(value: unknown, sessionId: string): BrowserS
   const elements = record.elements.map((candidate, index) => {
     const elementLabel = `${label}.elements[${index}]`;
     const element = parseSafeJsonObjectValue(candidate, elementLabel);
-    assertAllowedFields(element, ['ref', 'role', 'text', 'name'], elementLabel);
+    assertAllowedFields(
+      element,
+      [
+        'ref',
+        'tag',
+        'role',
+        'text',
+        'name',
+        'type',
+        'placeholder',
+        'href',
+        'value',
+        'visible',
+        'editable',
+        'focused',
+        'value_redacted',
+        'selector',
+      ],
+      elementLabel
+    );
     const ref = assertStringField(element, 'ref', elementLabel);
     const role = element.role;
     if (role !== undefined && role !== null && typeof role !== 'string') {
@@ -452,7 +528,26 @@ function parseBrowserRuntimeSessionRecord(
   const record = parseSafeJsonObjectValue(value, label);
   assertAllowedFields(
     record,
-    ['session_id', 'active_tab_id', 'lease_status', 'cdp_url', 'cdp_port', 'tabs'],
+    [
+      'session_id',
+      'user_data_dir',
+      'active_tab_id',
+      'tab_count',
+      'tabs',
+      'updated_at',
+      'last_trace_path',
+      'last_video_paths',
+      'video_output_dir',
+      'video_recording_pending',
+      'lease_expires_at',
+      'lease_status',
+      'retained',
+      'cdp_url',
+      'cdp_port',
+      'action_trail_count',
+      'action_trail_path',
+      'recent_actions',
+    ],
     label
   );
   const parsedSessionId = assertStringField(record, 'session_id', label);
@@ -510,7 +605,7 @@ function loadBrowserSnapshot(sessionId: string): BrowserSnapshotRecord | null {
   const filePath = browserSnapshotPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
   try {
-    return parseBrowserSnapshotRecord(readJson<unknown>(filePath), sessionId);
+    return parseBrowserSnapshotRecord(loadBrowserSnapshotAtPath(filePath), sessionId);
   } catch (error) {
     logger.warn(
       `[BROWSER_CONVERSATION_SESSION] Invalid snapshot ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
@@ -596,7 +691,7 @@ function loadBrowserRuntimeSession(sessionId: string): BrowserRuntimeSessionReco
   const filePath = browserRuntimeSessionPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
   try {
-    return parseBrowserRuntimeSessionRecord(readJson<unknown>(filePath), sessionId);
+    return parseBrowserRuntimeSessionRecord(loadBrowserRuntimeSessionAtPath(filePath), sessionId);
   } catch (error) {
     logger.warn(
       `[BROWSER_CONVERSATION_SESSION] Invalid runtime session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
