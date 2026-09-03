@@ -312,7 +312,15 @@ function renderGateSection(
           body: JSON.stringify({ requestId: cfg.requestId, decision: d, decidedBy: who, note: note, reasonCategory: reason || undefined })
         });
         var body = await res.json();
-        if (!res.ok || !body.ok) { status.textContent = '失敗: ' + (body.error || res.status); return; }
+        var validBody = body && typeof body === 'object' && !Array.isArray(body);
+        var responseError = validBody && typeof body.error === 'string' ? body.error : String(res.status);
+        var responseRequestId = validBody && typeof body.requestId === 'string' ? body.requestId : '';
+        var responseStatus = validBody && typeof body.status === 'string' ? body.status : '';
+        if (!res.ok || !validBody || body.ok !== true || responseRequestId !== cfg.requestId ||
+            (responseStatus !== 'approved' && responseStatus !== 'rejected')) {
+          status.textContent = '失敗: ' + responseError;
+          return;
+        }
         document.getElementById('mg-gate').setAttribute('data-decision', body.status);
         status.textContent = (body.status === 'approved' ? '✅ ' + MG_MESSAGES.approvedShort : '✏️ ' + MG_MESSAGES.changesShort) +
           ' — ' + MG_MESSAGES.submitted.replace('__REQUEST_ID__', body.requestId);
