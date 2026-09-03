@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReaddir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const mocks = vi.hoisted(() => {
   const ensureMissionTeamRuntime = vi.fn();
@@ -54,6 +54,23 @@ describe('agent-runtime-supervisor', () => {
     });
     expect(reloaded.team_roles).toEqual(['planner']);
     expect(reloaded.requested_by).toBe('test');
+  });
+
+  it('rejects an invalid prewarm request before queueing it', async () => {
+    const { enqueueMissionTeamPrewarmRequest } = await import('./agent-runtime-supervisor.js');
+    const requestDir = pathResolver.shared('coordination/agent-runtime/requests');
+    safeMkdir(requestDir, { recursive: true });
+    const before = safeReaddir(requestDir);
+
+    expect(() =>
+      enqueueMissionTeamPrewarmRequest({
+        missionId: 'MSN-PREWARM',
+        teamRoles: [''],
+        requestedBy: 'test',
+        scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
+      })
+    ).toThrow(/Invalid catalog agent-runtime-ensure-request/);
+    expect(safeReaddir(requestDir)).toEqual(before);
   });
 
   it('rejects request artifacts outside the supervisor request queue', async () => {
