@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media Artifact Library Index",
+  "type": "object",
+  "required": ["kind", "version", "artifact_library_path", "pack_count", "profile_count", "packs"],
+  "properties": {
+    "kind": { "const": "artifact-library-index" },
+    "version": { "type": "string", "minLength": 1 },
+    "artifact_library_path": { "type": "string", "minLength": 1 },
+    "pack_count": { "type": "integer", "minimum": 0 },
+    "profile_count": { "type": "integer", "minimum": 0 },
+    "packs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "domain", "profile_count", "profiles"],
+        "properties": {
+          "file": { "type": "string", "minLength": 1 },
+          "domain": { "type": "string", "minLength": 1 },
+          "profile_count": { "type": "integer", "minimum": 0 },
+          "profiles": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
