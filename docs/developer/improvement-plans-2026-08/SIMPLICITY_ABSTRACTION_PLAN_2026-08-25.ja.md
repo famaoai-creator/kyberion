@@ -15765,6 +15765,18 @@ canonical loader失敗時のnon-retry回帰を追加した。
 検証: Super-Nerve **1 file / 10 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 822
+
+SX-03／SX-04／SX-10 のtask decomposition入力を再監査し、mission canonical artifactではschemaを通る一方、
+明示されたrequirements draft／design spec pathだけが `readJson<unknown>` でdomain storeを迂回していた残存を修正した。
+requirements-draft storeとSDLC artifact storeにexplicit path loaderを追加し、`task-plan-ops`も同じschema／secure path boundaryを
+通してからreasoning backendへ渡すようにした。既存のmission canonical path、missing input、repository外path、save／gate semanticsは維持し、
+valid／schema-invalid explicit artifactの回帰を追加した。
+
+検証: requirements draft／SDLC artifact **2 files / 41 tests passed**、task-plan path boundary **1 test passed**、root typecheck、対象Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、
+SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

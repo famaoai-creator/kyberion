@@ -27,6 +27,7 @@ import {
   evaluateQaReadyGate,
   evaluateTaskPlanReadyGate,
   readDesignSpec,
+  readDesignSpecAtPath,
   readTaskPlan,
   readTestPlan,
   saveDesignSpec,
@@ -167,6 +168,28 @@ describe('sdlc-artifact-store', () => {
       );
 
       expect(() => readDesignSpec('MSN-D-INVALID')).toThrow(/Invalid catalog sdlc-design-spec/);
+    });
+
+    it('loads an explicitly supplied design spec through the canonical schema boundary', () => {
+      const file = path.join(tmpDir, 'explicit-design-spec.json');
+      fs.writeFileSync(
+        file,
+        JSON.stringify({
+          ...designExtracted,
+          version: 'v1',
+          project_name: 'Explicit project',
+          generated_at: new Date().toISOString(),
+        })
+      );
+
+      expect(readDesignSpecAtPath(file)?.project_name).toBe('Explicit project');
+    });
+
+    it('rejects a schema-invalid explicitly supplied design spec', () => {
+      const file = path.join(tmpDir, 'explicit-invalid-design-spec.json');
+      fs.writeFileSync(file, JSON.stringify({ version: 'v1', project_name: 'Broken' }));
+
+      expect(() => readDesignSpecAtPath(file)).toThrow(/Invalid catalog sdlc-design-spec/);
     });
 
     it('emits design specs that satisfy the schema', () => {
