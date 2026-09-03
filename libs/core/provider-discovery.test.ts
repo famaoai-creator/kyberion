@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -5,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeWriteFile: vi.fn(),
   safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeMkdir: vi.fn(),
   safeUnlinkSync: vi.fn(),
   rootDir: vi.fn(() => '/repo'),
@@ -32,6 +34,7 @@ vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     rootDir: mocks.rootDir,
     rootResolve: mocks.rootResolve,
+    knowledge: mocks.rootResolve,
     shared: mocks.shared,
   },
 }));
@@ -48,7 +51,13 @@ describe('provider-discovery', () => {
     mocks.safeMkdir.mockReturnValue(undefined);
     mocks.safeWriteFile.mockReturnValue(undefined);
     mocks.safeUnlinkSync.mockReturnValue(undefined);
-    mocks.safeReadFile.mockImplementation(() => {
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('provider-discovery-cache.schema.json')) {
+        return fs.readFileSync(
+          'knowledge/product/schemas/provider-discovery-cache.schema.json',
+          'utf8'
+        );
+      }
       throw new Error('ENOENT');
     });
 
