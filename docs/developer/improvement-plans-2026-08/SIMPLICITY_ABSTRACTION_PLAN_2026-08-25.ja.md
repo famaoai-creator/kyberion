@@ -14904,6 +14904,18 @@ SX-03／SX-04／OS-08 のOAuth session storeを再監査し、読み込み時は
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
 state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 748
+
+SX-03／SX-04／OS-11 のdata-vault entryを再監査し、content hash／tier／filename bindingの局所検証は
+存在していた一方、cache entryのread／writeが専用schemaなしのJSON helperとraw `safeWriteFile`に残って
+いたため修正した。`data-vault-entry.schema.json`とpath単位の`defineCatalog`境界を追加し、任意のcache
+payloadはdata fieldに限定したまま、envelopeのsource／key／project／tier／hash／timestampを共通検証する。
+content hash、期限切れ、filename binding、malformed entryのfail-closed semanticsは維持している。
+
+検証: data-vault **1 file / 19 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
+state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
