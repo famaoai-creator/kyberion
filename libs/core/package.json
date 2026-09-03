@@ -683,6 +683,14 @@
       "types": "./dist/cowork-surface.d.ts",
       "default": "./dist/cowork-surface.js"
     },
+    "./cowork-artifact-packet": {
+      "types": "./dist/cowork-artifact-packet.d.ts",
+      "default": "./dist/cowork-artifact-packet.js"
+    },
+    "./cowork-artifact-packet.js": {
+      "types": "./dist/cowork-artifact-packet.d.ts",
+      "default": "./dist/cowork-artifact-packet.js"
+    },
     "./customer-resolver": {
       "types": "./dist/customer-resolver.d.ts",
       "default": "./dist/customer-resolver.js"

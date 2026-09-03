@@ -14,34 +14,19 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { writeGovernedArtifactJson, ensureGovernedArtifactDir } from './artifact-store.js';
 import type { IntentResolutionContract } from './intent-resolution-contract.js';
+import {
+  loadCoworkArtifactPacketAtPath,
+  validateCoworkArtifactPacket,
+  type CoworkArtifactPacket as ValidatedCoworkArtifactPacket,
+} from './cowork-artifact-packet.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface CoworkArtifactPacket {
-  /** Unique delivery ID for deduplication. */
-  delivery_id: string;
-  /** ISO timestamp. */
-  delivered_at: string;
-  /** Mission that produced this artifact (if applicable). */
-  mission_id?: string;
-  /** Pipeline trace ID (if applicable). */
-  trace_id?: string;
-  /** Human-readable title shown in Cowork. */
-  title: string;
-  /** Short summary of what was produced (Operator Interaction Packet). */
-  summary: string;
-  /** Next suggested action for the operator. */
-  next_action?: string;
-  /** Structured explanation of how the source request was resolved. */
-  intent_resolution?: IntentResolutionContract;
-  /** Artifact payload: relative path(s) or inline content. */
-  artifacts: CoworkArtifact[];
-}
+export type CoworkArtifactPacket = ValidatedCoworkArtifactPacket;
 
 export interface CoworkArtifact {
   /** Relative path from the repo root, or 'inline' if content is embedded. */
@@ -105,7 +90,8 @@ export function deliverToCowork(
     artifacts,
   };
 
-  writeGovernedArtifactJson(GOVERNED_ROLE, outboxLogicalPath(deliveryId), packet);
+  const validatedPacket = validateCoworkArtifactPacket(packet, outboxLogicalPath(deliveryId));
+  writeGovernedArtifactJson(GOVERNED_ROLE, outboxLogicalPath(deliveryId), validatedPacket);
 
   return deliveryId;
 }
@@ -136,7 +122,7 @@ export function listCoworkOutbox(): CoworkArtifactPacket[] {
     if (!file.endsWith('.json')) continue;
     try {
       const filePath = assertSafeRepositoryPath(path.join(outboxPath, file));
-      results.push(readJson<CoworkArtifactPacket>(filePath));
+      results.push(loadCoworkArtifactPacketAtPath(filePath));
     } catch {
       // Skip corrupt entries
     }

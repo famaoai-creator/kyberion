@@ -6949,6 +6949,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/cowork-artifact-packet.schema.json",
+      "tier": "public",
+      "size": 3113,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/cowork-health-cache.schema.json",
       "tier": "public",
       "size": 1234,
