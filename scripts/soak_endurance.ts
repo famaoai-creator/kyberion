@@ -11,7 +11,12 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine, nowIso, readJsonIfPresent } from '@agent/core/foundation';
+import { appendJsonLine, nowIso } from '@agent/core/foundation';
+import {
+  loadSoakEvidenceManifestAtPath,
+  writeSoakEvidenceManifestAtPath,
+  type SoakEvidenceManifest as CoreSoakEvidenceManifest,
+} from '@agent/core/soak-evidence-manifest';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -58,19 +63,7 @@ export interface SoakReport {
   };
 }
 
-export interface SoakEvidenceManifest {
-  version: '1.0';
-  started_at: string;
-  last_run_at: string;
-  run_count: number;
-  total_cycles: number;
-  window_days_equivalent: number;
-  last_validation: {
-    ok: boolean;
-    regression_count: number;
-    issues: string[];
-  };
-}
+export type SoakEvidenceManifest = CoreSoakEvidenceManifest;
 
 export interface SoakEvidenceValidation {
   ok: boolean;
@@ -440,7 +433,13 @@ function updateLiveEvidenceManifest(report: SoakReport, evidenceRoot: string): v
     path.join(safeEvidenceRoot, 'manifest.json'),
     'evidence manifest'
   );
-  const previous = readJsonIfPresent<SoakEvidenceManifest>(manifestPath);
+  let previous: SoakEvidenceManifest | null = null;
+  try {
+    previous = loadSoakEvidenceManifestAtPath(manifestPath);
+  } catch {
+    // Preserve the existing best-effort rollover behavior for a missing or
+    // malformed previous manifest; the current run writes a validated one.
+  }
   const validation = validateSoakEvidence(report);
   const firstAt = previous?.started_at ?? report.timestamp;
   const lastAt = report.timestamp;
@@ -462,7 +461,7 @@ function updateLiveEvidenceManifest(report: SoakReport, evidenceRoot: string): v
   safeMkdir(safeEvidenceRoot, { recursive: true });
   assertSoakResourcePath(safeEvidenceRoot, 'evidence directory');
   assertSoakResourcePath(manifestPath, 'evidence manifest');
-  safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
+  writeSoakEvidenceManifestAtPath(manifestPath, manifest);
   report.evidence.manifest_path = manifestPath;
   report.evidence.window_days_equivalent = manifest.window_days_equivalent;
   safeWriteFile(
