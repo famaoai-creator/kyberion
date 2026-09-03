@@ -677,14 +677,23 @@ function isSafeMissionEvidenceFilename(value: unknown): value is string {
 function writeReceipt(receipt: SetupReceipt, missionId?: string): void {
   const file = receiptPath(receipt.manifest_id, missionId);
   safeMkdir(path.dirname(file), { recursive: true });
-  safeWriteFile(file, JSON.stringify(receipt, null, 2));
+  const validated = defineCatalog<SetupReceipt>({
+    id: 'environment-setup-receipt',
+    path: file,
+    schema: RECEIPT_SCHEMA_PATH,
+  }).validate(receipt, file);
+  safeWriteFile(file, JSON.stringify(validated, null, 2));
 }
 
 function readReceipt(manifestId: string, missionId?: string): SetupReceipt | null {
   const file = receiptPath(manifestId, missionId);
   if (!safeExistsSync(file)) return null;
   try {
-    return readJson<SetupReceipt>(file);
+    return defineCatalog<SetupReceipt>({
+      id: 'environment-setup-receipt',
+      path: file,
+      schema: RECEIPT_SCHEMA_PATH,
+    }).load();
   } catch (err: any) {
     logger.warn(`[environment-capability] receipt parse failed: ${err?.message ?? err}`);
     return null;
@@ -698,6 +707,9 @@ function readReceipt(manifestId: string, missionId?: string): SetupReceipt | nul
 const DEFAULT_MANIFEST_DIR = 'knowledge/product/governance/environment-manifests';
 const MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/environment-capability-manifest.schema.json'
+);
+const RECEIPT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/environment-setup-receipt.schema.json'
 );
 
 function governedManifestDir(): string {
