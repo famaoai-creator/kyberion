@@ -8839,6 +8839,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/provider-discovery-cache.schema.json",
+      "tier": "public",
+      "size": 1402,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/provider-egress-policy.schema.json",
       "tier": "public",
       "size": 3102,
