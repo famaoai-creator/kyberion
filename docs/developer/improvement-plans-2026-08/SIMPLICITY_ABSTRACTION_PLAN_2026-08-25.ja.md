@@ -14561,6 +14561,12 @@ SX-03／SX-04 のgovernance rulesにおけるsurface directory整合性チェッ
 
 検証: governance rules **2 files / 4 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 717
+
+SX-03／SX-04 のSovereign Dashboard接続情報表示を再監査し、active profileのconnection JSONを汎用`readJsonIfExists`で読み、service connection schema／catalog loaderを経由しない残存を修正した。`loadServiceConnectionAtPath`をcoreの公開canonical loaderとして追加し、repository／regular-file／schema boundaryをDashboardのconnection reviewとonboarding表示へ統合した。欠損・不正接続をnullへ収束させる既存Dashboard fail-safe semanticsとservice readiness判定は維持している。
+
+検証: Sovereign Dashboard／service engine **2 files / 13 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

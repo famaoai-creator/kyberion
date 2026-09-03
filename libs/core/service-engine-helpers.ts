@@ -39,9 +39,11 @@ function serviceConnectionCatalogAtPath(filePath: string) {
   });
 }
 
-function loadServiceConnectionAtPath(filePath: string): Record<string, unknown> {
-  if (!safeLstat(filePath).isFile()) throw new Error(`Service connection is not a regular file`);
-  return serviceConnectionCatalogAtPath(filePath).load();
+export function loadServiceConnectionAtPath(filePath: string): Record<string, unknown> {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile())
+    throw new Error(`Service connection is not a regular file: ${safeFilePath}`);
+  return serviceConnectionCatalogAtPath(safeFilePath).load();
 }
 
 function isPlainObject(value: unknown): value is Record<string, any> {
