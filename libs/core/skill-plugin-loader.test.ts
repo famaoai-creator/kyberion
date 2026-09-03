@@ -19,6 +19,7 @@ import {
   authorizeConfiguredSkillPlugins,
   disposeSkillPluginContributions,
   fireSkillPluginHook,
+  loadSkillPluginsConfigAtPath,
   loadAuthorizedSkillPlugins,
   normalizePluginContributionDeclaration,
   readSkillPluginsConfig,
@@ -322,6 +323,24 @@ describe('loadAuthorizedSkillPlugins', () => {
     safeSymlinkSync(targetConfig, path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME));
 
     expect(readSkillPluginsConfig(cwd)).toEqual([]);
+  });
+
+  it('rejects a schema-invalid plugin configuration before selectors are consumed', () => {
+    const cwd = cwdDir('invalid-config');
+    safeMkdir(cwd, { recursive: true });
+    const configPath = path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME);
+    safeWriteFile(configPath, JSON.stringify({ plugins: [123] }));
+
+    expect(() => loadSkillPluginsConfigAtPath(configPath)).toThrow('[PLUGIN_CONFIG_INVALID]');
+    expect(readSkillPluginsConfig(cwd)).toEqual([]);
+  });
+
+  it('rejects a plugin configuration directory before parsing', () => {
+    const cwd = cwdDir('config-directory');
+    const configPath = path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME);
+    safeMkdir(configPath, { recursive: true });
+
+    expect(() => loadSkillPluginsConfigAtPath(configPath)).toThrow('regular file');
   });
 
   it('fails closed when the trust decision is omitted', async () => {
