@@ -4,15 +4,13 @@ import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secur
 import { auditChain } from './audit-chain.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
-import { readJson } from './foundation/json.js';
 import { setRegisteredEnv } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
-import { getInjectionSignalPath } from './injection-signal.js';
+import { getInjectionSignalPath, loadInjectionSignalAtPath } from './injection-signal.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import type { MissionState } from './mission-types.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
 export { isInjectionSuspected } from './injection-signal.js';
 import {
   firstJsonObject,
@@ -201,9 +199,9 @@ export function setInjectionSuspected(suspected: boolean = true, scope: string =
   try {
     let currentSignal: { scopes: string[] } = { scopes: [] };
     if (safeExistsSync(signalPath)) {
-      const storedSignal = readJson<unknown>(signalPath);
+      const storedSignal = loadInjectionSignalAtPath(signalPath);
       currentSignal = {
-        scopes: isRecord(storedSignal) ? stringArray(storedSignal.scopes) : [],
+        scopes: storedSignal?.scopes || [],
       };
     }
 
