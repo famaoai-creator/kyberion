@@ -107,6 +107,24 @@ describe('relationship-graph-store', () => {
       ).toThrow(/unsupported source/);
     });
 
+    it('rejects schema-invalid interactions before writing a new node', () => {
+      expect(() =>
+        recordInteraction({
+          personSlug: 'invalid-interaction',
+          org: 'nbs',
+          source: 'voice-actuator',
+          interaction: {
+            at: 'not-a-timestamp',
+            summary: 'must not be persisted',
+          } as unknown as {
+            at: string;
+            summary: string;
+          },
+        })
+      ).toThrow(/Invalid catalog relationship-node|valid timestamp/);
+      expect(readNode('nbs', 'invalid-interaction')).toBeNull();
+    });
+
     it('rejects path-traversal in slugs', () => {
       expect(() =>
         recordInteraction({
