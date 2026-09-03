@@ -15372,6 +15372,19 @@ path-bound catalogが返すcanonical payloadを保存・読込へ統一した。
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、
 Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 787
+
+SX-03／SX-04／SX-08 のproject operational state／tenant rate-limit state writerを再監査し、normalizeまたは
+quota更新後のstateに対するcatalog validation結果を捨て、元のstateをraw writeしていたため修正した。project／tier／tenant
+path、mission／track／source同期、rate-limitのlock／refill／exempt persona／invalid fallback semanticsは維持し、runtime
+stateの保存値を検証済みcanonical payloadへ統一した。project stateのmetadata混入とquota enforcement後のcanonical stateを
+回帰で確認した。
+
+検証: project operational state／state sync／tenant rate limiter **3 files / 15 tests passed**、root typecheck、対象lint、
+Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の
+追加script／state loader、Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は
+未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
