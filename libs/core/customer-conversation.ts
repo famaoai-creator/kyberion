@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJsonIfPresent } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale } from './locale-normalize.js';
@@ -20,6 +20,7 @@ import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   appendDealNote,
   getActiveDealForChannel,
+  loadPriceBook,
   openDeal,
   summarizeDealForConversation,
   type DealRecord,
@@ -67,6 +68,28 @@ const ESCALATION_MARKER = '[NEEDS_OPERATOR]';
 const CONCIERGE_ESCALATION_HOLD_REPLY_KEY = 'concierge_escalation_hold_reply';
 const ESCALATION_HOLD_REPLY_FALLBACK_EN = 'We will confirm and get back to you shortly.';
 
+const SOLUTION_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/solution-catalog.schema.json'
+);
+
+/** Load customer-facing solution claims only through the catalog boundary. */
+export function loadSolutionCatalogAtPath(filePath: string): Record<string, unknown> | null {
+  try {
+    const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+    if (!safeLstat(safeFilePath).isFile()) return null;
+    return defineCatalog<Record<string, unknown>>({
+      id: 'solution-catalog',
+      path: safeFilePath,
+      schema: SOLUTION_CATALOG_SCHEMA_PATH,
+    }).load();
+  } catch (error: unknown) {
+    logger.warn(
+      `[customer-conversation] ignoring invalid solution catalog ${filePath}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
+}
+
 /**
  * Resolves the language-appropriate "we will confirm and get back to you"
  * phrase. `explicitLanguage` is the customer's bound language (free text,
@@ -111,20 +134,10 @@ function loadGroundingSources(tenantSlug: string): {
     pathResolver.knowledge('public/sales/solution-catalog.json'),
     { allowMissingLeaf: true }
   );
-  const catalog = readJsonIfPresent(catalogPath);
+  const catalog = loadSolutionCatalogAtPath(catalogPath);
   if (catalog) sources.push('solution-catalog');
 
-  const priceBookPath =
-    [
-      assertSafeRepositoryPath(
-        pathResolver.knowledge(path.join('confidential', tenantSlug, 'sales', 'price-book.json')),
-        { allowMissingLeaf: true }
-      ),
-      assertSafeRepositoryPath(pathResolver.knowledge('product/sales/price-book.json'), {
-        allowMissingLeaf: true,
-      }),
-    ].find((candidate) => safeExistsSync(candidate)) || '';
-  const priceBook = priceBookPath ? readJsonIfPresent(priceBookPath) : null;
+  const priceBook = loadPriceBook(tenantSlug);
   if (priceBook) sources.push('price-book');
 
   const tenantSalesDir = assertSafeRepositoryPath(
