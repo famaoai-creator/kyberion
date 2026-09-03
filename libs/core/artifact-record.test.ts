@@ -67,6 +67,24 @@ describe('artifact-record', () => {
     });
   });
 
+  it('persists the catalog canonical payload after quality metadata is added', () => {
+    const artifact = {
+      ...createArtifactRecord({
+        artifact_id: 'ART-QUALITY-DOC',
+        project_id: 'PRJ-QUALITY',
+        kind: 'markdown',
+        storage_class: 'artifact_store',
+        path: 'active/shared/tmp/quality-doc.md',
+      }),
+      $schema: 'https://example.invalid/runtime-metadata.json',
+    } as Parameters<typeof saveArtifactRecord>[0] & { $schema: string };
+
+    const filePath = saveArtifactRecord(artifact);
+    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    expect(parsed.$schema).toBeUndefined();
+    expect(loadArtifactRecord('ART-QUALITY-DOC')?.artifact_id).toBe('ART-QUALITY-DOC');
+  });
+
   it('rejects artifact ids that could escape the artifact-record namespace', () => {
     expect(() => loadArtifactRecord('../outside')).toThrow('[artifact-record] invalid artifact id');
   });

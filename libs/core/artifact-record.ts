@@ -89,23 +89,27 @@ export function validateArtifactRecord(value: unknown): value is ArtifactRecord 
 }
 
 export function saveArtifactRecord(record: ArtifactRecord): string {
-  if (!validateArtifactRecord(record)) {
-    const errors = (ensureValidator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+  const filePath = artifactPath(record.artifact_id);
+  let canonicalInput: ArtifactRecord;
+  try {
+    canonicalInput = artifactRecordCatalog(filePath).validate(record, filePath);
+  } catch (error) {
+    throw new Error(
+      `Invalid artifact record: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
-    throw new Error(`Invalid artifact record: ${errors.join('; ')}`);
   }
   const artifactDir = assertSafeRepositoryPath(ARTIFACT_DIR, { allowMissingLeaf: true });
   if (!safeExistsSync(artifactDir)) safeMkdir(artifactDir, { recursive: true });
-  const deliverableKind = inferDeliverableKind(record.kind);
+  const deliverableKind = inferDeliverableKind(canonicalInput.kind);
   const qualityReport = deliverableKind
     ? evaluateDeliverableQuality(deliverableKind, {
-        ...record,
-        text: record.preview_text,
+        ...canonicalInput,
+        text: canonicalInput.preview_text,
       })
     : null;
   const metadata = {
-    ...(record.metadata || {}),
+    ...(canonicalInput.metadata || {}),
     ...(qualityReport
       ? {
           quality_kind: qualityReport.kind,
@@ -116,23 +120,26 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
         }
       : {}),
   };
-  const filePath = artifactPath(record.artifact_id);
-  safeWriteFile(filePath, JSON.stringify({ ...record, metadata }, null, 2));
+  const canonicalRecord = artifactRecordCatalog(filePath).validate(
+    { ...canonicalInput, metadata },
+    filePath
+  );
+  safeWriteFile(filePath, `${JSON.stringify(canonicalRecord, null, 2)}\n`);
   appendArtifactOwnershipRecord(
     createArtifactOwnershipRecord({
-      artifact_id: record.artifact_id,
-      tenant_slug: record.tenant_slug,
-      organization_id: record.organization_id,
-      project_id: record.project_id,
-      mission_id: record.mission_id,
-      task_session_id: record.task_session_id,
-      kind: record.kind,
-      storage_class: record.storage_class,
-      path: record.path,
-      external_ref: record.external_ref,
-      ...(metadata ? { metadata } : {}),
-      evidence_refs: Array.isArray((metadata as any)?.evidence_refs)
-        ? ((metadata as any).evidence_refs as string[])
+      artifact_id: canonicalRecord.artifact_id,
+      tenant_slug: canonicalRecord.tenant_slug,
+      organization_id: canonicalRecord.organization_id,
+      project_id: canonicalRecord.project_id,
+      mission_id: canonicalRecord.mission_id,
+      task_session_id: canonicalRecord.task_session_id,
+      kind: canonicalRecord.kind,
+      storage_class: canonicalRecord.storage_class,
+      path: canonicalRecord.path,
+      external_ref: canonicalRecord.external_ref,
+      ...(canonicalRecord.metadata ? { metadata: canonicalRecord.metadata } : {}),
+      evidence_refs: Array.isArray((canonicalRecord.metadata as any)?.evidence_refs)
+        ? ((canonicalRecord.metadata as any).evidence_refs as string[])
         : [],
     })
   );
