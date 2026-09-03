@@ -13733,6 +13733,12 @@ SX-03／SX-04 のbackground review nudge stateを再監査し、session別の非
 
 検証: background review nudge **1 file / 4 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 579
+
+SX-03／SX-04 のaudio device leaseを再監査し、stale lease判定がraw `readJson`と局所的な期限フィールド検査だけで行われ、lease recordのschema・regular-file境界を共有していなかった残存を修正した。`audio-device-lease.schema.json`とlock pathに結び付くcanonical loaderを追加し、acquire／heartbeatの保存とstale判定をstrict schemaへ統合した。不正・未知フィールド・非regular lockはstale扱いで安全に置換し、既存のexclusive acquire、TTL／heartbeat、release semanticsは維持している。
+
+検証: audio device lease **1 file / 4 tests passed**。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
