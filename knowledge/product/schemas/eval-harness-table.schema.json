@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/eval-harness-table.schema.json",
+  "title": "Eval harness table",
+  "description": "Named configurations used by the deterministic evaluation harness.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name"],
+    "properties": {
+      "name": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$" },
+      "model": { "type": "string" },
+      "noTools": { "type": "boolean" },
+      "systemPrompt": { "type": "string" },
+      "facet_request": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "persona": { "type": "string", "minLength": 1 },
+          "policies": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "instructions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "output_contract": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
