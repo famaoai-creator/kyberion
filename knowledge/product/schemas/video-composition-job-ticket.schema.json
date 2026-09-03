@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "video-composition-job-ticket.schema.json",
+  "title": "Video Composition Job Ticket",
+  "description": "Governed persisted state for an asynchronous video composition job.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "job_id",
+    "status",
+    "created_at",
+    "updated_at",
+    "bundle_dir",
+    "output_format",
+    "await_completion",
+    "backend_rendering_enabled",
+    "backend_render_backend"
+  ],
+  "properties": {
+    "job_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["queued", "running", "completed", "failed", "cancelled"]
+    },
+    "created_at": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string", "minLength": 1 },
+    "bundle_dir": { "type": "string", "minLength": 1 },
+    "output_format": { "type": "string", "minLength": 1 },
+    "output_target_path": { "type": "string", "minLength": 1 },
+    "await_completion": { "type": "boolean" },
+    "detached_background": { "type": "boolean" },
+    "backend_rendering_enabled": { "type": "boolean" },
+    "backend_render_backend": { "type": "string", "minLength": 1 },
+    "artifact_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "rendered_output_path": { "type": "string", "minLength": 1 },
+    "diagnostics": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "created_at": { "type": "string", "minLength": 1 },
+        "started_at": { "type": "string", "minLength": 1 },
+        "finished_at": { "type": "string", "minLength": 1 },
+        "duration_ms": { "type": "number", "minimum": 0 },
+        "render_degraded": { "type": "boolean" },
+        "render_degraded_from": { "type": "string", "minLength": 1 },
+        "render_degradation_reason": { "type": "string", "minLength": 1 },
+        "terminal_status": {
+          "type": "string",
+          "enum": ["completed", "failed", "cancelled"]
+        },
+        "cancellation_reason": { "type": "string", "minLength": 1 },
+        "cancellation_requested_at": { "type": "string", "minLength": 1 },
+        "backend_exit_signal": { "type": ["string", "null"] },
+        "backend_exit_code": { "type": ["number", "null"] },
+        "backend_cancelled": { "type": "boolean" },
+        "backend_timed_out": { "type": "boolean" },
+        "last_error": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
