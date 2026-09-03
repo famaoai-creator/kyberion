@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
-import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import {
   applyBrowserOnboarding,
   getBrowserOnboardingState,
@@ -14,6 +14,10 @@ import {
   writeTenantProfile,
 } from '@agent/core/tenant-registry';
 import { loadNotificationPreferences } from '@agent/core/operator-notifications';
+import {
+  loadPersonalAgentIdentityAtPath,
+  loadPersonalIdentityAtPath,
+} from '@agent/core/personal-identity-reader';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadSurfaceManifest } from '@agent/core/surface-runtime';
@@ -321,7 +325,7 @@ export async function POST(req: NextRequest) {
             const identityPath = path.join(profileRoot, 'my-identity.json');
             const safeIdentityPath = resolveExistingProfileFile(identityPath);
             const identity = safeIdentityPath
-              ? readJson<Record<string, unknown>>(safeIdentityPath)
+              ? loadPersonalIdentityAtPath(safeIdentityPath) || {}
               : { name: 'user', language: 'ja', interaction_style: 'Concierge' };
             identity.avatar_path = 'avatar.png';
             identity.avatar_source = avatarSource === 'camera' ? 'camera' : 'upload';
@@ -392,7 +396,7 @@ export async function POST(req: NextRequest) {
         secureIo.withSensitivePathMediation(() => {
           const safeIdentityPath = resolveExistingProfileFile(identityPath);
           const currentIdentity = safeIdentityPath
-            ? readJson<Record<string, unknown>>(safeIdentityPath)
+            ? loadPersonalIdentityAtPath(safeIdentityPath) || {}
             : {};
           const currentTenant = readTenantProfile(activeSlug) || {
             tenant_slug: activeSlug,
@@ -403,7 +407,7 @@ export async function POST(req: NextRequest) {
           };
           const safeAgentPath = resolveExistingProfileFile(agentPath);
           const currentAgent = safeAgentPath
-            ? readJson<Record<string, unknown>>(safeAgentPath)
+            ? loadPersonalAgentIdentityAtPath(safeAgentPath) || {}
             : {};
           const agentId = (
             agentIdInput || String(currentAgent.agent_id || 'sovereign-agent')

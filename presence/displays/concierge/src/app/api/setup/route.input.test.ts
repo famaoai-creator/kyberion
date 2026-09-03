@@ -39,6 +39,8 @@ vi.mock('@agent/core/profile-root', () => ({
 }));
 vi.mock('@agent/core/path-resolver', () => ({
   pathResolver: {
+    rootDir: vi.fn(() => '/tmp/repo'),
+    knowledge: vi.fn((value: string) => `/tmp/repo/knowledge/${value}`),
     rootResolve: vi.fn((value: string) => `/tmp/repo/${value}`),
     toRepoRelative: vi.fn((value: string) => value),
   },
