@@ -22,33 +22,22 @@
 
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
+import {
+  loadGoldenOutputRegistryAtPath,
+  loadGoldenOutputSnapshotAtPath,
+  type GoldenOutputRegistryEntry,
+  type GoldenOutputSnapshot,
+} from '@agent/core/golden-output';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
-import { nowIso, readJson } from '@agent/core/foundation';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { nowIso } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-
-interface GoldenRegistryEntry {
-  /** Stable pipeline identifier (matches `id` field in the ADF JSON). */
-  id: string;
-  /** Path to the ADF pipeline JSON, relative to project root. */
-  pipeline: string;
-  /** Optional human-readable note for why this pipeline is in the golden set. */
-  note?: string;
-  /** Optional input context to seed the run. */
-  input?: Record<string, unknown>;
-  /** Fields to elide from comparison (dot-paths into the result context). */
-  ignore_paths?: string[];
-}
-
-interface GoldenSnapshot {
-  generated_at: string;
-  pipeline_id: string;
-  pipeline_path: string;
-  result_hash: string;
-  /** Normalized projection of the result (the actual snapshot). */
-  result: unknown;
-}
 
 const ROOT = pathResolver.rootDir();
 const REGISTRY_PATH = path.join(ROOT, 'tests', 'golden', 'pipelines.json');
@@ -74,18 +63,18 @@ const DEFAULT_IGNORE_PATHS = [
   '_persistedAt',
 ];
 
-function loadRegistry(): GoldenRegistryEntry[] {
+function loadRegistry(): GoldenOutputRegistryEntry[] {
   if (!safeExistsSync(REGISTRY_PATH)) return [];
-  return readJson<GoldenRegistryEntry[]>(REGISTRY_PATH);
+  return loadGoldenOutputRegistryAtPath(REGISTRY_PATH);
 }
 
-function loadSnapshot(id: string): GoldenSnapshot | null {
+function loadSnapshot(id: string): GoldenOutputSnapshot | null {
   const p = path.join(SNAPSHOTS_DIR, `${id}.json`);
   if (!safeExistsSync(p)) return null;
-  return readJson<GoldenSnapshot>(p);
+  return loadGoldenOutputSnapshotAtPath(p);
 }
 
-function writeSnapshot(snapshot: GoldenSnapshot): void {
+function writeSnapshot(snapshot: GoldenOutputSnapshot): void {
   withExecutionContext('ecosystem_architect', () => {
     if (!safeExistsSync(SNAPSHOTS_DIR)) safeMkdir(SNAPSHOTS_DIR, { recursive: true });
     const p = path.join(SNAPSHOTS_DIR, `${snapshot.pipeline_id}.json`);
@@ -146,7 +135,10 @@ async function runPipeline(
       inputPath: string,
       options?: { context?: Record<string, unknown>; quiet?: boolean }
     ) => Promise<unknown>
-  )(path.join(ROOT, pipelinePath), { context: input, quiet: true });
+  )(assertSafeRepositoryPath(path.join(ROOT, pipelinePath), { allowMissingLeaf: false }), {
+    context: input,
+    quiet: true,
+  });
 }
 
 interface Diagnostic {
@@ -155,7 +147,10 @@ interface Diagnostic {
   message: string;
 }
 
-async function checkOne(entry: GoldenRegistryEntry, rebaseline: boolean): Promise<Diagnostic[]> {
+async function checkOne(
+  entry: GoldenOutputRegistryEntry,
+  rebaseline: boolean
+): Promise<Diagnostic[]> {
   const diags: Diagnostic[] = [];
   let result: unknown;
   try {
@@ -171,7 +166,7 @@ async function checkOne(entry: GoldenRegistryEntry, rebaseline: boolean): Promis
 
   const normalized = normalizeResult(result, entry.ignore_paths ?? []);
   const newHash = hashResult(normalized);
-  const newSnap: GoldenSnapshot = {
+  const newSnap: GoldenOutputSnapshot = {
     generated_at: nowIso(),
     pipeline_id: entry.id,
     pipeline_path: entry.pipeline,
