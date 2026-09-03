@@ -9121,6 +9121,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/service-connection-document.schema.json",
+      "tier": "public",
+      "size": 361,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/service-connection-readiness.schema.json",
       "tier": "public",
       "size": 1003,

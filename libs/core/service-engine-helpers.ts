@@ -1,13 +1,13 @@
 import { classifyError } from './error-classifier.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { createLogger } from './logger.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 const logger = createLogger('service-engine-helpers');
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveRepositoryPathToken } from './path-token-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';
-import { assertSafeRepositoryPath } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 import { secretGuard } from './secret-guard.js';
 import { transform } from './transformer.js';
 
@@ -26,6 +26,23 @@ export const DEFAULT_RETRY_POLICY: Required<RetryPolicy> = {
   factor: 2,
   jitter: true,
 };
+
+const SERVICE_CONNECTION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-connection-document.schema.json'
+);
+
+function serviceConnectionCatalogAtPath(filePath: string) {
+  return defineCatalog<Record<string, unknown>>({
+    id: 'service-connection-document',
+    path: filePath,
+    schema: SERVICE_CONNECTION_SCHEMA_PATH,
+  });
+}
+
+function loadServiceConnectionAtPath(filePath: string): Record<string, unknown> {
+  if (!safeLstat(filePath).isFile()) throw new Error(`Service connection is not a regular file`);
+  return serviceConnectionCatalogAtPath(filePath).load();
+}
 
 function isPlainObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -49,7 +66,7 @@ export function loadConnectionWithFallback(serviceId: string): Record<string, an
       const safeConnectionPath = assertSafeRepositoryPath(connectionPath, {
         allowMissingLeaf: true,
       });
-      const primary = readJson<Record<string, unknown>>(safeConnectionPath);
+      const primary = loadServiceConnectionAtPath(safeConnectionPath);
       if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
     } catch (err) {
       logger.warn(`suppressed error in loadConnectionWithFallback: ${err}`);
@@ -63,7 +80,7 @@ export function loadConnectionWithFallback(serviceId: string): Record<string, an
       pathResolver.resolve(`knowledge/personal/connections/${normalizedServiceId}.json`),
       { allowMissingLeaf: true }
     );
-    const fallback = readJson<Record<string, unknown>>(fallbackPath);
+    const fallback = loadServiceConnectionAtPath(fallbackPath);
     if (fallback && typeof fallback === 'object' && Object.keys(fallback).length > 0)
       return fallback;
   } catch (err) {
