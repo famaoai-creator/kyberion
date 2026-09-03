@@ -8,7 +8,7 @@
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
 import { assertProjectTrustApproval } from './project-trust.js';
 import {
@@ -154,13 +154,11 @@ export function registerDiscoveredExternalLifecycleHooks(
         }
         assertProjectTrustApproval(approvalId, candidate.path);
       }
-      const parsed = readJson<unknown>(candidate.path);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('config root must be an object');
-      }
-      bridges.push(
-        registerExternalLifecycleHooks(engine, parsed as Record<string, unknown>, candidate.source)
+      const parsed = parseSafeJsonObjectValue(
+        readJson<unknown>(candidate.path),
+        `external hook config ${candidate.path}`
       );
+      bridges.push(registerExternalLifecycleHooks(engine, parsed, candidate.source));
     } catch (error) {
       skipped.push({
         path: candidate.path,
