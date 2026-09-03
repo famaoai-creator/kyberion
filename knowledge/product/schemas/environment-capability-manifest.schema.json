@@ -18,6 +18,11 @@
       "description": "ISO date or semver-like; bumped when capabilities change."
     },
     "description": { "type": "string" },
+    "signature": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Optional HMAC-SHA256 signature verified when the signing key is configured."
+    },
     "capabilities": {
       "type": "array",
       "items": { "$ref": "#/definitions/Capability" }
