@@ -235,6 +235,10 @@
       "types": "./dist/knowledge-scope.d.ts",
       "default": "./dist/knowledge-scope.js"
     },
+    "./knowledge-taxonomy": {
+      "types": "./dist/knowledge-taxonomy.d.ts",
+      "default": "./dist/knowledge-taxonomy.js"
+    },
     "./ranking-signals": {
       "types": "./dist/ranking-signals.d.ts",
       "default": "./dist/ranking-signals.js"

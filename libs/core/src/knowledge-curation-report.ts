@@ -28,6 +28,10 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import {
+  loadKnowledgeTaxonomyAtPath,
+  type KnowledgeTaxonomyDirectoryDefault,
+} from '../knowledge-taxonomy.js';
+import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
@@ -75,9 +79,6 @@ const curationSloCatalogs = new Map<
   string,
   GovernedCatalog<CurationSloConfig & { version: string }>
 >();
-const TAXONOMY_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/knowledge-taxonomy.schema.json'
-);
 
 function safeCurationOverridePath(override: string | undefined, canonical: string): string {
   if (!override) return canonical;
@@ -394,35 +395,10 @@ export function loadCurationSloConfig(): CurationSloConfig {
   }
 }
 
-interface TaxonomyDirectoryDefault {
-  path_prefix: string;
-  kind: string;
-}
-
-interface TaxonomyCatalogPayload {
-  version: string;
-  directory_defaults?: TaxonomyDirectoryDefault[];
-}
-
-const taxonomyCatalogs = new Map<string, GovernedCatalog<TaxonomyCatalogPayload>>();
-
-function taxonomyCatalog(filePath: string): GovernedCatalog<TaxonomyCatalogPayload> {
-  const cached = taxonomyCatalogs.get(filePath);
-  if (cached) return cached;
-  const catalog = defineCatalog<TaxonomyCatalogPayload>({
-    id: 'knowledge-taxonomy',
-    path: filePath,
-    schema: TAXONOMY_SCHEMA_PATH,
-  });
-  taxonomyCatalogs.set(filePath, catalog);
-  return catalog;
-}
-
-function loadTaxonomyDirectoryDefaults(): TaxonomyDirectoryDefault[] {
+function loadTaxonomyDirectoryDefaults(): KnowledgeTaxonomyDirectoryDefault[] {
   const filePath = taxonomyPath();
   try {
-    const parsed = taxonomyCatalog(filePath).load();
-    return Array.isArray(parsed.directory_defaults) ? parsed.directory_defaults : [];
+    return loadKnowledgeTaxonomyAtPath(filePath).directory_defaults;
   } catch {
     return [];
   }
@@ -471,7 +447,7 @@ function extractFrontmatterValue(content: string, key: string): string | undefin
 
 function kindForPath(
   relPath: string,
-  directoryDefaults: TaxonomyDirectoryDefault[]
+  directoryDefaults: KnowledgeTaxonomyDirectoryDefault[]
 ): string | undefined {
   const normalized = relPath.replace(/\\/g, '/');
   for (const entry of directoryDefaults) {
@@ -489,7 +465,7 @@ interface ScannedDoc {
 
 function scanMarkdownDocs(
   root: string,
-  directoryDefaults: TaxonomyDirectoryDefault[],
+  directoryDefaults: KnowledgeTaxonomyDirectoryDefault[],
   out: ScannedDoc[]
 ): void {
   let entries: string[];
