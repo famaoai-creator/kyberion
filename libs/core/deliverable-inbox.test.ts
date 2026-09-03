@@ -35,6 +35,7 @@ const secureIo = vi.hoisted(() => ({
     fs.writeFileSync(filePath, data);
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
@@ -77,6 +78,12 @@ describe('deliverable inbox', () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-inbox-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    const schemaDir = path.join(tmpRoot, 'knowledge/product/schemas');
+    fs.mkdirSync(schemaDir, { recursive: true });
+    fs.copyFileSync(
+      path.resolve('knowledge/product/schemas/deliverable-inbox-entry.schema.json'),
+      path.join(schemaDir, 'deliverable-inbox-entry.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
   });
 
@@ -214,5 +221,31 @@ describe('deliverable inbox', () => {
       fs.rmSync(inboxPath, { force: true });
       fs.rmSync(targetPath, { force: true });
     }
+  });
+
+  it('rejects schema-invalid persisted entries before listing or updating', async () => {
+    const { listInboxEntries } = await import('./deliverable-inbox.js');
+    const inboxDir = path.join(tmpRoot, 'active/shared/inbox');
+    const inboxPath = path.join(inboxDir, 'entries.jsonl');
+    fs.mkdirSync(inboxDir, { recursive: true });
+    fs.writeFileSync(
+      inboxPath,
+      `${JSON.stringify({
+        entry_id: 'INBOX-INVALID',
+        title: 'Invalid entry',
+        artifact_paths: [],
+        summary: 'missing timestamps and status',
+      })}\n`
+    );
+
+    expect(() => listInboxEntries()).toThrow(/Invalid catalog deliverable-inbox-entry/);
+  });
+
+  it('rejects a directory at the inbox entries path', async () => {
+    const { listInboxEntries } = await import('./deliverable-inbox.js');
+    const inboxDir = path.join(tmpRoot, 'active/shared/inbox');
+    fs.mkdirSync(path.join(inboxDir, 'entries.jsonl'), { recursive: true });
+
+    expect(() => listInboxEntries()).toThrow(/entries must be a regular file/);
   });
 });
