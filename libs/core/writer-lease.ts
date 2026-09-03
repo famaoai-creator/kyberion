@@ -9,7 +9,9 @@
 
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { readJson, readJsonIfPresent } from './foundation/json.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { readJsonIfPresent } from './foundation/json.js';
+import * as pathResolver from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withLock, withLockSync } from './src/lock-utils.js';
 
@@ -32,6 +34,21 @@ export interface WriterLeaseMetricsSnapshot {
   renewed: number;
   released: number;
   rejected: number;
+}
+
+const WRITER_LEASE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/writer-lease.schema.json');
+const writerLeaseCatalogs = new Map<string, GovernedCatalog<FencedWriterLease>>();
+
+function writerLeaseCatalog(leasePath: string): GovernedCatalog<FencedWriterLease> {
+  const existing = writerLeaseCatalogs.get(leasePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<FencedWriterLease>({
+    id: 'writer-lease',
+    path: leasePath,
+    schema: WRITER_LEASE_SCHEMA_PATH,
+  });
+  writerLeaseCatalogs.set(leasePath, catalog);
+  return catalog;
 }
 
 const writerLeaseMetrics = new Map<string, WriterLeaseMetricsSnapshot>();
@@ -150,32 +167,21 @@ export function writerLeaseResourceId(leasePath: string): string {
 function readLease(leasePath: string): FencedWriterLease | undefined {
   const safeLeasePath = assertSafeRepositoryPath(leasePath, { allowMissingLeaf: true });
   if (!safeExistsSync(safeLeasePath)) return undefined;
-  let parsed: unknown;
   try {
-    parsed = readJson<unknown>(safeLeasePath);
-  } catch {
+    return writerLeaseCatalog(safeLeasePath).load();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Invalid catalog writer-lease')) {
+      throw new Error(`[WRITER_LEASE_CORRUPT] invalid lease: ${leasePath}`);
+    }
     throw new Error(`[WRITER_LEASE_CORRUPT] unreadable lease: ${leasePath}`);
   }
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error(`[WRITER_LEASE_CORRUPT] invalid lease: ${leasePath}`);
-  }
-  const candidate = parsed as Partial<FencedWriterLease>;
-  if (
-    typeof candidate.resource_id !== 'string' ||
-    typeof candidate.owner_id !== 'string' ||
-    !Number.isInteger(candidate.fence) ||
-    candidate.fence < 0 ||
-    !Number.isFinite(candidate.expires_at_ms)
-  ) {
-    throw new Error(`[WRITER_LEASE_CORRUPT] invalid lease fields: ${leasePath}`);
-  }
-  return candidate as FencedWriterLease;
 }
 
 function writeLease(leasePath: string, lease: FencedWriterLease): void {
   const safeLeasePath = assertSafeRepositoryPath(leasePath, { allowMissingLeaf: true });
+  const validated = writerLeaseCatalog(safeLeasePath).validate(lease, safeLeasePath);
   safeMkdir(path.dirname(safeLeasePath), { recursive: true });
-  safeWriteFile(safeLeasePath, `${JSON.stringify(lease, null, 2)}\n`);
+  safeWriteFile(safeLeasePath, `${JSON.stringify(validated, null, 2)}\n`);
 }
 
 function validateLeaseOptions(

@@ -88,6 +88,26 @@ describe('withFencedWriterLease (PI-16)', () => {
         fn: () => undefined,
       })
     ).rejects.toThrow('WRITER_LEASE_CORRUPT');
+
+    safeWriteFile(
+      leasePath,
+      JSON.stringify({
+        resource_id: 'mission:PI16-B',
+        owner_id: 'owner-a',
+        fence: 4,
+        expires_at_ms: clock + 1_000,
+        unexpected: true,
+      })
+    );
+    await expect(
+      withFencedWriterLease({
+        resourceId: 'mission:PI16-B',
+        ownerId: 'owner-c',
+        nowMs: () => clock,
+        leasePath,
+        fn: () => undefined,
+      })
+    ).rejects.toThrow('WRITER_LEASE_CORRUPT');
   });
 
   it('rejects a symlinked lease leaf before reading its contents', async () => {
