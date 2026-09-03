@@ -47,6 +47,7 @@ import {
   resolveScopeBudget,
 } from './mission-context-pack-knowledge.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import type {
   BuildMissionContextPackInput,
   MissionContextPack,
@@ -242,7 +243,7 @@ function buildTaskGuidance(input: {
     );
     if (safeExistsSync(dispatchManifestPath)) {
       try {
-        const parsed = readJson<{ records?: Array<Record<string, unknown>> }>(dispatchManifestPath);
+        const parsed = loadMissionWorkItemDispatchManifestAtPath(dispatchManifestPath);
         const currentItemId = input.workItem?.item_id;
         const currentTeamRole = String(
           input.workItem?.metadata && typeof input.workItem.metadata === 'object'

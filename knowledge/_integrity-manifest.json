@@ -8017,6 +8017,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-workitem-dispatch-manifest.schema.json",
+      "tier": "public",
+      "size": 1327,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mobile-app-profile-index.example.json",
       "tier": "public",
       "size": 462,

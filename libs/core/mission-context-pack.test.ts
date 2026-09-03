@@ -17,6 +17,7 @@ import {
   type MissionContextPack,
   type MissionStateSummary,
 } from './mission-context-pack.js';
+import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import { _resetKnowledgeSlicesCacheForTests } from './knowledge-slices.js';
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import { projectRecordPath, saveProjectRecord } from './project-registry.js';
@@ -941,6 +942,12 @@ describe('mission-context-pack', () => {
   it('seeds fast-lane context with prior work item outputs from the same mission', () => {
     seedPriorWorkItemDispatchManifest();
 
+    expect(
+      loadMissionWorkItemDispatchManifestAtPath(
+        `${missionPath}/evidence/workitem-dispatch-manifest.json`
+      ).mission_id
+    ).toBe(missionId);
+
     const pack = makePack();
 
     expect(pack.task_guidance?.seed).toEqual(
@@ -950,6 +957,29 @@ describe('mission-context-pack', () => {
         expect.stringContaining('Prior work item: Prior implementation slice'),
         expect.stringContaining('Prior artifact: knowledge/product/architecture/prior-slice.md'),
       ])
+    );
+  });
+
+  it('rejects a malformed dispatch manifest before context projection', () => {
+    const evidenceDir = `${missionPath}/evidence`;
+    safeMkdir(evidenceDir, { recursive: true });
+    const manifestPath = `${evidenceDir}/workitem-dispatch-manifest.json`;
+    safeWriteFile(
+      manifestPath,
+      JSON.stringify({ mission_id: missionId, records: [], unknown: true })
+    );
+
+    expect(() => loadMissionWorkItemDispatchManifestAtPath(manifestPath)).toThrow(
+      'Invalid catalog mission-workitem-dispatch-manifest'
+    );
+  });
+
+  it('rejects a dispatch manifest directory before schema loading', () => {
+    const manifestPath = `${missionPath}/evidence/workitem-dispatch-manifest.json`;
+    safeMkdir(manifestPath, { recursive: true });
+
+    expect(() => loadMissionWorkItemDispatchManifestAtPath(manifestPath)).toThrow(
+      'manifest must be a regular file'
     );
   });
 
