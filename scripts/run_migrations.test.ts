@@ -174,5 +174,13 @@ export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun
     expect(source).toContain('readMigrationState');
     expect(source).toContain('writeMigrationState');
     expect(source).not.toContain('parseSafeJsonObjectValue');
+
+    const stateSource = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/migration-state.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(stateSource).toContain('migrationStateCatalog(safeStatePath).load()');
+    expect(stateSource).not.toContain('readJson');
   });
 });

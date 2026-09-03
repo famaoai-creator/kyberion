@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJson } from './foundation/json.js';
 import { knowledge } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -32,10 +31,15 @@ export function readMigrationState(statePath: string): MigrationState {
   }
 
   try {
-    const parsed = readJson<unknown>(safeStatePath);
     try {
-      return migrationStateCatalog(safeStatePath).validate(parsed, safeStatePath);
-    } catch {
+      return migrationStateCatalog(safeStatePath).load();
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !error.message.startsWith('Invalid catalog migration-state')
+      ) {
+        throw error;
+      }
       // Preserve the runner's fail-safe behavior for a syntactically valid but
       // unusable state: rerunning migrations is safer than trusting it.
       return { applied: [] };
