@@ -6691,6 +6691,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/browser-runtime-session-summary.schema.json",
+      "tier": "public",
+      "size": 1071,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/browser-runtime-session.schema.json",
       "tier": "public",
       "size": 2037,
@@ -6700,6 +6706,12 @@
       "path": "product/schemas/browser-session-snapshot.schema.json",
       "tier": "public",
       "size": 1862,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/browser-snapshot-summary.schema.json",
+      "tier": "public",
+      "size": 586,
       "type": "json"
     },
     {
