@@ -1,5 +1,5 @@
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   resolveDocumentContentsLabel,
@@ -576,7 +576,10 @@ export function normalizeSpreadsheetDocumentBrief(rootDir: string, input: any): 
       path.resolve(rootDir, input.payload.protocol_path),
       { allowMissingLeaf: true }
     );
-    protocol = readJson<unknown>(protocolPath);
+    protocol = parseSafeJsonObjectValue(
+      readJson<unknown>(protocolPath),
+      `spreadsheet protocol ${protocolPath}`
+    );
   }
   if (!protocol && (!Array.isArray(input.payload.columns) || !Array.isArray(input.payload.rows))) {
     throw new Error(

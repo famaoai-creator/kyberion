@@ -15859,6 +15859,16 @@ malformed configのskip semanticsは維持し、approved configのdangerous key�
 検証: external hook discovery **1 file / 7 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 831
+
+SX-03／SX-04／SX-10 のmedia spreadsheet `protocol_path`経路を再監査し、path scope検証後のJSONを未検証のまま
+document briefへ取り込んでいた残存を修正した。foundationの`parseSafeJsonObjectValue`を接続し、object shapeとネストした
+危険JSON keyをXLSX protocolの後続compile前に拒否するようにした。既存のrepository path boundary、semantic columns／rows fallback、
+XLSX normalization semanticsは維持し、valid protocolとdangerous keyの回帰を追加した。
+
+検証: media document helper／media actuator **2 files / 63 tests（52 passed、11 skipped）**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
