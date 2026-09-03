@@ -6,6 +6,7 @@
 import * as path from 'node:path';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson, readJsonIfPresent } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import * as pathResolver from './path-resolver.js';
 import {
@@ -30,6 +31,17 @@ import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mi
 import { loadMissionManagementConfig } from './mission-management-config.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
+const MISSION_FOCUS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-focus.schema.json'
+);
+
+function missionFocusCatalog(filePath: string) {
+  return defineCatalog<{ mission_id?: string; ts?: string }>({
+    id: 'mission-focus',
+    path: filePath,
+    schema: MISSION_FOCUS_SCHEMA_PATH,
+  });
+}
 
 function getMissionStateValidator() {
   return (missionStateValidate ??= compileSchema(
@@ -98,7 +110,7 @@ export function readFocusedMissionId(missionFocusPath: string): string | null {
   if (!safeExistsSync(missionFocusPath)) return null;
   try {
     const safePath = assertSafeRepositoryPath(missionFocusPath);
-    const parsed = readJsonIfPresent<{ mission_id?: string }>(safePath);
+    const parsed = missionFocusCatalog(safePath).load();
     return typeof parsed?.mission_id === 'string' ? parsed.mission_id.toUpperCase() : null;
   } catch (_) {
     return null;
@@ -107,17 +119,9 @@ export function readFocusedMissionId(missionFocusPath: string): string | null {
 
 export function writeFocusedMissionId(missionFocusPath: string, missionId: string): void {
   const safePath = assertSafeRepositoryPath(missionFocusPath, { allowMissingLeaf: true });
-  safeWriteFile(
-    safePath,
-    JSON.stringify(
-      {
-        mission_id: missionId.toUpperCase(),
-        ts: nowIso(),
-      },
-      null,
-      2
-    )
-  );
+  const value = { mission_id: missionId.toUpperCase(), ts: nowIso() };
+  const validated = missionFocusCatalog(safePath).validate(value, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2));
 }
 
 export function checkPrerequisites(): void {
