@@ -99,6 +99,36 @@ describe('mission-graph-run-journal', () => {
     ).toThrow(/non-contiguous/);
   });
 
+  it('rejects a schema-invalid journal event before recovery', () => {
+    const missionId = 'MSN-GRAPH-JOURNAL-SCHEMA';
+    const runId = 'ME-SCHEMA-1';
+    const coordinationPath = `${pathResolver.missionDir(missionId, 'public')}/coordination`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(coordinationPath, { recursive: true, force: true });
+    });
+    const journal = withExecutionContext('mission_controller', () =>
+      openOrCreateMissionGraphRunJournal({ missionId, runId, taskIds: ['task-a'] })
+    );
+    withExecutionContext('mission_controller', () => {
+      safeWriteFile(
+        journal.path,
+        `${JSON.stringify({
+          version: 1,
+          sequence: 2,
+          run_id: runId,
+          mission_id: missionId,
+          event: 'node_state',
+          timestamp: new Date().toISOString(),
+          payload: { task_id: 'task-a' },
+          unexpected: true,
+        })}\n`
+      );
+    });
+    expect(() =>
+      withExecutionContext('mission_controller', () => loadMissionGraphRunJournal(missionId, runId))
+    ).toThrow(/Invalid catalog mission-graph-run-journal-event/);
+  });
+
   it('re-reads the sequence under the fence when two handles append after a restart', () => {
     const missionId = 'MSN-GRAPH-JOURNAL-3';
     const runId = 'ME-STALE-HANDLES-1';

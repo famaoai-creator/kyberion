@@ -14075,6 +14075,12 @@ SX-03／SX-04 のintent snapshot／drift persistenceを再監査し、既存のs
 
 検証: intent snapshot store **1 file / 12 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 636
+
+SX-03／SX-04 のmission graph-run journalを再監査し、graph recoveryの連番・mission／run binding・node payload検証はあるものの、永続JSONL event envelopeは手書きparserだけで受理される残存を修正した。専用event schemaとpath-bound canonical catalogを追加し、graph_started／node_state／graph_finishedのappend／load双方でversion・sequence・timestamp・payload shapeを検証するようにした。fenced writer、contiguous sequence、node state、finished status、symlinked coordination directoryの既存semanticsは維持している。
+
+検証: mission graph-run journal **1 file / 6 tests passed**、対象typecheck、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

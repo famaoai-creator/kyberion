@@ -8005,6 +8005,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-graph-run-journal-event.schema.json",
+      "tier": "public",
+      "size": 729,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-journal-policy.schema.json",
       "tier": "public",
       "size": 915,
