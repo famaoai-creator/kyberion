@@ -14,6 +14,8 @@ import { resolveActiveProfileRoot } from './profile-root.js';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
+  writePersonalAgentIdentityAtPath,
+  writePersonalIdentityAtPath,
 } from './personal-identity-state.js';
 import {
   loadOperatorProviderPreferencesAtPath,
@@ -197,12 +199,6 @@ function onboardingPath(name: string): string {
   });
 }
 
-function writeJson(filePath: string, value: unknown): void {
-  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  safeMkdir(path.dirname(safePath), { recursive: true });
-  safeWriteFile(safePath, JSON.stringify(value, null, 2));
-}
-
 function assertVoiceSampleRefs(sampleRefs: string[]): void {
   const sampleRoot = assertSafeRepositoryPath(path.resolve(profileRoot(), 'voice', 'samples'), {
     allowMissingLeaf: true,
@@ -285,7 +281,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         const artifacts: string[] = [];
         const identityPath = path.join(profileRoot(), 'my-identity.json');
         const existingIdentity = loadPersonalIdentityAtPath(identityPath) || {};
-        writeJson(identityPath, {
+        writePersonalIdentityAtPath(identityPath, {
           ...existingIdentity,
           name: draft.identity.name,
           language: draft.identity.language,
@@ -306,7 +302,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         artifacts.push(visionPath);
 
         const agentPath = path.join(profileRoot(), 'agent-identity.json');
-        writeJson(agentPath, {
+        writePersonalAgentIdentityAtPath(agentPath, {
           agent_id: draft.identity.agent_id,
           version: '1.0.0',
           role: 'Ecosystem Architect / Senior Partner',
