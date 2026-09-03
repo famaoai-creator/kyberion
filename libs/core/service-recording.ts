@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-recording.schema.json');
@@ -203,7 +203,12 @@ export function loadServiceRecordingAtPath(filePath: string): ServiceRecording {
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[SERVICE_RECORDING] recording must be a regular file: ${filePath}`);
   }
-  const validation = validateServiceRecording(readJson<unknown>(safeFilePath));
+  const recording = defineCatalog<ServiceRecording>({
+    id: 'service-recording',
+    path: safeFilePath,
+    schema: SCHEMA_PATH,
+  }).load();
+  const validation = validateServiceRecording(recording);
   if (!validation.value) {
     throw new Error(
       `[SERVICE_RECORDING] invalid recording at ${filePath}: ${validation.errors.join('; ')}`

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { DesktopRecording, DesktopRecordingStep } from './desktop-recording.js';
 import { chooseNativeOps } from './native-op-mapping.js';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
@@ -62,7 +62,12 @@ export function loadDesktopIntentDraftAtPath(
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[DESKTOP_INTENT] intent draft must be a regular file: ${filePath}`);
   }
-  const intent = validateDesktopIntentDraft(readJson<unknown>(safeFilePath));
+  const intent = defineCatalog<DesktopIntentDraft>({
+    id: 'desktop-intent',
+    path: safeFilePath,
+    schema: pathResolver.knowledge('product/schemas/desktop-intent.schema.json'),
+  }).load();
+  validateDesktopIntentDraft(intent);
   if (
     expectedSourceRecordingId !== undefined &&
     intent.source_recording_id !== expectedSourceRecordingId

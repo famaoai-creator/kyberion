@@ -4,7 +4,7 @@ import type { FocusedInputState } from './apple-event-bridge.js';
 import type { OsAutomationBridge } from './os-automation-bridge.js';
 import type { MacOSAutomationProbe } from './macos-automation-bridge.js';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { redactSensitiveString } from './network.js';
@@ -270,7 +270,12 @@ export function loadDesktopRecordingAtPath(filePath: string): DesktopRecording {
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[DESKTOP_RECORDING] recording must be a regular file: ${filePath}`);
   }
-  const validation = validateDesktopRecording(readJson<unknown>(safeFilePath));
+  const recording = defineCatalog<DesktopRecording>({
+    id: 'desktop-recording',
+    path: safeFilePath,
+    schema: pathResolver.knowledge('product/schemas/desktop-recording.schema.json'),
+  }).load();
+  const validation = validateDesktopRecording(recording);
   if (!validation.value) {
     throw new Error(
       `[DESKTOP_RECORDING] invalid recording at ${filePath}: ${validation.errors.join('; ')}`
