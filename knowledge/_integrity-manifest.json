@@ -6673,6 +6673,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/browser-onboarding-state.schema.json",
+      "tier": "public",
+      "size": 1149,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/browser-passkey-providers.schema.json",
       "tier": "public",
       "size": 819,
