@@ -3,7 +3,7 @@
   "$id": "https://kyberion.local/schemas/surface-mission-proposal-state.schema.json",
   "title": "Surface Mission Proposal State",
   "type": "object",
-  "required": ["surface", "channel", "threadTs", "proposal", "createdAt"],
+  "required": ["channel", "threadTs", "proposal", "createdAt"],
   "properties": {
     "surface": { "type": "string", "minLength": 1, "maxLength": 100 },
     "channel": { "type": "string", "minLength": 1, "maxLength": 500 },
