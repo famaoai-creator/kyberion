@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleAction } from './index.js';
+import serviceManifestSchema from '../../../../knowledge/product/schemas/service-manifest.schema.json';
 
 const mocks = vi.hoisted(() => ({
   resolveServiceBinding: vi.fn(),
@@ -87,12 +88,31 @@ vi.mock('@agent/core/cloudflare-os-control-plane', () => ({
 }));
 
 describe('service-actuator: RECONCILE with auth check', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mocks.retry.mockImplementation(async (fn: () => Promise<unknown>) => fn());
     mocks.derivePipelineStatus.mockImplementation((results: Array<{ status: string }>) =>
       results.every((entry) => entry.status === 'success') ? 'succeeded' : 'failed'
     );
+    const foundation = await import('@agent/core/foundation');
+    foundation.registerFoundationIo({
+      loadJson: <T>(filePath: string): T =>
+        String(filePath).endsWith('/service-manifest.schema.json')
+          ? (serviceManifestSchema as T)
+          : (JSON.parse(String(mocks.safeReadFile(filePath))) as T),
+      loadJsonIfPresent: <T>(filePath: string): T | null => {
+        try {
+          return JSON.parse(String(mocks.safeReadFile(filePath))) as T;
+        } catch {
+          return null;
+        }
+      },
+      appendFile: vi.fn(),
+      exists: (filePath: string) => mocks.safeExistsSync(filePath),
+      readFile: (filePath: string) => String(mocks.safeReadFile(filePath)),
+      stat: () => ({ mtimeMs: 0, size: 0 }),
+      writeFile: (filePath: string, content: string) => mocks.safeWriteFile(filePath, content),
+    });
   });
 
   it('rejects an external manifest path before reading it', async () => {
