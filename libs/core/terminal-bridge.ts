@@ -1,10 +1,11 @@
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
@@ -20,6 +21,25 @@ const logger = createLogger('terminal-bridge');
  */
 
 const RUNTIME_BASE = pathResolver.shared('runtime/terminal');
+const TERMINAL_SESSION_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/terminal-session-state.schema.json'
+);
+const TERMINAL_RESPONSE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/terminal-response.schema.json'
+);
+
+export interface TerminalSessionState {
+  pid: number;
+  status?: string;
+}
+
+interface TerminalResponse {
+  data?: {
+    message?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
 
 function pathSegment(value: string, label: string): string {
   const normalized = String(value || '').trim();
@@ -39,6 +59,44 @@ function runtimePath(sessionId: string, ...parts: string[]): string {
   return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
+function terminalSessionStateCatalogAtPath(filePath: string) {
+  return defineCatalog<TerminalSessionState>({
+    id: 'terminal-session-state',
+    path: filePath,
+    schema: TERMINAL_SESSION_STATE_SCHEMA_PATH,
+  });
+}
+
+function terminalResponseCatalogAtPath(filePath: string) {
+  return defineCatalog<TerminalResponse>({
+    id: 'terminal-response',
+    path: filePath,
+    schema: TERMINAL_RESPONSE_SCHEMA_PATH,
+  });
+}
+
+/** Load a ReflexTerminal state only after repository and regular-file checks. */
+export function loadTerminalSessionStateAtPath(filePath: string): TerminalSessionState | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+    return terminalSessionStateCatalogAtPath(safePath).load();
+  } catch {
+    return null;
+  }
+}
+
+/** Load the latest ReflexTerminal response through the governed catalog. */
+function loadTerminalResponseAtPath(filePath: string): TerminalResponse | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+    return terminalResponseCatalogAtPath(safePath).load();
+  } catch {
+    return null;
+  }
+}
+
 function listReflexTerminalSessions() {
   if (!safeExistsSync(RUNTIME_BASE)) return [];
   const sessions: Array<{
@@ -56,8 +114,8 @@ function listReflexTerminalSessions() {
       continue;
     }
     if (!safeExistsSync(stateFile)) continue;
-    try {
-      const state = readJson<{ pid: number; status?: string }>(stateFile);
+    const state = loadTerminalSessionStateAtPath(stateFile);
+    if (state) {
       process.kill(state.pid, 0);
       sessions.push({
         winId: 'rt-main',
@@ -66,8 +124,6 @@ function listReflexTerminalSessions() {
         status: state.status || 'running',
         pid: state.pid,
       });
-    } catch (_) {
-      // ignore dead or malformed sessions
     }
   }
   return sessions;
@@ -87,13 +143,11 @@ const STRATEGIES: Record<string, any> = {
           continue;
         }
         if (safeExistsSync(stateFile)) {
-          try {
-            const state = readJson<{ pid: number; status?: string }>(stateFile);
+          const state = loadTerminalSessionStateAtPath(stateFile);
+          if (state) {
             // Simple check if the process is still alive
             process.kill(state.pid, 0);
             return { winId: 'rt-main', sessionId: id, type: 'ReflexTerminal' };
-          } catch (_) {
-            // Process dead, cleanup state if needed?
           }
         }
       }
@@ -261,12 +315,7 @@ export const terminalBridge = {
         return '';
       }
       if (safeExistsSync(latestPath)) {
-        try {
-          const content = readJson<{ data?: { message?: string } }>(latestPath);
-          return content.data.message || '';
-        } catch (_) {
-          return '';
-        }
+        return loadTerminalResponseAtPath(latestPath)?.data?.message || '';
       }
       return '';
     }
