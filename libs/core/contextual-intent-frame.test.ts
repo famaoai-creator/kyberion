@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
-import { recordSchedulePreference } from './contextual-intent-memory.js';
+import {
+  recordSchedulePreference,
+  saveContextualIntentMemory,
+} from './contextual-intent-memory.js';
 
 describe('contextual-intent-frame', () => {
   const memoryPath = pathResolver.shared('runtime/test-contextual-intent-memory.json');
@@ -58,5 +61,16 @@ describe('contextual-intent-frame', () => {
     expect(buildContextualIntentFrame('来週の予定教えて').source_binding.selected).toBe(
       'browser_calendar'
     );
+  });
+
+  it('rejects schema-invalid memory before persisting it', () => {
+    expect(() =>
+      saveContextualIntentMemory({
+        version: '1.0.0',
+        schedule: {
+          default_calendar_source: 'unknown' as 'google_calendar',
+        },
+      })
+    ).toThrow(/Invalid catalog contextual-intent-memory/);
   });
 });
