@@ -13,6 +13,10 @@ import {
 import { loadProviderConfig } from './provider-config.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import {
+  loadPersonalAgentIdentityAtPath,
+  loadPersonalIdentityAtPath,
+} from './personal-identity-state.js';
+import {
   getLlmSelectionSnapshot,
   saveLlmSelectionPreferences,
   validateLlmSelectionPreferences,
@@ -275,7 +279,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         const now = nowIso();
         const artifacts: string[] = [];
         const identityPath = path.join(profileRoot(), 'my-identity.json');
-        const existingIdentity = readJson<Record<string, unknown>>(identityPath) || {};
+        const existingIdentity = loadPersonalIdentityAtPath(identityPath) || {};
         writeJson(identityPath, {
           ...existingIdentity,
           name: draft.identity.name,
@@ -462,9 +466,7 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
       const toolPreference = readJson<Record<string, unknown>>(
         onboardingPath('tool-runtime-policy.json')
       );
-      const identity = readJson<Record<string, unknown>>(
-        path.join(profileRoot(), 'my-identity.json')
-      );
+      const identity = loadPersonalIdentityAtPath(path.join(profileRoot(), 'my-identity.json'));
       const visionPath = path.join(profileRoot(), 'my-vision.md');
       const vision = String(
         identity?.vision ||
@@ -479,7 +481,9 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
         profile_root: profileRoot(),
         identity,
         vision,
-        agent_identity: readJson(path.join(profileRoot(), 'agent-identity.json')),
+        agent_identity: loadPersonalAgentIdentityAtPath(
+          path.join(profileRoot(), 'agent-identity.json')
+        ),
         onboarding: readJson(onboardingPath('browser-onboarding-state.json')),
         providers: providerPreference || {
           version: 'default',
