@@ -15705,6 +15705,16 @@ SX-06 の `report-review/stamp.ts` を再監査し、共有 `defineScript` は�
 
 検証: report-review stamp **1 file / 3 tests passed**、実機 `pnpm exec tsx scripts/report-review/stamp.ts presence/displays/presence-studio/static/onboarding.html --dry-run --json`（`ok: true`、action=`add`、対象HTML未変更）、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。SX-03 の追加script／state loader、SX-04 の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 816
+
+SX-06 の `report-review/server.ts` を再監査し、共有ハーネスを呼び出していても server protocol の `--dry-run`／`--check` が
+listener bind まで進み、起動時の `console.log` が `--json`／`--quiet` の共有出力契約を迂回する残存を修正した。対象・port・
+review scope を先に検証し、dry-run／check は `listening: false` の起動計画だけを返すようにした。通常起動時も startup summaryを
+ハーネスの出力へ統合し、localhost限定bind、CSRF token、origin検査、secure-io保存、lifecycle receiptの既存境界は維持した。
+不正portの拒否と dry-run での非bind を回帰テストに追加した。
+
+検証: report-review server／stamp **2 files / 5 tests passed**、実機 `pnpm exec tsx scripts/report-review/server.ts presence/displays/presence-studio/static/onboarding.html --dry-run --json`（`ok: true`、`listening: false`）、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。SX-03 の追加script／state loader、SX-04 の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
