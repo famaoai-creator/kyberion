@@ -14201,6 +14201,12 @@ SX-03 のtenant drift watchdogを再監査し、confidential mission stateの実
 
 検証: tenant drift／entrypoint **2 files / 3 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 657
+
+SX-03 の`run_migrations` state loaderを再監査し、`applied`配列のregular-file検査、JSON parse、重複／空ID判定、永続writeがscript内に分散していた残存を修正した。migration state専用schemaとcoreのcanonical reader／writerを追加し、syntax-invalid JSONは既存どおりエラー、syntax-validだが契約外のstateは既存どおり空stateへfail-safeする境界を共有化した。CLIの`readState`／`writeState`互換export、migrationの順序・rollback・dry-run semanticsは維持している。
+
+検証: migration runner **1 file / 6 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

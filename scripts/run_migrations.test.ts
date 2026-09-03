@@ -164,4 +164,15 @@ export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun
     safeWriteFile(STATE_PATH, '{"__proto__":{"polluted":true}}', { encoding: 'utf8' });
     expect(() => readState(STATE_PATH)).toThrow('dangerous JSON key');
   });
+
+  it('uses the canonical migration state boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/run_migrations.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('readMigrationState');
+    expect(source).toContain('writeMigrationState');
+    expect(source).not.toContain('parseSafeJsonObjectValue');
+  });
 });
