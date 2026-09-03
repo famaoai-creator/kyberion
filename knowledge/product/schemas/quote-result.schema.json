@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/quote-result.schema.json",
+  "title": "Deterministic Quote Result",
+  "description": "Customer-facing quote calculation persisted from the governed price book.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "currency", "lines", "total", "unquotable"],
+  "properties": {
+    "ok": { "const": true },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description", "task_kind", "hours", "rate_sku", "unit_price", "amount"],
+        "properties": {
+          "description": { "type": "string", "minLength": 1 },
+          "task_kind": { "type": "string", "minLength": 1 },
+          "hours": { "type": "number", "minimum": 0 },
+          "rate_sku": { "type": "string", "minLength": 1 },
+          "unit_price": { "type": "number", "minimum": 0 },
+          "amount": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "total": { "type": "number", "minimum": 0 },
+    "unquotable": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["task_kind", "reason"],
+        "properties": {
+          "task_kind": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

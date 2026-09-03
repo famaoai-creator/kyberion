@@ -15478,6 +15478,19 @@ knowledge index／integrity manifest生成。canonical full gateはこの追記�
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は
 未完了である。
 
+## 2026-09-04 再レビュー修正 796
+
+SX-03／SX-04／E2E-06 のdeal quote persistenceを再監査し、price bookによる決定論的な見積計算とcontract review
+recordはschema-boundである一方、顧客向けquote JSONだけが専用schemaなしのraw writeに残っていたため修正した。
+quote line／unit price／amount／total／unquotable envelopeを専用`quote-result.schema.json`へ移し、tenant deal document
+pathを維持したまま、保存直前にpath-bound `defineCatalog`のcanonical payloadを使うよう統合した。unknown workを見積不能として
+operatorへ送る既存semanticsとquote markdown／deal stage更新は変更していない。
+
+検証: deal documents **1 file / 5 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`、knowledge
+index／integrity manifest生成。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は
+未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

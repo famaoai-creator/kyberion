@@ -1,9 +1,14 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
-import { loadContractReviewAtPath, recordContractReview } from './deal-documents.js';
+import { openDeal } from './deal-store.js';
+import {
+  generateQuoteForDeal,
+  loadContractReviewAtPath,
+  recordContractReview,
+} from './deal-documents.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const TENANT = 'deal-review-loader-test';
 const DEAL_ID = 'DEAL-REVIEW-001';
@@ -85,5 +90,39 @@ describe('deal document contract review loader', () => {
     withExecutionContext('mission_controller', () => safeMkdir(filePath, { recursive: true }));
 
     expect(() => loadContractReviewAtPath(filePath, TENANT, DEAL_ID, 1)).toThrow('regular file');
+  });
+
+  it('persists deterministic quotes through the quote schema boundary', () => {
+    const deal = withExecutionContext('mission_controller', () =>
+      openDeal({
+        tenantSlug: TENANT,
+        surface: 'test',
+        channelId: 'channel-quote',
+        summary: 'quote schema test',
+      })
+    );
+
+    const result = withExecutionContext('mission_controller', () =>
+      generateQuoteForDeal({
+        tenantSlug: TENANT,
+        dealId: deal.deal_id,
+        requests: [
+          {
+            task_kind: 'document_production',
+            size: 'S',
+            description: 'schema-bound proposal',
+          },
+        ],
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    const quotePath = pathResolver.rootResolve(
+      `customer/${TENANT}/deals/${deal.deal_id}/quote-v1.json`
+    );
+    const stored = JSON.parse(String(safeReadFile(quotePath)));
+    expect(stored.ok).toBe(true);
+    expect(stored.currency).toBe('JPY');
+    expect(stored.$schema).toBeUndefined();
   });
 });
