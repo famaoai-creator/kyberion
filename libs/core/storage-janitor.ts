@@ -17,6 +17,12 @@ import {
 } from './secure-io.js';
 import { logger } from './core.js';
 import {
+  DELEGATION_CHILDREN_REGISTRY_SUBPATH,
+  loadDelegationChildrenRegistryAtPath,
+  writeDelegationChildrenRegistryAtPath,
+  type DelegationChildRecord,
+} from './delegation-child-registry.js';
+import {
   loadRetentionCatalog,
   retentionTtlMsForPath,
   retentionTtlDaysForPath,
@@ -111,32 +117,8 @@ export interface SweepTrashResult {
   purged: string[];
 }
 
-/**
- * XP-06 zombie sweep: shape mirrors (deliberately duplicated, not imported —
- * see the comment on `DELEGATION_CHILDREN_REGISTRY_SUBPATH` below)
- * `DelegationChildRecord` in `delegation-concurrency.ts`, the module that
- * writes this registry in real time as CLI delegations start/finish.
- */
-export interface DelegationChildRecord {
-  id: string;
-  provider: string;
-  pid?: number;
-  startedAt: string;
-  deadlineAt: string;
-  budgetMs: number;
-  /** OS process start time, used to prevent PID-reuse kills after a restart. */
-  pidStartedAt?: string;
-}
-
-/**
- * Kept as a literal (not imported from `delegation-concurrency.ts`) so this
- * module's existing test-mocking convention (`vi.mock('./path-resolver.js', ...)`
- * with a minimal named-export surface) keeps working unchanged — importing
- * the sibling module would pull in `semaphore.ts` and its own lazy
- * `kill-switch.ts` wiring, none of which this file needs. Keep this string
- * in sync with `DELEGATION_CHILDREN_REGISTRY_SUBPATH` if either changes.
- */
-const DELEGATION_CHILDREN_REGISTRY_SUBPATH = 'runtime/delegation-children.json';
+/** XP-06 zombie sweep uses the same schema-bound record contract as its producer. */
+export type { DelegationChildRecord } from './delegation-child-registry.js';
 
 export interface SweepDelegationChildrenOptions {
   dryRun: boolean;
@@ -744,13 +726,11 @@ export function listUncoveredRuntimeDirs(catalog?: LoadedRetentionCatalog): stri
 
 function readDelegationChildrenRegistry(): DelegationChildRecord[] {
   const filePath = shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH);
-  if (!safeExistsSync(filePath)) return [];
-  const parsed = readJson<unknown>(filePath);
-  return Array.isArray(parsed) ? parsed : [];
+  return loadDelegationChildrenRegistryAtPath(filePath);
 }
 
 function writeDelegationChildrenRegistry(records: DelegationChildRecord[]): void {
-  safeWriteFile(shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH), JSON.stringify(records, null, 2));
+  writeDelegationChildrenRegistryAtPath(records, shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH));
 }
 
 function resolveProcessStartTime(pid: number): string | undefined {

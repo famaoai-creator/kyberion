@@ -66,14 +66,13 @@
  * Orphans that outlive the in-process SIGTERM -> SIGKILL escalation (e.g. the
  * Kyberion process itself exited or restarted mid-grace-window) are addressed
  * by persisting whatever handle *is* registered to
- * `active/shared/runtime/delegation-children.json` (via secure-io) and
+ * `active/shared/runtime/delegation-children.json` (via the shared
+ * schema-bound registry contract) and
  * reaping stale entries in `storage-janitor.ts`'s zombie sweep
  * (`sweepDelegationChildren`) — a separate maintenance pass that can run in a
  * later session even if the process that spawned the child has already
- * exited. `storage-janitor.ts` deliberately duplicates the
- * `DelegationChildRecord` shape (see its own comment) rather than importing
- * this module; `delegation-concurrency.test.ts`'s
- * "producer/consumer shape drift" test keeps the two definitions honest.
+ * exited. `storage-janitor.ts` consumes the same contract rather than
+ * importing this module's runtime dependencies.
  *
  * See docs/developer/improvement-plans-2026-07/
  * CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-06.
@@ -81,14 +80,18 @@
 
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
-import * as path from 'node:path';
 import { Semaphore } from './semaphore.js';
 import { logger } from './core.js';
-import { readJson } from './foundation/json.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeExecResult, safeMkdir, safeWriteFile } from './secure-io.js';
+import { safeExecResult } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import {
+  delegationChildrenRegistryPath as resolveDelegationChildrenRegistryPath,
+  loadDelegationChildrenRegistryAtPath,
+  writeDelegationChildrenRegistryAtPath,
+  type DelegationChildRecord,
+} from './delegation-child-registry.js';
+export { DELEGATION_CHILDREN_REGISTRY_SUBPATH } from './delegation-child-registry.js';
 
 const DEFAULT_GLOBAL_MAX_CONCURRENCY = 4;
 const DEFAULT_PROVIDER_MAX_CONCURRENCY = 2;
@@ -98,9 +101,7 @@ const DEFAULT_KILL_GRACE_MS = 5000;
 /** Bucket shared by delegations whose provider could not be identified. */
 export const UNKNOWN_DELEGATION_PROVIDER = 'unknown';
 
-/** Relative path (under `active/shared/`) of the persisted active-child PID registry. Kept in sync with `storage-janitor.ts`'s zombie sweep. */
-export const DELEGATION_CHILDREN_REGISTRY_SUBPATH = 'runtime/delegation-children.json';
-
+/** Relative path (under `active/shared/`) of the persisted active-child PID registry. */
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback;
   const n = Number.parseInt(raw, 10);
@@ -285,16 +286,7 @@ export function delegationChildHandleFromChildProcess(child: {
   };
 }
 
-export interface DelegationChildRecord {
-  id: string;
-  provider: string;
-  pid?: number;
-  startedAt: string;
-  deadlineAt: string;
-  budgetMs: number;
-  /** OS process start time, used to prevent PID-reuse kills after a restart. */
-  pidStartedAt?: string;
-}
+export type { DelegationChildRecord } from './delegation-child-registry.js';
 
 interface ActiveChildEntry {
   record: DelegationChildRecord;
@@ -305,15 +297,13 @@ const activeChildren = new Map<string, ActiveChildEntry>();
 let idCounter = 0;
 
 function delegationChildrenRegistryPath(): string {
-  return pathResolver.shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH);
+  return resolveDelegationChildrenRegistryPath();
 }
 
 function readPersistedRegistry(): DelegationChildRecord[] {
   try {
     const filePath = delegationChildrenRegistryPath();
-    if (!safeExistsSync(filePath)) return [];
-    const parsed = readJson<unknown>(filePath);
-    return Array.isArray(parsed) ? parsed : [];
+    return loadDelegationChildrenRegistryAtPath(filePath);
   } catch {
     return [];
   }
@@ -321,10 +311,7 @@ function readPersistedRegistry(): DelegationChildRecord[] {
 
 function writePersistedRegistry(records: DelegationChildRecord[]): void {
   try {
-    const filePath = delegationChildrenRegistryPath();
-    const dir = path.dirname(filePath);
-    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(filePath, JSON.stringify(records, null, 2), { encoding: 'utf8' });
+    writeDelegationChildrenRegistryAtPath(records, delegationChildrenRegistryPath());
   } catch (err) {
     logger.warn(
       `[delegation-concurrency] failed to persist active-child registry (non-fatal): ${err instanceof Error ? err.message : String(err)}`

@@ -24,7 +24,7 @@ vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     rootDir: () => path.join('/tmp', 'kyberion-test-root'),
     shared: (sub = '') => path.join(tmpDir, sub),
-    knowledge: (sub = '') => path.join('/tmp', 'kyberion-test-knowledge', sub),
+    knowledge: (sub = '') => path.join(process.cwd(), 'knowledge', sub),
     rootResolve: (sub = '') => path.join('/tmp', 'kyberion-test-root', sub),
   },
   // Named exports (as opposed to the `pathResolver` object above) are what
@@ -34,12 +34,15 @@ vi.mock('./path-resolver.js', () => ({
   // `pathResolver.shared(...)` writes to.
   shared: (sub = '') => path.join(tmpDir, sub),
   sharedTmp: (sub = '') => path.join(tmpDir, 'tmp', sub),
+  knowledge: (sub = '') => path.join(process.cwd(), 'knowledge', sub),
 }));
 
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
+    assertSafeRepositoryPath: (p: string) => p,
     safeExistsSync: (p: string) => actual.existsSync(p),
+    safeLstat: (p: string) => actual.lstatSync(p),
     safeReadFile: (p: string, opts: any) => actual.readFileSync(p, opts),
     safeMkdir: (p: string, opts: any) => actual.mkdirSync(p, opts),
     safeWriteFile: (p: string, data: string) => {
@@ -52,6 +55,14 @@ vi.mock('./secure-io.js', async () => {
 
 vi.mock('./foundation/json.js', () => ({
   readJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+}));
+
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    exists: (p: string) => fs.existsSync(p),
+    readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    stat: (p: string) => fs.statSync(p),
+  }),
 }));
 
 vi.mock('./core.js', () => ({
@@ -397,10 +408,9 @@ describe('delegation-concurrency', () => {
 
   // XP-06 remainder: the zombie sweep (`storage-janitor.ts`'s
   // `sweepDelegationChildren`) now has a real producer (the backend
-  // integration tests above). `storage-janitor.ts` deliberately duplicates
-  // `DelegationChildRecord` rather than importing this module (see its own
-  // comment) — these tests keep that duplication honest and prove a record
-  // left behind by a crashed run is actually reaped.
+  // integration tests above). Both producer and consumer use the shared
+  // schema-bound registry contract, and these tests prove a record left
+  // behind by a crashed run is actually reaped.
   describe('zombie-sweep producer/consumer shape (XP-06)', () => {
     it("shape-drift guard: this module's DelegationChildRecord and storage-janitor.ts's duplicated one declare the same fields", () => {
       const producerRecord: DelegationChildRecord = {
@@ -411,10 +421,8 @@ describe('delegation-concurrency', () => {
         deadlineAt: new Date().toISOString(),
         budgetMs: 1000,
       };
-      // Compile-time: if either interface gains/loses/renames a field this
-      // bidirectional assignment stops type-checking — the cheapest possible
-      // drift guard given the two are deliberately not the same imported
-      // type (see storage-janitor.ts's comment on why not).
+      // Compile-time: if the shared interface gains/loses/renames a field,
+      // this assignment stops type-checking.
       const asConsumerShape: JanitorDelegationChildRecord = producerRecord;
       const roundTrip: DelegationChildRecord = asConsumerShape;
       expect(roundTrip).toEqual(producerRecord);
