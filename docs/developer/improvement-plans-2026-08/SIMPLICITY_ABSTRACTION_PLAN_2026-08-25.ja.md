@@ -14237,6 +14237,12 @@ SX-03 のreasoning route user configを再監査し、通常設定はcanonical c
 
 検証: reasoning route resolver／rollback **3 files / 23 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 663
+
+SX-03／SX-04 のtenant registry exception readerを再監査し、tenant consistency checkerが既存schema付きallowlistを汎用`readJson`と局所shape判定で読み込んでいた残存を修正した。`tenant-registry-exceptions.schema.json`へ接続するcore canonical loaderを追加し、任意のrootDirでも欠如時は従来どおり空集合、存在時はschema・repository path・regular-file／symlink境界を通過してからconsistency判定へ渡すようにした。duplicate／reason／stale exceptionのwarning・violation出力と、schema-invalid入力をcheckerのproblemとしてfail-closed報告する既存API形は維持している。
+
+検証: tenant registry exceptions／consistency checker **2 files / 18 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

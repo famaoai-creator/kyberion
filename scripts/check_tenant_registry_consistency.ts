@@ -41,16 +41,16 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import {
+  loadTenantRegistryExceptionsFile,
+  type TenantRegistryException,
+} from '@agent/core/tenant-registry-exceptions';
 
 export const EXCEPTIONS_RELATIVE_PATH =
   'knowledge/product/governance/tenant-registry-exceptions.json';
 const CONFIDENTIAL_INDEX_RELATIVE_PATH = 'knowledge/confidential/tenants/index.json';
 
-export interface TenantRegistryException {
-  slug: string;
-  reason: string;
-}
+export type { TenantRegistryException } from '@agent/core/tenant-registry-exceptions';
 
 export interface TenantSystemsSnapshot {
   /** (a) tenant profile slugs — the spine. */
@@ -83,15 +83,6 @@ export interface TenantConsistencyReport {
 export interface CheckOptions {
   rootDir?: string;
   env?: NodeJS.ProcessEnv;
-}
-
-function readJsonIfExists<T>(filePath: string, rootDir: string): T | null {
-  const safePath = assertSafeRepositoryPath(filePath, {
-    allowMissingLeaf: true,
-    rootDir,
-  });
-  if (!safeExistsSync(safePath)) return null;
-  return readJson<T>(safePath);
 }
 
 export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsSnapshot {
@@ -186,10 +177,13 @@ export function loadTenantRegistryExceptions(options: CheckOptions = {}): {
 } {
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   const problems: string[] = [];
-  const payload = readJsonIfExists<{ exceptions?: TenantRegistryException[] }>(
-    path.join(rootDir, EXCEPTIONS_RELATIVE_PATH),
-    rootDir
-  );
+  let payload: ReturnType<typeof loadTenantRegistryExceptionsFile>;
+  try {
+    payload = loadTenantRegistryExceptionsFile(rootDir);
+  } catch (error) {
+    problems.push(error instanceof Error ? error.message : String(error));
+    return { exceptions: [], problems };
+  }
   const exceptions = payload?.exceptions ?? [];
   const seen = new Set<string>();
   for (const entry of exceptions) {
