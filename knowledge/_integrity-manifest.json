@@ -8263,6 +8263,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-working-memory-entries.schema.json",
+      "tier": "public",
+      "size": 2116,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-workitem-dispatch-manifest.schema.json",
       "tier": "public",
       "size": 1327,

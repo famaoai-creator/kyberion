@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
@@ -26,6 +26,18 @@ export interface MissionWorkingMemoryEntry {
   metadata?: Record<string, unknown>;
 }
 
+const MISSION_WORKING_MEMORY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-working-memory-entries.schema.json'
+);
+
+function missionWorkingMemoryCatalog(filePath: string) {
+  return defineCatalog<MissionWorkingMemoryEntry[]>({
+    id: 'mission-working-memory-entries',
+    path: filePath,
+    schema: MISSION_WORKING_MEMORY_SCHEMA_PATH,
+  });
+}
+
 function mwmPersistPath(missionId: string): string {
   const missionPath =
     pathResolver.findMissionPath(missionId.toUpperCase()) ??
@@ -40,7 +52,7 @@ function loadEntries(missionId: string): MissionWorkingMemoryEntry[] {
   const p = mwmPersistPath(missionId);
   if (!safeExistsSync(p)) return [];
   try {
-    return readJson<MissionWorkingMemoryEntry[]>(p);
+    return missionWorkingMemoryCatalog(p).load();
   } catch {
     return [];
   }
@@ -51,7 +63,8 @@ function saveEntries(missionId: string, entries: MissionWorkingMemoryEntry[]): v
     const p = mwmPersistPath(missionId);
     const dir = path.dirname(p);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(p, JSON.stringify(entries, null, 2));
+    const validated = missionWorkingMemoryCatalog(p).validate(entries, p);
+    safeWriteFile(p, JSON.stringify(validated, null, 2));
   } catch {
     // Disk persistence is best-effort; in-memory entries remain intact.
   }
