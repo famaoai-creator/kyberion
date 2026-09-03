@@ -8139,7 +8139,7 @@
     {
       "path": "product/schemas/mission-gate-record.schema.json",
       "tier": "public",
-      "size": 1726,
+      "size": 1761,
       "type": "json"
     },
     {
