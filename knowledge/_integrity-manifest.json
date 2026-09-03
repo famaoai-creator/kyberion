@@ -9595,6 +9595,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/share-grant-live-session-state.schema.json",
+      "tier": "public",
+      "size": 991,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/shared-tmp-allowlist.schema.json",
       "tier": "public",
       "size": 1074,
