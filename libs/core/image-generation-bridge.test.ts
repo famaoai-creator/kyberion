@@ -356,6 +356,21 @@ describe('LlmApiImageGenerationProvider', () => {
       })
     ).rejects.toThrow('Gemini Imagen API returned no image bytes');
   });
+
+  it('fails closed when image bytes are not valid base64', async () => {
+    process.env.GEMINI_API_KEY = 'mock-imagen-key';
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ generatedImages: [{ image: { imageBytes: 'not-base64!' } }] }),
+    } as Response);
+
+    await expect(
+      new LlmApiImageGenerationProvider().generate({
+        prompt: 'invalid image bytes',
+        providerPreference: ['gemini'],
+      })
+    ).rejects.toThrow('Gemini Imagen API returned no image bytes');
+  });
 });
 
 describe('LocalFluxImageGenerationProvider', () => {
