@@ -1,4 +1,3 @@
-import type { ValidateFunction } from 'ajv';
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 /**
@@ -21,9 +20,9 @@ import { nowIso } from './foundation/time.js';
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { isRecord } from './foundation/text.js';
-import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 
 export type ActionItemStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 
@@ -147,17 +146,19 @@ export interface ActionItemLifecycleSummary {
 
 const ITEM_ID_RE = /^AI-[A-Z0-9-]{2,40}$/;
 const ACTION_ITEM_SCHEMA_PATH = pathResolver.knowledge('product/schemas/action-item.schema.json');
-let actionItemValidate: ValidateFunction<ActionItem> | null = null;
 
-function validateActionItemSchema(value: unknown): ActionItem {
-  actionItemValidate ||= compileSchema<ActionItem>(ACTION_ITEM_SCHEMA_PATH);
-  if (!actionItemValidate(value)) {
-    const errors = (actionItemValidate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`[action-item-store] invalid persisted action item: ${errors}`);
+function actionItemCatalog(filePath: string): GovernedCatalog<ActionItem> {
+  return defineCatalog<ActionItem>({
+    id: 'action-item',
+    path: filePath,
+    schema: ACTION_ITEM_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularActionItemFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[action-item-store] action item store must be a regular file: ${filePath}`);
   }
-  return value as ActionItem;
 }
 
 function storePathFor(missionId: string): string {
@@ -213,9 +214,11 @@ function migrateLegacyPolicy(raw: unknown): unknown {
 function readAll(missionId: string): ActionItem[] {
   const file = storePathFor(missionId);
   if (!safeExistsSync(file)) return [];
+  ensureRegularActionItemFile(file);
+  const catalog = actionItemCatalog(file);
   return readJsonLines<ActionItem>(file, {
     onMalformed: 'skip',
-    map: (value) => validateActionItemSchema(migrateLegacyPolicy(value)),
+    map: (value) => catalog.validate(migrateLegacyPolicy(value), file),
   });
 }
 
@@ -232,9 +235,9 @@ function reduceLatest(items: ActionItem[]): Map<string, ActionItem> {
 
 function appendRecord(missionId: string, record: ActionItem): void {
   const file = storePathFor(missionId);
-  validateActionItemSchema(record);
   safeMkdir(path.dirname(file), { recursive: true });
-  appendJsonLine(file, record);
+  ensureRegularActionItemFile(file);
+  appendJsonLine(file, actionItemCatalog(file).validate(record, file));
 }
 
 function validateBasic(item: ActionItem): void {
