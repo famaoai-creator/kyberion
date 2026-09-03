@@ -15616,6 +15616,18 @@ request id binding、error stringを確認してからdecision stateを更新す
 追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、
 SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 808
+
+SX-03／SX-08／SX-10 のGrok API availability probeを再監査し、`/models` の成功レスポンスを部分的な型アサーションと
+optional chainingだけでmodel ID projectionへ渡していた残存を修正した。safe JSON object境界、data配列、各entryのobject、
+非空 string ID、危険JSON keyを共有parserで検証してからselected modelを照合し、primitive・array・malformed entry・dangerous
+keyは利用可能として扱わず fail-closed にした。API key／endpoint validation、timeout、selected modelの `xai:` prefix除去、
+既存のunavailable semanticsは維持し、外部応答の不正形状に対する回帰を追加した。
+
+検証: Grok API backend **1 file / 10 tests passed**、root typecheck、対象lint、source Prettier、`git diff --check`。canonical full gateは
+この追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの全体整理、
+SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
