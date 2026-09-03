@@ -103,6 +103,8 @@ import {
   readJanitorLastRunMs,
   readJanitorLastSubmissionMs,
   writeJanitorSubmissionMarker,
+  readSchedulerOpsAlertDays,
+  writeSchedulerOpsAlertDay,
   listUncoveredRuntimeDirs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_TRASH_GRACE_DAYS,
@@ -897,6 +899,35 @@ describe('storage-janitor', () => {
       fs.rmSync(markerPath, { force: true });
       fs.mkdirSync(markerPath, { recursive: true });
       expect(readJanitorLastSubmissionMs()).toBeNull();
+    });
+
+    it('validates scheduler alert-day markers and preserves valid keys on update', () => {
+      expect(readSchedulerOpsAlertDays()).toBeNull();
+
+      writeSchedulerOpsAlertDay('scheduler_alive', new Date('2026-08-09T12:00:00.000Z'));
+      expect(readSchedulerOpsAlertDays()).toEqual({ scheduler_alive: '2026-08-09' });
+
+      writeSchedulerOpsAlertDay('failed_schedules', new Date('2026-08-09T12:00:00.000Z'));
+      expect(readSchedulerOpsAlertDays()).toEqual({
+        scheduler_alive: '2026-08-09',
+        failed_schedules: '2026-08-09',
+      });
+
+      const markerPath = path.join(
+        path.dirname(tmpDir),
+        'runtime',
+        'state',
+        'scheduler-ops-alert-days.json'
+      );
+      fs.writeFileSync(
+        markerPath,
+        JSON.stringify({ scheduler_alive: '2026-08-09', unexpected: true })
+      );
+      expect(readSchedulerOpsAlertDays()).toBeNull();
+
+      fs.rmSync(markerPath, { force: true });
+      fs.mkdirSync(markerPath, { recursive: true });
+      expect(readSchedulerOpsAlertDays()).toBeNull();
     });
   });
 });

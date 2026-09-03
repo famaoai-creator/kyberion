@@ -20,6 +20,8 @@ import {
   readJanitorLastRunMs,
   readJanitorLastSubmissionMs as readJanitorLastSubmissionMarkerMs,
   writeJanitorSubmissionMarker,
+  readSchedulerOpsAlertDays,
+  writeSchedulerOpsAlertDay,
 } from '@agent/core/storage-janitor';
 import { listOrphanNhiIdentities } from '@agent/core/nhi-lifecycle-governance';
 import { readReasoningDegraded } from '@agent/core/reasoning-degradation';
@@ -180,7 +182,6 @@ export const CHRONOS_DAEMON_ID = 'chronos-daemon';
 // so a slow tick or a single missed write never flaps the baseline.
 export const SCHEDULER_HEARTBEAT_MAX_AGE_MS = 10 * 60 * 1000;
 export const SCHEDULES_FIRING_WINDOW_MS = 24 * 60 * 60 * 1000;
-const SCHEDULER_ALERT_MARKER = 'runtime/state/scheduler-ops-alert-days.json';
 
 export interface SchedulerHealthCheck {
   ok: boolean;
@@ -330,42 +331,13 @@ export function evaluateSchedulerHealth(input: {
  * check runs hourly; without this gate a dead daemon would append 24 critical
  * alerts a day. Marker maps alert key -> last emitted UTC day (YYYY-MM-DD).
  */
-export function shouldEmitDailyOpsAlert(markerRaw: string | null, key: string, now: Date): boolean {
+export function shouldEmitDailyOpsAlert(
+  marker: Record<string, string> | null,
+  key: string,
+  now: Date
+): boolean {
   const today = now.toISOString().slice(0, 10);
-  if (!markerRaw) return true;
-  try {
-    const parsed = parseSafeJsonInput(markerRaw, 'baseline alert marker') as Record<
-      string,
-      unknown
-    >;
-    return parsed?.[key] !== today;
-  } catch {
-    return true;
-  }
-}
-
-function readSchedulerAlertMarker(): string | null {
-  const markerPath = pathResolver.shared(SCHEDULER_ALERT_MARKER);
-  if (!safeExistsSync(markerPath)) return null;
-  try {
-    return safeReadFile(markerPath, { encoding: 'utf8' }) as string;
-  } catch {
-    return null;
-  }
-}
-
-function markSchedulerAlertDay(key: string, now: Date): void {
-  const markerPath = pathResolver.shared(SCHEDULER_ALERT_MARKER);
-  let existing: Record<string, unknown> = {};
-  if (safeExistsSync(markerPath)) {
-    try {
-      existing = readJson<Record<string, unknown>>(markerPath);
-    } catch {
-      existing = {};
-    }
-  }
-  existing[key] = now.toISOString().slice(0, 10);
-  safeWriteFile(markerPath, JSON.stringify(existing, null, 2));
+  return marker?.[key] !== today;
 }
 
 let baselineConfigDegraded = false;
@@ -881,10 +853,10 @@ export async function runBaselineCheck() {
   } = { scheduler_alive: null, failed_schedules: null };
   if (!process.env.VITEST) {
     try {
-      const markerRaw = readSchedulerAlertMarker();
+      const marker = readSchedulerOpsAlertDays();
       if (
         !schedulerHealth.scheduler_alive.ok &&
-        shouldEmitDailyOpsAlert(markerRaw, 'scheduler_alive', schedulerNow)
+        shouldEmitDailyOpsAlert(marker, 'scheduler_alive', schedulerNow)
       ) {
         schedulerAlerts.scheduler_alive = sendOpsAlert({
           severity: 'critical',
@@ -914,11 +886,11 @@ export async function runBaselineCheck() {
           evidenceRefs: ['baseline-check:scheduler_alive'],
           metadata: { heartbeat: schedulerHeartbeat },
         });
-        markSchedulerAlertDay('scheduler_alive', schedulerNow);
+        writeSchedulerOpsAlertDay('scheduler_alive', schedulerNow);
       }
       if (
         failedSchedules.length > 0 &&
-        shouldEmitDailyOpsAlert(markerRaw, 'failed_schedules', schedulerNow)
+        shouldEmitDailyOpsAlert(marker, 'failed_schedules', schedulerNow)
       ) {
         schedulerAlerts.failed_schedules = sweepFailedSchedules().alert;
         enqueueOperationalLearningSignal({
@@ -931,7 +903,7 @@ export async function runBaselineCheck() {
           evidenceRefs: failedSchedules.map((schedule) => `schedule:${schedule.id}`),
           metadata: { failed_schedules: failedSchedules },
         });
-        markSchedulerAlertDay('failed_schedules', schedulerNow);
+        writeSchedulerOpsAlertDay('failed_schedules', schedulerNow);
       }
     } catch (err: any) {
       logger.warn(

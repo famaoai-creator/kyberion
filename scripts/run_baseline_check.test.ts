@@ -469,27 +469,14 @@ describe('run_baseline_check', () => {
     it('shouldEmitDailyOpsAlert gates per key per UTC day and fails open on bad markers', () => {
       expect(shouldEmitDailyOpsAlert(null, 'scheduler_alive', NOW)).toBe(true);
       expect(
-        shouldEmitDailyOpsAlert(
-          JSON.stringify({ scheduler_alive: '2026-08-08' }),
-          'scheduler_alive',
-          NOW
-        )
+        shouldEmitDailyOpsAlert({ scheduler_alive: '2026-08-08' }, 'scheduler_alive', NOW)
       ).toBe(false);
       expect(
-        shouldEmitDailyOpsAlert(
-          JSON.stringify({ scheduler_alive: '2026-08-07' }),
-          'scheduler_alive',
-          NOW
-        )
+        shouldEmitDailyOpsAlert({ scheduler_alive: '2026-08-07' }, 'scheduler_alive', NOW)
       ).toBe(true);
       expect(
-        shouldEmitDailyOpsAlert(
-          JSON.stringify({ failed_schedules: '2026-08-08' }),
-          'scheduler_alive',
-          NOW
-        )
+        shouldEmitDailyOpsAlert({ failed_schedules: '2026-08-08' }, 'scheduler_alive', NOW)
       ).toBe(true);
-      expect(shouldEmitDailyOpsAlert('{broken', 'scheduler_alive', NOW)).toBe(true);
     });
   });
 });
