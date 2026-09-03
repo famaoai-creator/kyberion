@@ -166,8 +166,12 @@ describe('mission-orchestration-journal', () => {
   });
 
   it('provisions, writes, and verifies an artifact; mismatch is fail-closed', async () => {
-    const { provisionMissionEntry, verifyProvisionedEntry, writeProvisionedEntry } =
-      await import('./mission-orchestration-journal.js');
+    const {
+      provisionMissionEntry,
+      readProvisionedEntry,
+      verifyProvisionedEntry,
+      writeProvisionedEntry,
+    } = await import('./mission-orchestration-journal.js');
     const dir = pathResolver.shared(`tmp/pi-provisioned-entry-${process.pid}`);
     const filePath = `${dir}/artifact.json`;
     safeMkdir(dir, { recursive: true });
@@ -183,6 +187,11 @@ describe('mission-orchestration-journal', () => {
         content: { artifact: 'tampered', version: 1 },
       })
     ).toThrow('MISSION_LOG_CORRUPT:provisioned_entry_mismatch');
+
+    safeWriteFile(filePath, `${JSON.stringify({ ...persisted, unexpected: true })}\n`);
+    expect(() => readProvisionedEntry(filePath, provisioned)).toThrow(
+      'Invalid catalog mission-provisioned-entry'
+    );
 
     safeRmSync(dir, { recursive: true, force: true });
   });
