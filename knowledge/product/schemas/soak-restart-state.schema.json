@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/soak-restart-state.schema.json",
+  "title": "Soak restart state",
+  "description": "Persisted state used by the restart endurance smoke test.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "healthy": { "type": "boolean" },
+    "resumed": { "type": "boolean" },
+    "phase": { "type": "string", "enum": ["bootstrap", "resume"] },
+    "restored_from": { "type": ["string", "null"], "minLength": 1 }
+  },
+  "required": ["healthy", "resumed", "phase"]
+}
