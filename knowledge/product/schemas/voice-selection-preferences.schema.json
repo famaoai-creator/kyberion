@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/voice-selection-preferences.schema.json",
+  "title": "Voice Selection Preferences",
+  "description": "Persisted voice engine and speech-to-text selections for the active profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "tts_engine_id", "stt_backend"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "tts_engine_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "stt_backend": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "server",
+        "fluid_audio",
+        "faster_whisper",
+        "mlx_whisper",
+        "whisper_cpp",
+        "native_speech"
+      ]
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}
