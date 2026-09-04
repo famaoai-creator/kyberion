@@ -44,6 +44,7 @@ import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import {
   loadSemanticRenderTokenCatalog as loadValidatedSemanticRenderTokenCatalog,
   resolveSemanticRenderTokens as resolveValidatedSemanticRenderTokens,
+  type SemanticRenderTokenCatalog,
 } from './media-layout-design-tokens.js';
 import {
   cloneJsonValue,
@@ -639,7 +640,7 @@ function resolveMediaDesignSystem(
   return buildResult(fallbackId, catalog.systems?.[fallbackId] || {});
 }
 
-function loadSemanticRenderTokenCatalog(rootDir: string): any {
+function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderTokenCatalog {
   return loadValidatedSemanticRenderTokenCatalog(rootDir);
 }
 
