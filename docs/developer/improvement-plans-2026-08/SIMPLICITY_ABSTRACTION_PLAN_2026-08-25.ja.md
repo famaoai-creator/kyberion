@@ -19515,6 +19515,18 @@ SX-06／SX-09 の`html-to-pptx` CLIを再監査し、usageと変換完了通知�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1155
+
+SX-06 の非同期終了境界を再監査し、`minutes_record`、`meeting_participate`、delegated task worker、agent runtime supervisor daemon、browser native hostの直接`process.exitCode`操作をshared harnessの`setProcessExitCode`へ移した。録音停止後のfinalize、SIGINT／SIGTERM、worker polling、daemonのgraceful close、Native Messagingのstdout frame完了待ちは維持し、例外化による未処理エラーや応答切断を避けている。
+
+検証:
+
+- async exit boundary／meeting／delegated／harness **4 test files / 24 tests passed**。
+- 対象ESLint、`git diff --check` passed。5入口の直接`process.exitCode`は0件。
+- agent daemonの既存IPC suiteはsandboxで長時間化したため停止し、full validateの全体ゲートで再確認する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

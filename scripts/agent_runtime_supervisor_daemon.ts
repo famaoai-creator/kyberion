@@ -1,7 +1,7 @@
 import * as net from 'node:net';
 import { timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import {
   askAgentRuntime,
   ensureAgentRuntime,
@@ -922,7 +922,7 @@ export async function startAgentRuntimeSupervisorDaemon(
             `[agent-runtime-supervisor-daemon] existing healthy daemon already bound at ${transport === 'tcp' ? `${(listenTarget as net.ListenOptions).host}:${(listenTarget as net.ListenOptions).port}` : socketPath}`
           );
           if (options.exitOnExistingHealthyDaemon !== false) {
-            process.exitCode = 0;
+            setProcessExitCode(0);
             if (server.listening) server.close();
           }
           return;
@@ -940,7 +940,7 @@ export async function startAgentRuntimeSupervisorDaemon(
           );
         }
         if (options.exitOnFatalError !== false) {
-          process.exitCode = 1;
+          setProcessExitCode(1);
           if (server.listening) server.close();
         }
       })();
@@ -968,7 +968,7 @@ export async function startAgentRuntimeSupervisorDaemon(
       );
     }
     if (options.exitOnFatalError !== false) {
-      process.exitCode = 1;
+      setProcessExitCode(1);
       if (server.listening) server.close();
     }
   });
@@ -1040,14 +1040,14 @@ export async function startAgentRuntimeSupervisorDaemon(
   const stopDaemon = (exitCode: number) => {
     cleanup();
     if (!server.listening) {
-      process.exitCode = exitCode;
+      setProcessExitCode(exitCode);
       return;
     }
-    const forceExit = setTimeout(() => (process.exitCode = exitCode), 1500);
+    const forceExit = setTimeout(() => setProcessExitCode(exitCode), 1500);
     forceExit.unref?.();
     server.close(() => {
       clearTimeout(forceExit);
-      process.exitCode = exitCode;
+      setProcessExitCode(exitCode);
     });
   };
   requestShutdown = stopDaemon;
@@ -1088,7 +1088,7 @@ const runAgentRuntimeSupervisorDaemon = defineScript({
       await main(argv);
     } catch (error: any) {
       if (error instanceof DaemonExit) {
-        process.exitCode = error.code;
+        setProcessExitCode(error.code);
         return;
       }
       const message = error?.message || String(error);
@@ -1118,7 +1118,7 @@ const runAgentRuntimeSupervisorDaemon = defineScript({
           `[agent-runtime-supervisor-daemon] failed to write fatal ops alert: ${alertError?.message || alertError}`
         );
       }
-      process.exitCode = 1;
+      setProcessExitCode(1);
     }
   },
 });
