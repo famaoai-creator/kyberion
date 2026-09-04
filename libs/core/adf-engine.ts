@@ -71,7 +71,7 @@ function resolveAdfResourceClaims(
 }
 
 export interface AdfEngineContext {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AdfRunOptions {
