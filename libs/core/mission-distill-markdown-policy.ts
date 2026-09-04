@@ -24,27 +24,10 @@ const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-distill-markdown-policy.schema.json'
 );
 
-const FALLBACK_CATALOG: MissionDistillMarkdownPolicyCatalog = {
-  version: '1.0.0',
-  title_suffix: 'Completion Summary',
-  section_titles: {
-    summary: 'Summary',
-    key_learnings: 'Key Learnings',
-    patterns_discovered: 'Patterns Discovered',
-    failures_and_recoveries: 'Failures & Recoveries',
-    reusable_artifacts: 'Reusable Artifacts',
-  },
-  prompt_titles: {
-    mission_state: 'Mission State',
-    evidence_context: 'Evidence & Context',
-  },
-};
-
 const catalog = defineCatalog<MissionDistillMarkdownPolicyCatalog>({
   id: 'mission-distill-markdown-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadMissionDistillMarkdownPolicyCatalog(): MissionDistillMarkdownPolicyCatalog {

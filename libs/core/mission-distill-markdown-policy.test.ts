@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 
 import {
   loadMissionDistillMarkdownPolicyCatalog,
@@ -6,6 +8,14 @@ import {
 } from './mission-distill-markdown-policy.js';
 
 describe('mission-distill-markdown-policy', () => {
+  it('uses the canonical catalog without a duplicated fallback definition', () => {
+    const source = safeReadFile(
+      pathResolver.rootResolve('libs/core/mission-distill-markdown-policy.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(source).not.toContain('FALLBACK_CATALOG');
+  });
+
   it('loads the canonical mission distill markdown policy', () => {
     const catalog = loadMissionDistillMarkdownPolicyCatalog();
     expect(catalog.title_suffix).toBe('Completion Summary');
