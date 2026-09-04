@@ -12,6 +12,7 @@ import {
   parseAgentManifestsResponse,
   type ClientAgentManifest,
 } from '../lib/agent-manifests-response';
+import { parseAgentProvidersResponse } from '../lib/agent-providers-response';
 import { KyberionDonut } from './KyberionCharts';
 
 type AgentRecord = ClientAgentRecord;
@@ -133,17 +134,18 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     try {
       const res = await fetch('/api/agents?providers=true');
       if (res.ok) {
-        const data = await res.json();
-        const opts: ProviderOption[] = (data.providers || []).map((p: any) => ({
+        const data = parseAgentProvidersResponse(await res.json());
+        if (!data) return;
+        const opts: ProviderOption[] = data.providers.map((p) => ({
           value: p.provider,
           label: PROVIDER_LABELS[p.provider] || p.provider,
-          models: p.models || [],
+          models: p.models,
           installed: p.installed,
           version: p.installed && p.version && !p.version.includes('Error') ? p.version : null,
           protocol: p.protocol,
         }));
         setProviders(opts);
-        setAccessRole(data.accessRole || 'readonly');
+        setAccessRole(data.accessRole);
         // Auto-select first available provider if none selected
         setSpawnProvider((prev) => {
           if (prev) return prev;
