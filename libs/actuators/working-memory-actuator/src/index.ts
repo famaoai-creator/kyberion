@@ -17,7 +17,7 @@ import {
   safeWriteFile,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import {
   loadVolatileSidecarAtPath,
   parseVolatileSidecar as parseCanonicalVolatileSidecar,
@@ -747,7 +747,12 @@ function opList(params: Record<string, unknown>): unknown {
   });
   if (!isExistingRegularFile(indexPath)) return [];
   try {
-    const all = parseVolatileIndex(readJson<unknown>(indexPath));
+    const all = parseVolatileIndex(
+      parseSafeJsonInput(
+        String(safeReadFile(indexPath, { encoding: 'utf8' }) || ''),
+        'volatile knowledge index'
+      )
+    );
     if (!all) return [];
     return all.filter((entry) => {
       if (params.scope && entry.sidecar.scope !== params.scope) return false;
