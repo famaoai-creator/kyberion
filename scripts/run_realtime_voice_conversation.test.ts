@@ -280,5 +280,7 @@ describe('run_realtime_voice_conversation cli', () => {
     );
     expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
     expect(source).not.toContain('console.log(');
+    expect(source).not.toContain('process.stdout.write');
+    expect(source).not.toContain('process.stderr.write');
   });
 });
