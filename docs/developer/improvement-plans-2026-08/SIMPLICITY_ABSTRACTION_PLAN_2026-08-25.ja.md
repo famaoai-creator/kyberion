@@ -16569,6 +16569,13 @@ SX-08／SX-09 の Chronos AgentPanel provider discovery projectionを再監査�
 検証: Chronos agent providers response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 918
+
+SX-08／SX-09 の Chronos AgentPanel manual-drive responseを再監査し、`manual_peek`、`manual_status`、`manual_execute`、`manual_cancel`、`manual_resume` の payloadを HTTP status と直接の `payload` 読み取りだけで action／command stateへ渡す残存を修正した。専用 parser で action／approval、command state、execution status、queue／cancel結果、agent／command identity、dangerous keyを検証してから state更新へ渡し、失敗 responseは fail-closed とする。既存の localadmin gate、viewer scope、approval再実行、durable command polling／cancel semantics は変更していない。
+
+検証: Chronos agent manual response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
