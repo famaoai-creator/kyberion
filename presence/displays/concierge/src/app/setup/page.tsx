@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import type { ConciergeMessageKey } from '../../lib/i18n';
 import { parseSetupResponse, type Setup as SetupPayload } from '../../lib/setup-response';
+import { parseConciergeMutationResponse } from '../../lib/mutation-response';
 
 type NotificationChannelOption = { surface: string; display_name: string; status: string };
 type NotificationTarget = { surface: string; target: string };
@@ -232,9 +233,9 @@ export default function SetupPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ decision }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'plugin failed');
-        setNotice({ text: payload.message });
+        const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+        if (!response.ok || !parsed?.message) throw new Error('Plugin action failed');
+        setNotice({ text: parsed.message });
         setPluginConfirm(null);
         await refreshPlugins();
       } catch (err) {
@@ -260,9 +261,9 @@ export default function SetupPage() {
           inputs: configInputs,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'config mission failed');
-      setNotice({ text: payload.message });
+      const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed?.message) throw new Error('Config mission failed');
+      setNotice({ text: parsed.message });
       setConfigConfirm(false);
       setConfigPresetId('');
       setConfigInputs({});
@@ -301,8 +302,7 @@ export default function SetupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ surface: notif.surface, channel: notif.target.trim() }),
       });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'notification save failed');
+      if (!response.ok) throw new Error('Notification save failed');
       setNotice({ text: t('setup.notification_saved') });
       await Promise.all([refreshNotifications(), refresh()]);
     } catch (err) {
@@ -366,8 +366,7 @@ export default function SetupPage() {
             },
           }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'onboarding failed');
+        if (!response.ok) throw new Error('Onboarding failed');
         setNotice({
           text: includeVoice ? t('setup.voice_registered') : t('setup.onboarding_saved'),
         });
@@ -405,8 +404,7 @@ export default function SetupPage() {
           },
         }),
       });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'management save failed');
+      if (!response.ok) throw new Error('Management save failed');
       setNotice({ text: t('setup.management_saved') });
       await refresh();
     } catch (err) {
@@ -426,10 +424,12 @@ export default function SetupPage() {
         form.set('source', source);
         form.set('file', file);
         const response = await fetch('/api/setup', { method: 'POST', body: form });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'upload failed');
+        const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+        if (!response.ok || !parsed) throw new Error('Upload failed');
         if (action === 'voice_sample') {
-          setVoiceSampleRefs((current) => [...current, payload.sample.sample_ref].slice(-3));
+          const sampleRef = parsed.sample?.sample_ref;
+          if (!sampleRef) throw new Error('Invalid voice upload response');
+          setVoiceSampleRefs((current) => [...current, sampleRef].slice(-3));
         }
         setNotice({ text: action === 'avatar' ? t('setup.avatar_saved') : t('setup.voice_saved') });
         await refresh();
