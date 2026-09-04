@@ -12,13 +12,14 @@
  */
 
 import * as path from 'node:path';
-import { isRecord, readJson } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
+  safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
 
@@ -125,7 +126,14 @@ export function readCookies(accountSlug: string): PersistedBrowserCookie[] {
   const file = cookiePathFor(accountSlug);
   if (!safeExistsSync(file) || !safeLstat(file).isFile()) return [];
   try {
-    return parsePersistedCookies(readJson<unknown>(file)) ?? [];
+    return (
+      parsePersistedCookies(
+        parseSafeJsonInput(
+          String(safeReadFile(file, { encoding: 'utf8' }) || ''),
+          `browser cookie store ${file}`
+        )
+      ) ?? []
+    );
   } catch {
     return [];
   }
