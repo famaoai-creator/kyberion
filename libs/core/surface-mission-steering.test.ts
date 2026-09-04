@@ -503,6 +503,11 @@ describe('no-bypass structural check (SO-04 Task 3)', () => {
       encoding: 'utf8',
     }) as string;
 
+    expect(source).toContain('bridge:mission_steering_approval_required');
+    expect(source).not.toContain(
+      '状態: ミッション ${params.missionId} の${params.verbLabel}には承認が必要です。'
+    );
+
     const fnStart = source.indexOf('export async function executeApprovedMissionSteeringApproval');
     expect(fnStart, 'executeApprovedMissionSteeringApproval not found in source').toBeGreaterThan(
       -1

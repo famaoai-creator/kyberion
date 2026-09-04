@@ -4959,6 +4959,31 @@
         "ja": "返信: appr:{requestId}:approve または appr:{requestId}:reject",
         "qps-ploc": "⟦Řėṗŀẏ: ȧṗṗř:{requestId}:ȧṗṗřőṽė őř ȧṗṗř:{requestId}:řėĵėƈŧ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
+      "mission_steering_approval_required": {
+        "en": "Status: mission {missionId} requires approval for {verbLabel}.",
+        "ja": "状態: ミッション {missionId} の{verbLabel}には承認が必要です。",
+        "qps-ploc": "⟦Şŧȧŧůş: ɱïşşïőñ {missionId} řėɋůïřėş ȧṗṗřőṽȧŀ ƒőř {verbLabel}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "mission_steering_approve_choice": {
+        "en": "1: Approve",
+        "ja": "1: 承認する",
+        "qps-ploc": "⟦1: Ȧṗṗřőṽė ŀőř⟧"
+      },
+      "mission_steering_reject_choice": {
+        "en": "2: Reject",
+        "ja": "2: 却下する",
+        "qps-ploc": "⟦2: Řėĵėƈŧ ŀőř⟧"
+      },
+      "mission_steering_reply_instruction": {
+        "en": "Reply: appr:{requestId}:approve or appr:{requestId}:reject",
+        "ja": "返信: appr:{requestId}:approve または appr:{requestId}:reject",
+        "qps-ploc": "⟦Řėṗŀẏ: ȧṗṗř:{requestId}:ȧṗṗřőṽė őř ȧṗṗř:{requestId}:řėĵėƈŧ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "mission_steering_next_action": {
+        "en": "Next action: answer approval request {requestId} with one of the options above.",
+        "ja": "次のアクション: 上記のいずれかで承認要求({requestId})に回答してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: ȧñşẇėř ȧṗṗřőṽȧŀ řėɋůėşŧ {requestId} ẇïŧħ őñė őƒ ŧħė őṗŧïőñş ȧƀőṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
       "processing_note": {
         "en": "Processing. Please wait…",
         "ja": "処理中です。少々お待ちください…",
