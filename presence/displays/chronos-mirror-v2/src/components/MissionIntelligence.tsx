@@ -11,6 +11,7 @@ import { MissionIntelligenceSurfaceOverview } from './MissionIntelligenceSurface
 import { MissionIntelligenceDangerousActionDialog } from './MissionIntelligenceDangerousActionDialog';
 import { MissionIntelligenceStatusGate } from './MissionIntelligenceStatusGate';
 import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
+import { parseMissionIntelligenceResponse } from '../lib/mission-intelligence-response';
 import {
   buildMissionThread,
   missionActionLabel,
@@ -209,11 +210,9 @@ export function MissionIntelligence({
 
   const refreshData = async () => {
     const refreshed = await fetch(intelligenceUrl, { cache: 'no-store' });
-    const refreshedBody = await refreshed.json();
-    if (!refreshed.ok) {
-      throw new Error(refreshedBody.error || 'Failed to refresh mission intelligence');
-    }
-    setData(refreshedBody);
+    const payload = parseMissionIntelligenceResponse(await refreshed.json().catch(() => null));
+    if (!refreshed.ok || !payload) throw new Error('Invalid mission intelligence response');
+    setData(payload);
     setError(null);
   };
 
@@ -222,9 +221,9 @@ export function MissionIntelligence({
     const scheduler = new LiveSyncScheduler<IntelligencePayload>({
       fetchSnapshot: async () => {
         const res = await fetch(intelligenceUrl, { cache: 'no-store' });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || 'Failed to load mission intelligence');
-        return body as IntelligencePayload;
+        const payload = parseMissionIntelligenceResponse(await res.json().catch(() => null));
+        if (!res.ok || !payload) throw new Error('Invalid mission intelligence response');
+        return payload;
       },
       onSnapshot: (snapshot) => {
         if (!alive) return;
