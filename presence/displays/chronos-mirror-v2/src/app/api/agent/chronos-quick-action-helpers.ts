@@ -1,6 +1,5 @@
 import path from 'node:path';
 import { nowIso } from '@agent/core/foundation';
-import { parseMissionNextTaskRecords } from '@agent/core/mission-next-task-reader';
 import type { MissionState } from '@agent/core/mission-types';
 import { uxMessage, type SupportedLocale } from '../../../lib/ux-vocabulary';
 import { optionalStringField, recordField } from '../../../lib/json-record';
@@ -14,7 +13,10 @@ type ChronosQuickActionCore = {
   safeLstat(filePath: string): { isDirectory(): boolean; isFile(): boolean };
   safeReaddir(directoryPath: string): string[];
   loadStateAtPath(filePath: string): MissionState | null;
-  readJson<T = unknown>(filePath: string): T;
+  loadMissionNextTaskRecordsAtPath(
+    filePath: string,
+    expectedMissionId: string
+  ): Array<{ task_id?: string; status?: string }> | null;
   safeExecResult(
     command: string,
     args: string[],
@@ -69,8 +71,7 @@ export function collectActiveMissions(core: ChronosQuickActionCore): ActiveMissi
             path.join(safeMissionDir, 'NEXT_TASKS.json')
           );
           if (core.safeExistsSync(nextTasksPath) && core.safeLstat(nextTasksPath).isFile()) {
-            const nextTasks = core.readJson<unknown>(nextTasksPath);
-            nextTaskCount = parseMissionNextTaskRecords(nextTasks)?.length || 0;
+            nextTaskCount = core.loadMissionNextTaskRecordsAtPath(nextTasksPath, item)?.length || 0;
           }
         } catch {
           // Optional task projection is omitted when its path is unsafe.

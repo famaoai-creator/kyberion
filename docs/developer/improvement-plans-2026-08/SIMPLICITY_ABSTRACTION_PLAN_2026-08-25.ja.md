@@ -16885,6 +16885,12 @@ SX-03／SX-08 の Chronos intelligence mission progress readerを再監査し、
 
 検証: intelligence observation **1 file / 3 tests passed**、mission-next-task reader **1 file / 7 tests passed**、root typecheck、root lint、`git diff --check`。canonical full gate はこの追記後に実行する。残存する SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 963
+
+SX-03／SX-08 の Chronos quick-action mission projectionを再監査し、quick-action helper が `core.readJson<T>` で `NEXT_TASKS.json` を読み、parserへ渡す重複経路を修正した。`loadMissionNextTaskRecordsAtPath` を core contract として受け取り、mission directory name を期待 scopeに固定して、schema／safe JSON／regular-file／symlink境界を通常 intelligence projection と共有する。quick-action の all-tenant gate、mission status、plan／checkpoint／next task count semantics は変更していない。
+
+検証: quick-action **1 file / 3 tests passed**、intelligence observation **1 file / 3 tests passed**、mission-next-task reader **1 file / 8 tests passed**、root typecheck、root lint、`git diff --check`。canonical full gate はこの追記後に実行する。残存する SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
