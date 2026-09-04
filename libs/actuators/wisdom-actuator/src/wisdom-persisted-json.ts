@@ -1,5 +1,10 @@
-import { isRecord, readJson } from '@agent/core/foundation';
-import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -35,13 +40,28 @@ export function parseWisdomJsonObject(value: unknown): WisdomJsonObject | null {
   return isRecord(value) && hasSafeKeys(value) ? value : null;
 }
 
-export function readWisdomJsonObject(relativePath: string): WisdomJsonObject {
-  const absolutePath = assertSafeRepositoryPath(pathResolver.rootResolve(relativePath));
-  const parsed = parseWisdomJsonObject(readJson<unknown>(absolutePath));
+export function readWisdomJsonAtPath(filePath: string, label = 'wisdom JSON'): unknown {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`${label} must be an existing regular file: ${safePath}`);
+  }
+  return parseSafeJsonInput(String(safeReadFile(safePath, { encoding: 'utf8' }) || ''), label);
+}
+
+export function readWisdomJsonObjectAtPath(
+  filePath: string,
+  label = 'wisdom JSON'
+): WisdomJsonObject {
+  const parsed = parseWisdomJsonObject(readWisdomJsonAtPath(filePath, label));
   if (!parsed) {
-    throw new Error(`[WISDOM_JSON_SHAPE_INVALID] expected an object: ${relativePath}`);
+    throw new Error(`[WISDOM_JSON_SHAPE_INVALID] expected an object: ${filePath}`);
   }
   return parsed;
+}
+
+export function readWisdomJsonObject(relativePath: string): WisdomJsonObject {
+  const absolutePath = assertSafeRepositoryPath(pathResolver.rootResolve(relativePath));
+  return readWisdomJsonObjectAtPath(absolutePath, `wisdom JSON ${relativePath}`);
 }
 
 export function readWisdomRecordArray(
