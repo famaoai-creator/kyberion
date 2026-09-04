@@ -16,6 +16,7 @@ import {
   buildMediaGenerationBoundary,
   normalizeInvoiceDocumentBrief,
   type MediaBriefCategory,
+  type MediaGenerationBoundary,
   type ProtocolKind,
 } from './media-document-helpers.js';
 
@@ -123,7 +124,7 @@ export interface MediaDocumentPipelineDeps {
     tokens: Record<string, string>,
     fallback?: string
   ) => string;
-  buildMediaGenerationBoundary: (outline: any) => any;
+  buildMediaGenerationBoundary: (outline: any) => MediaGenerationBoundary;
   normalizeBriefForCategory: (rootDir: string, input: any) => any;
   resolveMediaBriefCategory: (input: any) => MediaBriefCategory;
   generateDrawioDocument: (

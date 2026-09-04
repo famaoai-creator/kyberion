@@ -27,6 +27,24 @@ import * as path from 'node:path';
 
 export type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
 export type ProtocolKind = 'pptx' | 'docx' | 'pdf' | 'xlsx';
+export interface MediaGenerationBoundary {
+  source_of_truth: {
+    document_profile: string;
+    design_system_id: string;
+    knowledge_controls: string[];
+  };
+  llm_zone: {
+    allowed: string[];
+    forbidden: string[];
+  };
+  compiler_zone: {
+    responsibilities: string[];
+  };
+  renderer_zone: {
+    responsibilities: string[];
+  };
+  rule: string;
+}
 export type DocumentCompositionPresetResolver = (
   rootDir: string,
   brief: any
@@ -40,7 +58,7 @@ export function warnLegacyMediaOp(op: string): void {
   );
 }
 
-export function buildMediaGenerationBoundary(briefOrOutline: any): any {
+export function buildMediaGenerationBoundary(briefOrOutline: any): MediaGenerationBoundary {
   return {
     source_of_truth: {
       document_profile: String(briefOrOutline?.document_profile || ''),
