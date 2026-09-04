@@ -10,5 +10,6 @@ describe('knowledge scope reconciliation entrypoint', () => {
     expect(source).toContain('json, quiet, print');
     expect(source).toContain('if (json) print(report)');
     expect(source).not.toContain('console.log(');
+    expect(source).not.toContain('console.warn(');
   });
 });

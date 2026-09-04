@@ -108,7 +108,7 @@ export const runKnowledgeScopeReconciliation = defineScript({
           },
           dedupe_key: 'knowledge-scope-reconciliation',
         });
-        if (!quiet) console.warn(`ops alert: ${receipt.recorded_path}`);
+        if (!quiet) print(`ops alert: ${receipt.recorded_path}`);
       }
       if (argv.includes('--fail') && report.status !== 'healthy') {
         throw new ScriptExitError(1, '', true);
