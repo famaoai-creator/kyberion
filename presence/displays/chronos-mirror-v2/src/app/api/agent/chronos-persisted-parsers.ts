@@ -35,8 +35,20 @@ export type ChronosAuditEvent = {
   result?: string;
 };
 
+export type ChronosSurfaceRequestArtifact = {
+  correlation_id: string;
+};
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+export function parseChronosSurfaceRequestArtifact(
+  value: unknown
+): ChronosSurfaceRequestArtifact | null {
+  if (!isRecord(value)) return null;
+  const correlationId = optionalString(value.correlation_id);
+  return correlationId ? { correlation_id: correlationId } : null;
 }
 
 export function parseChronosAuditEvent(value: unknown): ChronosAuditEvent | null {

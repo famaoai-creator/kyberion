@@ -22,6 +22,7 @@ import { POST } from './route.js';
 import {
   parseChronosAuditEvent,
   parseChronosMissionProposalState,
+  parseChronosSurfaceRequestArtifact,
 } from './chronos-persisted-parsers.js';
 
 describe('chronos agent route', () => {
@@ -69,6 +70,16 @@ describe('chronos agent route', () => {
     expect(parseChronosAuditEvent({ event_type: 'mission_started', mission_id: 42 })).toEqual({
       event_type: 'mission_started',
     });
+  });
+
+  it('accepts only request artifacts with a non-empty correlation id', () => {
+    expect(parseChronosSurfaceRequestArtifact({ correlation_id: 'request-1' })).toEqual({
+      correlation_id: 'request-1',
+    });
+    expect(parseChronosSurfaceRequestArtifact(null)).toBeNull();
+    expect(parseChronosSurfaceRequestArtifact([])).toBeNull();
+    expect(parseChronosSurfaceRequestArtifact({ correlation_id: 42 })).toBeNull();
+    expect(parseChronosSurfaceRequestArtifact({ correlation_id: '   ' })).toBeNull();
   });
 
   it('returns a user-facing envelope when request parsing fails', async () => {

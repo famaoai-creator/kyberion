@@ -16373,6 +16373,13 @@ SX-03／SX-04 の company aggregate component loader を再監査し、`customer
 検証: company loader **1 file / 4 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 890
+
+SX-03／SX-08／SX-09 の Chronos agent request artifact read を再監査し、persisted JSON を `readJson<{ correlation_id: string }>` の型アサーションだけで会話・delegation の correlation として利用する残存を修正した。専用 parser で object root と non-empty `correlation_id` を確認し、不正 artifact は会話処理前に fail-closed とする。既存の request recording、session、delegation、mission proposal semantics は変更していない。
+
+検証: Chronos agent route **1 file / 10 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

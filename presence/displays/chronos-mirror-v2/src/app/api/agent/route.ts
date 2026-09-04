@@ -32,6 +32,7 @@ import {
 import {
   parseChronosAuditEvent,
   parseChronosMissionProposalState,
+  parseChronosSurfaceRequestArtifact,
   type ChronosMissionProposalState,
   type MissionProposal,
 } from './chronos-persisted-parsers';
@@ -1277,7 +1278,12 @@ export async function POST(req: NextRequest) {
       sessionId,
       requesterId,
     });
-    const requestArtifact = readJson<{ correlation_id: string }>(requestArtifactPath);
+    const requestArtifact = parseChronosSurfaceRequestArtifact(
+      readJson<unknown>(requestArtifactPath)
+    );
+    if (!requestArtifact) {
+      throw new Error('Chronos surface request artifact is invalid');
+    }
 
     const deterministicPipelineResponse = await tryHandleDeterministicPipelineQuery(query, locale);
     if (deterministicPipelineResponse) {
