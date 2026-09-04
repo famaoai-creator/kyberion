@@ -3,13 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
-import {
-  collectActiveMissions,
-  collectMissionProgress,
-  readJson,
-} from './intelligence-observation-data';
+import { collectActiveMissions, collectMissionProgress } from './intelligence-observation-data';
 
-const fixtureRoot = pathResolver.sharedTmp('chronos-intelligence-json-boundary-test');
 const missionId = `chronos-progress-boundary-${process.pid}-${Date.now()}`;
 const missionDir = pathResolver.rootResolve(`active/missions/public/${missionId}`);
 const malformedMissionId = `chronos-malformed-state-${process.pid}-${Date.now()}`;
@@ -21,7 +16,6 @@ const assetTarget = pathResolver.sharedTmp(`${missionId}-deliverable.txt`);
 
 afterEach(() => {
   withExecutionContext('mission_controller', () => {
-    safeRmSync(fixtureRoot, { recursive: true, force: true });
     safeRmSync(missionDir, { recursive: true, force: true });
     safeRmSync(malformedMissionDir, { recursive: true, force: true });
     safeRmSync(taskBoardTarget, { force: true });
@@ -30,16 +24,6 @@ afterEach(() => {
 });
 
 describe('chronos intelligence JSON resource boundaries', () => {
-  it('returns no projection for a JSON resource reached through a symlink', () => {
-    safeMkdir(fixtureRoot, { recursive: true });
-    const targetPath = path.join(fixtureRoot, 'target.json');
-    const linkedPath = path.join(fixtureRoot, 'linked.json');
-    safeWriteFile(targetPath, JSON.stringify({ mission_id: 'MSN-LINKED' }));
-    safeSymlinkSync(targetPath, linkedPath);
-
-    expect(readJson(linkedPath)).toBeNull();
-  });
-
   it('does not project symlinked task boards or generated assets', () => {
     withExecutionContext('mission_controller', () => {
       safeMkdir(path.join(missionDir, 'deliverables'), { recursive: true });

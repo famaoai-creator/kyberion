@@ -16879,6 +16879,12 @@ SX-03 の source-analysis package manifest loaderを再監査し、`readJsonIfPr
 
 検証: source-analysis **1 file / 8 tests passed**、root typecheck、root lint、`git diff --check`。canonical full gate はこの追記後に実行する。残存する SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 962
+
+SX-03／SX-08 の Chronos intelligence mission progress readerを再監査し、`NEXT_TASKS.json` を画面側の汎用 `readJson<T>` で読む残存を削除した。active mission の directory name を期待 mission scope として canonical `loadMissionNextTaskObjectsAtPath` を通し、schema／safe JSON／regular-file／mission boundary を一つの loaderへ集約した。malformed／missing／symlink task file は従来どおり progress projection を空集合へ閉じ、mission status、task board、asset projection semantics は変更していない。
+
+検証: intelligence observation **1 file / 3 tests passed**、mission-next-task reader **1 file / 7 tests passed**、root typecheck、root lint、`git diff --check`。canonical full gate はこの追記後に実行する。残存する SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
