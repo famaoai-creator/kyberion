@@ -33,10 +33,11 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import { appendDependencyVulnerabilityLedgerRecord } from '@agent/core/dependency-vulnerability-ledger';
 import { runDegradationWatch, type DegradationReport } from '@agent/core/health-degradation';
 import { withExecutionContext } from '@agent/core/governance';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 export interface PatchCommandResult {
   status: number;
@@ -193,7 +194,10 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   const packageJsonPath = path.join(rootDir, 'package.json');
   const timestamp = nowIso();
 
-  const pkg = readJson<RootPackageJson>(packageJsonPath);
+  const pkg = readSafeJsonFile<RootPackageJson>(
+    packageJsonPath,
+    'dependency patch package manifest'
+  );
   const plan = planDependencyPatch(
     pkg,
     options.packageName,
