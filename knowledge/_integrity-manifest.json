@@ -9019,6 +9019,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/personality-roles.schema.json",
+      "tier": "public",
+      "size": 887,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/pfc-state.schema.json",
       "tier": "public",
       "size": 691,

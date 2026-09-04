@@ -1,6 +1,5 @@
 import * as path from 'node:path';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJsonIfPresent as loadOptionalJson } from './foundation/json.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
 import { loadAuthorityRoleIndex, loadTeamRoleIndex } from './mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
@@ -73,6 +72,16 @@ const DEFAULT_ORG_CHART_CANDIDATES: Array<{
   },
 ];
 const ORG_CHART_SCHEMA_PATH = pathResolver.knowledge('product/schemas/org-chart.schema.json');
+const PERSONALITY_ROLES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/personality-roles.schema.json'
+);
+
+interface PersonalityRoleCatalog {
+  domains: Record<string, { name: string; roles: Record<string, string> }>;
+  roles?: Record<string, unknown>;
+}
+
+const personalityRoleCatalogs = new Map<string, GovernedCatalog<PersonalityRoleCatalog>>();
 
 function resolveBaseDir(rootDir?: string): string {
   return rootDir ? path.resolve(rootDir) : pathResolver.rootDir();
@@ -120,11 +129,29 @@ function loadAuthorityRoleIndexFromRoot(
 }
 
 function loadDomainCatalog(baseDir: string): OrganizationOrgChartDomain[] {
-  const catalog = loadOptionalJson<{
-    domains?: Record<string, { name?: string; roles?: Record<string, string> }>;
-  }>(path.join(baseDir, 'knowledge', 'product', 'personalities', 'roles.json'));
+  const catalogPath = assertSafeRepositoryPath(
+    path.join(baseDir, 'knowledge', 'product', 'personalities', 'roles.json'),
+    { allowMissingLeaf: true, rootDir: baseDir }
+  );
+  let catalog: PersonalityRoleCatalog;
+  try {
+    let loader = personalityRoleCatalogs.get(catalogPath);
+    if (!loader) {
+      loader = defineCatalog<PersonalityRoleCatalog>({
+        id: 'personality-role-catalog',
+        path: catalogPath,
+        schema: PERSONALITY_ROLES_SCHEMA_PATH,
+      });
+      personalityRoleCatalogs.set(catalogPath, loader);
+    }
+    catalog = loader.load();
+  } catch {
+    // A malformed optional personality catalog must not prevent the derived
+    // org chart from exposing the independently governed team-role index.
+    return [];
+  }
 
-  const domains = Object.values(catalog?.domains || {});
+  const domains = Object.values(catalog.domains);
   const knownRoles = new Set<string>();
   const result = domains.map((domain, index) => {
     const roleIds = Object.values(domain.roles || {})
