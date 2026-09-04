@@ -16345,6 +16345,13 @@ SX-06／SX-09 のlong-lived entrypoint終了規約を再監査し、Slack／Tele
 検証: long-lived entrypoints **4 files / 19 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 886
+
+SX-03／SX-14 のTerminal HUD profile panelを再監査し、persisted `onboarding-state.json`をobject rootと確認せず`Object.entries`へ投影していた残存を修正した。safe JSON boundary後にobject shapeを検証し、array／primitive／nested dangerous keyをonboarding表示へ渡さないようにした。既存のscalar field表示、nested field除外、missing／malformed stateの空表示semanticsは維持し、変換関数の回帰テストを追加した。
+
+検証: Terminal HUD profile **1 file / 2 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
