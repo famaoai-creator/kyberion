@@ -17,6 +17,8 @@ import {
 import { appendJsonLine, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 export interface RestartE2EReport {
   timestamp: string;
   root: string;
@@ -245,7 +247,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
   };
 }
 
-export async function main(args: string[] = []): Promise<void> {
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
   if (args[0] === '--worker') {
     const phase = args[1] === 'resume' ? 'resume' : 'bootstrap';
     const rootArgIndex = args.indexOf('--root');
@@ -258,13 +260,13 @@ export async function main(args: string[] = []): Promise<void> {
   logger.success(
     `[soak-restart-e2e] restored=${report.restored}; bootstrap=${report.bootstrap.pid}; resume=${report.resume.pid}`
   );
-  console.log(JSON.stringify(report, null, 2));
+  print(JSON.stringify(report, null, 2));
 }
 
 export const runSoakRestartScript = defineScript({
   name: 'soak:restart-e2e',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (

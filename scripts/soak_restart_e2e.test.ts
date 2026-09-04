@@ -41,4 +41,12 @@ describe('soak_restart_e2e', () => {
     expect(source).not.toContain('readJson<{ phase?:');
     expect(source).not.toContain('readJson<{ resumed?:');
   });
+
+  it('routes CLI report output through the shared printer', async () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/soak_restart_e2e.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).not.toContain('console.log(JSON.stringify(report, null, 2))');
+  });
 });
