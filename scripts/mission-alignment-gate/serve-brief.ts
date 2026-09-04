@@ -37,6 +37,7 @@ import { renderMissionBriefHtml } from './render-brief.js';
 
 const ALIGNMENT_CHANNEL = 'brief';
 const MAX_BODY_BYTES = 256 * 1024;
+type Print = (value: unknown) => void;
 
 function argValue(flag: string, args: string[]): string | undefined {
   const index = args.indexOf(flag);
@@ -47,7 +48,7 @@ export function parseDecisionRequestBody(raw: string): Record<string, unknown> {
   return parseSafeJsonObjectInput(raw, 'decision request') ?? {};
 }
 
-async function main(args: string[] = []): Promise<void> {
+async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
   const missionId = (argValue('--mission', args) || argValue('-m', args) || '')
     .trim()
     .toUpperCase();
@@ -200,7 +201,7 @@ async function main(args: string[] = []): Promise<void> {
         ...(typeof body?.note === 'string' && body.note.trim() ? { note: body.note.trim() } : {}),
         ...(reasonCategory ? { reasonCategory } : {}),
       });
-      console.log(
+      print(
         `[decision] ${updated.status} ${updated.id} by ${decidedBy} (auth=${updated.decidedAuthMethod})`
       );
       return json(res, 200, {
@@ -259,21 +260,21 @@ async function main(args: string[] = []): Promise<void> {
 
   server.listen(port, '127.0.0.1', () => {
     const approval = currentApproval();
-    console.log(`Mission brief approval surface → http://127.0.0.1:${port}/`);
-    console.log(`  mission  : ${missionId}`);
-    console.log(`  brief    : ${briefPath}`);
-    console.log(
+    print(`Mission brief approval surface → http://127.0.0.1:${port}/`);
+    print(`  mission  : ${missionId}`);
+    print(`  brief    : ${briefPath}`);
+    print(
       `  approval : ${approval ? `${approval.id} (${approval.status})` : catalogT('mission_alignment:server_approval_missing')}`
     );
-    console.log(`  token    : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, authMethod=local_token)`);
-    console.log(`  ${catalogT('mission_alignment:server_decision_notice')}`);
+    print(`  token    : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, authMethod=local_token)`);
+    print(`  ${catalogT('mission_alignment:server_decision_notice')}`);
   });
 }
 
 export const runServeBrief = defineScript({
   name: 'mission-alignment:serve-brief',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
