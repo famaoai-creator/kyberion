@@ -17172,6 +17172,21 @@ semanticsは変更していない。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 982
+
+SX-10／SX-11 の共通ADF engine入力境界を再監査し、step paramsとtemplate resolverの型が`any`で定義され、
+各actuator handlerへ無制限の値を渡せる残存を修正した。ADF step params、resolver、capture／transform／apply／control
+handlerの引数を`unknown`へ統一し、domain handler側で明示的に入力を解釈する契約に改めた。preflight、repeat governor、
+graph scheduler、sandbox、nested fallbackの実行順序と既存context互換性は変更していない。
+
+検証:
+
+- ADF engine／lifecycle／sandbox **3 files / 43 tests passed**。
+- root typecheck、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
