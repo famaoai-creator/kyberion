@@ -17,6 +17,8 @@ import { closeTaskArtifacts } from './mission-artifact-closure.js';
 import { revokeGrantsForTaskBestEffort } from './task-scoped-grants.js';
 import { readJsonFile as readJsonFileFromDispatchIO } from './mission-dispatch-io.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+import { loadMissionTicketDispatchManifestAtPath } from './mission-ticket-dispatch-manifest.js';
 
 /**
  * Confidential missions default to external_egress=deny. A model-backed
@@ -178,9 +180,13 @@ export function updateTicketManifest(
   ticketState: 'done' | 'review' | 'blocked'
 ): void {
   const manifestFile = ticketManifestPath(missionPath);
-  const manifest = readJsonFileFromDispatchIO<{ records?: Array<Record<string, unknown>> }>(
-    manifestFile
-  );
+  const manifest = (() => {
+    try {
+      return loadMissionTicketDispatchManifestAtPath(manifestFile);
+    } catch {
+      return null;
+    }
+  })();
   if (!manifest?.records) return;
   const index = manifest.records.findIndex((record) => String(record.task_id || '') === taskId);
   if (index < 0) return;
@@ -216,7 +222,15 @@ export function updateNextTasksReflection(
   ticketState?: string
 ): void {
   const nextTasksFile = missionNextTasksPath(missionPath);
-  const tasks = readJsonFileFromDispatchIO<Array<Record<string, unknown>>>(nextTasksFile);
+  let tasks: Array<Record<string, unknown>> | null;
+  try {
+    tasks = loadMissionNextTaskObjectsAtPath(
+      nextTasksFile,
+      nodePath.basename(nodePath.resolve(missionPath))
+    );
+  } catch {
+    tasks = null;
+  }
   if (!tasks) return;
   const index = tasks.findIndex((task) => String(task.task_id || '') === taskId);
   if (index < 0) return;
@@ -334,9 +348,13 @@ export async function reflectTicketOutcome(input: {
         : 'blocked';
   const ticketState = deriveTicketState(effectiveFinalStatus, notes);
   const reflectionPath = ticketReplyPath(input.missionPath, taskId);
-  const manifest = readJsonFileFromDispatchIO<{ records?: Array<Record<string, unknown>> }>(
-    ticketManifestPath(input.missionPath)
-  );
+  const manifest = (() => {
+    try {
+      return loadMissionTicketDispatchManifestAtPath(ticketManifestPath(input.missionPath));
+    } catch {
+      return null;
+    }
+  })();
   const manifestRecord = manifest?.records?.find(
     (record) => String(record.task_id || '') === taskId
   );

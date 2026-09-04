@@ -50,6 +50,7 @@ export interface MissionTicketDispatchRecord {
   live_results: Record<string, unknown>;
   status: 'created' | 'updated' | 'skipped' | 'deferred' | 'failed';
   notes: string[];
+  [key: string]: unknown;
 }
 
 export interface MissionTicketDispatchManifest {
