@@ -1,5 +1,6 @@
 import type { TierLevel } from './types.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
@@ -52,6 +53,10 @@ function clean(value: unknown): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 /** Normalize aliases and remove empty optional values without widening scope. */
 
 /** Resolve runtime hints without ever treating customer stance as tenant scope. */
@@ -65,7 +70,7 @@ const SCOPE_ENV_KEYS = [
 ] as const;
 
 function scopeEnvPath(env: NodeJS.ProcessEnv = process.env): string {
-  const configured = env.KYBERION_SCOPE_ENV_PATH?.trim();
+  const configured = envText(env, 'KYBERION_SCOPE_ENV_PATH')?.trim();
   return assertSafeRepositoryPath(configured || pathResolver.shared('runtime/scope.env'), {
     allowMissingLeaf: true,
   });
@@ -176,12 +181,12 @@ function mergeScopeSources(
 ): { values: ScopeContextInput; provenance: ScopeResolution['provenance'] } {
   const persisted = options.includePersisted === false ? {} : readScopeEnv(env);
   const envValues: ScopeContextInput = {
-    tier: env.KYBERION_TIER as TierLevel | undefined,
-    tenant_slug: env.KYBERION_TENANT,
-    organization_id: env.KYBERION_ORGANIZATION_ID,
-    project_id: env.KYBERION_PROJECT_ID,
-    mission_id: env.MISSION_ID,
-    task_id: env.KYBERION_TASK_ID,
+    tier: envText(env, 'KYBERION_TIER') as TierLevel | undefined,
+    tenant_slug: envText(env, 'KYBERION_TENANT'),
+    organization_id: envText(env, 'KYBERION_ORGANIZATION_ID'),
+    project_id: envText(env, 'KYBERION_PROJECT_ID'),
+    mission_id: envText(env, 'MISSION_ID'),
+    task_id: envText(env, 'KYBERION_TASK_ID'),
   };
   const mission =
     options.inferFromMission === false
@@ -264,9 +269,9 @@ export function resolveScopeResolution(
   const { values, provenance } = mergeScopeSources(input, env, options);
   const scope = normalizeScopeContext({
     ...values,
-    customer_stance: input.customer_stance || env.KYBERION_CUSTOMER,
-    viewer_principal: input.viewer_principal || env.KYBERION_VIEWER_PRINCIPAL,
-    nhi_id: input.nhi_id || env.KYBERION_NHI_ACTOR,
+    customer_stance: input.customer_stance || envText(env, 'KYBERION_CUSTOMER'),
+    viewer_principal: input.viewer_principal || envText(env, 'KYBERION_VIEWER_PRINCIPAL'),
+    nhi_id: input.nhi_id || envText(env, 'KYBERION_NHI_ACTOR'),
   });
   return { scope, provenance, knowledge_roots: knowledgeRoots(scope) };
 }

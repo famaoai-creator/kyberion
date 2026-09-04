@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   assertScopeContext,
   currentScope,
@@ -205,5 +205,13 @@ describe('scope-context', () => {
         else process.env[key] = value;
       }
     }
+  });
+
+  it('routes runtime scope environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/scope-context.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 });
