@@ -92,6 +92,15 @@ interface MediaThemeCatalog {
 
 type MediaTheme = Record<string, unknown>;
 
+interface MediaPptxPalette {
+  dk1: string;
+  dk2: string;
+  lt1: string;
+  lt2: string;
+  accent1: string;
+  accent2: string;
+}
+
 interface MediaCompositionPreset {
   recommended_theme?: string;
   branding?: Record<string, unknown>;
@@ -982,8 +991,9 @@ function compileBriefToDesignProtocol(
   return mediaDocumentPipelineHelpers.compileBriefToDesignProtocol(rootDir, rawBrief);
 }
 
-function themeToPptxPalette(theme: any): any {
-  const colors = theme?.colors || theme?.theme?.colors || {};
+function themeToPptxPalette(theme: MediaTheme | null): MediaPptxPalette {
+  const nestedTheme = recordValue(theme?.theme);
+  const colors = recordValue(theme?.colors ?? nestedTheme.colors);
   return {
     dk1: String(colors.primary || '#000000').replace('#', ''),
     dk2: String(colors.secondary || colors.text || '#44546A').replace('#', ''),
@@ -995,31 +1005,32 @@ function themeToPptxPalette(theme: any): any {
 }
 
 function themeToDocxStyleHints(
-  theme: any,
+  theme: MediaTheme | null,
   locale?: string
 ): { headingFont: string; bodyFont: string; accent: string } {
-  const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
+  const nestedTheme = recordValue(theme?.theme);
+  const themeFonts = recordValue(theme?.fonts ?? nestedTheme.fonts);
+  const heading = typeof themeFonts.heading === 'string' ? themeFonts.heading : undefined;
+  const body = typeof themeFonts.body === 'string' ? themeFonts.body : undefined;
   const headingFont = normalizeFontFamily(
-    locale?.startsWith('ja')
-      ? resolveEastAsianFontFamily(themeFonts.heading || themeFonts.body)
-      : themeFonts.heading || 'Aptos'
+    locale?.startsWith('ja') ? resolveEastAsianFontFamily(heading || body) : heading || 'Aptos'
   );
   const bodyFont = normalizeFontFamily(
-    locale?.startsWith('ja')
-      ? resolveEastAsianFontFamily(themeFonts.body || themeFonts.heading)
-      : themeFonts.body || 'Aptos'
+    locale?.startsWith('ja') ? resolveEastAsianFontFamily(body || heading) : body || 'Aptos'
   );
+  const colors = recordValue(theme?.colors ?? nestedTheme.colors);
   return {
     headingFont,
     bodyFont,
-    accent: String(theme?.colors?.accent || theme?.theme?.colors?.accent || '#2563eb').replace(
-      '#',
-      ''
-    ),
+    accent: String(colors.accent || '#2563eb').replace('#', ''),
   };
 }
 
-function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
+function resolveThemeColorRole(
+  palette: MediaPptxPalette,
+  accentHex: string,
+  role?: string
+): string {
   const resolvedRole = resolveThemeColorRolePolicy(role, 'secondary');
   switch (resolvedRole) {
     case 'accent':
@@ -1031,7 +1042,11 @@ function resolveThemeColorRole(palette: any, accentHex: string, role?: string): 
   }
 }
 
-function resolveThemeHexColor(themeColors: any, role?: string, fallback = '#334155'): string {
+function resolveThemeHexColor(
+  themeColors: Record<string, unknown>,
+  role?: string,
+  fallback = '#334155'
+): string {
   const resolvedRole = resolveThemeHexRolePolicy(role, 'secondary');
   switch (resolvedRole) {
     case 'accent':
