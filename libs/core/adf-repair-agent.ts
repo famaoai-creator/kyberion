@@ -35,6 +35,7 @@ import { truncateNormalizedText } from './foundation/text.js';
 import { assertProjectTrustApproval } from './project-trust.js';
 import { isBuiltinPipelineResource } from './trust-requiring-resources.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/primitives.js';
 import type { ValidationResult } from './types.js';
 
 export interface AdfRepairResult {
@@ -101,10 +102,10 @@ export async function validateAndRepairAdf(
   const repairPath = resolveAdfRepairPath(adfPath);
   if (schemaName === 'pipeline-adf') assertPipelineRepairTrust(repairPath, options);
   const content = safeReadFile(repairPath, { encoding: 'utf8' }) as string;
-  let parsed: any;
+  let parsed: unknown;
   try {
     parsed = parseSafeJsonInput(content, 'ADF input');
-  } catch (err: any) {
+  } catch (err: unknown) {
     // 1. Try lightweight structural repair before escalating to the LLM subagent
     const lightweight = tryRepairJson(content);
     if (lightweight !== null) {
@@ -115,11 +116,12 @@ export async function validateAndRepairAdf(
       safeWriteFile(repairPath, repairedStr, { encoding: 'utf8' });
       parsed = lightweight;
     } else {
-      logger.error(`[adf-repair] Failed to parse JSON at ${repairPath}: ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error(`[adf-repair] Failed to parse JSON at ${repairPath}: ${message}`);
       return attemptSubagentRepair(
         repairPath,
         schemaName,
-        `JSON parse error: ${err.message}`,
+        `JSON parse error: ${message}`,
         [],
         options
       );
@@ -155,13 +157,19 @@ export async function validateAndRepairAdf(
         };
       }
       return { repaired: false };
-    } catch (err: any) {
-      return attemptSubagentRepair(repairPath, schemaName, '', [err.message], options);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return attemptSubagentRepair(repairPath, schemaName, '', [message], options);
     }
   }
 
   // 2. Schema validation
-  const validation = validate(parsed, schemaName);
+  const validation = isRecord(parsed)
+    ? validate(parsed, schemaName)
+    : {
+        valid: false,
+        errors: [{ field: '$', message: 'ADF root must be a JSON object' }],
+      };
   if (validation.valid) {
     return { repaired: false };
   }
@@ -182,11 +190,19 @@ const ADF_REPAIR_KNOWLEDGE_HINT_LIMIT = 2;
 const ADF_REPAIR_KNOWLEDGE_EXCERPT_MAX = 200;
 
 function validateRepairTarget(
-  value: Record<string, unknown>,
+  value: unknown,
   schemaName: string,
   adfPath: string
 ): ValidationResult {
-  if (schemaName !== 'pipeline-adf') return validate(value, schemaName);
+  if (schemaName !== 'pipeline-adf') {
+    if (!isRecord(value)) {
+      return {
+        valid: false,
+        errors: [{ field: '$', message: 'ADF root must be a JSON object' }],
+      };
+    }
+    return validate(value, schemaName);
+  }
   try {
     const pipeline = validatePipelineAdf(value);
     const guardrails = validatePipelineGuardrails(pipeline, adfPath);
@@ -403,11 +419,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
     if (updatedContent === originalContent) {
       const returnedRepair = tryRepairJson(report);
       if (returnedRepair !== null) {
-        const returnedValidation = validateRepairTarget(
-          returnedRepair as Record<string, unknown>,
-          schemaName,
-          adfPath
-        );
+        const returnedValidation = validateRepairTarget(returnedRepair, schemaName, adfPath);
         if (returnedValidation.valid) {
           const repairedStr = repairJsonString(report)!;
           safeWriteFile(adfPath, repairedStr, { encoding: 'utf8' });
@@ -415,7 +427,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
         }
       }
     }
-    let updatedParsed: any;
+    let updatedParsed: unknown;
     try {
       updatedParsed = parseSafeJsonInput(updatedContent, 'ADF repair output');
     } catch {
@@ -449,15 +461,16 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       errors: finalErrors,
       report: `Sub-agent attempted repair but file is still invalid: ${finalErrors.join('; ')}`,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
     completeDelegatedTaskTrace(trace, {
-      error: err instanceof Error ? err.message : String(err),
+      error: message,
       gapPhases: gaps.samples(),
     });
     return {
       repaired: false,
-      errors: [err.message],
-      report: `Sub-agent repair failed: ${err.message}`,
+      errors: [message],
+      report: `Sub-agent repair failed: ${message}`,
     };
   }
 }
