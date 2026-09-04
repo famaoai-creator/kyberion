@@ -60,6 +60,18 @@ describe('run_baseline_check', () => {
     expect(source).not.toContain('const raw = safeReadFile(configPath');
   });
 
+  it('keeps the baseline CLI exit boundary inside the shared harness', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/run_baseline_check.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).not.toContain('process.exitCode');
+    expect(source).toContain("new ScriptExitError(1, '', true, report)");
+    expect(source).toContain('runBaselineCheckCli = defineScript');
+  });
+
   it('marks readiness config as degraded when parse fails', () => {
     const result = parseConnectionReadinessConfig('{broken-json', 'fixture.json');
 
