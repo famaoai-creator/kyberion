@@ -160,8 +160,7 @@ export function DeliverablesWorkspace({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ artifactId: selected.artifactId, verdict, comment, tenant }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to review the deliverable');
+      if (!response.ok) throw new Error('Failed to review the deliverable');
       setComment('');
       await refresh();
     } catch (err) {
