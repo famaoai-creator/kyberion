@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { buildCliProviderBundle } from './reasoning-cli-provider.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 
 describe('CLI reasoning provider module', () => {
+  it('routes provider environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/reasoning-cli-provider.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).not.toMatch(/env\.(CLAUDECODE|ANTHROPIC_API_KEY)/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('owns Claude Agent and Copilot modes outside the bootstrap switch', () => {
     const claudeAgent = buildCliProviderBundle({
       mode: 'claude-agent',
