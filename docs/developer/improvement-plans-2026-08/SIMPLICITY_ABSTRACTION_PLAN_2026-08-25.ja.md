@@ -18267,6 +18267,20 @@ manifest-backed actuator catalog の各 `src/op-catalog` を実行時に発見�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1057
+
+SX-08／SX-09 の意図解釈契約を再監査し、`intent-resolution-contract.ts` に残っていた `next_action` の固定英語文言を
+`user-facing-vocabulary` の `next_action:intent_resolution_*` key へ移した。契約の既存出力は維持しながら、catalog を正本にして
+surface 側が同じ意味キーを再解決できる境界を整えた。
+
+検証:
+
+- intent-resolution contract **1 file / 12 tests passed**。clarification／approval／autonomous の next-action 文言が catalog と一致することを確認した。
+- generated vocabulary types、pseudo locale、knowledge index を再生成し、`catalogs`／`vocabulary-types`／`pseudo-locale` の個別 gate passed。
+- canonical full gate **69 gates / 0 failed** passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
