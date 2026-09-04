@@ -99,6 +99,10 @@ import {
   parseConnectionsResponse,
   type ClientConnectionReviewItem,
 } from '../lib/connections-response';
+import {
+  parseOperatorHomeResponse,
+  type ClientOperatorHomeSummary,
+} from '../lib/operator-home-response';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -149,7 +153,9 @@ function ChronosMirrorV2Content() {
   const [deliverableAskWhyVerdict, setDeliverableAskWhyVerdict] = useState<
     'reject' | 'request-changes' | null
   >(null);
-  const [operatorHomeSummary, setOperatorHomeSummary] = useState<any | null>(null);
+  const [operatorHomeSummary, setOperatorHomeSummary] = useState<ClientOperatorHomeSummary | null>(
+    null
+  );
   const [operatorHomeError, setOperatorHomeError] = useState<string | null>(null);
   const [operatorHomeRefreshTick, setOperatorHomeRefreshTick] = useState(0);
   const [missionHistory, setMissionHistory] = useState<ClientMissionHistoryEntry[]>([]);
@@ -365,11 +371,13 @@ function ChronosMirrorV2Content() {
     )
       .then(async (response) => {
         if (!response.ok) throw new Error(`operator-home ${response.status}`);
-        return (await response.json()) as { summary?: any };
+        const parsed = parseOperatorHomeResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid operator home response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setOperatorHomeSummary(payload.summary || null);
+        setOperatorHomeSummary(payload.summary);
         setOperatorHomeError(null);
       })
       .catch((error) => {
