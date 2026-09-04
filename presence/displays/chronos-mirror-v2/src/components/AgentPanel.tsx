@@ -23,6 +23,12 @@ import {
   type ClientManualExecutionStatus,
 } from '../lib/agent-manual-response';
 import { parseAgentLogsResponse } from '../lib/agent-logs-response';
+import {
+  parseAgentRefreshResponse,
+  parseAgentRestartResponse,
+  parseAgentShutdownResponse,
+  parseAgentSpawnResponse,
+} from '../lib/agent-control-response';
 import { KyberionDonut } from './KyberionCharts';
 
 type AgentRecord = ClientAgentRecord;
@@ -203,14 +209,15 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         body: JSON.stringify(body),
       });
       if (res.ok) {
+        const parsed = parseAgentSpawnResponse(await res.json());
+        if (!parsed) throw new Error('Agent spawn returned an invalid response.');
         setShowSpawn(false);
         setSpawnPrompt('');
         setSpawnProviderStrategy('adaptive');
         setSpawnFallbackProviders('');
         await fetchAgents();
       } else {
-        const err = await res.json();
-        alert(err.error || 'Spawn failed');
+        alert('Spawn failed');
       }
     } catch (_) {
       /* best-effort: failure here must not break the primary flow */
@@ -243,11 +250,15 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const handleShutdown = async (agentId: string) => {
     try {
       setMutatingAgent(agentId);
-      await fetch('/api/agents', {
+      const response = await fetch('/api/agents', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agentId }),
       });
+      if (!response.ok) throw new Error('Agent shutdown failed');
+      const parsed = parseAgentShutdownResponse(await response.json());
+      if (!parsed || parsed.agentId !== agentId)
+        throw new Error('Agent shutdown returned an invalid response.');
       await fetchAgents();
     } catch (_) {
       /* best-effort cleanup */
@@ -258,11 +269,19 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const handleAgentAction = async (agentId: string, action: 'refresh' | 'restart') => {
     try {
       setMutatingAgent(agentId);
-      await fetch('/api/agents', {
+      const response = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, agentId }),
       });
+      if (!response.ok) throw new Error(`Agent ${action} failed`);
+      const payload = await response.json();
+      const parsed =
+        action === 'refresh'
+          ? parseAgentRefreshResponse(payload)
+          : parseAgentRestartResponse(payload);
+      if (!parsed || parsed.agentId !== agentId)
+        throw new Error(`Agent ${action} returned an invalid response.`);
       await fetchAgents();
       if (viewingLogs === agentId) {
         await fetchLogs(agentId);
