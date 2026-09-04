@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runChannelTurn } from '@agent/core/channel-adapter';
 import type { IMessageStimulus } from '@agent/core/imessage-utils';
 import type { SurfaceConversationResult } from '@agent/core/channel-surface-types';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const stubs = vi.hoisted(() => ({
   sent: [] as string[],
@@ -81,6 +83,15 @@ afterEach(() => {
 });
 
 describe('imessage bridge processing note', () => {
+  it('uses the shared exit-code convention instead of terminating the host process', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/imessage-bridge/src/index.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toContain('process.exit(');
+  });
+
   it('keeps file input inside the repository and limited to regular files', () => {
     expect(() => resolveIMessageBridgeInputPath('/tmp/imessage-input.json')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
