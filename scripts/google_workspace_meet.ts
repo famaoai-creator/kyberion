@@ -11,11 +11,13 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
 
+type Print = (value: unknown) => void;
+
 type ArgMap = Record<string, string | boolean>;
 
-function printUsage(): void {
-  console.log('Usage: pnpm google-workspace-meet -- <create> [options]');
-  console.log('  pnpm google-workspace-meet -- create --json \'{"summary":"Planning"}\'');
+function printUsage(print: Print): void {
+  print('Usage: pnpm google-workspace-meet -- <create> [options]');
+  print('  pnpm google-workspace-meet -- create --json \'{"summary":"Planning"}\'');
 }
 
 function parseArgs(argv: string[]): { command: string; args: ArgMap; help: boolean } {
@@ -68,16 +70,16 @@ export function readPayload(args: ArgMap): Record<string, unknown> {
   return parseSafeJsonObjectInput(rawJson, 'Google Workspace Meet payload') || {};
 }
 
-async function main(argv: string[]): Promise<void> {
+async function main(argv: string[], print: Print = () => undefined): Promise<void> {
   const { command, args, help } = parseArgs(argv);
 
   if (help || command === 'help') {
-    printUsage();
+    printUsage(print);
     return;
   }
 
   if (command !== 'create') {
-    printUsage();
+    printUsage(print);
     throw new Error(`unknown command '${command}' (expected create)`);
   }
 
@@ -89,13 +91,13 @@ async function main(argv: string[]): Promise<void> {
     env,
     timeoutMs: 120000,
   }).trim();
-  console.log(output);
+  print(output);
 }
 
 const script = defineScript({
   name: 'google-workspace:meet',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'google_workspace_meet.ts') ||
