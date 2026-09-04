@@ -9,28 +9,10 @@ interface MediaDrawioTierOrderCatalog {
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-drawio-tier-order.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-drawio-tier-order.schema.json');
 
-const FALLBACK_CATALOG: MediaDrawioTierOrderCatalog = {
-  version: '1.0.0',
-  tier_order: [
-    'network',
-    'edge',
-    'web',
-    'application',
-    'app',
-    'data',
-    'database',
-    'security',
-    'module',
-    'control',
-    'state',
-  ],
-};
-
 const catalog = defineCatalog<MediaDrawioTierOrderCatalog>({
   id: 'media-drawio-tier-order',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadMediaDrawioTierOrderCatalog(): MediaDrawioTierOrderCatalog {
