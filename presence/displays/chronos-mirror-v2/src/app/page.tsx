@@ -95,6 +95,10 @@ import {
 } from '../lib/mission-history-response';
 import { parseCostSummaryResponse } from '../lib/cost-summary-response';
 import type { CostSummary } from '../lib/su-surface-data';
+import {
+  parseConnectionsResponse,
+  type ClientConnectionReviewItem,
+} from '../lib/connections-response';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -162,7 +166,7 @@ function ChronosMirrorV2Content() {
   const [planApprovalBusy, setPlanApprovalBusy] = useState(false);
   const [planApprovalMessage, setPlanApprovalMessage] = useState<string | null>(null);
   const [planApprovalSessionId, setPlanApprovalSessionId] = useState<string | null>(null);
-  const [connections, setConnections] = useState<any[]>([]);
+  const [connections, setConnections] = useState<ClientConnectionReviewItem[]>([]);
   const [connectionsError, setConnectionsError] = useState<string | null>(null);
   const [connectionsQuery, setConnectionsQuery] = useState('');
   const [connectionReviewBusyId, setConnectionReviewBusyId] = useState<string | null>(null);
@@ -332,11 +336,13 @@ function ChronosMirrorV2Content() {
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`connections ${response.status}`);
-        return (await response.json()) as { connections?: any[] };
+        const parsed = parseConnectionsResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid connections response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setConnections(Array.isArray(payload.connections) ? payload.connections : []);
+        setConnections(payload.connections);
         setConnectionsError(null);
       })
       .catch((error) => {
