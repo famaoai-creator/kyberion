@@ -126,4 +126,12 @@ describe('customer_switch', () => {
       'Source it with: source active/shared/runtime/customer.env',
     ]);
   });
+
+  it('routes help output through the injected printer', async () => {
+    const mod = await import('./customer_switch.js');
+    const output: unknown[] = [];
+
+    expect(() => mod.main(['--help'], (value) => output.push(value))).toThrow();
+    expect(output).toEqual(['Usage: customer_switch <slug>']);
+  });
 });

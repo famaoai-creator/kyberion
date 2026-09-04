@@ -11,6 +11,8 @@ import {
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 const CUSTOMER_ENV_PATH = pathResolver.shared('runtime/customer.env');
 const REQUIRED_FILES = ['customer.json', 'identity.json', 'vision.md'];
@@ -69,13 +71,13 @@ export function formatSwitchedCustomer(result: { slug: string; envPath: string }
   ];
 }
 
-function main(argv: string[]): string[] {
+export function main(argv: string[], print: Print = () => undefined): string[] {
   const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
     const usage = 'Usage: customer_switch <slug>';
     if (slug) {
-      console.error(usage);
-      throw new ScriptExitError(0);
+      print(usage);
+      throw new ScriptExitError(0, '', true);
     }
     throw new ScriptExitError(2, usage);
   }
@@ -96,6 +98,6 @@ if (
     name: 'customer:switch',
     flags: [],
     run(context) {
-      context.print(main(context.argv).join('\n'));
+      context.print(main(context.argv, context.print).join('\n'));
     },
   })();

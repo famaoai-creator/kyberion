@@ -105,6 +105,14 @@ describe('customer_create', () => {
     expect(() => mod.createCustomer('../bad')).toThrow('Invalid customer slug');
   });
 
+  it('routes help output through the injected printer', async () => {
+    const mod = await import('./customer_create.js');
+    const output: unknown[] = [];
+
+    expect(() => mod.main(['--help'], (value) => output.push(value))).toThrow();
+    expect(output).toEqual(['Usage: customer_create <slug>']);
+  });
+
   it('formats creation output without writing to stdout', async () => {
     mocks.pathResolver.rootDir.mockReturnValue('/tmp/kyberion');
     const mod = await import('./customer_create.js');
