@@ -37,8 +37,12 @@ vi.mock('@agent/core/async-utils', async (importOriginal) => ({
 }));
 
 describe('network-actuator', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { safeLstat } = await import('@agent/core/secure-io');
+    // The directory-boundary test overrides this mock; restore the catalog's
+    // regular-file precondition before every subsequent action test.
+    vi.mocked(safeLstat).mockReturnValue({ isFile: () => true } as never);
   });
 
   describe('handleAction()', () => {

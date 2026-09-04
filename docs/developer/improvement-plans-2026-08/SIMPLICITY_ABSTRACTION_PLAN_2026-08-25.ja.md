@@ -16944,9 +16944,24 @@ URL／egress／secret redaction／retry、network capture context、service outp
 
 検証:
 
-- secureFetch **1 file / 4 tests passed**、service engine **1 file / 18 tests passed**、Presence actuator **1 file / 2 tests passed**。
+- secureFetch **1 file / 4 tests passed**、service engine **1 file / 18 tests passed**、Presence actuator **1 file / 2 tests passed**、network actuator **1 file / 21 tests passed**。
 - root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check` passed。
-- network actuator全体テストは既存の catalog mock が `governed-catalog` の regular-file guardを差し替えないため、未知opテスト1件が失敗した。今回の型変更とは無関係で、network／service／Presenceの対象テストは単独実行で通過している。
+- network actuator testの前段で変更された `safeLstat=false` mockが次のテストへ残る回帰も、`beforeEach`でregular-file mockを復元して修正した。catalog regular-file guardとunknown-op suggestionを含む全体テストが単独で通過している。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
+## 2026-09-04 再レビュー修正 968
+
+SX-09／SX-11 の pipeline step hook HTTP境界を再監査し、`secureFetch` の既定型を `unknown` へ移行した際に、
+`step-hooks` がresponseを未検証のまま `decision`／`approved` 参照していた残存を修正した。safe object判定後に
+hook decisionを評価し、null／scalar／array responseは拒否判定を生成しないようにした。HTTP hookのURL展開、
+request payload、abort／rejected／approved=false の既存 semanticsは維持している。併せてcatalog regular-file guard
+追加後に前テストの `safeLstat=false` mockが残る network actuator test fixtureを各テスト前に復元し、21件全体を安定化した。
+
+検証:
+
+- step-hooks **1 file / 4 tests passed**、secureFetch **1 file / 4 tests passed**、service engine **1 file / 18 tests passed**、Presence actuator **1 file / 2 tests passed**、network actuator **1 file / 21 tests passed**。
+- root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check` passed。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
