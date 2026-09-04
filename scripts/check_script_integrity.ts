@@ -2,9 +2,9 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile, readSafeJsonValueFile } from './lib/json-input.js';
 
 const ROOT = pathResolver.rootDir();
 
@@ -266,9 +266,9 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
     ((repoRelativePath: string) => safeExistsSync(pathResolver.rootResolve(repoRelativePath)));
   const packageJsonPath = options.packageJsonPath || pathResolver.rootResolve('package.json');
   const scanRepositoryDocs = options.packageJsonPath === undefined;
-  const packageJson = readJson<{
+  const packageJson = readSafeJsonFile<{
     scripts?: Record<string, string>;
-  }>(packageJsonPath);
+  }>(packageJsonPath, 'script integrity package manifest');
   const packageScripts = new Set(Object.keys(packageJson.scripts || {}));
 
   for (const [scriptName, command] of Object.entries(packageJson.scripts || {})) {
@@ -283,7 +283,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
   const pipelineRoots = options.pipelineRoots || DEFAULT_PIPELINE_ROOTS;
   for (const file of listPipelineFiles(pipelineRoots)) {
     const owner = toRepoRelative(file);
-    const payload = readJson<unknown>(file);
+    const payload = readSafeJsonValueFile<unknown>(file, `script integrity pipeline ${owner}`);
     scanValue(owner, payload, violations, pathExists, packageScripts);
   }
 
