@@ -17,6 +17,8 @@ import { logger } from '@agent/core/core';
 import { getRegisteredEnv } from '@agent/core/foundation';
 import { getOptionValue } from './mission-cli-args.js';
 
+type Print = (value: unknown) => void;
+
 function registeredEnv(name: string): string | undefined {
   return getRegisteredEnv<string>(name) as string | undefined;
 }
@@ -41,7 +43,10 @@ function reviewForCli(candidateId: string, tenantSlug?: string): MemoryPromotion
   return reviews[0];
 }
 
-export function listMemoryQueue(filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted') {
+export function listMemoryQueue(
+  filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted',
+  print: Print = () => undefined
+) {
   const rows = reviewMemoryPromotionQueue(filterStatus);
   if (rows.length === 0) {
     logger.info(
@@ -52,53 +57,58 @@ export function listMemoryQueue(filterStatus?: 'queued' | 'approved' | 'rejected
     return;
   }
   const header = `${'CANDIDATE_ID'.padEnd(30)} ${'STATUS'.padEnd(10)} ${'DECISION'.padEnd(17)} ${'BLOCKERS'.padEnd(8)} ${'RECORDS'.padEnd(8)} ${'KIND'.padEnd(18)} ${'TIER'.padEnd(13)} SOURCE`;
-  console.log('');
-  console.log(header);
-  console.log('-'.repeat(header.length + 6));
+  print('');
+  print(header);
+  print('-'.repeat(header.length + 6));
   for (const review of rows) {
     const candidate = review.candidate;
-    console.log(
+    print(
       `${review.candidate_id.padEnd(30)} ${candidate.status.padEnd(10)} ${review.review_status.padEnd(17)} ${String(review.blockers.length).padEnd(8)} ${String(review.physical_record_count).padEnd(8)} ${candidate.proposed_memory_kind.padEnd(18)} ${candidate.sensitivity_tier.padEnd(13)} ${candidate.source_ref}`
     );
   }
-  console.log('');
+  print('');
 }
 
-export function showMemoryReview(candidateId: string, tenantSlug?: string, jsonOutput = false) {
+export function showMemoryReview(
+  candidateId: string,
+  tenantSlug?: string,
+  jsonOutput = false,
+  print: Print = () => undefined
+) {
   const review = reviewForCli(candidateId, tenantSlug);
   if (jsonOutput) {
-    console.log(JSON.stringify(review, null, 2));
+    print(JSON.stringify(review, null, 2));
     return;
   }
   const candidate = review.candidate;
-  console.log('');
-  console.log(`Candidate: ${review.candidate_id}`);
-  console.log(`Decision: ${review.review_status}`);
-  console.log(`Summary: ${candidate.summary}`);
-  console.log(`Source: ${candidate.source_type} / ${candidate.source_ref}`);
-  console.log(`Kind: ${candidate.proposed_memory_kind} -> ${review.target_kind}`);
-  console.log(`Target: ${review.target_path}`);
-  console.log(`Tier: ${candidate.sensitivity_tier}`);
-  console.log(`Scope: ${candidate.scope?.tenant_slug || 'legacy/global'}`);
-  console.log(`Ratification required: ${review.approval_required ? 'yes' : 'no'}`);
-  console.log(`Physical records: ${review.physical_record_count}`);
-  console.log(
+  print('');
+  print(`Candidate: ${review.candidate_id}`);
+  print(`Decision: ${review.review_status}`);
+  print(`Summary: ${candidate.summary}`);
+  print(`Source: ${candidate.source_type} / ${candidate.source_ref}`);
+  print(`Kind: ${candidate.proposed_memory_kind} -> ${review.target_kind}`);
+  print(`Target: ${review.target_path}`);
+  print(`Tier: ${candidate.sensitivity_tier}`);
+  print(`Scope: ${candidate.scope?.tenant_slug || 'legacy/global'}`);
+  print(`Ratification required: ${review.approval_required ? 'yes' : 'no'}`);
+  print(`Physical records: ${review.physical_record_count}`);
+  print(
     `Audit: ${review.audit.status}${review.audit.audit_id ? ` (${review.audit.audit_id})` : ''}`
   );
-  console.log('Evidence:');
+  print('Evidence:');
   for (const evidence of review.evidence) {
-    console.log(`  - [${evidence.status}] ${evidence.ref}`);
+    print(`  - [${evidence.status}] ${evidence.ref}`);
   }
   if (review.blockers.length > 0) {
-    console.log('Blockers:');
-    for (const blocker of review.blockers) console.log(`  - ${blocker.code}: ${blocker.detail}`);
+    print('Blockers:');
+    for (const blocker of review.blockers) print(`  - ${blocker.code}: ${blocker.detail}`);
   }
   if (review.warnings.length > 0) {
-    console.log('Warnings:');
-    for (const warning of review.warnings) console.log(`  - ${warning}`);
+    print('Warnings:');
+    for (const warning of review.warnings) print(`  - ${warning}`);
   }
-  console.log('');
-  console.log(
+  print('');
+  print(
     review.review_status === 'ready_to_approve'
       ? 'Next: memory-approve <CANDIDATE_ID> --note "<reason>"'
       : review.review_status === 'ready_to_promote'
@@ -107,7 +117,12 @@ export function showMemoryReview(candidateId: string, tenantSlug?: string, jsonO
   );
 }
 
-export function approveMemoryCandidate(candidateId: string, note?: string, tenantSlug?: string) {
+export function approveMemoryCandidate(
+  candidateId: string,
+  note?: string,
+  tenantSlug?: string,
+  print: Print = () => undefined
+) {
   if (!candidateId) {
     logger.error(
       'Usage: mission_controller memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>]'
@@ -135,7 +150,8 @@ export function rejectMemoryCandidate(
   candidateId: string,
   note?: string,
   tenantSlug?: string,
-  allDuplicates = false
+  allDuplicates = false,
+  print: Print = () => undefined
 ) {
   if (!candidateId) {
     logger.error(
@@ -176,7 +192,8 @@ export function rejectMemoryCandidate(
 export function acceptRubricOverride(
   hypothesisOrBranchId: string,
   reason?: string,
-  severity?: string
+  severity?: string,
+  print: Print = () => undefined
 ) {
   if (!hypothesisOrBranchId) {
     logger.error(
@@ -232,7 +249,8 @@ export async function promoteMemoryCandidate(
   executionRole: 'mission_controller' | 'chronos_gateway' = 'mission_controller',
   note?: string,
   supersedes?: string,
-  tenantSlug?: string
+  tenantSlug?: string,
+  print: Print = () => undefined
 ) {
   if (!candidateId) {
     logger.error(
@@ -259,12 +277,15 @@ export async function promoteMemoryCandidate(
   }
 }
 
-export async function promotePendingMemoryCandidates(input: {
-  executionRole?: 'mission_controller' | 'chronos_gateway';
-  dryRun?: boolean;
-  note?: string;
-  supersedes?: string;
-}) {
+export async function promotePendingMemoryCandidates(
+  input: {
+    executionRole?: 'mission_controller' | 'chronos_gateway';
+    dryRun?: boolean;
+    note?: string;
+    supersedes?: string;
+  },
+  print: Print = () => undefined
+) {
   const executionRole = input.executionRole || 'mission_controller';
   const pending = listMemoryPromotionCandidates()
     .filter((row) => row.status === 'approved')
@@ -281,14 +302,14 @@ export async function promotePendingMemoryCandidates(input: {
     for (const row of pending) {
       try {
         const review = reviewForCli(row.candidate_id);
-        console.log(
+        print(
           `- ${row.candidate_id} (${row.proposed_memory_kind}, ${row.sensitivity_tier}) -> ${review.target_path}`
         );
         if (review.blockers.length > 0) {
-          console.log(`  HOLD: ${review.blockers.map((blocker) => blocker.code).join(', ')}`);
+          print(`  HOLD: ${review.blockers.map((blocker) => blocker.code).join(', ')}`);
         }
       } catch (error) {
-        console.log(
+        print(
           `- ${row.candidate_id} HOLD: ${error instanceof Error ? error.message : String(error)}`
         );
       }
