@@ -14,7 +14,6 @@ import {
   type ResolvedFacet,
   type ResolvedFacets,
 } from '@agent/core/facet-registry';
-import { readJson } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -22,6 +21,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 export interface FacetEvalFixture {
   kind: FacetKind;
@@ -99,7 +99,15 @@ function fixtureEntries(root: string): Array<{ entry: string; fixture: FacetEval
       try {
         const fixturePath = assertSafeRepositoryPath(path.join(safeRoot, entry));
         if (!safeLstat(fixturePath).isFile()) return [];
-        return [{ entry, fixture: readJson<FacetEvalFixture>(fixturePath) }];
+        return [
+          {
+            entry,
+            fixture: readSafeJsonFile<FacetEvalFixture>(
+              fixturePath,
+              `facet evaluation fixture ${entry}`
+            ),
+          },
+        ];
       } catch {
         return [];
       }

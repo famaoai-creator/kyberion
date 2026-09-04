@@ -29,4 +29,12 @@ describe('eval facet fixture loader', () => {
       expect.objectContaining({ fixture: 'target.json' }),
     ]);
   });
+
+  it('skips dangerous persisted fixtures', () => {
+    const fixture = path.join(fixtureRoot, 'dangerous.json');
+    safeMkdir(fixtureRoot, { recursive: true });
+    safeWriteFile(fixture, '{"__proto__":{"polluted":true},"kind":"persona"}');
+
+    expect(evaluateFacetFixtures(fixtureRoot)).toEqual([]);
+  });
 });
