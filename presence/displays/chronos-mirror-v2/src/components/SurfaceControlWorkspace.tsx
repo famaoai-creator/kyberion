@@ -4,45 +4,19 @@ import * as React from 'react';
 import { AlertTriangle, CheckCircle2, CircleStop, Play, RefreshCw } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
+import {
+  parseSurfaceControlActionResponse,
+  parseSurfaceControlResponse,
+  type ClientSurfaceControlAction,
+  type ClientSurfaceControlActionSummary,
+  type ClientSurfaceSummary,
+  type SurfaceControlResponse,
+} from '../lib/surface-control-response';
 
-type ActionDefinition = {
-  operation: string;
-  label: string;
-  risk: 'safe' | 'risky';
-  enabled: boolean;
-  disabledReason?: string;
-};
-
-type Surface = {
-  id: string;
-  kind: string;
-  startupMode?: string;
-  running: boolean;
-  health: string;
-  detail?: string;
-  controlSummary?: string;
-  controlRequestedBy?: string;
-};
-
-type ActionSummary = {
-  event_id?: string;
-  ts?: string;
-  kind: 'mission' | 'surface';
-  target: string;
-  operation: string;
-  status: 'queued' | 'completed' | 'failed';
-  requested_by?: string;
-  error?: string;
-};
-
-type IntelligencePayload = {
-  surfaces: Surface[];
-  controlActions: ActionSummary[];
-  controlActionAvailability: {
-    globalSurface: ActionDefinition[];
-    surface: Record<string, ActionDefinition[]>;
-  };
-};
+type ActionDefinition = ClientSurfaceControlAction;
+type Surface = ClientSurfaceSummary;
+type ActionSummary = ClientSurfaceControlActionSummary;
+type IntelligencePayload = SurfaceControlResponse;
 
 const EMPTY_PAYLOAD: IntelligencePayload = {
   surfaces: [],
@@ -70,22 +44,9 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
         `/api/intelligence${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`,
         { cache: 'no-store' }
       );
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'surface control failed');
-      setData({
-        ...EMPTY_PAYLOAD,
-        ...payload,
-        surfaces: Array.isArray(payload.surfaces) ? payload.surfaces : [],
-        controlActions: Array.isArray(payload.controlActions) ? payload.controlActions : [],
-        controlActionAvailability: {
-          ...EMPTY_PAYLOAD.controlActionAvailability,
-          ...(payload.controlActionAvailability || {}),
-          globalSurface: Array.isArray(payload.controlActionAvailability?.globalSurface)
-            ? payload.controlActionAvailability.globalSurface
-            : [],
-          surface: payload.controlActionAvailability?.surface || {},
-        },
-      });
+      const payload = parseSurfaceControlResponse(await response.json().catch(() => null));
+      if (!response.ok || !payload) throw new Error('Invalid surface control response');
+      setData(payload);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -112,8 +73,8 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
             operation: action.operation,
           }),
         });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'Surface control action failed');
+        const payload = parseSurfaceControlActionResponse(await response.json().catch(() => null));
+        if (!response.ok || !payload) throw new Error('Invalid surface control action response');
         await refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
