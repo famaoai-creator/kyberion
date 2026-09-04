@@ -8,6 +8,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExec } from './secure-io.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale, type SupportedLocale } from './locale-normalize.js';
+import { t } from './t.js';
 import { a2aBridge } from './a2a-bridge.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { getAgentManifest, resolveAgentSelectionHints } from './agent-manifest.js';
@@ -165,7 +166,7 @@ async function handleGovernedExecutionHint(
     }
     return emptySurfaceResult(
       [
-        `承認と記録が必要なためミッションとして進めます。ミッションID: ${missionId}`,
+        t('bridge:mission_promoted_for_approval', { missionId }, 'ja'),
         '',
         formatExecutionReceipt({
           intentId: resolved.intentId,
@@ -348,7 +349,7 @@ async function handleGovernedExecutionHint(
     }
     return emptySurfaceResult(
       [
-        `承認と記録が必要なためミッションを作成しました。ミッションID: ${missionId}`,
+        t('bridge:mission_created_for_approval', { missionId }, 'ja'),
         '',
         formatExecutionReceipt({
           intentId: resolved.intentId,

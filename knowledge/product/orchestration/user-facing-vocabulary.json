@@ -5029,6 +5029,16 @@
         "ja": "ルーティング: {routing}",
         "qps-ploc": "⟦Řőůŧïñɠ: {routing} ŀőřėɱ⟧"
       },
+      "mission_promoted_for_approval": {
+        "en": "Proceeding as a mission because approval and recording are required. Mission ID: {missionId}",
+        "ja": "承認と記録が必要なためミッションとして進めます。ミッションID: {missionId}",
+        "qps-ploc": "⟦Ṗřőƈėėḓïñɠ ȧş ȧ ɱïşşïőñ ƀėƈȧůşė ȧṗṗřőṽȧŀ ȧñḓ řėƈőřḓïñɠ ȧřė řėɋůïřėḓ. Ɱïşşïőñ ÏḒ: {missionId} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "mission_created_for_approval": {
+        "en": "Created the mission because approval and recording are required. Mission ID: {missionId}",
+        "ja": "承認と記録が必要なためミッションを作成しました。ミッションID: {missionId}",
+        "qps-ploc": "⟦Ƈřėȧŧėḓ ŧħė ɱïşşïőñ ƀėƈȧůşė ȧṗṗřőṽȧŀ ȧñḓ řėƈőřḓïñɠ ȧřė řėɋůïřėḓ. Ɱïşşïőñ ÏḒ: {missionId} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
       "mission_issued_queued": {
         "en": "Background orchestration has been queued.",
         "ja": "バックグラウンド処理をキューに登録しました。結果はこのチャットに届きます。",

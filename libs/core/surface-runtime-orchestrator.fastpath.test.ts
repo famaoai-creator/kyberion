@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { t } from './t.js';
 
 const mocks = vi.hoisted(() => {
   const safeExec = vi.fn();
@@ -311,7 +312,9 @@ describe('surface-runtime-orchestrator fast-path', () => {
       senderAgentId: 'test-sender',
     });
 
-    expect(result.text).toContain('承認と記録が必要なためミッションとして進めます。');
+    expect(result.text).toContain(
+      t('bridge:mission_promoted_for_approval', { missionId: '' }, 'ja')
+    );
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
       expect.arrayContaining(['dist/scripts/mission_controller.js', 'create']),
@@ -364,7 +367,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     );
     expect(result.text).toContain('- mission authority');
     expect(result.text).toContain("If you'd like, I can narrow this down further.");
-    expect(result.text).toContain('Completion: Completion confirmed');
+    expect(result.text).toContain(`Completion: ${t('next_action:completion_confirmed')}`);
     expect(mocks.queryKnowledge).toHaveBeenCalledWith(
       expect.anything(),
       'mission authority',
@@ -848,7 +851,9 @@ describe('surface-runtime-orchestrator fast-path', () => {
       query: 'PPTX のテーマを取り込んで再現して',
       senderAgentId: 'test-sender',
     });
-    expect(result.text).toContain('承認と記録が必要なためミッションとして進めます。');
+    expect(result.text).toContain(
+      t('bridge:mission_promoted_for_approval', { missionId: '' }, 'ja')
+    );
     expect(result.text).toContain('"kind": "execution-receipt"');
     expect(result.text).toContain('"governance"');
     expect(result.text).toContain('"policy_version": "1.0.0"');
@@ -891,7 +896,9 @@ describe('surface-runtime-orchestrator fast-path', () => {
       senderAgentId: 'test-sender',
     });
 
-    expect(result.text).toContain('承認と記録が必要なためミッションとして進めます。');
+    expect(result.text).toContain(
+      t('bridge:mission_promoted_for_approval', { missionId: '' }, 'ja')
+    );
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
       expect.arrayContaining(['dist/scripts/mission_controller.js', 'create']),
@@ -928,7 +935,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(result.text).toContain('写真を取得しました。');
     expect(result.text).toContain('使用カメラ: FaceTime HD Camera');
     expect(result.text).toContain('保存先: /tmp/capture.jpg');
-    expect(result.text).toContain('Completion: Completion confirmed');
+    expect(result.text).toContain(`Completion: ${t('next_action:completion_confirmed')}`);
     expect(mocks.executeCapturePhotoTaskSession).toHaveBeenCalledWith(
       expect.objectContaining({
         session: expect.objectContaining({
