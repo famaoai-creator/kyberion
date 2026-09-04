@@ -12,6 +12,8 @@ import { safeExec } from '@agent/core/secure-io';
 import { checkTitle } from './check_pr_title.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 interface PublishOptions {
   title?: string;
   bodyFile?: string;
@@ -98,7 +100,7 @@ export function buildGhArgs(
   return args;
 }
 
-async function main(argv: string[]): Promise<void> {
+async function main(argv: string[], print: Print = () => undefined): Promise<void> {
   const options = parsePublishArgs(argv);
 
   safeExec('gh', ['--version'], { cwd: pathResolver.rootDir() });
@@ -106,15 +108,13 @@ async function main(argv: string[]): Promise<void> {
 
   const args = buildGhArgs(options);
   const output = safeExec('gh', args, { cwd: pathResolver.rootDir() });
-  if (output.trim()) {
-    console.log(output.trim());
-  }
+  if (output.trim()) print(output.trim());
 }
 
 const script = defineScript({
   name: 'pr:publish',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'publish_pull_request.ts') ||
