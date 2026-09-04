@@ -18371,6 +18371,21 @@ proposal state の保存・消去は route adapter の責務として維持し�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1064
+
+SX-09 の surface runtime read-model 文言を再監査し、`surface-runtime-orchestrator.ts` に残っていた mission 昇格時の承認・記録通知2件を
+`bridge` vocabulary catalog の意味キーへ移した。表示は日本語 fallback を維持し、mission ID はパラメータとして渡すことで、固定文言の再増加を
+防止する。併せて、`NextAction` の日本語化後も英語固定値を期待していた fast-path assertion 2件を catalog 値参照へ更新した。
+mission promotion、execution receipt、approval 判定、実行経路は変更していない。
+
+検証:
+
+- surface runtime fast-path／UX contract **2 files / 34 tests passed**。
+- generated vocabulary types、pseudo locale、knowledge index を再生成し、対象 ESLint、`pnpm run typecheck`、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
