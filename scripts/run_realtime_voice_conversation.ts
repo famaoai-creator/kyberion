@@ -198,14 +198,17 @@ export function parseRecorderBridgeResponse(raw: string): RecorderBridgeResponse
   throw new Error(`Could not find JSON payload in recorder output:\n${raw}`);
 }
 
-async function runRecorderTurn(input: {
-  turnIndex: number;
-  sessionId: string;
-  recordBridgePath: string;
-  pythonBin: string;
-  recordSeconds: number;
-  recordOutputDir: string;
-}): Promise<string> {
+async function runRecorderTurn(
+  input: {
+    turnIndex: number;
+    sessionId: string;
+    recordBridgePath: string;
+    pythonBin: string;
+    recordSeconds: number;
+    recordOutputDir: string;
+  },
+  print: (value: unknown) => void = () => undefined
+): Promise<string> {
   safeMkdir(input.recordOutputDir, { recursive: true });
   const turnLabel = String(input.turnIndex + 1).padStart(2, '0');
   const audioPath = path.join(input.recordOutputDir, `turn-${turnLabel}.wav`);
@@ -222,12 +225,11 @@ async function runRecorderTurn(input: {
   child.stdout.on('data', (chunk: Buffer) => {
     const text = chunk.toString('utf8');
     stdout += text;
-    process.stdout.write(text);
   });
   child.stderr.on('data', (chunk: Buffer) => {
     const text = chunk.toString('utf8');
     stderr += text;
-    process.stderr.write(text);
+    if (text.trim()) print(text.trimEnd());
   });
 
   const exitCode = await new Promise<number>((resolve, reject) => {
@@ -346,14 +348,17 @@ export async function runRealtimeVoiceConversationInteractive(
     (options.recorder === 'vad'
       ? (turnIndex: number) => runVadRecorderTurn({ turnIndex, options }, print)
       : (turnIndex: number) =>
-          runRecorderTurn({
-            turnIndex,
-            sessionId: options.sessionId,
-            recordBridgePath: options.recordBridgePath,
-            pythonBin: options.pythonBin,
-            recordSeconds: options.recordSeconds,
-            recordOutputDir: options.recordOutputDir,
-          }));
+          runRecorderTurn(
+            {
+              turnIndex,
+              sessionId: options.sessionId,
+              recordBridgePath: options.recordBridgePath,
+              pythonBin: options.pythonBin,
+              recordSeconds: options.recordSeconds,
+              recordOutputDir: options.recordOutputDir,
+            },
+            print
+          ));
 
   const promptForContinue =
     deps.promptForContinue ??
