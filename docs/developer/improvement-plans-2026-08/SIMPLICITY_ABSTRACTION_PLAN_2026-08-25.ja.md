@@ -16695,6 +16695,13 @@ SX-08／SX-09 の Concierge `/api/summary` 初回 HTTP projectionを再監査し
 検証: Concierge summary response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 936
+
+SX-08／SX-09 の Concierge ingest projection（`/api/setup` tenant catalog と `/api/ingest` POST）を再監査し、ingest pageが setup payload と ingest summaryを直接 cast／存在判定して tenant選択・成果表示へ渡す残存を修正した。既存の setup parserを tenant候補取得へ再利用し、専用 parser で ingest outcome、dry-run、表示用 path、file／tenant、message、dangerous keyを検証してから stateへ渡す。既存の tenant registry、PII gate、dry-run／commit ceremony、human action semantics は変更していない。
+
+検証: Concierge ingest response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
