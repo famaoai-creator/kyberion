@@ -47,9 +47,18 @@ export type ConciergeSummary = {
 };
 
 type JsonRecord = Record<string, unknown>;
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 function isRecord(value: unknown): value is JsonRecord {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasSafeTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(hasSafeTree);
+  if (!isRecord(value)) return true;
+  return Object.entries(value).every(
+    ([key, nested]) => !DANGEROUS_KEYS.has(key) && hasSafeTree(nested)
+  );
 }
 
 function hasStringFields(record: JsonRecord, fields: string[]): boolean {
@@ -130,6 +139,11 @@ export function parseConciergeSummaryValue(value: unknown): ConciergeSummary | n
     return null;
   }
   return value as ConciergeSummary;
+}
+
+export function parseConciergeSummaryResponse(value: unknown): ConciergeSummary | null {
+  if (!isRecord(value) || value.ok !== true || !hasSafeTree(value)) return null;
+  return parseConciergeSummaryValue(value.summary);
 }
 
 export function parseConciergeSummaryEvent(raw: string): ConciergeSummary | null {
