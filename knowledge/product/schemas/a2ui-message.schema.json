@@ -22,9 +22,11 @@
             "title": { "type": "string" },
             "titleKey": { "type": "string" }
           },
-          "required": ["surfaceId", "catalogId"]
+          "required": ["surfaceId", "catalogId"],
+          "additionalProperties": false
         }
       },
+      "additionalProperties": false,
       "required": ["createSurface"]
     },
     "UpdateComponentsMessage": {
@@ -42,6 +44,7 @@
           "required": ["surfaceId", "components"]
         }
       },
+      "additionalProperties": false,
       "required": ["updateComponents"]
     },
     "UpdateDataModelMessage": {
@@ -56,6 +59,7 @@
           "required": ["surfaceId", "data"]
         }
       },
+      "additionalProperties": false,
       "required": ["updateDataModel"]
     },
     "DeleteSurfaceMessage": {
@@ -69,6 +73,7 @@
           "required": ["surfaceId"]
         }
       },
+      "additionalProperties": false,
       "required": ["deleteSurface"]
     },
     "Component": {
@@ -83,7 +88,8 @@
           "description": "List of child component IDs"
         }
       },
-      "required": ["id", "type"]
+      "required": ["id", "type"],
+      "additionalProperties": false
     }
   }
 }
