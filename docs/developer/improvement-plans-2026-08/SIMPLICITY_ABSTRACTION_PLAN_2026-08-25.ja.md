@@ -18111,6 +18111,18 @@ SX-04／SX-10 の layout shape merge boundary を再監査し、`mergePptxShape`
 - `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
 - canonical full gateはこのsliceの後段で実行する。
 
+## 2026-09-05 再レビュー修正 1046
+
+SX-04／SX-10 の layout input boundary を再監査し、slide template expansion と runtime preset selection の入力を
+`MediaSlideTemplateData`、template 値を `unknown` として明示した。title／subtitle／body／visual と layout selection key の
+形を型付けし、placeholder 展開、preset fallback、body array の join semantics は変更していない。
+
+検証:
+
+- Media layout catalog／body-zone **2 files / 31 tests passed**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
