@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 import {
   loadMissionNextTaskObjectsAtPath,
   loadMissionNextTaskRecordsAtPath,
@@ -87,6 +87,18 @@ describe('loadMissionNextTaskRecordsAtPath', () => {
     safeWriteFile(loaderPath, JSON.stringify([]));
     expect(() => loadMissionNextTaskRecordsAtPath(loaderPath, 'MSN-OTHER')).toThrow(
       '[MISSION_NEXT_TASKS_SCOPE_MISMATCH]'
+    );
+  });
+
+  it('rejects a symlinked NEXT_TASKS resource before loading it', () => {
+    safeMkdir(path.dirname(loaderPath), { recursive: true });
+    const targetPath = path.join(path.dirname(loaderPath), 'target.json');
+    const linkPath = path.join(path.dirname(loaderPath), 'linked-NEXT_TASKS.json');
+    safeWriteFile(targetPath, JSON.stringify([{ task_id: 'linked-task' }]));
+    safeSymlinkSync(targetPath, linkPath);
+
+    expect(() => loadMissionNextTaskObjectsAtPath(linkPath, loaderMissionId)).toThrow(
+      '[RESOURCE_PATH_SYMLINK]'
     );
   });
 });
