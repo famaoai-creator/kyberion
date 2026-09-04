@@ -91,7 +91,7 @@
           "description": "List of child component IDs"
         }
       },
-      "required": ["id", "type"],
+      "required": ["id", "type", "props"],
       "additionalProperties": false
     }
   }
