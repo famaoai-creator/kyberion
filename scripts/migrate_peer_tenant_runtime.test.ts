@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { pathResolver, safeExistsSync, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 import {
   applyPeerTenantMigrationPlan,
   buildPeerTenantMigrationPlan,
@@ -157,5 +157,17 @@ describe('peer tenant runtime migration', () => {
     expect(safeExistsSync(`${LEGACY_ROOT}/tenants/tenant-acme/peers/peer-a/outbox.jsonl`)).toBe(
       true
     );
+  });
+
+  it('routes the migration plan through the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/migrate_peer_tenant_runtime.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) =>');
   });
 });

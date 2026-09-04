@@ -514,9 +514,9 @@ function parseArgs(argv: string[]): PeerTenantMigrationOptions {
 const script = defineScript({
   name: 'migrate:peer-tenant-runtime',
   flags: [],
-  run: ({ argv }) => {
+  run: ({ argv, print }) => {
     const plan = runPeerTenantMigration(parseArgs(argv));
-    console.log(JSON.stringify(plan, null, 2));
+    print(JSON.stringify(plan, null, 2));
     return plan;
   },
 });
