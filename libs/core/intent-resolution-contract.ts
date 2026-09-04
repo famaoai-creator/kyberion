@@ -214,20 +214,27 @@ export function resolveIntentResolutionContract(
     missingInputs.length > 0
       ? {
           kind: 'provide_input',
-          label: 'Provide the missing information to continue.',
-          consequence: 'Execution remains waiting until the missing information is provided.',
+          label: t('next_action:intent_resolution_provide_input', undefined, 'en'),
+          consequence: t(
+            'next_action:intent_resolution_provide_input_consequence',
+            undefined,
+            'en'
+          ),
         }
       : authorityLevel === 'approval_required'
         ? {
             kind: 'request_approval',
-            label: 'Approve this plan to continue.',
-            consequence:
-              'The requested action remains waiting and does not execute without approval.',
+            label: t('next_action:intent_resolution_request_approval', undefined, 'en'),
+            consequence: t(
+              'next_action:intent_resolution_request_approval_consequence',
+              undefined,
+              'en'
+            ),
           }
         : {
             kind: 'continue',
-            label: 'Continue with the resolved request.',
-            consequence: 'The request can proceed under the current authority boundary.',
+            label: t('next_action:intent_resolution_continue', undefined, 'en'),
+            consequence: t('next_action:intent_resolution_continue_consequence', undefined, 'en'),
           };
 
   return {

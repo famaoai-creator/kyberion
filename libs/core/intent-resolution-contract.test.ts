@@ -11,6 +11,7 @@ import { classifyTaskSessionIntent, getTaskIntentBuilder } from './task-session.
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { t } from './t.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
@@ -175,6 +176,32 @@ describe('intent-resolution-contract', () => {
     expect(contract.authority_level).toBe('human_clarification_required');
     expect(contract.resolution_shape).toBe('direct_answer');
     expect(contract.next_action.kind).toBe('provide_input');
+  });
+
+  it('sources next-action prose from the shared vocabulary catalog', () => {
+    const clarification = resolveIntentResolutionContract('zzzzzzzzqqqq');
+    expect(clarification.next_action.label).toBe(
+      t('next_action:intent_resolution_provide_input', undefined, 'en')
+    );
+    expect(clarification.next_action.consequence).toBe(
+      t('next_action:intent_resolution_provide_input_consequence', undefined, 'en')
+    );
+
+    const approval = resolveIntentResolutionContract('動画を生成して');
+    expect(approval.next_action.label).toBe(
+      t('next_action:intent_resolution_request_approval', undefined, 'en')
+    );
+    expect(approval.next_action.consequence).toBe(
+      t('next_action:intent_resolution_request_approval_consequence', undefined, 'en')
+    );
+
+    const autonomous = resolveIntentResolutionContract('来週の予定教えて');
+    expect(autonomous.next_action.label).toBe(
+      t('next_action:intent_resolution_continue', undefined, 'en')
+    );
+    expect(autonomous.next_action.consequence).toBe(
+      t('next_action:intent_resolution_continue_consequence', undefined, 'en')
+    );
   });
 
   it('reuses an injected resolution packet when deriving task requirements', () => {

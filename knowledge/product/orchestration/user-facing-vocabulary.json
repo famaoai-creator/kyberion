@@ -4752,6 +4752,36 @@
         "ja": "提供された証跡を確認し、目的が満たされたか判断してください。",
         "qps-ploc": "⟦Řėṽïėẇ ŧħė ḓėŀïṽėřėḓ ėṽïḓėñƈė ȧñḓ ƈőñƒïřɱ ẇħėŧħėř ŧħė ɠőȧŀ ïş şȧŧïşƒïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
+      "intent_resolution_provide_input": {
+        "en": "Provide the missing information to continue.",
+        "ja": "続行するために不足している情報を入力してください。",
+        "qps-ploc": "⟦Ṗřőṽïḓė ŧħė ɱïşşïñɠ ïñƒőřɱȧŧïőñ ŧő ƈőñŧïñůė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "intent_resolution_provide_input_consequence": {
+        "en": "Execution remains waiting until the missing information is provided.",
+        "ja": "不足している情報が入力されるまで実行は待機します。",
+        "qps-ploc": "⟦Ėẋėƈůŧïőñ řėɱȧïñş ẇȧïŧïñɠ ůñŧïŀ ŧħė ɱïşşïñɠ ïñƒőřɱȧŧïőñ ïş ṗřőṽïḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "intent_resolution_request_approval": {
+        "en": "Approve this plan to continue.",
+        "ja": "続行するにはこの計画を承認してください。",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŧħïş ṗŀȧñ ŧő ƈőñŧïñůė. ŀőřėɱ ïṗşů⟧"
+      },
+      "intent_resolution_request_approval_consequence": {
+        "en": "The requested action remains waiting and does not execute without approval.",
+        "ja": "承認されるまで要求された操作は待機し、実行されません。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧėḓ ȧƈŧïőñ řėɱȧïñş ẇȧïŧïñɠ ȧñḓ ḓőėş ñőŧ ėẋėƈůŧė ẇïŧħőůŧ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "intent_resolution_continue": {
+        "en": "Continue with the resolved request.",
+        "ja": "解決された依頼で続行します。",
+        "qps-ploc": "⟦Ƈőñŧïñůė ẇïŧħ ŧħė řėşőŀṽėḓ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "intent_resolution_continue_consequence": {
+        "en": "The request can proceed under the current authority boundary.",
+        "ja": "現在の権限境界のもとで依頼を進められます。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈȧñ ṗřőƈėėḓ ůñḓėř ŧħė ƈůřřėñŧ ȧůŧħőřïŧẏ ƀőůñḓȧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
       "verify_missing_runtime_prerequisites": {
         "en": "Verify missing runtime prerequisites",
         "ja": "不足している実行環境を確認",
