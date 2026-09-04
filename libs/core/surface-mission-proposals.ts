@@ -33,6 +33,7 @@ import type {
   SlackMissionProposalState,
   SurfaceMissionProposalState,
 } from './channel-surface-types.js';
+import { t } from './t.js';
 
 const SURFACE_MISSION_PROPOSAL_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-mission-proposal-state.schema.json'
@@ -400,15 +401,27 @@ export function stashMissionProposalForConfirmation(params: {
     routingDecision: params.routingDecision,
   });
   const summary =
-    String(params.proposal.summary || params.fallbackSummary || '').trim() || 'Mission proposal';
+    String(params.proposal.summary || params.fallbackSummary || '').trim() ||
+    t('bridge:mission_proposal_fallback', undefined, 'ja');
+  return buildMissionProposalConfirmationText({
+    summary,
+    intentResolution: params.intentResolution,
+  });
+}
+
+export function buildMissionProposalConfirmationText(params: {
+  summary: string;
+  intentResolution?: IntentResolutionContract;
+}): string {
+  const locale = 'ja' as const;
   return [
-    `${summary}\n1) 作成する 2) やめる`,
+    `${params.summary}\n${t('bridge:mission_proposal_confirmation_choices', undefined, locale)}`,
     ...(params.intentResolution
       ? [
-          `Authority: ${renderIntentAuthorityLabel(params.intentResolution.authority_level, 'ja')}`,
-          `Next action: ${params.intentResolution.next_action.label}`,
-          `Consequence: ${params.intentResolution.next_action.consequence}`,
-          `Outcome: ${renderIntentOutcomeLabel(params.intentResolution.outcome_kind, 'ja')}`,
+          `${t('bridge:contract_authority', undefined, locale)}: ${renderIntentAuthorityLabel(params.intentResolution.authority_level, locale)}`,
+          `${t('bridge:contract_next_action', undefined, locale)}: ${params.intentResolution.next_action.label}`,
+          `${t('bridge:contract_consequence', undefined, locale)}: ${params.intentResolution.next_action.consequence}`,
+          `${t('bridge:contract_outcome', undefined, locale)}: ${renderIntentOutcomeLabel(params.intentResolution.outcome_kind, locale)}`,
         ]
       : []),
   ].join('\n');
