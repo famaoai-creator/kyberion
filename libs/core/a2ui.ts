@@ -78,6 +78,16 @@ export interface A2UIMessage {
 export const A2UI_SURFACE_ID = /^[a-z0-9][a-z0-9:_-]{0,80}$/u;
 export const A2UI_COMPONENT_TYPE = /^[a-z0-9][a-z0-9:._-]{0,80}$/u;
 
+function assertKnownKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  label: string
+): void {
+  const allowedKeys = new Set(allowed);
+  const unknownKey = Object.keys(value).find((key) => !allowedKeys.has(key));
+  if (unknownKey) throw new Error(`A2UI ${label} contains unknown field: ${unknownKey}.`);
+}
+
 /**
  * Validate the structural A2UI wire contract before a surface applies a message.
  * Surface-specific scope and component policy remains outside this protocol parser.
@@ -87,6 +97,11 @@ export function validateA2UIMessage(value: unknown): A2UIMessage {
     throw new Error('A2UI message must be an object.');
   }
   const message = value as Record<string, unknown>;
+  assertKnownKeys(
+    message,
+    ['createSurface', 'updateComponents', 'updateDataModel', 'deleteSurface'],
+    'message'
+  );
   const operations = [
     'createSurface',
     'updateComponents',
@@ -100,6 +115,14 @@ export function validateA2UIMessage(value: unknown): A2UIMessage {
     throw new Error(`A2UI ${operations[0]} payload must be an object.`);
   }
   const payload = operation as Record<string, unknown>;
+  const operationName = operations[0];
+  const payloadKeys = {
+    createSurface: ['surfaceId', 'catalogId', 'title', 'titleKey'],
+    updateComponents: ['surfaceId', 'components'],
+    updateDataModel: ['surfaceId', 'data'],
+    deleteSurface: ['surfaceId'],
+  } as const;
+  assertKnownKeys(payload, payloadKeys[operationName], `${operationName} payload`);
   const surfaceId = payload.surfaceId;
   if (typeof surfaceId !== 'string' || !A2UI_SURFACE_ID.test(surfaceId)) {
     throw new Error('A2UI surfaceId is invalid.');
@@ -111,6 +134,9 @@ export function validateA2UIMessage(value: unknown): A2UIMessage {
     if (payload.title !== undefined && typeof payload.title !== 'string') {
       throw new Error('A2UI title must be a string.');
     }
+    if (payload.titleKey !== undefined && typeof payload.titleKey !== 'string') {
+      throw new Error('A2UI titleKey must be a string.');
+    }
   }
   if (operations[0] === 'updateComponents') {
     if (!Array.isArray(payload.components)) throw new Error('A2UI components must be an array.');
@@ -119,6 +145,7 @@ export function validateA2UIMessage(value: unknown): A2UIMessage {
         throw new Error('A2UI component must be an object.');
       }
       const item = component as Record<string, unknown>;
+      assertKnownKeys(item, ['id', 'type', 'props', 'children'], 'component');
       if (typeof item.id !== 'string' || !A2UI_SURFACE_ID.test(item.id)) {
         throw new Error('A2UI component id is invalid.');
       }
@@ -127,6 +154,14 @@ export function validateA2UIMessage(value: unknown): A2UIMessage {
       }
       if (!item.props || typeof item.props !== 'object' || Array.isArray(item.props)) {
         throw new Error('A2UI component props must be an object.');
+      }
+      if (item.children !== undefined) {
+        if (
+          !Array.isArray(item.children) ||
+          item.children.some((child) => typeof child !== 'string')
+        ) {
+          throw new Error('A2UI component children must be an array of strings.');
+        }
       }
     }
   }
@@ -237,10 +272,11 @@ class A2UIDispatcher {
   }
 
   public dispatch(message: A2UIMessage): void {
-    logger.info(`[A2UI_DISPATCH] ${JSON.stringify(message)}`);
+    const validatedMessage = validateA2UIMessage(message);
+    logger.info(`[A2UI_DISPATCH] ${JSON.stringify(validatedMessage)}`);
     for (const transport of this.transports) {
       try {
-        transport(message);
+        transport(validatedMessage);
       } catch (err: any) {
         logger.error(`[A2UI_TRANSPORT_ERROR] ${err.message}`);
       }

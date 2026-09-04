@@ -333,3 +333,9 @@ surface のJSON request readerを再監査し、Chronos／Concierge／operator-s
 Computer Surface の `/a2ui/dispatch` を再監査し、tenant scope の検査後に `A2UIMessage` へ型アサーションするだけで、malformedな update data model／component／operation を state 適用へ渡す残存を修正した。A2UI wire の構造 validator を core へ移し、Presence Studio も同じ validator を利用するように統合した。既存の tenant scope、localadmin gate、A2UI state適用 semanticsは変更していない。
 
 検証: A2UI validator／Computer Surface resource boundary **3 files / 追加回帰を含む focused tests**、root typecheck、root lint、`pnpm run check -- --scope full`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-04 再レビュー修正 30
+
+A2UI 共通 validator の適用範囲を再監査し、既知 operation の組み合わせだけを検査していたため、root／operation payload／component の未知 field と、型不正な `children`／`titleKey` が内部 dispatch または surface 適用へ到達し得る残存を検出した。validator に許可キーの fail-closed 検査と wire 型検査を追加し、A2UI dispatcher 自身も transport 呼び出し前に検証するようにした。併せて JSON Schema の `additionalProperties` 制約を実装と揃えた。
+
+検証: A2UI／Computer Surface **3 files / 17 tests passed**、root typecheck、root lint、`git diff --check`、knowledge index 生成。canonical full gate は修正後に再実行する。
