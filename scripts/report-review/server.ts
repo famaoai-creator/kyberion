@@ -40,7 +40,7 @@ export interface ReportReviewServerResult {
   listening: boolean;
 }
 
-async function main(
+export async function main(
   args: string[] = [],
   options: {
     dryRun?: boolean;
@@ -98,7 +98,7 @@ async function main(
     scope: reviewContext.scope,
     listening: false,
   };
-  const print = options.print ?? console.log;
+  const print = options.print ?? (() => undefined);
   if (options.dryRun || options.check) {
     if (options.json || options.dryRun || options.check) print(preview);
     else print(`${mode}: would serve ${target} at ${url}`);
@@ -203,13 +203,13 @@ async function main(
             res.end(
               `saved (backup: ${backup.split('/').pop()}, review_session: ${reviewContext.review_session_id})`
             );
-            console.log(
+            print(
               `[save] wrote ${target} (backup ${backup.split('/').pop()}, ${html.length} bytes)`
             );
           } catch (e: unknown) {
             res.writeHead(500);
             res.end(e instanceof Error ? e.message : String(e));
-            console.error('[save]', e);
+            print(`[save] ${e instanceof Error ? e.message : String(e)}`);
           }
         });
         return;
@@ -221,41 +221,48 @@ async function main(
       res.end(e instanceof Error ? e.message : String(e));
     }
   });
-  server.listen(port, '127.0.0.1', () => {
-    try {
-      recordProtocolServiceLifecycle({
-        serviceId: 'report-review',
-        action: 'start',
-        status: 'started',
-        scope: reviewContext.scope,
-        actorRole: 'surface_runtime',
-        principal: { kind: 'human', id: reviewContext.viewer_principal },
-        requestedBy: reviewContext.viewer_principal,
-        correlationId: reviewContext.review_session_id,
-        metadata: {
-          port,
-          artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref),
-        },
-      });
-    } catch (error) {
-      console.error(`[report-review] start lifecycle receipt unavailable: ${error}`);
-      server.close(() => {
-        process.exitCode = 1;
-      });
-      return;
-    }
-    if (options.json) {
-      print({ ...preview, listening: true });
-    } else {
-      print(`Report review server → ${url}`);
-      print(`  target : ${target}`);
-      print(`  artifact: ${reviewContext.artifact_ref}`);
-      print(
-        `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
-      );
-      print(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
-      print('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
-    }
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error) =>
+      reject(new ScriptExitError(1, `[report-review] failed to listen: ${error.message}`));
+    server.once('error', onError);
+    server.listen(port, '127.0.0.1', () => {
+      server.off('error', onError);
+      try {
+        recordProtocolServiceLifecycle({
+          serviceId: 'report-review',
+          action: 'start',
+          status: 'started',
+          scope: reviewContext.scope,
+          actorRole: 'surface_runtime',
+          principal: { kind: 'human', id: reviewContext.viewer_principal },
+          requestedBy: reviewContext.viewer_principal,
+          correlationId: reviewContext.review_session_id,
+          metadata: {
+            port,
+            artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref),
+          },
+        });
+      } catch (error) {
+        server.close(() => undefined);
+        reject(
+          new ScriptExitError(1, `[report-review] start lifecycle receipt unavailable: ${error}`)
+        );
+        return;
+      }
+      if (options.json) {
+        print({ ...preview, listening: true });
+      } else {
+        print(`Report review server → ${url}`);
+        print(`  target : ${target}`);
+        print(`  artifact: ${reviewContext.artifact_ref}`);
+        print(
+          `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
+        );
+        print(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
+        print('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
+      }
+      resolve();
+    });
   });
 
   let stopping = false;
@@ -274,7 +281,7 @@ async function main(
         correlationId: reviewContext.review_session_id,
       });
     } catch (error) {
-      console.error(`[report-review] stop lifecycle receipt unavailable: ${error}`);
+      print(`[report-review] stop lifecycle receipt unavailable: ${error}`);
     } finally {
       server.close();
     }
