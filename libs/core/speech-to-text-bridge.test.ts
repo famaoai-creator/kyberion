@@ -18,7 +18,7 @@ vi.mock('./policy-engine.js', () => ({
 }));
 
 import { pathResolver, rootResolve } from './path-resolver.js';
-import { safeSymlinkSync, safeUnlinkSync } from './secure-io.js';
+import { safeReadFile, safeSymlinkSync, safeUnlinkSync } from './secure-io.js';
 import {
   getSpeechToTextBridge,
   getSpeechToTextBridges,
@@ -29,6 +29,8 @@ import {
   parseSpeechToTextCapabilities,
   stubSpeechToTextBridge,
   ShellSpeechToTextBridge,
+  installFluidAudioSpeechToTextBridgeIfAvailable,
+  installShellSpeechToTextBridgeIfAvailable,
   type SpeechToTextBridge,
 } from './speech-to-text-bridge.js';
 
@@ -210,5 +212,51 @@ describe('speech-to-text-bridge', () => {
     );
     expect(result.capabilities).toEqual({ timestamps: false, granularity: 'none' });
     expect(result.segments).toEqual([]);
+  });
+
+  it('installs configured STT bridges from the injected environment', () => {
+    expect(
+      installShellSpeechToTextBridgeIfAvailable({
+        KYBERION_STT_COMMAND: 'whisper --file {{audio}}',
+        KYBERION_STT_CAPABILITIES: JSON.stringify({
+          timestamps: true,
+          granularity: 'segment',
+        }),
+        KYBERION_STT_PRIORITY: '7',
+      })
+    ).toBe(true);
+    expect(getSpeechToTextBridge().name).toBe('shell');
+    expect(getSpeechToTextBridge().priority).toBe(7);
+    expect(getSpeechToTextCapabilities(getSpeechToTextBridge())).toEqual({
+      timestamps: true,
+      granularity: 'segment',
+    });
+
+    resetSpeechToTextBridge();
+    expect(
+      installFluidAudioSpeechToTextBridgeIfAvailable({
+        KYBERION_FLUID_AUDIO_STT_COMMAND: 'parakeet --audio {{audio}}',
+      })
+    ).toBe(true);
+    expect(getSpeechToTextBridge().name).toBe('fluid-audio-parakeet');
+  });
+
+  it('keeps explicit shell STT ahead of the FluidAudio fallback', () => {
+    expect(
+      installFluidAudioSpeechToTextBridgeIfAvailable({
+        KYBERION_STT_COMMAND: 'whisper --file {{audio}}',
+        KYBERION_FLUID_AUDIO_STT_COMMAND: 'parakeet --audio {{audio}}',
+      })
+    ).toBe(false);
+  });
+
+  it('routes STT environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(path.join(pathResolver.rootDir(), 'libs/core/speech-to-text-bridge.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 });

@@ -19,6 +19,7 @@
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import {
@@ -75,6 +76,10 @@ export interface SpeechToTextBridge {
   /** Stable tie-breaker; higher values are preferred when capabilities match. */
   priority?: number;
   transcribe(input: TranscribeInput): Promise<TranscribeResult>;
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 export const NO_TIMESTAMP_STT_CAPABILITIES: SpeechToTextCapabilities = {
@@ -377,9 +382,10 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
 export function installFluidAudioSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  if (env.KYBERION_STT_COMMAND?.trim()) return false;
-  const command = env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim();
+  if (envText(env, 'KYBERION_STT_COMMAND')?.trim()) return false;
+  const command = envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim();
   if (!command) return false;
+  const timeoutText = envText(env, 'KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS');
   registerSpeechToTextBridge(
     new ShellSpeechToTextBridge({
       name: 'fluid-audio-parakeet',
@@ -387,9 +393,7 @@ export function installFluidAudioSpeechToTextBridgeIfAvailable(
       structuredOutput: true,
       priority: 100,
       capabilities: { timestamps: true, granularity: 'segment', local_only: true },
-      ...(env.KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS
-        ? { timeoutMs: parseInt(env.KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS, 10) }
-        : {}),
+      ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
     })
   );
   logger.success('[stt-bridge] installed FluidAudio Parakeet bridge');
@@ -404,15 +408,13 @@ export function installFluidAudioSpeechToTextBridgeIfAvailable(
 export function installShellSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  const command = env.KYBERION_STT_COMMAND?.trim();
+  const command = envText(env, 'KYBERION_STT_COMMAND')?.trim();
   if (!command) return false;
   let capabilities: SpeechToTextCapabilities | undefined;
-  if (env.KYBERION_STT_CAPABILITIES?.trim()) {
+  const capabilitiesText = envText(env, 'KYBERION_STT_CAPABILITIES')?.trim();
+  if (capabilitiesText) {
     try {
-      const parsed: unknown = parseSafeJsonInput(
-        env.KYBERION_STT_CAPABILITIES,
-        'speech-to-text capabilities'
-      );
+      const parsed: unknown = parseSafeJsonInput(capabilitiesText, 'speech-to-text capabilities');
       capabilities = parseSpeechToTextCapabilities(parsed);
       if (!capabilities) {
         logger.warn('[stt-bridge] ignored invalid KYBERION_STT_CAPABILITIES shape');
@@ -422,15 +424,15 @@ export function installShellSpeechToTextBridgeIfAvailable(
       logger.warn(`[stt-bridge] ignored invalid KYBERION_STT_CAPABILITIES: ${detail}`);
     }
   }
+  const priorityText = envText(env, 'KYBERION_STT_PRIORITY');
+  const timeoutText = envText(env, 'KYBERION_STT_TIMEOUT_MS');
   registerSpeechToTextBridge(
     new ShellSpeechToTextBridge({
       command,
-      ...(env.KYBERION_STT_OUTPUT_FORMAT === 'json' ? { structuredOutput: true } : {}),
+      ...(envText(env, 'KYBERION_STT_OUTPUT_FORMAT') === 'json' ? { structuredOutput: true } : {}),
       ...(capabilities ? { capabilities } : {}),
-      ...(env.KYBERION_STT_PRIORITY ? { priority: parseInt(env.KYBERION_STT_PRIORITY, 10) } : {}),
-      ...(env.KYBERION_STT_TIMEOUT_MS
-        ? { timeoutMs: parseInt(env.KYBERION_STT_TIMEOUT_MS, 10) }
-        : {}),
+      ...(priorityText ? { priority: parseInt(priorityText, 10) } : {}),
+      ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
     })
   );
   logger.success(`[stt-bridge] installed ShellSpeechToTextBridge from KYBERION_STT_COMMAND`);
@@ -445,7 +447,10 @@ export function installShellSpeechToTextBridgeIfAvailable(
 export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  if (env.KYBERION_STT_COMMAND?.trim() || env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()) {
+  if (
+    envText(env, 'KYBERION_STT_COMMAND')?.trim() ||
+    envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
+  ) {
     return false;
   }
   const pythonBin = resolveManagedToolPythonBin('mlx_whisper');
