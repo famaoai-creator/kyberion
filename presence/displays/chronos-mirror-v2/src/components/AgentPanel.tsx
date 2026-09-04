@@ -3,57 +3,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, RefreshCw, Cpu, X, FileText, Terminal, RotateCcw } from 'lucide-react';
 import { resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
+import {
+  parseAgentHealthResponse,
+  type ClientAgentHealthResponse,
+  type ClientAgentRecord,
+} from '../lib/agent-health-response';
 import { KyberionDonut } from './KyberionCharts';
 
-interface AgentRecord {
-  agentId: string;
-  provider: string;
-  modelId: string;
-  status: string;
-  capabilities: string[];
-  trustScore: number | null;
-  uptimeMs: number | null;
-  idleMs: number | null;
-  runtime: {
-    kind: string;
-    state: string;
-    pid?: number;
-    idleForMs: number;
-    shutdownPolicy: string;
-  } | null;
-  metrics: {
-    turnCount: number;
-    errorCount: number;
-    restartCount: number;
-    refreshCount: number;
-    totalPromptChars: number;
-    totalResponseChars: number;
-    usage?: {
-      totalTokens?: number;
-      inputTokens?: number;
-      outputTokens?: number;
-    };
-  } | null;
-  process: {
-    rssKb?: number;
-    cpuPercent?: number;
-  } | null;
-  supportsSoftRefresh: boolean;
-  providerRuntime?: Record<string, unknown>;
-  providerResolution?: {
-    preferredProvider?: string;
-    preferredModelId?: string;
-    strategy?: string;
-    availableProviders?: string[];
-  } | null;
-}
-
-interface HealthSnapshot {
-  total: number;
-  ready: number;
-  busy: number;
-  error: number;
-}
+type AgentRecord = ClientAgentRecord;
+type HealthSnapshot = Pick<ClientAgentHealthResponse, 'total' | 'ready' | 'busy' | 'error'>;
 
 type ChronosAccessRole = 'readonly' | 'localadmin';
 
@@ -151,10 +109,11 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     try {
       const res = await fetch('/api/agents');
       if (res.ok) {
-        const data = await res.json();
-        setAgents(data.agents || []);
+        const data = parseAgentHealthResponse(await res.json());
+        if (!data) return;
+        setAgents(data.agents);
         setHealth(data);
-        setAccessRole(data.accessRole || 'readonly');
+        setAccessRole(data.accessRole);
       }
     } catch (_) {
       /* best-effort: failure here must not break the primary flow */
