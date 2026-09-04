@@ -20,6 +20,7 @@ import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
@@ -52,6 +53,10 @@ export interface DeployResult {
 export interface DeploymentAdapter {
   name: string;
   deploy(input: DeployInput): Promise<DeployResult>;
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 const deploymentAdapterSeam = createSeam<DeploymentAdapter>({
@@ -130,16 +135,16 @@ function normalizeDeploymentProjectName(value: string): string {
 }
 
 function resolveDeploymentConfigPath(env: NodeJS.ProcessEnv): string | null {
-  const explicitPath = env.KYBERION_DEPLOY_CONFIG_PATH?.trim();
+  const explicitPath = envText(env, 'KYBERION_DEPLOY_CONFIG_PATH')?.trim();
   if (explicitPath) {
     return assertSafeRepositoryPath(pathResolver.resolve(explicitPath), {
       allowMissingLeaf: true,
     });
   }
   const projectName = normalizeDeploymentProjectName(
-    env.KYBERION_DEPLOY_PROJECT ||
-      env.KYBERION_PROJECT_NAME ||
-      env.KYBERION_DEPLOYMENT_PROJECT ||
+    envText(env, 'KYBERION_DEPLOY_PROJECT') ||
+      envText(env, 'KYBERION_PROJECT_NAME') ||
+      envText(env, 'KYBERION_DEPLOYMENT_PROJECT') ||
       'default'
   );
   if (!projectName) return null;
@@ -219,15 +224,14 @@ export class ShellDeploymentAdapter implements DeploymentAdapter {
 export function installShellDeploymentAdapterIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  const command = env.KYBERION_DEPLOY_COMMAND?.trim();
+  const command = envText(env, 'KYBERION_DEPLOY_COMMAND')?.trim();
   if (!command) return false;
+  const timeoutText = envText(env, 'KYBERION_DEPLOY_TIMEOUT_MS');
   resetDeploymentAdapter();
   registerDeploymentAdapter(
     new ShellDeploymentAdapter({
       command,
-      ...(env.KYBERION_DEPLOY_TIMEOUT_MS
-        ? { timeoutMs: parseInt(env.KYBERION_DEPLOY_TIMEOUT_MS, 10) }
-        : {}),
+      ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
     })
   );
   logger.success(
