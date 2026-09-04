@@ -219,8 +219,10 @@ function loadConfidentialThemePackEntries(
     let tenantNames: string[] = [];
     try {
       tenantNames = safeReaddir(confidentialDir);
-    } catch (err: any) {
-      logger.warn(`[THEME_RESOLVER] safeReaddir failed on ${confidentialDir}: ${err.message}`);
+    } catch (err: unknown) {
+      logger.warn(
+        `[THEME_RESOLVER] safeReaddir failed on ${confidentialDir}: ${errorMessage(err)}`
+      );
     }
     const entries: { theme_id: string; theme_name?: string; pack_path: string }[] = [];
     for (const tenantName of tenantNames) {
@@ -237,17 +239,17 @@ function loadConfidentialThemePackEntries(
           theme_name: typeof pack.theme?.name === 'string' ? pack.theme.name : undefined,
           pack_path: `knowledge/confidential/${tenantName}/design/theme.json`,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.warn(
-          `[THEME_RESOLVER] Failed reading theme JSON for tenant ${tenantName}: ${err.message}`
+          `[THEME_RESOLVER] Failed reading theme JSON for tenant ${tenantName}: ${errorMessage(err)}`
         );
         continue;
       }
     }
     return entries;
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.warn(
-      `[THEME_RESOLVER] loadConfidentialThemePackEntries general failure: ${err.message}`
+      `[THEME_RESOLVER] loadConfidentialThemePackEntries general failure: ${errorMessage(err)}`
     );
     return [];
   }
@@ -286,8 +288,8 @@ function resolveConfidentialThemePack(
           );
           return pack;
         }
-      } catch (err: any) {
-        logger.warn(`[THEME_RESOLVER] Direct load failed for ${directPath}: ${err.message}`);
+      } catch (err: unknown) {
+        logger.warn(`[THEME_RESOLVER] Direct load failed for ${directPath}: ${errorMessage(err)}`);
       }
     }
   }
@@ -376,6 +378,10 @@ function normalizeDesignLookupKey(input: unknown): string {
 
 function recordValue(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function resolveDesignBindingHints(brief: any): {
@@ -845,6 +851,8 @@ function resolveDocumentCompositionPresetCore(
 const buildPptxSlideFromPattern = (...args: Parameters<typeof runtimeBuildPptxSlideFromPattern>) =>
   runtimeBuildPptxSlideFromPattern(...args);
 
+type DocumentCompositionPresetResolution = ReturnType<typeof resolveDocumentCompositionPresetCore>;
+
 const mediaDocumentPipelineHelpers = createMediaDocumentPipelineHelpers({
   resolveNamedTheme,
   loadDocumentCompositionCatalog,
@@ -886,7 +894,7 @@ const mediaSpreadsheetPipelineHelpers = createMediaSpreadsheetPipelineHelpers({
 function resolveDocumentCompositionPreset(
   rootDir: string,
   brief: any
-): { profileId: string; preset: any } {
+): DocumentCompositionPresetResolution {
   return resolveDocumentCompositionPresetCore(rootDir, brief);
 }
 

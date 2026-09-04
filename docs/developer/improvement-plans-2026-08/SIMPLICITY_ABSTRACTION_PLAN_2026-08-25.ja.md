@@ -17819,6 +17819,21 @@ SX-03／SX-04／SX-10 の rendering palette contract を再監査し、PPTX pale
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 1025
+
+SX-03／SX-04／SX-10 の media protocol error／facade boundary を再監査し、confidential theme pack の例外を
+`unknown` と共通 error message helper で扱うようにした。document preset facade は core resolver の typed resolution を
+そのまま公開し、catalog／fallback の契約が facade で `any` に戻らないようにした。theme pack の探索順、ログ文面の情報量、
+fallback semantics は変更していない。
+
+検証:
+
+- Media theme／design-md／document composition／actuator integration **4 files / 53 tests passed（11 skipped）**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
