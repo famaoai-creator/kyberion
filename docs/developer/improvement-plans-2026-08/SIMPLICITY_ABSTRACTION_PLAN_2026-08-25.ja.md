@@ -16646,6 +16646,13 @@ SX-08／SX-09 の Chronos FocusedOperatorView `/api/intelligence` GET projection
 検証: FocusedOperatorView response **1 file / 4 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 929
+
+SX-08／SX-09 の Chronos MissionIntelligence `/api/intelligence` GET root projectionを再監査し、`IntelligencePayload` 型アサーションと shallow error fallbackだけで live-sync stateへ渡す残存を修正した。専用 parser で revision／access role、表示対象 collection の record array、control／runtime root、optional collection、dangerous keyを検証してから stateへ渡し、不正 responseは fail-closed とする。既存の tenant scope、live-sync、各子パネルの表示 semantics は変更していない。nested collection itemの詳細 shapeは後続 sliceで継続監査する。
+
+検証: MissionIntelligence root response **1 file / 4 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
