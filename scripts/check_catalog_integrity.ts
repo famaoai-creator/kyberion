@@ -4,7 +4,7 @@ import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-i
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
-import { compileSchema, readJson } from '@agent/core/foundation';
+import { compileSchema } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { generateIndex } from './generate_knowledge_index.js';
 import {
@@ -15,6 +15,7 @@ import {
   renderKyberionTailwindColorsBlock,
 } from './design-token-utils.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type CatalogCheck = {
   id: string;
@@ -200,7 +201,10 @@ const CHECKS: CatalogCheck[] = [
 
 function validateCatalog(check: CatalogCheck, violations: string[], warnings: string[]) {
   const validate = compileSchema(pathResolver.rootResolve(check.schemaPath));
-  const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(check.dataPath));
+  const data = readSafeJsonFile<Record<string, unknown>>(
+    pathResolver.rootResolve(check.dataPath),
+    `catalog ${check.dataPath}`
+  );
   const ok = validate(data);
   if (!ok) {
     for (const error of validate.errors || []) {
@@ -237,7 +241,7 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
     const directoryServiceIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = readJson<typeof typed>(filePath) as {
+      const payload = readSafeJsonFile<typeof typed>(filePath, `service endpoint ${fileName}`) as {
         default_pattern?: string;
         services?: Record<string, unknown>;
       };
@@ -339,7 +343,10 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
     const directoryIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = readJson<typeof typed>(filePath) as {
+      const payload = readSafeJsonFile<typeof typed>(
+        filePath,
+        `specialist catalog ${fileName}`
+      ) as {
         version?: string;
         specialists?: Record<string, unknown>;
       };
@@ -709,7 +716,7 @@ function validateDesignTokenCatalog(violations: string[]) {
       );
       continue;
     }
-    const raw = readJson<ThemeCatalogShape>(filePath);
+    const raw = readSafeJsonFile<ThemeCatalogShape>(filePath, `theme catalog ${filePath}`);
     violations.push(
       ...collectThemeCatalogViolations({
         label: path.relative(pathResolver.rootDir(), filePath),
@@ -725,8 +732,14 @@ function validateDesignTokenCatalog(violations: string[]) {
   // E2E-02: the flat catalog and the decomposed directory copy are a generated
   // pair; their theme maps must stay identical so neither drifts silently.
   try {
-    const flat = readJson<{ themes?: Record<string, unknown> }>(themeFiles[0]);
-    const nested = readJson<{ themes?: Record<string, unknown> }>(themeFiles[1]);
+    const flat = readSafeJsonFile<{ themes?: Record<string, unknown> }>(
+      themeFiles[0],
+      'flat theme catalog'
+    );
+    const nested = readSafeJsonFile<{ themes?: Record<string, unknown> }>(
+      themeFiles[1],
+      'nested theme catalog'
+    );
     if (JSON.stringify(flat.themes || {}) !== JSON.stringify(nested.themes || {})) {
       violations.push(
         'design-tokens: themes.json and themes/themes.json theme maps diverged. Run pnpm tsx scripts/generate_design_tokens.ts and align manual edits.'
@@ -836,7 +849,10 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
   const contractsPath = pathResolver.rootResolve(
     'knowledge/product/governance/governance-catalog-contracts.json'
   );
-  const contracts = readJson<GovernanceCatalogContracts>(contractsPath);
+  const contracts = readSafeJsonFile<GovernanceCatalogContracts>(
+    contractsPath,
+    'governance catalog contracts'
+  );
   const backedCatalogs = new Set<string>();
   const catalogs: GovernanceCatalogMetadata[] = [];
   for (const fileName of safeReaddir(root)
@@ -846,7 +862,10 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
     const filePath = pathResolver.rootResolve(relativePath);
     let payload: Record<string, unknown>;
     try {
-      payload = readJson<Record<string, unknown>>(filePath);
+      payload = readSafeJsonFile<Record<string, unknown>>(
+        filePath,
+        `governance catalog ${relativePath}`
+      );
     } catch (error) {
       violations.push(
         `governance-catalog: ${relativePath} is not valid JSON (${error instanceof Error ? error.message : String(error)})`
