@@ -291,14 +291,23 @@ export interface MissionControllerRoutingContext {
   purgeMissions: (dryRun?: boolean) => Awaitable<void>;
   archiveMissions: (options: { missionId?: string; execute?: boolean }) => Awaitable<void>;
   listMissions: (filterStatus?: string) => void;
-  listOrganizationCatalogs: (organizationId?: string, jsonOutput?: boolean) => Awaitable<void>;
-  listOrganizationProfiles: (organizationId?: string) => Awaitable<void>;
+  listOrganizationCatalogs: (
+    organizationId?: string,
+    jsonOutput?: boolean,
+    print?: Print
+  ) => Awaitable<void>;
+  listOrganizationProfiles: (organizationId?: string, print?: Print) => Awaitable<void>;
   showOrganizationProfile: (
     organizationId?: string,
     summaryOnly?: boolean,
-    jsonOutput?: boolean
+    jsonOutput?: boolean,
+    print?: Print
   ) => Awaitable<void>;
-  showOrganizationDiscovery: (jsonOutput?: boolean, summaryOnly?: boolean) => Awaitable<void>;
+  showOrganizationDiscovery: (
+    jsonOutput?: boolean,
+    summaryOnly?: boolean,
+    print?: Print
+  ) => Awaitable<void>;
   showMissionStatus: (id: string, follow?: boolean) => void;
   showReasoningBackendStatus: () => void;
   syncProjectLedger: (missionId: string) => Awaitable<unknown>;
@@ -1043,25 +1052,29 @@ export async function runMissionControllerAction(
     case 'organization-catalogs':
       await context.listOrganizationCatalogs(
         getValue('--organization-id', context.argv) || getValue('--org', context.argv),
-        context.argv.includes('--json')
+        context.argv.includes('--json'),
+        context.print
       );
       break;
     case 'organization-profiles':
       await context.listOrganizationProfiles(
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv),
+        context.print
       );
       break;
     case 'organization-profile':
       await context.showOrganizationProfile(
         getValue('--organization-id', context.argv) || getValue('--org', context.argv),
         context.argv.includes('--summary') || context.argv.includes('--compact'),
-        context.argv.includes('--json')
+        context.argv.includes('--json'),
+        context.print
       );
       break;
     case 'organization-discovery':
       await context.showOrganizationDiscovery(
         context.argv.includes('--json'),
-        context.argv.includes('--summary') || context.argv.includes('--compact')
+        context.argv.includes('--summary') || context.argv.includes('--compact'),
+        context.print
       );
       break;
     case 'status':
