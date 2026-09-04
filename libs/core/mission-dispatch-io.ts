@@ -1,7 +1,6 @@
 import { appendJsonLine as appendFoundationJsonLine } from './foundation/json.js';
 import * as nodePath from 'node:path';
-import { assertSafeRepositoryPath, safeMkdir, safeExistsSync, safeWriteFile } from './secure-io.js';
-import { readJsonIfPresent } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 
 export function countWords(value: string): number {
@@ -17,23 +16,6 @@ export function ensureDirectory(dirPath: string): void {
     'mission_controller',
     () => {
       if (!safeExistsSync(safeDirPath)) safeMkdir(safeDirPath, { recursive: true });
-    },
-    'worker'
-  );
-}
-
-export function readJsonFile<T>(filePath: string): T | null {
-  return readJsonIfPresent<T>(assertSafeRepositoryPath(filePath, { allowMissingLeaf: true }));
-}
-
-export function writeJsonFile(filePath: string, payload: unknown): void {
-  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  const dir = nodePath.dirname(safeFilePath);
-  ensureDirectory(dir);
-  withExecutionContext(
-    'mission_controller',
-    () => {
-      safeWriteFile(safeFilePath, JSON.stringify(payload, null, 2));
     },
     'worker'
   );
