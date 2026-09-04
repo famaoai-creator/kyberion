@@ -20,7 +20,10 @@ import {
   type MediaGenerationBoundary,
   type ProtocolKind,
 } from './media-document-helpers.js';
-import type { MediaReportPdfProtocol } from './media-report-pipeline-helpers.js';
+import type {
+  MediaReportDocxProtocol,
+  MediaReportPdfProtocol,
+} from './media-report-pipeline-helpers.js';
 
 const DOCUMENT_LAYOUTS_PATH = pathResolver.rootResolve(
   'knowledge/public/design-patterns/media-templates/document-layouts.json'
@@ -108,7 +111,7 @@ export interface MediaDocumentPipelineDeps {
   ) => any;
   buildSpreadsheetNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any) => any;
   buildDiagramNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any) => any;
-  buildReportDocxProtocol: (rootDir: string, brief: any) => any;
+  buildReportDocxProtocol: (rootDir: string, brief: any) => MediaReportDocxProtocol;
   buildReportPdfProtocol: (rootDir: string, brief: any) => MediaReportPdfProtocol;
   buildTrackerSpreadsheetProtocol: (rootDir: string, brief: any) => any;
   buildDocumentPdfProtocol: (rawBrief: any) => MediaInvoicePdfProtocol;
