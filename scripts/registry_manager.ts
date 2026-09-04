@@ -11,6 +11,8 @@ import { defineCatalog, nowIso } from '@agent/core/foundation';
 import yargs from 'yargs';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 type RegistryType = 'harness' | 'gateway';
 
 type CapabilityRegistry = {
@@ -62,7 +64,7 @@ export function validateCapabilityRegistry(
   }).validate(registry, registryPath);
 }
 
-export async function main(args: string[] = []) {
+export async function main(args: string[] = [], print: Print = () => undefined) {
   const argv = await yargs(args)
     .option('adapter', {
       type: 'string',
@@ -173,7 +175,7 @@ export async function main(args: string[] = []) {
 
   registry = validateCapabilityRegistry(absRegistryPath, type, registry);
   safeWriteFile(absRegistryPath, JSON.stringify(registry, null, 2));
-  console.log(
+  print(
     `[REGISTRY_MANAGER] Successfully registered ${capabilityId} into ${argv.tier} tier (${argv.type} registry).`
   );
 }
@@ -185,6 +187,6 @@ if (
   void defineScript({
     name: 'registry:manage',
     flags: [],
-    run: ({ argv }) => main(argv),
+    run: ({ argv, print }) => main(argv, print),
   })();
 }
