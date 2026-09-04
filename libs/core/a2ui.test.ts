@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { A2UIMessage } from './a2ui.js';
 
 describe('a2ui message validation', () => {
   afterEach(() => {
@@ -26,6 +27,29 @@ describe('a2ui message validation', () => {
     expect(() => validateA2UIMessage({ deleteSurface: { surfaceId: 'bad id' } })).toThrow(
       'A2UI surfaceId is invalid.'
     );
+  });
+
+  it('rejects unknown wire fields and malformed component children', async () => {
+    const { validateA2UIMessage } = await import('./a2ui.js');
+    expect(() =>
+      validateA2UIMessage({
+        updateDataModel: { surfaceId: 'surface-1', data: {} },
+        unexpectedOperation: {},
+      })
+    ).toThrow('A2UI message contains unknown field: unexpectedOperation.');
+    expect(() =>
+      validateA2UIMessage({
+        updateComponents: {
+          surfaceId: 'surface-1',
+          components: [{ id: 'button-1', type: 'button', props: {}, children: [1] }],
+        },
+      })
+    ).toThrow('A2UI component children must be an array of strings.');
+    expect(() =>
+      validateA2UIMessage({
+        deleteSurface: { surfaceId: 'surface-1', unexpectedField: true },
+      })
+    ).toThrow('A2UI deleteSurface payload contains unknown field: unexpectedField.');
   });
 });
 
@@ -81,5 +105,20 @@ describe('a2ui dispatch', () => {
     expect((init?.headers as Record<string, string>).Authorization).toBe(
       'Bearer surface-admin-token'
     );
+  });
+
+  it('rejects malformed messages before any transport is called', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    globalThis.fetch = fetchMock as typeof fetch;
+    process.env.KYBERION_A2UI_BRIDGE_URL = 'http://127.0.0.1:3031';
+
+    const { dispatchA2UI } = await import('./a2ui.js');
+    expect(() =>
+      dispatchA2UI({
+        updateDataModel: { surfaceId: 'surface-1', data: {} },
+        unexpectedOperation: {},
+      } as unknown as A2UIMessage)
+    ).toThrow('A2UI message contains unknown field: unexpectedOperation.');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
