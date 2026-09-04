@@ -7,25 +7,18 @@ import {
   parseConciergeSummaryValue,
   type ConciergeSummary,
 } from '../lib/summary-event';
+import {
+  parseConciergeHygieneResponse,
+  parseConciergeMemoryQueueResponse,
+  parseConciergeResponseStatusResponse,
+  type ConciergeHygieneInquiry,
+  type ConciergeMemoryQueueItem,
+  type ConciergeResponseStatus,
+} from '../lib/concierge-advisory-response';
 
-type HygieneInquiry = {
-  mission_id: string;
-  title: string;
-  reason: 'design_missing' | 'ready_not_started' | 'awaiting_gate';
-  age_days: number | null;
-  waiting_since?: string;
-};
-
-type MemoryQueueItem = {
-  id: string;
-  kind: 'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt';
-  summary: string;
-  source: string;
-  source_type: string;
-  sensitivity_tier: 'public' | 'confidential' | 'personal';
-  occurrences: number;
-  queued_at: string;
-};
+type HygieneInquiry = ConciergeHygieneInquiry;
+type MemoryQueueItem = ConciergeMemoryQueueItem;
+type ResponseStatus = ConciergeResponseStatus;
 
 type ArtifactPreview = {
   name: string;
@@ -42,22 +35,6 @@ type OutcomePreview = {
   total: number;
   shown: number;
   files: ArtifactPreview[];
-};
-
-type ResponseStatus = {
-  state: 'ready' | 'waiting' | 'queued';
-  label: string;
-  next_action: string;
-  active_count: number;
-  queued_count: number;
-  stale_child_count: number;
-  active_tasks: Array<{
-    delegation_id: string;
-    mission_id?: string;
-    task_id?: string;
-    backend_name?: string;
-    elapsed_seconds: number;
-  }>;
 };
 
 function formatWhen(value: string | undefined, locale: 'en' | 'ja'): string {
@@ -99,9 +76,9 @@ export default function ConciergePage() {
   const refreshResponseStatus = React.useCallback(async () => {
     try {
       const response = await fetch('/api/response-status', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'response status failed');
-      setResponseStatus(payload.response_status);
+      const parsed = parseConciergeResponseStatusResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid response status response');
+      setResponseStatus(parsed);
     } catch {
       // The response-status panel is advisory; the main concierge remains usable.
     }
@@ -121,9 +98,9 @@ export default function ConciergePage() {
   const refreshHygiene = React.useCallback(async () => {
     try {
       const response = await fetch('/api/hygiene', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'hygiene failed');
-      setHygiene(payload.inquiries as HygieneInquiry[]);
+      const parsed = parseConciergeHygieneResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid hygiene response');
+      setHygiene(parsed);
     } catch {
       // Advisory pane: a failed hygiene fetch never blocks the concierge.
     }
@@ -142,9 +119,9 @@ export default function ConciergePage() {
   const refreshMemoryQueue = React.useCallback(async () => {
     try {
       const response = await fetch('/api/memory-queue', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'memory queue failed');
-      setMemoryQueue(payload.candidates as MemoryQueueItem[]);
+      const parsed = parseConciergeMemoryQueueResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid memory queue response');
+      setMemoryQueue(parsed);
     } catch {
       // Advisory pane: a failed queue fetch never blocks the concierge.
     }
