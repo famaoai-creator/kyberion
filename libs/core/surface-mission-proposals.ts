@@ -23,6 +23,7 @@ import {
 import { appendGovernedArtifactJsonl, writeGovernedArtifactJson } from './artifact-store.js';
 import type { AgentRoutingDecision } from './intent-contract.js';
 import { nowIso } from './foundation/time.js';
+import type { SupportedLocale } from './locale.js';
 
 import { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
 
@@ -375,17 +376,36 @@ export async function resolveMissionProposalReply(params: {
 export function buildMissionIssuanceReply(
   issued: Pick<
     SlackMissionIssuanceResult,
-    'missionId' | 'missionType' | 'tier' | 'orchestrationStatus' | 'orchestrationError'
-  >
+    'missionId' | 'missionType' | 'tier' | 'persona' | 'orchestrationStatus' | 'orchestrationError'
+  > & { routingDecision?: AgentRoutingDecision },
+  options?: { locale?: SupportedLocale; includeDetails?: boolean }
 ): string {
-  const locale = 'ja' as const;
+  const locale = options?.locale ?? 'ja';
+  const details = options?.includeDetails
+    ? [
+        t('bridge:mission_issued_type', { missionType: issued.missionType }, locale),
+        t('bridge:mission_issued_tier', { tier: issued.tier }, locale),
+        t('bridge:mission_issued_persona', { persona: issued.persona }, locale),
+        issued.routingDecision
+          ? t(
+              'bridge:mission_issued_routing',
+              {
+                routing: `${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`,
+              },
+              locale
+            )
+          : undefined,
+      ].filter((line): line is string => Boolean(line))
+    : [
+        t(
+          'bridge:mission_issued_type_tier',
+          { missionType: issued.missionType, tier: issued.tier },
+          locale
+        ),
+      ];
   return [
     t('bridge:mission_issued_started', { missionId: issued.missionId }, locale),
-    t(
-      'bridge:mission_issued_type_tier',
-      { missionType: issued.missionType, tier: issued.tier },
-      locale
-    ),
+    ...details,
     issued.orchestrationStatus === 'queued'
       ? t('bridge:mission_issued_queued', undefined, locale)
       : t(

@@ -70,6 +70,7 @@ export {
   parseSlackOnboardingAction,
 } from './slack-onboarding.js';
 export {
+  buildMissionIssuanceReply,
   clearChronosMissionProposalState,
   clearSlackMissionProposalState,
   getChronosMissionProposalState,

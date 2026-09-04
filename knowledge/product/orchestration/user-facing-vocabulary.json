@@ -5009,10 +5009,30 @@
         "ja": "種別: {missionType} / ティア: {tier}",
         "qps-ploc": "⟦Ŧẏṗė: {missionType} / Ŧïėř: {tier} ŀőřėɱ ïṗşůɱ⟧"
       },
+      "mission_issued_type": {
+        "en": "Type: {missionType}",
+        "ja": "種別: {missionType}",
+        "qps-ploc": "⟦Ŧẏṗė: {missionType} ŀőřėɱ ⟧"
+      },
+      "mission_issued_tier": {
+        "en": "Tier: {tier}",
+        "ja": "ティア: {tier}",
+        "qps-ploc": "⟦Ŧïėř: {tier} ŀőř⟧"
+      },
+      "mission_issued_persona": {
+        "en": "Persona: {persona}",
+        "ja": "ペルソナ: {persona}",
+        "qps-ploc": "⟦Ṗėřşőñȧ: {persona} ŀőřėɱ⟧"
+      },
+      "mission_issued_routing": {
+        "en": "Routing: {routing}",
+        "ja": "ルーティング: {routing}",
+        "qps-ploc": "⟦Řőůŧïñɠ: {routing} ŀőřėɱ⟧"
+      },
       "mission_issued_queued": {
-        "en": "Background orchestration has been queued. The result will arrive in this chat.",
+        "en": "Background orchestration has been queued.",
         "ja": "バックグラウンド処理をキューに登録しました。結果はこのチャットに届きます。",
-        "qps-ploc": "⟦Ƀȧƈķɠřőůñḓ őřƈħėşŧřȧŧïőñ ħȧş ƀėėñ ɋůėůėḓ. Ŧħė řėşůŀŧ ẇïŀŀ ȧřřïṽė ïñ ŧħïş ƈħȧŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+        "qps-ploc": "⟦Ƀȧƈķɠřőůñḓ őřƈħėşŧřȧŧïőñ ħȧş ƀėėñ ɋůėůėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "mission_issued_queue_failed": {
         "en": "Background orchestration could not be queued: {error}",
