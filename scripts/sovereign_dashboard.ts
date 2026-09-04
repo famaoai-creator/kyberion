@@ -86,8 +86,8 @@ function getDashboardFocus(argv: string[] = []): DashboardFocus {
   return focusValue === 'onboarding' ? 'onboarding' : 'all';
 }
 
-function clearScreen() {
-  process.stdout.write('\x1Bc');
+function clearScreen(print: (value: unknown) => void): void {
+  print('\x1Bc');
 }
 
 function getDashboardVersion(): string {
@@ -991,13 +991,18 @@ function drawTrustBoard() {
 
 function render(
   argv: string[] = [],
-  options: { clear?: boolean; interactive?: boolean; log?: DashboardLog } = {}
+  options: {
+    clear?: boolean;
+    interactive?: boolean;
+    log?: DashboardLog;
+    clearOutput?: (value: unknown) => void;
+  } = {}
 ): void {
   const previousLog = dashboardLog;
   if (options.log) dashboardLog = options.log;
   try {
     const focus = getDashboardFocus(argv);
-    if (options.clear !== false) clearScreen();
+    if (options.clear !== false && options.clearOutput) clearScreen(options.clearOutput);
     drawHeader();
     drawCompanyOverview();
     drawOnboardingHome();
@@ -1068,10 +1073,10 @@ export function renderDashboardSnapshot(argv: string[] = []): {
 export function main(argv: string[] = [], print: (value: unknown) => void = () => undefined): void {
   const log: DashboardLog = (...values) => print(values.map((value) => String(value)).join(' '));
   if (argv.includes('--once')) {
-    render(argv, { interactive: false, log });
+    render(argv, { interactive: false, log, clearOutput: print });
   } else {
-    render(argv, { log });
-    setInterval(() => render(argv, { log }), 5000);
+    render(argv, { log, clearOutput: print });
+    setInterval(() => render(argv, { log, clearOutput: print }), 5000);
   }
 }
 
@@ -1096,6 +1101,7 @@ if (
         render(argv, {
           interactive: false,
           log: (...values) => print(values.map((value) => String(value)).join(' ')),
+          clearOutput: print,
         });
         return;
       }
