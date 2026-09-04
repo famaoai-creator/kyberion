@@ -11,6 +11,7 @@ describe('CLI workflow handler output boundary', () => {
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
+    expect(source).not.toContain('process.exitCode');
     expect(source).toContain('activePrint: Print = () => undefined');
     expect(source).toContain('withWorkflowOutputPrinter');
   });
