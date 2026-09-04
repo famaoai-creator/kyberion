@@ -16744,6 +16744,12 @@ SX-08／SX-09 の Chronos SovereignChat A2UI projectionを再監査し、chat re
 検証: Chronos agent chat A2UI response **1 file / 4 tests passed**、root typecheck、root lint、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 943
+
+SX-08／SX-09 の Chronos first-run identity projectionを再監査し、`FirstRunBanner` と `IdentityBadge` が `/api/identity` の JSON と `/api/agents` の `total` を未検証のまま state／表示へ渡す残存を修正した。identity の envelope、onboarded、sovereign／agent の nullable field、vision、dangerous keyを専用 parserで正規化し、agent healthは既存 parserを再利用してから表示判定へ渡す。不正 responseは fail-closed とし、既存の onboarding 判定、agent 起動導線、identity 表示 semantics は変更していない。
+
+検証: `pnpm exec vitest run presence/displays/chronos-mirror-v2/src/lib/identity-response.test.ts`、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
