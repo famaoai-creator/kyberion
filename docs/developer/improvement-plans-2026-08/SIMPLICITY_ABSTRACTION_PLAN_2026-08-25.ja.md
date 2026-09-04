@@ -18458,6 +18458,21 @@ SX-04 の governance catalog を継続監査し、`provider-cli-capability-repor
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1070
+
+SX-04 の domain catalog を継続監査し、`onboarding-flow-policy` と `promoted-report-template-policy` の stale な内蔵 fallback を削除した。
+前者は canonical catalog が `1.1.0` に更新されている一方で fallback が `1.0.0` のまま残っており、後者は schema の必須フィールドを同内容の fallback と
+resolver 内の重複参照で補っていた。いずれも `defineCatalog` の fallback 無し fail-closed 境界へ統一し、catalog 欠損・不正時に古い値を隠さないようにした。
+正規 catalog の値、onboarding 表示、promoted report の出力契約は変更していない。
+
+検証:
+
+- policy catalog **2 files / 7 tests passed**。canonical catalog の読込と fallback 定義の不在を確認した。
+- `pnpm run typecheck`、対象4ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
