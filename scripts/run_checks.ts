@@ -147,7 +147,7 @@ export async function main(
       const json = args.includes('--json');
       const message = `unknown check option: ${flag}`;
       if (json) print({ scope: undefined, results: [], failed: 0, error: message });
-      else console.error(`[check] ERROR ${message}`);
+      else print(`[check] ERROR ${message}`);
       return 1;
     }
     if (
@@ -157,7 +157,7 @@ export async function main(
       const json = args.includes('--json');
       const message = `${flag} requires a value`;
       if (json) print({ scope: undefined, results: [], failed: 0, error: message });
-      else console.error(`[check] ERROR ${message}`);
+      else print(`[check] ERROR ${message}`);
       return 1;
     }
   }
@@ -168,7 +168,7 @@ export async function main(
   const json = args.includes('--json');
   const error = (message: string): number => {
     if (json) print({ scope: scopeValue, results: [], failed: 0, error: message });
-    else console.error(`[check] ERROR ${message}`);
+    else print(`[check] ERROR ${message}`);
     return 1;
   };
   if (!isValidScope(scopeValue)) return error(`unknown check scope: ${String(scopeValue)}`);
