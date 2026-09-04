@@ -9,8 +9,8 @@ import {
 } from '@agent/core/web-design-system';
 import { loadBrandTokensAtPath } from '@agent/core/brand-tokens';
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type Palette = Record<string, string | undefined>;
 
@@ -22,7 +22,7 @@ type ContrastPair = {
 };
 
 function parseJson<T>(filePath: string): T {
-  return readJson<T>(filePath);
+  return readSafeJsonFile<T>(filePath, `design contrast themes ${filePath}`);
 }
 
 function normalizeHex(value: string): string | null {
