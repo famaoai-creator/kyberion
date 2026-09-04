@@ -99,7 +99,8 @@ function isIntentInboxItemArray(value: unknown): boolean {
 }
 
 export function parseConciergeSummaryValue(value: unknown): ConciergeSummary | null {
-  if (!isRecord(value) || typeof value.generated_at !== 'string') return null;
+  if (!isRecord(value) || !hasSafeTree(value) || typeof value.generated_at !== 'string')
+    return null;
 
   const briefing = value.briefing;
   if (!isRecord(briefing) || typeof briefing.sentence_ja !== 'string') return null;
