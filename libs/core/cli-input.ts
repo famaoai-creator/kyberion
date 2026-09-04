@@ -16,7 +16,7 @@ export function readTextFile(filePath: string): string {
   }) as string;
 }
 
-export function readJsonFile<T = any>(filePath: string): T {
+export function readJsonFile<T = unknown>(filePath: string): T {
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[CLI_INPUT] JSON input must be a regular file: ${filePath}`);
@@ -27,6 +27,6 @@ export function readJsonFile<T = any>(filePath: string): T {
   ) as T;
 }
 
-export function readJsonCliInput<T = any>(inputPath: string): T {
+export function readJsonCliInput<T = unknown>(inputPath: string): T {
   return readJsonFile<T>(resolveCliInputPath(inputPath));
 }
