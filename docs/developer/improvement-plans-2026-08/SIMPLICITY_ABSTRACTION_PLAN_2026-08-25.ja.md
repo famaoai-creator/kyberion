@@ -17142,6 +17142,21 @@ retry値は有限の正数だけを採用して不正なerror detailを既定値
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 980
+
+SX-03／SX-10 のA2A会話履歴・署名秘密鍵・actuator traceのerror boundaryを再監査し、永続化・署名鍵生成・
+trace保存の例外を`any`で参照する残存を修正した。catch対象を`unknown`として扱い、Error／primitiveの双方を
+安全にログへ正規化する。A2A履歴のtenant／tier filtering、署名秘密鍵の永続化とprocess-local fallback、traceの
+保存失敗時に実行結果を返す既存semanticsは変更していない。
+
+検証:
+
+- A2A conversation／signature **2 files / 12 tests passed**。
+- root typecheck、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
