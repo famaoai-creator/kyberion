@@ -5,6 +5,7 @@ import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExecResult, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
@@ -43,6 +44,10 @@ export interface RunCodexCliQueryParams<T> {
    */
   profile?: ProviderPermissionProfileName;
   options?: CodexCliQueryOptions;
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 export async function runCodexCliQuery<T>({
@@ -326,11 +331,11 @@ function isNullSchema(node: unknown): boolean {
 export function buildCodexCliQueryOptionsFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): CodexCliQueryOptions {
-  const bin = env.KYBERION_CODEX_CLI_BIN?.trim();
-  const model = env.KYBERION_CODEX_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_CODEX_CLI_TIMEOUT_MS?.trim();
+  const bin = envText(env, 'KYBERION_CODEX_CLI_BIN')?.trim();
+  const model = envText(env, 'KYBERION_CODEX_CLI_MODEL')?.trim();
+  const timeoutRaw = envText(env, 'KYBERION_CODEX_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const extraRaw = env.KYBERION_CODEX_CLI_EXTRA_ARGS?.trim();
+  const extraRaw = envText(env, 'KYBERION_CODEX_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/u).filter(Boolean) : undefined;
 
   logger.info(
@@ -355,7 +360,7 @@ export function buildCodexCliQueryOptionsFromEnv(
 // same thread; this function has already returned by the time any caller
 // could try.
 export function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
-  const explicit = env.KYBERION_CODEX_CLI_BIN?.trim();
+  const explicit = envText(env, 'KYBERION_CODEX_CLI_BIN')?.trim();
   if (explicit) return explicit;
 
   const repoRoot = pathResolver.rootDir();
