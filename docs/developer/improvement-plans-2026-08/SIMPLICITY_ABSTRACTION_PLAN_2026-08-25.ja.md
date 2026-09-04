@@ -16822,6 +16822,18 @@ SX-03 の adopt-or-delete 棚卸しで、`mission-dispatch-io.ts` に残って�
 
 検証: `pnpm exec vitest run libs/core/mission-dispatch-lifecycle.test.ts`、repo内参照検索、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 956
+
+SX-03 の direct JSONL inventory を継続し、`best-of-providers` の verdict log reader が JSON.parse 後に
+`BestOfProvidersVerdictRecord` へ型アサーションしていた残存を修正した。共有 `readJsonLines` と専用 parser を
+接続し、tier、digest、verdict、participants、votes、excluded、degraded の必須 shape と許可値を検証してから
+ops／test 用の読み取り結果へ渡すようにした。malformed／dangerous／型不正な行は valid record を保持したまま
+skip し、既存の verdict persistence と best-of-N 実行 semantics は変更していない。
+
+検証: `best-of-providers` **1 file / 9 tests passed**、root typecheck、root lint、`git diff --check`。
+canonical full gate はこの追記後に実行する。SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、
+SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
