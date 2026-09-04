@@ -17,7 +17,7 @@ import {
   stripNpmSeparatorArg,
   routeLegacyIntentToAsk,
 } from './cli.js';
-import { handleTaskCommand } from './cli-workflow-handlers.js';
+import { handleTaskCommand, withWorkflowOutputPrinter } from './cli-workflow-handlers.js';
 
 describe('Kyberion CLI helpers', () => {
   it('uses the governed parser for packet and pipeline preview files', () => {
@@ -292,12 +292,17 @@ describe('Kyberion CLI helpers', () => {
   });
 
   it('routes TaskScenario workflows through the unified task namespace', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const output: string[] = [];
 
-    await handleTaskCommand('scenario', ['list', '--json'], 'en');
+    await withWorkflowOutputPrinter(
+      (value) => output.push(String(value)),
+      () => handleTaskCommand('scenario', ['list', '--json'], 'en')
+    );
 
-    const output = logSpy.mock.calls.flat().join('');
-    const parsed = JSON.parse(output) as { status: string; scenarios: Array<{ id: string }> };
+    const parsed = JSON.parse(output.join('')) as {
+      status: string;
+      scenarios: Array<{ id: string }>;
+    };
     expect(parsed.status).toBe('ok');
     expect(parsed.scenarios.map((scenario) => scenario.id)).toContain('daily-email-triage');
   });
