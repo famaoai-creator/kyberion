@@ -5,6 +5,7 @@ import '../secure-io.js';
 import { getFoundationIo } from './io.js';
 export {
   parseSafeJsonInput,
+  parseSafeJsonEntriesInput,
   parseSafeJsonObjectInput,
   parseSafeJsonObjectValue,
   parsePersistedPipelineStrategy,
