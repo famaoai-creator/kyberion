@@ -2,7 +2,9 @@ import { dispatchA2UI } from '@agent/core/a2ui';
 import { buildPresenceSurfaceFrame } from '@agent/core/presence-surface';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 
-async function main() {
+type Print = (value: unknown) => void;
+
+async function main(print: Print = () => undefined) {
   const messages = buildPresenceSurfaceFrame({
     agentId: 'presence-surface-agent',
     title: 'Presence Studio',
@@ -21,13 +23,13 @@ async function main() {
 
   // Allow the bridge transport fetch to flush before this short-lived process exits.
   await new Promise((resolve) => setTimeout(resolve, 400));
-  console.log('Presence surface demo dispatched.');
+  print('Presence surface demo dispatched.');
 }
 
 const runPresenceSurfaceDemo = defineScript({
   name: 'presence-demo-surface',
   flags: [],
-  run: main,
+  run: ({ print }) => main(print),
 });
 
 if (
