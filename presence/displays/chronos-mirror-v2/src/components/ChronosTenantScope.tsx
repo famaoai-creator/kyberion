@@ -46,7 +46,10 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
     void fetch(`/api/tenant-scope${params.size ? `?${params.toString()}` : ''}`, {
       cache: 'no-store',
     })
-      .then((response) => response.json())
+      .then(async (response) => {
+        if (!response.ok) throw new Error('tenant scope request failed');
+        return response.json().catch(() => null);
+      })
       .then((payload: unknown) => {
         const normalized = normalizeChronosTenantScopePayload(payload);
         if (!cancelled && normalized) {
@@ -64,7 +67,7 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [selected, selectedOrganization, selectedProject]);
+  }, [locale, selected, selectedOrganization, selectedProject]);
 
   const updateScope = (key: 'tenant' | 'organization_id' | 'project_id', value: string) => {
     const params = new URLSearchParams(searchParams.toString());
