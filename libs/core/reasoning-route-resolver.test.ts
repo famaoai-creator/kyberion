@@ -1,6 +1,13 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver, safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './index.js';
+import {
+  pathResolver,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './index.js';
 
 const { resolveActiveProfileRootMock } = vi.hoisted(() => ({
   resolveActiveProfileRootMock: vi.fn(),
@@ -32,6 +39,16 @@ describe('reasoning-route-resolver', () => {
     } catch {
       // The fixture may not have been created.
     }
+  });
+
+  it('routes runtime environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/reasoning-route-resolver.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 
   it('ignores an operator selection that is reached through a symlink', () => {
