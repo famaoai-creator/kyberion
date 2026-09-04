@@ -16660,6 +16660,13 @@ SX-08／SX-09 の Concierge advisory GET projection（`/api/response-status`、`
 検証: Concierge advisory response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 931
+
+SX-08／SX-09 の Concierge outcome preview GET projection（`/api/outcomes/:id/preview`）を再監査し、response bodyを `ok` 判定と `OutcomePreview` 型アサーションだけで受領表示へ渡す残存を修正した。専用 parser で preview envelope、件数関係、artifact kind、任意の本文・data URI・状態フラグ、dangerous keyを検証してから表示 stateへ渡し、不正 responseは fail-closed とする。既存の viewer／tier／tenant scope、path mediation、bounded preview、human verdict semantics は変更していない。
+
+検証: Concierge outcome preview response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
