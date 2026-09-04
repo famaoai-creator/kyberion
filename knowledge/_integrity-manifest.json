@@ -10609,6 +10609,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/writer-lease-metrics.schema.json",
+      "tier": "public",
+      "size": 761,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/writer-lease.schema.json",
       "tier": "public",
       "size": 478,
