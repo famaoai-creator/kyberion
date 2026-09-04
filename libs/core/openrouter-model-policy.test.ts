@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   OPENROUTER_FREE_ROUTER_MODEL,
   resolveOpenRouterModelPolicy,
@@ -62,5 +64,20 @@ describe('openrouter-model-policy', () => {
         policy
       )
     ).toEqual(['model does not support required parameter "tool_choice"']);
+  });
+
+  it('routes OpenRouter runtime environment reads through the governed accessor', () => {
+    for (const file of [
+      'libs/core/openrouter-model-policy.ts',
+      'libs/core/openrouter-backend.ts',
+    ]) {
+      const source = String(
+        safeReadFile(pathResolver.rootResolve(file), {
+          encoding: 'utf8',
+        })
+      );
+      expect(source).not.toMatch(/env\.KYBERION_/u);
+      expect(source).toContain('getRegisteredEnvText');
+    }
   });
 });

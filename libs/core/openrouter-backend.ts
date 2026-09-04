@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -48,6 +49,10 @@ export interface OpenRouterBackendOptions {
   timeoutMs?: number;
   toolsEnabled?: boolean;
   allowedTools?: ReasoningToolName[];
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 export interface OpenRouterBackendOverrides {
@@ -583,10 +588,11 @@ export function buildOpenRouterBackendFromEnv(
   modelOverride?: string,
   overrides: OpenRouterBackendOverrides = {}
 ): OpenRouterBackend | null {
-  const apiKey = env.KYBERION_OPENROUTER_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
+  const apiKey =
+    envText(env, 'KYBERION_OPENROUTER_KEY')?.trim() || envText(env, 'OPENROUTER_API_KEY')?.trim();
   if (!apiKey) return null;
   const model = resolveOpenRouterModelPolicy(env, modelOverride).model;
-  const baseURL = env.KYBERION_OPENROUTER_URL?.trim();
+  const baseURL = envText(env, 'KYBERION_OPENROUTER_URL')?.trim();
   return new OpenRouterBackend({ apiKey, model, baseURL, ...overrides });
 }
 
@@ -594,7 +600,8 @@ export function buildOpenRouterBackendFromEnv(
 export async function probeOpenRouterBackendAvailability(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<{ available: boolean; reason?: string }> {
-  const apiKey = env.KYBERION_OPENROUTER_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
+  const apiKey =
+    envText(env, 'KYBERION_OPENROUTER_KEY')?.trim() || envText(env, 'OPENROUTER_API_KEY')?.trim();
   if (!apiKey) {
     return {
       available: false,
@@ -602,7 +609,7 @@ export async function probeOpenRouterBackendAvailability(
     };
   }
 
-  const baseURL = env.KYBERION_OPENROUTER_URL?.trim() || 'https://openrouter.ai/api/v1';
+  const baseURL = envText(env, 'KYBERION_OPENROUTER_URL')?.trim() || 'https://openrouter.ai/api/v1';
   try {
     const normalizedBaseURL = baseURL.endsWith('/') ? baseURL : `${baseURL}/`;
     const modelsURL = new URL('models', normalizedBaseURL);
