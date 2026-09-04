@@ -281,4 +281,18 @@ describe('installPluginManaged', () => {
     expect(record.activationStatus).toBe('blocked_broken_manifest');
     expect(isManagedPluginActivationAllowed(record)).toBe(false);
   });
+
+  it('does not treat a manifest directory as readable JSON', () => {
+    const managedRoot = managedRootDir('manifest-directory');
+    const src = sourceDir('manifest-directory');
+    safeMkdir(path.join(src, 'plugin-manifest.json'), { recursive: true });
+
+    const record = installPluginManaged({
+      pluginId: `manifest-directory-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+    });
+    expect(record.manifest).toBeNull();
+    expect(record.activationStatus).toBe('blocked_broken_manifest');
+  });
 });
