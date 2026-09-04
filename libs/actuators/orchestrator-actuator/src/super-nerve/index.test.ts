@@ -62,6 +62,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
       : ''
   ),
   safeExistsSync: vi.fn().mockReturnValue(true),
+  safeLstat: vi.fn(() => ({ isFile: () => true, isSymbolicLink: () => false })),
   safeWriteFile: vi.fn(),
   safeExec: vi.fn().mockReturnValue(''),
   safeUnlinkSync: vi.fn(),
@@ -291,6 +292,20 @@ describe('super-nerve engine', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.results).toHaveLength(1);
+  });
+
+  it('fails closed when a core include contains dangerous JSON keys', async () => {
+    const { safeReadFile } = await import('@agent/core/secure-io');
+    vi.mocked(safeReadFile).mockReturnValue('{"constructor":{"polluted":true}}');
+
+    const result = await executeSuperPipeline(
+      [{ op: 'core:call', params: { path: 'macros/dangerous.json' } }],
+      {},
+      { trustResolved: true }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.results[0]?.error).toContain('dangerous JSON key');
   });
 
   it('blocks core call/include until the caller supplies a trust decision', async () => {
