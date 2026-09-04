@@ -18356,6 +18356,21 @@ routing 値は変更していない。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1063
+
+SX-09／SX-10 の mission issuance 経路を再監査し、Chronos API に残っていた独自の mission ID 生成、`mission_controller` 起動、
+orchestration enqueue、mission-issued observation の実装を削除した。Chronos は core の `issueChronosMissionFromProposal` に接続し、
+Slack／surface-neutral bridge と同じ issuance facade と共有 reply renderer を利用する。Chronos の viewer／tenant 認可、A2UI payload、
+proposal state の保存・消去は route adapter の責務として維持している。
+
+検証:
+
+- Chronos agent route／mission proposal confirmation **2 files / 17 tests passed**。
+- `pnpm run typecheck`、変更対象の ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

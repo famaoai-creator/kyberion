@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { resolveRuntimeModelId } from '@agent/core/reasoning-model-routing';
 import { safeExistsSync } from '@agent/core/secure-io';
@@ -10,12 +9,10 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { resolveViewerContextForRequest, type ViewerContext } from '../../../lib/viewer-context';
 import { buildUserFacingError } from '../../../lib/user-facing-error';
 import {
-  buildSurfaceMissionId,
   chronosConversationScope,
   intentResolutionA2ui,
   readChronosAgentBody,
   resolveChronosPipelineInputPath,
-  sanitizeMissionSlug,
   withMissionRole,
 } from './agent-route-helpers';
 import {
@@ -86,6 +83,7 @@ async function loadChronosCore() {
     runSurfaceConversation: channelSurface.runSurfaceConversation,
     runSurfaceMessageConversation: channelSurface.runSurfaceMessageConversation,
     buildMissionIssuanceReply: channelSurface.buildMissionIssuanceReply,
+    issueChronosMissionFromProposal: channelSurface.issueChronosMissionFromProposal,
     reflectPresenceAgentReply: presenceBridge.reflectPresenceAgentReply,
     dispatchPresenceFrame: presenceBridge.dispatchPresenceFrame,
     listSurfaceOutboxMessages: channelSurface.listSurfaceOutboxMessages,
@@ -293,100 +291,6 @@ function clearChronosMissionProposalState(
     if (!core.safeExistsSync(statePath) || !core.safeLstat(statePath).isFile()) return;
     core.safeRmSync(statePath, { force: true });
   });
-}
-
-async function issueChronosMissionFromProposal(
-  params: {
-    sessionId: string;
-    proposal: MissionProposal;
-    sourceText?: string;
-    routingDecision?: AgentRoutingDecision;
-  },
-  core: Awaited<ReturnType<typeof loadChronosCore>>
-) {
-  const missionId = buildSurfaceMissionId(
-    'CHRONOS',
-    params.sessionId,
-    params.proposal,
-    params.sourceText
-  );
-  const tier = params.proposal.tier || 'public';
-  const missionType = params.proposal.mission_type || 'development';
-  const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
-  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
-
-  const startOutput = core.safeExec(
-    'node',
-    [
-      'dist/scripts/mission_controller.js',
-      'start',
-      missionId,
-      tier,
-      persona,
-      'default',
-      missionType,
-      ...(params.routingDecision
-        ? ['--routing-decision', JSON.stringify(params.routingDecision)]
-        : []),
-    ],
-    { env, cwd: PROJECT_ROOT }
-  );
-
-  let orchestrationStatus: 'queued' | 'failed' = 'queued';
-  let orchestrationJobPath: string | undefined;
-  let orchestrationError: string | undefined;
-  try {
-    const event = withMissionRole('chronos_gateway', () =>
-      core.enqueueMissionOrchestrationEvent({
-        eventType: 'mission_issue_requested',
-        missionId,
-        requestedBy: 'chronos_gateway',
-        correlationId: randomUUID(),
-        payload: {
-          sessionId: params.sessionId,
-          proposal: params.proposal,
-          sourceText: params.sourceText,
-          tier,
-          persona,
-          missionType,
-          channel: 'chronos',
-          threadTs: params.sessionId,
-        },
-      })
-    );
-    orchestrationJobPath = withMissionRole('chronos_gateway', () =>
-      core.startMissionOrchestrationWorker(event)
-    );
-  } catch (error) {
-    orchestrationStatus = 'failed';
-    orchestrationError = error instanceof Error ? error.message : String(error);
-  }
-
-  withMissionRole('chronos_gateway', () => {
-    core.emitMissionOrchestrationObservation({
-      decision: 'mission_issued',
-      source: 'chronos',
-      mission_id: missionId,
-      session_id: params.sessionId,
-      mission_type: missionType,
-      tier,
-      requested_by: 'chronos_gateway',
-      orchestration_status: orchestrationStatus,
-      orchestration_job_path: orchestrationJobPath,
-    });
-  });
-
-  return {
-    missionId,
-    tier,
-    missionType,
-    persona,
-    startOutput,
-    orchestrationStatus,
-    orchestrationJobPath,
-    orchestrationError,
-    routingDecision: params.routingDecision,
-  };
 }
 
 async function tryHandleDeterministicPipelineQuery(query: string, locale: SupportedLocale) {
@@ -1191,7 +1095,7 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
-      const issued = await issueChronosMissionFromProposal(
+      const issued = await core.issueChronosMissionFromProposal(
         {
           sessionId,
           proposal: pendingMissionProposal.proposal,
