@@ -103,6 +103,7 @@ import {
   parseOperatorHomeResponse,
   type ClientOperatorHomeSummary,
 } from '../lib/operator-home-response';
+import { parsePlanPreviewResponse, type ClientPlanPreview } from '../lib/plan-preview-response';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -135,7 +136,7 @@ function ChronosMirrorV2Content() {
   const [planMissionType, setPlanMissionType] = useState('proposal-brief');
   const [planPersona, setPlanPersona] = useState('operator');
   const [planTier, setPlanTier] = useState<'personal' | 'confidential' | 'public'>('confidential');
-  const [planPreview, setPlanPreview] = useState<any | null>(null);
+  const [planPreview, setPlanPreview] = useState<ClientPlanPreview | null>(null);
   const [planPreviewError, setPlanPreviewError] = useState<string | null>(null);
   const [planPreviewBusy, setPlanPreviewBusy] = useState(false);
   const [planPreviewSignature, setPlanPreviewSignature] = useState<string | null>(null);
@@ -630,11 +631,13 @@ function ChronosMirrorV2Content() {
           locale: locale,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'plan preview failed');
-      setPlanPreview(payload.preview);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('plan preview failed');
+      const parsed = parsePlanPreviewResponse(payload);
+      if (!parsed) throw new Error('Invalid plan preview response');
+      setPlanPreview(parsed.preview);
       setPlanPreviewSignature(currentPlanPreviewSignature);
-      setPlanApprovalSessionId(payload.preview?.missionId || null);
+      setPlanApprovalSessionId(parsed.preview.missionId);
       setPlanApprovalMessage(null);
     } catch (error) {
       setPlanPreview(null);
