@@ -8,6 +8,8 @@ import {
 } from '@agent/core/delegated-task-observability';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 function readArg(name: string, argv: string[]): string {
   const index = argv.indexOf(name);
   const value = index >= 0 ? argv[index + 1] : undefined;
@@ -15,7 +17,7 @@ function readArg(name: string, argv: string[]): string {
   return value.trim();
 }
 
-async function runWorker(argv: string[]): Promise<void> {
+async function runWorker(argv: string[], print: Print): Promise<void> {
   const delegationId = readArg('--delegation-id', argv);
   const owner = readArg('--owner', argv);
   let settled = false;
@@ -35,7 +37,7 @@ async function runWorker(argv: string[]): Promise<void> {
     try {
       await wakeDelegatedTaskWorker(delegationId, owner);
     } catch (error) {
-      console.error(
+      print(
         `[DELEGATED_TASK_WORKER] wake failed: ${error instanceof Error ? error.message : String(error)}`
       );
       await finish(1);
@@ -64,7 +66,7 @@ async function runWorker(argv: string[]): Promise<void> {
         });
         await finish(0);
       } catch (error) {
-        console.error(
+        print(
           `[DELEGATED_TASK_WORKER] resume failed: ${error instanceof Error ? error.message : String(error)}`
         );
         await finish(1);
@@ -90,7 +92,7 @@ async function runWorker(argv: string[]): Promise<void> {
 export const runDelegatedTaskWorker = defineScript({
   name: 'delegated-task:worker',
   flags: [],
-  run: ({ argv }) => runWorker(argv),
+  run: ({ argv, print }) => runWorker(argv, print),
 });
 
 if (
