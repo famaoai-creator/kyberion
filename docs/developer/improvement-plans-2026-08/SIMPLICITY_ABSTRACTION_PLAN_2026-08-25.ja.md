@@ -16786,6 +16786,12 @@ SX-03／SX-04 の work-item ticket reflection loaderを再監査し、`mission-w
 
 検証: `pnpm exec vitest run libs/core/mission-workitem-dispatch.test.ts libs/core/mission-ticket-dispatch.test.ts libs/core/mission-retrospective.test.ts libs/core/project-mission-ledger.test.ts libs/core/mission-ticket-dispatch-manifest.test.ts`、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 950
+
+SX-03／SX-04 の work-item artifact review projectionを再監査し、`mission-workitem-dispatch-review.ts` が review target／acceptance criteriaの解決と review receipt反映時の `NEXT_TASKS.json` を `mission-dispatch-io` の汎用 readerで読む残存を修正した。既存の mission-boundary task loaderを共有し、malformed task boardは review context／receipt reflectionを空結果または反映なしへ閉じる。review target、acceptance evidence、artifact receipt、task statusの既存 semanticsは変更していない。
+
+検証: `pnpm exec vitest run libs/core/mission-workitem-dispatch.test.ts`、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

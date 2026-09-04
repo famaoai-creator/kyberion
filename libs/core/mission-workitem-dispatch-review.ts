@@ -49,8 +49,8 @@ import type { ContextSecurityScope } from './context-security-scope.js';
 import { checkProviderEgress } from './provider-egress-gate.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import { reasoningBackendEndpoint } from './reasoning-egress-scope.js';
-import { readJsonFile as readJsonFileFromDispatchIO } from './mission-dispatch-io.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import type { ReasoningCallOptions } from './reasoning-backend.js';
 import {
@@ -269,6 +269,19 @@ export function missionNextTasksPath(missionPath: string): string {
   return nodePath.join(missionPath, 'NEXT_TASKS.json');
 }
 
+function loadReviewNextTasks(missionPath: string): Array<Record<string, unknown>> {
+  try {
+    return (
+      loadMissionNextTaskObjectsAtPath(
+        missionNextTasksPath(missionPath),
+        nodePath.basename(nodePath.resolve(missionPath))
+      ) || []
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function resolveWorkItemExecutionSurface(
   item: WorkItem,
   purpose: 'implementation' | 'review' = 'implementation',
@@ -344,10 +357,7 @@ export function resolveWorkItemArtifactReviewContext(input: {
   const taskId = getWorkItemTaskId(input.item);
   if (!taskId || (input.teamRole !== 'reviewer' && input.teamRole !== 'qa')) return null;
   const reviewerTeamRole = input.teamRole;
-  const tasks =
-    readJsonFileFromDispatchIO<WorkItemReviewPlannedTask[]>(
-      missionNextTasksPath(input.missionPath)
-    ) || [];
+  const tasks = loadReviewNextTasks(input.missionPath) as WorkItemReviewPlannedTask[];
   const reviewTask = tasks.find((task) => String(task.task_id || '') === taskId);
   const metadata = (input.item.metadata || {}) as Record<string, unknown>;
   const reviewTarget = String(reviewTask?.review_target || metadata.review_target || '').trim();
@@ -581,7 +591,7 @@ export function persistWorkItemArtifactReviewReceipt(input: {
   );
 
   const taskPath = missionNextTasksPath(input.missionPath);
-  const tasks = readJsonFileFromDispatchIO<Array<Record<string, unknown>>>(taskPath) || [];
+  const tasks = loadReviewNextTasks(input.missionPath);
   const index = tasks.findIndex(
     (task) => String(task.task_id || '') === input.context.reviewTaskId
   );
