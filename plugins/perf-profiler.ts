@@ -1,5 +1,6 @@
 import { safeWriteFile, safeReadFile, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 /**
@@ -12,11 +13,39 @@ const REGRESSION_THRESHOLD = 2.0;
 
 let profiles: Record<string, { times: number[]; avg: number }> = {};
 
+export function parsePerformanceProfiles(
+  value: unknown
+): Record<string, { times: number[]; avg: number }> {
+  let root: Record<string, unknown>;
+  try {
+    root = parseSafeJsonObjectValue(value, 'performance profile state');
+  } catch {
+    return {};
+  }
+  const parsed: Record<string, { times: number[]; avg: number }> = {};
+  for (const [skillName, rawProfile] of Object.entries(root)) {
+    try {
+      const profile = parseSafeJsonObjectValue(rawProfile, `performance profile ${skillName}`);
+      if (
+        !Array.isArray(profile.times) ||
+        profile.times.some((time) => typeof time !== 'number' || !Number.isFinite(time))
+      ) {
+        continue;
+      }
+      const avg = typeof profile.avg === 'number' && Number.isFinite(profile.avg) ? profile.avg : 0;
+      parsed[skillName] = { times: profile.times, avg };
+    } catch {
+      // Ignore one malformed skill profile while retaining healthy profiles.
+    }
+  }
+  return parsed;
+}
+
 try {
   if (safeExistsSync(PROFILE_FILE)) {
     const content = safeReadFile(PROFILE_FILE, { encoding: 'utf8' }) as string;
     if (content) {
-      profiles = JSON.parse(content);
+      profiles = parsePerformanceProfiles(parseSafeJsonInput(content, 'performance profile state'));
     }
   }
 } catch (_e) {
