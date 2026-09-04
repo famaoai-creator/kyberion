@@ -72,6 +72,18 @@ describe('TaskScenario record boundary', () => {
     );
   });
 
+  it('rejects dangerous persisted records before profile use', () => {
+    const recordPath = pathResolver.sharedTmp(`task-scenario-dangerous-${process.pid}.json`);
+    safeWriteFile(recordPath, '{"preferences":{"constructor":{"polluted":true}}}');
+    try {
+      expect(() => loadTaskRecord(recordPath, 'TaskScenario profile')).toThrow(
+        'dangerous JSON key'
+      );
+    } finally {
+      safeRmSync(recordPath, { force: true });
+    }
+  });
+
   it('accepts object answers and profiles', () => {
     expect(parseTaskRecord({ audience: 'operators' }, 'TaskScenario answers')).toEqual({
       audience: 'operators',
