@@ -22,6 +22,8 @@ import {
 } from './lib/harness.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './lib/json-input.js';
 
+type Print = (value: unknown) => void;
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -81,6 +83,7 @@ interface PlaygroundRunOptions {
   check?: boolean;
   json?: boolean;
   quiet?: boolean;
+  print?: Print;
 }
 
 async function runPlayground(
@@ -88,11 +91,13 @@ async function runPlayground(
   options: PlaygroundRunOptions = {}
 ): Promise<Record<string, unknown> | undefined> {
   const machineOutput = options.json === true || options.dryRun === true || options.check === true;
+  const print = options.print ?? (() => undefined);
+  const emit = (...values: unknown[]): void => values.forEach((value) => print(value));
   const log = (...values: unknown[]) => {
-    if (!machineOutput && !options.quiet) console.log(...values);
+    if (!machineOutput && !options.quiet) emit(...values);
   };
   const logError = (...values: unknown[]) => {
-    if (!machineOutput && !options.quiet) console.error(...values);
+    if (!machineOutput && !options.quiet) emit(...values);
   };
 
   log(chalk.bold.cyan('\n🛠️  [KYBERION] Actuator Playground CLI\n'));
@@ -360,10 +365,12 @@ const script = defineScript({
   name: 'actuator:playground',
   flags: ['json', 'dry-run', 'check', 'quiet'],
   run: ({ argv, dryRun, check, json, quiet, print }) =>
-    runPlayground(stripSharedScriptFlags(argv), { dryRun, check, json, quiet }).then((result) => {
-      if (result && (json || dryRun || check)) print(result);
-      return result;
-    }),
+    runPlayground(stripSharedScriptFlags(argv), { dryRun, check, json, quiet, print }).then(
+      (result) => {
+        if (result && (json || dryRun || check)) print(result);
+        return result;
+      }
+    ),
 });
 if (
   isDirectScript(import.meta.url, 'actuator_playground.ts') ||
