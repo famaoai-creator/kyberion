@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 export function parseVoiceHubIngestResponse(payload: unknown): Record<string, unknown> {
   return parseSafeJsonObjectValue(payload, 'voice hub ingest response');
 }
 
-async function main() {
+async function main(print: Print = () => undefined) {
   const response = await fetch('http://127.0.0.1:3032/api/ingest-text', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -24,13 +26,13 @@ async function main() {
   }
 
   const body = parseVoiceHubIngestResponse(await response.json());
-  console.log(JSON.stringify(body, null, 2));
+  print(JSON.stringify(body, null, 2));
 }
 
 const runVoiceHubIngestDemo = defineScript({
   name: 'presence-demo-voice-hub-ingest',
   flags: [],
-  run: main,
+  run: ({ print }) => main(print),
 });
 
 if (

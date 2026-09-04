@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { parsePresenceTimelineResponse } from './presence/demo_presence_timeline.js';
 import { parseVoiceHubIngestResponse } from './presence/demo_voice_hub_ingest.js';
 
@@ -19,6 +20,19 @@ describe('presence demo response boundaries', () => {
       expect(() => parse([])).toThrow('must be a JSON object');
       expect(() => parse('accepted')).toThrow('must be a JSON object');
       expect(() => parse({ result: { constructor: {} } })).toThrow('dangerous JSON key');
+    }
+  });
+
+  it('routes all presence demo output through the shared printer', () => {
+    for (const file of [
+      'scripts/presence/demo_presence_surface.ts',
+      'scripts/presence/demo_presence_timeline.ts',
+      'scripts/presence/demo_voice_hub_ingest.ts',
+    ]) {
+      const source = String(safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' }));
+      expect(source).not.toContain('console.log');
+      expect(source).not.toContain('console.error');
+      expect(source).toContain('run: ({ print }) => main(print)');
     }
   });
 });
