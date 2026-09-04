@@ -159,4 +159,12 @@ describe('customer_migrate_from_personal', () => {
       'Migrated personal setup to customer/acme',
     ]);
   });
+
+  it('routes help output through the injected printer', async () => {
+    const mod = await import('./customer_migrate_from_personal.js');
+    const print = vi.fn();
+
+    expect(() => mod.main(['--help'], print)).toThrow();
+    expect(print).toHaveBeenCalledWith('Usage: customer_migrate_from_personal <slug>');
+  });
 });
