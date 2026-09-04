@@ -4,6 +4,16 @@ import {
 } from '@agent/core/intent-resolution-contract-parser';
 import { isRecord } from '@agent/core/foundation/primitives';
 
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function hasSafeTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(hasSafeTree);
+  if (!isRecord(value)) return true;
+  return Object.entries(value).every(
+    ([key, nested]) => !DANGEROUS_KEYS.has(key) && hasSafeTree(nested)
+  );
+}
+
 /**
  * Shared request/response contract for the CS-02 voice tiers. Used by the
  * /api/voice/* proxy routes (server) and the use-voice hook (client) so the
@@ -102,7 +112,7 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 export function parseVoiceInputDevice(value: unknown): VoiceInputDevice | undefined {
-  if (!isRecord(value)) return undefined;
+  if (!isRecord(value) || !hasSafeTree(value)) return undefined;
   if (
     typeof value.id !== 'number' ||
     !Number.isInteger(value.id) ||
@@ -132,7 +142,11 @@ export function parseVoiceInputDevices(value: unknown): VoiceInputDevice[] | und
 }
 
 export function parseVoiceSpeechState(value: unknown): VoiceSpeechState | undefined {
-  if (!isRecord(value) || (value.status !== 'idle' && value.status !== 'speaking')) {
+  if (
+    !isRecord(value) ||
+    !hasSafeTree(value) ||
+    (value.status !== 'idle' && value.status !== 'speaking')
+  ) {
     return undefined;
   }
   const text = optionalString(value.text);
@@ -153,7 +167,9 @@ export function parseVoiceSpeechState(value: unknown): VoiceSpeechState | undefi
 }
 
 export function parseVoiceStatusResponse(value: unknown): VoiceStatusResponse | undefined {
-  if (!isRecord(value) || typeof value.available !== 'boolean') return undefined;
+  if (!isRecord(value) || !hasSafeTree(value) || typeof value.available !== 'boolean') {
+    return undefined;
+  }
   const sttBackends = value.sttBackends;
   if (
     sttBackends !== undefined &&
@@ -180,6 +196,7 @@ export function parseVoiceStatusResponse(value: unknown): VoiceStatusResponse | 
 export function parseVoiceStopResponse(value: unknown): VoiceStopResponse | undefined {
   if (
     !isRecord(value) ||
+    !hasSafeTree(value) ||
     typeof value.ok !== 'boolean' ||
     typeof value.stopped !== 'boolean' ||
     typeof value.reason !== 'string' ||
@@ -191,7 +208,7 @@ export function parseVoiceStopResponse(value: unknown): VoiceStopResponse | unde
 }
 
 export function parseVoiceListenOnceResponse(value: unknown): VoiceListenOnceResponse | undefined {
-  if (!isRecord(value) || typeof value.ok !== 'boolean') return undefined;
+  if (!isRecord(value) || !hasSafeTree(value) || typeof value.ok !== 'boolean') return undefined;
   const requestId = optionalString(value.request_id);
   const reason = optionalString(value.reason);
   const replyText = optionalString(value.replyText);
@@ -227,7 +244,7 @@ export function parseVoiceListenOnceResponse(value: unknown): VoiceListenOnceRes
   }
   let stt: VoiceListenOnceResponse['stt'];
   if (value.stt !== undefined) {
-    if (!isRecord(value.stt)) return undefined;
+    if (!isRecord(value.stt) || !hasSafeTree(value.stt)) return undefined;
     if (
       typeof value.stt.ok !== 'boolean' ||
       typeof value.stt.text !== 'string' ||
