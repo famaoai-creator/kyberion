@@ -3,6 +3,7 @@ import { resolveDocumentContentsLabel } from '@agent/core/document-contents-poli
 import { resolveReportSectionTitle } from '@agent/core/document-outline-label-policy';
 import { resolveThemeColorRole as resolveThemeColorRolePolicy } from '@agent/core/media-theme-role-policy';
 import { nowIso } from '@agent/core/foundation';
+import type { DocxDesignProtocol } from '@agent/core/src/types/docx-protocol';
 import type { PdfDesignProtocol } from '@agent/core/src/types/pdf-protocol';
 import {
   buildMediaGenerationBoundary,
@@ -54,6 +55,16 @@ export interface MediaReportPdfProtocol extends Omit<PdfDesignProtocol, 'metadat
   };
 }
 
+export interface MediaReportDocxProtocol extends DocxDesignProtocol {
+  metadata: {
+    composition: unknown;
+    generationBoundary: unknown;
+    recommendedTheme: string;
+    branding: Record<string, unknown>;
+    sectionSemantics: unknown[];
+  };
+}
+
 function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
   const resolvedRole = resolveThemeColorRolePolicy(role, 'secondary');
   switch (resolvedRole) {
@@ -81,7 +92,7 @@ function hexToPdfRgb(
 }
 
 export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) {
-  function buildReportDocxProtocol(rootDir: string, brief: any): any {
+  function buildReportDocxProtocol(rootDir: string, brief: any): MediaReportDocxProtocol {
     const outline = buildReportNarrativeOutline(
       rootDir,
       brief,
@@ -585,7 +596,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
               },
             },
             rPr: {
-              italics: evidenceCalloutBodyRule.italics ?? true,
+              italic: evidenceCalloutBodyRule.italics ?? true,
               color: {
                 val: resolveThemeColorRole(
                   palette,

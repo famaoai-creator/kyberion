@@ -23,7 +23,10 @@ import {
   type MediaInvoicePdfProtocol,
   type MediaPptxProtocol,
 } from './media-document-pipeline-helpers.js';
-import type { MediaReportPdfProtocol } from './media-report-pipeline-helpers.js';
+import type {
+  MediaReportDocxProtocol,
+  MediaReportPdfProtocol,
+} from './media-report-pipeline-helpers.js';
 import {
   buildMediaGenerationBoundary,
   resolveMediaBriefCategory,
@@ -1114,7 +1117,7 @@ function normalizeProposalBrief(rootDir: string, input: any): any {
   return proposalPptxFlow.normalizeProposalBrief(rootDir, input);
 }
 
-function buildReportDocxProtocol(rootDir: string, brief: any): any {
+function buildReportDocxProtocol(rootDir: string, brief: any): MediaReportDocxProtocol {
   return mediaReportPipelineHelpers.buildReportDocxProtocol(rootDir, brief);
 }
 
