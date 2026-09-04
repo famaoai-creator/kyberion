@@ -13,6 +13,15 @@ describe('avatar script path boundaries', () => {
     expect(source).not.toContain('readJson');
   });
 
+  it('routes avatar registration progress through the shared printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/register_avatar.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.warn');
+    expect(source).toContain('return main(context.argv, context.print);');
+  });
+
   it('keeps generation input and output inside the repository', () => {
     const paths = resolveAvatarGenerationPaths(
       'active/shared/tmp/user_face.jpg',
