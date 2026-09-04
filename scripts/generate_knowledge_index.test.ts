@@ -21,5 +21,7 @@ describe('generate_knowledge_index', () => {
     );
     expect(source).toContain("parseSafeJsonInput(content, 'knowledge integrity manifest')");
     expect(source).not.toContain('JSON.parse(content)');
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
   });
 });
