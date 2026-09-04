@@ -21,7 +21,6 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeReaddir: vi.fn(),
   safeWriteFile: vi.fn(),
-  loadJson: vi.fn((target: string) => JSON.parse(String(mocks.safeReadFile(target) || ''))),
   classifyError: vi.fn((err: any) => ({
     category: 'unknown',
     message: String(err?.message || err),
@@ -53,11 +52,19 @@ vi.mock('@agent/core/governance', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
 }));
 
-// customer.json is read through the foundation JSON facade, which dispatches
-// through its own registered IO bridge to the real secure-io — so it has to be
-// stubbed here, or the tmpdir fixture trips the project-root read policy.
+// The shared JSON loader is backed by the foundation parser and secure-io
+// bridge, so both parser seams are stubbed for this isolated tmpdir fixture.
 vi.mock('@agent/core/foundation', () => ({
-  readJson: mocks.loadJson,
+  parseSafeJsonInput: (text: string) => JSON.parse(text),
+  parseSafeJsonObjectValue: (value: unknown) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('expected JSON object');
+    }
+    if (Object.keys(value).some((key) => ['__proto__', 'prototype', 'constructor'].includes(key))) {
+      throw new Error('dangerous JSON key');
+    }
+    return value;
+  },
 }));
 
 vi.mock('./customer_create.js', () => ({
@@ -135,6 +142,12 @@ describe('customer_migrate_from_personal', () => {
     expect(JSON.parse(fs.readFileSync(path.join(customerRoot, 'customer.json'), 'utf8')).slug).toBe(
       'acme'
     );
+
+    fs.writeFileSync(
+      path.join(customerRoot, 'customer.json'),
+      '{"__proto__":{"polluted":true},"display_name":"Acme"}'
+    );
+    expect(() => mod.migratePersonalCustomer('acme')).toThrow('dangerous JSON key');
   });
 
   it('formats migration output without writing to stdout', async () => {

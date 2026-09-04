@@ -11,9 +11,9 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { createCustomer } from './customer_create.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 function copyTree(srcDir: string, dstDir: string): void {
   const rootDir = pathResolver.rootDir();
@@ -55,7 +55,10 @@ export function migratePersonalCustomer(slug: string): string {
     allowMissingLeaf: true,
     rootDir,
   });
-  const customerJson = readJson<Record<string, unknown>>(customerJsonPath);
+  const customerJson = readSafeJsonFile<Record<string, unknown>>(
+    customerJsonPath,
+    'customer migration overlay'
+  );
   safeWriteFile(
     customerJsonPath,
     JSON.stringify(
