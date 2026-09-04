@@ -96,10 +96,64 @@ export interface MediaLayoutShape {
   [key: string]: unknown;
 }
 
+export type MediaLayoutMargin = [number, number, number, number];
+
+export interface MediaLayoutVisualLabel {
+  h?: number;
+  y_from_bottom?: number;
+  font_size?: number;
+  margin?: MediaLayoutMargin;
+  fill?: string;
+  color?: string;
+}
+
+export interface MediaLayoutBodyZone {
+  left_w: number;
+  right_x: number;
+  right_w: number;
+  panel_h: number;
+  left_font_size: number;
+  left_line_spacing_pct: number;
+  left_margin: MediaLayoutMargin;
+  panel_header_font_size: number;
+  panel_body_font_size: number;
+  panel_body_line_spacing_pct: number;
+  panel_header_margin: MediaLayoutMargin;
+  panel_body_margin: MediaLayoutMargin;
+  desc_h: number;
+  panel_header_y_offset: number;
+  panel_header_h: number;
+  panel_body_y_offset: number;
+  desc_font_size: number;
+  desc_line_spacing_pct: number;
+  desc_margin: MediaLayoutMargin;
+  msg_y_offset: number;
+  msg_h: number;
+  cta_y_offset: number;
+  cta_x: number;
+  cta_w: number;
+  cta_h: number;
+  msg_font_size: number;
+  msg_line_spacing_pct: number;
+  msg_margin: MediaLayoutMargin;
+  cta_font_size: number;
+  font_size: number;
+  line_spacing_pct: number;
+  margin: MediaLayoutMargin;
+  panel_label?: string;
+  panel_header_fill?: string;
+  panel_body_fill?: string;
+  panel_body_color?: string;
+  semantic_labels?: Record<string, string>;
+  visual_label?: MediaLayoutVisualLabel;
+  regions?: ZoneRegionSpec[];
+  [key: string]: unknown;
+}
+
 export interface MediaLayoutTemplate {
   chrome?: MediaLayoutChrome;
   hero?: MediaLayoutHero;
-  body_zones?: Record<string, MediaLayoutTemplate>;
+  body_zones?: Record<string, MediaLayoutBodyZone>;
   title?: MediaLayoutShape;
   body?: MediaLayoutShape;
   visual?: MediaLayoutShape;
@@ -114,7 +168,7 @@ export interface MediaSlideLayoutPresetCatalog {
   grid?: Record<string, unknown>;
   chrome?: MediaLayoutChrome;
   hero?: MediaLayoutHero;
-  body_zones?: Record<string, MediaLayoutTemplate>;
+  body_zones?: Record<string, MediaLayoutBodyZone>;
   default?: string;
   templates?: Record<string, MediaLayoutTemplate>;
   _meta?: string;
