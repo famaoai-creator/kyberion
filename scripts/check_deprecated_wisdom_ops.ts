@@ -68,9 +68,10 @@ export const runCheckDeprecatedWisdomOps = defineScript({
       context.print('[check:deprecated-wisdom-ops] OK (no deprecated Wisdom ops in catalogs)');
     } else {
       for (const finding of findings) {
-        console.warn(
-          `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
-        );
+        if (!context.json)
+          context.print(
+            `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
+          );
       }
       if (context.argv.includes('--fail')) throw new ScriptExitError(1);
     }

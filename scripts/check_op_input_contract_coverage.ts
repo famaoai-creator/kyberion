@@ -31,7 +31,10 @@ function readDiscovery(): DiscoveryFile {
   return loadActuatorOpDiscoveryAtPath(DISCOVERY_PATH);
 }
 
-export function findOpInputContractViolations(discovery: DiscoveryFile): string[] {
+export function findOpInputContractViolations(
+  discovery: DiscoveryFile,
+  print: (value: unknown) => void = () => undefined
+): string[] {
   const violations: string[] = [];
   let inferredLegacyCount = 0;
   const baselinePath = resolveBaselinePath();
@@ -58,7 +61,7 @@ export function findOpInputContractViolations(discovery: DiscoveryFile): string[
   // count visible in the gate output so the migration remains measurable,
   // while avoiding a false-green contract that rejects real pipeline params.
   if (inferredLegacyCount > 0) {
-    console.warn(
+    print(
       `[check:op-input-contract-coverage] ${inferredLegacyCount} inferred-legacy contract(s) remain`
     );
   }
@@ -77,15 +80,17 @@ export function findOpInputContractViolations(discovery: DiscoveryFile): string[
   return violations;
 }
 
-export function findMissingOpInputContractCoverage(): string[] {
-  return findOpInputContractViolations(readDiscovery());
+export function findMissingOpInputContractCoverage(
+  print: (value: unknown) => void = () => undefined
+): string[] {
+  return findOpInputContractViolations(readDiscovery(), print);
 }
 
 export const runCheckOpInputContractCoverage = defineScript({
   name: 'check:op-input-contract-coverage',
   flags: [],
   run(context) {
-    const violations = findMissingOpInputContractCoverage();
+    const violations = findMissingOpInputContractCoverage(context.json ? undefined : context.print);
     if (violations.length > 0) {
       throw new ScriptExitError(
         1,
