@@ -36,7 +36,7 @@ import {
   safeReaddir,
   safeReadFile,
 } from './secure-io.js';
-import { loadMissionPhaseGateDefinitionAtPath } from './mission-orchestration-phase-gates.js';
+import { loadMissionPhaseGateDefinitionAtPath } from './mission-phase-gate-definition-reader.js';
 import {
   type MissionClass,
   type MissionDeliveryShape,

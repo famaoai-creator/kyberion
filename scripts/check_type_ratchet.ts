@@ -6,8 +6,9 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
-import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 const ROOT = pathResolver.rootDir();
 const DEFAULT_BASELINE_PATH = resolveCiGateBaselinePath('type-ratchet');
@@ -136,7 +137,7 @@ function scanCurrentCounts(scanRoots: string[]): RatchetBaseline {
 
 function loadBaseline(baselinePath: string): RatchetBaseline | null {
   if (!safeExistsSync(baselinePath)) return null;
-  return readJson<RatchetBaseline>(baselinePath);
+  return readSafeJsonFile<RatchetBaseline>(baselinePath, 'type ratchet baseline');
 }
 
 function compareBuckets(current: RatchetBucket, baseline: RatchetBucket, label: string): string[] {
