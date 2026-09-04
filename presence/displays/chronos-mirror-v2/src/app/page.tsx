@@ -104,6 +104,8 @@ import {
   type ClientOperatorHomeSummary,
 } from '../lib/operator-home-response';
 import { parsePlanPreviewResponse, type ClientPlanPreview } from '../lib/plan-preview-response';
+import { parseDeliverableReviewResponse } from '../lib/deliverable-review-response';
+import { parseConnectionReviewResponse } from '../lib/connection-review-response';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -747,13 +749,15 @@ function ChronosMirrorV2Content() {
             reasonCategory: options?.reasonCategory,
           }),
         });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'deliverable review failed');
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error('deliverable review failed');
+        const parsed = parseDeliverableReviewResponse(payload);
+        if (!parsed) throw new Error('Invalid deliverable review response');
         setDeliverableReviewComment('');
         refreshDeliverables();
         setOperatorHomeRefreshTick((value) => value + 1);
-        if (payload.state?.current_artifact_id) {
-          setSelectedDeliverableId(payload.state.current_artifact_id);
+        if (parsed.state.current_artifact_id) {
+          setSelectedDeliverableId(parsed.state.current_artifact_id);
         }
       } catch (error) {
         setDeliverableReviewError(error instanceof Error ? error.message : String(error));
@@ -778,16 +782,18 @@ function ChronosMirrorV2Content() {
             tenant,
           }),
         });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'connection review failed');
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error('connection review failed');
+        const parsed = parseConnectionReviewResponse(payload);
+        if (!parsed) throw new Error('Invalid connection review response');
         setConnections((current) =>
           current.map((entry) =>
             entry.binding_id === bindingId
               ? {
                   ...entry,
-                  reviewAction: payload.review?.action,
-                  reviewNote: payload.review?.note,
-                  reviewedAt: payload.review?.reviewed_at,
+                  reviewAction: parsed.review.action,
+                  reviewNote: parsed.review.note,
+                  reviewedAt: parsed.review.reviewed_at,
                 }
               : entry
           )
