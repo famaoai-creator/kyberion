@@ -77,7 +77,7 @@ export function main(
     action: plan.action,
     changed: plan.changed,
   };
-  const print = options.print ?? console.log;
+  const print = options.print ?? (() => undefined);
   if (options.json || options.dryRun || options.check) print(result);
   else if (plan.action === 'remove') print(`removed review layer from ${target}`);
   else if (plan.action === 'add')
