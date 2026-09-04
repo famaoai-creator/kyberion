@@ -339,3 +339,9 @@ Computer Surface の `/a2ui/dispatch` を再監査し、tenant scope の検査�
 A2UI 共通 validator の適用範囲を再監査し、既知 operation の組み合わせだけを検査していたため、root／operation payload／component の未知 field と、型不正な `children`／`titleKey` が内部 dispatch または surface 適用へ到達し得る残存を検出した。validator に許可キーの fail-closed 検査と wire 型検査を追加し、A2UI dispatcher 自身も transport 呼び出し前に検証するようにした。併せて JSON Schema の `additionalProperties` 制約を実装と揃えた。
 
 検証: A2UI／Computer Surface **3 files / 17 tests passed**、root typecheck、root lint、`git diff --check`、knowledge index 生成。canonical full gate は修正後に再実行する。
+
+## 2026-09-04 再レビュー修正 31
+
+A2UI の wire Schema と runtime validator を再照合し、nested payload の未知 field と Component の `props` 欠落に対して Schema 側の制約が緩い残存を修正した。create／update／delete 各 payload、Component の `additionalProperties` と `props` 必須条件を runtime validator と一致させ、Schema 経由の検証でも同じ fail-closed 契約を適用するようにした。
+
+検証: A2UI／Computer Surface **3 files / 17 tests passed**、root typecheck、root lint、`git diff --check`、knowledge index 生成、canonical full gate **69/69 passed**。
