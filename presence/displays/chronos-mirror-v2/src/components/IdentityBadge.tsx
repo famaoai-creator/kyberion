@@ -1,32 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
-interface IdentityResponse {
-  status: string;
-  onboarded: boolean;
-  sovereign: {
-    name: string | null;
-    interaction_style: string | null;
-    primary_domain: string | null;
-  } | null;
-  agent: {
-    agent_id: string | null;
-    trust_tier: string | null;
-  } | null;
-  vision: string | null;
-}
+import { parseIdentityResponse } from '../lib/identity-response';
 
 export function IdentityBadge() {
-  const [data, setData] = useState<IdentityResponse | null>(null);
+  const [data, setData] = useState<ReturnType<typeof parseIdentityResponse>>();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     fetch('/api/identity')
-      .then((r) => r.json())
-      .then((j) => {
-        if (!cancelled) setData(j);
+      .then((r) => r.json().catch(() => null))
+      .then((payload) => {
+        const parsed = parseIdentityResponse(payload);
+        if (!cancelled) {
+          if (!parsed) setError('invalid identity response');
+          else setData(parsed);
+        }
       })
       .catch((e) => {
         if (!cancelled) setError(String(e));
