@@ -16,6 +16,7 @@ import {
   buildMediaGenerationBoundary,
   normalizeInvoiceDocumentBrief,
   type MediaBriefCategory,
+  type MediaDocumentCompositionCatalog,
   type MediaGenerationBoundary,
   type ProtocolKind,
 } from './media-document-helpers.js';
@@ -87,7 +88,7 @@ const documentLayoutCatalog = defineCatalog<DocumentLayoutCatalog>({
 
 export interface MediaDocumentPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
-  loadDocumentCompositionCatalog: (rootDir: string) => any;
+  loadDocumentCompositionCatalog: (rootDir: string) => MediaDocumentCompositionCatalog;
   buildPptxSlideFromPattern: (
     rootDir: string,
     data: any,

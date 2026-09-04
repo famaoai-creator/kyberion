@@ -27,6 +27,23 @@ import * as path from 'node:path';
 
 export type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
 export type ProtocolKind = 'pptx' | 'docx' | 'pdf' | 'xlsx';
+export interface MediaCompositionPreset {
+  artifact_family?: string;
+  document_type?: string;
+  design_system_id?: string;
+  narrative_pattern_id?: string;
+  recommended_layout_template_id?: string;
+  recommended_theme?: string;
+  branding?: Record<string, unknown>;
+  prompt_guide?: unknown[];
+  source_design?: Record<string, unknown> | null;
+  design_recommendations?: unknown[];
+  [key: string]: unknown;
+}
+export interface MediaDocumentCompositionCatalog {
+  defaults: Record<string, unknown>;
+  profiles: Record<string, MediaCompositionPreset>;
+}
 export interface MediaGenerationBoundary {
   source_of_truth: {
     document_profile: string;
@@ -48,8 +65,8 @@ export interface MediaGenerationBoundary {
 export type DocumentCompositionPresetResolver = (
   rootDir: string,
   brief: any
-) => { profileId: string; preset: any };
-export type DocumentCompositionCatalogLoader = (rootDir: string) => any;
+) => { profileId: string; preset: MediaCompositionPreset };
+export type DocumentCompositionCatalogLoader = (rootDir: string) => MediaDocumentCompositionCatalog;
 
 export function warnLegacyMediaOp(op: string): void {
   if (!isLegacyMediaOp(op)) return;
@@ -717,8 +734,8 @@ function inferDocumentProfileId(
   if (family && docType) {
     const catalog = loadDocumentCompositionCatalog(rootDir);
     for (const [profileId, profile] of Object.entries(catalog.profiles || {})) {
-      if (String((profile as any).artifact_family || '') !== family) continue;
-      if (String((profile as any).document_type || '') !== docType) continue;
+      if (String(profile.artifact_family || '') !== family) continue;
+      if (String(profile.document_type || '') !== docType) continue;
       return profileId;
     }
   }
