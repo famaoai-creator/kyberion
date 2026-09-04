@@ -1241,7 +1241,7 @@ describe('mission_controller argument parsing', () => {
 
   it('emits a redacted intent-track gate summary for project-linked dry runs', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const output: unknown[] = [];
     process.argv = [
       'node',
       'dist/scripts/mission_controller.js',
@@ -1261,8 +1261,8 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main();
-      const payload = JSON.parse(logSpy.mock.calls.flat().join('\n'));
+      await main(undefined, (value) => output.push(value));
+      const payload = JSON.parse(String(output[0]));
       expect(payload.input.relationships.track.track_id).toBe('TRK-TEST-INTENT-DRY-DELIVERY');
       expect(payload.intentTrackGate.status).toBe('ready_to_provision');
       expect(payload.intentTrackGate.track_record.project_id).toBe('PRJ-TEST-INTENT-DRY');
@@ -1271,7 +1271,6 @@ describe('mission_controller argument parsing', () => {
       expect(payload.intentTrackGate.track_record.metadata).toBeUndefined();
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
     }
   });
 
@@ -1298,7 +1297,7 @@ describe('mission_controller argument parsing', () => {
 
   it('surfaces low-confidence intent-track gates unless explicitly confirmed', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const output: unknown[] = [];
     process.argv = [
       'node',
       'dist/scripts/mission_controller.js',
@@ -1318,19 +1317,18 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main();
-      const payload = JSON.parse(logSpy.mock.calls.flat().join('\n'));
+      await main(undefined, (value) => output.push(value));
+      const payload = JSON.parse(String(output[0]));
       expect(payload.intentTrackGate.status).toBe('escalation_required');
       expect(payload.input.relationships.track).toBeUndefined();
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
     }
   });
 
   it('allows low-confidence intent-track dry runs with explicit confirmation', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const output: unknown[] = [];
     process.argv = [
       'node',
       'dist/scripts/mission_controller.js',
@@ -1352,13 +1350,12 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main();
-      const payload = JSON.parse(logSpy.mock.calls.flat().join('\n'));
+      await main(undefined, (value) => output.push(value));
+      const payload = JSON.parse(String(output[0]));
       expect(payload.intentTrackGate.status).toBe('ready_to_provision');
       expect(payload.input.relationships.track.note).toContain('confirmed below threshold');
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
     }
   });
 
