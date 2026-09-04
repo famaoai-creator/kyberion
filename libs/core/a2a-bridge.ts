@@ -1097,9 +1097,10 @@ class A2ABridgeImpl {
 }
 
 const GLOBAL_KEY = Symbol.for('@kyberion/a2a-bridge');
-if (!(globalThis as any)[GLOBAL_KEY]) {
-  (globalThis as any)[GLOBAL_KEY] = new A2ABridgeImpl();
+const globalRegistry = globalThis as typeof globalThis & { [key: symbol]: unknown };
+if (!globalRegistry[GLOBAL_KEY]) {
+  globalRegistry[GLOBAL_KEY] = new A2ABridgeImpl();
 }
-export const a2aBridge: A2ABridgeImpl = (globalThis as any)[GLOBAL_KEY];
+export const a2aBridge = globalRegistry[GLOBAL_KEY] as A2ABridgeImpl;
 
 registerA2ARoute((envelope) => a2aBridge.route(envelope));
