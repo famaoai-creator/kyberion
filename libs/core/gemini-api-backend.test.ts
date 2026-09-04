@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   buildGeminiApiBackendFromEnv,
   GeminiApiBackend,
@@ -221,5 +223,16 @@ describe('GeminiApiBackend', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain(
       '/models/gemini-flash-latest:streamGenerateContent?alt=sse'
     );
+  });
+
+  it('routes Gemini runtime environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/gemini-api-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).not.toMatch(/env\.(GEMINI_API_KEY|GOOGLE_API_KEY)/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 });
