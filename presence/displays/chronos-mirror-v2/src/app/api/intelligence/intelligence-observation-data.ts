@@ -50,6 +50,7 @@ import {
   parseTaskBoard,
   summarizeNextTasks,
 } from '../../../lib/mission-progress';
+import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission-next-task-reader';
 import { applyBrowserSessionControl } from '../../../lib/browser-session-control';
 import { buildRuntimeTopology } from '../../../lib/runtime-topology';
 import {
@@ -100,7 +101,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeReadFile,
-  readJson as readFoundationJson,
   safeReaddir,
   saveDistillCandidateRecord,
   saveMissionSeedRecord,
@@ -874,24 +874,20 @@ export function resolveProjectRootPath(
   return metadataRoot || null;
 }
 
-export function readJson<T = unknown>(filePath: string): T | null {
-  let safePath: string;
+function safeMissionResourcePath(filePath: string): string | null {
   try {
-    safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  } catch {
-    return null;
-  }
-  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
-  try {
-    return readFoundationJson<T>(safePath);
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   } catch {
     return null;
   }
 }
 
-function safeMissionResourcePath(filePath: string): string | null {
+function loadMissionNextTasksForProjection(
+  filePath: string,
+  missionDirectoryName: string
+): ReturnType<typeof parseNextTaskRecords> {
   try {
-    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    return parseNextTaskRecords(loadMissionNextTaskObjectsAtPath(filePath, missionDirectoryName));
   } catch {
     return null;
   }
@@ -917,8 +913,8 @@ export function collectActiveMissions(): MissionSummary[] {
         const state = statePath ? loadStateAtPath(statePath) : null;
         const status = state?.status;
         if (!status || !['active', 'planned', 'paused', 'failed'].includes(status)) continue;
-        const rawNextTasks = readJson<unknown>(path.join(missionPath, 'NEXT_TASKS.json'));
-        const nextTaskRecords = parseNextTaskRecords(rawNextTasks) || [];
+        const nextTaskRecords =
+          loadMissionNextTasksForProjection(path.join(missionPath, 'NEXT_TASKS.json'), item) || [];
         const planPath = safeMissionResourcePath(path.join(missionPath, 'PLAN.md'));
         const planReady = Boolean(
           planPath && safeExistsSync(planPath) && safeLstat(planPath).isFile()
@@ -988,7 +984,7 @@ export function collectMissionProgress(activeMissions: MissionSummary[]): Missio
         ? String(safeReadFile(taskBoardPath, { encoding: 'utf8' }) || '')
         : '';
     const nextTasks = nextTasksPath
-      ? parseNextTaskRecords(readJson<unknown>(nextTasksPath)) || []
+      ? loadMissionNextTasksForProjection(nextTasksPath, path.basename(missionPath)) || []
       : [];
     const missionState = statePath ? loadStateAtPath(statePath) : null;
     const board = parseTaskBoard(taskBoard);
