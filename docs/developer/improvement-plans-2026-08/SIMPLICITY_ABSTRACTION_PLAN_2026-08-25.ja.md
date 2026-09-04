@@ -17878,6 +17878,20 @@ protocol は従来どおり空集合として扱う optional input 境界を保�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 1029
+
+SX-04／SX-10 の invoice PDF compilation boundary を再監査し、生成する PDF protocol を core の `PdfDesignProtocol` と
+invoice 固有の composition metadata を持つ明示型へ接続した。source、render options、metadata の必須境界を維持し、請求明細の
+集計、丸め、レイアウト template、generation boundary の既存挙動は変更していない。
+
+検証:
+
+- Media actuator の invoice／document bridge **1 file / 3 tests passed（58 skipped）**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
