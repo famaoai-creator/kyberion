@@ -16702,6 +16702,13 @@ SX-08／SX-09 の Concierge ingest projection（`/api/setup` tenant catalog と 
 検証: Concierge ingest response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 937
+
+SX-08／SX-09 の Chronos MissionIntelligence `/api/intelligence` nested projectionを再監査し、root object／record array判定だけで表示 stateへ渡す残存を修正した。専用 parser で mission、project／track、seed／candidate、artifact／approval、surface、message／handoff、progress、browser session、outbox、runtime／topology、control action の必須フィールド、列挙値、非負カウンタ、nested arrayを検証し、不正 responseは fail-closed とする。既存の tenant scope、live-sync、human approval、各 workspaceの表示 semantics は変更していない。自由形式の metadata／work-loop／company 部分は dangerous key検査を維持したうえで、詳細 shapeは後続 sliceで継続監査する。
+
+検証: MissionIntelligence nested response **1 file / 5 tests passed**、root typecheck、root lint、baseline-check、`pnpm run validate`（`scope=full gates=69 failed=0`）。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
