@@ -32,7 +32,7 @@ export function LiveTerminalDrawer({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'logs', agentId, limit: 2000 }),
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error('terminal log load failed');
     const parsed = parseAgentLogsResponse(payload);
     if (!parsed || parsed.agentId !== agentId) {
@@ -71,8 +71,7 @@ export function LiveTerminalDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'ask', agentId, query: prompt.trim(), itemId }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'steering failed');
+      if (!response.ok) throw new Error('steering failed');
       setPrompt('');
       await refresh();
       setError(null);
@@ -95,8 +94,7 @@ export function LiveTerminalDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'mission_control', missionId, operation }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || `${operation} failed`);
+      if (!response.ok) throw new Error(`${operation} failed`);
       setError(null);
       await refresh();
     } catch (err) {

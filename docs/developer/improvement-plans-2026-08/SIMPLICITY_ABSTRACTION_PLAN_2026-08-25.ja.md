@@ -16709,6 +16709,13 @@ SX-08／SX-09 の Chronos MissionIntelligence `/api/intelligence` nested project
 検証: MissionIntelligence nested response **1 file / 5 tests passed**、root typecheck、root lint、baseline-check、`pnpm run validate`（`scope=full gates=69 failed=0`）。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 938
+
+SX-08／SX-09 の Chronos `LiveTerminalDrawer` mutation projectionを再監査し、agent steering／mission pause・resume の成功 bodyを利用していないにもかかわらず、未検証 JSON の `error` fieldを失敗メッセージへ流用する残存を修正した。成功時はHTTP statusだけで既存のログ refreshへ進み、失敗時は固定メッセージを使うため、サーバー由来の未検証 payloadが terminal UIへ混入しない。ログ取得の `parseAgentLogsResponse`、bounded tail、mission boundary、既存の操作 semantics は変更していない。
+
+検証: `LiveTerminalDrawer` response boundary **1 file / status-only mutation projection**、root typecheck、root lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
