@@ -18071,9 +18071,9 @@ SX-04／SX-10 の layout catalog consumer を再監査し、PPTX geometry matche
 
 検証:
 
-- Media layout catalog／diagram rendering **2 files / 2 tests passed**。
+- Media layout catalog **1 file / 2 tests passed**。
 - `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
-- canonical full gateはこのsliceの後段で実行する。
+- canonical full gate **69 gates / 0 failed**。
 
 ## 参照
 
