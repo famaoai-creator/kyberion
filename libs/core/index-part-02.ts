@@ -84,6 +84,8 @@ export * from './financial-model.js';
 
 export * from './finance-controller.js';
 
+export * from './finance-controller-cost-report.js';
+
 export * from './okr-tracker.js';
 
 export * from './decision-rights.js';
