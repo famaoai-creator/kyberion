@@ -14,7 +14,12 @@ import {
   safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
-import { loadState, readJsonFileSafe } from './mission-state.js';
+import { loadState } from './mission-state.js';
+import {
+  loadProjectMissionLedgerAtPath,
+  writeProjectMissionLedgerAtPath,
+  type ProjectMissionLedger,
+} from './project-mission-ledger.js';
 import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { normalizeEventScope } from './event-scope.js';
@@ -55,6 +60,14 @@ export function escapeTableCell(value: string): string {
   return value.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
 }
 
+function readProjectMissionLedger(filePath: string): ProjectMissionLedger | null {
+  try {
+    return loadProjectMissionLedgerAtPath(filePath);
+  } catch {
+    return null;
+  }
+}
+
 export function upsertMissionLedgerRow(content: string, row: string, missionId: string): string {
   const policy = resolveMissionLedgerPolicy();
   const lines = content.split('\n');
@@ -92,10 +105,10 @@ export function removeMissionFromProjectLedger(projectPath: string, missionId: s
     safeWriteFile(ledgerPath, `${updated.trimEnd()}\n`);
   }
   if (safeExistsSync(ledgerJsonPath)) {
-    const jsonLedger = readJsonFileSafe(ledgerJsonPath);
+    const jsonLedger = readProjectMissionLedger(ledgerJsonPath);
     if (jsonLedger && Array.isArray(jsonLedger.entries)) {
       jsonLedger.entries = jsonLedger.entries.filter((entry: any) => entry?.mission_id !== upperId);
-      safeWriteFile(ledgerJsonPath, JSON.stringify(jsonLedger, null, 2));
+      writeProjectMissionLedgerAtPath(ledgerJsonPath, jsonLedger);
     }
   }
 }
@@ -139,11 +152,13 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
   safeWriteFile(ledgerPath, updated);
 
   const projectId = project.project_id || path.basename(path.dirname(path.dirname(ledgerJsonPath)));
-  const jsonLedger = readJsonFileSafe(ledgerJsonPath) || {
-    project_id: projectId,
-    project_name: projectId,
-    entries: [],
-  };
+  const jsonLedger =
+    readProjectMissionLedger(ledgerJsonPath) ||
+    ({
+      project_id: projectId,
+      project_name: projectId,
+      entries: [],
+    } satisfies ProjectMissionLedger);
   jsonLedger.project_id = jsonLedger.project_id || projectId;
   jsonLedger.project_name = jsonLedger.project_name || projectId;
   const projectScope = resolveProjectLedgerScope(state, projectId);
@@ -162,7 +177,7 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
   jsonLedger.entries = Array.isArray(jsonLedger.entries) ? jsonLedger.entries : [];
   jsonLedger.entries = jsonLedger.entries.filter((entry: any) => entry?.mission_id !== upperId);
   jsonLedger.entries.push(nextEntry);
-  safeWriteFile(ledgerJsonPath, JSON.stringify(jsonLedger, null, 2));
+  writeProjectMissionLedgerAtPath(ledgerJsonPath, jsonLedger);
 
   logger.success(
     `🔗 Synced mission ${upperId} into project ledger: ${path.relative(rootDir, ledgerPath)} (+ ${path.relative(rootDir, ledgerJsonPath)})`

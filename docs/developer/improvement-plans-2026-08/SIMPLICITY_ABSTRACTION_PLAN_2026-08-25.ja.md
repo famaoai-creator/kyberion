@@ -16774,6 +16774,12 @@ SX-03／SX-04 の mission dispatch loaderを再監査し、`mission-retrospectiv
 
 検証: `pnpm exec vitest run libs/core/mission-retrospective.test.ts libs/core/mission-ticket-dispatch-manifest.test.ts libs/core/mission-ticket-dispatch.test.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 948
+
+SX-03／SX-04 の project ledger loaderを再監査し、`mission-project-ledger.ts` が既存 `project-mission-ledger.schema.json` を使わず `readJsonFileSafe` と手作業の `entries` shape mutationで JSON ledgerを読み書きする残存を修正した。専用 loader／writerを既存 schemaと `defineCatalog` に接続し、破損 ledgerは従来同様に新規初期化へ閉じる。Markdown ledger、mission rowの置換 semantics、project scopeの保存は変更していない。
+
+検証: `pnpm exec vitest run libs/core/project-mission-ledger.test.ts libs/core/mission-project-ledger.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
