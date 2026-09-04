@@ -9,6 +9,7 @@ import { secureFetch } from '@agent/core/network';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { isRecord } from '@agent/core/foundation/text';
 import { WebClient } from '@slack/web-api';
 
 const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve(
@@ -65,6 +66,13 @@ const buildRetryOptions = createGovernedRetryOptionsBuilder({
   defaults: DEFAULT_PRESENCE_RETRY,
   fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
+
+export function normalizeTimelineDispatchResponse(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new Error('[PRESENCE] timeline dispatch response must be a JSON object');
+  }
+  return value;
+}
 
 export async function handleAction(input: PresenceAction) {
   const { action } = input;
@@ -163,9 +171,9 @@ export async function handleAction(input: PresenceAction) {
     case 'dispatch_timeline': {
       const timeline = validatePresenceTimeline(params.payload.timeline);
       const bridgeUrl = getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') || 'http://127.0.0.1:3031';
-      const body = await retry(
+      const body: unknown = await retry(
         async () =>
-          secureFetch<Record<string, unknown>>({
+          secureFetch({
             method: 'POST',
             url: `${bridgeUrl}/api/timeline/dispatch`,
             headers: { 'Content-Type': 'application/json' },
@@ -174,7 +182,7 @@ export async function handleAction(input: PresenceAction) {
           }),
         buildRetryOptions()
       );
-      return { status: 'timeline_dispatched', ...body };
+      return { status: 'timeline_dispatched', ...normalizeTimelineDispatchResponse(body) };
     }
 
     case 'record_interaction': {
