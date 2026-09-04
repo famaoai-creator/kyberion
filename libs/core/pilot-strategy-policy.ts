@@ -18,25 +18,10 @@ export interface PilotStrategyPolicyCatalog {
 const CATALOG_PATH = pathResolver.knowledge('product/governance/pilot-strategy-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/pilot-strategy-policy.schema.json');
 
-const FALLBACK_CATALOG: PilotStrategyPolicyCatalog = {
-  version: '1.0.0',
-  title: 'Kyberion AI Consulting: Go-to-Market Strategy',
-  target: 'Japanese Mid-sized Enterprise (SMB) Managers',
-  value_proposition_title: 'Value Proposition: "Safety through Governance"',
-  market_strategy_title: 'Market Strategy (Japanese SMB Focus)',
-  key_benefits_title: 'Key Benefits',
-  phase_titles: {
-    education: 'Education',
-    pilot: 'Pilot',
-    expansion: 'Expansion',
-  },
-};
-
 const catalog = defineCatalog<PilotStrategyPolicyCatalog>({
   id: 'pilot-strategy-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadPilotStrategyPolicyCatalog(): PilotStrategyPolicyCatalog {
