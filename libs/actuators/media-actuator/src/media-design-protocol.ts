@@ -45,6 +45,7 @@ import {
   loadSemanticRenderTokenCatalog as loadValidatedSemanticRenderTokenCatalog,
   resolveSemanticRenderTokens as resolveValidatedSemanticRenderTokens,
   type SemanticRenderTokenCatalog,
+  type SemanticRenderTokens,
 } from './media-layout-design-tokens.js';
 import {
   cloneJsonValue,
@@ -656,7 +657,7 @@ function resolveSemanticRenderTokens(
   rootDir: string,
   semanticType?: string,
   designSystemId?: string
-): any {
+): SemanticRenderTokens {
   return resolveValidatedSemanticRenderTokens(rootDir, semanticType, designSystemId);
 }
 
@@ -665,11 +666,16 @@ function resolveSemanticComponentRule(
   semanticType: string | undefined,
   medium: string,
   component: string
-): any {
+): Record<string, unknown> {
   const tokens = resolveSemanticRenderTokens(rootDir, semanticType);
-  return {
-    ...(tokens?.[medium] && tokens[medium][component] ? tokens[medium][component] : {}),
-  };
+  const mediumTokens = tokens[medium];
+  if (!mediumTokens) return {};
+  const componentTokens = mediumTokens[component];
+  if (isRecord(componentTokens)) return { ...componentTokens };
+  // PDF rules are defined directly under the medium rather than beneath a
+  // component key. Preserve that schema shape while keeping docx component
+  // lookups strict and fail-closed when the requested component is absent.
+  return medium === 'pdf' ? { ...mediumTokens } : {};
 }
 
 function resolveNamedTheme(rootDir: string, preferredTheme?: string): MediaTheme | null {

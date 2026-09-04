@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
-import { loadDocumentCompositionCatalog } from './media-design-protocol.js';
+import {
+  loadDocumentCompositionCatalog,
+  resolveSemanticComponentRule,
+} from './media-design-protocol.js';
 
 describe('media document composition catalog boundary', () => {
   it('validates the merged preset and artifact profile envelope', () => {
@@ -22,5 +25,12 @@ describe('media document composition catalog boundary', () => {
     expect(catalog.defaults).toBeDefined();
     expect(catalog.profiles).toBeDefined();
     expect(Object.keys(catalog.profiles).length).toBeGreaterThan(0);
+
+    expect(resolveSemanticComponentRule(pathResolver.rootDir(), 'summary', 'pdf', 'body')).toEqual(
+      expect.objectContaining({ body_x: 'margin', header_color: 'accent' })
+    );
+    expect(
+      resolveSemanticComponentRule(pathResolver.rootDir(), 'appendix', 'docx', 'heading')
+    ).toEqual(expect.objectContaining({ spacing_before: 100, bold: true }));
   });
 });
