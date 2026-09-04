@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeRmSync, safeWriteFile, loadJson } from '@agent/core';
+import {
+  loadJson,
+  pathResolver,
+  safeExistsSync,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core';
 import {
   AI_AUDIT_CASES_SCHEMA,
   SKIP_REASON_STUB_BACKEND,
@@ -201,5 +208,17 @@ describe('runAiAudit deterministic guards', () => {
   it('rejects malformed auditor output via the shared schema', () => {
     expect(() => AI_AUDIT_CASES_SCHEMA.parse({ cases: [] })).toThrow();
     expect(() => AI_AUDIT_CASES_SCHEMA.parse({ cases: [{ name: 'x', pass: 'yes' }] })).toThrow();
+  });
+});
+
+describe('runAiAudit script boundary', () => {
+  it('routes report output through the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/run_ai_audit.ts'), { encoding: 'utf8' }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 });

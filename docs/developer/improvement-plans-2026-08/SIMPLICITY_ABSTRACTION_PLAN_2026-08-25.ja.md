@@ -19040,6 +19040,18 @@ SX-06／SX-09 の organization role CLIを再監査し、helpとrole bundle結�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1114
+
+SX-06／SX-09 のAI audit CLIを再監査し、JSON reportと人間向けreportの直接console出力をshared harness printerへ統一した。invariant解析、scopeのrepository境界、backend skip／failure判定、Trace／report永続化、exit codeは変更していない。
+
+検証:
+
+- AI audit **1 test file / 10 tests passed**。invariant解析、scope境界、fail／skip／guard、直接console不在、harness printer接続を確認した。
+- `pnpm exec tsc --noEmit --pretty false`、対象2ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

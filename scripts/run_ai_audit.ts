@@ -39,6 +39,8 @@ import {
 import { TraceContext, finalizeAndPersist } from '@agent/core/src/trace';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 
+type Print = (value: unknown) => void;
+
 export const AI_AUDIT_CASES_SCHEMA = z.object({
   cases: z
     .array(
@@ -458,7 +460,7 @@ export function renderReport(report: AiAuditReport, reportPath: string): string 
   return lines.join('\n');
 }
 
-async function main(args: string[] = []): Promise<void> {
+async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
   const argv = await createStandardYargs(['node', 'run_ai_audit', ...args])
     .option('dir', { type: 'string', describe: 'Invariants directory (default: tests_ai)' })
     .option('json', { type: 'boolean', default: false, describe: 'Print the raw report JSON' })
@@ -472,9 +474,9 @@ async function main(args: string[] = []): Promise<void> {
   });
 
   if (argv.json) {
-    console.log(JSON.stringify(report, null, 2));
+    print(JSON.stringify(report, null, 2));
   } else {
-    console.log(renderReport(report, reportPath));
+    print(renderReport(report, reportPath));
   }
   process.exitCode = exitCode;
 }
@@ -482,7 +484,7 @@ async function main(args: string[] = []): Promise<void> {
 export const runAiAuditScript = defineScript({
   name: 'ai-audit',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
