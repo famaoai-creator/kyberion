@@ -16450,6 +16450,13 @@ SX-08／SX-09 の Chronos deliverables projectionを再監査し、`/api/deliver
 検証: Chronos deliverables response **既存 1 file / 2 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 901
+
+SX-08／SX-09 の Chronos mission history projectionを再監査し、`/api/missions/search` responseを `any[]` cast と配列判定だけで親surface stateへ渡す残存を修正した。専用 parser で mission status／tier／artifact 集計／tenant・project metadataと dangerous keyを検証してから表示へ渡す。viewer scope、検索条件、mission操作 semantics は変更していない。
+
+検証: Chronos mission history response **1 file / 8 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
