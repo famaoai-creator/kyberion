@@ -1,11 +1,4 @@
-import {
-  clamp,
-  defineCatalog,
-  isRecord,
-  nowIso,
-  readJson,
-  parseSafeJsonInput,
-} from '@agent/core/foundation';
+import { clamp, defineCatalog, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -663,7 +656,10 @@ function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
   const filePath = trailPath(sessionId);
   if (!isExistingRegularFile(filePath)) return [];
   try {
-    const value = readJson<unknown>(filePath);
+    const value = parseSafeJsonInput(
+      String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
+      `browser action trail ${filePath}`
+    );
     return parseRecordedActions(value).slice(-200);
   } catch {
     return [];
