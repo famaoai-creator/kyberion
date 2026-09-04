@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   buildGhArgs,
   parseDefaultBranchResponse,
@@ -43,5 +44,17 @@ describe('publish_pull_request', () => {
     expect(() =>
       parseDefaultBranchResponse('{"defaultBranchRef":{"__proto__":{"name":"evil"}}}')
     ).toThrow('dangerous JSON key');
+  });
+
+  it('routes gh output through the shared harness printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/publish_pull_request.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 });
