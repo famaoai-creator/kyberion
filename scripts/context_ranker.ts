@@ -37,6 +37,8 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 import type { ScopeContext } from '@agent/core/scope-context';
 import { isRecord } from '@agent/core/foundation';
 
+type Print = (value: unknown) => void;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -430,7 +432,7 @@ function loadWeights(scope?: ScopeContext): RankingWeights {
   }
 }
 
-async function main(args: string[] = []) {
+export async function main(args: string[] = [], print: Print = () => undefined) {
   const intentIdx = args.indexOf('--intent');
   const roleIdx = args.indexOf('--role');
   const phaseIdx = args.indexOf('--phase');
@@ -530,7 +532,7 @@ async function main(args: string[] = []) {
     .slice(0, limit);
 
   if (jsonFlag) {
-    console.log(
+    print(
       JSON.stringify(
         {
           intent,
@@ -565,7 +567,7 @@ async function main(args: string[] = []) {
 const script = defineScript({
   name: 'knowledge:context-ranker',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'context_ranker.ts') ||

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { normalizeRankingWeights, type RankingWeights } from './context_ranker.js';
 
 const defaults: RankingWeights = {
@@ -37,5 +39,17 @@ describe('context ranker configuration boundary', () => {
     expect(normalizeRankingWeights({ algorithms: { ranking: { weights: [] } } }, defaults)).toEqual(
       {}
     );
+  });
+
+  it('routes JSON output through the shared script printer', () => {
+    const source = String(
+      safeReadFile(path.join(pathResolver.rootDir(), 'scripts/context_ranker.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 });
