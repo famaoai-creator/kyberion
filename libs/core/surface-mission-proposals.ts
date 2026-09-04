@@ -349,7 +349,7 @@ export async function resolveMissionProposalReply(params: {
     clearMissionProposalState(params.surface, params.channel, params.thread);
     return {
       handled: true,
-      reply: 'ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。',
+      reply: t('bridge:mission_proposal_cancelled', undefined, 'ja'),
     };
   }
   if (isMissionConfirmation(params.text)) {
@@ -365,16 +365,35 @@ export async function resolveMissionProposalReply(params: {
     return {
       handled: true,
       missionId: issued.missionId,
-      reply: [
-        `Mission ${issued.missionId} started.`,
-        `Type: ${issued.missionType} / Tier: ${issued.tier}`,
-        issued.orchestrationStatus === 'queued'
-          ? 'Background orchestration has been queued. 結果はこのチャットに届きます。'
-          : `Background orchestration could not be queued: ${issued.orchestrationError || 'unknown'}`,
-      ].join('\n'),
+      reply: buildMissionIssuanceReply(issued),
     };
   }
   return { handled: false };
+}
+
+/** Render the surface-neutral mission issuance result for messaging bridges. */
+export function buildMissionIssuanceReply(
+  issued: Pick<
+    SlackMissionIssuanceResult,
+    'missionId' | 'missionType' | 'tier' | 'orchestrationStatus' | 'orchestrationError'
+  >
+): string {
+  const locale = 'ja' as const;
+  return [
+    t('bridge:mission_issued_started', { missionId: issued.missionId }, locale),
+    t(
+      'bridge:mission_issued_type_tier',
+      { missionType: issued.missionType, tier: issued.tier },
+      locale
+    ),
+    issued.orchestrationStatus === 'queued'
+      ? t('bridge:mission_issued_queued', undefined, locale)
+      : t(
+          'bridge:mission_issued_queue_failed',
+          { error: issued.orchestrationError || 'unknown' },
+          locale
+        ),
+  ].join('\n');
 }
 
 /**

@@ -4994,6 +4994,31 @@
         "ja": "1) 作成する 2) やめる",
         "qps-ploc": "⟦1) Ƈřėȧŧė 2) Ƈȧñƈėŀ ŀőřėɱ ⟧"
       },
+      "mission_proposal_cancelled": {
+        "en": "The mission proposal was cancelled. You can propose it again whenever needed.",
+        "ja": "ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ ṗřőṗőşȧŀ ẇȧş ƈȧñƈėŀŀėḓ. Ẏőů ƈȧñ ṗřőṗőşė ïŧ ȧɠȧïñ ẇħėñėṽėř ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "mission_issued_started": {
+        "en": "Mission {missionId} started.",
+        "ja": "ミッション {missionId} を開始しました。",
+        "qps-ploc": "⟦Ɱïşşïőñ {missionId} şŧȧřŧėḓ. ŀőřėɱ ïṗş⟧"
+      },
+      "mission_issued_type_tier": {
+        "en": "Type: {missionType} / Tier: {tier}",
+        "ja": "種別: {missionType} / ティア: {tier}",
+        "qps-ploc": "⟦Ŧẏṗė: {missionType} / Ŧïėř: {tier} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "mission_issued_queued": {
+        "en": "Background orchestration has been queued. The result will arrive in this chat.",
+        "ja": "バックグラウンド処理をキューに登録しました。結果はこのチャットに届きます。",
+        "qps-ploc": "⟦Ƀȧƈķɠřőůñḓ őřƈħėşŧřȧŧïőñ ħȧş ƀėėñ ɋůėůėḓ. Ŧħė řėşůŀŧ ẇïŀŀ ȧřřïṽė ïñ ŧħïş ƈħȧŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "mission_issued_queue_failed": {
+        "en": "Background orchestration could not be queued: {error}",
+        "ja": "バックグラウンド処理をキューに登録できませんでした: {error}",
+        "qps-ploc": "⟦Ƀȧƈķɠřőůñḓ őřƈħėşŧřȧŧïőñ ƈőůŀḓ ñőŧ ƀė ɋůėůėḓ: {error} ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "processing_note": {
         "en": "Processing. Please wait…",
         "ja": "処理中です。少々お待ちください…",

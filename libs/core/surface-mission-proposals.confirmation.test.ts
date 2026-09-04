@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
+  buildMissionIssuanceReply,
   buildMissionProposalConfirmationText,
   isSlackMissionConfirmation,
   isSlackMissionRejection,
@@ -39,6 +40,36 @@ describe('mission proposal confirmation grammar (UX-04)', () => {
     expect(text).toContain(`${t('bridge:contract_authority', undefined, 'ja')}:`);
     expect(text).toContain(`${t('bridge:contract_next_action', undefined, 'ja')}:`);
     expect(text).toContain(`${t('bridge:contract_outcome', undefined, 'ja')}:`);
+  });
+
+  it('renders mission issuance outcomes from the shared catalog', () => {
+    expect(
+      buildMissionIssuanceReply({
+        missionId: 'MSN-TEST-123',
+        missionType: 'product_development',
+        tier: 'public',
+        orchestrationStatus: 'queued',
+      })
+    ).toBe(
+      [
+        t('bridge:mission_issued_started', { missionId: 'MSN-TEST-123' }, 'ja'),
+        t(
+          'bridge:mission_issued_type_tier',
+          { missionType: 'product_development', tier: 'public' },
+          'ja'
+        ),
+        t('bridge:mission_issued_queued', undefined, 'ja'),
+      ].join('\n')
+    );
+    expect(
+      buildMissionIssuanceReply({
+        missionId: 'MSN-TEST-123',
+        missionType: 'product_development',
+        tier: 'public',
+        orchestrationStatus: 'failed',
+        orchestrationError: 'queue unavailable',
+      })
+    ).toContain(t('bridge:mission_issued_queue_failed', { error: 'queue unavailable' }, 'ja'));
   });
 
   it('accepts the numbered choice and the classic affirmations', () => {

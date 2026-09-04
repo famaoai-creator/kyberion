@@ -18324,6 +18324,22 @@ fallback 名、作成／キャンセル選択、IntentResolutionContract の表�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1061
+
+SX-09 の共通 mission proposal issuance reply を再監査し、`surface-mission-proposals.ts` に残っていた開始通知、種別・ティア表示、
+バックグラウンド処理のキュー成功／失敗通知、キャンセル通知を `bridge` vocabulary catalog へ移した。`buildMissionIssuanceReply` を
+共有 renderer として切り出し、Telegram／Discord／iMessage など surface-neutral resolver の表示を同じ意味キーから再解決できるようにした。
+mission ID、mission type、tier、orchestration status、失敗理由の値と issuance 経路は変更していない。
+
+検証:
+
+- mission proposal confirmation／issuance **1 file / 7 tests passed**。queued／failed の両分岐が catalog から描画されることを確認した。
+- generated vocabulary types、pseudo locale、knowledge index を再生成し、`catalogs`／`vocabulary-types`／`pseudo-locale` の gate passed。
+- `pnpm run typecheck`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gate **69 gates / 0 failed** passed。i18n baseline は `surface-mission-proposals.ts` の直書き数 2→0 を反映した。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
