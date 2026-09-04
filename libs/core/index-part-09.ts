@@ -6,6 +6,8 @@ export * from './mission-orchestration-phase-gates.js';
 
 export * from './mission-next-task-reader.js';
 
+export * from './mission-ticket-dispatch-manifest.js';
+
 export * from './mission-task-events.js';
 
 export * from './worker-assignment-policy.js';
