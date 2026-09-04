@@ -48,6 +48,10 @@ import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
+type Print = (value: unknown) => void;
+
+let workCoordinationPrint: Print = () => undefined;
+
 function csv(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((entry) => String(entry)).filter(Boolean);
   if (typeof value !== 'string' || !value.trim()) return [];
@@ -109,7 +113,11 @@ function context(argv: Record<string, unknown>): WorkItemContext | undefined {
 }
 
 function print(value: unknown): void {
-  console.log(JSON.stringify(value, null, 2));
+  workCoordinationPrint(JSON.stringify(value, null, 2));
+}
+
+function printText(value: string): void {
+  workCoordinationPrint(value);
 }
 
 export function resolveWorkCoordinationInputPath(inputPath: string): string {
@@ -175,7 +183,7 @@ function discoverReadableMissionStates(): Array<{ missionId: string; state: any 
   return states;
 }
 
-async function main(args: string[] = []): Promise<void> {
+async function runMain(args: string[] = []): Promise<void> {
   const yargs = createStandardYargs(['node', 'work_coordination', ...args])
     .command('create-item', 'Create a new work item', () => undefined)
     .command('create-board', 'Create or update a board', () => undefined)
@@ -442,7 +450,7 @@ async function main(args: string[] = []): Promise<void> {
         auditEntries: auditChain.loadAll(),
       });
       if (argv.json) print({ correlationId, rows });
-      else console.log(formatIntegratedHandoffHistory(correlationId, rows));
+      else printText(formatIntegratedHandoffHistory(correlationId, rows));
       break;
     }
     default: {
@@ -465,10 +473,20 @@ async function main(args: string[] = []): Promise<void> {
   }
 }
 
+export async function main(args: string[] = [], output: Print = () => undefined): Promise<void> {
+  const previousPrint = workCoordinationPrint;
+  workCoordinationPrint = output;
+  try {
+    await runMain(args);
+  } finally {
+    workCoordinationPrint = previousPrint;
+  }
+}
+
 export const runWorkCoordination = defineScript({
   name: 'work:coordination',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
