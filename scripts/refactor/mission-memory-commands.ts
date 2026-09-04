@@ -16,6 +16,7 @@ import {
 import { logger } from '@agent/core/core';
 import { getRegisteredEnv } from '@agent/core/foundation';
 import { getOptionValue } from './mission-cli-args.js';
+import { ScriptExitError } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 
@@ -124,10 +125,10 @@ export function approveMemoryCandidate(
   print: Print = () => undefined
 ) {
   if (!candidateId) {
-    logger.error(
+    throw new ScriptExitError(
+      1,
       'Usage: mission_controller memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>]'
     );
-    return;
   }
   try {
     const review = reviewForCli(candidateId, tenantSlug);
@@ -141,8 +142,7 @@ export function approveMemoryCandidate(
     if (!updated) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
     logger.success(`✅ Memory candidate approved: ${updated.candidate_id}`);
   } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+    throw new ScriptExitError(1, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -154,10 +154,10 @@ export function rejectMemoryCandidate(
   print: Print = () => undefined
 ) {
   if (!candidateId) {
-    logger.error(
+    throw new ScriptExitError(
+      1,
       'Usage: mission_controller memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>]'
     );
-    return;
   }
   try {
     const review = reviewForCli(candidateId, tenantSlug);
@@ -176,8 +176,7 @@ export function rejectMemoryCandidate(
     if (!updated) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
     logger.success(`✅ Memory candidate rejected: ${updated.candidate_id}`);
   } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+    throw new ScriptExitError(1, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -196,23 +195,20 @@ export function acceptRubricOverride(
   print: Print = () => undefined
 ) {
   if (!hypothesisOrBranchId) {
-    logger.error(
+    throw new ScriptExitError(
+      1,
       'Usage: mission_controller accept-with-override <HYPOTHESIS_OR_BRANCH_ID> --reason "<text>" [--severity warn|poor]'
     );
-    return;
   }
   if (!reason) {
-    logger.error(
+    throw new ScriptExitError(
+      1,
       'accept-with-override requires --reason "<text>" — overrides without reasoning are not auditable.'
     );
-    process.exitCode = 1;
-    return;
   }
   const sev = (severity || 'warn').toLowerCase();
   if (!['warn', 'poor'].includes(sev)) {
-    logger.error('--severity must be warn or poor');
-    process.exitCode = 1;
-    return;
+    throw new ScriptExitError(1, '--severity must be warn or poor');
   }
   if (sev === 'poor') {
     logger.warn(
@@ -253,10 +249,10 @@ export async function promoteMemoryCandidate(
   print: Print = () => undefined
 ) {
   if (!candidateId) {
-    logger.error(
+    throw new ScriptExitError(
+      1,
       'Usage: mission_controller memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]'
     );
-    return;
   }
   try {
     const review = reviewForCli(candidateId, tenantSlug);
@@ -272,8 +268,7 @@ export async function promoteMemoryCandidate(
       `✅ Memory candidate promoted: ${result.candidate.candidate_id} -> ${result.promotedRef}`
     );
   } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+    throw new ScriptExitError(1, error instanceof Error ? error.message : String(error));
   }
 }
 
