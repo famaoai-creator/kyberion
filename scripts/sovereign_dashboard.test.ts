@@ -48,6 +48,8 @@ describe('sovereign dashboard governance loaders', () => {
     expect(source).toContain('renderDashboardSnapshot');
     expect(source).toContain('print(snapshot)');
     expect(source).not.toContain("name: 'dashboard', flags: []");
+    expect(source).not.toContain('console.log');
+    expect(source).toContain('main(argv, print)');
   });
 
   it('does not enumerate symlinked mission or connection resources', () => {

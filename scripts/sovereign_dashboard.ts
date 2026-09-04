@@ -65,7 +65,7 @@ const PACKAGE_JSON_PATH = pathResolver.rootResolve('package.json');
 type DashboardFocus = 'all' | 'onboarding' | 'capabilities' | 'skills';
 type DashboardLog = (...values: unknown[]) => void;
 
-let dashboardLog: DashboardLog = (...values) => console.log(...values);
+let dashboardLog: DashboardLog = () => undefined;
 
 function resolveDashboardTenantSlug(): string | null {
   const onboardingState = readDashboardOnboardingState();
@@ -991,50 +991,56 @@ function drawTrustBoard() {
 
 function render(
   argv: string[] = [],
-  options: { clear?: boolean; interactive?: boolean } = {}
+  options: { clear?: boolean; interactive?: boolean; log?: DashboardLog } = {}
 ): void {
-  const focus = getDashboardFocus(argv);
-  if (options.clear !== false) clearScreen();
-  drawHeader();
-  drawCompanyOverview();
-  drawOnboardingHome();
-  drawTenantContext();
-  drawConnectionReview();
-  drawStarterMissionSuggestion();
-  if (focus === 'capabilities') {
+  const previousLog = dashboardLog;
+  if (options.log) dashboardLog = options.log;
+  try {
+    const focus = getDashboardFocus(argv);
+    if (options.clear !== false) clearScreen();
+    drawHeader();
+    drawCompanyOverview();
+    drawOnboardingHome();
+    drawTenantContext();
+    drawConnectionReview();
+    drawStarterMissionSuggestion();
+    if (focus === 'capabilities') {
+      drawCapabilityLandscape();
+      dashboardLog(chalk.dim(' Focused view: provider capability snapshot and provider health.'));
+      dashboardLog(chalk.dim(' Press Ctrl+C to exit.'));
+      return;
+    }
+    if (focus === 'skills') {
+      drawSkillLandscape();
+      dashboardLog(chalk.dim(' Focused view: governed skill catalog.'));
+      dashboardLog(chalk.dim(' Press Ctrl+C to exit.'));
+      return;
+    }
+    if (focus === 'onboarding') {
+      dashboardLog(
+        chalk.dim(
+          ' Focused view: onboarding setup, connection review, tenant context, starter mission.'
+        )
+      );
+      dashboardLog(chalk.dim(' Press Ctrl+C to exit.'));
+      return;
+    }
+    drawMissions();
+    drawMissionOrchestration();
+    drawOwnerSummaries();
+    drawRuntimeLeaseDoctor();
+    drawBackupStatus();
+    drawRuntimeSurfaces();
     drawCapabilityLandscape();
-    dashboardLog(chalk.dim(' Focused view: provider capability snapshot and provider health.'));
-    dashboardLog(chalk.dim(' Press Ctrl+C to exit.'));
-    return;
-  }
-  if (focus === 'skills') {
     drawSkillLandscape();
-    dashboardLog(chalk.dim(' Focused view: governed skill catalog.'));
-    dashboardLog(chalk.dim(' Press Ctrl+C to exit.'));
-    return;
-  }
-  if (focus === 'onboarding') {
-    dashboardLog(
-      chalk.dim(
-        ' Focused view: onboarding setup, connection review, tenant context, starter mission.'
-      )
-    );
-    dashboardLog(chalk.dim(' Press Ctrl+C to exit.'));
-    return;
-  }
-  drawMissions();
-  drawMissionOrchestration();
-  drawOwnerSummaries();
-  drawRuntimeLeaseDoctor();
-  drawBackupStatus();
-  drawRuntimeSurfaces();
-  drawCapabilityLandscape();
-  drawSkillLandscape();
-  drawSlackOutbox();
-  drawA2ATraffic();
-  drawTrustBoard();
-  if (options.interactive !== false) {
-    dashboardLog(chalk.dim(' Press Ctrl+C to exit. Refreshing every 5s...'));
+    drawSlackOutbox();
+    drawA2ATraffic();
+    drawTrustBoard();
+    if (options.interactive !== false) {
+      dashboardLog(chalk.dim(' Press Ctrl+C to exit. Refreshing every 5s...'));
+    }
+  } finally {
+    dashboardLog = previousLog;
   }
 }
 
@@ -1059,12 +1065,13 @@ export function renderDashboardSnapshot(argv: string[] = []): {
   return { ok: true, focus: getDashboardFocus(argv), output: lines.join('\n') };
 }
 
-export function main(argv: string[] = []): void {
+export function main(argv: string[] = [], print: (value: unknown) => void = () => undefined): void {
+  const log: DashboardLog = (...values) => print(values.map((value) => String(value)).join(' '));
   if (argv.includes('--once')) {
-    render(argv, { interactive: false });
+    render(argv, { interactive: false, log });
   } else {
-    render(argv);
-    setInterval(() => render(argv), 5000);
+    render(argv, { log });
+    setInterval(() => render(argv, { log }), 5000);
   }
 }
 
@@ -1086,9 +1093,12 @@ if (
         return;
       }
       if (bounded) {
-        render(argv, { interactive: false });
+        render(argv, {
+          interactive: false,
+          log: (...values) => print(values.map((value) => String(value)).join(' ')),
+        });
         return;
       }
-      main(argv);
+      main(argv, print);
     },
   })();
