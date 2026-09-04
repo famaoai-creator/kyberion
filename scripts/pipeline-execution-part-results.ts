@@ -46,7 +46,7 @@ import {
 } from './pipeline-result-reporting.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import { currentProcessArgv, exitProcess } from './lib/harness.js';
+import { currentProcessArgv, exitProcess, ScriptExitError } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runSteps } from './pipeline-execution-part-execution.js';
 
@@ -296,7 +296,9 @@ export async function executePipelineFile(
   return { ...result, trace, persistedPath: persisted.path };
 }
 
-export async function main(args?: string[]) {
+type Print = (value: unknown) => void;
+
+export async function main(args?: string[], print: Print = () => undefined) {
   // Propagate resolved identity to process.env so spawned subprocesses inherit them.
   const identity = resolveIdentityContext();
   if (identity.role && !process.env.MISSION_ROLE) {
@@ -368,15 +370,13 @@ export async function main(args?: string[]) {
       });
       const report = assessPipelineDryRun(pipeline as Parameters<typeof assessPipelineDryRun>[0]);
       if (argv.json) {
-        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+        print(report);
       } else {
-        process.stdout.write(`[pipeline-dry-run] ${report.verdict}: ${report.pipeline_id}\n`);
-        for (const check of report.checks) {
-          process.stdout.write(`- ${check.status}: ${check.message}\n`);
-        }
-        for (const action of report.next_actions) process.stdout.write(`next: ${action}\n`);
+        print(`[pipeline-dry-run] ${report.verdict}: ${report.pipeline_id}`);
+        for (const check of report.checks) print(`- ${check.status}: ${check.message}`);
+        for (const action of report.next_actions) print(`next: ${action}`);
       }
-      process.exitCode = report.verdict === 'blocked' ? 1 : 0;
+      if (report.verdict === 'blocked') throw new ScriptExitError(1, '', true, report);
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -398,10 +398,11 @@ export async function main(args?: string[]) {
             ]
           : ['Fix the pipeline ADF/guardrail validation errors and rerun the dry-run.'],
       };
-      if (argv.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-      else process.stderr.write(`[pipeline-dry-run] blocked: ${report.checks[0].message}\n`);
-      process.exitCode = 1;
-      return;
+      if (argv.json) {
+        print(report);
+        throw new ScriptExitError(1, '', true, report);
+      }
+      throw new ScriptExitError(1, `[pipeline-dry-run] blocked: ${report.checks[0].message}`);
     }
   }
 

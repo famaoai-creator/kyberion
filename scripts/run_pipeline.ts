@@ -64,6 +64,6 @@ if (isDirectRun) {
   void defineScript({
     name: 'pipeline',
     flags: [],
-    run: ({ argv }) => runPipelineMain(resolvePipelinePresetArgs(argv)),
+    run: ({ argv, print }) => runPipelineMain(resolvePipelinePresetArgs(argv), print),
   })();
 }

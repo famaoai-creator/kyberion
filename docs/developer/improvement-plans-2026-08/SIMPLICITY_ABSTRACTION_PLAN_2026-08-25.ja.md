@@ -19480,6 +19480,18 @@ SX-06／SX-07 の`run_baseline_check` CLIを再監査し、needs_recovery／fata
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1152
+
+SX-06／SX-07 の`pipeline` dry-run境界を再監査し、human／JSONレポートの`process.stdout/stderr`直接書込みとdry-run分岐の直接`process.exitCode`操作を除去した。出力は注入printerへ、blocked結果はsilentな`ScriptExitError`（JSON）またはharnessのstderrエラー（human）へ返す。ADF検証、trust gate、dry-run判定、report schema、終了コード1のsemanticsは変更していない。通常pipeline実行の非同期終了処理は別sliceとして残している。
+
+検証:
+
+- `run_pipeline_dry_run.test.ts` **5 tests passed**。既存formatter／weekly review回帰に加え、JSON ready／blockedのprinter・exit境界を確認した。
+- 対象ESLint、`git diff --check` passed。
+- 併走した`run_pipeline.test.ts`は既存のPTC Unix socket bindがsandboxで`EPERM`となり1件失敗（71 tests中70 pass）。dry-run変更の実行経路外であり、full validateで再確認する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
