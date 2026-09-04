@@ -1,9 +1,9 @@
-import { readJson } from '@agent/core/foundation';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { handleAction } from './wisdom-pipeline-helpers.js';
 import { describeOps } from './op-catalog.js';
+import { readWisdomJsonObjectAtPath } from './wisdom-persisted-json.js';
 import {
   currentProcessArgv,
   runActuatorCli,
@@ -11,8 +11,9 @@ import {
 } from '@agent/core/cli-utils';
 
 const main = async () => {
-  const schema = readJson<object>(
-    pathResolver.rootResolve('knowledge/product/schemas/wisdom-action.schema.json')
+  const schema = readWisdomJsonObjectAtPath(
+    pathResolver.rootResolve('knowledge/product/schemas/wisdom-action.schema.json'),
+    'wisdom action schema'
   );
   await runActuatorCli({
     name: 'wisdom-actuator',

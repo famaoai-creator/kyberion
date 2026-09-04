@@ -1,10 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   parseWisdomJsonObject,
   parseWisdomReconcileStrategy,
+  readWisdomJsonObjectAtPath,
   readWisdomRecordArray,
   readWisdomStringArray,
 } from './wisdom-persisted-json.js';
+
+const TEST_ROOT = pathResolver.sharedTmp(`wisdom-persisted-json-boundary-${process.pid}`);
+
+afterEach(() => {
+  safeRmSync(TEST_ROOT, { recursive: true, force: true });
+});
 
 describe('wisdom persisted JSON boundary', () => {
   it('accepts an object while rejecting non-object roots and dangerous keys', () => {
@@ -50,5 +59,26 @@ describe('wisdom persisted JSON boundary', () => {
         strategies: [{ pipeline: [{ type: 'control', op: 'if', params: { then: ['bad'] } }] }],
       })
     ).toBeNull();
+  });
+
+  it('reads persisted objects through the regular-file and safe JSON boundary', () => {
+    const filePath = `${TEST_ROOT}/valid.json`;
+    safeWriteFile(filePath, '{"topic":"decision"}', { mkdir: true });
+
+    expect(readWisdomJsonObjectAtPath(filePath)).toEqual({ topic: 'decision' });
+  });
+
+  it('rejects dangerous persisted JSON before wisdom parsing', () => {
+    const filePath = `${TEST_ROOT}/dangerous.json`;
+    safeWriteFile(filePath, '{"constructor":{"polluted":true}}', { mkdir: true });
+
+    expect(() => readWisdomJsonObjectAtPath(filePath)).toThrow('dangerous JSON key');
+  });
+
+  it('rejects a directory masquerading as persisted wisdom JSON', () => {
+    const directoryPath = `${TEST_ROOT}/directory.json`;
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(() => readWisdomJsonObjectAtPath(directoryPath)).toThrow('existing regular file');
   });
 });
