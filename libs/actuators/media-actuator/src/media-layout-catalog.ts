@@ -96,6 +96,17 @@ export interface MediaLayoutShape {
   [key: string]: unknown;
 }
 
+export interface MediaSlideTemplateData {
+  title?: string;
+  subtitle?: string;
+  body?: string | string[];
+  visual?: string;
+  layout_key?: string;
+  media_kind?: string;
+  design_system_id?: string;
+  [key: string]: unknown;
+}
+
 export type MediaLayoutMargin = [number, number, number, number];
 
 export interface MediaLayoutVisualLabel {
@@ -213,7 +224,11 @@ function mergePptxShape(base: MediaLayoutShape, overrides: unknown): MediaLayout
   };
 }
 
-function resolveSlideTemplate(template: any, slideData: any, fallback = ''): string {
+function resolveSlideTemplate(
+  template: unknown,
+  slideData: MediaSlideTemplateData,
+  fallback = ''
+): string {
   if (typeof template !== 'string') return fallback;
   return template
     .replace(/{{\s*title\s*}}/g, slideData?.title || '')
@@ -247,7 +262,10 @@ function loadSlideLayoutPresetCatalog(rootDir: string): MediaSlideLayoutPresetCa
   return catalog.validate(merged, directoryPath);
 }
 
-function resolveRuntimeSlidePreset(rootDir: string, slideData: any): MediaLayoutTemplate | null {
+function resolveRuntimeSlidePreset(
+  rootDir: string,
+  slideData: MediaSlideTemplateData
+): MediaLayoutTemplate | null {
   const layoutKey = String(slideData?.layout_key || '').trim();
   const mediaKind = String(slideData?.media_kind || '').trim();
   const presetKey = layoutKey || mediaKind;
