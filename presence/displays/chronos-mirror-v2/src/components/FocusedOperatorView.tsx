@@ -11,6 +11,7 @@ import { buildRuntimeTopologyGraph } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
 import { chronosSpeechLocale, resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
 import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
+import { parseFocusedOperatorResponse } from '../lib/focused-operator-response';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import { TraceViewer } from './TraceViewer';
 import {
@@ -22,7 +23,6 @@ import {
   graphNodePalette,
   isEditableHotkeyTarget,
   loadFocusedOperatorSelectedSessionId,
-  normalizePayload,
   pickDefaultSessionId,
   resolveComputerSessionHotkeySelection,
   RUNTIME_GRAPH_NODE_HEIGHT,
@@ -100,9 +100,9 @@ export function FocusedOperatorView({
           `/api/intelligence${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`,
           { cache: 'no-store' }
         );
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || 'Failed to load operator view');
-        return normalizePayload(body);
+        const payload = parseFocusedOperatorResponse(await res.json().catch(() => null));
+        if (!res.ok || !payload) throw new Error('Invalid operator view response');
+        return payload;
       },
       onSnapshot: (snapshot) => {
         if (!alive) return;
