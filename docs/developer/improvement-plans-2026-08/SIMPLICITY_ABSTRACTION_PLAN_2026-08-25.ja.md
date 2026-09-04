@@ -16015,6 +16015,16 @@ semanticsは維持し、unsafe inputとdirectory inputの回帰を追加した�
 検証: process actuator **1 file / 6 tests passed**、root typecheck、type-ratchet、対象Prettier、`git diff --check`、対象ソースのdirect `readJson`検索で該当なし。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 846
+
+SX-03／SX-04／SX-08／SX-10 のmedia actuator JSON loaderを再監査し、recursive catalog、standalone JSON、confidential theme pack、
+spreadsheet protocolの各経路でpersisted JSONを`readJson`の型引数だけで後段へ渡していた残存を修正した。regular-fileを確認し、safe JSON
+parserを通す共通loaderへ揃え、object契約が必要なtheme pack／protocolではobject parserも適用した。既存のsymlink除外、catalog schema検証、
+malformed catalogの既存挙動、任意JSON valueのloader互換を維持し、directory偽装とdangerous JSONの回帰を追加した。
+
+検証: media catalog／document helper **2 files / 9 tests passed**、root typecheck、type-ratchet、対象Prettier、`git diff --check`、対象loaderのdirect `readJson`検索で該当なし。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

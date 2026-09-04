@@ -34,6 +34,20 @@ describe('media catalog loaders', () => {
     expect(() => loadJsonValue(link)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
+  it('rejects a directory masquerading as a standalone JSON file', () => {
+    const directoryPath = `${rootDir}/directory.json`;
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(() => loadJsonValue(directoryPath)).toThrow('existing regular file');
+  });
+
+  it('rejects dangerous JSON keys from the standalone JSON loader', () => {
+    const inputPath = `${rootDir}/dangerous.json`;
+    safeWriteFile(inputPath, '{"constructor":{"polluted":true}}', { mkdir: true });
+
+    expect(() => loadJsonValue(inputPath)).toThrow('dangerous JSON key');
+  });
+
   it('does not import symlinked JSON during recursive catalog discovery', () => {
     const target = `${rootDir}/target.json`;
     const link = `${rootDir}/link.json`;
