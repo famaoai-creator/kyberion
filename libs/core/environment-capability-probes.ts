@@ -22,7 +22,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeStat, safeExec } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
@@ -387,8 +387,20 @@ function readRootEnginesNodeRange(): string | null {
   try {
     const pkgPath = pathResolver.rootResolve('package.json');
     if (!safeExistsSync(pkgPath)) return null;
-    const pkg = readJson<{ engines?: { node?: unknown } }>(pkgPath);
-    const range = pkg.engines?.node;
+    return parseNodeEnginesRange(readJson<unknown>(pkgPath));
+  } catch {
+    return null;
+  }
+}
+
+export function parseNodeEnginesRange(value: unknown): string | null {
+  try {
+    const pkg = parseSafeJsonObjectValue(value, 'package.json');
+    const engines =
+      pkg.engines === undefined
+        ? null
+        : parseSafeJsonObjectValue(pkg.engines, 'package.json engines');
+    const range = engines?.node;
     return typeof range === 'string' && range.trim() !== '' ? range : null;
   } catch {
     return null;
