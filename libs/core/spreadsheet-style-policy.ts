@@ -9,27 +9,10 @@ interface SpreadsheetStylePolicyCatalog {
 const CATALOG_PATH = pathResolver.knowledge('product/governance/spreadsheet-style-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/spreadsheet-style-policy.schema.json');
 
-const FALLBACK_CATALOG: SpreadsheetStylePolicyCatalog = {
-  version: '1.0.0',
-  role_indices: {
-    base: 0,
-    title: 1,
-    subtitle: 2,
-    header: 3,
-    section: 4,
-    info: 5,
-    success: 6,
-    warning: 7,
-    danger: 8,
-    body: 9,
-  },
-};
-
 const catalog = defineCatalog<SpreadsheetStylePolicyCatalog>({
   id: 'spreadsheet-style-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadSpreadsheetStylePolicyCatalog(): SpreadsheetStylePolicyCatalog {
@@ -41,5 +24,5 @@ export function resolveSpreadsheetStyleIndex(role: string): number {
     .trim()
     .toLowerCase();
   const catalog = loadSpreadsheetStylePolicyCatalog();
-  return catalog.role_indices[normalized] ?? FALLBACK_CATALOG.role_indices[normalized] ?? 0;
+  return catalog.role_indices[normalized] ?? 0;
 }

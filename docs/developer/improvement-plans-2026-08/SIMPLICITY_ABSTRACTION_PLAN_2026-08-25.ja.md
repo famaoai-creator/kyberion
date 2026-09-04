@@ -18502,6 +18502,20 @@ SX-04／SX-10 の Drawio boundary catalog を継続監査し、`media-drawio-bou
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1073
+
+SX-04 の media catalog を継続監査し、`legacy-media-ops` と `spreadsheet-style-policy` に残っていた canonical JSON と同内容の
+fallback を削除した。spreadsheet の未知roleは catalog fallback に依存せず、従来どおり `0` を返す明示的な解決規則へ置き換えた。
+legacy media 判定、spreadsheet style index、schema、canonical catalog の値は変更していない。
+
+検証:
+
+- media policy **2 files / 4 tests passed**。canonical catalog の読込、fallback 定義の不在、未知roleの `0` を確認した。
+- `pnpm run typecheck`、対象4ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
