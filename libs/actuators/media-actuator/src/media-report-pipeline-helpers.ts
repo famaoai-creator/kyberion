@@ -10,11 +10,12 @@ import {
   buildReportNarrativeOutline,
   classifyRenderSemantic,
   type DocumentCompositionPresetResolver,
+  type MediaTheme,
 } from './media-document-helpers.js';
 import type { MediaPptxPalette } from './media-layout-design-tokens.js';
 
 export interface MediaReportPipelineDeps {
-  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
+  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => MediaTheme | null;
   resolveDocumentCompositionPreset: DocumentCompositionPresetResolver;
   resolveDocumentLayoutTemplate: (
     rootDir: string,
@@ -30,7 +31,7 @@ export interface MediaReportPipelineDeps {
     theme: any,
     locale?: string
   ) => { headingFont: string; bodyFont: string; accent: string };
-  themeToPptxPalette: (theme: any) => MediaPptxPalette;
+  themeToPptxPalette: (theme: MediaTheme | null) => MediaPptxPalette;
   normalizeFontFamily: (input: string) => string;
 }
 

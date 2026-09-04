@@ -4,6 +4,7 @@ import {
   classifyRenderSemantic,
   rankSignalTone,
   type DocumentCompositionPresetResolver,
+  type MediaTheme,
 } from './media-document-helpers.js';
 import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media-signal-entry-policy';
 import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
@@ -13,7 +14,7 @@ import { nowIso } from '@agent/core/foundation';
 import type { XlsxDesignProtocol } from '@agent/core/src/types/xlsx-protocol';
 
 export interface MediaSpreadsheetPipelineDeps {
-  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
+  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => MediaTheme | null;
   resolveDocumentCompositionPreset: DocumentCompositionPresetResolver;
   resolveDocumentLayoutTemplate: (
     rootDir: string,
