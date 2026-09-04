@@ -78,6 +78,12 @@ export interface ConfidentialThemePack {
     theme_id?: unknown;
     name?: unknown;
   };
+  layout_templates?: unknown;
+  pptx?: {
+    master?: Record<string, unknown>;
+    canvas?: Record<string, unknown>;
+  };
+  web?: Record<string, unknown>;
   [key: string]: unknown;
 }
 

@@ -36,6 +36,7 @@ import {
 import { buildPptxSlideFromPattern as runtimeBuildPptxSlideFromPattern } from './media-layout-runtime.js';
 import {
   loadConfidentialThemePack,
+  type ConfidentialThemePack,
   resolveConfidentialTenantOverride,
 } from './media-catalog-loaders.js';
 import * as path from 'node:path';
@@ -74,6 +75,17 @@ type ArtifactLibraryCatalog = {
   >;
 };
 
+interface MediaDocumentCompositionCatalog {
+  defaults: Record<string, unknown>;
+  profiles: Record<string, unknown>;
+}
+
+interface MediaThemeCatalog {
+  version: string;
+  default_theme: string;
+  themes: Record<string, Record<string, unknown>>;
+}
+
 function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   const dirPath = path.resolve(
     rootDir,
@@ -96,7 +108,7 @@ function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   return catalog.validate(merged, dirPath);
 }
 
-function loadDocumentCompositionCatalog(rootDir: string): any {
+function loadDocumentCompositionCatalog(rootDir: string): MediaDocumentCompositionCatalog {
   const fallback = { defaults: {}, profiles: {} };
   const catalog = defineCatalog<{
     defaults: Record<string, unknown>;
@@ -139,19 +151,15 @@ function loadDocumentCompositionCatalog(rootDir: string): any {
   );
 }
 
-function loadThemeCatalog(rootDir: string): any {
+function loadThemeCatalog(rootDir: string): MediaThemeCatalog {
   const fallback = {
     version: '1.0.0',
     default_theme: 'kyberion-standard',
     themes: {},
   };
   const schemaPath = path.resolve(rootDir, 'knowledge/product/schemas/media-themes.schema.json');
-  const loadScope = (id: string, directoryPath: string, filePath: string): any => {
-    const catalog = defineCatalog<{
-      version: string;
-      default_theme: string;
-      themes: Record<string, unknown>;
-    }>({
+  const loadScope = (id: string, directoryPath: string, filePath: string): MediaThemeCatalog => {
+    const catalog = defineCatalog<MediaThemeCatalog>({
       id,
       path: path.resolve(rootDir, filePath),
       schema: schemaPath,
@@ -232,7 +240,10 @@ function loadConfidentialThemePackEntries(
   }
 }
 
-function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
+function resolveConfidentialThemePack(
+  rootDir: string,
+  themeName: string
+): ConfidentialThemePack | null {
   const normalized = String(themeName || '')
     .trim()
     .toLowerCase();
@@ -752,14 +763,16 @@ function resolveDocumentCompositionPresetCore(
     }
   }
 
+  const defaultProfile = (key: string): string =>
+    typeof defaults[key] === 'string' ? defaults[key] : '';
   const inferredProfileId =
     explicitProfile ||
-    defaults[artifactFamily] ||
-    defaults[documentType] ||
-    defaults.proposal ||
-    defaults.report ||
-    defaults.spreadsheet ||
-    defaults.diagram;
+    defaultProfile(artifactFamily) ||
+    defaultProfile(documentType) ||
+    defaultProfile('proposal') ||
+    defaultProfile('report') ||
+    defaultProfile('spreadsheet') ||
+    defaultProfile('diagram');
   if (inferredProfileId && profiles?.[inferredProfileId]) {
     return buildPreset(inferredProfileId, profiles[inferredProfileId]);
   }
