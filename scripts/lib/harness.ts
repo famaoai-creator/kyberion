@@ -52,7 +52,8 @@ export function setProcessExitCode(code: number): void {
 
 /** Read a nested script's pending exit status without exposing process globals to callers. */
 export function getProcessExitCode(): number | undefined {
-  return process.exitCode;
+  const code = process.exitCode;
+  return code === undefined ? undefined : Number(code);
 }
 
 /** Clear a nested script's pending exit status before returning to its caller. */
