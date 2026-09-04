@@ -7,7 +7,7 @@ import {
   safeLstat,
   safeReadFile,
 } from '@agent/core/secure-io';
-import { parseSafeJsonInput, readJson, readJsonIfPresent } from '@agent/core/foundation';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import {
   validatePipelineGuardrails,
@@ -19,6 +19,7 @@ import {
   isBuiltinPipelineResource,
   requiresProjectTrust,
 } from '@agent/core/trust-requiring-resources';
+import { readSafeJsonValueFile } from '../lib/json-input.js';
 
 export interface AdfInputOptions {
   /** Set false for pre-trust callers; project-local pipeline resources are not read. */
@@ -32,8 +33,16 @@ const SCRIPT_WRAPPER_BASELINE_PATH = rootResolve(
 );
 
 function loadScriptWrapperBaseline(): AdfScriptWrapperBaselineEntry[] {
-  const parsed = readJsonIfPresent<{ violations?: unknown }>(SCRIPT_WRAPPER_BASELINE_PATH);
-  if (!parsed) return [];
+  if (
+    !safeExistsSync(SCRIPT_WRAPPER_BASELINE_PATH) ||
+    !safeLstat(SCRIPT_WRAPPER_BASELINE_PATH).isFile()
+  ) {
+    return [];
+  }
+  const parsed = parseSafeJsonObjectValue(
+    readSafeJsonValueFile<unknown>(SCRIPT_WRAPPER_BASELINE_PATH, 'script wrapper baseline'),
+    'script wrapper baseline'
+  );
   try {
     return Array.isArray(parsed.violations)
       ? parsed.violations.filter(
@@ -59,7 +68,7 @@ export function resolveAdfInputPath(inputPath: string): string {
 }
 
 export function readJsonInput<T = any>(inputPath: string): T {
-  return readJson<T>(resolveAdfInputPath(inputPath));
+  return readSafeJsonValueFile<T>(resolveAdfInputPath(inputPath), `ADF input ${inputPath}`);
 }
 
 function isWorkflowModulePath(inputPath: string): boolean {
