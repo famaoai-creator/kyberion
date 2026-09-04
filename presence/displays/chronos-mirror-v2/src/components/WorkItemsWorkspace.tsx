@@ -12,46 +12,15 @@ import {
 } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
+import {
+  parseWorkItemMutationResponse,
+  parseWorkItemsResponse,
+  type ClientWorkItem,
+  type ClientWorkItemLineage,
+} from '../lib/workitems-response';
 
-type WorkItem = {
-  item_id: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  source: string;
-  source_ref: string;
-  project_id: string;
-  assignee_peer_id?: string;
-  assignee_user_id?: string;
-  labels: string[];
-  dependencies: string[];
-  created_at: string;
-  updated_at: string;
-  context?: {
-    organization_id?: string;
-    mission_id?: string;
-    project_id?: string;
-    task_id?: string;
-    tenant_slug?: string;
-    work_shape?: string;
-    source?: string;
-    warnings?: string[];
-  };
-  claimed_by_peer_id?: string;
-  claimed_by_user_id?: string;
-  metadata?: Record<string, unknown>;
-};
-
-type WorkItemLineage = {
-  hierarchy: string[];
-  nodes: Array<{ key: string; kind: string; id: string; item_count: number }>;
-  edges: Array<{ from: string; to: string; relationship: string; item_count: number }>;
-  total_items: number;
-  complete_chain_items: number;
-  incomplete_chain_items: number;
-  missing_by_kind: Record<string, number>;
-};
+type WorkItem = ClientWorkItem;
+type WorkItemLineage = ClientWorkItemLineage;
 
 type WorkCoordinationSummary = {
   total: number;
@@ -138,13 +107,13 @@ export function WorkItemsWorkspace({
         fetch(`/api/workitems${scopeQuery ? `?${scopeQuery}` : ''}`, { cache: 'no-store' }),
         fetch(`/api/intelligence${scopeQuery ? `?${scopeQuery}` : ''}`, { cache: 'no-store' }),
       ]);
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'work items failed');
-      setItems(Array.isArray(payload.items) ? payload.items : []);
-      setStatuses(Array.isArray(payload.statuses) ? payload.statuses : []);
+      const payload = parseWorkItemsResponse(await response.json().catch(() => null));
+      if (!response.ok || !payload) throw new Error('Invalid work items response');
+      setItems(payload.items);
+      setStatuses(payload.statuses);
       setProjection({
-        scope: String(payload.scope || 'work_items'),
-        view: String(payload.view || 'all'),
+        scope: payload.scope,
+        view: payload.view,
         quality: payload.quality,
         lineage: payload.lineage,
       });
@@ -173,8 +142,8 @@ export function WorkItemsWorkspace({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId, status }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'move failed');
+        const payload = parseWorkItemMutationResponse(await response.json().catch(() => null));
+        if (!response.ok || !payload) throw new Error('Invalid work item move response');
         await refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
