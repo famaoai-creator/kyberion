@@ -1,4 +1,5 @@
-import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/adf-engine';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -90,14 +91,73 @@ function readFileContext(filePath: string): Record<string, unknown> {
  * Restored specialized ops: tail, append, exists, copy, move.
  */
 
+type FilePipelineParams = Record<string, unknown>;
+type FilePipelineContext = AdfEngineContext;
+type FilePipelineOptions = { max_steps?: number; timeout_ms?: number };
+type FilePipelineStep = Omit<AdfStep, 'params'> & { params: FilePipelineParams };
+
 interface FileAction {
   action: 'pipeline';
-  steps: Array<{ type: 'capture' | 'transform' | 'apply' | 'control'; op: string; params: any }>;
-  context?: Record<string, any>;
-  options?: {
-    max_steps?: number;
-    timeout_ms?: number;
-  };
+  steps: FilePipelineStep[];
+  context?: FilePipelineContext;
+  options?: FilePipelineOptions;
+}
+
+function requireParams(value: unknown, label: string): FilePipelineParams {
+  if (!isRecord(value)) throw new Error(`${label} params must be an object`);
+  return value;
+}
+
+function readStringParam(params: FilePipelineParams, key: string, fallback = ''): string {
+  const value = params[key];
+  return typeof value === 'string' ? value : value == null ? fallback : String(value);
+}
+
+function readNumberParam(params: FilePipelineParams, key: string, fallback: number): number {
+  const value = params[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function readNestedSteps(value: unknown, label: string): AdfStep[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  return value.map((entry, index) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.op !== 'string' ||
+      !['capture', 'transform', 'apply', 'control'].includes(String(entry.type))
+    ) {
+      throw new Error(`${label}[${index}] must be an ADF step`);
+    }
+    return entry as unknown as AdfStep;
+  });
+}
+
+function resolvedString(
+  value: unknown,
+  resolve: (value: unknown) => unknown,
+  fallback = ''
+): string {
+  const resolved = resolve(value);
+  return typeof resolved === 'string' ? resolved : resolved == null ? fallback : String(resolved);
+}
+
+function exportKey(params: FilePipelineParams, fallback: string): string {
+  return readStringParam(params, 'export_as', fallback) || fallback;
+}
+
+function contextKey(params: FilePipelineParams, fallback: string): string {
+  return readStringParam(params, 'from', fallback) || fallback;
+}
+
+function toFileData(value: unknown): string | Buffer {
+  if (typeof value === 'string' || Buffer.isBuffer(value)) return value;
+  return value == null ? '' : JSON.stringify(value);
+}
+
+function nestedFailure(result: AdfRunResult<FilePipelineContext>): string {
+  return (
+    result.results.find((entry) => entry.status === 'failed')?.error || 'nested pipeline failed'
+  );
 }
 
 export async function handleAction(input: FileAction) {
@@ -110,15 +170,15 @@ export async function handleAction(input: FileAction) {
 }
 
 async function executePipeline(
-  steps: Array<{ type: 'capture' | 'transform' | 'apply' | 'control'; op: string; params: any }>,
-  initialCtx: any = {},
-  options: any = {}
+  steps: FilePipelineStep[],
+  initialCtx: FilePipelineContext = {},
+  options: FilePipelineOptions = {}
 ) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, root: rootDir };
+  let ctx: FilePipelineContext = { ...initialCtx, root: rootDir };
 
   const contextPath = initialCtx.context_path
     ? resolveFilePath(String(initialCtx.context_path), true)
@@ -161,29 +221,27 @@ async function executePipeline(
 
 async function opControl(
   op: string,
-  params: any,
-  ctx: any,
-  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
-  _resolve: (value: any) => any
+  rawParams: unknown,
+  ctx: FilePipelineContext,
+  runSteps: (
+    steps: AdfStep[],
+    seedCtx?: FilePipelineContext
+  ) => Promise<AdfRunResult<FilePipelineContext>>,
+  _resolve: (value: unknown) => unknown
 ) {
+  const params = requireParams(rawParams, `file:${op}`);
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await runSteps(params.then, ctx);
+        const res = await runSteps(readNestedSteps(params.then, 'file:if then'), ctx);
         if (res.status === 'failed') {
-          throw new Error(
-            res.results.find((result: any) => result.status === 'failed')?.error ||
-              'nested pipeline failed'
-          );
+          throw new Error(nestedFailure(res));
         }
         return res.context;
       } else if (params.else) {
-        const res = await runSteps(params.else, ctx);
+        const res = await runSteps(readNestedSteps(params.else, 'file:if else'), ctx);
         if (res.status === 'failed') {
-          throw new Error(
-            res.results.find((result: any) => result.status === 'failed')?.error ||
-              'nested pipeline failed'
-          );
+          throw new Error(nestedFailure(res));
         }
         return res.context;
       }
@@ -194,16 +252,13 @@ async function opControl(
 
     case 'while':
       let iterations = 0;
-      const maxIter = params.max_iterations || 100;
+      const maxIter = readNumberParam(params, 'max_iterations', 100);
       let executed = false;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
         executed = true;
-        const res = await runSteps(params.pipeline, ctx);
+        const res = await runSteps(readNestedSteps(params.pipeline, 'file:while pipeline'), ctx);
         if (res.status === 'failed') {
-          throw new Error(
-            res.results.find((result: any) => result.status === 'failed')?.error ||
-              'nested pipeline failed'
-          );
+          throw new Error(nestedFailure(res));
         }
         ctx = res.context;
         iterations++;
@@ -217,7 +272,13 @@ async function opControl(
   }
 }
 
-async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
+async function opCapture(
+  op: string,
+  rawParams: unknown,
+  ctx: FilePipelineContext,
+  resolve: (value: unknown) => unknown
+) {
+  const params = requireParams(rawParams, `file:${op}`);
   const validation = validateOpInput('file', op, params);
   if (!validation.valid) {
     throw new Error(
@@ -227,7 +288,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
   switch (op) {
     case 'read':
     case 'read_file': {
-      const filePath = resolve(params.path);
+      const filePath = resolvedString(params.path, resolve);
       const rawText = await retry(
         async () => safeReadFile(resolveFilePath(String(filePath)), { encoding: 'utf8' }),
         buildRetryOptions()
@@ -238,11 +299,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           : rawText;
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: wrappedText,
+        [exportKey(params, 'last_capture')]: wrappedText,
       };
     }
     case 'read_json': {
-      const filePath = resolve(params.path);
+      const filePath = resolvedString(params.path, resolve);
       const rawText = await retry(
         async () => safeReadFile(resolveFilePath(String(filePath)), { encoding: 'utf8' }),
         buildRetryOptions()
@@ -250,25 +311,25 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const parsed = parseSafeJsonInput(String(rawText), 'file read_json input');
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: parsed,
+        [exportKey(params, 'last_capture_data')]: parsed,
       };
     }
     case 'list':
       return {
         ...ctx,
-        [params.export_as || 'file_list']: await retry(
-          async () => safeReaddir(resolveFilePath(String(resolve(params.path)))),
+        [exportKey(params, 'file_list')]: await retry(
+          async () => safeReaddir(resolveFilePath(resolvedString(params.path, resolve))),
           buildRetryOptions()
         ),
       };
     case 'stat':
       const s = await retry(
-        async () => safeStat(resolveFilePath(String(resolve(params.path)))),
+        async () => safeStat(resolveFilePath(resolvedString(params.path, resolve))),
         buildRetryOptions()
       );
       return {
         ...ctx,
-        [params.export_as || 'last_stat']: {
+        [exportKey(params, 'last_stat')]: {
           size: s.size,
           mtime: s.mtime,
           isFile: s.isFile(),
@@ -278,14 +339,14 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'exists':
       return {
         ...ctx,
-        [params.export_as || 'exists']: await retry(
-          async () => safeExistsSync(resolveFilePath(String(resolve(params.path)), true)),
+        [exportKey(params, 'exists')]: await retry(
+          async () => safeExistsSync(resolveFilePath(resolvedString(params.path, resolve), true)),
           buildRetryOptions()
         ),
       };
     case 'search': {
-      const pattern = resolve(params.pattern);
-      const targetPath = resolveFilePath(String(resolve(params.path)));
+      const pattern = resolvedString(params.pattern, resolve);
+      const targetPath = resolveFilePath(resolvedString(params.path, resolve));
       const rgOutput = await retry(
         async () => safeExec('rg', ['--json', String(pattern), targetPath], { encoding: 'utf8' }),
         buildRetryOptions()
@@ -295,14 +356,18 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         .map((line) => line.trim())
         .filter(Boolean)
         .map((line) => parseSafeJsonInput(line, 'file search result'));
-      return { ...ctx, [params.export_as || 'search_results']: results };
+      return { ...ctx, [exportKey(params, 'search_results')]: results };
     }
     case 'tail': {
-      const filePath = resolve(params.path);
+      const filePath = resolvedString(params.path, resolve);
       const tailPath = resolveFilePath(String(filePath));
       const stats = await retry(async () => safeStat(tailPath), buildRetryOptions());
-      const posKey = params.pos_key || 'last_pos';
-      const lastPos = ctx[posKey] || 0;
+      const posKey = readStringParam(params, 'pos_key', 'last_pos') || 'last_pos';
+      const lastPosValue = ctx[posKey];
+      const lastPos =
+        typeof lastPosValue === 'number' && Number.isFinite(lastPosValue)
+          ? lastPosValue
+          : Number(lastPosValue) || 0;
       const fullText = await retry(
         async () => safeReadFile(tailPath, { encoding: 'utf8' }) as string,
         buildRetryOptions()
@@ -312,41 +377,60 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         typeof newText === 'string'
           ? processUntrustedContent(newText, `file:${filePath}`).wrapped
           : newText;
-      return { ...ctx, [params.export_as || 'last_capture']: wrappedText, [posKey]: stats.size };
+      return { ...ctx, [exportKey(params, 'last_capture')]: wrappedText, [posKey]: stats.size };
     }
     default:
       throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 
-async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
+async function opTransform(
+  op: string,
+  rawParams: unknown,
+  ctx: FilePipelineContext,
+  resolve: (value: unknown) => unknown
+) {
+  const params = requireParams(rawParams, `file:${op}`);
   switch (op) {
     case 'regex_replace':
       return {
         ...ctx,
-        [params.export_as || 'last_transform']: String(
-          ctx[params.from || 'last_capture'] || ''
-        ).replace(new RegExp(params.pattern, 'g'), resolve(params.template)),
+        [exportKey(params, 'last_transform')]: String(
+          ctx[contextKey(params, 'last_capture')] || ''
+        ).replace(
+          new RegExp(readStringParam(params, 'pattern')),
+          resolvedString(params.template, resolve)
+        ),
       };
     case 'json_parse':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: parseSafeJsonInput(
-          String(ctx[params.from || 'last_capture']),
+        [exportKey(params, 'last_capture_data')]: parseSafeJsonInput(
+          String(ctx[contextKey(params, 'last_capture')]),
           'file json_parse input'
         ),
       };
     case 'path_join':
       return {
         ...ctx,
-        [params.export_as]: path.join(...params.parts.map((p: string) => resolve(p))),
+        [exportKey(params, 'last_transform')]: path.join(
+          ...(Array.isArray(params.parts) ? params.parts : []).map((part) =>
+            resolvedString(part, resolve)
+          )
+        ),
       };
     default:
       throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 
-async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
+async function opApply(
+  op: string,
+  rawParams: unknown,
+  ctx: FilePipelineContext,
+  resolve: (value: unknown) => unknown
+) {
+  const params = requireParams(rawParams, `file:${op}`);
   const validation = validateOpInput('file', op, params);
   if (!validation.valid) {
     throw new Error(
@@ -360,11 +444,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         true
       );
       const content =
-        ctx[params.from || 'last_transform'] ||
-        ctx[params.from || 'last_capture'] ||
+        ctx[contextKey(params, 'last_transform')] ||
+        ctx[contextKey(params, 'last_capture')] ||
         resolve(params.content);
       await retry(async () => {
-        safeWriteFile(out, content);
+        safeWriteFile(out, toFileData(content));
         return undefined;
       }, buildRetryOptions());
       break;
@@ -381,7 +465,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
             : JSON.stringify(spec.content, null, 2);
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
       await retry(async () => {
-        safeWriteFile(out, content);
+        safeWriteFile(out, toFileData(content));
         return undefined;
       }, buildRetryOptions());
       break;
@@ -392,10 +476,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         true
       );
       const content =
-        ctx[params.from || 'last_transform'] ||
-        ctx[params.from || 'last_capture'] ||
+        ctx[contextKey(params, 'last_transform')] ||
+        ctx[contextKey(params, 'last_capture')] ||
         resolve(params.content);
-      const payload = content + (params.newline !== false ? '\n' : '');
+      const payload = `${toFileData(content)}${params.newline !== false ? '\n' : ''}`;
       await retry(async () => {
         safeAppendFileSync(out, payload);
         return undefined;

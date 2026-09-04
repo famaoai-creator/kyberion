@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -29,6 +29,11 @@ interface TransportOptions {
   method: 'local';
   encrypt: boolean;
   target_public_key?: string;
+}
+
+export interface A2AEnvelope {
+  header: { msg_id: string } & Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface A2AInboxMessage {
@@ -64,9 +69,17 @@ export function parseA2ASecretValue(value: unknown): string {
 /**
  * Sends an A2A message to the physical transport layer.
  */
-export async function sendA2AMessage(message: any, options: TransportOptions) {
-  const msgId = message.header.msg_id;
-  let payload = JSON.stringify(message);
+export async function sendA2AMessage(message: unknown, options: TransportOptions) {
+  if (
+    !isRecord(message) ||
+    !isRecord(message.header) ||
+    typeof message.header.msg_id !== 'string'
+  ) {
+    throw new Error('[A2A_Transport] message must contain a valid header.msg_id');
+  }
+  const envelope = message as unknown as A2AEnvelope;
+  const msgId = envelope.header.msg_id;
+  let payload = JSON.stringify(envelope);
 
   if (options.encrypt && options.target_public_key) {
     logger.info(`🔒 [A2A_Transport] Encrypting message ${msgId}...`);

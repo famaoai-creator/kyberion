@@ -1,4 +1,10 @@
-import { nowIso, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import {
+  isRecord,
+  nowIso,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
+import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/adf-engine';
 import { distillHttpResponse } from '@agent/core/observation-distill';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
@@ -62,11 +68,16 @@ const buildNetworkRetryOptions = createGovernedRetryOptionsBuilder({
   fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
-function buildRetryOptions(stepParams: Record<string, any>) {
+type NetworkPipelineParams = Record<string, unknown>;
+type NetworkPipelineContext = AdfEngineContext;
+type NetworkPipelineOptions = { max_steps?: number; timeout_ms?: number };
+type NetworkPipelineStep = Omit<AdfStep, 'params'> & { params: NetworkPipelineParams };
+
+function buildRetryOptions(stepParams: NetworkPipelineParams) {
   const explicitRetry =
     stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
-      ? { ...(stepParams.retry as Record<string, any>) }
-      : {};
+      ? { ...(stepParams.retry as Record<string, unknown>) }
+      : ({} satisfies Record<string, unknown>);
   if (stepParams?.max_retries !== undefined)
     explicitRetry.maxRetries = Number(stepParams.max_retries);
   if (stepParams?.retry_delay_ms !== undefined)
@@ -104,20 +115,63 @@ function readNetworkContext(filePath: string): Record<string, unknown> {
   );
 }
 
-export interface PipelineStep {
-  type: 'capture' | 'transform' | 'apply' | 'control';
-  op: string;
-  params: any;
-}
+export type PipelineStep = NetworkPipelineStep;
 
 export interface NetworkAction {
   action: 'pipeline';
   steps: PipelineStep[];
-  context?: Record<string, any>;
-  options?: {
-    max_steps?: number;
-    timeout_ms?: number;
-  };
+  context?: NetworkPipelineContext;
+  options?: NetworkPipelineOptions;
+}
+
+function requireParams(value: unknown, label: string): NetworkPipelineParams {
+  if (!isRecord(value)) throw new Error(`${label} params must be an object`);
+  return value;
+}
+
+function readStringParam(params: NetworkPipelineParams, key: string, fallback = ''): string {
+  const value = params[key];
+  return typeof value === 'string' ? value : value == null ? fallback : String(value);
+}
+
+function readNumberParam(params: NetworkPipelineParams, key: string, fallback: number): number {
+  const value = params[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function readNestedSteps(value: unknown, label: string): AdfStep[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  return value.map((entry, index) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.op !== 'string' ||
+      !['capture', 'transform', 'apply', 'control'].includes(String(entry.type))
+    ) {
+      throw new Error(`${label}[${index}] must be an ADF step`);
+    }
+    return entry as unknown as AdfStep;
+  });
+}
+
+function exportKey(params: NetworkPipelineParams, fallback: string): string {
+  return readStringParam(params, 'export_as', fallback) || fallback;
+}
+
+function contextKey(params: NetworkPipelineParams, fallback: string): string {
+  return readStringParam(params, 'from', fallback) || fallback;
+}
+
+function nestedFailure(result: AdfRunResult<NetworkPipelineContext>): string {
+  return (
+    result.results.find((entry) => entry.status === 'failed')?.error || 'nested pipeline failed'
+  );
+}
+
+function readHeaders(value: unknown): Record<string, string> | undefined {
+  if (!isRecord(value)) return undefined;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, String(entry ?? '')])
+  );
 }
 
 export async function handleAction(input: NetworkAction) {
@@ -135,11 +189,15 @@ export async function handleAction(input: NetworkAction) {
 // nested control failures now propagate instead of being silently absorbed
 // (the old loop took res.context regardless of nested status — AR-06's
 // no-silent-failure rule says that was a bug, not a feature).
-async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}) {
+async function executePipeline(
+  steps: PipelineStep[],
+  initialCtx: NetworkPipelineContext = {},
+  options: NetworkPipelineOptions = {}
+) {
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, timestamp: nowIso() };
+  let ctx: NetworkPipelineContext = { ...initialCtx, timestamp: nowIso() };
 
   const contextPath = initialCtx.context_path
     ? resolveNetworkPath(String(initialCtx.context_path))
@@ -178,18 +236,19 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
 async function opControl(
   op: string,
-  params: any,
-  ctx: any,
-  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
-  _resolve: (value: any) => any
+  rawParams: unknown,
+  ctx: NetworkPipelineContext,
+  runSteps: (
+    steps: AdfStep[],
+    seedCtx?: NetworkPipelineContext
+  ) => Promise<AdfRunResult<NetworkPipelineContext>>,
+  _resolve: (value: unknown) => unknown
 ) {
-  const runNested = async (steps: any[], seedCtx: any) => {
-    const res = await runSteps(steps, seedCtx);
+  const params = requireParams(rawParams, `network:${op}`);
+  const runNested = async (steps: unknown, seedCtx: NetworkPipelineContext) => {
+    const res = await runSteps(readNestedSteps(steps, `network:${op} nested steps`), seedCtx);
     if (res.status === 'failed') {
-      throw new Error(
-        res.results.find((entry: any) => entry.status === 'failed')?.error ||
-          'nested pipeline failed'
-      );
+      throw new Error(nestedFailure(res));
     }
     return res.context;
   };
@@ -205,7 +264,7 @@ async function opControl(
 
     case 'while': {
       let iterations = 0;
-      const maxIter = params.max_iterations || 100;
+      const maxIter = readNumberParam(params, 'max_iterations', 100);
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
         ctx = await runNested(params.pipeline, ctx);
         iterations++;
@@ -218,53 +277,55 @@ async function opControl(
   }
 }
 
-async function opCapture(op: string, params: any, ctx: any) {
+async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineContext) {
+  const params = requireParams(rawParams, `network:${op}`);
   switch (op) {
     case 'fetch':
       const response = await retry(async () => {
         return await secureFetch({
-          method: params.method || 'GET',
+          method: readStringParam(params, 'method', 'GET'),
           url: resolveVars(params.url, ctx),
-          headers: params.headers,
+          headers: readHeaders(params.headers),
           data: params.data,
           params: params.query,
-          timeout: params.timeout || 20000,
+          timeout: readNumberParam(params, 'timeout', 20000),
         });
       }, buildRetryOptions(params));
-      return { ...ctx, [params.export_as || 'last_capture']: response };
+      return { ...ctx, [exportKey(params, 'last_capture')]: response };
 
     case 'shell':
       assertUnsafeShellAllowed();
-      const cmd = resolveVars(params.cmd, ctx);
-      return { ...ctx, [params.export_as || 'last_capture']: safeExec(cmd).trim() };
+      const cmd = String(resolveVars(params.cmd, ctx) ?? '');
+      return { ...ctx, [exportKey(params, 'last_capture')]: safeExec(cmd).trim() };
 
     case 'a2a_poll':
       const messages = await pollA2AInbox();
-      return { ...ctx, [params.export_as || 'inbox_messages']: messages };
+      return { ...ctx, [exportKey(params, 'inbox_messages')]: messages };
 
     default:
       throw buildUnknownNetworkOpError(op);
   }
 }
 
-async function opTransform(op: string, params: any, ctx: any) {
+async function opTransform(op: string, rawParams: unknown, ctx: NetworkPipelineContext) {
+  const params = requireParams(rawParams, `network:${op}`);
   switch (op) {
     case 'json_query':
-      const data = ctx[params.from || 'last_capture'];
-      const result = getPathValue(data, params.path);
-      return { ...ctx, [params.export_as]: result };
+      const data = ctx[contextKey(params, 'last_capture')];
+      const result = getPathValue(data, readStringParam(params, 'path'));
+      return { ...ctx, [exportKey(params, 'last_capture')]: result };
 
     case 'distill_response': {
       // AR-07: deterministic distillation of a fetched response (JSON shape /
       // HTML title+links / text preview, bounded) so llm_decide never sees
       // the raw body.
-      const source = ctx[params.from || 'last_capture'];
+      const source = ctx[contextKey(params, 'last_capture')];
       const distillate = distillHttpResponse(source, {
-        maxPreviewChars: params.max_preview_chars,
-        maxJsonKeys: params.max_json_keys,
-        maxLinks: params.max_links,
+        maxPreviewChars: readNumberParam(params, 'max_preview_chars', 2000),
+        maxJsonKeys: readNumberParam(params, 'max_json_keys', 30),
+        maxLinks: readNumberParam(params, 'max_links', 15),
       });
-      return { ...ctx, [params.export_as || 'response_distillate']: distillate };
+      return { ...ctx, [exportKey(params, 'response_distillate')]: distillate };
     }
 
     case 'llm_decide': {
@@ -272,22 +333,23 @@ async function opTransform(op: string, params: any, ctx: any) {
       return executeLlmDecideOp({
         params,
         ctx,
-        resolve: (value: any) => (typeof value === 'string' ? resolveVars(value, ctx) : value),
+        resolve: (value: unknown) => (typeof value === 'string' ? resolveVars(value, ctx) : value),
         defaultFromKey: 'response_distillate',
       });
     }
 
     case 'regex_extract':
-      const input = String(ctx[params.from || 'last_capture'] || '');
-      const match = input.match(new RegExp(params.pattern, 'm'));
-      return { ...ctx, [params.export_as]: match ? match[1] || match[0] : null };
+      const input = String(ctx[contextKey(params, 'last_capture')] || '');
+      const match = input.match(new RegExp(readStringParam(params, 'pattern'), 'm'));
+      return { ...ctx, [exportKey(params, 'last_capture')]: match ? match[1] || match[0] : null };
 
     default:
       throw buildUnknownNetworkOpError(op);
   }
 }
 
-async function opApply(op: string, params: any, ctx: any) {
+async function opApply(op: string, rawParams: unknown, ctx: NetworkPipelineContext) {
+  const params = requireParams(rawParams, `network:${op}`);
   switch (op) {
     case 'write_file':
     case 'write_artifact':
@@ -307,7 +369,7 @@ async function opApply(op: string, params: any, ctx: any) {
     case 'a2a_send':
       const message = resolveVars(params.message, ctx);
       await sendA2AMessage(message, {
-        method: params.method || 'local',
+        method: readStringParam(params, 'method', 'local') === 'local' ? 'local' : 'local',
         encrypt: params.encrypt !== false,
         target_public_key: params.target_public_key
           ? resolveNetworkPath(String(resolveVars(params.target_public_key, ctx)))

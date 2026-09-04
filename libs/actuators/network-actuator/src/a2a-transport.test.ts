@@ -44,6 +44,12 @@ describe('a2a-transport', () => {
     });
   });
 
+  it('rejects a message without a typed header id', async () => {
+    await expect(
+      sendA2AMessage({ body: { hello: 'world' } }, { method: 'local', encrypt: false })
+    ).rejects.toThrow('valid header.msg_id');
+  });
+
   it('rejects a message id that could escape the local outbox', async () => {
     await expect(
       sendA2AMessage(
