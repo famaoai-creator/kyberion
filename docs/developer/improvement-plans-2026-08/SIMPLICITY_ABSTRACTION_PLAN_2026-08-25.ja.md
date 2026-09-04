@@ -16471,6 +16471,13 @@ SX-08／SX-09 の Chronos connections projectionを再監査し、`/api/connecti
 検証: Chronos connections response **1 file / 9 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 904
+
+PR #711 の GitHub Actions build を再監査し、actuator build でのみ露呈する persisted record の optional unknown field narrowing 漏れを修正した。browser approval の `timeout_ms`、browser action の `classification` を専用 narrowing 経由にし、orchestrator project ledger の no-ledger fallback に型完全な `project_id` を与えた。既存の不正入力拒否、fallback、approval／action projection semantics は変更していない。
+
+検証: actuator build、browser／orchestrator対象テスト、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
