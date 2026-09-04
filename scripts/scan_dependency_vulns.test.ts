@@ -104,6 +104,18 @@ describe('scan_dependency_vulns', () => {
     expect(result.findings[0]?.package_name).toBe('evil_dep');
     expect(result.findings[0]?.reachability).toBe(0);
   });
+
+  it('fails closed when audit or outdated output has a non-object root', () => {
+    const result = scanDependencyVulnerabilitiesFromInputs({
+      auditJson: JSON.stringify([{ vulnerabilities: { should_not_be_read: {} } }]),
+      outdatedJson: JSON.stringify(['not-an-object']),
+      workspaceRoot: pathResolver.rootDir(),
+      ledgerPath,
+    });
+
+    expect(result.scanned_packages).toBe(0);
+    expect(result.findings).toEqual([]);
+  });
 });
 
 function finding(
