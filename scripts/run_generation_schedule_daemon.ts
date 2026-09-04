@@ -5,7 +5,7 @@ import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import { spawn } from 'node:child_process';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEFAULT_INTERVAL_MS = Number(
   getRegisteredEnvText('KYBERION_GENERATION_SCHEDULE_INTERVAL_MS') || 60_000
@@ -72,7 +72,6 @@ const runGenerationScheduleDaemon = defineScript({
       await main(argv);
     } catch (err: any) {
       const message = err?.message ?? String(err);
-      logger.error(message);
       recordDaemonHeartbeat(DAEMON_ID, { status: 'error', details: { error: message } });
       sendOpsAlert({
         severity: 'critical',
@@ -81,7 +80,7 @@ const runGenerationScheduleDaemon = defineScript({
         recommendation: 'Restart the generation schedule daemon unit and inspect its logs.',
         dedupe_key: `${DAEMON_ID}:fatal`,
       });
-      process.exitCode = 1;
+      throw new ScriptExitError(1, message);
     }
   },
 });
