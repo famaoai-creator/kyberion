@@ -20,6 +20,15 @@ export interface SemanticRenderTokenCatalog {
 
 export type SemanticRenderTokens = Record<string, Record<string, unknown>>;
 
+export interface MediaPptxPalette {
+  dk1: string;
+  dk2: string;
+  lt1: string;
+  lt2: string;
+  accent1: string;
+  accent2: string;
+}
+
 export function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderTokenCatalog {
   const fallback = {
     version: '1.0.0',
@@ -67,7 +76,11 @@ export function resolveSemanticRenderTokens(
   };
 }
 
-export function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
+export function resolveThemeColorRole(
+  palette: MediaPptxPalette,
+  accentHex: string,
+  role?: string
+): string {
   const resolvedRole = resolveThemeColorRolePolicy(role, 'secondary');
   switch (resolvedRole) {
     case 'accent':
@@ -80,7 +93,7 @@ export function resolveThemeColorRole(palette: any, accentHex: string, role?: st
 }
 
 export function resolveThemeHexColor(
-  themeColors: any,
+  themeColors: Record<string, unknown>,
   role?: string,
   fallback = '#334155'
 ): string {
