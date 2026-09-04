@@ -37,6 +37,15 @@ function requiredTimestamp(
   return value;
 }
 
+function optionalTimeoutMs(record: Record<string, unknown>, label: string): number | undefined {
+  const value = record.timeout_ms;
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new Error(`${label}.timeout_ms must be a finite non-negative number`);
+  }
+  return value;
+}
+
 /** Parse and reconstruct a browser operator approval artifact before it is reused. */
 export function parseBrowserOperatorApprovalRecord(
   value: unknown,
@@ -53,13 +62,7 @@ export function parseBrowserOperatorApprovalRecord(
     throw new Error(`${label}.status must be a valid approval status`);
   }
 
-  const timeoutMs = record.timeout_ms;
-  if (
-    timeoutMs !== undefined &&
-    (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs < 0)
-  ) {
-    throw new Error(`${label}.timeout_ms must be a finite non-negative number`);
-  }
+  const timeoutMs = optionalTimeoutMs(record, label);
 
   const completedAt =
     record.completed_at === undefined
