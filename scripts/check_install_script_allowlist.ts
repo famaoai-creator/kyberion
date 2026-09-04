@@ -1,8 +1,8 @@
 /** PI-12: ensure pnpm build-script policy and its reasons cannot drift. */
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
 import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type AllowlistEntry = { allow: boolean; reason: string };
 type AllowlistFile = { schema_version: number; packages: Record<string, AllowlistEntry> };
@@ -34,8 +34,9 @@ export function checkInstallScriptAllowlist(): {
     safeReadFile(pathResolver.rootResolve('pnpm-workspace.yaml'), { encoding: 'utf8' })
   );
   const allowBuilds = parseAllowBuildsYaml(workspace);
-  const policy = readJson<AllowlistFile>(
-    pathResolver.rootResolve('knowledge/product/governance/install-script-allowlist.json')
+  const policy = readSafeJsonFile<AllowlistFile>(
+    pathResolver.rootResolve('knowledge/product/governance/install-script-allowlist.json'),
+    'install-script allowlist'
   );
   const findings: string[] = [];
 
