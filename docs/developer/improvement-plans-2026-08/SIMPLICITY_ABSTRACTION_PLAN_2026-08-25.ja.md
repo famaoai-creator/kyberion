@@ -19291,6 +19291,17 @@ SX-06／SX-07 のmanifest-driven `run_checks`を再監査し、未知option／op
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1135
+
+SX-05／SX-06 のorganization operating model CLIを再監査し、model／help／domain／service／cadence／decision等の出力をshared harness printerへ統一した。JSON／human-readable形式、command routing、organization／tenant scope、dry-run／applyの書き込み境界は変更していない。
+
+検証:
+
+- organization operating model **2 tests passed**。直接console出力不在、helpのprinter注入、既存CLI出力境界を確認した。
+- 対象ESLint、`pnpm exec tsc --noEmit --pretty false`、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
