@@ -16,7 +16,7 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import {
@@ -44,6 +44,7 @@ import {
   safeMkdir,
   safeMoveSync,
   safeReaddir,
+  safeReadFile,
   safeRmSync,
   safeStat,
   safeWriteFile,
@@ -143,8 +144,15 @@ function readPluginManifestSafely(pluginRoot: string): {
 
   let parsed: Record<string, unknown>;
   try {
+    if (!safeLstat(candidatePath).isFile()) {
+      throw new Error(`plugin manifest must be a regular file: ${candidatePath}`);
+    }
     parsed = parseSafeJsonObjectValue(
-      readJson<unknown>(candidatePath),
+      parseSafeJsonInput(
+        String(safeReadFile(candidatePath, { encoding: 'utf8' }) || ''),
+        `plugin manifest ${candidatePath}`,
+        { preserveParseError: true }
+      ),
       `plugin manifest ${candidatePath}`
     );
   } catch (err: unknown) {
