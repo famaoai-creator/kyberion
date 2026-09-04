@@ -221,7 +221,31 @@ describe('control-plane-client', () => {
               },
               { seed_id: null },
             ],
-            pendingApprovals: [{ id: 'APR-1', title: 'Approve' }, 'invalid'],
+            pendingApprovals: [{ id: 'APR-1', title: 'Approve', leaked: 'drop' }, 'invalid'],
+            distillCandidates: [
+              {
+                candidate_id: 'DSC-1',
+                source_type: 'mission',
+                title: 'Pattern',
+                summary: 'Reusable pattern',
+                status: 'proposed',
+                target_kind: 'knowledge_hint',
+                extra: 'drop',
+              },
+              { candidate_id: 'DSC-2', source_type: 'unknown' },
+            ],
+            memoryCandidates: [
+              {
+                candidate_id: 'MEM-1',
+                status: 'queued',
+                proposed_memory_kind: 'preference',
+                sensitivity_tier: 'personal',
+                source_ref: 'task:1',
+                evidence_refs: ['event:1'],
+                extra: 'drop',
+              },
+              { candidate_id: 'MEM-2', status: 'queued' },
+            ],
             nextActions: [
               {
                 action_id: 'act-1',
@@ -257,6 +281,26 @@ describe('control-plane-client', () => {
       execution_contract: { recommended_action: 'review', repository_id: 'repo-1' },
     });
     expect(overview.pendingApprovals).toEqual([{ id: 'APR-1', title: 'Approve' }]);
+    expect(overview.distillCandidates).toEqual([
+      {
+        candidate_id: 'DSC-1',
+        source_type: 'mission',
+        title: 'Pattern',
+        summary: 'Reusable pattern',
+        status: 'proposed',
+        target_kind: 'knowledge_hint',
+      },
+    ]);
+    expect(overview.memoryCandidates).toEqual([
+      {
+        candidate_id: 'MEM-1',
+        status: 'queued',
+        proposed_memory_kind: 'preference',
+        sensitivity_tier: 'personal',
+        source_ref: 'task:1',
+        evidence_refs: ['event:1'],
+      },
+    ]);
   });
 
   it('raises a stale surface error with a suggested command', async () => {
