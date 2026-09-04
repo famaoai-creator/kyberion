@@ -18281,6 +18281,20 @@ surface 側が同じ意味キーを再解決できる境界を整えた。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1058
+
+SX-09 の共通 approval text renderer を再監査し、`surface-approval-ui.ts` に残っていた見出し、項目ラベル、番号操作、返信指示、
+IntentResolutionContract の表示ラベルを `bridge` vocabulary catalog へ移した。approval record、decision token、severity、権限判定、
+intent contract の値は変更せず、全 surface 共通の日本語 fallback 表示だけを catalog 正本に揃えた。
+
+検証:
+
+- surface approval UI **1 file / 11 tests passed**。番号 fallback、契約表示、approval lifecycle を確認した。
+- generated vocabulary types、pseudo locale、knowledge index を再生成し、`catalogs`／`vocabulary-types`／`pseudo-locale` の個別 gate passed。
+- canonical full gate **69 gates / 0 failed** passed。i18n baseline は直書き数 24→19 の減少を反映した。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

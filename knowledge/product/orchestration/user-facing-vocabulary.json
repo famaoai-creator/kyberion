@@ -4924,6 +4924,41 @@
         "ja": "続行するには承認が必要です。",
         "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ïş řėɋůïřėḓ ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
+      "approval_heading": {
+        "en": "Approval required [{surface}]",
+        "ja": "承認が必要です [{surface}]",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůïřėḓ [{surface}] ŀőřėɱ ïṗş⟧"
+      },
+      "approval_title_label": {
+        "en": "Title",
+        "ja": "タイトル",
+        "qps-ploc": "⟦Ŧïŧŀė ŀőř⟧"
+      },
+      "approval_details_label": {
+        "en": "Details",
+        "ja": "詳細",
+        "qps-ploc": "⟦Ḓėŧȧïŀş ŀőř⟧"
+      },
+      "approval_severity_label": {
+        "en": "Severity",
+        "ja": "重要度",
+        "qps-ploc": "⟦Şėṽėřïŧẏ ŀőř⟧"
+      },
+      "approval_approve_choice": {
+        "en": "1: Approve",
+        "ja": "1: 承認する",
+        "qps-ploc": "⟦1: Ȧṗṗřőṽė ŀőř⟧"
+      },
+      "approval_reject_choice": {
+        "en": "2: Reject",
+        "ja": "2: 却下する",
+        "qps-ploc": "⟦2: Řėĵėƈŧ ŀőř⟧"
+      },
+      "approval_reply_instruction": {
+        "en": "Reply: appr:{requestId}:approve or appr:{requestId}:reject",
+        "ja": "返信: appr:{requestId}:approve または appr:{requestId}:reject",
+        "qps-ploc": "⟦Řėṗŀẏ: ȧṗṗř:{requestId}:ȧṗṗřőṽė őř ȧṗṗř:{requestId}:řėĵėƈŧ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
       "processing_note": {
         "en": "Processing. Please wait…",
         "ja": "処理中です。少々お待ちください…",
