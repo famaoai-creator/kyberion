@@ -5,6 +5,13 @@ import { nowIso } from './foundation/time.js';
 /**
  * ACE (Autonomous Consensus Engine) Core Utility
  */
+export interface AceVote {
+  securityScore?: string;
+  urgencyScore?: string;
+  role?: string;
+  comment?: string;
+}
+
 export const aceCore = {
   calculateHash: (text: string) => {
     return createHash('sha256').update(text).digest('hex');
@@ -56,7 +63,7 @@ export const aceCore = {
     return true;
   },
 
-  evaluateDecision: (votes: any[]) => {
+  evaluateDecision: (votes: AceVote[]) => {
     const securityRisk = votes.find((v) => v.securityScore === 'S1');
     const highUrgency = votes.some((v) => v.urgencyScore === 'U1');
 
