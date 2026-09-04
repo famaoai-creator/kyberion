@@ -151,6 +151,20 @@ describe('source-analysis compiler', () => {
     expect(analysis.dependencies).not.toContain('should_not_be_loaded');
   });
 
+  it('ignores a package manifest containing a dangerous JSON key', () => {
+    prepareFixture();
+    safeWriteFile(
+      path.join(FIXTURE, 'package.json'),
+      '{"dependencies":{"__proto__":{"polluted":true},"safe-package":"^1.0.0"}}'
+    );
+
+    const analysis = analyzeSourceTree({
+      sourceRoot: 'active/shared/tmp/source-analysis-tests/sample-app',
+    });
+
+    expect(analysis.dependencies).not.toContain('safe-package');
+  });
+
   it('requires approval for tests with external side-effect signals', () => {
     prepareFixture();
     safeWriteFile(

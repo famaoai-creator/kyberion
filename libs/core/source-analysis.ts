@@ -11,7 +11,8 @@ import {
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { readJsonIfPresent } from './foundation/json.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
+import { isRecord } from './foundation/primitives.js';
 import { clamp } from './foundation/text.js';
 import { parseTestInventory } from './software-quality.js';
 
@@ -475,15 +476,21 @@ export function analyzeSourceTree(options: AnalyzeSourceTreeOptions = {}): Sourc
   const packagePath = path.join(resolved.absolute, 'package.json');
   if (safeExistsSync(packagePath)) {
     try {
-      const packageJson = readJsonIfPresent<Record<string, unknown>>(
-        assertSafeRepositoryPath(packagePath)
+      const packageJson = parseSafeJsonObjectValue(
+        parseSafeJsonInput(
+          String(
+            safeReadFile(assertSafeRepositoryPath(packagePath), {
+              encoding: 'utf8',
+              maxSizeMB: 4,
+            })
+          ),
+          'source package manifest'
+        ),
+        'source package manifest'
       );
-      if (packageJson) {
-        for (const group of ['dependencies', 'devDependencies', 'peerDependencies']) {
-          const values = packageJson[group];
-          if (values && typeof values === 'object')
-            Object.keys(values).forEach((name) => dependencies.add(name));
-        }
+      for (const group of ['dependencies', 'devDependencies', 'peerDependencies']) {
+        const values = packageJson[group];
+        if (isRecord(values)) Object.keys(values).forEach((name) => dependencies.add(name));
       }
     } catch {
       // The file is still represented in the IR; malformed metadata is a source limitation.
