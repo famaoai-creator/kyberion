@@ -3,6 +3,7 @@ import * as pathResolver from '@agent/core/path-resolver';
 import { retry } from '@agent/core/async-utils';
 import { safeExec } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord } from '@agent/core/foundation/text';
 import {
   createCalendarEvent,
   listCalendarAgenda,
@@ -133,7 +134,72 @@ const buildRetryOptions = createGovernedRetryOptionsBuilder({
   fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
-async function runJxa<T>(scriptBody: string, params: Record<string, unknown>): Promise<T> {
+export function normalizeCalendarSummaryList(value: unknown): CalendarSummary[] {
+  if (!Array.isArray(value)) {
+    throw new Error('calendar-actuator: osascript calendars response must be an array');
+  }
+  return value.map((entry, index) => {
+    if (!isRecord(entry) || typeof entry.name !== 'string') {
+      throw new Error(`calendar-actuator: invalid calendar summary at index ${index}`);
+    }
+    return {
+      name: entry.name,
+      ...(typeof entry.id === 'string' ? { id: entry.id } : {}),
+      ...(typeof entry.time_zone === 'string' ? { time_zone: entry.time_zone } : {}),
+    };
+  });
+}
+
+export function normalizeCalendarEventList(value: unknown): CalendarEvent[] {
+  if (!Array.isArray(value)) {
+    throw new Error('calendar-actuator: osascript events response must be an array');
+  }
+  return value.map((entry, index) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.title !== 'string' ||
+      typeof entry.start !== 'string' ||
+      typeof entry.end !== 'string' ||
+      typeof entry.calendar !== 'string' ||
+      typeof entry.location !== 'string' ||
+      typeof entry.description !== 'string'
+    ) {
+      throw new Error(`calendar-actuator: invalid calendar event at index ${index}`);
+    }
+    return {
+      title: entry.title,
+      start: entry.start,
+      end: entry.end,
+      calendar: entry.calendar,
+      location: entry.location,
+      description: entry.description,
+    };
+  });
+}
+
+export function normalizeCalendarEventMutation(value: unknown): CalendarEventMutation {
+  if (
+    !isRecord(value) ||
+    typeof value.status !== 'string' ||
+    typeof value.title !== 'string' ||
+    (value.id !== undefined && typeof value.id !== 'string') ||
+    (value.error !== undefined && typeof value.error !== 'string')
+  ) {
+    throw new Error('calendar-actuator: invalid osascript event mutation response');
+  }
+  return {
+    status: value.status,
+    title: value.title,
+    ...(typeof value.id === 'string' ? { id: value.id } : {}),
+    ...(typeof value.error === 'string' ? { error: value.error } : {}),
+  };
+}
+
+async function runJxa<T>(
+  scriptBody: string,
+  params: Record<string, unknown>,
+  normalize: (value: unknown) => T
+): Promise<T> {
   const paramsLiteral = JSON.stringify(JSON.stringify(params));
   const script = `
     (function() {
@@ -146,9 +212,10 @@ async function runJxa<T>(scriptBody: string, params: Record<string, unknown>): P
     buildRetryOptions()
   );
   const trimmed = String(output).trim();
-  if (!trimmed) return undefined as unknown as T;
   try {
-    return parseSafeJsonInput(trimmed, 'calendar osascript response') as T;
+    return normalize(
+      trimmed ? parseSafeJsonInput(trimmed, 'calendar osascript response') : undefined
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`calendar-actuator: failed to parse osascript output: ${message}`);
@@ -183,7 +250,8 @@ class JxaCalendarBackend implements CalendarBackend {
           return { name: cal.name() };
         }));
       `,
-      {}
+      {},
+      normalizeCalendarSummaryList
     );
   }
 
@@ -229,7 +297,8 @@ class JxaCalendarBackend implements CalendarBackend {
         calendar_names: params.calendar_names ?? null,
         start_iso: start.toISOString(),
         end_iso: end.toISOString(),
-      }
+      },
+      normalizeCalendarEventList
     );
   }
 
@@ -295,7 +364,8 @@ class JxaCalendarBackend implements CalendarBackend {
         end_iso: end.toISOString(),
         location: params.location?.trim() || '',
         description: params.description?.trim() || '',
-      }
+      },
+      normalizeCalendarEventMutation
     );
   }
 }
