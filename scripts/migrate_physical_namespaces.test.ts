@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   feedbackScopes,
   intentScopes,
@@ -85,5 +85,17 @@ describe('physical namespace migration CLI', () => {
 
     expect(intentScopes(intent)).toMatchObject({ disposition: 'invalid' });
     safeRmSync(root, { recursive: true, force: true });
+  });
+
+  it('routes migration plans through the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/migrate_physical_namespaces.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 });
