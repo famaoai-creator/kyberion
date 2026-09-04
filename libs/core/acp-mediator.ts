@@ -18,6 +18,14 @@ import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import type {
+  Client,
+  ClientSideConnection,
+  PromptResponse,
+  RequestPermissionRequest,
+  RequestPermissionResponse,
+  SessionNotification,
+} from '@agentclientprotocol/sdk';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -69,8 +77,8 @@ function sanitizeEnvForChild(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 }
 
 // Dynamic import for ESM-only @agentclientprotocol/sdk
-let _acpSdk: { ClientSideConnection: any; ndJsonStream: any } | null = null;
-async function getACPSdk() {
+let _acpSdk: typeof import('@agentclientprotocol/sdk') | null = null;
+async function getACPSdk(): Promise<typeof import('@agentclientprotocol/sdk')> {
   if (!_acpSdk) {
     _acpSdk = await import('@agentclientprotocol/sdk');
   }
@@ -175,7 +183,7 @@ interface CrashState {
 
 export class ACPMediator {
   private child: ChildProcess | null = null;
-  private connection: any = null;
+  private connection: InstanceType<typeof ClientSideConnection> | null = null;
   private acpSessionId: string | null = null;
   private accumulatedResponse: string = '';
   private processedA2UIOffsets: Set<number> = new Set();
@@ -331,7 +339,7 @@ export class ACPMediator {
     const targetModel = this.options.modelId || resolveRuntimeModelId('gemini-default');
     try {
       logger.info(`[ACP_MEDIATOR] Setting model to: ${targetModel}`);
-      await this.connection.unstable_setSessionModel({
+      await this.connection.extMethod('session/set_model', {
         sessionId: this.acpSessionId,
         modelId: targetModel,
       });
@@ -437,12 +445,13 @@ export class ACPMediator {
 
     const { ClientSideConnection, ndJsonStream } = await getACPSdk();
     this.connection = new ClientSideConnection(
-      (agent: any) => ({
-        sessionUpdate: async (params: any) => {
+      (): Client => ({
+        sessionUpdate: async (params: SessionNotification) => {
           logger.info(`[ACP_NOTIF] ${JSON.stringify(params)}`);
           this.updateUsageFromPayload(params);
-          if (params.update?.sessionUpdate === 'agent_message_chunk') {
-            const text = params.update.content?.text || '';
+          const update = params.update;
+          if (update.sessionUpdate === 'agent_message_chunk') {
+            const text = update.content.type === 'text' ? update.content.text : '';
             this.accumulatedResponse += text;
             logger.info(`[ACP_AGENT_SAYS] ${text}`);
             this.log('agent', text);
@@ -468,15 +477,28 @@ export class ACPMediator {
             }
           }
         },
-        async requestPermission(params: any) {
+        async requestPermission(
+          params: RequestPermissionRequest
+        ): Promise<RequestPermissionResponse> {
+          const selectAllowedOption = (): RequestPermissionResponse => {
+            const option = params.options.find(
+              (candidate) => candidate.kind === 'allow_once' || candidate.kind === 'allow_always'
+            );
+            return option
+              ? { outcome: { outcome: 'selected', optionId: option.optionId } }
+              : { outcome: { outcome: 'cancelled' } };
+          };
+          const cancel = (): RequestPermissionResponse => ({
+            outcome: { outcome: 'cancelled' },
+          });
           const title = (params.toolCall?.title || '').toLowerCase();
-          const toolCallId = (params.toolCall?.toolCallId || '').toLowerCase();
+          const toolCallId = params.toolCall?.toolCallId.toLowerCase();
 
           if (toolCallId.includes('ask_user') || title.includes('asking user')) {
             logger.warn(
               `[ACP_PERMISSION] Denied interactive user prompt tool: ${params.toolCall?.title}`
             );
-            return { outcome: 'denied' as const };
+            return cancel();
           }
 
           // Actuator restriction: check manifest whitelist/blacklist
@@ -501,7 +523,7 @@ export class ACPMediator {
                 logger.error(
                   `[ACP_PERMISSION] DENIED by manifest: ${threadId} cannot use ${actuator} (tool: ${title})`
                 );
-                return { outcome: 'denied' as const };
+                return cancel();
               }
             }
           }
@@ -509,10 +531,10 @@ export class ACPMediator {
           const shellDecision = evaluateShellCommandPolicy(title);
           if (shellDecision.verdict === 'deny') {
             logger.error(`[ACP_PERMISSION] BLOCKED dangerous operation: ${title}`);
-            return { outcome: 'denied' as const };
+            return cancel();
           }
           if (shellDecision.verdict === 'allow') {
-            return { outcome: 'approved' as const };
+            return selectAllowedOption();
           }
 
           // Allow safe operations
@@ -531,7 +553,7 @@ export class ACPMediator {
             'git diff',
           ];
           if (safePatterns.some((p) => title.includes(p))) {
-            return { outcome: 'approved' as const };
+            return selectAllowedOption();
           }
 
           // SA-05 Task 3.3: single approval decision source — file a pending
@@ -553,13 +575,13 @@ export class ACPMediator {
               },
             });
             if (approval.allowed) {
-              return { outcome: 'approved' as const };
+              return selectAllowedOption();
             }
           } catch (approvalErr: unknown) {
             logger.warn(`[ACP_PERMISSION] approval routing failed: ${errorMessage(approvalErr)}`);
           }
           logger.warn(`[ACP_PERMISSION] Approval required (pending): ${title}`);
-          return { outcome: 'denied' as const };
+          return cancel();
         },
         async readTextFile(params) {
           throw new Error('Not implemented');
@@ -573,7 +595,10 @@ export class ACPMediator {
         extMethod: async (m, p) => ({}),
         extNotification: async (m, p) => {},
       }),
-      ndJsonStream(Writable.toWeb(sdkOutput) as any, Readable.toWeb(sdkInput) as any)
+      ndJsonStream(
+        Writable.toWeb(sdkOutput) as unknown as WritableStream<Uint8Array>,
+        Readable.toWeb(sdkInput) as unknown as ReadableStream<Uint8Array>
+      )
     );
 
     await waitForBootSignal(this.child, `acp:${threadId}`);
@@ -582,7 +607,7 @@ export class ACPMediator {
     await this.connection.initialize({
       protocolVersion: 1,
       clientInfo: { name: 'Kyberion', version: '1.0.0' },
-    } as any);
+    });
 
     if (this.options.authenticateMethod !== null) {
       logger.info('[ACP_MEDIATOR] Authenticating...');
@@ -640,7 +665,7 @@ export class ACPMediator {
       options.timeoutMs ??
       this.options.turnTimeoutMs ??
       Number(getRegisteredEnvText('KYBERION_AGENT_TURN_TIMEOUT_MS') || 60_000);
-    const response = await new Promise<any>((resolve, reject) => {
+    const response = await new Promise<PromptResponse>((resolve, reject) => {
       const timeout =
         timeoutMs > 0
           ? setTimeout(
