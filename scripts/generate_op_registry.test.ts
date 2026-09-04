@@ -148,6 +148,8 @@ describe('generate_op_registry discovery output', () => {
     );
     expect(generator).not.toContain('PipelineOpKind');
     expect(generator).toContain('ActuatorOpDescription');
+    expect(generator).toContain('loadDescribeOpsSources');
+    expect(generator).not.toContain('describeOps as describe');
     expect(generator).toContain('loadActuatorOpRegistry()');
     expect(generator).toContain('defineCatalog<MediaManifestFile>');
     expect(generator).not.toContain('readJson<');

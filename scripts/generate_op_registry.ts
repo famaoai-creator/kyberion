@@ -3,78 +3,12 @@ import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-i
 import type { ActuatorOpDescription } from '@agent/core/actuator-sdk';
 import { loadActuatorOpRegistry, type PipelineStepType } from '@agent/core/actuator-op-registry';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
 import { getOpInputContract } from '@agent/core/op-input-contracts';
+import * as path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
-import { describeOps as describeSystemOps } from '../libs/actuators/system-actuator/src/op-catalog.js';
-import { describeOps as describeBrowserOps } from '../libs/actuators/browser-actuator/src/op-catalog.js';
-import { describeOps as describeCodeOps } from '../libs/actuators/code-actuator/src/op-catalog.js';
-import { describeOps as describeFileOps } from '../libs/actuators/file-actuator/src/op-catalog.js';
-import { describeOps as describeModelingOps } from '../libs/actuators/modeling-actuator/src/op-catalog.js';
-import { describeOps as describeProcessOps } from '../libs/actuators/process-actuator/src/op-catalog.js';
-import { describeOps as describeTerminalOps } from '../libs/actuators/terminal-actuator/src/op-catalog.js';
-import { describeOps as describeSecretOps } from '../libs/actuators/secret-actuator/src/op-catalog.js';
-import { describeOps as describeApprovalOps } from '../libs/actuators/approval-actuator/src/op-catalog.js';
-import { describeOps as describeAgentOps } from '../libs/actuators/agent-actuator/src/op-catalog.js';
-import { describeOps as describeArtifactOps } from '../libs/actuators/artifact-actuator/src/op-catalog.js';
-import { describeOps as describeNetworkOps } from '../libs/actuators/network-actuator/src/op-catalog.js';
-import { describeOps as describeWisdomOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
-import { describeOps as describeBlockchainOps } from '../libs/actuators/blockchain-actuator/src/op-catalog.js';
-import { describeOps as describeBuildOps } from '../libs/actuators/build-actuator/src/op-catalog.js';
-import { describeOps as describeCalendarOps } from '../libs/actuators/calendar-actuator/src/op-catalog.js';
-import { describeOps as describeEmailOps } from '../libs/actuators/email-actuator/src/op-catalog.js';
-import { describeOps as describeIngestOps } from '../libs/actuators/ingest-actuator/src/op-catalog.js';
-import { describeOps as describePresenceOps } from '../libs/actuators/presence-actuator/src/op-catalog.js';
-import { describeOps as describeServiceOps } from '../libs/actuators/service-actuator/src/op-catalog.js';
-import { describeOps as describeOrchestratorOps } from '../libs/actuators/orchestrator-actuator/src/op-catalog.js';
-import { describeOps as describeAndroidOps } from '../libs/actuators/android-actuator/src/op-catalog.js';
-import { describeOps as describeIosOps } from '../libs/actuators/ios-actuator/src/op-catalog.js';
-import { describeOps as describeVisionOps } from '../libs/actuators/vision-actuator/src/op-catalog.js';
-import { describeOps as describeVoiceOps } from '../libs/actuators/voice-actuator/src/op-catalog.js';
-import { describeOps as describeMeetingOps } from '../libs/actuators/meeting-actuator/src/op-catalog.js';
-import { describeOps as describeMediaGenerationOps } from '../libs/actuators/media-generation-actuator/src/op-catalog.js';
-import { describeOps as describeMediaOps } from '../libs/actuators/media-actuator/src/op-catalog.js';
-import { describeOps as describeVideoCompositionOps } from '../libs/actuators/video-composition-actuator/src/op-catalog.js';
-import { describeOps as describeDeploymentOps } from '../libs/actuators/deployment-actuator/src/op-catalog.js';
-import { describeOps as describeWorkingMemoryOps } from '../libs/actuators/working-memory-actuator/src/op-catalog.js';
-
-// AR-02: actuators that self-describe their op surface. The registry and
-// discovery index are generated from these; `generate:op-registry -- --check` fails on
-// drift between the committed files and this source of truth.
-const DESCRIBE_OPS_SOURCES: Record<string, () => ActuatorOpDescription[]> = {
-  'system-actuator': describeSystemOps,
-  'file-actuator': describeFileOps,
-  'network-actuator': describeNetworkOps,
-  'code-actuator': describeCodeOps,
-  'modeling-actuator': describeModelingOps,
-  'wisdom-actuator': describeWisdomOps,
-  'browser-actuator': describeBrowserOps,
-  'process-actuator': describeProcessOps,
-  'terminal-actuator': describeTerminalOps,
-  'secret-actuator': describeSecretOps,
-  'approval-actuator': describeApprovalOps,
-  'agent-actuator': describeAgentOps,
-  'artifact-actuator': describeArtifactOps,
-  'blockchain-actuator': describeBlockchainOps,
-  'build-actuator': describeBuildOps,
-  'calendar-actuator': describeCalendarOps,
-  'email-actuator': describeEmailOps,
-  'ingest-actuator': describeIngestOps,
-  'presence-actuator': describePresenceOps,
-  'service-actuator': describeServiceOps,
-  'orchestrator-actuator': describeOrchestratorOps,
-  'android-actuator': describeAndroidOps,
-  'ios-actuator': describeIosOps,
-  'vision-actuator': describeVisionOps,
-  'voice-actuator': describeVoiceOps,
-  'meeting-actuator': describeMeetingOps,
-  'media-generation-actuator': describeMediaGenerationOps,
-  'media-actuator': describeMediaOps,
-  'video-composition-actuator': describeVideoCompositionOps,
-  'deployment-actuator': describeDeploymentOps,
-  'working-memory-actuator': describeWorkingMemoryOps,
-};
 
 interface ManifestPipelineOp {
   op?: string;
@@ -116,6 +50,41 @@ interface OpDiscoveryRecord {
 interface OpDiscoveryReport {
   v: string;
   actuators: OpDiscoveryRecord[];
+}
+
+type DescribeOpsSource = () => ActuatorOpDescription[];
+
+/**
+ * AR-02: discover self-describing actuator catalogs from the manifest-backed
+ * actuator directories. Keeping the source list in the manifests means a new
+ * actuator is picked up by this generator without a second hand-maintained
+ * import table.
+ */
+async function loadDescribeOpsSources(
+  manifestCatalog: ReturnType<typeof loadActuatorManifestCatalog>
+): Promise<Record<string, DescribeOpsSource>> {
+  const runtimeModuleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const entries = await Promise.all(
+    manifestCatalog.map(async (entry) => {
+      const javascriptPath = path.resolve(runtimeModuleRoot, entry.path, 'src/op-catalog.js');
+      const sourcePath = path.resolve(runtimeModuleRoot, entry.path, 'src/op-catalog.ts');
+      const modulePath = assertSafeRepositoryPath(
+        safeExistsSync(javascriptPath) ? javascriptPath : sourcePath,
+        { allowMissingLeaf: true }
+      );
+      if (!safeExistsSync(modulePath)) return null;
+      const loaded = (await import(pathToFileURL(modulePath).href)) as {
+        describeOps?: unknown;
+      };
+      if (typeof loaded.describeOps !== 'function') {
+        throw new Error(`Actuator ${entry.n} has no exported describeOps catalog`);
+      }
+      return [entry.n, loaded.describeOps as DescribeOpsSource] as const;
+    })
+  );
+  return Object.fromEntries(
+    entries.filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+  );
 }
 
 function enrichDescribedOp(item: {
@@ -196,13 +165,14 @@ function buildCurrentRegistryBase(): ActuatorOpRegistryFile {
 
 function buildOpDiscoveryReport(
   manifestCatalog: ReturnType<typeof loadActuatorManifestCatalog>,
-  registry: ActuatorOpRegistryFile
+  registry: ActuatorOpRegistryFile,
+  describeOpsSources: Record<string, DescribeOpsSource>
 ): OpDiscoveryReport {
   const mediaManifest = loadMediaManifest();
   const report: OpDiscoveryRecord[] = [];
   for (const entry of manifestCatalog) {
     const actuatorId = entry.n;
-    const describe = DESCRIBE_OPS_SOURCES[actuatorId];
+    const describe = describeOpsSources[actuatorId];
     if (describe) {
       const ops = describe();
       report.push({
@@ -250,7 +220,9 @@ function buildOpDiscoveryReport(
   };
 }
 
-function buildGeneratedRegistry(): ActuatorOpRegistryFile {
+function buildGeneratedRegistry(
+  describeOpsSources: Record<string, DescribeOpsSource>
+): ActuatorOpRegistryFile {
   const registry = buildCurrentRegistryBase();
   const manifest = loadMediaManifest();
   const mediaOps = buildMediaOpsFromManifest(manifest);
@@ -258,7 +230,7 @@ function buildGeneratedRegistry(): ActuatorOpRegistryFile {
     ...registry.domains,
     media: normalizeDomainRegistry(mediaOps),
   };
-  for (const [actuatorId, describe] of Object.entries(DESCRIBE_OPS_SOURCES)) {
+  for (const [actuatorId, describe] of Object.entries(describeOpsSources)) {
     const domainName = actuatorId.replace(/-actuator$/, '');
     const ops = describe();
     domains[domainName] = normalizeDomainRegistry({
@@ -291,8 +263,9 @@ export const main = defineGenerator({
   outputs: [REGISTRY_PATH, DISCOVERY_PATH],
   async render() {
     const manifestCatalog = loadActuatorManifestCatalog();
-    const registry = buildGeneratedRegistry();
-    const discovery = buildOpDiscoveryReport(manifestCatalog, registry);
+    const describeOpsSources = await loadDescribeOpsSources(manifestCatalog);
+    const registry = buildGeneratedRegistry(describeOpsSources);
+    const discovery = buildOpDiscoveryReport(manifestCatalog, registry, describeOpsSources);
     return [
       { path: REGISTRY_PATH, content: await stringifyJson(registry, REGISTRY_PATH) },
       { path: DISCOVERY_PATH, content: await stringifyJson(discovery, DISCOVERY_PATH) },
