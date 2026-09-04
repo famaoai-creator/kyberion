@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { resolveVoiceProfileResourcePath } from './voice_upgrade.js';
 
 const root = pathResolver.sharedTmp(`voice-upgrade-boundary-${process.pid}`);
@@ -11,6 +17,14 @@ afterEach(() => {
 });
 
 describe('voice_upgrade resource boundary', () => {
+  it('uses the governed existing profile JSON loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/voice_upgrade.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain('readSafeJsonFile');
+    expect(source).not.toContain('readJson<Record<string, unknown>>(out)');
+  });
+
   it('rejects repository-external profile resources', () => {
     expect(() => resolveVoiceProfileResourcePath('/tmp/voice-profile.json')).toThrow(
       '[RESOURCE_PATH_SCOPE]'

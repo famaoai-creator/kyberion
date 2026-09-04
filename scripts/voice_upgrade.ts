@@ -35,13 +35,14 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import {
   defineScript,
   isDirectScript,
   ScriptExitError,
   stripSharedScriptFlags,
 } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type Tier = 0 | 1 | 2;
 
@@ -179,7 +180,7 @@ function writeTier(tier: Tier): string {
   if (safeExistsSync(out)) {
     if (!safeLstat(out).isFile()) throw new Error(`voice profile is not a regular file: ${out}`);
     try {
-      existing = readJson<Record<string, unknown>>(out);
+      existing = readSafeJsonFile<Record<string, unknown>>(out, 'voice profile');
     } catch {
       existing = {};
     }
