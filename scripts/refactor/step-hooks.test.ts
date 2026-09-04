@@ -95,4 +95,28 @@ describe('step-hooks', () => {
 
     expect(decision).toBe('continue');
   });
+
+  it('only treats a validated object response as an HTTP hook decision', async () => {
+    const { runStepHooks } = await import('./step-hooks.js');
+    mocks.secureFetch.mockResolvedValueOnce({ approved: false });
+
+    await expect(
+      runStepHooks(
+        [{ type: 'http', url: 'https://example.com/hook' }],
+        {},
+        'before',
+        async () => async () => ({ handled: true, ctx: {} })
+      )
+    ).resolves.toBe('abort');
+
+    mocks.secureFetch.mockResolvedValueOnce(null);
+    await expect(
+      runStepHooks(
+        [{ type: 'http', url: 'https://example.com/hook' }],
+        {},
+        'before',
+        async () => async () => ({ handled: true, ctx: {} })
+      )
+    ).resolves.toBe('continue');
+  });
 });

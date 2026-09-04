@@ -2,6 +2,7 @@ import { logger } from '@agent/core/core';
 import { safeExecResult } from '@agent/core/secure-io';
 import { secureFetch } from '@agent/core/network';
 import type { StepHook } from '@agent/core/pipeline-contract';
+import { isRecord } from '@agent/core/foundation';
 
 type HookDecision = 'continue' | 'skip' | 'abort';
 type DispatchFunc = (
@@ -92,17 +93,16 @@ async function runActuatorHook(
 
 async function runHttpHook(hook: StepHook, ctx: Record<string, unknown>): Promise<boolean> {
   if (!hook.url) throw new Error('http hook requires url');
-  const response = await secureFetch({
+  const response = await secureFetch<unknown>({
     url: String(resolveVars(hook.url, ctx)),
     method: hook.method ?? 'GET',
     data: resolveParamsRecursive(hook.body, ctx),
     headers: resolveParamsRecursive(hook.headers, ctx),
   });
 
+  if (!isRecord(response)) return false;
   return (
-    response?.decision === 'abort' ||
-    response?.decision === 'rejected' ||
-    response?.approved === false
+    response.decision === 'abort' || response.decision === 'rejected' || response.approved === false
   );
 }
 
