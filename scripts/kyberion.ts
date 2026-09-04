@@ -208,12 +208,12 @@ export async function main(
     case 'organization-roles':
     case 'project-controller': {
       const { runGovernedController } = await import('./kyberion-governed-controllers.js');
-      await runGovernedController(entrypoint.id, args.slice(1));
+      await runGovernedController(entrypoint.id, args.slice(1), print);
       return;
     }
     case 'operator-home': {
       const { main: operatorHomeMain } = await import('./kyberion_home.js');
-      await operatorHomeMain(args);
+      await operatorHomeMain(args, print);
       return;
     }
     case 'pipeline-runner': {

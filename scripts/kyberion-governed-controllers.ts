@@ -3,14 +3,15 @@ import { main as projectControllerMain } from './project_controller.js';
 
 export async function runGovernedController(
   entrypointId: string,
-  args: string[]
+  args: string[],
+  print: (value: unknown) => void = () => undefined
 ): Promise<void | undefined> {
   switch (entrypointId) {
     case 'organization-model':
       await organizationMain(args);
       return;
     case 'project-controller':
-      await projectControllerMain(args);
+      await projectControllerMain(args, print);
       return;
     default:
       return undefined;
