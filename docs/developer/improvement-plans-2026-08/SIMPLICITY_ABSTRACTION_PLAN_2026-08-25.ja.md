@@ -18661,11 +18661,25 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 SX-06／SX-09 の OAuth setup interactive script を再監査し、usage、authorization summary、confirmation prompt、完了通知の直接 console 出力を
 注入 printerへ統一した。CLI wrapper／pipeline経路から同じ出力境界を利用し、OAuth callback surface起動、PKCE／state、credential summary保存、
-readline確認、既存signal cleanupは変更していない。signal exit codeは次のdaemon／interactive終了境界のsliceで継続監査する。
+readline確認、既存signal cleanupは変更していない。signal exit codeの移行は1085で完了した。
 
 検証:
 
 - OAuth setup **1 file / 1 test passed**。help usageのprinter経路と直接 console 出力の不在を確認した。
+- `pnpm run typecheck`、対象ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
+## 2026-09-05 再レビュー修正 1085
+
+SX-06／SX-09 の OAuth setup signal boundary を再監査し、SIGINT／SIGTERM handler が直接 `process.exitCode` を設定していた残存を除去した。
+signal時は callback surface のcleanupを実行し、health待機・authorization確認・callback server終了待機の各promiseを `ScriptExitError(130/143)`
+で中断して、shared harnessが終了コードを設定するようにした。OAuth開始、state／PKCE、summary保存、readline確認、provider callbackの既存 semanticsは変更していない。
+
+検証:
+
+- OAuth setup **1 file / 1 test passed**。SIGINT／SIGTERMのharness委譲、direct console／process exit codeの不在、既存printer経路を確認した。
 - `pnpm run typecheck`、対象ファイルの ESLint、`git diff --check` passed。
 - canonical full gate はこの slice の後段で実行する。
 

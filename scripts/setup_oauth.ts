@@ -48,95 +48,116 @@ export async function main(args: string[] = [], print: Print = defaultPrint): Pr
     if (!server.killed) server.kill('SIGTERM');
   };
   activeCleanup = cleanup;
-  process.once('SIGINT', () => {
-    cleanup();
-    process.exitCode = 130;
+  let rejectSignal: (error: ScriptExitError) => void = () => undefined;
+  const signalPromise = new Promise<never>((_, reject) => {
+    rejectSignal = reject;
   });
-  process.once('SIGTERM', () => {
+  const onSigint = () => {
     cleanup();
-    process.exitCode = 143;
-  });
+    rejectSignal(new ScriptExitError(130, '', true));
+  };
+  const onSigterm = () => {
+    cleanup();
+    rejectSignal(new ScriptExitError(143, '', true));
+  };
+  process.once('SIGINT', onSigint);
+  process.once('SIGTERM', onSigterm);
   process.once('exit', cleanup);
 
   logger.info(`Starting OAuth callback surface on ${redirectUri}...`);
-  await new Promise<void>((resolve, reject) => {
-    const timeout = Date.now() + 10_000;
-    const poll = async () => {
-      try {
-        const health = await fetch(`http://${callbackHost}:${callbackPort}/health`);
-        if (health.ok) {
+  try {
+    await Promise.race([
+      new Promise<void>((resolve, reject) => {
+        const timeout = Date.now() + 10_000;
+        const poll = async () => {
+          try {
+            const health = await fetch(`http://${callbackHost}:${callbackPort}/health`);
+            if (health.ok) {
+              resolve();
+              return;
+            }
+          } catch {
+            // Keep polling until the server responds or the timeout elapses.
+          }
+          if (Date.now() >= timeout) {
+            reject(new Error('OAuth callback surface did not become healthy in time'));
+            return;
+          }
+          setTimeout(poll, 250).unref?.();
+        };
+
+        server.once('exit', (code, signal) => {
+          if (!shuttingDown && code !== 0 && signal !== 'SIGTERM') {
+            reject(new Error(`OAuth callback surface exited early (${code ?? signal})`));
+          }
+        });
+        server.once('error', (error) => reject(error));
+        void poll();
+      }),
+      signalPromise,
+    ]);
+
+    const result = beginInteractiveServiceOAuth(serviceId, { redirectUri });
+    const summaryPath = `${runtimeDir}/${serviceId}-setup.json`;
+    safeWriteFile(
+      summaryPath,
+      JSON.stringify(
+        {
+          serviceId,
+          redirectUri,
+          authorizationUrl: result.authorizationUrl,
+          state: result.state,
+          scopes: result.scopes,
+          ts: nowIso(),
+        },
+        null,
+        2
+      ) + '\n'
+    );
+
+    print('');
+    print(`Service: ${serviceId}`);
+    print(`Redirect URI: ${redirectUri}`);
+    print(`Authorization URL: ${result.authorizationUrl}`);
+    print('');
+    print('Open the URL above, approve the request, then return here.');
+    print('Press ENTER after the browser shows Authorization Complete.');
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    await Promise.race([
+      new Promise<void>((resolve) => {
+        rl.question('', () => {
+          rl.close();
+          resolve();
+        });
+      }),
+      signalPromise,
+    ]);
+
+    cleanup();
+    await Promise.race([
+      new Promise<void>((resolve) => {
+        if (server.exitCode !== null) {
           resolve();
           return;
         }
-      } catch {
-        // Keep polling until the server responds or the timeout elapses.
-      }
-      if (Date.now() >= timeout) {
-        reject(new Error('OAuth callback surface did not become healthy in time'));
-        return;
-      }
-      setTimeout(poll, 250).unref?.();
-    };
+        server.once('exit', () => resolve());
+      }),
+      signalPromise,
+    ]);
 
-    server.once('exit', (code, signal) => {
-      if (!shuttingDown && code !== 0 && signal !== 'SIGTERM') {
-        reject(new Error(`OAuth callback surface exited early (${code ?? signal})`));
-      }
-    });
-    server.once('error', (error) => reject(error));
-    void poll();
-  });
-
-  const result = beginInteractiveServiceOAuth(serviceId, { redirectUri });
-  const summaryPath = `${runtimeDir}/${serviceId}-setup.json`;
-  safeWriteFile(
-    summaryPath,
-    JSON.stringify(
-      {
-        serviceId,
-        redirectUri,
-        authorizationUrl: result.authorizationUrl,
-        state: result.state,
-        scopes: result.scopes,
-        ts: nowIso(),
-      },
-      null,
-      2
-    ) + '\n'
-  );
-
-  print('');
-  print(`Service: ${serviceId}`);
-  print(`Redirect URI: ${redirectUri}`);
-  print(`Authorization URL: ${result.authorizationUrl}`);
-  print('');
-  print('Open the URL above, approve the request, then return here.');
-  print('Press ENTER after the browser shows Authorization Complete.');
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  await new Promise<void>((resolve) => {
-    rl.question('', () => {
-      rl.close();
-      resolve();
-    });
-  });
-
-  cleanup();
-  await new Promise<void>((resolve) => {
-    if (server.exitCode !== null) {
-      resolve();
-      return;
-    }
-    server.once('exit', () => resolve());
-  });
-
-  print(
-    `OAuth connection setup complete. Tokens should be stored in knowledge/personal/connections/${serviceId}.json`
-  );
+    print(
+      `OAuth connection setup complete. Tokens should be stored in knowledge/personal/connections/${serviceId}.json`
+    );
+  } finally {
+    process.off('SIGINT', onSigint);
+    process.off('SIGTERM', onSigterm);
+    process.off('exit', cleanup);
+  }
 }
 
 export const runOAuthSetup = defineScript({
