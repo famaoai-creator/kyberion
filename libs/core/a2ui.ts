@@ -48,10 +48,12 @@ export type A2UIComponentType =
   | 'presence.transcript'
   | 'presence.avatar';
 
+export type A2UIDataModel = Record<string, unknown>;
+
 export interface A2UIComponent {
   id: string;
   type: A2UIComponentType;
-  props: Record<string, any>;
+  props: A2UIDataModel;
   children?: string[];
 }
 
@@ -68,7 +70,7 @@ export interface A2UIMessage {
   };
   updateDataModel?: {
     surfaceId: string;
-    data: Record<string, any>;
+    data: A2UIDataModel;
   };
   deleteSurface?: {
     surfaceId: string;
@@ -177,7 +179,7 @@ export type A2UITransport = (message: A2UIMessage) => void;
 
 export class A2UISurface {
   private components: Map<string, A2UIComponent> = new Map();
-  private data: Record<string, any> = {};
+  private data: A2UIDataModel = {};
 
   constructor(
     public readonly surfaceId: string,
@@ -200,12 +202,12 @@ export class A2UISurface {
     return this.components.get(id);
   }
 
-  public setData(key: string, value: any): this {
+  public setData(key: string, value: unknown): this {
     this.data[key] = value;
     return this;
   }
 
-  public getData(): Record<string, any> {
+  public getData(): A2UIDataModel {
     return { ...this.data };
   }
 
@@ -277,8 +279,8 @@ class A2UIDispatcher {
     for (const transport of this.transports) {
       try {
         transport(validatedMessage);
-      } catch (err: any) {
-        logger.error(`[A2UI_TRANSPORT_ERROR] ${err.message}`);
+      } catch (err: unknown) {
+        logger.error(`[A2UI_TRANSPORT_ERROR] ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
@@ -310,8 +312,10 @@ function createBridgeTransport(
           ...(localadminToken ? { Authorization: `Bearer ${localadminToken}` } : {}),
         },
         body: JSON.stringify(payload),
-      }).catch((err) => {
-        logger.warn(`[A2UI_BRIDGE] Failed to relay to bridge ${target}: ${err.message}`);
+      }).catch((err: unknown) => {
+        logger.warn(
+          `[A2UI_BRIDGE] Failed to relay to bridge ${target}: ${err instanceof Error ? err.message : String(err)}`
+        );
       });
     }
   };
