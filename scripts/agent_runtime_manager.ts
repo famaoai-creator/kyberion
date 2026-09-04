@@ -9,8 +9,9 @@ import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type AgentAction = 'ps' | 'spawn' | 'shutdown' | 'list-manifests' | 'inspect';
+type Print = (value: unknown) => void;
 
-export const main = async (args: string[] = []) => {
+export const main = async (args: string[] = [], print: Print = () => undefined) => {
   const argv = await createStandardYargs(['node', 'agent_runtime_manager', ...args])
     .option('action', {
       type: 'string',
@@ -40,43 +41,47 @@ export const main = async (args: string[] = []) => {
 
   switch (action) {
     case 'ps':
-      await listRunningAgents();
+      await listRunningAgents(print);
       break;
     case 'spawn':
       if (!argv['agent-id']) throw new Error('--agent-id (manifest ID) is required for spawn');
-      await spawnAgent(argv['agent-id'] as string, {
-        provider: argv.provider as any,
-        modelId: argv.model as string,
-        missionId: argv['mission-id'] as string,
-      });
+      await spawnAgent(
+        argv['agent-id'] as string,
+        {
+          provider: argv.provider as any,
+          modelId: argv.model as string,
+          missionId: argv['mission-id'] as string,
+        },
+        print
+      );
       break;
     case 'shutdown':
       if (!argv['agent-id']) throw new Error('--agent-id is required for shutdown');
       await shutdownAgent(argv['agent-id'] as string);
       break;
     case 'list-manifests':
-      await listManifests();
+      await listManifests(print);
       break;
     case 'inspect':
       if (!argv['agent-id']) throw new Error('--agent-id is required for inspect');
-      await inspectAgent(argv['agent-id'] as string);
+      await inspectAgent(argv['agent-id'] as string, print);
       break;
     default:
       throw new Error(`Unsupported action: ${action}`);
   }
 };
 
-export async function listRunningAgents() {
+export async function listRunningAgents(print: Print) {
   const agents = agentRegistry.list();
   if (agents.length === 0) {
-    console.log('\nNo agents currently running.\n');
+    print('\nNo agents currently running.\n');
     return;
   }
 
-  console.log('');
+  print('');
   const header = `${'AGENT_ID'.padEnd(30)} ${'STATUS'.padEnd(12)} ${'PROVIDER'.padEnd(12)} ${'MODEL'.padEnd(25)} MISSION_ID`;
-  console.log(header);
-  console.log('-'.repeat(header.length + 10));
+  print(header);
+  print('-'.repeat(header.length + 10));
 
   for (const agent of agents) {
     const statusIcon =
@@ -88,39 +93,40 @@ export async function listRunningAgents() {
         shutdown: '📁',
       }[agent.status] || '  ';
 
-    console.log(
+    print(
       `${agent.agentId.padEnd(30)} ${statusIcon} ${agent.status.padEnd(10)} ${agent.provider.padEnd(12)} ${agent.modelId.padEnd(25)} ${agent.missionId || '-'}`
     );
   }
-  console.log('');
+  print('');
 }
 
-export async function listManifests() {
+export async function listManifests(print: Print) {
   const manifests = loadAgentManifests();
   if (manifests.length === 0) {
-    console.log('\nNo agent manifests found in knowledge/product/agents/.\n');
+    print('\nNo agent manifests found in knowledge/product/agents/.\n');
     return;
   }
 
-  console.log('');
+  print('');
   const header = `${'MANIFEST_ID'.padEnd(30)} ${'AUTO'.padEnd(6)} ${'TRUST'.padEnd(6)} DESCRIPTION`;
-  console.log(header);
-  console.log('-'.repeat(header.length + 20));
+  print(header);
+  print('-'.repeat(header.length + 20));
 
   for (const m of manifests) {
     const autoIcon = m.autoSpawn ? '✅' : '  ';
     const description =
       m.systemPrompt.split('\n')[0].slice(0, 50) + (m.systemPrompt.length > 50 ? '...' : '');
-    console.log(
+    print(
       `${m.agentId.padEnd(30)} ${autoIcon} ${String(m.trustRequired).padEnd(6)} ${description}`
     );
   }
-  console.log('');
+  print('');
 }
 
 export async function spawnAgent(
   manifestId: string,
-  overrides: { provider?: any; modelId?: string; missionId?: string }
+  overrides: { provider?: any; modelId?: string; missionId?: string },
+  print: Print
 ) {
   const manifest = getAgentManifest(manifestId);
   if (!manifest) throw new Error(`Agent manifest "${manifestId}" not found.`);
@@ -160,7 +166,7 @@ export async function spawnAgent(
   });
 
   logger.success(`✅ Agent spawned: ${handle.agentId}`);
-  console.log(JSON.stringify(handle.getRecord(), null, 2));
+  print(JSON.stringify(handle.getRecord(), null, 2));
 }
 
 export async function shutdownAgent(agentId: string) {
@@ -179,13 +185,13 @@ export async function shutdownAgent(agentId: string) {
   logger.success(`✅ Agent "${agentId}" shut down.`);
 }
 
-export async function inspectAgent(agentId: string) {
+export async function inspectAgent(agentId: string, print: Print) {
   const snapshot = agentLifecycle.getSnapshot(agentId);
   if (!snapshot) {
     // Try to find in registry even if lifecycle handle is gone
     const record = agentRegistry.get(agentId);
     if (!record) throw new Error(`Agent "${agentId}" not found.`);
-    console.log(
+    print(
       JSON.stringify(
         {
           record,
@@ -198,35 +204,35 @@ export async function inspectAgent(agentId: string) {
     return;
   }
 
-  console.log('\n--- Agent Inspection ---');
-  console.log(`  ID:       ${snapshot.agent.agentId}`);
-  console.log(`  Status:   ${snapshot.agent.status}`);
-  console.log(`  Provider: ${snapshot.agent.provider}`);
-  console.log(`  Model:    ${snapshot.agent.modelId}`);
-  console.log(`  Mission:  ${snapshot.agent.missionId || '-'}`);
+  print('\n--- Agent Inspection ---');
+  print(`  ID:       ${snapshot.agent.agentId}`);
+  print(`  Status:   ${snapshot.agent.status}`);
+  print(`  Provider: ${snapshot.agent.provider}`);
+  print(`  Model:    ${snapshot.agent.modelId}`);
+  print(`  Mission:  ${snapshot.agent.missionId || '-'}`);
 
   if (snapshot.metrics) {
-    console.log('\n  Metrics:');
-    console.log(`    Turns:           ${snapshot.metrics.turnCount}`);
-    console.log(`    Errors:          ${snapshot.metrics.errorCount}`);
-    console.log(`    Total Tokens:    ${snapshot.metrics.usage?.totalTokens || '-'}`);
+    print('\n  Metrics:');
+    print(`    Turns:           ${snapshot.metrics.turnCount}`);
+    print(`    Errors:          ${snapshot.metrics.errorCount}`);
+    print(`    Total Tokens:    ${snapshot.metrics.usage?.totalTokens || '-'}`);
   }
 
   if (snapshot.logs && snapshot.logs.length > 0) {
-    console.log('\n  Recent Logs (last 5):');
+    print('\n  Recent Logs (last 5):');
     for (const log of snapshot.logs.slice(-5)) {
-      console.log(
+      print(
         `    [${new Date(log.ts).toISOString().slice(11, 19)}] [${log.type}] ${log.content.slice(0, 80)}`
       );
     }
   }
-  console.log('');
+  print('');
 }
 
 export const runAgentRuntimeManager = defineScript({
   name: 'agent-runtime:manage',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (

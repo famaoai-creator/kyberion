@@ -87,24 +87,22 @@ describe('agent_runtime_manager', () => {
   });
 
   it('prints a running agent table', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await listRunningAgents();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('AGENT_ID'));
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('demo-agent-1234'));
-    spy.mockRestore();
+    const print = vi.fn();
+    await listRunningAgents(print);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('AGENT_ID'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('demo-agent-1234'));
   });
 
   it('prints manifest listing rows', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await listManifests();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('MANIFEST_ID'));
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('manifest-a'));
-    spy.mockRestore();
+    const print = vi.fn();
+    await listManifests(print);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('MANIFEST_ID'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('manifest-a'));
   });
 
   it('spawns an agent from the manifest defaults', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await spawnAgent('manifest-a', { missionId: 'MSN-TEST' });
+    const print = vi.fn();
+    await spawnAgent('manifest-a', { missionId: 'MSN-TEST' }, print);
     expect(mocks.spawn).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: 'claude',
@@ -115,14 +113,13 @@ describe('agent_runtime_manager', () => {
     expect(mocks.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'agent.manual_spawn' })
     );
-    spy.mockRestore();
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('demo-agent-1234'));
   });
 
   it('audits classified spawn failures before rethrowing', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     mocks.spawn.mockRejectedValueOnce(new Error('permission denied by runtime policy'));
 
-    await expect(spawnAgent('manifest-a', { missionId: 'MSN-TEST' })).rejects.toThrow(
+    await expect(spawnAgent('manifest-a', { missionId: 'MSN-TEST' }, vi.fn())).rejects.toThrow(
       'permission denied'
     );
 
@@ -138,16 +135,14 @@ describe('agent_runtime_manager', () => {
       })
     );
     expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('policy_violation'));
-    spy.mockRestore();
   });
 
   it('inspects a registered but inactive agent', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await inspectAgent('demo-agent-1234');
-    expect(spy).toHaveBeenCalledWith(
+    const print = vi.fn();
+    await inspectAgent('demo-agent-1234', print);
+    expect(print).toHaveBeenCalledWith(
       expect.stringContaining('registered but not actively managed')
     );
-    spy.mockRestore();
   });
 
   it('delegates command failures to the shared script harness', () => {
@@ -157,7 +152,9 @@ describe('agent_runtime_manager', () => {
       })
     );
 
-    expect(source).toContain('run: ({ argv }) => main(argv)');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).not.toContain('console.log(');
+    expect(source).not.toContain('console.error(');
     expect(source).not.toContain('process.exitCode = 1');
   });
 });
