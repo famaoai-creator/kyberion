@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode,
@@ -299,5 +301,15 @@ describe('reasoning-backend-policy', () => {
     expect(resolveReasoningBackendModeFromContext({ policy, env: {}, providers: [] })).toBe(
       'claude-cli'
     );
+  });
+
+  it('routes runtime environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/reasoning-backend-policy.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 });

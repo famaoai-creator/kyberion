@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 
 export type ReasoningBackendMode =
@@ -172,6 +173,10 @@ export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
   return policyCatalog.load();
 }
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 export function normalizeReasoningBackendMode(
   mode: ReasoningBackendMode,
   policy: ReasoningBackendPolicy = loadReasoningBackendPolicy()
@@ -187,13 +192,13 @@ function matchesSelectionRule(
   if (
     Array.isArray(rule.env_any) &&
     rule.env_any.length > 0 &&
-    !rule.env_any.some((name) => Boolean(env[name]))
+    !rule.env_any.some((name) => Boolean(envText(env, name)))
   ) {
     return false;
   }
   if (rule.env_equals) {
     for (const [name, value] of Object.entries(rule.env_equals)) {
-      if (env[name] !== value) return false;
+      if (envText(env, name) !== value) return false;
     }
   }
   return true;
@@ -251,7 +256,7 @@ export function resolveReasoningBackendSelectionFromContext(input: {
     return { mode: requested, reason: `requested mode=${requested}${scopeSuffix}` };
   }
 
-  const envMode = env.KYBERION_REASONING_BACKEND as ReasoningBackendMode | undefined;
+  const envMode = envText(env, 'KYBERION_REASONING_BACKEND') as ReasoningBackendMode | undefined;
   if (envMode) {
     const normalizedEnvMode = normalizeReasoningBackendMode(envMode, policy);
     if (policy.allowed_modes.includes(normalizedEnvMode)) {
@@ -263,7 +268,7 @@ export function resolveReasoningBackendSelectionFromContext(input: {
   }
 
   for (const [index, rule] of policy.auto_select_env_priority.entries()) {
-    if (!env[rule.env]) continue;
+    if (!envText(env, rule.env)) continue;
     const normalizedRuleMode = normalizeReasoningBackendMode(rule.mode, policy);
     if (policy.allowed_modes.includes(normalizedRuleMode)) {
       return {
