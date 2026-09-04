@@ -274,6 +274,18 @@ export async function readTelegramJsonObject(
   return parseSafeJsonObjectValue(value, 'request body');
 }
 
+/** Validate the persisted CLI envelope before it is narrowed to a Telegram union. */
+export function parseTelegramBridgeInput(value: unknown): TelegramBridgeInput | TelegramUpdate {
+  const record = parseSafeJsonObjectValue(value, 'telegram bridge input');
+  if (record.action !== undefined && record.action !== 'send' && record.action !== 'webhook') {
+    throw new Error('telegram bridge action must be send or webhook');
+  }
+  if (record.update !== undefined) {
+    parseSafeJsonObjectValue(record.update, 'telegram bridge update');
+  }
+  return record as TelegramBridgeInput | TelegramUpdate;
+}
+
 export function parseTelegramSendInput(value: unknown): TelegramSendInput {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('telegram send input must be a JSON object');
@@ -808,7 +820,7 @@ export function resolveTelegramBridgeInputPath(inputPath: string): string {
 
 async function handleInputFile(inputPath: string, options: TelegramBridgeOptions): Promise<void> {
   const resolved = resolveTelegramBridgeInputPath(inputPath);
-  const parsed = readJson<TelegramBridgeInput | TelegramUpdate>(resolved);
+  const parsed = parseTelegramBridgeInput(readJson<unknown>(resolved));
 
   if ('action' in parsed && parsed.action === 'send') {
     const payload = await sendTelegramMessage(

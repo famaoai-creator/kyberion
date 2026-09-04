@@ -16359,6 +16359,13 @@ SX-03／SX-09 のOperator Surface provider pins loaderを再監査し、persiste
 検証: Operator Surface data boundary **1 file / 7 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 888
+
+SX-03／SX-09 の Telegram bridge persisted CLI input を再監査し、`readJson<T>` の型アサーション後に primitive／配列や不正な `action` を Telegram union として扱う残存を修正した。共有 safe object boundary と専用 envelope parser を入力ファイル読込へ接続し、`update` も object 以外を bridge dispatch へ渡さない。既存の raw update／send／webhook 分岐と provider 呼出し semantics は変更していない。
+
+検証: Telegram bridge input **1 file / 11 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

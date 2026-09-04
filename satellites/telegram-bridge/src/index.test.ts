@@ -41,6 +41,7 @@ import {
   buildTelegramThreadContextFromEntries,
   handleTelegramCallbackQuery,
   handleTelegramUpdate,
+  parseTelegramBridgeInput,
   parseTelegramThreadHistoryEntry,
   parseTelegramSendInput,
   readTelegramJsonObject,
@@ -122,6 +123,25 @@ describe('telegram bridge thread context', () => {
     );
     expect(() => parseTelegramSendInput({ chatId: 42, text: 'hello', extra: true })).toThrow(
       'unexpected telegram send field'
+    );
+  });
+
+  it('validates persisted bridge envelopes before union narrowing', () => {
+    expect(parseTelegramBridgeInput({ action: 'webhook', update: { update_id: 1 } })).toEqual({
+      action: 'webhook',
+      update: { update_id: 1 },
+    });
+    expect(() => parseTelegramBridgeInput(null)).toThrow(
+      'telegram bridge input must be a JSON object'
+    );
+    expect(() => parseTelegramBridgeInput(['invalid'])).toThrow(
+      'telegram bridge input must be a JSON object'
+    );
+    expect(() => parseTelegramBridgeInput({ action: 'unexpected' })).toThrow(
+      'telegram bridge action must be send or webhook'
+    );
+    expect(() => parseTelegramBridgeInput({ update: ['invalid'] })).toThrow(
+      'telegram bridge update must be a JSON object'
     );
   });
 
