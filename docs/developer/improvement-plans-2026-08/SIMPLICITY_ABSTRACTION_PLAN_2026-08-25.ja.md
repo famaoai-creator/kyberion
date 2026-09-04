@@ -19527,6 +19527,17 @@ SX-06 の非同期終了境界を再監査し、`minutes_record`、`meeting_part
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1156
+
+SX-06／SX-09 の`publish_pull_request`を再監査し、`gh pr create`の完了出力に残っていた直接`console.log`をharness printerへ統一した。Conventional Commit title検証、default branch応答の安全なparse、draft／fill／body-file／headの引数生成、外部操作の実行順序は変更していない。
+
+検証:
+
+- `publish_pull_request.test.ts` **5 tests passed**。引数、タイトル、default branchの危険キー拒否、printer境界を確認した。
+- 対象ESLint、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
