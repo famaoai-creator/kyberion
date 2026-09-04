@@ -18572,6 +18572,20 @@ SX-06 の local interactive script を再監査し、`chat_local.ts` に残っ�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1078
+
+SX-06／SX-09 の mesh delivery driver を再監査し、`--json` の report 出力を直接 console へ書き込み、driver wrapper が独自に
+`process.exitCode` と error log を設定していた残存を修正した。single-pass／loop、lock、signal stop、delivery report、pipeline
+からの既存呼び出しは維持し、CLI実行時の report と失敗を shared harness の printer／`ScriptExitError` 境界へ統一した。
+
+検証:
+
+- mesh delivery driver **1 file / 1 test passed**。JSON report の printer 経路、direct console／process exit code の不在、delivery pass 引数を確認した。
+- `pnpm run typecheck`、対象ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
