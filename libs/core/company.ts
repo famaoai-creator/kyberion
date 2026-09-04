@@ -6,7 +6,7 @@ import { resolveDecisionRightsMatrix, type DecisionRightsMatrix } from './decisi
 import { resolveFinancialModel, type FinancialModel } from './financial-model.js';
 import { resolveOkrTracker, type OkrTracker } from './okr-tracker.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as customerResolver from './customer-resolver.js';
@@ -56,7 +56,11 @@ function loadJsonComponent<T>(filePath: string): CompanyComponentRef<T> {
   }
 
   try {
-    return { path: filePath, exists: true, data: readJson<T>(filePath) };
+    const value = parseSafeJsonObjectValue(
+      readJson<unknown>(filePath),
+      `company component ${path.basename(filePath)}`
+    );
+    return { path: filePath, exists: true, data: value as T };
   } catch {
     return { path: filePath, exists: true, data: null };
   }
