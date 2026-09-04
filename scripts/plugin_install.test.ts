@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
-import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { runPluginInstall } from './plugin_install.js';
 
 const cleanupPaths: string[] = [];
@@ -36,23 +36,8 @@ afterEach(() => {
   });
 });
 
-function captureStdout(): { text: () => string; restore: () => void } {
-  const original = process.stdout.write.bind(process.stdout);
-  let buffer = '';
-  process.stdout.write = ((chunk: any) => {
-    buffer += String(chunk);
-    return true;
-  }) as typeof process.stdout.write;
-  return {
-    text: () => buffer,
-    restore: () => {
-      process.stdout.write = original;
-    },
-  };
-}
-
-function runWithProcessArgs(): number {
-  return runPluginInstall(process.argv.slice(2));
+function runWithProcessArgs(print: (value: unknown) => void = () => undefined): number {
+  return runPluginInstall(process.argv.slice(2), print);
 }
 
 describe('plugin_install CLI', () => {
@@ -77,12 +62,11 @@ describe('plugin_install CLI', () => {
       '--json',
     ];
 
-    const capture = captureStdout();
-    const exitCode = runWithProcessArgs();
-    capture.restore();
+    const output: string[] = [];
+    const exitCode = runWithProcessArgs((value) => output.push(String(value)));
 
     expect(exitCode).toBe(0);
-    const record = JSON.parse(capture.text());
+    const record = JSON.parse(output.join(''));
     expect(record.trust).toBe('official');
     expect(record.activationStatus).toBe('activatable');
     expect(record.approvalRequestId).toBeUndefined();
@@ -109,17 +93,16 @@ describe('plugin_install CLI', () => {
       managedRoot,
     ];
 
-    const capture = captureStdout();
-    const exitCode = runWithProcessArgs();
-    capture.restore();
+    const output: string[] = [];
+    const exitCode = runWithProcessArgs((value) => output.push(String(value)));
 
     expect(exitCode).toBe(0);
-    const output = capture.text();
-    expect(output).toContain('Trust: third-party');
-    expect(output).toContain('Activation status: pending_approval');
-    expect(output).toContain('Approval request id:');
-    expect(output).toContain('pnpm kyberion approvals');
-    expect(output).toMatch(/pnpm kyberion approve \S+ \S+/);
+    const rendered = output.join('\n');
+    expect(rendered).toContain('Trust: third-party');
+    expect(rendered).toContain('Activation status: pending_approval');
+    expect(rendered).toContain('Approval request id:');
+    expect(rendered).toContain('pnpm kyberion approvals');
+    expect(rendered).toMatch(/pnpm kyberion approve \S+ \S+/);
   });
 
   it('reports a broken manifest as never-activatable and exits non-zero', () => {
@@ -140,11 +123,22 @@ describe('plugin_install CLI', () => {
       managedRoot,
     ];
 
-    const capture = captureStdout();
-    const exitCode = runWithProcessArgs();
-    capture.restore();
+    const output: string[] = [];
+    const exitCode = runWithProcessArgs((value) => output.push(String(value)));
 
     expect(exitCode).toBe(1);
-    expect(capture.text()).toContain('will never be loaded');
+    expect(output.join('\n')).toContain('will never be loaded');
+  });
+
+  it('connects the plugin CLI to the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/plugin_install.ts'), { encoding: 'utf8' }) ||
+        ''
+    );
+
+    expect(source).not.toContain('process.stdout.write');
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('runPluginInstall(context.argv, context.print)');
   });
 });
