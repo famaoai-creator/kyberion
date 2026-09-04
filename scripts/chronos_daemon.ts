@@ -29,7 +29,7 @@ import { withExecutionContextAsync } from '@agent/core/authority';
 import type { ChronosDeliveryTarget } from '@agent/core/chronos-delivery';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const TICK_INTERVAL_MS = 60_000;
 const triggerRunner = createTriggerRunner();
@@ -328,7 +328,7 @@ const runChronosDaemon = defineScript({
     try {
       await main(argv);
     } catch (err: any) {
-      logger.error(`[CHRONOS] Fatal: ${err.message}`);
+      const message = `[CHRONOS] Fatal: ${err?.message ?? String(err)}`;
       recordDaemonHeartbeat('chronos-daemon', {
         status: 'error',
         details: { error: err?.message ?? String(err) },
@@ -341,7 +341,7 @@ const runChronosDaemon = defineScript({
           'Restart chronos and inspect active/shared/logs/traces for the last failure.',
         dedupe_key: 'chronos-daemon:fatal',
       });
-      process.exitCode = 1;
+      throw new ScriptExitError(1, message);
     }
   },
 });
