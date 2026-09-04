@@ -306,14 +306,15 @@ function printMissionContextBanner(missionId?: string) {
  */
 export async function routeLegacyIntentToAsk(
   utterance: string,
-  mode: 'explain' | 'clarify' = 'explain'
+  mode: 'explain' | 'clarify' = 'explain',
+  print: Print = () => undefined
 ): Promise<void> {
   const askFlag = mode === 'clarify' ? '--clarify' : '--explain';
-  console.error(
+  print(
     `[DEPRECATED] \`pnpm kyberion intent\` is now routed to \`pnpm kyberion ask ${askFlag}\`; use the latter directly.`
   );
   const { main: operatorHomeMain } = await import('./kyberion_home.js');
-  await operatorHomeMain(['ask', utterance, askFlag]);
+  await operatorHomeMain(['ask', utterance, askFlag], print);
 }
 
 function printActuatorList(actuators: ActuatorRecord[]) {
@@ -1137,7 +1138,7 @@ export function shouldBootstrapRuntime(args: string[]): boolean {
   return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
 }
 
-async function mainImpl(args: string[] = [], print: Print = (value) => console.log(value)) {
+async function mainImpl(args: string[] = [], print: Print = () => undefined) {
   activeCliArgs = [...args];
   const missionId = process.env.MISSION_ID;
   printMissionContextBanner(missionId);
@@ -1379,7 +1380,7 @@ async function mainImpl(args: string[] = [], print: Print = (value) => console.l
     // Both the historical read-only form and --run now use one governed
     // surface route. `kyberion ask` decides whether to explain, clarify, or
     // execute after the canonical resolver and approval gates have run.
-    await routeLegacyIntentToAsk(utterance, doClarify ? 'clarify' : 'explain');
+    await routeLegacyIntentToAsk(utterance, doClarify ? 'clarify' : 'explain', print);
     return;
   }
 
@@ -1436,7 +1437,7 @@ async function mainImpl(args: string[] = [], print: Print = (value) => console.l
   throw new Error(t('cli_error_unknown_command', locale).replace('{command}', command));
 }
 
-export async function main(args: string[] = [], print: Print = (value) => console.log(value)) {
+export async function main(args: string[] = [], print: Print = () => undefined) {
   const previousPrint = activeCliPrint;
   activeCliPrint = print;
   try {
