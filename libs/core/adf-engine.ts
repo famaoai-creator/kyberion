@@ -35,7 +35,7 @@ export type AdfStepType = 'capture' | 'transform' | 'apply' | 'control';
 export interface AdfStep {
   type: AdfStepType;
   op: string;
-  params: any;
+  params: unknown;
   /** Optional budget projected from the governed actuator operation definition. */
   timeout_ms?: number;
   /** Optional step-level approval metadata projected by the pipeline contract. */
@@ -47,7 +47,7 @@ export interface AdfStep {
 function resolveAdfResourceClaims(
   step: AdfStep,
   context: AdfEngineContext,
-  resolve: (value: any, ctx: Record<string, any>) => any
+  resolve: (value: unknown, ctx: Record<string, any>) => unknown
 ): Array<string | ResourceClaim> {
   if (step.resource_claims !== undefined) return [...new Set(step.resource_claims)];
   const normalizedOp = String(step.op || '').replace(/^([a-z]+):/u, '$1:');
@@ -78,7 +78,7 @@ export interface AdfRunOptions {
   /** Log prefix for step progress lines (default '[ADF]'). */
   label?: string;
   /** Override the template resolver (default: shared resolveVars). */
-  resolveVars?: (value: any, ctx: Record<string, any>) => any;
+  resolveVars?: (value: unknown, ctx: Record<string, any>) => unknown;
   /**
    * Called when the repeat governor force-stops the run (KC-01). Default
    * records a governance action on the kill switch; tests inject a spy.
@@ -115,20 +115,30 @@ export interface AdfSkippedStep {
 }
 
 export interface AdfStepHandlers<Ctx extends AdfEngineContext = AdfEngineContext> {
-  capture: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
-  transform: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
+  capture: (
+    op: string,
+    params: unknown,
+    ctx: Ctx,
+    resolve: (value: unknown) => unknown
+  ) => Promise<Ctx>;
+  transform: (
+    op: string,
+    params: unknown,
+    ctx: Ctx,
+    resolve: (value: unknown) => unknown
+  ) => Promise<Ctx>;
   apply: (
     op: string,
-    params: any,
+    params: unknown,
     ctx: Ctx,
-    resolve: (value: any) => any
+    resolve: (value: unknown) => unknown
   ) => Promise<void | Ctx | AdfSkippedStep>;
   control?: (
     op: string,
-    params: any,
+    params: unknown,
     ctx: Ctx,
     runSteps: (steps: AdfStep[], seedCtx?: Ctx) => Promise<AdfRunResult<Ctx>>,
-    resolve: (value: any) => any
+    resolve: (value: unknown) => unknown
   ) => Promise<Ctx | AdfSkippedStep>;
 }
 
@@ -227,7 +237,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
   let ctx = { ...initialCtx } as Ctx;
   const results: PipelineStepResult[] = [];
 
-  const resolve = (value: any) =>
+  const resolve = (value: unknown) =>
     options.resolveVars ? options.resolveVars(value, ctx) : resolveVars(value, ctx);
   const runNestedSteps = async (
     nestedSteps: AdfStep[],
