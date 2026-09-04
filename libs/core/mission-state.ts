@@ -5,7 +5,7 @@
 
 import * as path from 'node:path';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson, readJsonIfPresent } from './foundation/json.js';
+import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import * as pathResolver from './path-resolver.js';
@@ -419,12 +419,4 @@ export function listActiveMissions(
   return listMissionsInSearchDirs(options).filter(
     ({ missionId }) => loadState(missionId, options)?.status === 'active'
   );
-}
-
-export function readJsonFileSafe(filePath: string): any | null {
-  try {
-    return readJsonIfPresent(assertSafeRepositoryPath(filePath));
-  } catch (_) {
-    return null;
-  }
 }
