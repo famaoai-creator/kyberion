@@ -19681,6 +19681,17 @@ SX-03のscope環境残差を再監査し、`scope-context`のscope.env path、ti
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1170
+
+SX-03の推論バックエンド選択境界を再監査し、`reasoning-backend-policy`の明示モード、auto-select環境優先順位、CLI／provider選択ルールにおける環境直読を`getRegisteredEnvText(name, { env })`へ移行した。環境変数名をpolicyから動的に評価する仕様、明示モード・API key・CLI probe・fallbackの選択優先順位、安全なprovenance文字列は変更していない。
+
+検証:
+
+- `reasoning-backend-policy.test.ts` **8 tests passed**。明示／環境／provider／scope overlay選択、秘密値を含めないprovenance、Claude harness判定、env accessor境界を確認した。
+- 対象ファイルの`env.KYBERION_*`直接環境参照は0件。`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
