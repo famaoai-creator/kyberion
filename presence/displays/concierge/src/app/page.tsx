@@ -15,27 +15,16 @@ import {
   type ConciergeMemoryQueueItem,
   type ConciergeResponseStatus,
 } from '../lib/concierge-advisory-response';
+import {
+  parseConciergeOutcomePreviewResponse,
+  type ConciergeOutcomePreview,
+} from '../lib/outcome-preview-response';
 
 type HygieneInquiry = ConciergeHygieneInquiry;
 type MemoryQueueItem = ConciergeMemoryQueueItem;
 type ResponseStatus = ConciergeResponseStatus;
 
-type ArtifactPreview = {
-  name: string;
-  kind: 'markdown' | 'text' | 'image' | 'other';
-  content?: string;
-  truncated?: boolean;
-  data_uri?: string;
-  missing?: boolean;
-  too_large?: boolean;
-};
-
-type OutcomePreview = {
-  entry_id: string;
-  total: number;
-  shown: number;
-  files: ArtifactPreview[];
-};
+type OutcomePreview = ConciergeOutcomePreview;
 
 function formatWhen(value: string | undefined, locale: 'en' | 'ja'): string {
   if (!value) return '';
@@ -318,9 +307,11 @@ export default function ConciergePage() {
         const response = await fetch(`/api/outcomes/${encodeURIComponent(item.entry_id)}/preview`, {
           cache: 'no-store',
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'preview failed');
-        setPreviewData(payload.preview as OutcomePreview);
+        const parsed = parseConciergeOutcomePreviewResponse(
+          await response.json().catch(() => null)
+        );
+        if (!response.ok || !parsed) throw new Error('Invalid outcome preview response');
+        setPreviewData(parsed);
         setPreviewError(null);
       } catch (error) {
         setPreviewData(null);
