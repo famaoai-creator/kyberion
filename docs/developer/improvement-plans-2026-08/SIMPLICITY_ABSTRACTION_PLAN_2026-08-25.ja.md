@@ -18782,6 +18782,19 @@ SX-06／SX-07 のcatalog／contract checkerを再監査し、`check_catalog_inte
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1093
+
+SX-06 の customer facadeを再監査し、`customer_create.ts`／`customer_switch.ts` のhelp時に残っていた直接stderr出力を
+注入 printerへ統一した。shared harnessのsilent exit、customer overlayのvalidation／copy／required-file検査、activation envの書込 semanticsは変更していない。
+
+検証:
+
+- customer facade **3 files / 10 tests passed**。help printer、direct console不在、既存customer create／switch契約を確認した。
+- `pnpm run typecheck`、対象5ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
