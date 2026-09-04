@@ -89,6 +89,10 @@ import {
 } from '../lib/chronos-theme';
 import { parseTenantDesignResponse } from '../lib/tenant-design-response';
 import { parseDeliverablesResponse, type ClientDeliverable } from '../lib/deliverables-response';
+import {
+  parseMissionHistoryResponse,
+  type ClientMissionHistoryEntry,
+} from '../lib/mission-history-response';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -142,7 +146,7 @@ function ChronosMirrorV2Content() {
   const [operatorHomeSummary, setOperatorHomeSummary] = useState<any | null>(null);
   const [operatorHomeError, setOperatorHomeError] = useState<string | null>(null);
   const [operatorHomeRefreshTick, setOperatorHomeRefreshTick] = useState(0);
-  const [missionHistory, setMissionHistory] = useState<any[]>([]);
+  const [missionHistory, setMissionHistory] = useState<ClientMissionHistoryEntry[]>([]);
   const [missionHistoryError, setMissionHistoryError] = useState<string | null>(null);
   const [missionHistoryQuery, setMissionHistoryQuery] = useState('');
   // Defaulting to 'completed' made this panel read "No missions match the
@@ -270,11 +274,13 @@ function ChronosMirrorV2Content() {
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`missions ${response.status}`);
-        return (await response.json()) as { missions?: any[] };
+        const parsed = parseMissionHistoryResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid mission history response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setMissionHistory(Array.isArray(payload.missions) ? payload.missions : []);
+        setMissionHistory(payload.missions);
         setMissionHistoryError(null);
       })
       .catch((error) => {
