@@ -19324,6 +19324,18 @@ SX-06／SX-08／SX-09 の`kyberion_home`を再監査し、home／help／inbox／
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1138
+
+SX-06／SX-08／SX-09 のoperator home secondary actionを再監査し、feedback／improvements／dealsの出力を注入printerへ統一した。入力不備・対象不存在・deal audio失敗などの終了は`ScriptExitError`へ寄せ、feedback記録、改善候補更新、deal requirements／audio処理、customer channel bindingの条件は変更していない。
+
+検証:
+
+- secondary action **1 test file / 2 tests passed**。直接console／stderr／exitCode不在、printer出力、失敗境界を確認した。
+- kyberion home関連 **3 test files / 29 tests passed**。既存home／router／trust回帰を含む。
+- 対象ESLint、`pnpm exec tsc --noEmit --pretty false`、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
