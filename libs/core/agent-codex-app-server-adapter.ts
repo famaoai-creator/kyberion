@@ -29,6 +29,23 @@ import type {
 const logger = createLogger('codex-app-server-adapter');
 const PROJECT_ROOT = pathResolver.rootDir();
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function readNestedString(value: unknown, ...keys: string[]): string | undefined {
+  let current: unknown = value;
+  for (const key of keys) {
+    if (!isRecord(current)) return undefined;
+    current = current[key];
+  }
+  return readString(current);
+}
+
 interface CodexAppServerMessage {
   jsonrpc?: '2.0';
   id?: number | string;
@@ -190,10 +207,8 @@ export class CodexExecutionEnhancer implements AgentEnhancer {
       const excerpt = agents.content.slice(0, maxChars).trim();
       this.cachedContext = header + '\n\n' + excerpt;
       return this.cachedContext;
-    } catch (error: any) {
-      logger.warn(
-        '[CodexEnhancer] Failed to load AGENTS.md context: ' + (error?.message || String(error))
-      );
+    } catch (error: unknown) {
+      logger.warn('[CodexEnhancer] Failed to load AGENTS.md context: ' + errorMessage(error));
       this.cachedContext = '';
       return this.cachedContext;
     }
@@ -205,7 +220,7 @@ export interface CodexAppServerAdapterOptions {
   modelProvider?: string;
   cwd?: string;
   systemPrompt?: string;
-  approvalPolicy?: any;
+  approvalPolicy?: string;
   timeoutMs?: number;
   approvalMode?: 'strict' | 'relaxed';
   sandboxMode?: 'workspace-write' | 'read-only' | 'danger-full-access';
@@ -234,9 +249,9 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private buffer = '';
   private nextId = 1;
   private pendingRequests: Map<
-    number,
+    number | string,
     {
-      resolve: (value: any) => void;
+      resolve: (value: unknown) => void;
       reject: (err: Error) => void;
       timeout?: ReturnType<typeof setTimeout>;
     }
@@ -369,7 +384,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     );
     const approvalMode = this.options.approvalMode || 'strict';
     const sandboxMode = this.getSandboxMode();
-    const threadRes: any = await this.sendRequest(
+    const threadRes = await this.sendRequest<unknown>(
       'thread/start',
       {
         model: this.options.model ?? undefined,
@@ -384,15 +399,20 @@ export class CodexAppServerAdapter implements AgentAdapter {
       },
       bootTimeoutMs
     );
-    this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
+    this.threadId =
+      readNestedString(threadRes, 'thread', 'id') ??
+      readNestedString(threadRes, 'threadId') ??
+      null;
     if (!this.threadId) {
       throw new Error(
         'Codex app-server thread/start missing thread id: ' + JSON.stringify(threadRes)
       );
     }
     this.activeThreadId = this.threadId;
-    this.nativeMultiAgentMode =
-      threadRes?.multiAgentMode ?? threadRes?.thread?.multiAgentMode ?? null;
+    this.nativeMultiAgentMode = isRecord(threadRes)
+      ? (threadRes.multiAgentMode ??
+        (isRecord(threadRes.thread) ? threadRes.thread.multiAgentMode : null))
+      : null;
     logger.info('[UAA] Codex App Server ready. Thread: ' + this.threadId);
   }
 
@@ -411,12 +431,16 @@ export class CodexAppServerAdapter implements AgentAdapter {
     let targetThreadId = parentThreadId;
     let forked = false;
     try {
-      const forkResponse: any = await this.sendRequest(
+      const forkResponse = await this.sendRequest<unknown>(
         'thread/fork',
         { threadId: parentThreadId },
         this.options.timeoutMs ?? 20000
       );
-      targetThreadId = forkResponse?.thread?.id || forkResponse?.threadId || forkResponse?.id;
+      targetThreadId =
+        readNestedString(forkResponse, 'thread', 'id') ??
+        readNestedString(forkResponse, 'threadId') ??
+        readNestedString(forkResponse, 'id') ??
+        '';
       if (!targetThreadId) throw new Error('Codex app-server thread/fork missing thread id.');
       forked = true;
     } catch (err) {
@@ -458,7 +482,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     this.accumulatedText = '';
     this.sawAgentDelta = false;
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: enhanced.prompt });
-    const turnRes: any = await this.sendRequest(
+    const turnRes = await this.sendRequest<unknown>(
       'turn/start',
       {
         threadId: targetThreadId,
@@ -471,7 +495,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       },
       this.options.timeoutMs ?? 20000
     );
-    const turnId = turnRes?.turn?.id || turnRes?.turnId;
+    const turnId = readNestedString(turnRes, 'turn', 'id') ?? readNestedString(turnRes, 'turnId');
     if (turnId) this.currentTurnId = turnId;
     if (!turnId) {
       throw new Error('Codex app-server turn/start missing turn id: ' + JSON.stringify(turnRes));
@@ -558,7 +582,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const cwd = this.resolveCwd();
     const approvalMode = this.options.approvalMode || 'strict';
     const sandboxMode = this.getSandboxMode();
-    const threadRes: any = await this.sendRequest(
+    const threadRes = await this.sendRequest<unknown>(
       'thread/start',
       {
         model: this.options.model ?? undefined,
@@ -573,7 +597,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
       },
       this.options.timeoutMs ?? 20000
     );
-    this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
+    this.threadId =
+      readNestedString(threadRes, 'thread', 'id') ??
+      readNestedString(threadRes, 'threadId') ??
+      null;
     this.activeThreadId = this.threadId;
     return { mode: 'soft', threadId: this.threadId };
   }
@@ -591,21 +618,21 @@ export class CodexAppServerAdapter implements AgentAdapter {
             parseSafeJsonInput(line, 'Codex app-server message')
           );
           if (msg) this.handleMessage(msg);
-        } catch (e: any) {
-          logger.warn('[UAA_CODEX_PARSE] Failed to parse JSON: ' + e.message);
+        } catch (error: unknown) {
+          logger.warn('[UAA_CODEX_PARSE] Failed to parse JSON: ' + errorMessage(error));
         }
       }
       newlineIdx = this.buffer.indexOf('\n');
     }
   }
 
-  private handleMessage(msg: any): void {
-    if (!msg || typeof msg !== 'object') return;
+  private handleMessage(msg: CodexAppServerMessage): void {
     const hasId = Object.prototype.hasOwnProperty.call(msg, 'id');
     const hasMethod = Object.prototype.hasOwnProperty.call(msg, 'method');
     const hasResult = Object.prototype.hasOwnProperty.call(msg, 'result');
     const hasError = Object.prototype.hasOwnProperty.call(msg, 'error');
     if (hasId && (hasResult || hasError)) {
+      if (msg.id === undefined) return;
       const pending = this.pendingRequests.get(msg.id);
       if (pending) {
         this.pendingRequests.delete(msg.id);
@@ -626,7 +653,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     if (hasMethod) this.handleNotification(msg);
   }
 
-  private handleNotification(msg: any): void {
+  private handleNotification(msg: CodexAppServerMessage): void {
     const method = msg.method;
     const params = msg.params || {};
     if (method === 'item/agentMessage/delta') {
@@ -643,15 +670,14 @@ export class CodexAppServerAdapter implements AgentAdapter {
       const activeThreadId = this.activeThreadId || this.threadId;
       if (activeThreadId && params.threadId && params.threadId !== activeThreadId) return;
       if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
-      if (
-        !this.sawAgentDelta &&
-        params.item?.type === 'message' &&
-        params.item?.role === 'assistant'
-      ) {
-        const content = Array.isArray(params.item?.content) ? params.item.content : [];
+      const item = isRecord(params.item) ? params.item : null;
+      if (!this.sawAgentDelta && item?.type === 'message' && item.role === 'assistant') {
+        const content = Array.isArray(item.content) ? item.content : [];
         const text = content
-          .filter((c: any) => c?.type === 'output_text' && typeof c.text === 'string')
-          .map((c: any) => c.text)
+          .filter((contentItem): contentItem is Record<string, unknown> => isRecord(contentItem))
+          .filter((contentItem) => contentItem.type === 'output_text')
+          .map((contentItem) => contentItem.text)
+          .filter((contentItem): contentItem is string => typeof contentItem === 'string')
           .join('');
         if (text) this.accumulatedText += text;
       }
@@ -660,14 +686,17 @@ export class CodexAppServerAdapter implements AgentAdapter {
       return;
     }
     if (method === 'turn/started') {
-      const turnId = params.turn?.id;
+      const turn = isRecord(params.turn) ? params.turn : null;
+      const turnId = readString(turn?.id);
       if (turnId) this.currentTurnId = turnId;
       return;
     }
     if (method === 'turn/completed') {
-      const turnId = params.turn?.id;
+      const turn = isRecord(params.turn) ? params.turn : null;
+      const turnId = readString(turn?.id);
       if (!turnId) return;
-      const status = params.turn?.status || 'completed';
+      const status =
+        turn?.status === 'failed' || turn?.status === 'interrupted' ? turn.status : 'completed';
       const stopReason =
         status === 'failed' ? 'error' : status === 'interrupted' ? 'interrupted' : 'completed';
       const finalText = this.accumulatedText;
@@ -692,8 +721,9 @@ export class CodexAppServerAdapter implements AgentAdapter {
     }
   }
 
-  private async handleServerRequest(msg: any): Promise<void> {
+  private async handleServerRequest(msg: CodexAppServerMessage): Promise<void> {
     const { id, method, params } = msg;
+    if (id === undefined) return;
     const relaxed = (this.activeApprovalMode ?? this.options.approvalMode) === 'relaxed';
     switch (method) {
       case 'item/commandExecution/requestApproval': {
@@ -707,7 +737,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       }
       case 'item/permissions/requestApproval': {
         this.sendResponse(id, {
-          permissions: relaxed ? params?.permissions || {} : {},
+          permissions: relaxed && isRecord(params?.permissions) ? params.permissions : {},
           scope: relaxed ? 'session' : 'turn',
         });
         return;
@@ -748,7 +778,11 @@ export class CodexAppServerAdapter implements AgentAdapter {
     }
   }
 
-  private sendRequest<T>(method: string, params: any, timeoutMs?: number): Promise<T> {
+  private sendRequest<T = unknown>(
+    method: string,
+    params: Record<string, unknown>,
+    timeoutMs?: number
+  ): Promise<T> {
     if (!this.child?.stdin?.writable) throw new Error('Codex app-server stdin not writable.');
     const id = this.nextId++;
     const payload = JSON.stringify({ jsonrpc: '2.0', id, method, params });
@@ -761,17 +795,21 @@ export class CodexAppServerAdapter implements AgentAdapter {
           reject(new Error('Codex app-server request timed out (' + method + ').'));
         }, timeoutMs);
       }
-      this.pendingRequests.set(id, { resolve, reject, timeout });
+      this.pendingRequests.set(id, {
+        resolve: (value: unknown) => resolve(value as T),
+        reject,
+        timeout,
+      });
     });
   }
 
-  private sendResponse(id: number | string, result: any): void {
+  private sendResponse(id: number | string, result: Record<string, unknown>): void {
     if (!this.child?.stdin?.writable) return;
     const payload = JSON.stringify({ jsonrpc: '2.0', id, result });
     this.child.stdin.write(payload + '\n');
   }
 
-  private sendError(id: number | string, code: number, message: string, data?: any): void {
+  private sendError(id: number | string, code: number, message: string, data?: unknown): void {
     if (!this.child?.stdin?.writable) return;
     const payload = JSON.stringify({ jsonrpc: '2.0', id, error: { code, message, data } });
     this.child.stdin.write(payload + '\n');
@@ -795,28 +833,36 @@ export class CodexAppServerAdapter implements AgentAdapter {
     }
   }
 
-  private isReadOnlyCommand(params: any): boolean {
-    const actions = Array.isArray(params?.commandActions) ? params.commandActions : [];
+  private isReadOnlyCommand(params: unknown): boolean {
+    if (!isRecord(params)) return false;
+    const actions = Array.isArray(params.commandActions) ? params.commandActions : [];
     if (actions.length === 0) return false;
-    if (!this.isCwdAllowed(params?.cwd)) return false;
-    return actions.every((action: any) => {
-      const type = action?.type;
+    const cwd = typeof params.cwd === 'string' ? params.cwd : null;
+    if (!this.isCwdAllowed(cwd)) return false;
+    return actions.every((action) => {
+      if (!isRecord(action)) return false;
+      const type = action.type;
       if (type === 'read' || type === 'listFiles' || type === 'search') {
-        return this.isPathAllowed(action?.path, params?.cwd);
+        const targetPath = typeof action.path === 'string' ? action.path : null;
+        return this.isPathAllowed(targetPath, cwd);
       }
       return false;
     });
   }
 
-  private isReadOnlyParsedCommand(params: any): boolean {
-    const parsed = Array.isArray(params?.parsedCmd) ? params.parsedCmd : [];
+  private isReadOnlyParsedCommand(params: unknown): boolean {
+    if (!isRecord(params)) return false;
+    const parsed = Array.isArray(params.parsedCmd) ? params.parsedCmd : [];
     if (parsed.length === 0) return false;
-    if (!this.isCwdAllowed(params?.cwd)) return false;
-    return parsed.every((cmd: any) => {
-      const type = cmd?.type;
-      if (type === 'read') return this.isPathAllowed(cmd?.path, params?.cwd);
+    const cwd = typeof params.cwd === 'string' ? params.cwd : null;
+    if (!this.isCwdAllowed(cwd)) return false;
+    return parsed.every((cmd) => {
+      if (!isRecord(cmd)) return false;
+      const type = cmd.type;
+      const targetPath = typeof cmd.path === 'string' ? cmd.path : null;
+      if (type === 'read') return this.isPathAllowed(targetPath, cwd);
       if (type === 'list_files' || type === 'search') {
-        return this.isPathAllowed(cmd?.path, params?.cwd);
+        return this.isPathAllowed(targetPath, cwd);
       }
       return false;
     });
@@ -862,9 +908,10 @@ export function extractUsageSummary(payload: unknown): Record<string, unknown> |
   while (queue.length > 0) {
     const current = queue.shift();
     if (!current || typeof current !== 'object') continue;
-    const usage = (current as any).usage;
-    if (usage && typeof usage === 'object') return usage as Record<string, unknown>;
-    for (const value of Object.values(current as Record<string, unknown>)) {
+    if (!isRecord(current)) continue;
+    const usage = current.usage;
+    if (isRecord(usage)) return usage;
+    for (const value of Object.values(current)) {
       if (value && typeof value === 'object') queue.push(value);
     }
   }
