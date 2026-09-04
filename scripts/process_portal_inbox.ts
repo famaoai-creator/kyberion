@@ -6,6 +6,8 @@ import { nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
 
+type Print = (value: unknown) => void;
+
 const inboxPath = pathResolver.shared('portal/inbox.json');
 const outboxPath = pathResolver.shared('portal/outbox.json');
 
@@ -40,18 +42,18 @@ export function parsePortalRequest(raw: string): PortalRequest | null {
   }
 }
 
-async function processInbox(): Promise<void> {
+async function processInbox(print: Print = () => undefined): Promise<void> {
   if (!safeExistsSync(inboxPath)) return;
 
   const raw = readTextFile(inboxPath);
   const request = parsePortalRequest(raw);
   if (!request) {
-    console.warn('[portal] ignored malformed inbox request');
+    print('[portal] ignored malformed inbox request');
     return;
   }
   if (request.status !== 'pending') return;
 
-  console.log(chalk.bold.cyan(`\n📩 Processing Portal Request: "${request.intent}"`));
+  print(chalk.bold.cyan(`\n📩 Processing Portal Request: "${request.intent}"`));
 
   const thought = `Lord（上様）より「${request.intent}」との命を授かった。\n現在のロール（Architect）に基づき、単なるコマンド実行に留まらず、広範な影響調査を実施する。`;
 
@@ -103,14 +105,14 @@ async function processInbox(): Promise<void> {
   request.status = 'processed';
   safeWriteFile(inboxPath, JSON.stringify(request, null, 2));
 
-  console.log(chalk.green('✔ Agent has responded to the portal.'));
+  print(chalk.green('✔ Agent has responded to the portal.'));
 }
 
 export const runProcessPortalInbox = defineScript({
   name: 'process-portal-inbox',
   flags: [],
-  run() {
-    return processInbox();
+  run({ print }) {
+    return processInbox(print);
   },
 });
 
