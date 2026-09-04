@@ -17092,6 +17092,23 @@ rate-limit評価 semanticsは維持した。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 977
+
+SX-03／SX-10／SX-11 の semantic decision boundaryを再監査し、`parseSafeJsonInput`またはrepair後の
+responseを`any`として扱い、非object／非string decisionや任意型reasonを後段へ渡す残存を修正した。
+semantic decision本体と共通`executeLlmDecideOp`のparams／context／resolver／戻り値をunknownベースへ揃え、
+decisionはstring、reasonはstringの場合だけ採用する。selection外のdecision、model failure、degradation
+threshold、既存actuatorのllm_decide export semanticsは変更していない。
+
+検証:
+
+- semantic-decide **1 file / 7 tests passed**。
+- production fileの`any`検索（コメント中の一般語を除く）に型宣言・cast残存なし、root typecheck、root lint、
+  `git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
