@@ -21,6 +21,7 @@ import {
 import { parseSafeJsonInput } from './lib/json-input.js';
 
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
+type Print = (value: unknown) => void;
 
 interface TaskInitArgs {
   scenarioId?: string;
@@ -59,11 +60,9 @@ function parseArgs(argv: string[]): TaskInitArgs {
   return parsed;
 }
 
-function printUsage(): void {
-  console.log(
-    'Usage: pnpm task:init <scenario-id> [--answers-json <json>] [--answers-file <path>]'
-  );
-  console.log('  pnpm task:init <scenario-id> --print-template');
+function printUsage(print: Print): void {
+  print('Usage: pnpm task:init <scenario-id> [--answers-json <json>] [--answers-file <path>]');
+  print('  pnpm task:init <scenario-id> --print-template');
 }
 
 function resolveScenarioDir(): string {
@@ -148,14 +147,14 @@ function buildProfile(scenario: TaskScenario, answers: Record<string, unknown>) 
   };
 }
 
-export async function main(argv: string[] = []): Promise<void> {
+export async function main(argv: string[] = [], print: Print = () => undefined): Promise<void> {
   const args = parseArgs(argv);
   if (args.help) {
-    printUsage();
+    printUsage(print);
     return;
   }
   if (!args.scenarioId) {
-    printUsage();
+    printUsage(print);
     throw new Error('Missing scenario id');
   }
 
@@ -165,7 +164,7 @@ export async function main(argv: string[] = []): Promise<void> {
   }
 
   if (args.printTemplate) {
-    console.log(JSON.stringify(buildAnswerTemplate(scenario), null, 2));
+    print(JSON.stringify(buildAnswerTemplate(scenario), null, 2));
     return;
   }
 
@@ -180,14 +179,14 @@ export async function main(argv: string[] = []): Promise<void> {
   safeMkdir(path.dirname(profilePath), { recursive: true });
   safeWriteFile(profilePath, `${JSON.stringify(profile, null, 2)}\n`);
 
-  console.log(`Created profile: ${scenario.first_run.profile_output}`);
-  console.log(`Next: pnpm task:run ${scenario.id}`);
+  print(`Created profile: ${scenario.first_run.profile_output}`);
+  print(`Next: pnpm task:run ${scenario.id}`);
 }
 
 export const runTaskInit = defineScript({
   name: 'task:init',
   flags: [],
-  run: (context) => main(context.argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
