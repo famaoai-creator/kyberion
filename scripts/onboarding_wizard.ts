@@ -60,6 +60,8 @@ import {
   resolveReasoningBackendMenuSelection,
 } from './reasoning_backend_selection.js';
 
+type Print = (value: unknown) => void;
+
 const onboardingStateValidate = compileSchema(
   pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
 );
@@ -379,9 +381,9 @@ function buildSummaryMarkdown(state: OnboardingState): string {
   ].join('\n');
 }
 
-async function runIdentityPhase(state: OnboardingState): Promise<void> {
+async function runIdentityPhase(state: OnboardingState, print: Print): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n🧬 Phase 1 — ${pt(flowPolicy.phase_titles.identity)}\n`);
+  print(`\n🧬 Phase 1 — ${pt(flowPolicy.phase_titles.identity)}\n`);
   const identity = buildIdentityFromState(state);
   setWizardLanguage(identity.language);
 
@@ -446,7 +448,7 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
     identity.persona = personaInput as IdentityDraft['persona'];
   }
   const personaEnvPath = persistPersona(identity.persona);
-  console.log(
+  print(
     t(
       `Persisted default persona ${identity.persona} to ${personaEnvPath}`,
       `既定 persona ${identity.persona} を ${personaEnvPath} に永続化しました`
@@ -498,15 +500,15 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
   await saveState(state);
 }
 
-async function runReasoningPhase(state: OnboardingState): Promise<void> {
-  console.log(t('\nReasoning Backend\n', '\n推論バックエンド\n'));
+async function runReasoningPhase(state: OnboardingState, print: Print): Promise<void> {
+  print(t('\nReasoning Backend\n', '\n推論バックエンド\n'));
   let reasoning = await evaluateReasoningBackend();
   if (reasoning.available) {
-    console.log(
+    print(
       chalk.green(t('Real reasoning backend detected.', '実働する推論バックエンドを検出しました。'))
     );
   } else if (reasoning.mode === 'stub_explicit') {
-    console.log(
+    print(
       chalk.yellow(
         t(
           'KYBERION_REASONING_BACKEND=stub is explicitly selected.',
@@ -514,7 +516,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
         )
       )
     );
-    console.log(
+    print(
       chalk.yellow(
         t(
           'Real work will use deterministic placeholder responses until reconfigured.',
@@ -523,7 +525,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
       )
     );
   } else {
-    console.log(
+    print(
       chalk.red(
         t(
           'No real reasoning backend was detected.',
@@ -531,14 +533,14 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
         )
       )
     );
-    console.log(
+    print(
       reasoning.reason ??
         t(
           'Run `pnpm reasoning:setup` to configure one.',
           '`pnpm reasoning:setup` を実行して設定してください。'
         )
     );
-    console.log(
+    print(
       t(
         '\nRun `pnpm reasoning:setup` to configure Codex/Gemini/AGY CLI, Anthropic API, OpenRouter, or a local backend.',
         '\n`pnpm reasoning:setup` で Codex/Gemini/AGY CLI・Anthropic API・OpenRouter・ローカルバックエンドを設定できます。'
@@ -555,7 +557,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
         )
       );
       if (!continueWithStub) {
-        console.log(
+        print(
           t(
             'Onboarding paused. Configure a reasoning backend, then re-run `pnpm onboard`.',
             'オンボーディングを中断しました。推論バックエンドを設定してから `pnpm onboard` を再実行してください。'
@@ -575,18 +577,18 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
     const choices = listReasoningBackendChoices();
     const persisted =
       getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim() || readPersistedReasoningBackend();
-    console.log('');
-    console.log(
+    print('');
+    print(
       t(
         'Select the reasoning backend to persist as KYBERION_REASONING_BACKEND:',
         '永続化する推論バックエンド(KYBERION_REASONING_BACKEND)を選択してください:'
       )
     );
     for (const line of formatReasoningBackendMenu(choices)) {
-      console.log(`  ${line}`);
+      print(`  ${line}`);
     }
     if (persisted) {
-      console.log(t(`Currently set: ${persisted}`, `現在の設定: ${persisted}`));
+      print(t(`Currently set: ${persisted}`, `現在の設定: ${persisted}`));
     }
     const answer = await ask(
       t(
@@ -613,7 +615,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
         const envLocal = persistReasoningBackend(selection);
         setRegisteredEnv('KYBERION_REASONING_BACKEND', selection);
         reasoning = { ...reasoning, backend_hint: selection };
-        console.log(
+        print(
           t(
             `Persisted KYBERION_REASONING_BACKEND=${selection} to ${envLocal}`,
             `KYBERION_REASONING_BACKEND=${selection} を ${envLocal} に永続化しました`
@@ -697,10 +699,11 @@ async function promptGenericConnection(serviceId: string): Promise<Record<string
 
 async function runServicesPhase(
   state: OnboardingState,
-  selectedServiceIds?: string[]
+  selectedServiceIds: string[] | undefined,
+  print: Print
 ): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n🔌 Phase 2 — ${pt(flowPolicy.phase_titles.services)}\n`);
+  print(`\n🔌 Phase 2 — ${pt(flowPolicy.phase_titles.services)}\n`);
   const wantsServiceSetup = selectedServiceIds?.length
     ? true
     : isAffirmative(
@@ -803,9 +806,9 @@ async function runServicesPhase(
   await saveState(state);
 }
 
-async function runTenantsPhase(state: OnboardingState): Promise<void> {
+async function runTenantsPhase(state: OnboardingState, print: Print): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n🏢 Phase 3 — ${pt(flowPolicy.phase_titles.tenants)}\n`);
+  print(`\n🏢 Phase 3 — ${pt(flowPolicy.phase_titles.tenants)}\n`);
   const entries: TenantDraft[] = [];
   const defaultTenant = withExecutionContext(
     'knowledge_steward',
@@ -839,7 +842,7 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
       try {
         tenantSlug = normalizeTenantSlug(slugInput);
       } catch (error) {
-        console.log(chalk.red(String(error)));
+        print(chalk.red(String(error)));
       }
     }
     const displayName = await ask(
@@ -890,9 +893,9 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
   await saveState(state);
 }
 
-async function runTutorialPhase(state: OnboardingState): Promise<void> {
+async function runTutorialPhase(state: OnboardingState, print: Print): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n🎓 Phase 4 — ${pt(flowPolicy.phase_titles.tutorial)}\n`);
+  print(`\n🎓 Phase 4 — ${pt(flowPolicy.phase_titles.tutorial)}\n`);
   const modeInput = (
     await ask('Tutorial mode: simulate / apply / skipped [simulate]: ', 'simulate')
   )
@@ -934,9 +937,9 @@ async function runTutorialPhase(state: OnboardingState): Promise<void> {
   await saveState(state);
 }
 
-async function runSummaryPhase(state: OnboardingState): Promise<void> {
+async function runSummaryPhase(state: OnboardingState, print: Print): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n📊 Phase 5 — ${pt(flowPolicy.phase_titles.summary)}\n`);
+  print(`\n📊 Phase 5 — ${pt(flowPolicy.phase_titles.summary)}\n`);
   const summary = buildSummaryMarkdown(state);
   const runbookSkill = generateOnboardingRunbookSkill({
     profileRoot: profileRoot(),
@@ -952,41 +955,39 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
   await saveState(state);
 
   const identity = state.identity;
-  console.log(chalk.green(`✅ ${pt(flowPolicy.complete_message)}`));
-  console.log(
-    `Identity: ${identity?.name || 'Sovereign'} / ${identity?.agent_id || 'KYBERION-PRIME'}`
-  );
-  console.log(`Summary written to: ${summaryPath()}`);
-  console.log(`Runbook skill written to: ${runbookSkill.skillPath}`);
-  console.log(`State written to: ${statePath()}`);
-  console.log(t('\nNext steps:', '\n次のステップ:'));
+  print(chalk.green(`✅ ${pt(flowPolicy.complete_message)}`));
+  print(`Identity: ${identity?.name || 'Sovereign'} / ${identity?.agent_id || 'KYBERION-PRIME'}`);
+  print(`Summary written to: ${summaryPath()}`);
+  print(`Runbook skill written to: ${runbookSkill.skillPath}`);
+  print(`State written to: ${statePath()}`);
+  print(t('\nNext steps:', '\n次のステップ:'));
   if (state.reasoning && !state.reasoning.available) {
-    console.log(
+    print(
       t(
         '0. Configure a real reasoning backend with `pnpm reasoning:setup` before real work.',
         '0. 実運用の前に `pnpm reasoning:setup` で実際の推論バックエンドを設定してください。'
       )
     );
   }
-  console.log(
+  print(
     t(
       `1. Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`,
       `1. \`${path.join(profileRoot(), 'connections')}/\` のサービス接続ドラフトを確認してください。`
     )
   );
-  console.log(
+  print(
     t(
       `2. Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
       `2. \`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
     )
   );
-  console.log(
+  print(
     t(
       '3. If the tutorial should become real work, create a mission explicitly after review.',
       '3. チュートリアルを実作業にする場合は、レビュー後に明示的にミッションを作成してください。'
     )
   );
-  console.log(
+  print(
     t(
       '4. Re-run `pnpm surfaces reconcile` after the workspace is ready.',
       '4. ワークスペースの準備ができたら `pnpm surfaces reconcile` を再実行してください。'
@@ -1005,7 +1006,10 @@ function onboardingArtifactsMissing(state: OnboardingState, phase: OnboardingPha
   );
 }
 
-export async function runOnboarding(args: string[] = []): Promise<void> {
+export async function runOnboarding(
+  args: string[] = [],
+  print: Print = () => undefined
+): Promise<void> {
   process.env.MISSION_ROLE = 'sovereign_concierge';
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const rootDir = pathResolver.rootDir();
@@ -1022,7 +1026,7 @@ export async function runOnboarding(args: string[] = []): Promise<void> {
           customerSlug = slugInput.trim();
           setRegisteredEnv('KYBERION_CUSTOMER', customerSlug);
         } catch (error) {
-          console.log(chalk.red(String(error)));
+          print(chalk.red(String(error)));
         }
       }
     }
@@ -1037,7 +1041,7 @@ export async function runOnboarding(args: string[] = []): Promise<void> {
       allowDefaults: getRegisteredEnvText('KYBERION_ONBOARDING_NON_INTERACTIVE_OK'),
     })
   ) {
-    console.error(
+    print(
       chalk.red(
         t(
           '\n❌ Refusing to run interactive onboarding without a TTY.',
@@ -1045,65 +1049,61 @@ export async function runOnboarding(args: string[] = []): Promise<void> {
         )
       )
     );
-    console.error(
+    print(
       t(
         '  This wizard would otherwise silently apply default values for every prompt,',
         '  このまま実行すると、すべての質問に既定値が黙って適用され、'
       )
     );
-    console.error(
+    print(
       t(
         "  producing an identity that does not reflect the Sovereign's intent.",
         '  Sovereign の意図を反映しないアイデンティティが作られてしまいます。'
       )
     );
-    console.error(t('\n  Options:', '\n  選択肢:'));
-    console.error(
+    print(t('\n  Options:', '\n  選択肢:'));
+    print(
       t(
         '    1. Run from a real terminal: pnpm onboard',
         '    1. 実ターミナルから実行する: pnpm onboard'
       )
     );
-    console.error(
+    print(
       '    2. If you need a customer overlay, create it first with `pnpm customer:create <slug>`'
     );
-    console.error('       and activate it with `pnpm customer:switch <slug>` before onboarding.');
-    console.error(
-      '    3. Use the agent Path B flow (CLAUDE.md → docs/.../onboarding.md): write the'
-    );
-    console.error(
-      `       active profile root (${profileRoot()}/...) directly per the schemas under`
-    );
-    console.error('       knowledge/public/{schemas,templates}.');
-    console.error(
+    print('       and activate it with `pnpm customer:switch <slug>` before onboarding.');
+    print('    3. Use the agent Path B flow (CLAUDE.md → docs/.../onboarding.md): write the');
+    print(`       active profile root (${profileRoot()}/...) directly per the schemas under`);
+    print('       knowledge/public/{schemas,templates}.');
+    print(
       '    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1'
     );
     rl.close();
     throw new ScriptExitError(2);
   }
 
-  console.log(
+  print(
     t(
       '\n🌟 Welcome to Kyberion Sovereign Awakening 🌟\n',
       '\n🌟 Kyberion Sovereign Awakening へようこそ 🌟\n'
     )
   );
-  console.log(
+  print(
     t(
       'This flow captures identity, service readiness, tenant scope, and a safe first tutorial.\n',
       'このフローでは、アイデンティティ、サービスの準備状態、テナントのスコープ、安全な最初のチュートリアルを設定します。\n'
     )
   );
-  console.log(t('Estimated time: 5-10 minutes.', '所要時間の目安: 5〜10分。'));
+  print(t('Estimated time: 5-10 minutes.', '所要時間の目安: 5〜10分。'));
   if (expressMode) {
-    console.log(
+    print(
       t(
         'Express mode: accept safe defaults now; refine identity and connections later with `pnpm onboard`.',
         'Express モード: 安全な既定値で開始し、後から `pnpm onboard` でアイデンティティと接続を調整します。'
       )
     );
   }
-  console.log(
+  print(
     t(
       'You can stop with Ctrl-C at any point and resume later.\n',
       'Ctrl-C でいつでも中断でき、後から再開できます。\n'
@@ -1130,8 +1130,8 @@ export async function runOnboarding(args: string[] = []): Promise<void> {
     serviceArgIndex >= 0 ? args[serviceArgIndex + 1]?.trim() || undefined : undefined;
   if (servicesOnly) {
     state ??= createInitialState();
-    await runServicesPhase(state, selectedService ? [selectedService] : undefined);
-    console.log(
+    await runServicesPhase(state, selectedService ? [selectedService] : undefined, print);
+    print(
       selectedService
         ? `Service connection draft updated: ${selectedService}`
         : 'Service connection drafts updated.'
@@ -1141,26 +1141,26 @@ export async function runOnboarding(args: string[] = []): Promise<void> {
   }
 
   if (isMenuMode || (state && state.status === 'complete' && interactive && !expressMode)) {
-    console.log(chalk.bold.cyan(`\n${mt('onboarding_menu_title')}`));
-    console.log(mt('onboarding_menu_item_identity'));
-    console.log(mt('onboarding_menu_item_avatar'));
-    console.log(mt('onboarding_menu_item_voice'));
-    console.log(mt('onboarding_menu_item_knowledge'));
-    console.log(mt('onboarding_menu_item_ping'));
-    console.log(mt('onboarding_menu_item_guardrails'));
-    console.log(mt('onboarding_menu_item_cadence'));
-    console.log(mt('onboarding_menu_item_tutorial'));
-    console.log(mt('onboarding_menu_item_restart'));
-    console.log('---------------------------------------------------');
+    print(chalk.bold.cyan(`\n${mt('onboarding_menu_title')}`));
+    print(mt('onboarding_menu_item_identity'));
+    print(mt('onboarding_menu_item_avatar'));
+    print(mt('onboarding_menu_item_voice'));
+    print(mt('onboarding_menu_item_knowledge'));
+    print(mt('onboarding_menu_item_ping'));
+    print(mt('onboarding_menu_item_guardrails'));
+    print(mt('onboarding_menu_item_cadence'));
+    print(mt('onboarding_menu_item_tutorial'));
+    print(mt('onboarding_menu_item_restart'));
+    print('---------------------------------------------------');
     const choice = (await ask(mt('onboarding_menu_prompt'), 'Q')).trim().toUpperCase();
 
     if (choice === '1' && state) {
-      await runIdentityPhase(state);
-      await runSummaryPhase(state);
+      await runIdentityPhase(state, print);
+      await runSummaryPhase(state, print);
       rl.close();
       return;
     } else if (choice === '2') {
-      console.log(`\n${mt('onboarding_menu_running_avatar')}`);
+      print(`\n${mt('onboarding_menu_running_avatar')}`);
       try {
         await runManagedMenuTask('avatar-pipeline', [
           'dist/scripts/run_pipeline.js',
@@ -1168,12 +1168,12 @@ export async function runOnboarding(args: string[] = []): Promise<void> {
           'knowledge/product/pipeline-templates/create-my-avatar.json',
         ]);
       } catch (e) {
-        console.error(mt('onboarding_menu_error_avatar'), formatMenuTaskError(e));
+        print(`${mt('onboarding_menu_error_avatar')}: ${formatMenuTaskError(e)}`);
       }
       rl.close();
       return;
     } else if (choice === '3') {
-      console.log(`\n${mt('onboarding_menu_running_voice')}`);
+      print(`\n${mt('onboarding_menu_running_voice')}`);
       try {
         await runManagedMenuTask('voice-pipeline', [
           'dist/scripts/run_pipeline.js',
@@ -1181,39 +1181,39 @@ export async function runOnboarding(args: string[] = []): Promise<void> {
           'knowledge/product/pipeline-templates/clone-my-voice.json',
         ]);
       } catch (e) {
-        console.error(mt('onboarding_menu_error_voice'), formatMenuTaskError(e));
+        print(`${mt('onboarding_menu_error_voice')}: ${formatMenuTaskError(e)}`);
       }
       rl.close();
       return;
     } else if (choice === '4') {
-      console.log(`\n${mt('onboarding_menu_running_knowledge')}`);
+      print(`\n${mt('onboarding_menu_running_knowledge')}`);
       try {
         await runManagedMenuTask('knowledge-index', ['dist/scripts/generate_knowledge_index.js']);
       } catch (e) {
-        console.error(mt('onboarding_menu_error_knowledge'), formatMenuTaskError(e));
+        print(`${mt('onboarding_menu_error_knowledge')}: ${formatMenuTaskError(e)}`);
       }
       rl.close();
       return;
     } else if (choice === '5') {
-      console.log(`\n${mt('onboarding_menu_running_ping')}`);
+      print(`\n${mt('onboarding_menu_running_ping')}`);
       try {
         await runManagedMenuTask('setup-report', ['dist/scripts/setup_report.js']);
       } catch (e) {
-        console.error(mt('onboarding_menu_error_ping'), formatMenuTaskError(e));
+        print(`${mt('onboarding_menu_error_ping')}: ${formatMenuTaskError(e)}`);
       }
       rl.close();
       return;
     } else if (choice === '6') {
-      console.log(`\n${mt('onboarding_menu_running_guardrails')}`);
+      print(`\n${mt('onboarding_menu_running_guardrails')}`);
       try {
         await runManagedMenuTask('governance-check', ['dist/scripts/check_governance_rules.js']);
       } catch (e) {
-        console.error(mt('onboarding_menu_error_guardrails'), formatMenuTaskError(e));
+        print(`${mt('onboarding_menu_error_guardrails')}: ${formatMenuTaskError(e)}`);
       }
       rl.close();
       return;
     } else if (choice === '7') {
-      console.log(`\n${mt('onboarding_menu_running_cadence')}`);
+      print(`\n${mt('onboarding_menu_running_cadence')}`);
       try {
         await runManagedMenuTask('schedule-list', [
           'dist/scripts/run_generation_schedule.js',
@@ -1221,21 +1221,21 @@ export async function runOnboarding(args: string[] = []): Promise<void> {
           'list',
         ]);
       } catch (e) {
-        console.error(mt('onboarding_menu_error_cadence'), formatMenuTaskError(e));
+        print(`${mt('onboarding_menu_error_cadence')}: ${formatMenuTaskError(e)}`);
       }
       rl.close();
       return;
     } else if (choice === '8' && state) {
-      await runTutorialPhase(state);
-      await runSummaryPhase(state);
+      await runTutorialPhase(state, print);
+      await runSummaryPhase(state, print);
       rl.close();
       return;
     } else if (choice === '9') {
-      console.log(`\n${mt('onboarding_menu_running_restart')}`);
+      print(`\n${mt('onboarding_menu_running_restart')}`);
       state = createInitialState();
       await saveState(state);
     } else {
-      console.log(mt('onboarding_menu_quit'));
+      print(mt('onboarding_menu_quit'));
       rl.close();
       return;
     }
@@ -1259,35 +1259,35 @@ export async function runOnboarding(args: string[] = []): Promise<void> {
   for (const phase of PHASES) {
     if (state.completed_phases.includes(phase) && phase !== 'summary') {
       if (onboardingArtifactsMissing(state, phase)) {
-        console.log(`completed 扱いだが成果物がありません。再実行します: ${phase}`);
+        print(`completed 扱いだが成果物がありません。再実行します: ${phase}`);
       } else {
         continue;
       }
     }
     if (phase === 'identity') {
-      await runIdentityPhase(state);
+      await runIdentityPhase(state, print);
     } else if (phase === 'reasoning') {
-      await runReasoningPhase(state);
+      await runReasoningPhase(state, print);
     } else if (phase === 'services') {
-      await runServicesPhase(state);
+      await runServicesPhase(state, undefined, print);
     } else if (phase === 'tenants') {
-      await runTenantsPhase(state);
+      await runTenantsPhase(state, print);
     } else if (phase === 'tutorial') {
-      await runTutorialPhase(state);
+      await runTutorialPhase(state, print);
     } else if (phase === 'summary') {
-      await runSummaryPhase(state);
+      await runSummaryPhase(state, print);
     }
   }
 
-  console.log(t('\nWelcome aboard.', '\nようこそ。'));
-  console.log(`Workspace root: ${rootDir}`);
+  print(t('\nWelcome aboard.', '\nようこそ。'));
+  print(`Workspace root: ${rootDir}`);
   rl.close();
 }
 
 export const runOnboardingScript = defineScript({
   name: 'onboard',
   flags: [],
-  run: ({ argv }) => runOnboarding(argv),
+  run: ({ argv, print }) => runOnboarding(argv, print),
 });
 
 if (

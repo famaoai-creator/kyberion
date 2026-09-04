@@ -11,10 +11,10 @@ import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.
  */
 export async function main(
   args: string[] = currentProcessArgv().slice(2),
-  print: (value: unknown) => void = (value) => console.log(value)
+  print: (value: unknown) => void = () => undefined
 ): Promise<void> {
   if (args[0] === 'apply') {
-    await applyOnboardingMain(args.slice(1));
+    await applyOnboardingMain(args.slice(1), print);
     return;
   }
   if (args[0] === 'reset') {
@@ -31,7 +31,7 @@ export async function main(
     if (status !== 0) throw new Error(`onboard company failed with exit code ${status}`);
     return;
   }
-  await runOnboardingWizard(args);
+  await runOnboardingWizard(args, print);
 }
 
 export const runOnboarding = defineScript({
