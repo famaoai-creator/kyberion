@@ -9,14 +9,12 @@ import {
   buildMediaGenerationBoundary,
   buildReportNarrativeOutline,
   classifyRenderSemantic,
+  type DocumentCompositionPresetResolver,
 } from './media-document-helpers.js';
 
 export interface MediaReportPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
-  resolveDocumentCompositionPreset: (
-    rootDir: string,
-    brief: any
-  ) => { profileId: string; preset: any };
+  resolveDocumentCompositionPreset: DocumentCompositionPresetResolver;
   resolveDocumentLayoutTemplate: (
     rootDir: string,
     brief: any

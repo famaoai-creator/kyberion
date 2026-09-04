@@ -27,6 +27,12 @@ import * as path from 'node:path';
 
 export type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
 export type ProtocolKind = 'pptx' | 'docx' | 'pdf' | 'xlsx';
+export interface MediaCompositionBranding {
+  logo_url?: string;
+  brand_name?: string;
+  tone?: 'professional' | 'creative' | 'technical' | 'casual';
+  [key: string]: unknown;
+}
 export interface MediaCompositionPreset {
   artifact_family?: string;
   document_type?: string;
@@ -34,7 +40,7 @@ export interface MediaCompositionPreset {
   narrative_pattern_id?: string;
   recommended_layout_template_id?: string;
   recommended_theme?: string;
-  branding?: Record<string, unknown>;
+  branding?: MediaCompositionBranding;
   prompt_guide?: unknown[];
   source_design?: Record<string, unknown> | null;
   design_recommendations?: unknown[];
