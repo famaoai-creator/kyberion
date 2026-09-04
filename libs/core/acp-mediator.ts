@@ -17,6 +17,7 @@ import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -698,9 +699,9 @@ function extractUsageSummary(payload: unknown): ProviderUsageSummary | null {
   const queue: unknown[] = [payload];
   while (queue.length > 0) {
     const current = queue.shift();
-    if (!current || typeof current !== 'object') continue;
-    const usage = (current as any).usage;
-    if (usage && typeof usage === 'object') {
+    if (!isRecord(current)) continue;
+    const usage = current.usage;
+    if (isRecord(usage)) {
       const inputTokens = coerceNumber(
         usage.inputTokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.prompt_tokens
       );
@@ -720,7 +721,7 @@ function extractUsageSummary(payload: unknown): ProviderUsageSummary | null {
         raw: usage as Record<string, unknown>,
       };
     }
-    for (const value of Object.values(current as Record<string, unknown>)) {
+    for (const value of Object.values(current)) {
       if (value && typeof value === 'object') queue.push(value);
     }
   }
