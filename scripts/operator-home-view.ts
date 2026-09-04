@@ -7,6 +7,7 @@ import { collectOperatorHomeSummary } from '@agent/core/operator-home-summary';
 import type { VocabularyKey } from '@agent/core/t';
 
 export type HomeUi = (key: VocabularyKey, params?: Record<string, string | number>) => string;
+export type HomePrint = (value: unknown) => void;
 
 export const COMMANDS: ReadonlyArray<readonly [string, string]> = [
   ['pnpm kyberion', 'i18n:recorder:recorder_help_home'],
@@ -46,51 +47,55 @@ export const COMMANDS: ReadonlyArray<readonly [string, string]> = [
   ['pnpm kyberion doctor', 'i18n:recorder:recorder_help_doctor'],
 ] as const;
 
-export function printCommands(ui: HomeUi): void {
-  console.log(ui('recorder:recorder_commands_header'));
+export function printCommands(ui: HomeUi, print: HomePrint = () => undefined): void {
+  print(ui('recorder:recorder_commands_header'));
   for (const [command, description] of COMMANDS) {
     const rendered = description.startsWith('i18n:')
       ? ui(description.slice('i18n:'.length) as VocabularyKey)
       : description;
-    console.log(`  ${command.padEnd(52)} ${rendered}`);
+    print(`  ${command.padEnd(52)} ${rendered}`);
   }
   const registry = loadCliManifest();
   const registryCommands = registry.commands.filter((command) => command.audience === 'user');
-  console.log('');
-  console.log('  Registered user commands:');
+  print('');
+  print('  Registered user commands:');
   for (const command of registryCommands) {
     const label = command.command ? `pnpm kyberion ${command.command}` : 'pnpm kyberion';
-    console.log(`  ${label.padEnd(52)} ${command.noun} ${command.verb}`);
+    print(`  ${label.padEnd(52)} ${command.noun} ${command.verb}`);
   }
 }
-function printCustomerBindingsWarning(ui: HomeUi): void {
+function printCustomerBindingsWarning(ui: HomeUi, print: HomePrint): void {
   try {
     const bindings = listCustomerChannelBindings().filter(
       (entry) => entry.binding.active !== false
     );
     if (bindings.length === 0) return;
-    console.log('');
-    console.log(ui('recorder:recorder_customer_binding_warning', { count: bindings.length }));
+    print('');
+    print(ui('recorder:recorder_customer_binding_warning', { count: bindings.length }));
     for (const entry of bindings.slice(0, 5)) {
-      console.log(
+      print(
         `  - ${entry.binding.surface}:${entry.binding.channel_id} → ${entry.tenantSlug}` +
           (entry.binding.counterpart?.org ? ` (${entry.binding.counterpart.org})` : '')
       );
     }
     if (bindings.length > 5)
-      console.log(ui('recorder:recorder_customer_binding_more', { count: bindings.length - 5 }));
+      print(ui('recorder:recorder_customer_binding_more', { count: bindings.length - 5 }));
   } catch {
     // home must never fail on an optional panel
   }
 }
 
-export async function showHome(ui: HomeUi, json: boolean): Promise<void> {
+export async function showHome(
+  ui: HomeUi,
+  json: boolean,
+  print: HomePrint = () => undefined
+): Promise<void> {
   const doctor = await collectDoctorReport({});
   const governance = getGovernanceControlSummary();
   const home = collectOperatorHomeSummary({ limit: 8 });
 
   if (json) {
-    console.log(
+    print(
       JSON.stringify(
         {
           doctor,
@@ -105,12 +110,12 @@ export async function showHome(ui: HomeUi, json: boolean): Promise<void> {
     return;
   }
 
-  console.log(ui('recorder:recorder_home_title'));
-  console.log(
+  print(ui('recorder:recorder_home_title'));
+  print(
     ui('recorder:recorder_home_status', { label: home.statusLabel, detail: home.statusDetail })
   );
-  console.log(ui('recorder:recorder_home_doctor', { count: doctor.totalMissing }));
-  console.log(
+  print(ui('recorder:recorder_home_doctor', { count: doctor.totalMissing }));
+  print(
     ui('recorder:recorder_home_counts', {
       approvals: governance.pending_approvals,
       questions: home.counts.clarificationQuestions,
@@ -122,7 +127,7 @@ export async function showHome(ui: HomeUi, json: boolean): Promise<void> {
       String(right.updatedAt || '').localeCompare(String(left.updatedAt || ''))
     )
     .slice(0, 3);
-  console.log(
+  print(
     ui('recorder:recorder_home_missions', {
       active: home.counts.activeMissions,
       recent: home.counts.recentlyActiveMissions,
@@ -130,15 +135,15 @@ export async function showHome(ui: HomeUi, json: boolean): Promise<void> {
     })
   );
   for (const mission of recent) {
-    console.log(
+    print(
       `  - ${mission.missionId} [${mission.missionType || 'mission'}] ${String(mission.goalSummary || '').slice(0, 70)}`
     );
   }
-  console.log('');
+  print('');
   for (const line of formatNextAction(home.nextAction)) {
-    console.log(line);
+    print(line);
   }
-  printCustomerBindingsWarning(ui);
-  console.log('');
-  printCommands(ui);
+  printCustomerBindingsWarning(ui, print);
+  print('');
+  printCommands(ui, print);
 }
