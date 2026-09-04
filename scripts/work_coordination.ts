@@ -43,9 +43,10 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 function csv(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((entry) => String(entry)).filter(Boolean);
@@ -113,6 +114,13 @@ function print(value: unknown): void {
 
 export function resolveWorkCoordinationInputPath(inputPath: string): string {
   return assertSafeRepositoryPath(inputPath);
+}
+
+export function loadWorkCoordinationIssue(inputPath: string): GitHubIssueLike | JiraIssueLike {
+  return readSafeJsonFile<GitHubIssueLike | JiraIssueLike>(
+    resolveWorkCoordinationInputPath(inputPath),
+    'work coordination issue input'
+  );
 }
 
 function discoverReadableMissionStates(): Array<{ missionId: string; state: any }> {
@@ -443,9 +451,7 @@ async function main(args: string[] = []): Promise<void> {
         throw new Error(`unknown command '${command}'`);
       }
       if (!argv.input) throw new Error('Missing --input issue JSON file');
-      const issue = readJson<GitHubIssueLike | JiraIssueLike>(
-        resolveWorkCoordinationInputPath(String(argv.input))
-      );
+      const issue = loadWorkCoordinationIssue(String(argv.input));
       const projectId = argv.project
         ? String(argv.project)
         : importEntry.default_project_id || undefined;
