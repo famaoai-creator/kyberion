@@ -44,11 +44,18 @@ import { recordMissionHandoff } from '@agent/core/work-coordination';
 import type { ArtifactReviewFinding } from '@agent/core/artifact-review';
 import { createMissionWorkReconciliationApprovalRequest } from '@agent/core/mission-work-reconciliation';
 
+type Print = (value: unknown) => void;
+
 function registeredEnv(name: string): string | undefined {
   return getRegisteredEnv<string>(name) as string | undefined;
 }
 
 let activeMissionControllerArgs: string[] = [];
+let activePrint: Print = () => undefined;
+
+function printOutput(value: unknown): void {
+  activePrint(value);
+}
 
 // --- Sub-module imports ---
 import {
@@ -167,7 +174,7 @@ async function reassignMissionProject(
     ...(options.force ? { force: true } : {}),
     ...(options.dryRun ? { dry_run: true } : {}),
   });
-  console.log(JSON.stringify(result, null, 2));
+  printOutput(JSON.stringify(result, null, 2));
   return result;
 }
 
@@ -185,7 +192,7 @@ async function dispatchMissionTickets(id: string): Promise<void> {
     id,
     resolveMissionTicketDispatchOptionsFromArgv()
   );
-  console.log(JSON.stringify(result, null, 2));
+  printOutput(JSON.stringify(result, null, 2));
 }
 
 async function dispatchMissionWorkItems(id: string): Promise<void> {
@@ -194,7 +201,7 @@ async function dispatchMissionWorkItems(id: string): Promise<void> {
       id,
       resolveMissionWorkItemDispatchOptionsFromArgv()
     );
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(JSON.stringify(result, null, 2));
   } finally {
     try {
       await getReasoningBackend().resetSession?.();
@@ -367,7 +374,7 @@ async function finishMission(id: string, seal: boolean = false) {
     (finalState && finalState.status !== 'archived') ||
     (!finalState && !safeExistsSync(archivedPath))
   ) {
-    console.error(
+    printOutput(
       JSON.stringify({
         status: 'blocked',
         mission_id: id.toUpperCase(),
@@ -539,7 +546,7 @@ async function requestMissionWorkReconciliationApproval(
     manifestPath,
     requestedBy,
   });
-  console.log(JSON.stringify(result, null, 2));
+  printOutput(JSON.stringify(result, null, 2));
   return result;
 }
 
@@ -555,13 +562,13 @@ async function reconcileExistingWork(
     dryRun,
     approvalRequestId
   );
-  console.log(JSON.stringify(result, null, 2));
+  printOutput(JSON.stringify(result, null, 2));
   return result;
 }
 
 async function reenterMissionFromReview(missionId: string) {
   const result = await missionSystem.reenterMissionFromReview(missionId);
-  console.log(JSON.stringify(result, null, 2));
+  printOutput(JSON.stringify(result, null, 2));
   return result;
 }
 
@@ -583,7 +590,7 @@ async function archiveMissions(
   const result = options.missionId
     ? await missionLifecycleService.archive({ missionId: options.missionId })
     : await missionLifecycleService.archive({ dryRun: !options.execute });
-  console.log(JSON.stringify(result, null, 2));
+  printOutput(JSON.stringify(result, null, 2));
 }
 
 /**
@@ -599,9 +606,9 @@ function listMissions(filterStatus?: string) {
 
   // Table header
   const header = `${'ID'.padEnd(30)} ${'STATUS'.padEnd(12)} ${'TIER'.padEnd(14)} ${'CP'.padStart(3)} LAST EVENT`;
-  console.log('');
-  console.log(header);
-  console.log('-'.repeat(header.length + 10));
+  printOutput('');
+  printOutput(header);
+  printOutput('-'.repeat(header.length + 10));
   for (const m of missions) {
     const missionId = String(m.id ?? '-');
     const statusRaw = String(m.status ?? '-');
@@ -619,11 +626,11 @@ function listMissions(filterStatus?: string) {
         distilling: '🧠',
         archived: '📦',
       }[statusRaw] || '  ';
-    console.log(
+    printOutput(
       `${missionId.padEnd(30)} ${statusIcon} ${status.padEnd(10)} ${tier.padEnd(14)} ${String(m.checkpoints).padStart(3)} ${lastEvent}`
     );
   }
-  console.log('');
+  printOutput('');
   logger.info(`${missions.length} mission(s) found.`);
 }
 
@@ -639,68 +646,68 @@ function showMissionStatus(id: string, follow: boolean = false) {
   }
   const { state, missionPath, nextAction, recentHistory } = view;
 
-  console.log('');
-  console.log(`  Mission:     ${state.mission_id}`);
-  console.log(`  Status:      ${renderStatus('mission', state.status, 'en')}`);
-  console.log(`  Tier:        ${state.tier}`);
-  console.log(`  Persona:     ${state.assigned_persona}`);
-  console.log(`  Confidence:  ${state.confidence_score}`);
-  console.log(`  Priority:    ${state.priority}`);
-  console.log(`  Mode:        ${state.execution_mode}`);
+  printOutput('');
+  printOutput(`  Mission:     ${state.mission_id}`);
+  printOutput(`  Status:      ${renderStatus('mission', state.status, 'en')}`);
+  printOutput(`  Tier:        ${state.tier}`);
+  printOutput(`  Persona:     ${state.assigned_persona}`);
+  printOutput(`  Confidence:  ${state.confidence_score}`);
+  printOutput(`  Priority:    ${state.priority}`);
+  printOutput(`  Mode:        ${state.execution_mode}`);
   if (state.classification) {
-    console.log(
+    printOutput(
       `  Class:       ${state.classification.mission_class} (risk: ${state.classification.risk_profile}, shape: ${state.classification.delivery_shape})`
     );
   }
   if (state.process_template) {
-    console.log(
+    printOutput(
       `  Process:     ${state.process_template.workflow_id} — ${state.process_template.phases.join(' → ')}`
     );
   }
-  console.log(`  Branch:      ${state.git.branch}`);
-  console.log(`  Commit:      ${state.git.latest_commit.slice(0, 8)}`);
-  console.log(`  Checkpoints: ${state.git.checkpoints.length}`);
+  printOutput(`  Branch:      ${state.git.branch}`);
+  printOutput(`  Commit:      ${state.git.latest_commit.slice(0, 8)}`);
+  printOutput(`  Checkpoints: ${state.git.checkpoints.length}`);
   if (missionPath) {
-    console.log(`  Directory:   ${path.relative(ROOT_DIR, missionPath)}`);
+    printOutput(`  Directory:   ${path.relative(ROOT_DIR, missionPath)}`);
   }
 
   if (state.delegation) {
-    console.log(
+    printOutput(
       `  Delegated:   ${state.delegation.agent_id} (${state.delegation.verification_status})`
     );
   }
 
   if (state.relationships?.prerequisites?.length) {
-    console.log(`  Prereqs:     ${state.relationships.prerequisites.join(', ')}`);
+    printOutput(`  Prereqs:     ${state.relationships.prerequisites.join(', ')}`);
   }
   if (state.relationships?.project) {
-    console.log(`  Project:     ${state.relationships.project.project_id || '-'}`);
-    console.log(`  Relation:    ${state.relationships.project.relationship_type}`);
-    console.log(`  Gate Impact: ${state.relationships.project.gate_impact || 'none'}`);
+    printOutput(`  Project:     ${state.relationships.project.project_id || '-'}`);
+    printOutput(`  Relation:    ${state.relationships.project.relationship_type}`);
+    printOutput(`  Gate Impact: ${state.relationships.project.gate_impact || 'none'}`);
   }
   if (state.relationships?.track) {
-    console.log(`  Track:       ${state.relationships.track.track_id || '-'}`);
+    printOutput(`  Track:       ${state.relationships.track.track_id || '-'}`);
     if (state.relationships.track.track_name) {
-      console.log(`  Track Name:  ${state.relationships.track.track_name}`);
+      printOutput(`  Track Name:  ${state.relationships.track.track_name}`);
     }
-    console.log(`  Track Rel:   ${state.relationships.track.relationship_type}`);
+    printOutput(`  Track Rel:   ${state.relationships.track.relationship_type}`);
   }
   if (state.context?.routing_decision_summary) {
-    console.log(`  Routing:     ${state.context.routing_decision_summary}`);
+    printOutput(`  Routing:     ${state.context.routing_decision_summary}`);
   }
 
-  console.log(`  Next:        ${nextAction}`);
+  printOutput(`  Next:        ${nextAction}`);
 
   // Recent history (last 5)
-  console.log('');
-  console.log('  Recent History:');
+  printOutput('');
+  printOutput('  Recent History:');
   for (const h of recentHistory) {
-    console.log(`    ${h.ts.slice(0, 16)}  [${h.event}]  ${h.note}`);
+    printOutput(`    ${h.ts.slice(0, 16)}  [${h.event}]  ${h.note}`);
   }
-  console.log('');
+  printOutput('');
 
   if (follow) {
-    console.log(
+    printOutput(
       `  [SYS] Following mission ledger for ${id.toUpperCase()}... (Press Ctrl-C to exit)\n`
     );
     let lastHistoryLength = view.state.history.length;
@@ -709,7 +716,7 @@ function showMissionStatus(id: string, follow: boolean = false) {
       if (current && current.state.history.length > lastHistoryLength) {
         const newEvents = current.state.history.slice(lastHistoryLength);
         for (const h of newEvents) {
-          console.log(`    ${h.ts.slice(0, 16)}  [${h.event}]  ${h.note}`);
+          printOutput(`    ${h.ts.slice(0, 16)}  [${h.event}]  ${h.note}`);
         }
         lastHistoryLength = current.state.history.length;
       }
@@ -726,12 +733,12 @@ function showReasoningBackendStatus() {
     ['claude', 'gemini', 'codex'].includes(provider.provider)
   );
 
-  console.log('');
-  console.log('  Reasoning Backend:');
-  console.log(
+  printOutput('');
+  printOutput('  Reasoning Backend:');
+  printOutput(
     `    Selected: ${selectedMode || registeredEnv('KYBERION_REASONING_BACKEND') || 'auto'}`
   );
-  console.log(
+  printOutput(
     `    Wisdom profile: ${registeredEnv('KYBERION_WISDOM_LLM_PROFILE') || 'distill policy default'}`
   );
   for (const provider of providers) {
@@ -741,16 +748,16 @@ function showReasoningBackendStatus() {
         : 'installed-unhealthy'
       : 'missing';
     const version = provider.version || 'n/a';
-    console.log(`    ${provider.provider.padEnd(6)} ${state.padEnd(18)} ${version}`);
+    printOutput(`    ${provider.provider.padEnd(6)} ${state.padEnd(18)} ${version}`);
   }
-  console.log('    Endpoint runtimes:');
+  printOutput('    Endpoint runtimes:');
   for (const endpoint of discoverReasoningEndpoints()) {
     const state = endpoint.configured ? 'configured' : 'not-configured';
-    console.log(
+    printOutput(
       `      ${endpoint.runtime.padEnd(14)} ${state.padEnd(18)} ${endpoint.configuration_env.join(' | ')}`
     );
   }
-  console.log('');
+  printOutput('');
 }
 
 export function buildHelpText(): string {
@@ -954,7 +961,7 @@ Track Traceability Options:
 }
 
 function showHelp() {
-  console.log(buildHelpText());
+  printOutput(buildHelpText());
 }
 
 function showMissionTeam(
@@ -1002,7 +1009,7 @@ async function classifyMission(id: string, intentId?: string, taskType?: string)
     shape: 'mission',
     utterance: `${state.mission_type || ''} ${state.vision_ref || ''}`.trim(),
   });
-  console.log(JSON.stringify({ mission_id: upperId, classification }, null, 2));
+  printOutput(JSON.stringify({ mission_id: upperId, classification }, null, 2));
 }
 
 async function selectMissionWorkflow(
@@ -1037,7 +1044,7 @@ async function selectMissionWorkflow(
     intentId,
     taskType,
   });
-  console.log(JSON.stringify({ mission_id: upperId, classification, workflow }, null, 2));
+  printOutput(JSON.stringify({ mission_id: upperId, classification, workflow }, null, 2));
 }
 
 async function reviewWorkerOutput(
@@ -1317,7 +1324,7 @@ async function approveScopeChange(
 /**
  * 7. Main Entry
  */
-export async function main(args: string[] = currentProcessArgv()): Promise<void> {
+async function mainImpl(args: string[] = currentProcessArgv()): Promise<void> {
   activeMissionControllerArgs = [...args];
   const requestedAction = args[0];
   const isHelpFlag = args.includes('--help') || args.includes('-h');
@@ -1430,10 +1437,23 @@ export async function main(args: string[] = currentProcessArgv()): Promise<void>
   });
 }
 
+export async function main(
+  args: string[] = currentProcessArgv(),
+  print: Print = () => undefined
+): Promise<void> {
+  const previousPrint = activePrint;
+  activePrint = print;
+  try {
+    await mainImpl(args);
+  } finally {
+    activePrint = previousPrint;
+  }
+}
+
 export const runMissionController = defineScript({
   name: 'mission:controller',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
