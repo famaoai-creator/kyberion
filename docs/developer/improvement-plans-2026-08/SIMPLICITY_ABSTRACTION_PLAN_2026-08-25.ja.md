@@ -17978,6 +17978,20 @@ sheet draft は専用 normalize 境界で正規化する契約を明示し、met
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 1036
+
+SX-04／SX-10 の XLSX normalization boundary を再監査し、raw／draft spreadsheet protocol を normalize 後の core
+`XlsxDesignProtocol` へ明示接続した。styles、shared strings、defined names、worksheets の正規化結果を renderer の入力契約として
+固定し、smart table の変換、空配列 fallback、sheet／cell の既存 semantics は変更していない。
+
+検証:
+
+- Media actuator の tracker／spreadsheet／normalization **1 file / 6 tests passed（55 skipped）**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

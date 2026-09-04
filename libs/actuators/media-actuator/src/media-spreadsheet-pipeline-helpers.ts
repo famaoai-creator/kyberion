@@ -126,7 +126,7 @@ export function buildSmartTableSheet(sheet: any, index: number): any {
   };
 }
 
-export function normalizeXlsxDesignProtocol(protocol: any): any {
+export function normalizeXlsxDesignProtocol(protocol: any): XlsxDesignProtocol {
   if (!protocol || typeof protocol !== 'object') {
     throw new Error('normalizeXlsxDesignProtocol: protocol must be an object');
   }
