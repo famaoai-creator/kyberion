@@ -535,12 +535,13 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     .slice(0, 10);
 
   // customer front desk
-  // Deal files live in the customer overlay; tenant_slug on each deal is the
-  // canonical sub-scope. Do not enumerate other customer roots while a
-  // customer or explicit tenant scope is active.
+  // Deal files are tenant-scoped; customer stance is not a tenant slug. Use
+  // only the already-resolved visible tenant set when a registry is present.
   const channelBindings = customerSlug ? [] : listCustomerChannelBindings();
   const dealRoots = customerSlug
-    ? [customerSlug]
+    ? visibleTenantSlugs
+      ? Array.from(visibleTenantSlugs)
+      : [customerSlug]
     : requestedTenantSlug
       ? [requestedTenantSlug]
       : Array.from(
@@ -1251,6 +1252,7 @@ ${legend}
 // ---------- main ----------
 
 const DEFAULT_OUT = 'active/shared/exports/virtual-office/office.html';
+type Print = (value: unknown) => void;
 
 async function generateOnce(outPath: string, refreshSeconds?: number): Promise<string> {
   const snapshot = collectOfficeSnapshot();
@@ -1262,7 +1264,7 @@ async function generateOnce(outPath: string, refreshSeconds?: number): Promise<s
   return resolved;
 }
 
-async function main(args: string[] = []): Promise<void> {
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
   const argv = await createStandardYargs(['node', 'virtual_office', ...args])
     .option('out', { type: 'string', default: DEFAULT_OUT })
     .option('watch', {
@@ -1273,16 +1275,22 @@ async function main(args: string[] = []): Promise<void> {
 
   const watchSeconds = argv.watch && argv.watch > 0 ? Math.max(5, argv.watch) : undefined;
   const written = await generateOnce(String(argv.out), watchSeconds);
-  console.log(`[virtual-office] ${written}`);
-  console.log(`[virtual-office] open it: open "${written}"`);
+  print(`[virtual-office] ${written}`);
+  print(`[virtual-office] open it: open "${written}"`);
   if (watchSeconds) {
-    console.log(`[virtual-office] watching — regenerating every ${watchSeconds}s (Ctrl-C to stop)`);
+    print(`[virtual-office] watching — regenerating every ${watchSeconds}s (Ctrl-C to stop)`);
     setInterval(() => {
       void generateOnce(String(argv.out), watchSeconds)
         .then((writtenPath) => {
-          console.log(`[virtual-office] refreshed ${writtenPath} @ ${nowIso()}`);
+          print(`[virtual-office] refreshed ${writtenPath} @ ${nowIso()}`);
         })
-        .catch((error) => console.error(`[virtual-office] regeneration failed: ${error}`));
+        .catch((error) =>
+          print(
+            `[virtual-office] regeneration failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          )
+        );
     }, watchSeconds * 1000);
   }
 }
@@ -1292,14 +1300,7 @@ export { generateOnce };
 export const runVirtualOffice = defineScript({
   name: 'office',
   flags: [],
-  run: async ({ argv }) => {
-    try {
-      await main(argv);
-    } catch (error) {
-      console.error(error);
-      process.exitCode = 1;
-    }
-  },
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
