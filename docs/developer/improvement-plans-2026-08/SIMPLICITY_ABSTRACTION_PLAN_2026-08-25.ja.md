@@ -19626,6 +19626,17 @@ SX-06／SX-11 の残存CLI境界を再監査し、`system_upgrade`がnested pipe
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1165
+
+1164のfull validateで検出されたNode型の`process.exitCode`（`string | number`）差分を修正し、harnessの`getProcessExitCode`で数値化して公開戻り値契約（`number | undefined`）を満たすようにした。nested pipelineの終了値と非同期終了境界の挙動は変更していない。
+
+検証:
+
+- `system_upgrade.test.ts`／`async-exit-boundary.test.ts` **2 files / 10 tests passed**。
+- 対象ESLint、`git diff --check` passed。full validateで検出されたTypeScriptエラーを解消した。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
