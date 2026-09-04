@@ -117,9 +117,7 @@ export const runBindings = defineScript({
     const json = context.argv.includes('--json');
     if (!dump) throw new Error(usage());
     const bindings = loadCoreSeamBindings();
-    process.stdout.write(
-      json ? `${JSON.stringify(bindings, null, 2)}\n` : `${renderHuman(bindings)}\n`
-    );
+    context.print(json ? JSON.stringify(bindings, null, 2) : renderHuman(bindings));
   },
 });
 
