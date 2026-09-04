@@ -17007,7 +17007,7 @@ surface mismatch error semanticsは変更していない。
 
 - control-plane client **1 file / 10 tests passed**。
 - root typecheck、root lint、`git diff --check` passed。
-- canonical full gateはこのsliceの後段で実行する。
+- canonical full gate **69 gates / 0 failed**。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
@@ -18031,6 +18031,20 @@ style rendering の挙動は変更していない。
 検証:
 
 - Media theme／document composition／document bridge **3 files / 20 tests passed（43 skipped）**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
+## 2026-09-05 再レビュー修正 1040
+
+SX-04／SX-10 の spreadsheet semantic token dependency を再監査し、spreadsheet pipeline の token catalog loader を
+`SemanticRenderTokenCatalog` へ接続した。signal tone の versioned catalog contract を維持し、tone fallback／style selection／sheet
+rendering の順序と semantics は変更していない。
+
+検証:
+
+- Media semantic token／spreadsheet **2 files / 5 tests passed（57 skipped）**。
 - `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
 - canonical full gateはこのsliceの後段で実行する。
 
