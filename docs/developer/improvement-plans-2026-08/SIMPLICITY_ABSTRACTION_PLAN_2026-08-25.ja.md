@@ -18822,6 +18822,20 @@ dry-run既定と保存処理の既存semanticsは変更していない。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1096
+
+SX-06 の onboarding apply scriptを再監査し、CLIのdry-run／JSON／summary出力だけでなく、pipeline library入口
+`applyOnboardingInput` 内のpersona／reasoning backend通知も注入 printerへ統一した。harnessのquiet／json／failure boundaryを利用し、
+identity、tenant、tutorial、reasoning、runbook、state／summaryの生成と保存順序は変更していない。
+
+検証:
+
+- onboarding apply **2 files / 12 tests passed**。既存入力validation／summary／state契約とdirect console不在を確認した。
+- `pnpm run typecheck`、対象2ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -44,6 +44,8 @@ import {
 } from './reasoning_backend_selection.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 const ONBOARDING_IDENTITY_EXAMPLE = 'knowledge/public/templates/onboarding/identity.example.json';
 
 type ApplyInput = OnboardingApplyInput;
@@ -437,7 +439,7 @@ export function buildApplySummary(
 }
 
 /** Library entry used by governed pipelines; the CLI below remains a facade. */
-export async function applyOnboardingInput(input: ApplyInput) {
+export async function applyOnboardingInput(input: ApplyInput, print: Print = () => undefined) {
   const validatedInput = parseApplyInput(input);
   const validateState = compileSchema(
     pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
@@ -449,7 +451,7 @@ export async function applyOnboardingInput(input: ApplyInput) {
   const persona = resolveInputPersona(input);
   const personaEnvPath = persistPersona(persona);
   setRegisteredEnv('KYBERION_PERSONA', persona);
-  console.log(`Persisted KYBERION_PERSONA=${persona} to ${personaEnvPath}`);
+  print(`Persisted KYBERION_PERSONA=${persona} to ${personaEnvPath}`);
   await applyIdentity(validatedInput, now);
   const tenantEntries = await applyTenants(validatedInput, now);
   const tutorial = await applyTutorial(validatedInput, now);
@@ -458,7 +460,7 @@ export async function applyOnboardingInput(input: ApplyInput) {
     if (backend) {
       const envLocal = persistReasoningBackend(backend);
       setRegisteredEnv('KYBERION_REASONING_BACKEND', backend);
-      console.log(`Persisted KYBERION_REASONING_BACKEND=${backend} to ${envLocal}`);
+      print(`Persisted KYBERION_REASONING_BACKEND=${backend} to ${envLocal}`);
     }
   }
   const reasoning = await evaluateReasoningBackend(new Date(now));
@@ -491,7 +493,7 @@ export async function applyOnboardingInput(input: ApplyInput) {
   };
 }
 
-export async function main(argv: string[] = []) {
+export async function main(argv: string[] = [], print: Print = () => undefined) {
   const parsed = await yargs(argv)
     .option('identity', {
       type: 'string',
@@ -513,16 +515,16 @@ export async function main(argv: string[] = []) {
   validateInput(input);
 
   if (parsed['dry-run']) {
-    console.log(JSON.stringify({ status: 'validated', identity: input.identity }, null, 2));
+    print(JSON.stringify({ status: 'validated', identity: input.identity }, null, 2));
     return;
   }
 
-  const result = await applyOnboardingInput(input);
+  const result = await applyOnboardingInput(input, print);
   if (parsed.json) {
-    console.log(JSON.stringify(result, null, 2));
+    print(JSON.stringify(result, null, 2));
     return;
   }
-  console.log(
+  print(
     buildApplySummary(
       input,
       Array.from({ length: result.tenants }),
@@ -539,9 +541,9 @@ export async function main(argv: string[] = []) {
 export const runOnboardingApply = defineScript({
   name: 'onboarding:apply',
   flags: [],
-  run: async ({ argv }) => {
+  run: async ({ argv, print }) => {
     try {
-      return await main(argv);
+      return await main(argv, print);
     } catch (error) {
       throw new ScriptExitError(
         1,
