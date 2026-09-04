@@ -9,13 +9,15 @@ import {
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePipelineContextValues, resolveVars } from '@agent/core/src/logic-utils';
+import { resolvePipelineContextValues } from '@agent/core/src/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, sleep } from '@agent/core/async-utils';
 import { defineCatalog, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
-import { runActuatorStepSequence } from '../../../core/actuator-sdk.js';
+import { runAdfActuatorPipeline } from '../../../core/actuator-sdk.js';
+import type { AdfEngineContext } from '../../../core/adf-engine.js';
+import { DEFAULT_PIPELINE_TIMEOUT_MS } from '@agent/core/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import * as path from 'node:path';
 
@@ -74,7 +76,7 @@ const androidUiDefaultsCatalog = defineCatalog<AndroidUiDefaults>({
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
+  params: Record<string, unknown>;
 }
 
 export interface AndroidAction {
@@ -86,7 +88,7 @@ export interface AndroidAction {
     max_steps?: number;
     artifacts_dir?: string;
   };
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 interface AndroidUiNode {
@@ -127,7 +129,7 @@ export async function handleAction(input: AndroidAction) {
 export async function executePipeline(
   steps: PipelineStep[],
   options: AndroidAction['options'] = {},
-  initialCtx: Record<string, any> = {}
+  initialCtx: AdfEngineContext = {}
 ) {
   ensureDefaultOpPreflight();
   const rootDir = pathResolver.rootDir();
@@ -138,39 +140,58 @@ export async function executePipeline(
   );
   if (!safeExistsSync(artifactsDir)) safeMkdir(artifactsDir, { recursive: true });
 
-  let ctx: Record<string, any> = {
+  let ctx: AdfEngineContext = {
     ...initialCtx,
     timestamp: nowIso(),
     artifacts_dir: artifactsDir,
-    android_serial: options?.serial || initialCtx.android_serial || '',
+    android_serial:
+      options?.serial ||
+      (typeof initialCtx.android_serial === 'string' ? initialCtx.android_serial : ''),
   };
 
   const maxSteps = options?.max_steps ?? 50;
-  const sequence = await runActuatorStepSequence({
-    actuatorId: 'android',
-    steps,
-    context: ctx,
-    maxSteps,
-    resolveParams: (params, context) =>
-      resolvePipelineContextValues(params, context) as Record<string, any>,
-    onStepStart: (step) => logger.info(`  [ANDROID_PIPELINE] ${step.type}:${step.op}...`),
-    onStepError: (step, error) =>
-      logger.error(
-        `  [ANDROID_PIPELINE] Step failed (${step.op}): ${error instanceof Error ? error.message : String(error)}`
-      ),
-    execute: async (_op, params, context, step) => {
-      const resolve = (val: any): any => resolveVars(val, context);
-      switch (step.type) {
-        case 'capture':
-          return opCapture(step.op, params, context, resolve, options);
-        case 'transform':
-          return opTransform(step.op, params, context, resolve);
-        case 'apply':
-          return opApply(step.op, params, context, resolve, options);
-        default:
-          logger.warn(`[ANDROID_PIPELINE] Unsupported step type: ${step.type}`);
-          return context;
+  const executableSteps = steps
+    .filter((step): step is PipelineStep => {
+      if (
+        step.type === 'capture' ||
+        step.type === 'transform' ||
+        step.type === 'apply' ||
+        step.type === 'control'
+      ) {
+        return true;
       }
+      logger.warn(`[ANDROID_PIPELINE] Unsupported step type: ${String(step.type)}`);
+      return false;
+    })
+    .map((step) => ({ ...step, op: `android:${step.op}` }));
+
+  const sequence = await runAdfActuatorPipeline({
+    actuatorId: 'android',
+    steps: executableSteps,
+    context: ctx,
+    options: {
+      maxSteps,
+      timeoutMs: options?.timeout_ms ?? DEFAULT_PIPELINE_TIMEOUT_MS,
+      resolveVars: (value, context) => resolvePipelineContextValues(value, context),
+    },
+    handlers: {
+      capture: (op, params, context, resolve) =>
+        opCapture(stripAndroidOpPrefix(op), params, context, resolve, options),
+      transform: (op, params, context, resolve) =>
+        opTransform(stripAndroidOpPrefix(op), params, context, resolve),
+      apply: (op, params, context, resolve) =>
+        opApply(stripAndroidOpPrefix(op), params, context, resolve, options),
+    },
+    hooks: {
+      beforeStep: (step) =>
+        logger.info(`  [ANDROID_PIPELINE] ${step.type}:${stripAndroidOpPrefix(step.op)}...`),
+      afterStep: (step, _stepNumber, _context, outcome) => {
+        if (outcome.status === 'failed') {
+          logger.error(
+            `  [ANDROID_PIPELINE] Step failed (${stripAndroidOpPrefix(step.op)}): ${outcome.error || 'unknown error'}`
+          );
+        }
+      },
     },
   });
   ctx = sequence.context;
@@ -184,9 +205,16 @@ export async function executePipeline(
 
   return {
     status: sequence.status,
-    results: sequence.results,
+    results: sequence.results.map((result) => ({
+      ...result,
+      op: stripAndroidOpPrefix(result.op),
+    })),
     context: ctx,
   };
+}
+
+function stripAndroidOpPrefix(op: string): string {
+  return op.startsWith('android:') ? op.slice('android:'.length) : op;
 }
 
 async function opCapture(
