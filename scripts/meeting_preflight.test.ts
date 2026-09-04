@@ -236,32 +236,33 @@ describe('meeting_preflight', () => {
 
     const { main } = await import('./meeting_preflight.js');
 
-    const status = await main();
+    const print = vi.fn();
+    const status = await main([], print);
 
     expect(status).toBe(1);
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(print).toHaveBeenCalledWith(
       expect.stringContaining('[meeting-preflight] doctor.meeting: fail')
     );
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(print).toHaveBeenCalledWith(
       expect.stringContaining('pnpm env:bootstrap --manifest meeting-participation-runtime --apply')
     );
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(print).toHaveBeenCalledWith(
       expect.stringContaining('pnpm exec playwright install chromium')
     );
     if (process.platform === 'darwin') {
       // BlackHole remediation is macOS-only; linux prints a warn with no fix.
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('brew install blackhole-2ch'));
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('brew install blackhole-2ch'));
     }
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('uv pip install mlx-audio'));
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('uv pip install mlx-audio'));
+    expect(print).toHaveBeenCalledWith(
       expect.stringContaining('Run Task 2: pnpm pipeline --input pipelines/voice-onboarding.json')
     );
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(print).toHaveBeenCalledWith(
       expect.stringContaining(
         'pnpm meeting:consent grant --mission <MISSION_ID> --operator <handle>'
       )
     );
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm reasoning:setup'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('pnpm reasoning:setup'));
   });
 
   it('requires operator action when the exact BlackHole route is ambiguous', async () => {

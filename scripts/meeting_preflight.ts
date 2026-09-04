@@ -16,6 +16,8 @@ import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meetin
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 export type MeetingPreflightStatus = 'pass' | 'fail' | 'warn' | 'operator_action_required';
 
 export interface MeetingPreflightItem {
@@ -364,16 +366,16 @@ export async function runMeetingPreflight(
   };
 }
 
-function printMeetingPreflightReport(report: MeetingPreflightReport): void {
+function printMeetingPreflightReport(report: MeetingPreflightReport, print: Print): void {
   for (const entry of report.items) {
-    console.log(`[meeting-preflight] ${entry.id}: ${entry.status}`);
-    console.log(`  detail: ${entry.detail}`);
-    console.log(`  fix: ${entry.fix}`);
+    print(`[meeting-preflight] ${entry.id}: ${entry.status}`);
+    print(`  detail: ${entry.detail}`);
+    print(`  fix: ${entry.fix}`);
   }
-  console.log('');
+  print('');
 }
 
-export async function main(args: string[] = []): Promise<number> {
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<number> {
   const argv = await createStandardYargs(['node', 'meeting_preflight', ...args])
     .option('mission', { type: 'string' })
     .option('json', { type: 'boolean', default: false })
@@ -384,9 +386,9 @@ export async function main(args: string[] = []): Promise<number> {
   });
 
   if (argv.json) {
-    console.log(JSON.stringify(report, null, 2));
+    print(JSON.stringify(report, null, 2));
   } else {
-    printMeetingPreflightReport(report);
+    printMeetingPreflightReport(report, print);
   }
 
   return report.ready ? 0 : 1;
@@ -400,7 +402,7 @@ if (
     name: 'meeting:preflight',
     flags: [],
     async run(context) {
-      const status = await main(context.argv);
+      const status = await main(context.argv, context.print);
       if (status !== 0) throw new Error(`meeting:preflight failed with exit code ${status}`);
     },
   })();
