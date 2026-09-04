@@ -1,5 +1,34 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+describe('a2ui message validation', () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it('accepts one structurally valid operation', async () => {
+    const { validateA2UIMessage } = await import('./a2ui.js');
+    expect(
+      validateA2UIMessage({
+        updateDataModel: { surfaceId: 'surface-1', data: { status: 'ready' } },
+      })
+    ).toEqual({
+      updateDataModel: { surfaceId: 'surface-1', data: { status: 'ready' } },
+    });
+  });
+
+  it('rejects malformed operations before a surface applies them', async () => {
+    const { validateA2UIMessage } = await import('./a2ui.js');
+    expect(() =>
+      validateA2UIMessage({
+        updateDataModel: { surfaceId: 'surface-1', data: [] },
+      })
+    ).toThrow('A2UI data model must be an object.');
+    expect(() => validateA2UIMessage({ deleteSurface: { surfaceId: 'bad id' } })).toThrow(
+      'A2UI surfaceId is invalid.'
+    );
+  });
+});
+
 describe('a2ui dispatch', () => {
   const originalFetch = globalThis.fetch;
   const originalBridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL;
