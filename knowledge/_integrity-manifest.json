@@ -7315,6 +7315,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/finance-controller-cost-report.schema.json",
+      "tier": "public",
+      "size": 3009,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/financial-model.schema.json",
       "tier": "public",
       "size": 1903,

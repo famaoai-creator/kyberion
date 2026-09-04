@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/finance-controller-cost-report.schema.json",
+  "title": "Finance Controller Cost Report Input",
+  "type": "object",
+  "additionalProperties": true,
+  "propertyNames": {
+    "not": { "enum": ["__proto__", "constructor", "prototype"] }
+  },
+  "definitions": {
+    "numberLike": {
+      "oneOf": [{ "type": "number" }, { "type": "string", "minLength": 1 }]
+    },
+    "metricEnvelope": {
+      "type": "object",
+      "additionalProperties": true,
+      "propertyNames": {
+        "not": { "enum": ["__proto__", "constructor", "prototype"] }
+      },
+      "properties": {
+        "totalCostUsd": { "$ref": "#/definitions/numberLike" },
+        "total_cost_usd": { "$ref": "#/definitions/numberLike" },
+        "costUsd": { "$ref": "#/definitions/numberLike" },
+        "cost_usd": { "$ref": "#/definitions/numberLike" },
+        "total_usd": { "$ref": "#/definitions/numberLike" },
+        "totalTokens": { "$ref": "#/definitions/numberLike" },
+        "total_tokens": { "$ref": "#/definitions/numberLike" },
+        "promptTokens": { "$ref": "#/definitions/numberLike" },
+        "prompt_tokens": { "$ref": "#/definitions/numberLike" },
+        "completionTokens": { "$ref": "#/definitions/numberLike" },
+        "completion_tokens": { "$ref": "#/definitions/numberLike" }
+      },
+      "anyOf": [
+        { "required": ["totalCostUsd"] },
+        { "required": ["total_cost_usd"] },
+        { "required": ["costUsd"] },
+        { "required": ["cost_usd"] },
+        { "required": ["total_usd"] },
+        { "required": ["totalTokens"] },
+        { "required": ["total_tokens"] },
+        { "required": ["promptTokens"] },
+        { "required": ["prompt_tokens"] },
+        { "required": ["completionTokens"] },
+        { "required": ["completion_tokens"] }
+      ]
+    }
+  },
+  "properties": {
+    "totalCostUsd": { "$ref": "#/definitions/numberLike" },
+    "total_cost_usd": { "$ref": "#/definitions/numberLike" },
+    "costUsd": { "$ref": "#/definitions/numberLike" },
+    "cost_usd": { "$ref": "#/definitions/numberLike" },
+    "total_usd": { "$ref": "#/definitions/numberLike" },
+    "totalTokens": { "$ref": "#/definitions/numberLike" },
+    "total_tokens": { "$ref": "#/definitions/numberLike" },
+    "promptTokens": { "$ref": "#/definitions/numberLike" },
+    "prompt_tokens": { "$ref": "#/definitions/numberLike" },
+    "completionTokens": { "$ref": "#/definitions/numberLike" },
+    "completion_tokens": { "$ref": "#/definitions/numberLike" },
+    "totals": { "$ref": "#/definitions/metricEnvelope" },
+    "usage": { "$ref": "#/definitions/metricEnvelope" },
+    "metrics": { "$ref": "#/definitions/metricEnvelope" },
+    "summary": { "$ref": "#/definitions/metricEnvelope" }
+  },
+  "anyOf": [
+    { "$ref": "#/definitions/metricEnvelope" },
+    { "required": ["totals"] },
+    { "required": ["usage"] },
+    { "required": ["metrics"] },
+    { "required": ["summary"] }
+  ]
+}
