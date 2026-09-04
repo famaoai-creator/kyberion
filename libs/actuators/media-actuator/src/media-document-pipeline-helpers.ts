@@ -9,6 +9,7 @@ import {
   generateNativePptx,
   generateNativeXlsx,
 } from '@agent/core/media-contracts';
+import type { PdfDesignProtocol } from '@agent/core/src/types/pdf-protocol';
 import type { PptxDesignProtocol, PptxSlide } from '@agent/core/src/types/pptx-protocol';
 import * as path from 'node:path';
 import {
@@ -67,6 +68,16 @@ export interface MediaPptxProtocol extends PptxDesignProtocol {
   };
 }
 
+export interface MediaInvoicePdfProtocol extends Omit<PdfDesignProtocol, 'metadata'> {
+  metadata: {
+    title?: string;
+    subject?: string;
+    author?: string;
+    creationDate?: string;
+    composition: Record<string, unknown>;
+  };
+}
+
 const documentLayoutCatalog = defineCatalog<DocumentLayoutCatalog>({
   id: 'document-layouts',
   path: DOCUMENT_LAYOUTS_PATH,
@@ -97,7 +108,7 @@ export interface MediaDocumentPipelineDeps {
   buildReportDocxProtocol: (rootDir: string, brief: any) => any;
   buildReportPdfProtocol: (rootDir: string, brief: any) => any;
   buildTrackerSpreadsheetProtocol: (rootDir: string, brief: any) => any;
-  buildDocumentPdfProtocol: (rawBrief: any) => any;
+  buildDocumentPdfProtocol: (rawBrief: any) => MediaInvoicePdfProtocol;
   normalizeXlsxDesignProtocol: (protocol: any) => any;
   resolveDocumentLayoutTemplate: (
     rootDir: string,
@@ -464,7 +475,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     }
   }
 
-  function buildDocumentPdfProtocol(rawBrief: any): any {
+  function buildDocumentPdfProtocol(rawBrief: any): MediaInvoicePdfProtocol {
     const brief = normalizeInvoiceDocumentBrief(rawBrief);
     if (brief.document_type !== 'invoice') {
       throw new Error(
