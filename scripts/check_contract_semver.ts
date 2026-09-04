@@ -26,10 +26,11 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 interface Manifest {
   actuator_id: string;
@@ -74,7 +75,7 @@ function listActuatorManifests(): string[] {
 }
 
 function readManifest(p: string): Manifest {
-  return readJson<Manifest>(p);
+  return readSafeJsonFile<Manifest>(p, `actuator manifest ${p}`);
 }
 
 function sha256(content: string): string {
@@ -234,7 +235,7 @@ function check(prev: BaselineFile, current: ActuatorFingerprint[]): Diagnostic[]
 
 function loadBaseline(): BaselineFile | null {
   if (!safeExistsSync(BASELINE_PATH)) return null;
-  return readJson<BaselineFile>(BASELINE_PATH);
+  return readSafeJsonFile<BaselineFile>(BASELINE_PATH, 'contract semver baseline');
 }
 
 function writeBaseline(file: BaselineFile): void {
