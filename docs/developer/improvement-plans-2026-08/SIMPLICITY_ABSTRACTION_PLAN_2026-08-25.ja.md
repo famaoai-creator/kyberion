@@ -18252,6 +18252,21 @@ SX-09／SX-14 の共通 `NextAction` 出力を再監査し、`next-action.ts` �
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1056
+
+SX-10 の actuator ABI を再監査し、`generate_op_registry.ts` に残っていた actuator ごとの `describeOps` 手動 import／一覧を廃止した。
+manifest-backed actuator catalog の各 `src/op-catalog` を実行時に発見して読み込み、source 実行（ts-loader）と compiled 実行（dist）の双方で
+同じ catalog discovery を使うようにした。生成済み registry／discovery の内容、manifest の順序、非 catalog actuator の扱いは変更していない。
+
+検証:
+
+- `generate_op_registry` **1 file / 3 tests passed**。manifest-backed catalog の動的 discovery と手動 import 一覧の除去を確認した。
+- `pnpm generate:op-registry -- --check` passed。生成済み registry／discovery に差分なし。
+- `pnpm run typecheck`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gate **69 gates / 0 failed** passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
