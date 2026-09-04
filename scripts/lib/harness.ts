@@ -45,6 +45,11 @@ export function exitProcess(code: number): never {
   process.exit(code);
 }
 
+/** Set a final exit status for asynchronous processes without terminating them. */
+export function setProcessExitCode(code: number): void {
+  process.exitCode = code;
+}
+
 /** Replace process argv for legacy child-entry modules that inspect it directly. */
 export function setCurrentProcessArgv(argv: string[]): void {
   process.argv = [...argv];

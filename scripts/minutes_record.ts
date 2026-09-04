@@ -24,7 +24,12 @@ import { logger } from '@agent/core/core';
 import { probeMicCapture } from '@agent/core/mic-capture';
 import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
 import { t as catalogT } from '@agent/core/t';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import {
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  setProcessExitCode,
+} from './lib/harness.js';
 
 function getFlag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -106,10 +111,10 @@ async function main(argv: string[] = []): Promise<void> {
           minutes,
         })}`
       );
-      process.exitCode = 0;
+      setProcessExitCode(0);
     } catch (error) {
       logger.error(error instanceof Error ? error.message : String(error));
-      process.exitCode = 1;
+      setProcessExitCode(1);
     }
   };
   process.on('SIGINT', () => void finish());

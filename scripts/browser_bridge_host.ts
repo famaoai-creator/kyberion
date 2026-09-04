@@ -15,6 +15,7 @@
  */
 
 import { Buffer } from 'node:buffer';
+import { setProcessExitCode } from './lib/harness.js';
 import {
   buildBrowserExtensionPipelineCandidate,
   compileBrowserRecordingToPipeline,
@@ -996,4 +997,4 @@ process.stdin.on('end', () => {
   inputEnded = true;
   exitWhenDrained();
 });
-process.stdin.on('error', () => (process.exitCode = 1));
+process.stdin.on('error', () => setProcessExitCode(1));

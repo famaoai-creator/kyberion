@@ -54,7 +54,7 @@ import type {
 import type { ConversationAgent } from '@agent/core/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathToFileURL } from 'node:url';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
 // Side-effect imports register the audio-bus capability probes so the
 // participation-runtime manifest can resolve `audio-bus.blackhole` etc.
@@ -585,7 +585,7 @@ async function main(args: string[] = []): Promise<void> {
     const persisted = finalizeAndPersist(trace);
     logger.info(`📋 meeting_participate trace: ${persisted.path}`);
     if (exitCode !== 0) {
-      process.exitCode = exitCode;
+      setProcessExitCode(exitCode);
     }
   }
 }

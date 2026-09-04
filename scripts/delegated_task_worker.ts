@@ -6,7 +6,7 @@ import {
   resumeDelegatedTask,
   wakeDelegatedTaskWorker,
 } from '@agent/core/delegated-task-observability';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
@@ -29,7 +29,7 @@ async function runWorker(argv: string[], print: Print): Promise<void> {
     settled = true;
     if (poll) clearInterval(poll);
     if (idleTimeout) clearTimeout(idleTimeout);
-    process.exitCode = exitCode;
+    setProcessExitCode(exitCode);
   }
 
   async function consumeWake(): Promise<void> {
