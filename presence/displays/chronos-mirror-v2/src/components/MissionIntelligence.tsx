@@ -301,10 +301,7 @@ export function MissionIntelligence({
           agentId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) {
-        throw new Error(body.error || 'Failed to remediate runtime lease');
-      }
+      if (!res.ok) throw new Error('Failed to remediate runtime lease');
       await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to remediate runtime lease');
@@ -327,10 +324,7 @@ export function MissionIntelligence({
           messageId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) {
-        throw new Error(body.error || 'Failed to clear outbox message');
-      }
+      if (!res.ok) throw new Error('Failed to clear outbox message');
       await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to clear outbox message');
@@ -351,8 +345,7 @@ export function MissionIntelligence({
           operation,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Mission control action failed');
+      if (!res.ok) throw new Error('Mission control action failed');
       setActionResult(`${missionId}: ${operation}`);
       await refreshData();
     } catch (err: any) {
@@ -373,8 +366,7 @@ export function MissionIntelligence({
           seedId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Mission seed promotion failed');
+      if (!res.ok) throw new Error('Mission seed promotion failed');
       setActionResult(`${seedId}: promoted`);
       await refreshData();
     } catch (err: any) {
@@ -396,8 +388,7 @@ export function MissionIntelligence({
           artifactId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Track seed creation failed');
+      if (!res.ok) throw new Error('Track seed creation failed');
       setActionResult(`${trackId}: seed ready`);
       await refreshData();
     } catch (err: any) {
@@ -544,8 +535,7 @@ export function MissionIntelligence({
           decision,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Approval decision failed');
+      if (!res.ok) throw new Error('Approval decision failed');
       setActionResult(`${approval.id}: ${decision}`);
       await refreshData();
     } catch (err: any) {
@@ -570,8 +560,7 @@ export function MissionIntelligence({
           decision,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Distill candidate decision failed');
+      if (!res.ok) throw new Error('Distill candidate decision failed');
       setActionResult(`${candidate.candidate_id}: ${decision}`);
       await refreshData();
     } catch (err: any) {
@@ -593,8 +582,7 @@ export function MissionIntelligence({
           operation,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Surface control action failed');
+      if (!res.ok) throw new Error('Surface control action failed');
       setActionResult(`${surfaceId || 'surfaces'}: ${operation}`);
       await refreshData();
     } catch (err: any) {
@@ -615,8 +603,7 @@ export function MissionIntelligence({
           dryRun,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Memory promotion action failed');
+      if (!res.ok) throw new Error('Memory promotion action failed');
       if (dryRun) {
         const pending = Array.isArray(body.pending) ? body.pending.length : 0;
         setActionResult(`memory promotion dry-run: ${pending} candidate(s)`);
@@ -802,8 +789,7 @@ export function MissionIntelligence({
           sessionId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Browser session control action failed');
+      if (!res.ok) throw new Error('Browser session control action failed');
       setActionResult(`${sessionId}: ${action}`);
       await refreshData();
     } catch (err: any) {

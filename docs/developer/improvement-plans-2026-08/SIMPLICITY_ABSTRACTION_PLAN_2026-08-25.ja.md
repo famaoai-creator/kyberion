@@ -16632,6 +16632,13 @@ SX-08／SX-09 の Chronos ApprovalsWorkspace `/api/approvals` queue projection�
 検証: Approvals response **1 file / 4 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 927
+
+SX-08／SX-09 の Chronos legacy mutation projectionを再監査し、MissionIntelligence の各 POST と DeliverablesWorkspace の review POST が response bodyを未検証の `error` fieldとして読む残存を修正した。成功時は既存の refresh／専用 parserへ進み、失敗時はHTTP statusと固定の利用者向けメッセージだけで扱うため、未検証 payloadが stateやエラー表示へ流入しない。MissionIntelligence GET の広域 projection parserは別スライスとして残る。
+
+検証: Chronos mutation response boundary **対象変更のみ / 0 body projection**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
