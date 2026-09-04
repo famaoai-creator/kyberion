@@ -8,13 +8,18 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePipelineContextValues, resolveVars } from '@agent/core/src/logic-utils';
+import { resolvePipelineContextValues } from '@agent/core/src/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry } from '@agent/core/async-utils';
 import { isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
-import { runActuatorStepSequence } from '../../../core/actuator-sdk.js';
+import { runAdfActuatorPipeline } from '../../../core/actuator-sdk.js';
+import type { AdfEngineContext } from '../../../core/adf-engine.js';
+import {
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import * as path from 'node:path';
 
@@ -42,7 +47,7 @@ function resolveIosRepositoryPath(rootDir: string, value: unknown): string {
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
+  params: Record<string, unknown>;
 }
 
 export interface IOSAction {
@@ -53,7 +58,7 @@ export interface IOSAction {
     timeout_ms?: number;
     artifacts_dir?: string;
   };
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 interface SimctlDevice {
@@ -67,7 +72,7 @@ interface SimctlDevice {
 export async function executePipeline(
   steps: PipelineStep[],
   options: IOSAction['options'] = {},
-  initialCtx: Record<string, any> = {}
+  initialCtx: AdfEngineContext = {}
 ) {
   ensureDefaultOpPreflight();
   const rootDir = pathResolver.rootDir();
@@ -77,37 +82,57 @@ export async function executePipeline(
   );
   if (!safeExistsSync(artifactsDir)) safeMkdir(artifactsDir, { recursive: true });
 
-  let ctx: Record<string, any> = {
+  let ctx: AdfEngineContext = {
     ...initialCtx,
     timestamp: nowIso(),
     artifacts_dir: artifactsDir,
-    ios_device_udid: options?.device_udid || initialCtx.ios_device_udid || '',
+    ios_device_udid:
+      options?.device_udid ||
+      (typeof initialCtx.ios_device_udid === 'string' ? initialCtx.ios_device_udid : ''),
   };
 
-  const sequence = await runActuatorStepSequence({
-    actuatorId: 'ios',
-    steps,
-    context: ctx,
-    resolveParams: (params, context) =>
-      resolvePipelineContextValues(params, context) as Record<string, any>,
-    onStepStart: (step) => logger.info(`  [IOS_PIPELINE] ${step.type}:${step.op}...`),
-    onStepError: (step, error) =>
-      logger.error(
-        `  [IOS_PIPELINE] Step failed (${step.op}): ${error instanceof Error ? error.message : String(error)}`
-      ),
-    execute: async (_op, params, context, step) => {
-      const resolve = (val: any): any => resolveVars(val, context);
-      switch (step.type) {
-        case 'capture':
-          return opCapture(step.op, params, context, resolve, options);
-        case 'transform':
-          return opTransform(step.op, params, context, resolve);
-        case 'apply':
-          return opApply(step.op, params, context, resolve, options);
-        default:
-          logger.warn(`[IOS_PIPELINE] Unsupported step type: ${step.type}`);
-          return context;
+  const executableSteps = steps
+    .filter((step): step is PipelineStep => {
+      if (
+        step.type === 'capture' ||
+        step.type === 'transform' ||
+        step.type === 'apply' ||
+        step.type === 'control'
+      ) {
+        return true;
       }
+      logger.warn(`[IOS_PIPELINE] Unsupported step type: ${String(step.type)}`);
+      return false;
+    })
+    .map((step) => ({ ...step, op: `ios:${step.op}` }));
+
+  const sequence = await runAdfActuatorPipeline({
+    actuatorId: 'ios',
+    steps: executableSteps,
+    context: ctx,
+    options: {
+      maxSteps: DEFAULT_MAX_PIPELINE_STEPS,
+      timeoutMs: options?.timeout_ms ?? DEFAULT_PIPELINE_TIMEOUT_MS,
+      resolveVars: (value, context) => resolvePipelineContextValues(value, context),
+    },
+    handlers: {
+      capture: (op, params, context, resolve) =>
+        opCapture(stripIosOpPrefix(op), params, context, resolve, options),
+      transform: (op, params, context, resolve) =>
+        opTransform(stripIosOpPrefix(op), params, context, resolve),
+      apply: (op, params, context, resolve) =>
+        opApply(stripIosOpPrefix(op), params, context, resolve, options),
+    },
+    hooks: {
+      beforeStep: (step) =>
+        logger.info(`  [IOS_PIPELINE] ${step.type}:${stripIosOpPrefix(step.op)}...`),
+      afterStep: (step, _stepNumber, _context, outcome) => {
+        if (outcome.status === 'failed') {
+          logger.error(
+            `  [IOS_PIPELINE] Step failed (${stripIosOpPrefix(step.op)}): ${outcome.error || 'unknown error'}`
+          );
+        }
+      },
     },
   });
   ctx = sequence.context;
@@ -124,9 +149,16 @@ export async function executePipeline(
 
   return {
     status: sequence.status,
-    results: sequence.results,
+    results: sequence.results.map((result) => ({
+      ...result,
+      op: stripIosOpPrefix(result.op),
+    })),
     context: ctx,
   };
+}
+
+function stripIosOpPrefix(op: string): string {
+  return op.startsWith('ios:') ? op.slice('ios:'.length) : op;
 }
 
 async function opCapture(
