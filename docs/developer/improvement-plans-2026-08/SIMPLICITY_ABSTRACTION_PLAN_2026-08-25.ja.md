@@ -18657,6 +18657,20 @@ SX-06／SX-09 の `control_plane_cli` を再監査し、JSON／table-like list�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1084
+
+SX-06／SX-09 の OAuth setup interactive script を再監査し、usage、authorization summary、confirmation prompt、完了通知の直接 console 出力を
+注入 printerへ統一した。CLI wrapper／pipeline経路から同じ出力境界を利用し、OAuth callback surface起動、PKCE／state、credential summary保存、
+readline確認、既存signal cleanupは変更していない。signal exit codeは次のdaemon／interactive終了境界のsliceで継続監査する。
+
+検証:
+
+- OAuth setup **1 file / 1 test passed**。help usageのprinter経路と直接 console 出力の不在を確認した。
+- `pnpm run typecheck`、対象ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
