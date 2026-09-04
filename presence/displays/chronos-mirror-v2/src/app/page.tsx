@@ -93,6 +93,8 @@ import {
   parseMissionHistoryResponse,
   type ClientMissionHistoryEntry,
 } from '../lib/mission-history-response';
+import { parseCostSummaryResponse } from '../lib/cost-summary-response';
+import type { CostSummary } from '../lib/su-surface-data';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -155,7 +157,7 @@ function ChronosMirrorV2Content() {
   const [missionHistoryStatus, setMissionHistoryStatus] = useState('');
   const [missionHistoryTier, setMissionHistoryTier] = useState('');
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
-  const [costSummary, setCostSummary] = useState<any | null>(null);
+  const [costSummary, setCostSummary] = useState<CostSummary | null>(null);
   const [costSummaryError, setCostSummaryError] = useState<string | null>(null);
   const [planApprovalBusy, setPlanApprovalBusy] = useState(false);
   const [planApprovalMessage, setPlanApprovalMessage] = useState<string | null>(null);
@@ -304,11 +306,13 @@ function ChronosMirrorV2Content() {
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`cost ${response.status}`);
-        return (await response.json()) as { summary?: any };
+        const parsed = parseCostSummaryResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid cost summary response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setCostSummary(payload.summary || null);
+        setCostSummary(payload.summary);
         setCostSummaryError(null);
       })
       .catch((error) => {
