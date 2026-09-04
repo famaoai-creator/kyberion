@@ -162,6 +162,12 @@ interface WebAppProfileIndexRecord {
 const rootDir = pathResolver.rootDir();
 const ORCHESTRATOR_PACKET_DIR = path.join(rootDir, 'active/shared/tmp/orchestrator');
 let activeCliArgs: string[] = [];
+let activeCliPrint: Print = () => undefined;
+
+function printText(value: unknown = ''): void {
+  const rendered = typeof value === 'string' ? value : String(value);
+  activeCliPrint(rendered.endsWith('\n') ? rendered.slice(0, -1) : rendered);
+}
 
 /**
  * @deprecated Thin wrapper over `@agent/core`'s `resolveLocale`. `--locale`
@@ -282,7 +288,7 @@ function printMissionContextBanner(missionId?: string) {
   try {
     const state = loadStateAtPath(statePath);
     if (!state) return;
-    process.stderr.write(
+    printText(
       chalk.cyan(
         `\n🧠 BRAIN: Context hydrated from mission "${missionId}" (Status: ${state.status || 'unknown'})\n`
       )
@@ -314,52 +320,52 @@ function printActuatorList(actuators: ActuatorRecord[]) {
   printHeader();
 
   if (actuators.length === 0) {
-    console.log('No actuators were found in the actuator catalog.');
+    printText('No actuators were found in the actuator catalog.');
     return;
   }
 
-  console.log(`Indexed actuators: ${actuators.length}\n`);
+  printText(`Indexed actuators: ${actuators.length}\n`);
   actuators.forEach((actuator) => {
-    console.log(`- ${chalk.bold(actuator.name)} (${actuator.status})`);
-    console.log(`  ${actuator.description}`);
-    console.log(`  ${chalk.gray(actuator.path)}`);
+    printText(`- ${chalk.bold(actuator.name)} (${actuator.status})`);
+    printText(`  ${actuator.description}`);
+    printText(`  ${chalk.gray(actuator.path)}`);
   });
 }
 
 function printActuatorExampleSummary(actuators: ActuatorRecord[]) {
   printHeader();
-  console.log('Actuator-owned examples\n');
+  printText('Actuator-owned examples\n');
 
   let totalExamples = 0;
   for (const actuator of actuators) {
     const examples = loadActuatorExamples(actuator);
     if (examples.length === 0) continue;
     totalExamples += examples.length;
-    console.log(`- ${chalk.bold(actuator.name)} (${examples.length})`);
-    console.log(`  ${examples.map((example) => example.id).join(', ')}`);
+    printText(`- ${chalk.bold(actuator.name)} (${examples.length})`);
+    printText(`  ${examples.map((example) => example.id).join(', ')}`);
   }
 
   if (totalExamples === 0) {
-    console.log('No actuator-owned examples found.');
+    printText('No actuator-owned examples found.');
     return;
   }
 
-  console.log(`\nTotal examples: ${totalExamples}`);
+  printText(`\nTotal examples: ${totalExamples}`);
 }
 
 function printActuatorInfo(actuator: ActuatorRecord) {
   printHeader();
-  console.log(`${chalk.bold(actuator.name)} (${actuator.status})`);
-  console.log(actuator.description);
-  console.log(`Path: ${actuator.path}`);
+  printText(`${chalk.bold(actuator.name)} (${actuator.status})`);
+  printText(actuator.description);
+  printText(`Path: ${actuator.path}`);
 
   const runnableScript = resolveActuatorPath(actuator.path);
-  console.log(`Runnable: ${runnableScript ? runnableScript : 'Not built yet (run pnpm build)'}`);
+  printText(`Runnable: ${runnableScript ? runnableScript : 'Not built yet (run pnpm build)'}`);
   if (actuator.contractSchema) {
-    console.log(`Contract schema: ${actuator.contractSchema}`);
+    printText(`Contract schema: ${actuator.contractSchema}`);
   }
   const examples = loadActuatorExamples(actuator);
-  console.log(`Examples: ${examples.length}`);
+  printText(`Examples: ${examples.length}`);
 }
 
 function resolveActuatorExamplesCatalogPath(actuator: ActuatorRecord): string {
@@ -399,20 +405,20 @@ function loadActuatorExamples(actuator: ActuatorRecord): ActuatorExampleRecord[]
 function printActuatorExamples(actuator: ActuatorRecord) {
   printHeader();
   const examples = loadActuatorExamples(actuator);
-  console.log(`${chalk.bold(actuator.name)} examples\n`);
+  printText(`${chalk.bold(actuator.name)} examples\n`);
 
   if (examples.length === 0) {
-    console.log('No actuator-owned examples found.');
+    printText('No actuator-owned examples found.');
     return;
   }
 
   examples.forEach((example) => {
-    console.log(`- ${chalk.bold(example.id)}: ${example.title}`);
-    console.log(`  ${example.description}`);
-    console.log(`  ${chalk.gray(example.path)}`);
-    console.log(`  run: node dist/${actuator.path}/src/index.js --input ${example.path}`);
+    printText(`- ${chalk.bold(example.id)}: ${example.title}`);
+    printText(`  ${example.description}`);
+    printText(`  ${chalk.gray(example.path)}`);
+    printText(`  run: node dist/${actuator.path}/src/index.js --input ${example.path}`);
     if (example.tags?.length) {
-      console.log(`  tags: ${example.tags.join(', ')}`);
+      printText(`  tags: ${example.tags.join(', ')}`);
     }
   });
 }
@@ -455,17 +461,17 @@ type AppProfileRecord = {
 
 function printAppProfilesSummary(profiles: AppProfileRecord[], kind: string): void {
   printHeader();
-  console.log(`${kind} profiles\n`);
+  printText(`${kind} profiles\n`);
   if (profiles.length === 0) {
-    console.log(`No shared ${kind.toLowerCase()} profiles found.`);
+    printText(`No shared ${kind.toLowerCase()} profiles found.`);
     return;
   }
   profiles.forEach((profile) => {
-    console.log(`- ${chalk.bold(profile.id)} (${profile.platform})`);
-    console.log(`  ${profile.title}`);
-    console.log(`  ${profile.description}`);
-    console.log(`  ${chalk.gray(profile.path)}`);
-    if (profile.tags?.length) console.log(`  tags: ${profile.tags.join(', ')}`);
+    printText(`- ${chalk.bold(profile.id)} (${profile.platform})`);
+    printText(`  ${profile.title}`);
+    printText(`  ${profile.description}`);
+    printText(`  ${chalk.gray(profile.path)}`);
+    if (profile.tags?.length) printText(`  tags: ${profile.tags.join(', ')}`);
   });
 }
 
@@ -473,11 +479,11 @@ function printAppProfile(profiles: AppProfileRecord[], profileId: string, kind: 
   const profile = profiles.find((entry) => entry.id === profileId);
   if (!profile) throw new Error(`${kind} profile "${profileId}" not found.`);
   printHeader();
-  console.log(`${chalk.bold(profile.id)} (${profile.platform})`);
-  console.log(profile.title);
-  console.log(profile.description);
-  console.log(`Path: ${profile.path}`);
-  if (profile.tags?.length) console.log(`Tags: ${profile.tags.join(', ')}`);
+  printText(`${chalk.bold(profile.id)} (${profile.platform})`);
+  printText(profile.title);
+  printText(profile.description);
+  printText(`Path: ${profile.path}`);
+  if (profile.tags?.length) printText(`Tags: ${profile.tags.join(', ')}`);
 }
 
 function printMobileAppProfilesSummary() {
@@ -501,21 +507,21 @@ function printArtifactInfo(targetPath: string) {
   const stat = safeStat(resolvedPath);
   const ext = path.extname(resolvedPath).toLowerCase();
   printHeader();
-  console.log(chalk.bold(path.basename(resolvedPath)));
-  console.log(`Path: ${targetPath}`);
-  console.log(`Size: ${stat.size} bytes`);
-  console.log(`Modified: ${stat.mtime.toISOString()}`);
+  printText(chalk.bold(path.basename(resolvedPath)));
+  printText(`Path: ${targetPath}`);
+  printText(`Size: ${stat.size} bytes`);
+  printText(`Modified: ${stat.mtime.toISOString()}`);
   if (['.json', '.md', '.txt', '.log', '.adf', '.xml', '.yaml', '.yml'].includes(ext)) {
     const content = readTextFile(resolvedPath);
     const preview = content.split('\n').slice(0, 40).join('\n');
-    console.log('\nPreview:\n');
-    console.log(preview);
+    printText('\nPreview:\n');
+    printText(preview);
     if (content.split('\n').length > 40) {
-      console.log('\n... truncated ...');
+      printText('\n... truncated ...');
     }
     return;
   }
-  console.log('\nBinary artifact. Review this path with an appropriate local viewer if needed.');
+  printText('\nBinary artifact. Review this path with an appropriate local viewer if needed.');
 }
 
 function resolveOpenArtifactCommand(targetPath: string): { command: string; args: string[] } {
@@ -536,9 +542,9 @@ function openArtifact(targetPath: string) {
   }
   const opener = resolveOpenArtifactCommand(resolvedPath);
   printHeader();
-  console.log(chalk.bold(path.basename(resolvedPath)));
-  console.log(`Opening: ${targetPath}`);
-  console.log(`Command: ${[opener.command, ...opener.args].join(' ')}\n`);
+  printText(chalk.bold(path.basename(resolvedPath)));
+  printText(`Opening: ${targetPath}`);
+  printText(`Command: ${[opener.command, ...opener.args].join(' ')}\n`);
   safeExec(opener.command, opener.args, { cwd: rootDir, timeoutMs: 120000 });
 }
 
@@ -595,41 +601,40 @@ export function formatOperatorPacketLines(packet: OperatorInteractionPacket): st
 function printOperatorPacket(packet: OperatorInteractionPacket) {
   printHeader();
   for (const line of formatOperatorPacketLines(packet)) {
-    console.log(line);
+    printText(line);
   }
 }
 
 function printSystemStatusReport(report: SystemStatusReportLike) {
   printHeader();
-  console.log(chalk.bold(report.headline));
-  console.log(report.summary);
+  printText(chalk.bold(report.headline));
+  printText(report.summary);
   if (report.findings?.length) {
-    console.log(`\n${t('cli_findings')}:`);
+    printText(`\n${t('cli_findings')}:`);
     report.findings.forEach((finding) => {
-      console.log(`- ${chalk.bold(finding.id)} [${finding.severity}]: ${finding.message}`);
-      if (finding.detail) console.log(`  ${t('cli_detail')}: ${finding.detail}`);
+      printText(`- ${chalk.bold(finding.id)} [${finding.severity}]: ${finding.message}`);
+      if (finding.detail) printText(`  ${t('cli_detail')}: ${finding.detail}`);
     });
   }
   if (report.next_actions?.length) {
-    console.log(`\n${t('cli_next_actions')}:`);
+    printText(`\n${t('cli_next_actions')}:`);
     report.next_actions.forEach((action) => {
-      console.log(
+      printText(
         `- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}${action.next_action_type ? ` <${action.next_action_type}>` : ''}: ${action.action}`
       );
-      if (action.reason) console.log(`  ${t('cli_reason')}: ${action.reason}`);
-      if (action.suggested_command)
-        console.log(`  ${t('cli_command')}: ${action.suggested_command}`);
+      if (action.reason) printText(`  ${t('cli_reason')}: ${action.reason}`);
+      if (action.suggested_command) printText(`  ${t('cli_command')}: ${action.suggested_command}`);
       if (action.suggested_pipeline_path)
-        console.log(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
+        printText(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
       if (action.suggested_followup_request)
-        console.log(`  ${t('cli_follow_up')}: ${action.suggested_followup_request}`);
+        printText(`  ${t('cli_follow_up')}: ${action.suggested_followup_request}`);
     });
   }
 }
 
 function printResponsePreview(preview: OperatorResponsePreview) {
   printHeader();
-  console.log(preview.text);
+  printText(preview.text);
 }
 
 function loadPacketFile(targetPath: string): PacketFile {
@@ -804,8 +809,8 @@ function acceptNextAction(packetPath: string, actionId: string) {
     throw new Error(`Next action "${actionId}" not found in packet.`);
   }
   printHeader();
-  console.log(chalk.bold(`Executing next action: ${action.id}`));
-  console.log(action.action);
+  printText(chalk.bold(`Executing next action: ${action.id}`));
+  printText(action.action);
   let output = '';
   let executedVia: 'command' | 'pipeline' = 'command';
   let executedTarget = '';
@@ -818,13 +823,13 @@ function acceptNextAction(packetPath: string, actionId: string) {
       if (!command) {
         throw new Error(`Next action "${actionId}" has an empty suggested_command.`);
       }
-      console.log(`Command: ${action.suggested_command}\n`);
+      printText(`Command: ${action.suggested_command}\n`);
       output = safeExec(command, args, { cwd: rootDir, timeoutMs: 120000 });
       executedVia = 'command';
       executedTarget = action.suggested_command;
     } else if (action.suggested_pipeline_path) {
       assertApprovedPipelinePath(action.suggested_pipeline_path);
-      console.log(`Pipeline: ${action.suggested_pipeline_path}\n`);
+      printText(`Pipeline: ${action.suggested_pipeline_path}\n`);
       output = safeExec(
         'node',
         ['dist/scripts/run_pipeline.js', '--input', action.suggested_pipeline_path],
@@ -860,10 +865,7 @@ function acceptNextAction(packetPath: string, actionId: string) {
     }
   }
   if (output) {
-    process.stdout.write(output);
-    if (!output.endsWith('\n')) {
-      process.stdout.write('\n');
-    }
+    printText(output);
   }
   const outcome = classifyNextActionExecutionOutcome(
     packetPath,
@@ -880,16 +882,16 @@ function acceptNextAction(packetPath: string, actionId: string) {
     `next-action-outcome-${action.id}.json`
   );
   safeWriteFile(outcomePath, JSON.stringify(outcome, null, 2));
-  console.log(`\nOutcome classification: ${outcome.recommended_next_action_type}`);
-  console.log(`Reason: ${outcome.deterministic_reason}`);
-  console.log(`LLM consult recommended: ${outcome.llm_consult_recommended ? 'yes' : 'no'}`);
-  console.log(`Outcome artifact: ${outcomePath}`);
+  printText(`\nOutcome classification: ${outcome.recommended_next_action_type}`);
+  printText(`Reason: ${outcome.deterministic_reason}`);
+  printText(`LLM consult recommended: ${outcome.llm_consult_recommended ? 'yes' : 'no'}`);
+  printText(`Outcome artifact: ${outcomePath}`);
   if (
     packet.kind === 'operator-interaction-packet' &&
     packet.refresh_command &&
     packet.refresh_packet_path
   ) {
-    console.log('\nRefreshing status packet...\n');
+    printText('\nRefreshing status packet...\n');
     assertApprovedNextActionCommand(packet.refresh_command);
     const [refreshCommand, ...refreshArgs] = tokenizeSuggestedCommand(packet.refresh_command);
     if (!refreshCommand) {
@@ -900,10 +902,7 @@ function acceptNextAction(packetPath: string, actionId: string) {
       timeoutMs: 120000,
     });
     if (refreshOutput) {
-      process.stdout.write(refreshOutput);
-      if (!refreshOutput.endsWith('\n')) {
-        process.stdout.write('\n');
-      }
+      printText(refreshOutput);
     }
     printInteractionPacketFile(packet.refresh_packet_path);
   }
@@ -918,35 +917,35 @@ function printApprovalRequests(channelArg?: string) {
   });
 
   if (requests.length === 0) {
-    console.log('No pending approval requests found.');
+    printText('No pending approval requests found.');
     return;
   }
 
-  console.log(`Pending approvals: ${requests.length}\n`);
+  printText(`Pending approvals: ${requests.length}\n`);
   for (const request of requests) {
-    console.log(`- ${chalk.bold(request.id)} [${request.kind}]`);
-    console.log(`  ${request.title}`);
-    console.log(
+    printText(`- ${chalk.bold(request.id)} [${request.kind}]`);
+    printText(`  ${request.title}`);
+    printText(
       `  status: ${request.status} · channel: ${request.storageChannel} · requested by: ${request.requestedBy}`
     );
     if (request.target) {
-      console.log(
+      printText(
         `  target: ${request.target.serviceId}/${request.target.secretKey} (${request.target.mutation})`
       );
     }
     if (request.risk) {
-      console.log(
+      printText(
         `  risk: ${request.risk.level} · restart: ${request.risk.restartScope} · strong auth: ${request.risk.requiresStrongAuth ? 'yes' : 'no'}`
       );
     }
     if (request.justification?.reason) {
-      console.log(`  reason: ${request.justification.reason}`);
+      printText(`  reason: ${request.justification.reason}`);
     }
     if (request.workflow) {
       const pendingRoles = request.workflow.approvals
         .filter((approval) => approval.status === 'pending')
         .map((approval) => approval.role);
-      console.log(
+      printText(
         `  workflow: ${request.workflow.workflowId} · pending roles: ${pendingRoles.join(', ') || 'none'}`
       );
     }
@@ -990,11 +989,11 @@ function applyApprovalDecision(
   });
 
   printHeader();
-  console.log(`${chalk.bold(decided.id)} ${decision}`);
-  console.log(`${decided.title}`);
-  console.log(`storage channel: ${decided.storageChannel}`);
+  printText(`${chalk.bold(decided.id)} ${decision}`);
+  printText(`${decided.title}`);
+  printText(`storage channel: ${decided.storageChannel}`);
   if (decided.target) {
-    console.log(
+    printText(
       `target: ${decided.target.serviceId}/${decided.target.secretKey} (${decided.target.mutation})`
     );
   }
@@ -1002,7 +1001,7 @@ function applyApprovalDecision(
     const completedRoles = decided.workflow.approvals
       .filter((approval) => approval.status === decision)
       .map((approval) => approval.role);
-    console.log(`workflow roles updated: ${completedRoles.join(', ') || 'none'}`);
+    printText(`workflow roles updated: ${completedRoles.join(', ') || 'none'}`);
   }
 }
 
@@ -1012,17 +1011,17 @@ function requestProjectTrust(inputPath: string, json = false): void {
     requestedBy: resolveOperatorDisplayName(),
   });
   if (json) {
-    console.log(JSON.stringify(record, null, 2));
+    printText(JSON.stringify(record, null, 2));
     return;
   }
   printHeader();
-  console.log(`${chalk.bold(record.id)} pending`);
-  console.log(record.title);
-  console.log(`storage channel: ${record.storageChannel}`);
-  console.log(
+  printText(`${chalk.bold(record.id)} pending`);
+  printText(record.title);
+  printText(`storage channel: ${record.storageChannel}`);
+  printText(
     `Approve after review with: pnpm kyberion approve ${record.id} ${record.storageChannel}`
   );
-  console.log(
+  printText(
     `Run after approval with: pnpm pipeline --input ${inputPath} --project-trust-approval ${record.id}`
   );
 }
@@ -1080,7 +1079,7 @@ function runActuator(
   }
 
   const forwardedArgs = args.filter((arg) => arg !== '--');
-  process.stderr.write(chalk.blue(`🚀 ACTUATING: ${actuator.name}...\n`));
+  printText(chalk.blue(`🚀 ACTUATING: ${actuator.name}...\n`));
 
   try {
     const output = safeExec('node', [script, ...forwardedArgs], {
@@ -1089,20 +1088,20 @@ function runActuator(
     });
 
     if (output) {
-      process.stdout.write(output);
+      printText(output);
     }
   } catch (err: any) {
     const isTimeout = /timed?\s*out|timeout|deadline|ETIMEDOUT/i.test(err.message || '');
     const timeoutHint = isTimeout
       ? ' (30-minute timeout exceeded — for long-running tasks, run the actuator directly: `node dist/<path>/src/index.js --input <file>`)'
       : '';
-    process.stderr.write(
+    printText(
       chalk.red(
         `\n${t('cli_error_execution_failed').replace('{message}', err.message)}${timeoutHint}\n`
       )
     );
     if (err.stdout) {
-      process.stdout.write(err.stdout.toString());
+      printText(err.stdout.toString());
     }
     throw err;
   }
@@ -1163,18 +1162,18 @@ async function mainImpl(args: string[] = [], print: Print = (value) => console.l
     const hasCheck = normalizedArgs.includes('--check');
     if (hasCheck) {
       const statuses = await checkAllActuatorCapabilities();
-      console.log('\n=== Runtime Capability Check ===');
+      printText('\n=== Runtime Capability Check ===');
       for (const status of statuses) {
         const available = status.capabilities.filter((c) => c.available).length;
         const total = status.capabilities.length;
         const icon = available === total ? '\u2705' : available > 0 ? '\u26A0\uFE0F' : '\u274C';
-        console.log(
+        printText(
           `${icon} ${status.actuatorId} (v${status.version}): ${available}/${total} ops available`
         );
         for (const cap of status.capabilities) {
           if (!cap.available) {
-            console.log(`   \u274C ${cap.op}: ${cap.reason}`);
-            if (cap.prerequisites) console.log(`      Fix: ${cap.prerequisites.join(', ')}`);
+            printText(`   \u274C ${cap.op}: ${cap.reason}`);
+            if (cap.prerequisites) printText(`      Fix: ${cap.prerequisites.join(', ')}`);
           }
         }
       }
@@ -1337,27 +1336,27 @@ async function mainImpl(args: string[] = [], print: Print = (value) => console.l
     const pipeline = parseSafeJsonInput(content, 'Pipeline preview file');
     const preview = previewPipeline(pipeline);
 
-    console.log(`\n=== Pipeline Preview ===`);
-    console.log(`Valid: ${preview.valid ? '\u2705' : '\u274C'}`);
-    console.log(`Total steps: ${preview.totalSteps}`);
+    printText(`\n=== Pipeline Preview ===`);
+    printText(`Valid: ${preview.valid ? '\u2705' : '\u274C'}`);
+    printText(`Total steps: ${preview.totalSteps}`);
     if (preview.errors.length > 0) {
-      console.log(`\nErrors:`);
-      preview.errors.forEach((e: string) => console.log(`  \u274C ${e}`));
+      printText(`\nErrors:`);
+      preview.errors.forEach((e: string) => printText(`  \u274C ${e}`));
     }
     if (preview.warnings.length > 0) {
-      console.log(`\nWarnings:`);
-      preview.warnings.forEach((w: string) => console.log(`  \u26A0\uFE0F  ${w}`));
+      printText(`\nWarnings:`);
+      preview.warnings.forEach((w: string) => printText(`  \u26A0\uFE0F  ${w}`));
     }
-    console.log(`\nSteps:`);
+    printText(`\nSteps:`);
     const printStep = (step: any, indent: number = 0) => {
       const pad = '  '.repeat(indent);
       const warn = step.warnings?.length ? ` \u26A0\uFE0F ${step.warnings.length}` : '';
-      console.log(`${pad}${step.index + 1}. [${step.type}:${step.op}] ${step.description}${warn}`);
+      printText(`${pad}${step.index + 1}. [${step.type}:${step.op}] ${step.description}${warn}`);
       if (step.children) step.children.forEach((c: any) => printStep(c, indent + 1));
     };
     preview.steps.forEach((s: any) => printStep(s));
     if (restArgs.includes('--preview-graph') && preview.graph) {
-      console.log(`\n=== Effective Graph (Mermaid) ===\n${preview.graph.mermaid}`);
+      printText(`\n=== Effective Graph (Mermaid) ===\n${preview.graph.mermaid}`);
     }
     if (!preview.valid) throw new ScriptExitError(1, '', true);
     return;
@@ -1389,9 +1388,9 @@ async function mainImpl(args: string[] = [], print: Print = (value) => console.l
     if (subAction === 'list') {
       const schedules = listScheduledPipelines();
       if (schedules.length === 0) {
-        console.log('No scheduled pipelines.');
+        printText('No scheduled pipelines.');
       } else {
-        console.log(`\n=== Scheduled Pipelines (${schedules.length}) ===`);
+        printText(`\n=== Scheduled Pipelines (${schedules.length}) ===`);
         for (const s of schedules) {
           const status = s.enabled ? '\u2705' : '\u23F8\uFE0F';
           const trigger =
@@ -1399,8 +1398,8 @@ async function mainImpl(args: string[] = [], print: Print = (value) => console.l
               ? `cron: ${s.trigger.cron}`
               : `interval: ${s.trigger.intervalMs}ms`;
           const last = s.lastRun ? ` | last: ${s.lastRun} (${s.lastStatus})` : '';
-          console.log(`${status} ${s.id} \u2014 ${s.name} [${s.actuator}] ${trigger}${last}`);
-          console.log(`   pipeline: ${s.pipelinePath}`);
+          printText(`${status} ${s.id} \u2014 ${s.name} [${s.actuator}] ${trigger}${last}`);
+          printText(`   pipeline: ${s.pipelinePath}`);
         }
       }
     } else if (subAction === 'register') {
@@ -1420,16 +1419,16 @@ async function mainImpl(args: string[] = [], print: Print = (value) => console.l
         trigger: { type: 'cron', cron },
         enabled: true,
       });
-      console.log(`Registered: ${id} \u2192 ${pipelinePath} [${actuator}] cron: ${cron}`);
+      printText(`Registered: ${id} \u2192 ${pipelinePath} [${actuator}] cron: ${cron}`);
     } else if (subAction === 'remove') {
       const id = restArgs[0];
       if (!id) {
         throw new ScriptExitError(1, 'Usage: pnpm kyberion schedule remove <id>');
       }
       unregisterScheduledPipeline(id);
-      console.log(`Removed: ${id}`);
+      printText(`Removed: ${id}`);
     } else {
-      console.log('Usage: pnpm kyberion schedule [list|register|remove]');
+      printText('Usage: pnpm kyberion schedule [list|register|remove]');
     }
     return;
   }
@@ -1438,7 +1437,13 @@ async function mainImpl(args: string[] = [], print: Print = (value) => console.l
 }
 
 export async function main(args: string[] = [], print: Print = (value) => console.log(value)) {
-  return withPresentationOutputPrinter(print, () => mainImpl(args, print));
+  const previousPrint = activeCliPrint;
+  activeCliPrint = print;
+  try {
+    return await withPresentationOutputPrinter(print, () => mainImpl(args, print));
+  } finally {
+    activeCliPrint = previousPrint;
+  }
 }
 
 export const runCli = defineScript({
