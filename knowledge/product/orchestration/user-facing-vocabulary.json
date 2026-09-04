@@ -4726,6 +4726,103 @@
         "qps-ploc": "⟦Řėṽïėẇ ḓėŀïṽėřȧƀŀė ŀőřėɱ⟧"
       }
     },
+    "next_action": {
+      "completion_confirmed": {
+        "en": "Completion confirmed",
+        "ja": "完了を確認しました",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧïőñ ƈőñƒïřɱėḓ ŀőřėɱ ⟧"
+      },
+      "completion_followup": {
+        "en": "Completion requires follow-up",
+        "ja": "追加対応が必要です",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧïőñ řėɋůïřėş ƒőŀŀőẇ-ůṗ ŀőřėɱ ïṗş⟧"
+      },
+      "completion_next_step_proceed": {
+        "en": "Proceed with archival, promotion, or the next mission step.",
+        "ja": "保管、昇格、または次の依頼ステップへ進んでください。",
+        "qps-ploc": "⟦Ṗřőƈėėḓ ẇïŧħ ȧřƈħïṽȧŀ, ṗřőɱőŧïőñ, őř ŧħė ñėẋŧ ɱïşşïőñ şŧėṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "completion_next_step_resolve": {
+        "en": "Resolve the gaps and rerun completion reconciliation.",
+        "ja": "不足を解消して完了確認を再実行してください。",
+        "qps-ploc": "⟦Řėşőŀṽė ŧħė ɠȧṗş ȧñḓ řėřůñ ƈőɱṗŀėŧïőñ řėƈőñƈïŀïȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "completion_next_step_review": {
+        "en": "Review the delivered evidence and confirm whether the goal is satisfied.",
+        "ja": "提供された証跡を確認し、目的が満たされたか判断してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ḓėŀïṽėřėḓ ėṽïḓėñƈė ȧñḓ ƈőñƒïřɱ ẇħėŧħėř ŧħė ɠőȧŀ ïş şȧŧïşƒïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "verify_missing_runtime_prerequisites": {
+        "en": "Verify missing runtime prerequisites",
+        "ja": "不足している実行環境を確認",
+        "qps-ploc": "⟦Ṽėřïƒẏ ɱïşşïñɠ řůñŧïɱė ṗřėřėɋůïşïŧėş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "repair_credentials": {
+        "en": "Repair credentials and onboarding",
+        "ja": "認証情報と初期設定を修復",
+        "qps-ploc": "⟦Řėṗȧïř ƈřėḓėñŧïȧŀş ȧñḓ őñƀőȧřḓïñɠ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "inspect_configured_secrets": {
+        "en": "Inspect configured secrets",
+        "ja": "設定済みの秘密情報を確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ƈőñƒïɠůřėḓ şėƈřėŧş ŀőřėɱ ïṗ⟧"
+      },
+      "fix_write_path_scope": {
+        "en": "Fix the write path scope",
+        "ja": "書き込み先の範囲を修正",
+        "qps-ploc": "⟦Ƒïẋ ŧħė ẇřïŧė ṗȧŧħ şƈőṗė ŀőřėɱ ï⟧"
+      },
+      "request_required_approval": {
+        "en": "Request the required approval",
+        "ja": "必要な承認を依頼",
+        "qps-ploc": "⟦Řėɋůėşŧ ŧħė řėɋůïřėḓ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗş⟧"
+      },
+      "resolve_policy_block": {
+        "en": "Resolve the policy block",
+        "ja": "ポリシーによる停止を解消",
+        "qps-ploc": "⟦Řėşőŀṽė ŧħė ṗőŀïƈẏ ƀŀőƈķ ŀőřėɱ ï⟧"
+      },
+      "resolve_mission_id": {
+        "en": "Resolve the mission id",
+        "ja": "依頼IDを確認",
+        "qps-ploc": "⟦Řėşőŀṽė ŧħė ɱïşşïőñ ïḓ ŀőřėɱ ï⟧"
+      },
+      "fix_failing_pipeline_input": {
+        "en": "Fix the failing pipeline input",
+        "ja": "失敗した実行入力を修正",
+        "qps-ploc": "⟦Ƒïẋ ŧħė ƒȧïŀïñɠ ṗïṗėŀïñė ïñṗůŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "fix_failing_input": {
+        "en": "Fix the failing input",
+        "ja": "失敗した入力を修正",
+        "qps-ploc": "⟦Ƒïẋ ŧħė ƒȧïŀïñɠ ïñṗůŧ ŀőřėɱ ⟧"
+      },
+      "check_remote_dependency_retry": {
+        "en": "Check the remote dependency and retry",
+        "ja": "接続先を確認して再実行",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė řėɱőŧė ḓėṗėñḓėñƈẏ ȧñḓ řėŧřẏ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "inspect_failure_rerun": {
+        "en": "Inspect the failure and rerun",
+        "ja": "失敗を確認して再実行",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė ƒȧïŀůřė ȧñḓ řėřůñ ŀőřėɱ ïṗş⟧"
+      },
+      "verify_runtime_prerequisites": {
+        "en": "Verify runtime prerequisites",
+        "ja": "実行環境を確認",
+        "qps-ploc": "⟦Ṽėřïƒẏ řůñŧïɱė ṗřėřėɋůïşïŧėş ŀőřėɱ ïṗş⟧"
+      },
+      "fix_service_setup": {
+        "en": "Fix service setup for {service}",
+        "ja": "{service} のサービス設定を修復",
+        "qps-ploc": "⟦Ƒïẋ şėřṽïƈė şėŧůṗ ƒőř {service} ŀőřėɱ ïṗşů⟧"
+      },
+      "bootstrap_runtime": {
+        "en": "Bootstrap {runtime}",
+        "ja": "{runtime} を初期設定",
+        "qps-ploc": "⟦Ƀőőŧşŧřȧṗ {runtime} ŀőřėɱ ⟧"
+      }
+    },
     "bridge": {
       "thread_context": {
         "en": "Recent {channel} thread context:",
