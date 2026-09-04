@@ -18050,6 +18050,19 @@ rendering の順序と semantics は変更していない。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1041
+
+SX-04／SX-10 の layout catalog boundary を再監査し、slide preset／body-zone／confidential layout template loader の戻り値を
+共有 `MediaSlideLayoutPresetCatalog`／`MediaLayoutTemplateCatalog`／`MediaLayoutTemplate` 契約へ接続した。chrome／hero geometry、
+placeholder shape、template map の実利用形を型で表現し、`defineCatalog` の schema validation、cache、tenant fallback、layout selection の
+既存 semantics は変更していない。
+
+検証:
+
+- Media layout catalog／semantic token **2 files / 3 tests passed**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gate **69 gates / 0 failed**。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
