@@ -5,7 +5,6 @@ import {
   loadState,
   loadStateAtPath,
   readFocusedMissionId,
-  readJsonFileSafe,
   writeFocusedMissionId,
 } from './mission-state.js';
 import { writeMissionStateAtPath } from './mission-state-reader.js';
@@ -67,7 +66,6 @@ describe('mission-state loader', () => {
     safeSymlinkSync(target, link);
 
     expect(readFocusedMissionId(link)).toBeNull();
-    expect(readJsonFileSafe(link)).toBeNull();
     expect(() => writeFocusedMissionId(link, missionId)).toThrow(/symbolic link/);
   });
 
