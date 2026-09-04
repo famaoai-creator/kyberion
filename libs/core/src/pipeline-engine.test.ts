@@ -184,5 +184,18 @@ describe('pipeline-engine', () => {
         expect.objectContaining({ _error: expect.any(Object) })
       );
     });
+
+    it('rejects a fallback ref that resolves to a non-string path', async () => {
+      await expect(
+        handleStepError(
+          testError,
+          testStep,
+          { strategy: 'fallback', ref: '{{fallback_ref}}' },
+          testCtx,
+          vi.fn(),
+          () => ({ invalid: true })
+        )
+      ).rejects.toThrow('fallback ref must resolve to a non-empty string');
+    });
   });
 });

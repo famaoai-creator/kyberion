@@ -17203,6 +17203,22 @@ fallback callbackのcontextもunknown境界にした。graph scheduler、preflig
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 984
+
+SX-03／SX-10／SX-11 のshared pipeline engineを再監査し、`resolveRef`と`handleStepError`がbind、parent context、
+fallback steps、resolver戻り値を`any`で受け渡す残存を修正した。ref／on_error bindを`Record<string, unknown>`へ、
+pipeline contextとfallback resultをtyped recordへ統一し、resolverで解決したref pathがnon-empty stringであることを
+確認してから安全なref path resolverへ渡す。参照深度が不正な場合もdepth 1から開始し、既存の最大深度・trust・
+symlink境界、skip／abort／fallback semanticsは維持した。
+
+検証:
+
+- pipeline engine／ADF engine **2 files / 28 tests passed**。
+- root typecheck、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
