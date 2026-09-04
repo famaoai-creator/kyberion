@@ -16401,6 +16401,13 @@ SX-03／SX-10 の OpenRouter response／tool boundary を再監査し、safe JSO
 検証: OpenRouter backend **1 file / 7 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 894
+
+SX-03／SX-04 の legacy `validate.ts` schema loader を再監査し、`readJson<JsonSchema>` の型アサーションだけで schema root を軽量 validator へ渡す残存を修正した。共通 safe object boundary を loader 入口へ接続し、配列／primitive／dangerous key の schema document を fail-closed にする。既存の schema cache、required／anyOf／property validation semantics は変更していない。
+
+検証: legacy schema loader **1 file / 6 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

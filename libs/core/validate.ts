@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ValidationResult, ValidationError, JsonSchema } from './types.js';
 import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const schemasDir: string = path.resolve(currentDir, '../../knowledge/product/schemas');
@@ -17,9 +18,13 @@ const schemaCache: Record<string, JsonSchema> = {};
 export function loadSchema(schemaName: string): JsonSchema {
   if (schemaCache[schemaName]) return schemaCache[schemaName];
   const filePath = path.join(schemasDir, `${schemaName}.schema.json`);
-  const schema = readJson<JsonSchema>(filePath);
+  const schema = parseSchemaDocument(readJson<unknown>(filePath), schemaName);
   schemaCache[schemaName] = schema;
   return schema;
+}
+
+export function parseSchemaDocument(value: unknown, schemaName = 'schema'): JsonSchema {
+  return parseSafeJsonObjectValue(value, `${schemaName} schema`);
 }
 
 export function validate(data: Record<string, unknown>, schemaName: string): ValidationResult {
