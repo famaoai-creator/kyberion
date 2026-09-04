@@ -190,6 +190,75 @@ describe('control-plane-client', () => {
     expect(overview.nextActions?.[0]?.action_id).toBe('act-1');
   });
 
+  it('normalizes all chronos overview collections before projection', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            accessRole: 'readonly',
+            projects: [{ project_id: 'PRJ-1', name: 'Project', leaked: 'drop' }, { project_id: 9 }],
+            projectTracks: [
+              { track_id: 'TRK-1', project_id: 'PRJ-1', name: 'Track' },
+              { track_id: [] },
+            ],
+            gateReadiness: [
+              {
+                track_id: 'TRK-1',
+                ready: true,
+                ready_gate_count: 2,
+                next_required_artifacts: [{ artifact_id: 'requirements' }, { artifact_id: 4 }],
+              },
+              { track_id: 8, ready: true },
+            ],
+            missionSeeds: [
+              {
+                seed_id: 'MSD-1',
+                metadata: {
+                  template_ref: 'template.md',
+                  mission_seed_assessment: { eligible: true, reason: 'ready', extra: 'drop' },
+                  execution_contract: { recommended_action: 'review', repository_id: 'repo-1' },
+                },
+              },
+              { seed_id: null },
+            ],
+            pendingApprovals: [{ id: 'APR-1', title: 'Approve' }, 'invalid'],
+            nextActions: [
+              {
+                action_id: 'act-1',
+                next_action_type: 'approve',
+                reason: 'Review',
+                risk: 'medium',
+                approval_required: false,
+              },
+            ],
+          }),
+          { status: 200 }
+        )
+    ) as typeof fetch;
+
+    const client = createControlPlaneClient('chronos', { baseUrl: 'http://127.0.0.1:3000' });
+    const overview = await client.getChronosOverview();
+
+    expect(overview.projects).toEqual([{ project_id: 'PRJ-1', name: 'Project' }]);
+    expect(overview.projectTracks).toEqual([
+      { track_id: 'TRK-1', project_id: 'PRJ-1', name: 'Track' },
+    ]);
+    expect(overview.gateReadiness).toEqual([
+      {
+        track_id: 'TRK-1',
+        ready: true,
+        ready_gate_count: 2,
+        next_required_artifacts: [{ artifact_id: 'requirements' }],
+      },
+    ]);
+    expect(overview.missionSeeds?.[0]?.metadata).toEqual({
+      template_ref: 'template.md',
+      mission_seed_assessment: { eligible: true, reason: 'ready' },
+      execution_contract: { recommended_action: 'review', repository_id: 'repo-1' },
+    });
+    expect(overview.pendingApprovals).toEqual([{ id: 'APR-1', title: 'Approve' }]);
+  });
+
   it('raises a stale surface error with a suggested command', async () => {
     globalThis.fetch = vi.fn(
       async () =>
