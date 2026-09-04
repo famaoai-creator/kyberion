@@ -12,7 +12,12 @@ import {
   appendDependencyVulnerabilityLedgerRecord,
   readDependencyVulnerabilityLedgerRecords,
 } from '@agent/core/dependency-vulnerability-ledger';
-import { isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  isRecord,
+  nowIso,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -78,19 +83,31 @@ export interface UnresolvedSummary {
 
 const DEFAULT_LEDGER_PATH = pathResolver.active('shared/runtime/vuln-ledger.jsonl');
 
-function readJson<T>(text: string, label: string): T {
+function readJsonObject(text: string, label: string): Record<string, unknown> {
   const trimmed = String(text || '').trim();
-  if (!trimmed) return {} as T;
-  try {
-    return parseSafeJsonInput(trimmed, label) as T;
-  } catch {
-    const start = trimmed.indexOf('{');
-    const end = trimmed.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      return parseSafeJsonInput(trimmed.slice(start, end + 1), label) as T;
-    }
-    return {} as T;
+  if (!trimmed) return {};
+  const candidates = [trimmed];
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  // A JSON array may contain object entries; never recover one of those
+  // entries as if it were the command's root object.
+  if (!trimmed.startsWith('[') && start >= 0 && end > start) {
+    candidates.push(trimmed.slice(start, end + 1));
   }
+
+  let lastError: unknown;
+  for (const candidate of [...new Set(candidates)]) {
+    try {
+      return parseSafeJsonObjectValue(parseSafeJsonInput(candidate, label), label);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError instanceof Error && lastError.message.includes('dangerous JSON key')) {
+    throw lastError;
+  }
+  return {};
 }
 
 function addWorkspacePackageJson(files: Set<string>, dir: string): void {
@@ -142,12 +159,10 @@ function collectWorkspaceDependencyNames(rootDir = pathResolver.rootDir()): Set<
   const names = new Set<string>();
   for (const file of listWorkspacePackageJsonFiles(rootDir)) {
     try {
-      const pkg = readJson<{
-        name?: string;
-        dependencies?: Record<string, string>;
-        devDependencies?: Record<string, string>;
-        peerDependencies?: Record<string, string>;
-      }>(safeReadFile(file, { encoding: 'utf8' }) as string, `package.json at ${file}`);
+      const pkg = readJsonObject(
+        safeReadFile(file, { encoding: 'utf8' }) as string,
+        `package.json at ${file}`
+      );
       for (const section of [pkg.dependencies, pkg.devDependencies, pkg.peerDependencies]) {
         for (const dep of Object.keys(section || {})) names.add(dep);
       }
@@ -220,7 +235,7 @@ function inferRollbackDifficulty(severity: string): number {
 }
 
 function parseAuditJson(raw: string): AuditJson {
-  return readJson<AuditJson>(raw, 'pnpm audit json');
+  return readJsonObject(raw, 'pnpm audit json') as AuditJson;
 }
 
 interface PreviousLedgerState {
@@ -349,7 +364,7 @@ function summarizeUnresolved(
 }
 
 function parseOutdatedJson(raw: string): OutdatedJson {
-  return readJson<OutdatedJson>(raw, 'pnpm outdated json');
+  return readJsonObject(raw, 'pnpm outdated json') as OutdatedJson;
 }
 
 export function scanDependencyVulnerabilitiesFromInputs(input: {
