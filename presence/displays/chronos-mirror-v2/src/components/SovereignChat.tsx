@@ -12,6 +12,11 @@ import { Send, Loader2, MessageSquare, Mic, MicOff, GripHorizontal } from 'lucid
 import { chronosSpeechLocale, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import { buildUserFacingError } from '../lib/user-facing-error';
 import { useChronosLocale } from '../lib/hooks';
+import {
+  parseAgentChatErrorResponse,
+  parseAgentChatSuccessResponse,
+  type ClientAgentChatMessage,
+} from '../lib/agent-chat-response';
 
 const AGENT_URL = '/api/agent';
 
@@ -55,7 +60,7 @@ export function SovereignChat({
   onA2UIMessage,
   onReady,
 }: {
-  onA2UIMessage?: (message: any) => void;
+  onA2UIMessage?: (message: ClientAgentChatMessage) => void;
   onReady?: (sendFn: (query: string) => void) => void;
 }) {
   const locale = useChronosLocale();
@@ -178,29 +183,37 @@ export function SovereignChat({
           body: JSON.stringify({ query, locale }),
           signal: controller.signal,
         });
-        const data = await res.json();
-        const envelope = buildUserFacingError(
-          data.error || data.response || new Error('No response'),
-          {
+        const payload = await res.json().catch(() => null);
+        if (res.ok) {
+          const data = parseAgentChatSuccessResponse(payload);
+          if (!data) throw new Error('Invalid Chronos agent response');
+          const agentMsg: ChatMessage = {
+            id: `agent-${Date.now()}`,
+            role: 'agent',
+            content: data.response,
+            timestamp: data.timestamp,
+            status: 'complete',
+          };
+          setMessages((prev) => [...prev, agentMsg]);
+
+          if (data.a2ui && onA2UIMessage) {
+            for (const msg of data.a2ui) onA2UIMessage(msg);
+          }
+        } else {
+          const data = parseAgentChatErrorResponse(payload);
+          const envelope = buildUserFacingError(data?.error || new Error(`HTTP ${res.status}`), {
             locale,
             surface: 'chronos',
-            traceId: data.traceId,
-          }
-        );
-
-        const agentMsg: ChatMessage = {
-          id: `agent-${Date.now()}`,
-          role: 'agent',
-          content: data.response || `${envelope.title}: ${envelope.body} ${envelope.nextAction}`,
-          timestamp: data.timestamp || new Date().toISOString(),
-          status: res.ok ? 'complete' : 'error',
-        };
-        setMessages((prev) => [...prev, agentMsg]);
-
-        if (data.a2ui && Array.isArray(data.a2ui) && onA2UIMessage) {
-          for (const msg of data.a2ui) {
-            onA2UIMessage(msg);
-          }
+            traceId: data?.traceId || data?.correlationId,
+          });
+          const agentMsg: ChatMessage = {
+            id: `agent-${Date.now()}`,
+            role: 'agent',
+            content: `${envelope.title}: ${envelope.body} ${envelope.nextAction}`,
+            timestamp: new Date().toISOString(),
+            status: 'error',
+          };
+          setMessages((prev) => [...prev, agentMsg]);
         }
       } catch (err: any) {
         if (err?.name === 'AbortError') {
