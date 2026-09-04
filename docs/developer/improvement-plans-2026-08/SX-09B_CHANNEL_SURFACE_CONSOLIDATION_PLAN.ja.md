@@ -327,3 +327,9 @@ Concierge ingest の外部CLI verdict parserを再監査し、marker後のJSON�
 surface のJSON request readerを再監査し、Chronos／Concierge／operator-surface に重複していた malformed／非object body の読み取りを foundation の `readJsonObjectRequest` へ統合した。dangerous nested key も共通境界で拒否し、各surfaceの route-specific field parser、認可、approval、multipart、外部配送の責務は維持した。
 
 検証: foundation／surface request input／operator inbox **4 files / 33 tests passed**、core package build、root typecheck、対象 lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-04 再レビュー修正 29
+
+Computer Surface の `/a2ui/dispatch` を再監査し、tenant scope の検査後に `A2UIMessage` へ型アサーションするだけで、malformedな update data model／component／operation を state 適用へ渡す残存を修正した。A2UI wire の構造 validator を core へ移し、Presence Studio も同じ validator を利用するように統合した。既存の tenant scope、localadmin gate、A2UI state適用 semanticsは変更していない。
+
+検証: A2UI validator／Computer Surface resource boundary **3 files / 追加回帰を含む focused tests**、root typecheck、root lint、`pnpm run check -- --scope full`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
