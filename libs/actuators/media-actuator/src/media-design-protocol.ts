@@ -365,12 +365,16 @@ function loadImportedDesignMdIndex(rootDir: string): ImportedDesignMdIndex {
   return catalog.validate(merged, directoryPath);
 }
 
-function normalizeDesignLookupKey(input: any): string {
+function normalizeDesignLookupKey(input: unknown): string {
   return String(input || '')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
 }
 
 function resolveDesignBindingHints(brief: any): {
@@ -379,7 +383,7 @@ function resolveDesignBindingHints(brief: any): {
   design_system_id?: string;
   design_reference?: string;
   theme?: string;
-  branding?: Record<string, any>;
+  branding?: Record<string, unknown>;
 } {
   const direct = {
     tenant_id:
@@ -407,19 +411,19 @@ function resolveDesignBindingHints(brief: any): {
   const project = projectId ? loadProjectRecord(projectId) : null;
   const projectMeta =
     project?.metadata && typeof project.metadata === 'object'
-      ? (project.metadata as Record<string, any>)
+      ? (project.metadata as Record<string, unknown>)
       : {};
   const bindingIds = [
     ...(Array.isArray(project?.service_bindings) ? project!.service_bindings : []).map(
-      (value: any) => String(value)
+      (value: unknown) => String(value)
     ),
     ...(Array.isArray(brief?.service_binding_ids) ? brief.service_binding_ids : []).map(
-      (value: any) => String(value)
+      (value: unknown) => String(value)
     ),
     ...(Array.isArray(brief?.payload?.service_binding_ids)
       ? brief.payload.service_binding_ids
       : []
-    ).map((value: any) => String(value)),
+    ).map((value: unknown) => String(value)),
   ].filter(Boolean);
   const bindings = bindingIds
     .map((bindingId) => loadServiceBindingRecord(bindingId))
@@ -428,7 +432,7 @@ function resolveDesignBindingHints(brief: any): {
     bindings
       .map((binding) =>
         binding.metadata && typeof binding.metadata === 'object'
-          ? (binding.metadata as Record<string, any>)
+          ? (binding.metadata as Record<string, unknown>)
           : {}
       )
       .find((meta) => Object.keys(meta).length > 0) || {};
@@ -457,16 +461,16 @@ function resolveDesignBindingHints(brief: any): {
       undefined,
     theme: direct.theme || String(projectMeta.theme || bindingMeta.theme || '').trim() || undefined,
     branding: {
-      ...(projectMeta.branding || {}),
-      ...(bindingMeta.branding || {}),
-      ...(direct.branding || {}),
+      ...recordValue(projectMeta.branding),
+      ...recordValue(bindingMeta.branding),
+      ...recordValue(direct.branding),
     },
   };
 }
 
 function resolveImportedDesignReference(
   rootDir: string,
-  input: any
+  input: Record<string, unknown>
 ): ImportedDesignReference | null {
   const catalog = loadImportedDesignMdIndex(rootDir);
   const candidates = [
@@ -477,7 +481,7 @@ function resolveImportedDesignReference(
     input?.project_name,
     input?.project_id,
   ]
-    .map((value: any) => normalizeDesignLookupKey(value))
+    .map((value: unknown) => normalizeDesignLookupKey(value))
     .filter(Boolean);
   if (candidates.length === 0) return null;
   const systems = Array.isArray(catalog.systems) ? catalog.systems : [];
