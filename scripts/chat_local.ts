@@ -9,23 +9,23 @@ import * as readline from 'node:readline';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
 import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
 import { logger } from '@agent/core/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-async function main(_args: string[] = []) {
+type Print = (value: unknown) => void;
+
+export async function main(_args: string[] = [], print: Print = () => undefined) {
   logger.info('🚀 Initializing Kyberion Local Chat...');
 
   const success = installReasoningBackends({ mode: 'local', force: true });
   if (!success) {
-    logger.error('Failed to initialize local reasoning backend.');
-    process.exitCode = 1;
-    return;
+    throw new ScriptExitError(1, 'Failed to initialize local reasoning backend.');
   }
 
   const backend = getReasoningBackend();
   logger.success(`Kyberion is online via ${backend.name}.`);
-  console.log('\n--- Kyberion Local REPL ---');
-  console.log('Type your message to start. Type "exit" or "quit" to stop.');
-  console.log('You can ask me to read or write files in this directory.\n');
+  print('\n--- Kyberion Local REPL ---');
+  print('Type your message to start. Type "exit" or "quit" to stop.');
+  print('You can ask me to read or write files in this directory.\n');
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -44,31 +44,22 @@ async function main(_args: string[] = []) {
 
     if (input) {
       try {
-        process.stdout.write('Kyberion> ');
         const response = await backend.prompt(input);
-        console.log(response);
+        print(`Kyberion> ${response}`);
       } catch (err: any) {
         logger.error(`Error: ${err.message}`);
       }
     }
     rl.prompt();
   }).on('close', () => {
-    console.log('\nSession closed. Goodbye.');
-    process.exitCode = 0;
+    print('\nSession closed. Goodbye.');
   });
 }
 
 const runLocalChat = defineScript({
   name: 'chat:local',
   flags: [],
-  run: async ({ argv }) => {
-    try {
-      await main(argv);
-    } catch (err: any) {
-      logger.error(err.message);
-      process.exitCode = 1;
-    }
-  },
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
