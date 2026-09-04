@@ -46,6 +46,15 @@ describe('computer-surface a2ui messages', () => {
         },
       })
     ).toBe(false);
+    expect(
+      validate({
+        updateDataModel: {
+          surfaceId: 'computer-surface',
+          data: {},
+          unexpectedField: true,
+        },
+      })
+    ).toBe(false);
   });
 
   it('rejects traversal-shaped computer session ids before persistence', () => {
