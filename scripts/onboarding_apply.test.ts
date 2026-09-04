@@ -199,5 +199,7 @@ describe('onboarding_apply', () => {
     expect(script).toContain('summaryPath()');
     expect(script).toContain('loadOnboardingApplyInputAtPath');
     expect(script).not.toContain('readJson');
+    expect(script).not.toContain('console.log');
+    expect(script).not.toContain('console.error');
   });
 });
