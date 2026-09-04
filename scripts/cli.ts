@@ -47,7 +47,12 @@ import {
   withWorkflowOutputPrinter,
 } from './cli-workflow-handlers.js';
 export { parseOffboardArgs } from './cli-workflow-handlers.js';
-import { printBranchBanner, printHeader, printHelp } from './cli-presentation.js';
+import {
+  printBranchBanner,
+  printHeader,
+  printHelp,
+  withPresentationOutputPrinter,
+} from './cli-presentation.js';
 import { parseInteractionPacket } from './cli-packet-parser.js';
 export { parseInteractionPacket } from './cli-packet-parser.js';
 
@@ -1133,7 +1138,7 @@ export function shouldBootstrapRuntime(args: string[]): boolean {
   return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
 }
 
-export async function main(args: string[] = [], print: Print = (value) => console.log(value)) {
+async function mainImpl(args: string[] = [], print: Print = (value) => console.log(value)) {
   activeCliArgs = [...args];
   const missionId = process.env.MISSION_ID;
   printMissionContextBanner(missionId);
@@ -1430,6 +1435,10 @@ export async function main(args: string[] = [], print: Print = (value) => consol
   }
 
   throw new Error(t('cli_error_unknown_command', locale).replace('{command}', command));
+}
+
+export async function main(args: string[] = [], print: Print = (value) => console.log(value)) {
+  return withPresentationOutputPrinter(print, () => mainImpl(args, print));
 }
 
 export const runCli = defineScript({
