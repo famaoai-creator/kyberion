@@ -1,7 +1,8 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
-import { defineCatalog, readJson } from '@agent/core/foundation';
+import { defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 export interface CliEntrypoint {
   id: string;
@@ -57,8 +58,9 @@ export function resolveCliModulePath(module: string, allowMissingLeaf = false): 
 }
 
 function loadPackageScriptNames(): Set<string> {
-  const packageJson = readJson<{ scripts?: Record<string, string> }>(
-    pathResolver.rootResolve('package.json')
+  const packageJson = readSafeJsonFile<{ scripts?: Record<string, string> }>(
+    pathResolver.rootResolve('package.json'),
+    'package manifest for CLI manifest check'
   );
   return new Set(Object.keys(packageJson.scripts || {}));
 }
