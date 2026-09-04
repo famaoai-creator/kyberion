@@ -240,6 +240,36 @@ describe('Meeting Copilot service worker', () => {
     expect(response.ok).toBe(false);
     expect(harness.hooks.relayed).toHaveLength(0);
   });
+
+  it('ignores malformed WebSocket control messages before dispatch', async () => {
+    const harness = await createHarness();
+    const socket = harness.openSocket();
+
+    socket.onmessage?.({ data: JSON.stringify({ cmd: 'set_mic', on: 'yes' }) });
+    socket.onmessage?.({ data: JSON.stringify({ cmd: 'unknown', control_token: 'x' }) });
+    socket.onmessage?.({ data: JSON.stringify(['set_mic', true]) });
+    socket.onmessage?.({ data: '{malformed' });
+    await Promise.resolve();
+
+    expect(harness.hooks.relayed).toHaveLength(0);
+  });
+
+  it('accepts a shape-valid WebSocket control message', async () => {
+    const harness = await createHarness();
+    const socket = harness.openSocket();
+    const controlToken = 'test-control-token-012345678901234567890123456789';
+    socket.onmessage?.({ data: JSON.stringify({ cmd: 'session', control_token: controlToken }) });
+    socket.onmessage?.({
+      data: JSON.stringify({
+        cmd: 'set_mic',
+        control_token: controlToken,
+        on: true,
+      }),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(harness.hooks.relayed).toContainEqual({ type: 'meet:set_mic', on: true });
+  });
 });
 
 /**
