@@ -177,6 +177,16 @@ export class AgentBusyError extends Error {
 const GLOBAL_LIMIT = Number(getRegisteredEnvText('KYBERION_GLOBAL_INFLIGHT_LIMIT') || 8);
 const AGENT_LIMIT = Number(getRegisteredEnvText('KYBERION_AGENT_INFLIGHT_LIMIT') || 2);
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function errorName(error: unknown): string | undefined {
+  if (error instanceof Error) return error.name;
+  if (isRecord(error) && typeof error.name === 'string') return error.name;
+  return undefined;
+}
+
 const globalSemaphore = new Semaphore(GLOBAL_LIMIT);
 const agentSemaphores = new Map<string, Semaphore>();
 
@@ -242,8 +252,8 @@ class A2ABridgeImpl {
           recordGovernanceAction(envelope.header.sender, 'a2a_signature_invalid', 'system', true);
           throw new Error('A2A message signature verification failed');
         }
-      } catch (e: any) {
-        if (e.message.includes('signature verification')) throw e;
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message.includes('signature verification')) throw e;
         // Buffer length mismatch etc - treat as invalid
         throw new Error('A2A message signature malformed');
       }
@@ -425,9 +435,9 @@ class A2ABridgeImpl {
         intent: typeof payloadRecord?.intent === 'string' ? payloadRecord.intent : undefined,
         prompt_excerpt: runtimePrompt.slice(0, 240),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
-        `[A2A_BRIDGE] Failed to record orchestration observation: ${error?.message || error}`
+        `[A2A_BRIDGE] Failed to record orchestration observation: ${errorMessage(error)}`
       );
     }
 
@@ -470,11 +480,19 @@ class A2ABridgeImpl {
           ...(missionId ? { missionId } : {}),
         });
         responseText = result.text;
-      } catch (err: any) {
-        if (err?.errorDetail?.type === 'busy') {
-          throw new AgentBusyError(err.message, err.errorDetail.retry_after_ms);
+      } catch (err: unknown) {
+        const errorDetail =
+          isRecord(err) && isRecord(err.errorDetail) ? err.errorDetail : undefined;
+        if (errorDetail?.type === 'busy') {
+          const retryAfterMs =
+            typeof errorDetail.retry_after_ms === 'number' &&
+            Number.isFinite(errorDetail.retry_after_ms) &&
+            errorDetail.retry_after_ms > 0
+              ? errorDetail.retry_after_ms
+              : 1000;
+          throw new AgentBusyError(errorMessage(err), retryAfterMs);
         }
-        if (err?.name === 'AgentRuntimeCrashedError') {
+        if (errorName(err) === 'AgentRuntimeCrashedError') {
           logger.warn(
             `[A2A_BRIDGE] Crash detected during ask. Re-ensuring agent and retrying with rehydrated prompt...`
           );
@@ -506,7 +524,7 @@ class A2ABridgeImpl {
           throw err;
         }
       }
-    } catch (daemonErr: any) {
+    } catch (daemonErr: unknown) {
       if (daemonErr instanceof AgentBusyError) throw daemonErr;
 
       // Fallback in-process route with Semaphore limits
@@ -530,8 +548,8 @@ class A2ABridgeImpl {
             })
           )
         );
-      } catch (inProcessErr: any) {
-        if (inProcessErr?.name === 'AgentRuntimeCrashedError') {
+      } catch (inProcessErr: unknown) {
+        if (errorName(inProcessErr) === 'AgentRuntimeCrashedError') {
           logger.warn(
             `[A2A_BRIDGE] Crash detected during in-process ask. Re-ensuring agent and retrying with rehydrated prompt...`
           );
@@ -618,8 +636,8 @@ class A2ABridgeImpl {
     for (const handler of handlers) {
       try {
         handler(response);
-      } catch (err: any) {
-        logger.warn(`[A2A_BRIDGE] Response handler failed: ${err?.message || err}`);
+      } catch (err: unknown) {
+        logger.warn(`[A2A_BRIDGE] Response handler failed: ${errorMessage(err)}`);
       }
     }
 
