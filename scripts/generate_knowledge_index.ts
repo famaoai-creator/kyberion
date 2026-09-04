@@ -13,6 +13,8 @@ import { parseSafeJsonInput } from '@agent/core/foundation';
 import { loadFrontmatterExclusions } from '@agent/core/frontmatter-exclusions';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 interface ManifestEntry {
   path: string;
   tier: string;
@@ -287,7 +289,7 @@ function generatedFilesAreCurrent(files: readonly GeneratedFile[]): boolean {
   );
 }
 
-export function generateIndex(checkOnly = false): boolean {
+export function generateIndex(checkOnly = false, print: Print = () => undefined): boolean {
   try {
     return withKnowledgeAccess(() => {
       const files = renderKnowledgeIndexFiles();
@@ -296,9 +298,7 @@ export function generateIndex(checkOnly = false): boolean {
       return true;
     });
   } catch (error: unknown) {
-    console.error(
-      `[generate_knowledge_index] ${error instanceof Error ? error.message : String(error)}`
-    );
+    print(`[generate_knowledge_index] ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
