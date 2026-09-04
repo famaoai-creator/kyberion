@@ -42,6 +42,7 @@ import { main as taskInitMain } from './task_init.js';
 import { main as taskListMain } from './task_list.js';
 import { main as taskRunMain } from './task_run.js';
 import { main as taskSmokeMain } from './task_smoke.js';
+import { ScriptExitError } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
@@ -381,7 +382,7 @@ export async function handleOffboardCommand(
   // delete attempt or a failure. A dry run and a clean offboarding exit 0,
   // and `not_found` is a legitimate "nothing to do" answer.
   if (result.status === 'approval_required' || result.status === 'error') {
-    process.exitCode = 1;
+    throw new ScriptExitError(1, '', true);
   }
 }
 
