@@ -8,6 +8,7 @@ import * as customerResolver from './customer-resolver.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExec } from './secure-io.js';
 import { runCodexCliQuery } from './codex-cli-query.js';
@@ -381,16 +382,17 @@ export async function runStructuredLlmProfile<T>(
  * Parses the raw LLM output into a structured object.
  * Supported formats: "json_envelope", "raw_json", "text"
  */
-export function parseLlmResponse(raw: string, responseFormat?: string): any {
+export function parseLlmResponse(raw: string, responseFormat?: string): unknown {
   const format = responseFormat || 'json_envelope';
 
   let content: string;
   if (format === 'json_envelope') {
-    const envelope = parseSafeJsonInput(raw, 'mission LLM envelope') as {
-      result?: unknown;
-    };
-    content =
-      typeof envelope.result === 'string' ? envelope.result : JSON.stringify(envelope.result);
+    const parsedEnvelope = parseSafeJsonInput(raw, 'mission LLM envelope');
+    if (!isRecord(parsedEnvelope) || !Object.hasOwn(parsedEnvelope, 'result')) {
+      throw new Error('mission LLM envelope must be a JSON object with a result field');
+    }
+    const result = parsedEnvelope.result;
+    content = typeof result === 'string' ? result : JSON.stringify(result) || '';
   } else {
     content = raw;
   }
@@ -409,8 +411,13 @@ export function parseLlmResponse(raw: string, responseFormat?: string): any {
   return parseSafeJsonInput(content.trim(), 'mission LLM response');
 }
 
-function isQuotaError(err: any): boolean {
-  return err?.cause?.code === 429 || err?.message?.includes('QUOTA_EXHAUSTED');
+function isQuotaError(err: unknown): boolean {
+  if (!isRecord(err)) return false;
+  const cause = isRecord(err.cause) ? err.cause : undefined;
+  return (
+    cause?.code === 429 ||
+    (typeof err.message === 'string' && err.message.includes('QUOTA_EXHAUSTED'))
+  );
 }
 
 /**
@@ -454,12 +461,13 @@ export async function runAdaptiveStructuredLlmProfile<T>(
     logger.info(`  [Try] ${name}: executing`);
     try {
       return await runStructuredLlmProfile(profile, prompt, schema, { systemPrompt });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isQuotaError(err)) {
         logger.warn(`⚠️ Model "${name}" exhausted, trying next...`);
         continue;
       }
-      logger.error(`❌ Model "${name}" failed with non-quota error: ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error(`❌ Model "${name}" failed with non-quota error: ${message}`);
       throw err;
     }
   }
