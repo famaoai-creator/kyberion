@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
-import { loadTrustScores, scanMissions } from './mission_journal.js';
+import { loadTrustScores, main, scanMissions } from './mission_journal.js';
 
 const root = pathResolver.sharedTmp(`mission-journal-loader-${process.pid}`);
 const outside = pathResolver.sharedTmp(`mission-journal-loader-outside-${process.pid}`);
@@ -101,5 +101,18 @@ describe('mission journal resource boundary', () => {
 
     safeWriteFile(ledger, '{"__proto__":{"agent-a":{"current_score":1000}}}');
     expect(loadTrustScores(ledger)).toEqual({});
+  });
+
+  it('routes journal rendering through the injected script printer', () => {
+    const output: unknown[] = [];
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      main(['--tenant-slug', `missing-tenant-${process.pid}`], (value) => output.push(value));
+      expect(output).toHaveLength(2);
+      expect(String(output[0])).toContain('[KYBERION]');
+      expect(logSpy).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 });

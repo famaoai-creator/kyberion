@@ -16,6 +16,14 @@ import { isRecord } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { readSafeJsonValueFile } from './lib/json-input.js';
 
+type Print = (value: unknown) => void;
+
+let activePrint: Print = () => undefined;
+
+function printOutput(value: unknown): void {
+  activePrint(value);
+}
+
 interface MissionHistoryEntry {
   ts: string;
   event: string;
@@ -175,12 +183,12 @@ export function scanMissions(
 
 function renderJournal(tenantSlug?: string) {
   const policy = resolveMissionJournalPolicy();
-  console.log(chalk.bold.cyan(`\n📜 [KYBERION] ${policy.title}\n`));
+  printOutput(chalk.bold.cyan(`\n📜 [KYBERION] ${policy.title}\n`));
 
   const missions = scanMissions(tenantSlug);
 
   if (missions.length === 0) {
-    console.log(policy.empty_message);
+    printOutput(policy.empty_message);
     return;
   }
 
@@ -189,19 +197,19 @@ function renderJournal(tenantSlug?: string) {
       m.status === 'completed' ? chalk.green : m.status === 'active' ? chalk.yellow : chalk.gray;
     const tierIcon = m.tier === 'personal' ? '🛡️' : m.tier === 'confidential' ? '🔒' : '🌐';
 
-    console.log(
+    printOutput(
       `${tierIcon} ${chalk.bold(m.mission_id.padEnd(25))} [${statusColor(m.status.toUpperCase())}] (${m.tier})`
     );
 
     // Relationships
     if (m.relationships) {
       if (m.relationships.prerequisites?.length) {
-        console.log(
+        printOutput(
           `   ${chalk.blue(`← ${policy.relationship_labels.prerequisites}:`)} ${m.relationships.prerequisites.join(', ')}`
         );
       }
       if (m.relationships.successors?.length) {
-        console.log(
+        printOutput(
           `   ${chalk.magenta(`→ ${policy.relationship_labels.successors}:`)} ${m.relationships.successors.join(', ')}`
         );
       }
@@ -214,11 +222,11 @@ function renderJournal(tenantSlug?: string) {
         locale: resolveOperatorLocale(),
         timeZone: resolveTimeZone(),
       });
-      console.log(
+      printOutput(
         `   ${chalk.gray(prefix)}${chalk.dim(time)}: ${chalk.white(h.event)} - ${chalk.italic(h.note)}`
       );
     });
-    console.log('');
+    printOutput('');
   });
 
   // Summary
@@ -227,36 +235,42 @@ function renderJournal(tenantSlug?: string) {
     stats[mission.status] = (stats[mission.status] || 0) + 1;
   }
 
-  console.log(chalk.bold(`📈 ${policy.summary_title}:`));
+  printOutput(chalk.bold(`📈 ${policy.summary_title}:`));
   Object.keys(stats).forEach((s) => {
-    console.log(`  - ${s.toUpperCase()}: ${stats[s]}`);
+    printOutput(`  - ${s.toUpperCase()}: ${stats[s]}`);
   });
-  console.log(`  - TOTAL MISSIONS: ${missions.length}\n`);
+  printOutput(`  - TOTAL MISSIONS: ${missions.length}\n`);
 
   // Trust Scores Summary
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   const ledger = loadTrustScores(ledgerPath);
   if (Object.keys(ledger).length > 0) {
-    console.log(chalk.bold(`🤝 ${policy.trust_scores_title}:`));
+    printOutput(chalk.bold(`🤝 ${policy.trust_scores_title}:`));
     Object.keys(ledger).forEach((a) => {
       const normalized = ledger[a] / 100;
       const color = normalized >= 7.0 ? chalk.green : normalized >= 5.0 ? chalk.yellow : chalk.red;
-      console.log(`  - ${a}: ${color(normalized.toFixed(1))}/10.0`);
+      printOutput(`  - ${a}: ${color(normalized.toFixed(1))}/10.0`);
     });
-    console.log('');
+    printOutput('');
   }
 }
 
-export function main(argv: string[] = []): void {
+export function main(argv: string[] = [], print: Print = () => undefined): void {
+  const previousPrint = activePrint;
+  activePrint = print;
   const tenantFlag = argv.indexOf('--tenant-slug');
   const tenantSlug = tenantFlag >= 0 ? argv[tenantFlag + 1]?.trim() : undefined;
-  renderJournal(tenantSlug || undefined);
+  try {
+    renderJournal(tenantSlug || undefined);
+  } finally {
+    activePrint = previousPrint;
+  }
 }
 
 const script = defineScript({
   name: 'mission:journal',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'mission_journal.ts') ||
