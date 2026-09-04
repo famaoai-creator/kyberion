@@ -13,6 +13,10 @@ import {
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
 import { parseKnowledgeResponse, type ClientKnowledgeCandidate } from '../lib/knowledge-response';
+import {
+  parseKnowledgeFeedbackResponse,
+  parseKnowledgeMutationResponse,
+} from '../lib/knowledge-mutation-response';
 
 type Candidate = ClientKnowledgeCandidate;
 
@@ -100,8 +104,11 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
           tenant,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to promote knowledge');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('Failed to promote knowledge');
+      if (!parseKnowledgeMutationResponse(payload)) {
+        throw new Error('Invalid knowledge promotion response');
+      }
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -118,8 +125,11 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ document_path: selected.promoted_ref, verdict, tenant }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to record feedback');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('Failed to record feedback');
+      if (!parseKnowledgeFeedbackResponse(payload)) {
+        throw new Error('Invalid knowledge feedback response');
+      }
       setFeedback(verdict);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -140,8 +150,11 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
           tenant,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to approve the candidate');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('Failed to approve the candidate');
+      if (!parseKnowledgeMutationResponse(payload)) {
+        throw new Error('Invalid knowledge approval response');
+      }
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -165,8 +178,11 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
           note: decisionNote,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to reject the candidate');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('Failed to reject the candidate');
+      if (!parseKnowledgeMutationResponse(payload)) {
+        throw new Error('Invalid knowledge rejection response');
+      }
       setDecisionNote('');
       await refresh();
     } catch (err) {
