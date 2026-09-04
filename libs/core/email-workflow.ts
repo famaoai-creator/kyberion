@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import { executeServicePreset } from './service-engine.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { clamp } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
@@ -223,6 +223,14 @@ export function extractFirstJsonBlock(text: string): Record<string, unknown> | n
     }
   }
   return null;
+}
+
+export function parseEmailDraftArtifact(value: unknown): Record<string, unknown> | null {
+  try {
+    return parseSafeJsonObjectValue(value, 'email draft artifact');
+  } catch {
+    return null;
+  }
 }
 
 export function extractBodyMarkdownFromDraft(draftMarkdown: string): string {
@@ -655,8 +663,8 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
   const { markdown, json } = resolveLatestEmailDraftPaths();
   if (safeExistsSync(json)) {
     try {
-      const parsed = readJson<Record<string, unknown>>(json);
-      if (parsed && typeof parsed === 'object') {
+      const parsed = parseEmailDraftArtifact(readJson<unknown>(json));
+      if (parsed) {
         const jsonStat = safeStat(json);
         return {
           exists: true,
