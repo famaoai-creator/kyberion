@@ -16338,6 +16338,13 @@ SX-06／SX-09 のiMessage bridge入口を再監査し、未捕捉main errorが�
 検証: iMessage bridge **1 file / 7 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 885
+
+SX-06／SX-09 のlong-lived entrypoint終了規約を再監査し、Slack／Telegram／Telegram polling／Nexus／Terminal HUDに残っていた直接`process.exit(1)`を除去した。認証情報不足、接続失敗、未捕捉main errorの既存exit code semanticsは`process.exitCode`へ維持し、bridge／daemon本体がhost processを即時終了させない経路へ統一した。Discord／iMessageを含む対象entrypoint全体に直接終了APIを再導入しない契約テストを追加した。
+
+検証: long-lived entrypoints **4 files / 19 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

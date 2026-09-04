@@ -7,13 +7,15 @@ async function main() {
   const connection = secretGuard.loadConnectionDocument('telegram');
   if (!connection || Object.keys(connection).length === 0) {
     logger.error('❌ [TelegramPolling] telegram.json not found in Personal connections.');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const { token } = connection;
   if (!token) {
     logger.error('❌ [TelegramPolling] Token missing in telegram.json.');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   logger.info('🚀 [TelegramPolling] Starting Telegram Bot Long-Polling...');
@@ -60,5 +62,5 @@ async function main() {
 
 main().catch((err) => {
   console.error(err);
-  process.exit(1);
+  process.exitCode = 1;
 });

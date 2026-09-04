@@ -932,6 +932,6 @@ const directEntry = isDirectEntry(import.meta.url, 'satellites/telegram-bridge/s
 if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
