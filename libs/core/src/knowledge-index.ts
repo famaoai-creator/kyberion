@@ -1,8 +1,7 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { readJson } from '../foundation/json.js';
-import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
+import { parseSafeJsonEntriesInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
 import * as pathResolver from '../path-resolver.js';
 import {
@@ -951,8 +950,10 @@ function _loadJsonHints(
     const filePath = path.join(dir, file);
     if (!isSafeScannerPath(knowledgeBase, filePath)) continue;
     try {
-      const parsed = readJson<unknown>(filePath);
-      const entries: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+      const entries = parseSafeJsonEntriesInput(
+        String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
+        `knowledge hint file ${filePath}`
+      );
       const relSource = scannerSource(knowledgeBase, filePath);
       for (const entry of entries) {
         const parsedHint = parseKnowledgeHint(entry);

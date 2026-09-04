@@ -48,6 +48,33 @@ export function parseSafeJsonObjectValue(value: unknown, label: string): Record<
   return value as Record<string, unknown>;
 }
 
+/**
+ * Parse a JSON object or array as independently validated records.
+ *
+ * Hint and fixture catalogs intentionally allow one malformed record to be
+ * skipped while retaining valid siblings. Each sibling is serialized and
+ * passed back through the safe tree validator so dangerous keys never escape
+ * this boundary.
+ */
+export function parseSafeJsonEntriesInput(raw: string, label: string): unknown[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error(`${label} must be valid JSON`);
+  }
+  const entries = Array.isArray(parsed) ? parsed : [parsed];
+  return entries.flatMap((entry, index) => {
+    try {
+      const serialized = JSON.stringify(entry);
+      if (serialized === undefined) return [];
+      return [parseSafeJsonInput(serialized, `${label}[${index}]`)];
+    } catch {
+      return [];
+    }
+  });
+}
+
 export type PersistedPipelineStep = {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
