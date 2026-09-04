@@ -19,6 +19,7 @@ import {
   type MediaBriefCategory,
   type MediaDocumentCompositionCatalog,
   type MediaGenerationBoundary,
+  type MediaTheme,
   type DocumentCompositionPresetResolver,
   type ProtocolKind,
 } from './media-document-helpers.js';
@@ -94,7 +95,7 @@ const documentLayoutCatalog = defineCatalog<DocumentLayoutCatalog>({
 });
 
 export interface MediaDocumentPipelineDeps {
-  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
+  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => MediaTheme | null;
   loadDocumentCompositionCatalog: (rootDir: string) => MediaDocumentCompositionCatalog;
   buildPptxSlideFromPattern: (
     rootDir: string,
@@ -262,7 +263,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       designDefaults: designDefaultsFromMediaTheme({
         colors: themeColors,
         fonts: theme?.fonts || theme?.theme?.fonts || {},
-        typography: theme?.typography || theme?.theme?.typography || {},
+        typography: theme?.typography || theme?.theme?.typography,
       }),
       slides: contentData.map((data: any, idx: number) =>
         deps.buildPptxSlideFromPattern(

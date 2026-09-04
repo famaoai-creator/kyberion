@@ -37,6 +37,7 @@ import {
   buildDiagramNarrativeOutline,
   type MediaCompositionPreset,
   type MediaDocumentCompositionCatalog,
+  type MediaTheme,
 } from './media-document-helpers.js';
 import { generateDrawioDocument, normalizeFontFamily } from './media-diagram-render-helpers.js';
 import { createMediaReportPipelineHelpers } from './media-report-pipeline-helpers.js';
@@ -94,10 +95,8 @@ type ArtifactLibraryCatalog = {
 interface MediaThemeCatalog {
   version: string;
   default_theme: string;
-  themes: Record<string, Record<string, unknown>>;
+  themes: Record<string, MediaTheme>;
 }
-
-type MediaTheme = Record<string, unknown>;
 
 function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   const dirPath = path.resolve(
