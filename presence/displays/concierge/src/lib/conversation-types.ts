@@ -4,6 +4,17 @@ import {
 } from '@agent/core/intent-resolution-contract-parser';
 import { isRecord } from '@agent/core/foundation/primitives';
 
+const CONVERSATION_RESPONSE_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function hasSafeConversationTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(hasSafeConversationTree);
+  if (!isRecord(value)) return true;
+  return Object.entries(value).every(
+    ([key, nested]) =>
+      !CONVERSATION_RESPONSE_DANGEROUS_KEYS.has(key) && hasSafeConversationTree(nested)
+  );
+}
+
 /**
  * Shared request/response contract for the concierge conversation core
  * (CS-01). Used by both the /api/message route (server) and the
@@ -54,7 +65,7 @@ export interface VoiceHubConversationResponse {
 export function parseVoiceHubConversationResponse(
   value: unknown
 ): VoiceHubConversationResponse | undefined {
-  if (!isRecord(value)) return undefined;
+  if (!isRecord(value) || !hasSafeConversationTree(value)) return undefined;
   const replyFields = ['reply', 'replyText', 'text', 'response'] as const;
   for (const field of replyFields) {
     if (value[field] !== undefined && typeof value[field] !== 'string') return undefined;

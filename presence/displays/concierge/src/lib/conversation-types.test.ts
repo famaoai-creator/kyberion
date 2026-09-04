@@ -15,4 +15,9 @@ describe('voice-hub conversation response parser', () => {
     ).toBeUndefined();
     expect(parseVoiceHubConversationResponse({ reply: '   ' })).toBeUndefined();
   });
+
+  it('rejects dangerous response trees before delivery', () => {
+    const unsafe = JSON.parse('{"replyText":"hello","stimulus":{"constructor":{"secret":"leak"}}}');
+    expect(parseVoiceHubConversationResponse(unsafe)).toBeUndefined();
+  });
 });
