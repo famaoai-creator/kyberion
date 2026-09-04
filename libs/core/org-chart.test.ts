@@ -154,6 +154,19 @@ describe('org-chart', () => {
     expect(chart.source_path).toContain('org-chart.derived.json');
   });
 
+  it('fails closed when the personality role catalog is malformed', () => {
+    safeMkdir(`${tmpRoot}/knowledge/product/personalities`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/knowledge/product/personalities/roles.json`,
+      JSON.stringify({ domains: { 1: { name: 'Invalid', roles: { 1: 42 } } } })
+    );
+
+    const chart = resolveOrganizationOrgChart('acme', tmpRoot);
+
+    expect(chart.source_kind).toBe('derived');
+    expect(chart.domains).toEqual([]);
+  });
+
   it('fails closed for an invalid tenant slug', () => {
     safeMkdir(`${tmpRoot}/customer`, { recursive: true });
     safeWriteFile(
