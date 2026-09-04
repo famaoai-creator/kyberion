@@ -14,7 +14,6 @@
  */
 
 import * as nodePath from 'node:path';
-import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -50,6 +49,14 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+type Print = (value: unknown) => void;
+
+let activePrint: Print = () => undefined;
+
+function printText(value: unknown = ''): void {
+  activePrint(value);
+}
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -259,19 +266,19 @@ function validateInputs(preset: ConfigMissionPreset, inputs: Record<string, stri
 function cmdList(): void {
   const presets = listPresets();
   if (presets.length === 0) {
-    logger.info('No config mission presets found.');
+    printText('No config mission presets found.');
     return;
   }
-  console.log('\nAvailable config mission presets:\n');
-  console.log('  PRESET ID                        CATEGORY             DESCRIPTION');
-  console.log('  ' + '─'.repeat(80));
+  printText('\nAvailable config mission presets:\n');
+  printText('  PRESET ID                        CATEGORY             DESCRIPTION');
+  printText('  ' + '─'.repeat(80));
   for (const p of presets) {
     const id = p.preset_id.padEnd(32);
     const cat = p.category.padEnd(20);
-    console.log(`  ${id} ${cat} ${p.description}`);
+    printText(`  ${id} ${cat} ${p.description}`);
   }
-  console.log(`\nTotal: ${presets.length} preset(s)`);
-  console.log(
+  printText(`\nTotal: ${presets.length} preset(s)`);
+  printText(
     `\nTo create a mission: pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]`
   );
 }
@@ -295,8 +302,8 @@ function cmdCreate(argv: string[]): void {
 
   const errors = validateInputs(preset, inputs);
   if (errors.length > 0) {
-    console.error('\n❌ Input validation failed:\n');
-    for (const e of errors) console.error(`  • ${e}`);
+    printText('\n❌ Input validation failed:\n');
+    for (const e of errors) printText(`  • ${e}`);
     throw new ScriptExitError(1, 'Input validation failed');
   }
 
@@ -360,21 +367,19 @@ function cmdCreate(argv: string[]): void {
     metadata: { preset_id: presetId, tenant, instance_id: instanceId },
   });
 
-  console.log(`\n✅ Config mission created: ${instanceId}`);
-  console.log(`   Preset:  ${presetId}`);
-  console.log(`   Tenant:  ${tenant}`);
-  console.log(`   Brief:   ${briefPath(tenant, instanceId)}`);
-  console.log(`   Scope:   ${scope.scope.scope_kind}/${scope.scope.tenant_slug}`);
-  console.log(
+  printText(`\n✅ Config mission created: ${instanceId}`);
+  printText(`   Preset:  ${presetId}`);
+  printText(`   Tenant:  ${tenant}`);
+  printText(`   Brief:   ${briefPath(tenant, instanceId)}`);
+  printText(`   Scope:   ${scope.scope.scope_kind}/${scope.scope.tenant_slug}`);
+  printText(
     `   Risk:    ${scope.risk} (approval required: ${configChangeRequiresApproval(scope)})`
   );
-  console.log(`   Desired: ${scope.desired_hash}`);
+  printText(`   Desired: ${scope.desired_hash}`);
   if (configChangeRequiresApproval(scope) && !scope.approval_ref) {
-    console.log(
-      `\nNext: pnpm config-mission request-approval --tenant ${tenant} --id ${instanceId}`
-    );
+    printText(`\nNext: pnpm config-mission request-approval --tenant ${tenant} --id ${instanceId}`);
   }
-  console.log(`\nTo apply: pnpm config-mission apply --tenant ${tenant} --id ${instanceId}`);
+  printText(`\nTo apply: pnpm config-mission apply --tenant ${tenant} --id ${instanceId}`);
 }
 
 function cmdRequestApproval(argv: string[]): void {
@@ -389,7 +394,7 @@ function cmdRequestApproval(argv: string[]): void {
     ? loadApprovalRequest('config-mission', brief.change.approval_ref)
     : null;
   if (existing) {
-    console.log(`Approval already requested: ${existing.id}`);
+    printText(`Approval already requested: ${existing.id}`);
     return;
   }
   const record = createApprovalRequest('mission_controller', {
@@ -415,8 +420,8 @@ function cmdRequestApproval(argv: string[]): void {
   });
   brief.change.approval_ref = record.id;
   safeWriteFile(bPath, JSON.stringify(brief, null, 2));
-  console.log(`Approval requested: ${record.id}`);
-  console.log('Approve it through an existing governed approval surface before apply.');
+  printText(`Approval requested: ${record.id}`);
+  printText('Approve it through an existing governed approval surface before apply.');
 }
 
 function cmdStatus(argv: string[]): void {
@@ -431,7 +436,7 @@ function cmdStatus(argv: string[]): void {
 
   const missionsDir = configMissionRoot(tenant);
   if (!safeExistsSync(missionsDir)) {
-    logger.info(`No config missions found for tenant: ${tenant}`);
+    printText(`No config missions found for tenant: ${tenant}`);
     return;
   }
 
@@ -439,7 +444,7 @@ function cmdStatus(argv: string[]): void {
   const targets = id ? entries.filter((e) => e === id) : entries;
 
   if (targets.length === 0) {
-    logger.info(
+    printText(
       id
         ? `Config mission ${id} not found for tenant ${tenant}`
         : `No config missions for tenant ${tenant}`
@@ -447,9 +452,9 @@ function cmdStatus(argv: string[]): void {
     return;
   }
 
-  console.log(`\nConfig missions for tenant '${tenant}':\n`);
-  console.log('  ID                         PRESET                           STATUS     CREATED');
-  console.log('  ' + '─'.repeat(85));
+  printText(`\nConfig missions for tenant '${tenant}':\n`);
+  printText('  ID                         PRESET                           STATUS     CREATED');
+  printText('  ' + '─'.repeat(85));
 
   for (const entry of targets) {
     try {
@@ -458,9 +463,9 @@ function cmdStatus(argv: string[]): void {
       const presetCol = brief.preset_id.padEnd(32);
       const statusCol = brief.status.padEnd(10);
       const created = brief.created_at.slice(0, 10);
-      console.log(`  ${instanceCol} ${presetCol} ${statusCol} ${created}`);
+      printText(`  ${instanceCol} ${presetCol} ${statusCol} ${created}`);
     } catch {
-      console.log(`  ${entry.padEnd(26)} (unreadable brief)`);
+      printText(`  ${entry.padEnd(26)} (unreadable brief)`);
     }
   }
 }
@@ -491,7 +496,7 @@ async function cmdApply(argv: string[]): Promise<void> {
   });
 
   if (brief.status === 'applied') {
-    logger.info(`Config mission ${id} is already applied.`);
+    printText(`Config mission ${id} is already applied.`);
     return;
   }
 
@@ -501,7 +506,7 @@ async function cmdApply(argv: string[]): Promise<void> {
   brief.status = 'applying';
   safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
-  logger.info(`[CONFIG_MISSION] Applying ${brief.preset_id} for tenant ${tenant}…`);
+  printText(`[CONFIG_MISSION] Applying ${brief.preset_id} for tenant ${tenant}…`);
 
   try {
     // Delegate execution directly to Node.  The previous implementation used
@@ -545,8 +550,8 @@ async function cmdApply(argv: string[]): Promise<void> {
       });
     }
 
-    console.log(`\n✅ Config mission ${id} applied successfully.`);
-    if (preset.notes) console.log(`\n💡 ${preset.notes}`);
+    printText(`\n✅ Config mission ${id} applied successfully.`);
+    if (preset.notes) printText(`\n💡 ${preset.notes}`);
   } catch (err) {
     brief.status = 'failed';
     brief.error = String(err);
@@ -583,17 +588,15 @@ async function cmdApply(argv: string[]): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function printUsage(): void {
-  console.error('Usage: pnpm config-mission <list|create|status|request-approval|apply> [options]');
-  console.error('  pnpm config-mission help');
-  console.error(
-    '  pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]'
-  );
-  console.error('  pnpm config-mission status --tenant <slug> [--id <cfg-id>]');
-  console.error('  pnpm config-mission request-approval --tenant <slug> --id <cfg-id>');
-  console.error('  pnpm config-mission apply --tenant <slug> --id <cfg-id>');
+  printText('Usage: pnpm config-mission <list|create|status|request-approval|apply> [options]');
+  printText('  pnpm config-mission help');
+  printText('  pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]');
+  printText('  pnpm config-mission status --tenant <slug> [--id <cfg-id>]');
+  printText('  pnpm config-mission request-approval --tenant <slug> --id <cfg-id>');
+  printText('  pnpm config-mission apply --tenant <slug> --id <cfg-id>');
 }
 
-async function main(args: string[] = []): Promise<void> {
+async function mainImpl(args: string[] = []): Promise<void> {
   const [command, ...rest] = args;
 
   if (!command || command === 'help' || command === '--help' || command === '-h') {
@@ -619,16 +622,26 @@ async function main(args: string[] = []): Promise<void> {
       await cmdApply(rest);
       break;
     default:
-      console.error(`Unknown command: ${command ?? '(none)'}`);
+      printText(`Unknown command: ${command ?? '(none)'}`);
       printUsage();
       throw new ScriptExitError(1, `Unknown command: ${command ?? '(none)'}`);
+  }
+}
+
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
+  const previousPrint = activePrint;
+  activePrint = print;
+  try {
+    await mainImpl(args);
+  } finally {
+    activePrint = previousPrint;
   }
 }
 
 const script = defineScript({
   name: 'config:mission',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'config_mission.ts') ||
