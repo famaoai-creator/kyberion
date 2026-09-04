@@ -1,5 +1,10 @@
 import { logger } from '@agent/core/core';
-import { nowIso, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import {
+  isRecord,
+  nowIso,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
 import {
   safeReadFile,
   safeWriteFile,
@@ -14,7 +19,6 @@ import {
 import { resolveVars, evaluateCondition } from '@agent/core/src/logic-utils';
 import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
-import { derivePipelineStatus } from '@agent/core/pipeline-contract';
 import { pathResolver } from '@agent/core/path-resolver';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
 import { registerTaskPlanCoordinator } from '@agent/core/task-plan-coordinator-port';
@@ -22,7 +26,8 @@ import { evaluateTaskPlanReadyGate } from '@agent/core/sdlc-artifact-store';
 import { buildCostReportFromHistory } from '@agent/core/cost-report';
 import { summarizeSemanticDegradations } from '@agent/core/semantic-degradation-log';
 import { listPromotionCandidates } from '@agent/core/promotion-candidates';
-import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import { runAdfActuatorPipeline } from '../../../core/actuator-sdk.js';
+import type { AdfEngineContext, AdfRunResult, AdfStep } from '../../../core/adf-engine.js';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -150,19 +155,23 @@ function readOrchestratorJson(filePath: string, label: string): unknown {
  */
 export async function executePipeline(
   steps: PipelineStep[],
-  initialCtx: any = {},
-  options: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() }
+  initialCtx: AdfEngineContext = {},
+  options: { max_steps?: number; timeout_ms?: number } = {}
 ) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, root: rootDir, HOME: process.env.HOME || '/Users' };
+  let ctx: AdfEngineContext = {
+    ...initialCtx,
+    root: rootDir,
+    HOME: process.env.HOME || '/Users',
+  };
 
-  const contextPath = initialCtx.context_path
-    ? resolveOrchestratorRepositoryPath(rootDir, initialCtx.context_path)
-    : undefined;
+  const contextPath =
+    typeof initialCtx.context_path === 'string' && initialCtx.context_path
+      ? resolveOrchestratorRepositoryPath(rootDir, initialCtx.context_path)
+      : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
     const saved = parseSafeJsonObjectValue(
       readOrchestratorJson(contextPath, 'orchestrator context'),
@@ -171,78 +180,79 @@ export async function executePipeline(
     ctx = { ...ctx, ...saved };
   }
 
-  const results = [];
-  for (const step of steps) {
-    state.stepCount++;
-    if (state.stepCount > MAX_STEPS)
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT)
-      throw new Error(`[SAFETY_LIMIT] Execution timed out (${TIMEOUT}ms)`);
-
-    try {
-      logger.info(`  [ORCH_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-
-      ctx = await runActuatorPipeline({
-        actuatorId: 'orchestrator',
-        steps: [step],
-        context: ctx,
-        execute: async (op, params, context) => {
-          if (step.type === 'control') {
-            return opControl(op, params, context, options, state);
-          }
-          switch (step.type) {
-            case 'capture':
-              return opCapture(op, params, context);
-            case 'transform':
-              return opTransform(op, params, context);
-            case 'apply':
-              return opApply(op, params, context);
-            default:
-              return context;
-          }
-        },
-      });
-      results.push({ op: step.op, status: 'success' });
-    } catch (err: any) {
-      logger.error(`  [ORCH_PIPELINE] Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
-      break;
-    }
-  }
-
-  if (initialCtx.context_path) {
-    safeWriteFile(
-      resolveOrchestratorRepositoryPath(rootDir, initialCtx.context_path),
-      JSON.stringify(ctx, null, 2)
-    );
-  }
-
-  return {
-    status: derivePipelineStatus(results),
-    results,
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'orchestrator',
+    steps,
     context: ctx,
-    total_steps: state.stepCount,
-  };
+    options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+    handlers: {
+      capture: (op, params, currentCtx) => opCapture(op, params, currentCtx),
+      transform: (op, params, currentCtx) => opTransform(op, params, currentCtx),
+      apply: (op, params, currentCtx) => opApply(op, params, currentCtx),
+      control: opControl,
+    },
+    hooks: {
+      beforeStep: (step, stepNumber) =>
+        logger.info(`  [ORCH_PIPELINE] [Step ${stepNumber}] ${step.type}:${step.op}...`),
+      afterStep: (step, _stepNumber, _context, outcome) => {
+        if (outcome.status === 'failed') {
+          logger.error(
+            `  [ORCH_PIPELINE] Step failed (${step.op}): ${outcome.error || 'unknown error'}`
+          );
+        }
+      },
+    },
+  });
+
+  ctx = result.context;
+
+  if (contextPath) {
+    safeWriteFile(contextPath, JSON.stringify(ctx, null, 2));
+  }
+
+  return result;
 }
 
-async function opControl(op: string, params: any, ctx: any, options: any, state: any) {
+async function opControl(
+  op: string,
+  params: unknown,
+  ctx: AdfEngineContext,
+  runSteps: (
+    steps: AdfStep[],
+    seedCtx?: AdfEngineContext
+  ) => Promise<AdfRunResult<AdfEngineContext>>,
+  _resolve: (value: unknown) => unknown
+): Promise<AdfEngineContext> {
+  if (!isRecord(params)) {
+    throw new Error(`[INVALID_PARAMS] ${op} control params must be an object`);
+  }
+  const runNested = async (steps: unknown, seedCtx: AdfEngineContext) => {
+    const result = await runSteps(asAdfSteps(steps, op), seedCtx);
+    if (result.status === 'failed') {
+      throw new Error(
+        result.results.find((entry) => entry.status === 'failed')?.error || 'nested pipeline failed'
+      );
+    }
+    return result.context;
+  };
+
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipeline(params.then, ctx, options, state);
-        return res.context;
+        return runNested(params.then, ctx);
       } else if (params.else) {
-        const res = await executePipeline(params.else, ctx, options, state);
-        return res.context;
+        return runNested(params.else, ctx);
       }
       return ctx;
 
     case 'while':
       let iterations = 0;
-      const maxIter = params.max_iterations || 100;
+      const maxIter =
+        typeof params.max_iterations === 'number' && params.max_iterations >= 0
+          ? params.max_iterations
+          : 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipeline(params.pipeline, ctx, options, state);
-        ctx = res.context;
+        ctx = await runNested(params.pipeline, ctx);
         iterations++;
       }
       return ctx;
@@ -250,6 +260,24 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
     default:
       throw buildUnknownOrchestratorOpError(op);
   }
+}
+
+function asAdfSteps(value: unknown, op: string): AdfStep[] {
+  if (
+    !Array.isArray(value) ||
+    !value.every(
+      (step): step is AdfStep =>
+        isRecord(step) &&
+        typeof step.op === 'string' &&
+        (step.type === 'capture' ||
+          step.type === 'transform' ||
+          step.type === 'apply' ||
+          step.type === 'control')
+    )
+  ) {
+    throw new Error(`[INVALID_PARAMS] ${op} control requires an array of ADF steps`);
+  }
+  return value;
 }
 
 async function opCapture(op: string, params: any, ctx: any) {
