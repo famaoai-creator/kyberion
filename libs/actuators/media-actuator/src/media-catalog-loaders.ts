@@ -2,11 +2,16 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
+  safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
 import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
 import { loadTenantDesignOverride } from '@agent/core/tenant-design-override';
-import { defineCatalog, readJson } from '@agent/core/foundation';
+import {
+  defineCatalog,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
 import * as path from 'node:path';
 
 export function cloneJsonValue<T>(value: T): T {
@@ -49,14 +54,21 @@ export function readJsonFilesRecursively(dirPath: string): any[] {
       continue;
     }
     if (stat.isFile() && entry.endsWith('.json')) {
-      docs.push(readJson(assertSafeRepositoryPath(fullPath)));
+      docs.push(loadJsonValue(fullPath));
     }
   }
   return docs;
 }
 
 export function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
-  return readJson(assertSafeRepositoryPath(filePath));
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`Media JSON input must be an existing regular file: ${safePath}`);
+  }
+  return parseSafeJsonInput(
+    String(safeReadFile(safePath, { encoding: 'utf8' }) || ''),
+    `Media JSON input ${safePath}`
+  );
 }
 
 export interface ConfidentialThemePack {
@@ -74,10 +86,10 @@ export function loadConfidentialThemePack(
   filePath: string
 ): ConfidentialThemePack {
   const safePath = assertSafeRepositoryPath(filePath);
-  const raw = readJson<unknown>(safePath);
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new Error(`Confidential theme pack must be an object: ${safePath}`);
-  }
+  const raw = parseSafeJsonObjectValue(
+    loadJsonValue(safePath),
+    `Confidential theme pack ${safePath}`
+  );
   const kind = (raw as Record<string, unknown>).kind;
   const schemaFile =
     kind === 'pptx-theme-pack'
