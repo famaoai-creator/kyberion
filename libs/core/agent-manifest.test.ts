@@ -92,6 +92,31 @@ describe('agent-manifest selection hint loading', () => {
     expect(manifest?.selection_hints?.preferred_modelId).toBe('gemini-2.5-flash');
   });
 
+  it('closes malformed frontmatter values to typed defaults', () => {
+    const root = pathResolver.sharedTmp('agent-manifest-malformed-frontmatter-test');
+    const agentsDir = `${root}/knowledge/product/agents`;
+
+    safeMkdir(agentsDir, { recursive: true });
+    safeWriteFile(
+      `${agentsDir}/malformed-agent.agent.md`,
+      `---\nagentId: malformed-agent\ncapabilities: [reasoning, 7]\nauto_spawn: yes\ntrust_required: high\nrequires:\n  env: [TOKEN, 8]\n  services: invalid\nallowed_actuators: [browser, false]\n---\n# Malformed Agent\n`
+    );
+
+    const manifest = loadAgentManifests(root).find((entry) => entry.agentId === 'malformed-agent');
+
+    expect(manifest).toMatchObject({
+      agentId: 'malformed-agent',
+      capabilities: ['reasoning'],
+      autoSpawn: false,
+      trustRequired: 0,
+      requires: {
+        env: ['TOKEN'],
+        services: [],
+      },
+      allowedActuators: ['browser'],
+    });
+  });
+
   it('rejects a manifest file reached through a symbolic link', () => {
     const root = pathResolver.sharedTmp('agent-manifest-symlink-test');
     const agentsDir = `${root}/knowledge/product/agents`;
