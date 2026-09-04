@@ -71,7 +71,7 @@ import {
   type BaselineCacheSnapshot,
 } from '@agent/core/baseline-check-cache';
 import { scanTenantDrift } from './watch_tenant_drift.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type ReadinessRule = {
   required_keys_any?: string[];
@@ -1067,7 +1067,7 @@ export const runBaselineCheckCli = defineScript({
       const report = await runBaselineCheck();
       context.print(report);
       if (report.status === 'needs_recovery' && report.circuit_broken) {
-        process.exitCode = 1;
+        throw new ScriptExitError(1, '', true, report);
       }
       return report;
     } catch (error) {
@@ -1079,8 +1079,7 @@ export const runBaselineCheckCli = defineScript({
         error: error instanceof Error ? error.message : String(error),
       };
       context.print(fatalReport);
-      process.exitCode = 1;
-      return fatalReport;
+      throw new ScriptExitError(1, '', true, fatalReport);
     }
   },
 });
