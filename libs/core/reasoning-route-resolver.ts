@@ -2,6 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
@@ -239,6 +240,10 @@ export function normalizeReasoningRole(
   throw new Error(`Unknown reasoning role "${value}". Allowed roles: ${roles.join(', ')}`);
 }
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 function mergeSampling(...values: Array<SamplingParams | undefined>): SamplingParams {
   const result: SamplingParams = {};
   for (const value of values) if (value) Object.assign(result, value);
@@ -251,7 +256,7 @@ function mergeSampling(...values: Array<SamplingParams | undefined>): SamplingPa
 
 function requestedBinding(role: ReasoningRole, env: NodeJS.ProcessEnv): string | undefined {
   const key = `KYBERION_REASONING_ROLE_${role.toUpperCase()}`;
-  return env[key]?.trim() || env.KYBERION_REASONING_PROFILE?.trim();
+  return envText(env, key)?.trim() || envText(env, 'KYBERION_REASONING_PROFILE')?.trim();
 }
 
 function loadOperatorLlmSelection(): { provider: string; model_id?: string } | null {
@@ -288,7 +293,7 @@ function modelFromRuntimeEnv(mode: string, env: NodeJS.ProcessEnv): string | und
     local: ['KYBERION_LOCAL_LLM_MODEL'],
   };
   return [...(keys[mode] || []), 'KYBERION_REASONING_MODEL']
-    .map((key) => env[key]?.trim())
+    .map((key) => envText(env, key)?.trim())
     .find(Boolean);
 }
 
@@ -452,7 +457,10 @@ export function resolveReasoningRoute(
     }
     const toolsEnabled = overlay?.tools_enabled ?? base.tools_enabled ?? false;
     const allowedTools = toolsEnabled ? (overlay?.allowed_tools ?? base.allowed_tools ?? []) : [];
-    if (allowedTools.includes('shell_exec') && env.KYBERION_REASONING_ALLOW_SHELL_TOOL !== 'true') {
+    if (
+      allowedTools.includes('shell_exec') &&
+      envText(env, 'KYBERION_REASONING_ALLOW_SHELL_TOOL') !== 'true'
+    ) {
       rejectedCandidates.push({
         profile: profileRef,
         reason: 'shell_exec requires KYBERION_REASONING_ALLOW_SHELL_TOOL=true',
@@ -693,7 +701,8 @@ export function resolveStepReasoningRoute(input: {
   let binding: ReasoningRouteBinding | undefined;
   let source: ResolvedStepReasoningRoute['source'] = 'policy';
 
-  const envBinding = env.KYBERION_REASONING_PROFILE || env.KYBERION_REASONING_BACKEND;
+  const envBinding =
+    envText(env, 'KYBERION_REASONING_PROFILE') || envText(env, 'KYBERION_REASONING_BACKEND');
   if (envBinding) {
     binding = envBinding.startsWith('profile:')
       ? { profile: envBinding.slice('profile:'.length) }
