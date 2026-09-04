@@ -107,6 +107,23 @@ describe('bumpDependencySpec', () => {
 });
 
 describe('applyDependencyPatch', () => {
+  it('rejects dangerous package manifest JSON before planning a patch', () => {
+    safeWriteFile(path.join(testRoot, 'package.json'), '{"__proto__":{"polluted":true}}');
+
+    expect(() =>
+      applyDependencyPatch({
+        packageName: 'leftpad',
+        targetVersion: '1.0.1',
+        apply: false,
+        rootDir: testRoot,
+        ledgerPath,
+        backupRoot,
+        runner: new FakeRunner(() => ok),
+        gates: GATES,
+      })
+    ).toThrow(/dangerous JSON key/);
+  });
+
   it('propose mode records the plan without touching files', () => {
     const runner = new FakeRunner(() => ok);
     const outcome = applyDependencyPatch({
