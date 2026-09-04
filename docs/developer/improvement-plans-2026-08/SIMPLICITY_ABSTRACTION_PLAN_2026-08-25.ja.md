@@ -16867,6 +16867,12 @@ voice-hub の stimulus や追加 response tree に dangerous key が残る場合
 canonical full gate はこの追記後に実行する。SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、
 SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 960
+
+SX-10 の service actuator dynamic boundary を再監査した。service の `context`／`params`／pipeline `steps` は外部サービスごとの任意形状を受けるため、残存する 3 件の `additionalProperties: true` を機械的に strict 化せず、admission 前後の共通 runtime boundary で `__proto__`／`constructor`／`prototype` を再帰的に拒否するようにした。これにより provider 固有キーの互換性を保ったまま、preflight repair が追加した値を含めて prototype 制御キーが実行・merge 経路へ到達しない。既存の approval、tenant／security scope、service execution semantics は変更していない。
+
+検証: service actuator **1 file / 17 tests passed**、root typecheck、root lint、`git diff --check`。canonical full gate はこの追記後に実行する。残存する SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -116,6 +116,7 @@ const SERVICE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
 );
 const serviceManifestCatalogs = new Map<string, GovernedCatalog<ServiceManifest>>();
 const cloudflareOsControlPlane = new CloudflareOsControlPlane();
+const DANGEROUS_DYNAMIC_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 function serviceManifestCatalogAtPath(manifestPath: string): GovernedCatalog<ServiceManifest> {
   const existing = serviceManifestCatalogs.get(manifestPath);
@@ -139,6 +140,19 @@ function isSafeServiceId(value: string): boolean {
 
 function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Service params/context/steps intentionally accept provider-specific fields.
+ * Keep that dynamic contract, but never pass prototype-control keys through the
+ * actuator boundary where they could be merged into runtime state.
+ */
+function hasSafeDynamicServiceTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(hasSafeDynamicServiceTree);
+  if (!isRecord(value)) return true;
+  return Object.entries(value).every(
+    ([key, nested]) => !DANGEROUS_DYNAMIC_KEYS.has(key) && hasSafeDynamicServiceTree(nested)
+  );
 }
 
 /** Validate a persisted service manifest before reconcile can start or stop services. */
@@ -481,6 +495,9 @@ async function admitServiceAction(
   input: ServiceAction,
   options: ServiceActionExecutionOptions = {}
 ): Promise<ServiceAction> {
+  if (!hasSafeDynamicServiceTree(input)) {
+    throw new Error('[POLICY_VIOLATION] Service action payload contains a reserved prototype key');
+  }
   ensureDefaultOpPreflight();
   const preflight = await runOpPreflight({
     op: `service:${String(input.mode || input.action || 'unknown').toLowerCase()}:${input.action || 'unknown'}`,
@@ -492,6 +509,9 @@ async function admitServiceAction(
     approvalGranted: options.approvalGranted ? await options.approvalGranted(input) : false,
     ...(options.hasHuman !== undefined ? { hasHuman: options.hasHuman } : {}),
   });
+  if (preflight.decision === 'allow' && !hasSafeDynamicServiceTree(preflight.input)) {
+    throw new Error('[POLICY_VIOLATION] Service preflight produced a reserved prototype key');
+  }
   if (preflight.decision !== 'allow') {
     throw new Error(
       `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Service operation was not admitted.'}`
