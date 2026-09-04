@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseConciergeSummaryResponse } from './summary-event';
+import { parseConciergeSummaryEvent, parseConciergeSummaryResponse } from './summary-event';
 
 const summary = {
   generated_at: '2026-09-04T00:00:00Z',
@@ -30,5 +30,13 @@ describe('concierge summary response boundary', () => {
       '{"ok":true,"summary":{"generated_at":"2026-09-04T00:00:00Z","briefing":{"sentence_ja":"x","counts":{"active_missions":0,"pending_approvals":0,"unread_outcomes":0,"exceptions":0}},"intent_inbox":[],"approval_queue":[],"outcome_feed":[],"exception_feed":[],"constructor":{}}}'
     );
     expect(parseConciergeSummaryResponse(unsafe)).toBeNull();
+  });
+
+  it('rejects dangerous keys in event summaries before projection', () => {
+    const unsafe = {
+      ...summary,
+      constructor: { polluted: true },
+    };
+    expect(parseConciergeSummaryEvent(JSON.stringify(unsafe))).toBeNull();
   });
 });

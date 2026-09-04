@@ -16834,6 +16834,17 @@ skip し、既存の verdict persistence と best-of-N 実行 semantics は変�
 canonical full gate はこの追記後に実行する。SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、
 SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 957
+
+SX-08／SX-09 の Concierge summary event projection を再監査し、HTTP response では safe-tree 検査済みである一方、
+event raw JSON は `JSON.parse` 後に summary value parser へ直接渡され、summary root の dangerous key が未検査のまま
+表示 projection に到達し得る残存を修正した。summary value parser を HTTP／event の共通境界として safe-tree 検証するようにし、
+既存の summary shape、件数、表示 semantics は変更していない。
+
+検証: Concierge summary response／event **1 file / 4 tests passed**、root typecheck、root lint、`git diff --check`。
+canonical full gate はこの追記後に実行する。SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、
+SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
