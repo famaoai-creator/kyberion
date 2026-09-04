@@ -26,6 +26,106 @@ const DEFAULT_MEDIA_RETRY = {
   jitter: true,
 };
 
+export interface MediaLayoutPosition {
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  [key: string]: unknown;
+}
+
+export interface MediaLayoutChrome {
+  header_h?: number;
+  body_x?: number;
+  body_y?: number;
+  body_w?: number;
+  body_h?: number;
+  footer_y?: number;
+  footer_h?: number;
+  footer_font_size?: number;
+  logo_zone_x?: number;
+  logo_zone_y?: number;
+  logo_zone_w?: number;
+  logo_zone_h?: number;
+  logo_display_h?: number;
+  logo_display_max_w?: number;
+  title_w_logo?: number;
+  title_w_no_logo?: number;
+  title_font_size?: number;
+  title_x?: number;
+  accent_strip_x?: number;
+  accent_strip_w?: number;
+  separator_h?: number;
+  [key: string]: unknown;
+}
+
+export interface MediaLayoutHero {
+  white_panel_y?: number;
+  white_panel_h?: number;
+  separator_y?: number;
+  separator_h?: number;
+  logo_display_h?: number;
+  logo_display_max_w?: number;
+  logo_right_margin?: number;
+  logo_y?: number;
+  brand_name_x?: number;
+  brand_name_y?: number;
+  brand_name_w?: number;
+  brand_name_h?: number;
+  brand_name_font_size?: number;
+  title_x?: number;
+  title_y?: number;
+  title_w?: number;
+  title_h?: number;
+  title_font_size?: number;
+  subtitle_x?: number;
+  subtitle_y?: number;
+  subtitle_w?: number;
+  subtitle_h?: number;
+  subtitle_font_size?: number;
+  [key: string]: unknown;
+}
+
+export interface MediaLayoutShape {
+  type?: string;
+  shapeType?: string;
+  placeholderType?: string;
+  pos?: MediaLayoutPosition;
+  style?: Record<string, unknown>;
+  text?: string;
+  [key: string]: unknown;
+}
+
+export interface MediaLayoutTemplate {
+  chrome?: MediaLayoutChrome;
+  hero?: MediaLayoutHero;
+  body_zones?: Record<string, MediaLayoutTemplate>;
+  title?: MediaLayoutShape;
+  body?: MediaLayoutShape;
+  visual?: MediaLayoutShape;
+  web?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface MediaSlideLayoutPresetCatalog {
+  version: string;
+  defaults: Record<string, MediaLayoutTemplate>;
+  presets: Record<string, MediaLayoutTemplate>;
+  grid?: Record<string, unknown>;
+  chrome?: MediaLayoutChrome;
+  hero?: MediaLayoutHero;
+  body_zones?: Record<string, MediaLayoutTemplate>;
+  default?: string;
+  templates?: Record<string, MediaLayoutTemplate>;
+  _meta?: string;
+}
+
+export interface MediaLayoutTemplateCatalog {
+  version: string;
+  default: string;
+  templates: Record<string, MediaLayoutTemplate>;
+}
+
 function cloneJsonValue<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }
@@ -63,14 +163,9 @@ function resolveSlideTemplate(template: any, slideData: any, fallback = ''): str
     .replace(/{{\s*visual\s*}}/g, slideData?.visual || '');
 }
 
-function loadSlideLayoutPresetCatalog(rootDir: string): any {
-  const fallback = { version: '1.0.0', defaults: {}, presets: {} };
-  const catalog = defineCatalog<{
-    version: string;
-    defaults: Record<string, unknown>;
-    presets: Record<string, unknown>;
-    [key: string]: unknown;
-  }>({
+function loadSlideLayoutPresetCatalog(rootDir: string): MediaSlideLayoutPresetCatalog {
+  const fallback: MediaSlideLayoutPresetCatalog = { version: '1.0.0', defaults: {}, presets: {} };
+  const catalog = defineCatalog<MediaSlideLayoutPresetCatalog>({
     id: 'slide-layout-presets',
     path: path.resolve(
       rootDir,
@@ -109,8 +204,8 @@ function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
   return mergePptxShape(preset || {}, override || {});
 }
 
-let _cachedBzl: any = null;
-function loadBodyZoneLayouts(rootDir: string): any {
+let _cachedBzl: MediaLayoutTemplate | null = null;
+function loadBodyZoneLayouts(rootDir: string): MediaLayoutTemplate {
   if (_cachedBzl) return _cachedBzl;
   const catalog = loadSlideLayoutPresetCatalog(rootDir);
   _cachedBzl = {
@@ -206,8 +301,8 @@ function resolveBodyZoneLayout(semanticType: string): string {
   }
 }
 
-let _cachedLayoutTemplates: any = null;
-function loadLayoutTemplateCatalog(rootDir: string): any {
+let _cachedLayoutTemplates: MediaLayoutTemplateCatalog | null = null;
+function loadLayoutTemplateCatalog(rootDir: string): MediaLayoutTemplateCatalog {
   if (_cachedLayoutTemplates) return _cachedLayoutTemplates;
   const catalog = loadSlideLayoutPresetCatalog(rootDir);
   _cachedLayoutTemplates = {
@@ -218,18 +313,14 @@ function loadLayoutTemplateCatalog(rootDir: string): any {
   return _cachedLayoutTemplates;
 }
 
-function loadLayoutTemplateCatalogFromPath(filePath: string): any {
+function loadLayoutTemplateCatalogFromPath(filePath: string): MediaLayoutTemplateCatalog {
   const catalogPath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  const fallback = {
+  const fallback: MediaLayoutTemplateCatalog = {
     version: '1.0.0',
     default: 'corporate-standard',
     templates: {},
   };
-  return defineCatalog<{
-    version: string;
-    default: string;
-    templates: Record<string, unknown>;
-  }>({
+  return defineCatalog<MediaLayoutTemplateCatalog>({
     id: 'layout-template-catalog',
     path: catalogPath,
     schema: pathResolver.rootResolve(
