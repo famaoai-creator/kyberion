@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseMissionNextTaskRecords } from '@agent/core/mission-next-task-reader';
 import { collectActiveMissions } from './chronos-quick-action-helpers';
 
 function makeCore(state: unknown, nextTasks: unknown) {
@@ -19,8 +20,7 @@ function makeCore(state: unknown, nextTasks: unknown) {
       (filePath.endsWith('mission-state.json') && state && typeof state === 'object'
         ? state
         : null) as never,
-    readJson: <T = unknown>(filePath: string) =>
-      (filePath.endsWith('mission-state.json') ? state : nextTasks) as T,
+    loadMissionNextTaskRecordsAtPath: () => parseMissionNextTaskRecords(nextTasks),
     safeExecResult: () => ({ status: 0 }),
   };
   return core;
