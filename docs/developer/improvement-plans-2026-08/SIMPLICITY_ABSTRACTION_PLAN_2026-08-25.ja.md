@@ -18231,9 +18231,24 @@ SX-09 の read-model 文言境界を再監査し、`operator-home-summary` に�
 
 検証:
 
-- operator／CEO home summary **2 files / 6 tests passed**。
+- operator／CEO home summary **2 files / 7 tests passed**。
 - vocabulary catalog の `catalogs` gate、generated vocabulary types の `vocabulary-types` gate passed。
 - `pnpm run typecheck`、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
+## 2026-09-05 再レビュー修正 1055
+
+SX-09／SX-14 の共通 `NextAction` 出力を再監査し、`next-action.ts` に残っていた固定タイトルと完了確認の固定文言を
+`user-facing-vocabulary` catalog の `next_action:*` key へ移した。error remediation の各分岐には `next_action_key` を付与し、CEO briefing など
+別 locale の surface が同じ key から再解決できるようにした。分類理由の動的 remediation、suggested command、error category、既存の return shape は変更していない。
+
+検証:
+
+- next-action／contract／CEO briefing **3 files / 14 tests passed**。
+- generated vocabulary types、pseudo locale、knowledge index を再生成し、`catalogs`／`vocabulary-types` の個別 gate passed。
+- `pnpm run typecheck`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 

@@ -104,6 +104,21 @@ const NEXT_ACTION_JA_BY_KEY: Partial<Record<VocabularyKey, VocabularyKey>> = {
   'operator_home:next_action.review_quality': 'operator_home:next_action.review_quality',
   'operator_home:next_action.acknowledge_inbox': 'operator_home:next_action.acknowledge_inbox',
   'operator_home:next_action.monitor': 'operator_home:next_action.monitor',
+  'next_action:verify_missing_runtime_prerequisites':
+    'next_action:verify_missing_runtime_prerequisites',
+  'next_action:repair_credentials': 'next_action:repair_credentials',
+  'next_action:inspect_configured_secrets': 'next_action:inspect_configured_secrets',
+  'next_action:fix_write_path_scope': 'next_action:fix_write_path_scope',
+  'next_action:request_required_approval': 'next_action:request_required_approval',
+  'next_action:resolve_policy_block': 'next_action:resolve_policy_block',
+  'next_action:resolve_mission_id': 'next_action:resolve_mission_id',
+  'next_action:fix_failing_pipeline_input': 'next_action:fix_failing_pipeline_input',
+  'next_action:fix_failing_input': 'next_action:fix_failing_input',
+  'next_action:check_remote_dependency_retry': 'next_action:check_remote_dependency_retry',
+  'next_action:inspect_failure_rerun': 'next_action:inspect_failure_rerun',
+  'next_action:verify_runtime_prerequisites': 'next_action:verify_runtime_prerequisites',
+  'next_action:fix_service_setup': 'next_action:fix_service_setup',
+  'next_action:bootstrap_runtime': 'next_action:bootstrap_runtime',
   'home.next_action': 'home.next_action',
 };
 

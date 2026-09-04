@@ -6,6 +6,7 @@ import {
   buildNextActionFromError,
   formatCompletionNextAction,
 } from './next-action.js';
+import { t } from './t.js';
 
 describe('next-action remediation commands', () => {
   it('suggests the setup report for missing secrets', () => {
@@ -44,7 +45,7 @@ describe('next-action completion path', () => {
     });
 
     expect(action).toMatchObject({
-      title: 'Completion confirmed',
+      title: t('next_action:completion_confirmed'),
       request: 'The closeout note is saved',
       satisfied: true,
       confidence: 0.93,
@@ -52,12 +53,12 @@ describe('next-action completion path', () => {
       gaps: [],
       evidence_refs: ['evidence/closeout.md'],
     });
-    expect(action.next_step).toContain('archival');
+    expect(action.next_step).toBe(t('next_action:completion_next_step_proceed'));
 
     const lines = formatCompletionNextAction(action);
     expect(lines).toEqual(
       expect.arrayContaining([
-        'Completion: Completion confirmed',
+        `Completion: ${t('next_action:completion_confirmed')}`,
         'Goal: The closeout note is saved',
         'Satisfied: yes',
         'Confidence: 0.93',
@@ -82,11 +83,11 @@ describe('next-action completion path', () => {
     });
 
     expect(action).toMatchObject({
-      title: 'Completion requires follow-up',
+      title: t('next_action:completion_followup'),
       satisfied: false,
       confidence: 0.35,
       gaps: ['No mission evidence refs were collected.'],
     });
-    expect(action.next_step).toContain('Resolve the gaps');
+    expect(action.next_step).toBe(t('next_action:completion_next_step_resolve'));
   });
 });
