@@ -20,11 +20,13 @@ import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { loadMissionBriefAtPath } from './mission-brief.js';
 
+type Print = (value: unknown) => void;
+
 export function resolveDecisionResourcePath(inputPath: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(inputPath, { allowMissingLeaf });
 }
 
-export function main(argv: string[] = []): void {
+export function main(argv: string[] = [], print: Print = () => undefined): void {
   const htmlPath = argv[0];
   const jsonPath = argv[1];
   if (!htmlPath || !jsonPath)
@@ -52,7 +54,7 @@ export function main(argv: string[] = []): void {
       ? loadMissionBriefAtPath(safeJsonPath)
       : {};
 
-  console.log(
+  print(
     JSON.stringify(
       { decision, decidedAt: at, decidedBy: by, commentCount: comments.length, comments },
       null,
@@ -61,19 +63,19 @@ export function main(argv: string[] = []): void {
   );
 
   if (decision === 'approved') {
-    console.log(`\n=== ${catalogT('mission_alignment:decision_approved')} ===`);
-    console.log(
+    print(`\n=== ${catalogT('mission_alignment:decision_approved')} ===`);
+    print(
       'Static HTML is not an approval record. Re-check the shared approval-store with ' +
         `node dist/scripts/mission_alignment_decision.js --mission ${b.missionId || '<MISSION_ID>'} --strict`
     );
-    console.log(
+    print(
       'If the strict check passes, use mission_controller gate-pass ALIGNMENT_APPROVED; do not run start from this output.'
     );
     throw new ScriptExitError(2, '', true);
   } else if (decision === 'changes' || decision === 'rejected') {
-    console.log(`\n=== ${catalogT('mission_alignment:decision_changes')} ===`);
+    print(`\n=== ${catalogT('mission_alignment:decision_changes')} ===`);
   } else {
-    console.log(`\n=== ${catalogT('mission_alignment:decision_pending')} ===`);
+    print(`\n=== ${catalogT('mission_alignment:decision_pending')} ===`);
   }
 }
 
@@ -84,5 +86,5 @@ if (
   void defineScript({
     name: 'mission-alignment:read-decision',
     flags: [],
-    run: ({ argv }) => main(argv),
+    run: ({ argv, print }) => main(argv, print),
   })();
