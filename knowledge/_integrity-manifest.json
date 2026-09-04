@@ -7861,6 +7861,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/legacy-customer-financials.schema.json",
+      "tier": "public",
+      "size": 356,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/legacy-media-ops.schema.json",
       "tier": "public",
       "size": 373,
