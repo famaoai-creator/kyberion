@@ -1,8 +1,8 @@
 /** PI-12: reject dependency declarations that bypass the lockfile policy. */
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
 import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type PackageManifest = {
   packageManager?: string;
@@ -11,7 +11,10 @@ type PackageManifest = {
 };
 
 export function checkPinnedDependencies(): string[] {
-  const manifest = readJson<PackageManifest>(pathResolver.rootResolve('package.json'));
+  const manifest = readSafeJsonFile<PackageManifest>(
+    pathResolver.rootResolve('package.json'),
+    'package manifest'
+  );
   const findings: string[] = [];
 
   if (!/^pnpm@\d+\.\d+\.\d+$/u.test(String(manifest.packageManager || ''))) {
