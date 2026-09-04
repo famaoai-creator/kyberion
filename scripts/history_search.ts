@@ -20,7 +20,12 @@ import {
 } from '@agent/core/history-search-index';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
-export function runHistorySearch(args: string[] = currentProcessArgv().slice(2)): number {
+type Print = (value: unknown) => void;
+
+export function runHistorySearch(
+  args: string[] = currentProcessArgv().slice(2),
+  print: Print = () => undefined
+): number {
   const argv = createStandardYargs(['node', 'history_search', ...args])
     .scriptName('history_search')
     .option('query', { type: 'string', describe: 'Japanese or free-text query' })
@@ -64,17 +69,15 @@ export function runHistorySearch(args: string[] = currentProcessArgv().slice(2))
     : searchHistory({ ...searchOptions, tiers: ['public'] });
 
   if (argv.json) {
-    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    print(JSON.stringify(report, null, 2));
     return 0;
   }
 
   for (const result of report.results) {
-    process.stdout.write(
-      `${result.timestamp} [${result.sourceType}] ${result.entryId}: ${result.snippet}\n`
-    );
+    print(`${result.timestamp} [${result.sourceType}] ${result.entryId}: ${result.snippet}`);
   }
   if (report.results.length === 0) {
-    process.stdout.write('No public history results.\n');
+    print('No public history results.');
   }
   return 0;
 }
@@ -82,8 +85,8 @@ export function runHistorySearch(args: string[] = currentProcessArgv().slice(2))
 const runHistorySearchScript = defineScript({
   name: 'history:search',
   flags: [],
-  run({ argv }) {
-    return runHistorySearch(argv);
+  run({ argv, print }) {
+    return runHistorySearch(argv, print);
   },
 });
 
