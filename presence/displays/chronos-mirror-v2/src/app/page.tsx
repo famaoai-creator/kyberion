@@ -88,6 +88,7 @@ import {
   type ChronosThemeMode,
 } from '../lib/chronos-theme';
 import { parseTenantDesignResponse } from '../lib/tenant-design-response';
+import { parseDeliverablesResponse, type ClientDeliverable } from '../lib/deliverables-response';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -124,7 +125,7 @@ function ChronosMirrorV2Content() {
   const [planPreviewError, setPlanPreviewError] = useState<string | null>(null);
   const [planPreviewBusy, setPlanPreviewBusy] = useState(false);
   const [planPreviewSignature, setPlanPreviewSignature] = useState<string | null>(null);
-  const [deliverables, setDeliverables] = useState<any[]>([]);
+  const [deliverables, setDeliverables] = useState<ClientDeliverable[]>([]);
   const [deliverablesError, setDeliverablesError] = useState<string | null>(null);
   const [deliverablesQuery, setDeliverablesQuery] = useState('');
   const [deliverablesRefreshTick, setDeliverablesRefreshTick] = useState(0);
@@ -237,11 +238,13 @@ function ChronosMirrorV2Content() {
         if (!response.ok) {
           throw new Error(`deliverables ${response.status}`);
         }
-        return (await response.json()) as { deliverables?: any[] };
+        const parsed = parseDeliverablesResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid deliverables response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setDeliverables(Array.isArray(payload.deliverables) ? payload.deliverables : []);
+        setDeliverables(payload.deliverables);
         setDeliverablesError(null);
       })
       .catch((error) => {
