@@ -17234,6 +17234,21 @@ executionのsemanticsは変更していない。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 986
+
+SX-03／SX-08／SX-09 のA2UI protocol boundaryを再監査し、component props、data model、surface storeのdynamic
+valueとtransport例外を`any`で扱う残存を修正した。props／data model／`setData`／`getData`をunknownベースの
+拡張可能recordへ統一し、dispatch／bridge transportの例外はError／primitiveを安全にログ化する。wire operation
+のstrict validation、secret redaction、surface-specific scope、transport dispatch順序は変更していない。
+
+検証:
+
+- A2UI／surface projection **4 files / 26 tests passed**。
+- A2UI protocol production fileの`any`型利用を除去し、root typecheck、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
