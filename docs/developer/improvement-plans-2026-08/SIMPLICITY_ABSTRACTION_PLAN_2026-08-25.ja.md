@@ -16072,6 +16072,16 @@ skip、malformed strategy拒否 semanticsは維持し、dangerous JSONとinvalid
 検証: orchestrator **3 files / 45 tests passed**、root typecheck、type-ratchet、対象Prettier、`git diff --check`、対象3 loaderのdirect `readJson`検索で該当なし。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 852
+
+SX-03／SX-04 の追加 script loader として、PR title checker の GitHub event、pinned dependency checker の package manifest、install-script allowlist checker の
+governance JSON を再監査した。JSON parse 後の型アサーションだけで各 checker へ渡していた残存を、通常ファイル確認と safe JSON parser を備えた
+`scripts/lib/json-input.ts` の共通 `readSafeJsonFile` へ移行した。directory、欠損、malformed JSON、dangerous key は checker の判定へ進む前に閉じ、既存の
+Conventional Commit／lockfile／allowBuilds の検査 semantics は維持した。GitHub event の directory／dangerous key 回帰を追加した。
+
+検証: checker **3 files / 6 tests passed**、root typecheck、対象 Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

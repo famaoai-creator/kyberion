@@ -8,10 +8,10 @@
  */
 
 import * as path from 'node:path';
-import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExec } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 interface CheckResult {
   ok: boolean;
@@ -40,7 +40,7 @@ function isConventionalCommitTitle(value: string): boolean {
 
 function readEventTitle(eventPath: string): string | null {
   try {
-    const event = readJson<GitHubEventPayload>(eventPath);
+    const event = readSafeJsonFile<GitHubEventPayload>(eventPath, 'GitHub event payload');
     if (typeof event?.pull_request?.title === 'string') return event.pull_request.title;
     if (typeof event?.pull_request?.head?.commit?.message === 'string') {
       return event.pull_request.head.commit.message.split('\n', 1)[0];
