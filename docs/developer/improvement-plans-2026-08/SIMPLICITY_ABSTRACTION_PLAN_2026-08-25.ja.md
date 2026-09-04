@@ -19615,6 +19615,17 @@ SX-06／SX-08／SX-09 のPresence demo 3入口（surface dispatch、timeline dis
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1164
+
+SX-06／SX-11 の残存CLI境界を再監査し、`system_upgrade`がnested pipelineの終了値を捕捉する処理をharnessの`getProcessExitCode`／`clearProcessExitCode`へ閉じ込めた。併せて`test-insession`のdelegated result出力を注入printerへ移した。system upgradeのcheck／execute選択、pipeline status、reasoning backend呼出しは変更していない。
+
+検証:
+
+- `system_upgrade.test.ts`／`async-exit-boundary.test.ts` **2 files / 10 tests passed**。nested status capture、async exit boundary、in-session printer境界を確認した。
+- 対象ESLint、`git diff --check` passed。harness外の対象ファイルに直接`process.exitCode`／`console.log`は0件。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

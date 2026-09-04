@@ -2,7 +2,9 @@
 
 import {
   currentProcessArgv,
+  clearProcessExitCode,
   defineScript,
+  getProcessExitCode,
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
@@ -54,12 +56,12 @@ export async function runSystemUpgrade(
   argv: readonly string[] = currentProcessArgv().slice(2)
 ): Promise<number> {
   const { mode, pipelineArgs } = parseSystemUpgradeArgs(argv);
-  process.exitCode = undefined;
+  clearProcessExitCode();
   await runPipelineMain(buildSystemUpgradeArgs(mode, pipelineArgs));
-  const rawStatus = process.exitCode;
+  const rawStatus = getProcessExitCode();
   const parsedStatus = rawStatus === undefined ? 0 : Number(rawStatus);
   const status = Number.isFinite(parsedStatus) ? parsedStatus : 1;
-  process.exitCode = undefined;
+  clearProcessExitCode();
   if (status !== 0) {
     throw new ScriptExitError(status, `system upgrade ${mode} failed`, true);
   }
