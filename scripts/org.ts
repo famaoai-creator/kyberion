@@ -11,6 +11,8 @@ import { defineCatalog, nowIso, type GovernedCatalog } from '@agent/core/foundat
 import { withExecutionContext } from '@agent/core/governance';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 type Persona =
   'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
 type AutonomyLevel = 'low' | 'medium' | 'high';
@@ -1003,14 +1005,17 @@ export function createRoleBundle(
   };
 }
 
-function printResult(result: Record<string, unknown>): void {
-  console.log(JSON.stringify(result, null, 2));
+function printResult(result: Record<string, unknown>, print: Print): void {
+  print(JSON.stringify(result, null, 2));
 }
 
-export async function main(argv = currentProcessArgv().slice(2)): Promise<void> {
+export async function main(
+  argv = currentProcessArgv().slice(2),
+  print: Print = () => undefined
+): Promise<void> {
   const command = parseArgs(argv);
   if (command.kind === 'help') {
-    console.log(helpText());
+    print(helpText());
     return;
   }
 
@@ -1054,13 +1059,13 @@ export async function main(argv = currentProcessArgv().slice(2)): Promise<void> 
             approvalId: command.options.approvalId as string | undefined,
           })
         );
-  printResult(result);
+  printResult(result, print);
 }
 
 export const runOrg = defineScript({
   name: 'organization:org',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (isDirectScript(import.meta.url, 'org.ts') || isDirectScript(import.meta.url, 'org.js'))
