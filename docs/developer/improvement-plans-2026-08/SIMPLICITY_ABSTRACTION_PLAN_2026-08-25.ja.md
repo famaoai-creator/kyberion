@@ -1,7 +1,7 @@
 ---
 title: SIMPLICITY ABSTRACTION PLAN 2026 08 25
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-04
+last_updated: 2026-09-05
 status: active
 ---
 
@@ -18220,6 +18220,20 @@ JXA script、date range、Calendar.app selection、GWS fallback の既存 semant
 - Calendar backend selection／GWS／JXA response boundary **1 file / 9 tests passed**。
 - `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
 - canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
+## 2026-09-05 再レビュー修正 1054
+
+SX-09 の read-model 文言境界を再監査し、`operator-home-summary` に残っていた状態ラベル、状態詳細、次アクション、action queue の固定文言を
+直接記述から `user-facing-vocabulary` catalog と共通 `t()` へ移した。`NextAction.next_action_key` も operator-home 用の canonical key に揃え、
+英語／日本語／pseudo locale の表示を同じ catalog entry から解決する。mission／approval／deliverable の動的値と、既存の API shape・priority・suggested command は変更していない。
+
+検証:
+
+- operator／CEO home summary **2 files / 6 tests passed**。
+- vocabulary catalog の `catalogs` gate、generated vocabulary types の `vocabulary-types` gate passed。
+- `pnpm run typecheck`、`git diff --check` passed。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 

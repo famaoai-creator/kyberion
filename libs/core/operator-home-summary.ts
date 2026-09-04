@@ -12,6 +12,7 @@ import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 import { buildNhiLedgerReport } from './nhi-lifecycle-governance.js';
 import { loadMissionManagementConfig } from './mission-management-config.js';
 import { nowIso } from './foundation/time.js';
+import { t } from './t.js';
 
 export interface OperatorHomeMissionItem {
   missionId: string;
@@ -429,7 +430,7 @@ function collectActionQueue(
       missionId: mission.missionId,
       status: mission.status,
       priority: 100,
-      nextAction: 'Inspect and recover the mission',
+      nextAction: t('operator_home:queue.recover_mission'),
     });
   }
   for (const approval of approvals) {
@@ -440,7 +441,7 @@ function collectActionQueue(
       missionId: approval.requestedByContext?.missionId,
       status: approval.status,
       priority: approval.severity === 'high' ? 95 : 80,
-      nextAction: 'Review and decide',
+      nextAction: t('operator_home:queue.review_decide'),
     });
   }
   for (const entry of inboxEntries.filter(
@@ -454,7 +455,9 @@ function collectActionQueue(
       status: entry.status,
       priority: entry.status === 'changes_requested' ? 85 : 60,
       nextAction:
-        entry.status === 'changes_requested' ? 'Review requested changes' : 'Review deliverable',
+        entry.status === 'changes_requested'
+          ? t('operator_home:queue.review_changes')
+          : t('operator_home:queue.review_deliverable'),
     });
   }
   return items.sort(
@@ -542,50 +545,59 @@ export function collectOperatorHomeSummary(
       : pendingApprovals.length > 0 || unreadInbox > 0 || pendingQualityDecisions > 0
         ? 'attention'
         : 'ready';
-  const statusLabel =
-    status === 'blocked' ? 'blocked' : status === 'attention' ? 'attention required' : 'ready';
+  const statusLabel = t(`operator_home:status.${status}`);
   const statusDetail =
     status === 'blocked'
-      ? `${blockedMissions.length} mission(s) are paused or failed.`
+      ? t('operator_home:status_detail.blocked', { count: blockedMissions.length })
       : status === 'attention'
-        ? `${pendingApprovals.length} approval(s), ${unreadInbox} inbox item(s), and ${pendingQualityDecisions} quality decision(s) need attention.`
-        : 'No blocking issues detected.';
+        ? t('operator_home:status_detail.attention', {
+            approvals: pendingApprovals.length,
+            inbox: unreadInbox,
+            quality: pendingQualityDecisions,
+          })
+        : t('operator_home:status_detail.ready');
 
   const nextAction =
     blockedMissions.length > 0
       ? buildNextAction({
-          title: 'Inspect blocked missions',
-          next_action_key: 'chronos:chronos_home_action_blocked',
-          reason: `${blockedMissions.length} mission(s) need recovery before the surface should be treated as clear.`,
+          title: t('operator_home:next_action.inspect_blocked'),
+          next_action_key: 'operator_home:next_action.inspect_blocked',
+          reason: t('operator_home:next_action_reason.blocked', { count: blockedMissions.length }),
           next_action_type: 'inspect_artifact',
           suggested_command: 'pnpm mission list --active',
         })
       : pendingApprovals.length > 0
         ? buildNextAction({
-            title: 'Review the approval queue',
-            next_action_key: 'chronos:chronos_home_action_approvals',
-            reason: `${pendingApprovals.length} approval request(s) are waiting for operator review.`,
+            title: t('operator_home:next_action.review_approvals'),
+            next_action_key: 'operator_home:next_action.review_approvals',
+            reason: t('operator_home:next_action_reason.approvals', {
+              count: pendingApprovals.length,
+            }),
             next_action_type: 'run_command',
             suggested_command: 'pnpm kyberion approvals',
           })
         : pendingQualityDecisions > 0
           ? buildNextAction({
-              title: 'Review the software quality recommendation',
-              reason: `${qualitySummary?.recommendation ?? 'unknown'} is awaiting the accountable human decision.`,
+              title: t('operator_home:next_action.review_quality'),
+              next_action_key: 'operator_home:next_action.review_quality',
+              reason: t('operator_home:next_action_reason.quality', {
+                recommendation: qualitySummary?.recommendation ?? 'unknown',
+              }),
               next_action_type: 'inspect_artifact',
               suggested_command: 'pnpm quality:report -- --help',
             })
           : unreadInbox > 0
             ? buildNextAction({
-                title: 'Acknowledge new deliverables',
-                next_action_key: 'chronos:chronos_home_action_inbox',
-                reason: `${unreadInbox} inbox item(s) were delivered and are still unread.`,
+                title: t('operator_home:next_action.acknowledge_inbox'),
+                next_action_key: 'operator_home:next_action.acknowledge_inbox',
+                reason: t('operator_home:next_action_reason.inbox', { count: unreadInbox }),
                 next_action_type: 'inspect_artifact',
                 suggested_command: 'pnpm kyberion inbox',
               })
             : buildNextAction({
-                title: 'Keep monitoring the surface',
-                reason: 'No immediate operator action is pending.',
+                title: t('operator_home:next_action.monitor'),
+                next_action_key: 'operator_home:next_action.monitor',
+                reason: t('operator_home:next_action_reason.monitor'),
                 next_action_type: 'open_docs',
                 suggested_command: 'pnpm doctor',
               });
