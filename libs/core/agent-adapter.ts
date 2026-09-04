@@ -129,6 +129,8 @@ async function getACPSdk() {
   return await import('@agentclientprotocol/sdk');
 }
 
+type ACPConnection = InstanceType<typeof import('@agentclientprotocol/sdk').ClientSideConnection>;
+
 /**
  * Universal Agent Adapter (UAA) v1.5
  * Truly Universal: Handles deeply nested ID structures and complex turn lifecycles.
@@ -262,6 +264,12 @@ function firstStringValue(...values: unknown[]): string | undefined {
   );
 }
 
+function extractAcpSessionId(response: unknown): string | undefined {
+  if (!isRecord(response)) return undefined;
+  const thread = isRecord(response.thread) ? response.thread : undefined;
+  return firstStringValue(response.sessionId, response.threadId, thread?.id);
+}
+
 function parseProviderJsonObject(raw: string): Record<string, unknown> | undefined {
   try {
     const parsed: unknown = parseSafeJsonInput(raw, 'provider JSON response');
@@ -322,7 +330,7 @@ interface ACPDialect {
 
 abstract class BaseACPAdapter implements AgentAdapter {
   protected child: ChildProcess | null = null;
-  protected connection: any = null;
+  protected connection: ACPConnection | null = null;
   protected acpSessionId: string | null = null;
   protected accumulatedResponse: string = '';
   protected accumulatedThought: string = '';
@@ -414,7 +422,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
     const { ClientSideConnection, ndJsonStream } = await getACPSdk();
     this.connection = new ClientSideConnection(
-      (agent) => ({
+      () => ({
         sessionUpdate: async (params: SessionNotification) => {
           logger.info(`[UAA_NOTIF] ${JSON.stringify(params)}`);
           this.handleSessionUpdate(params);
@@ -473,13 +481,16 @@ abstract class BaseACPAdapter implements AgentAdapter {
         extMethod: async (m, p) => ({}),
         extNotification: async (m, p) => {},
       }),
-      ndJsonStream(Writable.toWeb(sdkOutput) as any, Readable.toWeb(sdkInput) as any)
+      ndJsonStream(
+        Writable.toWeb(sdkOutput) as unknown as WritableStream<Uint8Array>,
+        Readable.toWeb(sdkInput) as unknown as ReadableStream<Uint8Array>
+      )
     );
 
     await waitForBootSignal(this.child, `agent-adapter:${this.bootCommand}`);
     await this.connection.initialize({
       protocolVersion: 1,
-      capabilities: {},
+      clientCapabilities: {},
       clientInfo: { name: 'Kyberion', version: '1.0.0' },
     });
 
@@ -492,14 +503,14 @@ abstract class BaseACPAdapter implements AgentAdapter {
       logger.warn(`suppressed error in createTerminal: ${err}`);
     }
 
-    const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, {
+    const sessionRes = await this.connection.extMethod(this.dialect.newSession, {
       cwd: PROJECT_ROOT,
       workingDirectory: PROJECT_ROOT,
       mcpServers: [],
     });
 
     // ROBUST ID EXTRACTION: Check all known locations
-    this.acpSessionId = sessionRes.sessionId || sessionRes.threadId || sessionRes.thread?.id;
+    this.acpSessionId = extractAcpSessionId(sessionRes) ?? null;
 
     if (!this.acpSessionId) {
       throw new Error(`Failed to extract session ID from response: ${JSON.stringify(sessionRes)}`);
@@ -526,7 +537,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
     this.accumulatedResponse = '';
     this.accumulatedThought = '';
 
-    const response: any = await this.connection.extMethod(this.dialect.prompt, {
+    const response = await this.connection.extMethod(this.dialect.prompt, {
       sessionId: this.acpSessionId,
       threadId: this.acpSessionId,
       prompt: [{ type: 'text', text: enhanced.prompt }],
@@ -540,17 +551,21 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
     // If accumulatedResponse is empty, try to extract from the result object
     let finalText = this.accumulatedResponse;
-    if (!finalText && response.turn?.content) {
-      finalText = (response.turn.content as any[])
-        .filter((p) => p.type === 'text')
-        .map((p) => p.text)
+    const turn = isRecord(response.turn) ? response.turn : undefined;
+    if (!finalText && Array.isArray(turn?.content)) {
+      finalText = turn.content
+        .filter(
+          (part): part is Record<string, unknown> =>
+            isRecord(part) && part.type === 'text' && typeof part.text === 'string'
+        )
+        .map((part) => part.text)
         .join('\n');
     }
 
     const agentResponse: AgentResponse = {
       text: finalText,
       thought: this.accumulatedThought,
-      stopReason: (response as any).stopReason || 'completed',
+      stopReason: firstStringValue(response.stopReason) || 'completed',
       trace,
     };
     return applyEnhancersAfterAsk(this.enhancers, agentResponse);
@@ -577,12 +592,12 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
   public async refreshContext(): Promise<{ mode: 'soft'; sessionId?: string | null }> {
     if (!this.connection) throw new Error('Agent not booted.');
-    const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, {
+    const sessionRes = await this.connection.extMethod(this.dialect.newSession, {
       cwd: PROJECT_ROOT,
       workingDirectory: PROJECT_ROOT,
       mcpServers: [],
     });
-    this.acpSessionId = sessionRes.sessionId || sessionRes.threadId || sessionRes.thread?.id;
+    this.acpSessionId = extractAcpSessionId(sessionRes) ?? null;
     return { mode: 'soft', sessionId: this.acpSessionId };
   }
 }
