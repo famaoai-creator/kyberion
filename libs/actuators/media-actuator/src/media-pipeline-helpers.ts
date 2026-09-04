@@ -1,8 +1,15 @@
 import { safeWriteFile } from '@agent/core/secure-io';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import type {
+  AdfEngineContext,
+  AdfStepHandlers,
+  AdfStepHooks,
+  AdfStepOutcome,
+} from '@agent/core/adf-engine';
 import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
-import { nowIso } from '@agent/core/foundation';
+import { isRecord, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import type { PipelineAdfStep } from '@agent/core/pipeline-contract';
 import { resolveRef } from '@agent/core/src/pipeline-engine';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
@@ -13,14 +20,14 @@ import * as path from 'node:path';
 export interface MediaPipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'sink' | 'control';
   op: string;
-  params: any;
-  on_error?: any;
+  params: Record<string, unknown>;
+  on_error?: PipelineAdfStep['on_error'];
 }
 
 export interface MediaAction {
   action: 'pipeline';
   steps: MediaPipelineStep[];
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   options?: {
     max_steps?: number;
     timeout_ms?: number;
@@ -30,9 +37,9 @@ export interface MediaAction {
 }
 
 export interface MediaPipelineDeps {
-  opCapture: (op: string, params: any, ctx: any, resolve: Function) => Promise<any>;
-  opTransform: (op: string, params: any, ctx: any, resolve: Function) => Promise<any>;
-  opApply: (op: string, params: any, ctx: any, resolve: Function) => Promise<any>;
+  opCapture: AdfStepHandlers['capture'];
+  opTransform: AdfStepHandlers['transform'];
+  opApply: AdfStepHandlers['apply'];
 }
 
 export async function handleMediaAction(input: MediaAction, deps: MediaPipelineDeps) {
@@ -58,7 +65,7 @@ export async function handleMediaAction(input: MediaAction, deps: MediaPipelineD
     ...input,
     ...(Array.isArray(admitted.steps) ? { steps: admitted.steps as MediaPipelineStep[] } : {}),
     ...(admitted.context && typeof admitted.context === 'object'
-      ? { context: admitted.context as Record<string, any> }
+      ? { context: admitted.context as Record<string, unknown> }
       : {}),
     ...(admitted.options && typeof admitted.options === 'object'
       ? { options: admitted.options as MediaAction['options'] }
@@ -81,9 +88,10 @@ export async function handleMediaAction(input: MediaAction, deps: MediaPipelineD
       );
       pt.endSpan('ok');
       return result;
-    } catch (err: any) {
-      pt.endSpan('error', err?.message ?? String(err));
-      return { status: 'failed', message: err?.message ?? String(err) };
+    } catch (err: unknown) {
+      const message = errorMessage(err);
+      pt.endSpan('error', message);
+      return { status: 'failed', message };
     }
   }
 
@@ -100,11 +108,12 @@ export async function handleMediaAction(input: MediaAction, deps: MediaPipelineD
     );
     traceCtx.endSpan('ok');
     return { ...result, ...finalizeActuatorTrace(traceCtx) };
-  } catch (err: any) {
-    traceCtx.endSpan('error', err?.message ?? String(err));
+  } catch (err: unknown) {
+    const message = errorMessage(err);
+    traceCtx.endSpan('error', message);
     return {
       status: 'failed',
-      message: err?.message ?? String(err),
+      message,
       ...finalizeActuatorTrace(traceCtx),
     };
   }
@@ -116,16 +125,39 @@ const stripMediaOpPrefix = (op: string) => ((op || '').startsWith('media:') ? op
 // extra surface ('media:' op prefixes, the 'sink' alias for apply) is
 // normalized up front — recursively into on_error.fallback arrays, which the
 // engine runs through the same nested-step path.
-function normalizeMediaSteps(list: MediaPipelineStep[]): any[] {
-  return (list || []).map((step) => ({
-    ...step,
-    op: stripMediaOpPrefix(step.op),
-    type: step.type === 'sink' ? 'apply' : step.type,
-    __media_step_type: step.type,
-    ...(step.on_error?.fallback
-      ? { on_error: { ...step.on_error, fallback: normalizeMediaSteps(step.on_error.fallback) } }
-      : {}),
-  }));
+type MediaStepInput = MediaPipelineStep | PipelineAdfStep;
+type NormalizedMediaStep = Omit<PipelineAdfStep, 'type' | 'on_error'> & {
+  type: 'capture' | 'transform' | 'apply' | 'control';
+  on_error?: {
+    strategy: 'skip' | 'abort' | 'fallback';
+    fallback?: PipelineAdfStep[];
+    ref?: string;
+    bind?: Record<string, unknown>;
+    remediation?: string;
+  };
+  __media_step_type: MediaPipelineStep['type'];
+};
+
+function normalizeMediaSteps(list: readonly MediaStepInput[]): NormalizedMediaStep[] {
+  return (list || []).map((step) => {
+    const mediaStepType = step.type ?? 'apply';
+    const normalizedType = mediaStepType === 'sink' ? 'apply' : mediaStepType;
+    const fallback = step.on_error?.fallback;
+    const normalized: NormalizedMediaStep = {
+      ...step,
+      op: stripMediaOpPrefix(step.op),
+      type: normalizedType,
+      __media_step_type: mediaStepType,
+      ...(fallback
+        ? { on_error: { ...step.on_error, fallback: normalizeMediaSteps(fallback) } }
+        : {}),
+    };
+    return normalized;
+  });
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
@@ -136,20 +168,21 @@ function normalizeMediaSteps(list: MediaPipelineStep[]): any[] {
 // can be slow, so the default timeout is 10 minutes, not the engine's 60s).
 export async function executeMediaPipeline(
   steps: MediaPipelineStep[],
-  initialCtx: any = {},
-  options: any = {},
-  traceCtx?: any,
+  initialCtx: AdfEngineContext = {},
+  options: MediaAction['options'] = {},
+  traceCtx?: TraceContext,
   deps?: MediaPipelineDeps
 ) {
-  let ctx = { ...initialCtx, timestamp: nowIso() };
+  let ctx: AdfEngineContext = { ...initialCtx, timestamp: nowIso() };
 
-  const hooks = {
-    beforeStep: (step: any, stepNumber: number) => {
-      traceCtx?.startSpan?.(`media:${step.__media_step_type || step.type}:${step.op}`, {
+  const hooks: AdfStepHooks = {
+    beforeStep: (step, stepNumber) => {
+      const mediaStep = step as NormalizedMediaStep;
+      traceCtx?.startSpan?.(`media:${mediaStep.__media_step_type || step.type}:${step.op}`, {
         stepCount: stepNumber,
       });
     },
-    afterStep: (_step: any, _stepNumber: number, _stepCtx: any, outcome: any) => {
+    afterStep: (_step, _stepNumber, _stepCtx, outcome: AdfStepOutcome) => {
       if (outcome.status === 'success' || outcome.status === 'skipped') {
         traceCtx?.endSpan?.('ok');
       } else {
@@ -174,21 +207,27 @@ export async function executeMediaPipeline(
         if (op !== 'ref') {
           throw new Error(`Unsupported control operator in Media-Actuator: ${op}`);
         }
-        const refPath = resolve(params.path);
-        const bindResolved: Record<string, any> = {};
-        if (params.bind) {
-          for (const [k, v] of Object.entries(params.bind as Record<string, any>)) {
+        if (!isRecord(params)) {
+          throw new Error('Media-Actuator ref control params must be an object');
+        }
+        const resolvedPath = resolve(params.path);
+        if (typeof resolvedPath !== 'string' || !resolvedPath.trim()) {
+          throw new Error('Media-Actuator ref control requires a non-empty path');
+        }
+        const bindResolved: Record<string, unknown> = {};
+        if (isRecord(params.bind)) {
+          for (const [k, v] of Object.entries(params.bind)) {
             bindResolved[k] = resolve(v);
           }
         }
-        const refResult = await resolveRef(refPath, bindResolved, stepCtx, resolve);
+        const refResult = await resolveRef(resolvedPath, bindResolved, stepCtx, resolve);
         const res = await runSteps(normalizeMediaSteps(refResult.steps), {
           ...stepCtx,
           ...refResult.mergedCtx,
         });
         if (res.status === 'failed') {
           throw new Error(
-            res.results.find((entry: any) => entry.status === 'failed')?.error ||
+            res.results.find((entry) => entry.status === 'failed')?.error ||
               'nested pipeline failed'
           );
         }
@@ -200,7 +239,7 @@ export async function executeMediaPipeline(
   });
   ctx = result.context;
 
-  if (initialCtx.context_path) {
+  if (typeof initialCtx.context_path === 'string' && initialCtx.context_path) {
     safeWriteFile(
       path.resolve(pathResolver.rootDir(), initialCtx.context_path),
       JSON.stringify(ctx, null, 2)
