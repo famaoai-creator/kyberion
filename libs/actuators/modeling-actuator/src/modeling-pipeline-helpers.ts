@@ -8,6 +8,7 @@ import {
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import type { AdfEngineContext } from '@agent/core/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -117,14 +118,14 @@ const browserExecutionPresetCatalog = defineCatalog<BrowserExecutionPresetCatalo
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
+  params: Record<string, unknown>;
 }
 
 export interface ModelingAction {
   action: 'pipeline' | 'reconcile';
   steps?: PipelineStep[];
   strategy_path?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   options?: {
     max_steps?: number;
     timeout_ms?: number;
@@ -166,15 +167,18 @@ function readModelingJson(filePath: string, label: string): unknown {
 // silently absorbed (AR-06 no-silent-failure).
 export async function executePipeline(
   steps: PipelineStep[],
-  initialCtx: any = {},
-  options: any = {}
+  initialCtx: AdfEngineContext = {},
+  options: ModelingAction['options'] = {}
 ) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, timestamp: nowIso() };
-  const contextPath = resolveContextPath(rootDir, initialCtx.context_path);
+  let ctx: AdfEngineContext = { ...initialCtx, timestamp: nowIso() };
+  const contextPath = resolveContextPath(
+    rootDir,
+    typeof initialCtx.context_path === 'string' ? initialCtx.context_path : undefined
+  );
 
   if (contextPath && safeExistsSync(contextPath)) {
     const saved = await retry(
