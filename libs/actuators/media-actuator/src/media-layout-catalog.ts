@@ -191,6 +191,20 @@ export interface MediaLayoutTemplateCatalog {
   templates: Record<string, MediaLayoutTemplate>;
 }
 
+export interface MediaLayoutThemeInput {
+  layout_template_id?: string;
+  layout_templates?: MediaLayoutTemplateCatalog;
+  pptx?: {
+    layout_templates?: MediaLayoutTemplateCatalog;
+    [key: string]: unknown;
+  };
+  web?: {
+    layout_templates?: MediaLayoutTemplateCatalog;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 function cloneJsonValue<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }
@@ -415,7 +429,7 @@ function resolveLayoutTemplate(
   rootDir: string,
   designSystemId: string | undefined,
   slideData?: any,
-  theme?: any
+  theme?: MediaLayoutThemeInput
 ): MediaLayoutTemplate {
   const themeTemplateCatalog =
     theme?.layout_templates ||
