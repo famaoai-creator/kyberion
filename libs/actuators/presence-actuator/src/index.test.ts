@@ -4,6 +4,7 @@ import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as pathResolver from '@agent/core/path-resolver';
+import { normalizeTimelineDispatchResponse } from './presence-actuator-helpers.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -58,5 +59,15 @@ describe('presence-actuator schema', () => {
         params: {},
       })
     ).toBe(false);
+  });
+
+  it('rejects non-object timeline bridge responses before result projection', () => {
+    expect(normalizeTimelineDispatchResponse({ accepted: true })).toEqual({ accepted: true });
+    expect(() => normalizeTimelineDispatchResponse([])).toThrow(
+      'timeline dispatch response must be a JSON object'
+    );
+    expect(() => normalizeTimelineDispatchResponse('accepted')).toThrow(
+      'timeline dispatch response must be a JSON object'
+    );
   });
 });
