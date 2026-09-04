@@ -653,7 +653,7 @@ const directEntry = isDirectEntry(import.meta.url, 'satellites/imessage-bridge/s
 if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    process.exitCode = 1;
   });
 } else if (directEntry) {
   logger.warn('[iMessageBridge] VITEST is set — suppressing the direct-entry start.');
