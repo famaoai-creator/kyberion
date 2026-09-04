@@ -13,5 +13,6 @@ describe('catalog integrity schema loader boundary', () => {
     expect(source).not.toContain('ajv.compile');
     expect(source).not.toContain('ajv.addSchema');
     expect(source).not.toContain("from 'ajv-formats'");
+    expect(source).not.toContain('console.warn');
   });
 });

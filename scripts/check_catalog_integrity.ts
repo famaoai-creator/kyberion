@@ -953,13 +953,16 @@ export const runCheckCatalogIntegrity = defineScript({
   name: 'check:catalogs',
   flags: [],
   run(context) {
-    const result = runCatalogIntegrityCheck();
+    const result = runCatalogIntegrityCheck(context.json ? undefined : context.print);
     context.print(result);
     return result;
   },
 });
 
-export function runCatalogIntegrityCheck(): { status: 'passed'; warnings: string[] } {
+export function runCatalogIntegrityCheck(print: (value: unknown) => void = () => undefined): {
+  status: 'passed';
+  warnings: string[];
+} {
   const violations: string[] = [];
   const warnings: string[] = [];
   for (const check of CHECKS) {
@@ -977,9 +980,9 @@ export function runCatalogIntegrityCheck(): { status: 'passed'; warnings: string
   }
 
   if (warnings.length > 0) {
-    console.warn('[check:catalogs] warnings (non-fatal):');
+    print('[check:catalogs] warnings (non-fatal):');
     for (const warning of warnings.sort()) {
-      console.warn(`- ${warning}`);
+      print(`- ${warning}`);
     }
   }
 
