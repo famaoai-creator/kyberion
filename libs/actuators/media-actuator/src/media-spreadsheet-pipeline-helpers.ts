@@ -6,6 +6,7 @@ import {
   type DocumentCompositionPresetResolver,
   type MediaTheme,
 } from './media-document-helpers.js';
+import type { SemanticRenderTokenCatalog } from './media-layout-design-tokens.js';
 import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media-signal-entry-policy';
 import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
 import { resolveSpreadsheetStyleIndex } from '@agent/core/spreadsheet-style-policy';
@@ -20,7 +21,7 @@ export interface MediaSpreadsheetPipelineDeps {
     rootDir: string,
     brief: any
   ) => { templateId: string; template: any };
-  loadSemanticRenderTokenCatalog: (rootDir: string) => any;
+  loadSemanticRenderTokenCatalog: (rootDir: string) => SemanticRenderTokenCatalog;
 }
 
 export interface MediaTrackerXlsxProtocol extends Omit<XlsxDesignProtocol, 'sheets'> {
