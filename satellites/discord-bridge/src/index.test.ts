@@ -8,7 +8,7 @@ import type {
 } from '@agent/core/channel-surface-types';
 import { withExecutionContext } from '@agent/core/authority';
 import * as pathResolver from '@agent/core/path-resolver';
-import { safeRmSync } from '@agent/core/secure-io';
+import { safeReadFile, safeRmSync } from '@agent/core/secure-io';
 
 vi.mock('discord.js', () => ({
   Client: class MockClient {},
@@ -70,6 +70,15 @@ afterEach(() => {
 });
 
 describe('discord bridge thread context', () => {
+  it('uses the shared exit-code convention instead of terminating the host process', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/discord-bridge/src/index.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toContain('process.exit(');
+  });
+
   it('rejects malformed persisted thread history entries', () => {
     expect(parseDiscordThreadHistoryEntry(['invalid'])).toBeNull();
     expect(parseDiscordThreadHistoryEntry({ role: 'system' })).toBeNull();
