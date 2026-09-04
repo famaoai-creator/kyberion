@@ -99,6 +99,11 @@ const NEXT_ACTION_JA_BY_KEY: Partial<Record<VocabularyKey, VocabularyKey>> = {
   'chronos:chronos_home_action_blocked': 'chronos:chronos_home_action_blocked',
   'chronos:chronos_home_action_approvals': 'chronos:chronos_home_action_approvals',
   'chronos:chronos_home_action_inbox': 'chronos:chronos_home_action_inbox',
+  'operator_home:next_action.inspect_blocked': 'operator_home:next_action.inspect_blocked',
+  'operator_home:next_action.review_approvals': 'operator_home:next_action.review_approvals',
+  'operator_home:next_action.review_quality': 'operator_home:next_action.review_quality',
+  'operator_home:next_action.acknowledge_inbox': 'operator_home:next_action.acknowledge_inbox',
+  'operator_home:next_action.monitor': 'operator_home:next_action.monitor',
   'home.next_action': 'home.next_action',
 };
 

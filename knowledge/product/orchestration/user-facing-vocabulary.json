@@ -4624,6 +4624,108 @@
         "qps-ploc": "⟦Şŧȧŧůş řėṗőřŧ ŀőřė⟧"
       }
     },
+    "operator_home": {
+      "status.ready": {
+        "en": "ready",
+        "ja": "対応可能",
+        "qps-ploc": "⟦řėȧḓẏ ŀőř⟧"
+      },
+      "status.attention": {
+        "en": "attention required",
+        "ja": "要対応",
+        "qps-ploc": "⟦ȧŧŧėñŧïőñ řėɋůïřėḓ ŀőřėɱ⟧"
+      },
+      "status.blocked": {
+        "en": "blocked",
+        "ja": "停止中",
+        "qps-ploc": "⟦ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "status_detail.ready": {
+        "en": "No blocking issues detected.",
+        "ja": "対応を妨げる問題は見つかりませんでした。",
+        "qps-ploc": "⟦Ñő ƀŀőƈķïñɠ ïşşůėş ḓėŧėƈŧėḓ. ŀőřėɱ ïṗş⟧"
+      },
+      "status_detail.attention": {
+        "en": "{approvals} approval(s), {inbox} inbox item(s), and {quality} quality decision(s) need attention.",
+        "ja": "承認{approvals}件、受信箱{inbox}件、品質判断{quality}件への対応が必要です。",
+        "qps-ploc": "⟦{approvals} ȧṗṗřőṽȧŀ(ş), {inbox} ïñƀőẋ ïŧėɱ(ş), ȧñḓ {quality} ɋůȧŀïŧẏ ḓėƈïşïőñ(ş) ñėėḓ ȧŧŧėñŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "status_detail.blocked": {
+        "en": "{count} mission(s) are paused or failed.",
+        "ja": "停止または失敗している依頼が{count}件あります。",
+        "qps-ploc": "⟦{count} ɱïşşïőñ(ş) ȧřė ṗȧůşėḓ őř ƒȧïŀėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "next_action.inspect_blocked": {
+        "en": "Inspect blocked missions",
+        "ja": "停止中の依頼を確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ƀŀőƈķėḓ ɱïşşïőñş ŀőřėɱ ï⟧"
+      },
+      "next_action.review_approvals": {
+        "en": "Review the approval queue",
+        "ja": "承認キューを確認",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ȧṗṗřőṽȧŀ ɋůėůė ŀőřėɱ ïṗ⟧"
+      },
+      "next_action.review_quality": {
+        "en": "Review the software quality recommendation",
+        "ja": "品質に関する提案を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė şőƒŧẇȧřė ɋůȧŀïŧẏ řėƈőɱɱėñḓȧŧïőñ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "next_action.acknowledge_inbox": {
+        "en": "Acknowledge new deliverables",
+        "ja": "新しい成果物を確認",
+        "qps-ploc": "⟦Ȧƈķñőẇŀėḓɠė ñėẇ ḓėŀïṽėřȧƀŀėş ŀőřėɱ ïṗş⟧"
+      },
+      "next_action.monitor": {
+        "en": "Keep monitoring the surface",
+        "ja": "この画面を見守る",
+        "qps-ploc": "⟦Ķėėṗ ɱőñïŧőřïñɠ ŧħė şůřƒȧƈė ŀőřėɱ ïṗ⟧"
+      },
+      "next_action_reason.blocked": {
+        "en": "{count} mission(s) need recovery before the surface should be treated as clear.",
+        "ja": "この画面を正常とみなす前に、{count}件の依頼を復旧する必要があります。",
+        "qps-ploc": "⟦{count} ɱïşşïőñ(ş) ñėėḓ řėƈőṽėřẏ ƀėƒőřė ŧħė şůřƒȧƈė şħőůŀḓ ƀė ŧřėȧŧėḓ ȧş ƈŀėȧř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "next_action_reason.approvals": {
+        "en": "{count} approval request(s) are waiting for operator review.",
+        "ja": "{count}件の承認依頼が担当者の確認を待っています。",
+        "qps-ploc": "⟦{count} ȧṗṗřőṽȧŀ řėɋůėşŧ(ş) ȧřė ẇȧïŧïñɠ ƒőř őṗėřȧŧőř řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "next_action_reason.quality": {
+        "en": "{recommendation} is awaiting the accountable human decision.",
+        "ja": "{recommendation}について責任者の判断を待っています。",
+        "qps-ploc": "⟦{recommendation} ïş ȧẇȧïŧïñɠ ŧħė ȧƈƈőůñŧȧƀŀė ħůɱȧñ ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "next_action_reason.inbox": {
+        "en": "{count} inbox item(s) were delivered and are still unread.",
+        "ja": "未読の受信項目が{count}件届いています。",
+        "qps-ploc": "⟦{count} ïñƀőẋ ïŧėɱ(ş) ẇėřė ḓėŀïṽėřėḓ ȧñḓ ȧřė şŧïŀŀ ůñřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "next_action_reason.monitor": {
+        "en": "No immediate operator action is pending.",
+        "ja": "直ちに必要な対応はありません。",
+        "qps-ploc": "⟦Ñő ïɱɱėḓïȧŧė őṗėřȧŧőř ȧƈŧïőñ ïş ṗėñḓïñɠ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "queue.recover_mission": {
+        "en": "Inspect and recover the mission",
+        "ja": "依頼を確認して復旧",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧñḓ řėƈőṽėř ŧħė ɱïşşïőñ ŀőřėɱ ïṗşů⟧"
+      },
+      "queue.review_decide": {
+        "en": "Review and decide",
+        "ja": "確認して判断",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ŀőřėɱ⟧"
+      },
+      "queue.review_changes": {
+        "en": "Review requested changes",
+        "ja": "依頼された修正を確認",
+        "qps-ploc": "⟦Řėṽïėẇ řėɋůėşŧėḓ ƈħȧñɠėş ŀőřėɱ ï⟧"
+      },
+      "queue.review_deliverable": {
+        "en": "Review deliverable",
+        "ja": "成果物を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ḓėŀïṽėřȧƀŀė ŀőřėɱ⟧"
+      }
+    },
     "bridge": {
       "thread_context": {
         "en": "Recent {channel} thread context:",
