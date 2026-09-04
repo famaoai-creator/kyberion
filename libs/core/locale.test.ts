@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   safeExistsSync,
   safeMkdir,
+  safeReadFile,
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
@@ -181,5 +182,18 @@ describe('resolveLocale precedence chain', () => {
     safeSymlinkSync(targetPath, linkedPath);
     process.env.LANG = 'C';
     expect(resolveLocale({ identityPath: linkedPath })).toBe('en');
+  });
+});
+
+describe('scoped locale resource boundary', () => {
+  it('uses the safe object parser and regular-file guard for locale overlays', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/locale.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain('parseSafeJsonObjectInput');
+    expect(source).toContain('safeLstat(candidate).isFile()');
+    expect(source).not.toContain(
+      'readJson<{ locale?: string; default_locale?: string }>(candidate)'
+    );
   });
 });

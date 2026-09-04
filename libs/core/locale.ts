@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectInput } from './foundation/json.js';
 import { loadVocabularyCatalog } from './vocabulary-catalog.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync } from './secure-io.js';
+import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { normalizeLocale, nextSupportedLocale, type SupportedLocale } from './locale-normalize.js';
@@ -117,8 +117,12 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
   ].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
     try {
-      if (!safeExistsSync(candidate)) continue;
-      const parsed = readJson<{ locale?: string; default_locale?: string }>(candidate);
+      if (!safeExistsSync(candidate) || !safeLstat(candidate).isFile()) continue;
+      const parsed = parseSafeJsonObjectInput(
+        String(safeReadFile(candidate, { encoding: 'utf8' }) || ''),
+        `locale overlay ${candidate}`
+      );
+      if (!parsed) continue;
       const locale = normalizeLocale(parsed.locale || parsed.default_locale);
       if (locale) return locale;
     } catch {
