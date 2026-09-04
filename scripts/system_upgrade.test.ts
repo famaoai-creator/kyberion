@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   buildSystemUpgradeArgs,
   parseSystemUpgradeArgs,
@@ -32,5 +33,23 @@ describe('system upgrade dispatcher', () => {
     expect(() => parseSystemUpgradeArgs(['--mode', 'repair'])).toThrow(
       'unknown system upgrade mode'
     );
+  });
+
+  it('keeps nested exit status capture behind the shared harness', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/system_upgrade.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain('process.exitCode');
+    expect(source).toContain('getProcessExitCode()');
+    expect(source).toContain('clearProcessExitCode()');
+  });
+
+  it('routes the in-session delegated result through the shared printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/test-insession.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain('console.log');
+    expect(source).toContain('run({ print })');
+    expect(source).toContain('test(print)');
   });
 });

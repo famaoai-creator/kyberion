@@ -50,6 +50,16 @@ export function setProcessExitCode(code: number): void {
   process.exitCode = code;
 }
 
+/** Read a nested script's pending exit status without exposing process globals to callers. */
+export function getProcessExitCode(): number | undefined {
+  return process.exitCode;
+}
+
+/** Clear a nested script's pending exit status before returning to its caller. */
+export function clearProcessExitCode(): void {
+  process.exitCode = undefined;
+}
+
 /** Replace process argv for legacy child-entry modules that inspect it directly. */
 export function setCurrentProcessArgv(argv: string[]): void {
   process.argv = [...argv];
