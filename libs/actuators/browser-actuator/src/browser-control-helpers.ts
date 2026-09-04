@@ -1,6 +1,8 @@
 import { evaluateCondition } from '@agent/core/src/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { isRecord } from '@agent/core/foundation';
+import type { AdfRunResult, AdfStep } from '@agent/core/adf-engine';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import {
   removeVirtualPasskeyAuthenticator,
@@ -11,18 +13,23 @@ import type { BrowserRuntime } from './browser-pipeline-helpers.js';
 
 export async function opControl(
   op: string,
-  params: any,
+  params: unknown,
   runtime: BrowserRuntime,
-  ctx: any,
-  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
-  resolve: Function
-) {
-  const runNested = async (steps: any[], seedCtx: any) => {
-    const res = await runSteps(steps, seedCtx);
+  ctx: Record<string, unknown>,
+  runSteps: (
+    steps: AdfStep[],
+    seedCtx?: Record<string, unknown>
+  ) => Promise<AdfRunResult<Record<string, unknown>>>,
+  resolve: (value: unknown) => unknown
+): Promise<Record<string, unknown>> {
+  if (!isRecord(params)) {
+    throw new Error(`[INVALID_PARAMS] ${op} control params must be an object`);
+  }
+  const runNested = async (steps: unknown, seedCtx: Record<string, unknown>) => {
+    const res = await runSteps(asAdfSteps(steps, op), seedCtx);
     if (res.status === 'failed') {
       throw new Error(
-        res.results.find((entry: any) => entry.status === 'failed')?.error ||
-          'nested pipeline failed'
+        res.results.find((entry) => entry.status === 'failed')?.error || 'nested pipeline failed'
       );
     }
     return res.context;
@@ -31,10 +38,17 @@ export async function opControl(
   switch (op) {
     case 'open_tab': {
       const page = await runtime.context.newPage();
-      const tabId = params.tab_id || `tab-${runtime.tabs.size + 1}`;
+      const tabId =
+        typeof params.tab_id === 'string' && params.tab_id.trim()
+          ? params.tab_id
+          : `tab-${runtime.tabs.size + 1}`;
+      const resolvedUrl = params.url ? resolve(params.url) : undefined;
       browserRuntimeHelpers.registerBrowserPage(runtime, page, tabId);
       if (params.url) {
-        const url = resolve(params.url);
+        if (typeof resolvedUrl !== 'string' || !resolvedUrl.trim()) {
+          throw new Error('open_tab requires a non-empty url');
+        }
+        const url = resolvedUrl;
         browserRuntimeHelpers.assertNavigationAllowed(url, runtime.navigationPolicy);
         await page.goto(url, { waitUntil: params.waitUntil || 'networkidle' });
       }
@@ -49,13 +63,15 @@ export async function opControl(
           kind: 'control',
           op: 'open_tab',
           tab_id: tabId,
-          url: params.url ? resolve(params.url) : undefined,
+          url: typeof resolvedUrl === 'string' ? resolvedUrl : undefined,
         }
       );
     }
     case 'select_tab': {
       const tabId = resolve(params.tab_id);
-      if (!runtime.tabs.has(tabId)) throw new Error(`Unknown browser tab: ${tabId}`);
+      if (typeof tabId !== 'string' || !runtime.tabs.has(tabId)) {
+        throw new Error(`Unknown browser tab: ${String(tabId)}`);
+      }
       runtime.activeTabId = tabId;
       return browserRuntimeHelpers.recordBrowserAction(
         {
@@ -97,9 +113,9 @@ export async function opControl(
       }
 
       runtime.activeTabId = selected.tabId;
-      if (typeof (selected.page as any).bringToFront === 'function') {
-        await (selected.page as any).bringToFront();
-      }
+      const bringToFront = (selected.page as Page & { bringToFront?: () => Promise<void> })
+        .bringToFront;
+      if (typeof bringToFront === 'function') await bringToFront.call(selected.page);
       return browserRuntimeHelpers.recordBrowserAction(
         {
           ...ctx,
@@ -127,14 +143,17 @@ export async function opControl(
         }
       );
     case 'pause_for_operator': {
-      const sessionId = ctx.session_id || 'default';
-      const message = resolve(
-        params.message || 'Operator input required. Press Enter to continue.'
+      const sessionId = typeof ctx.session_id === 'string' ? ctx.session_id : 'default';
+      const message = String(
+        resolve(params.message || 'Operator input required. Press Enter to continue.')
       );
       const continueFile = params.continue_file
-        ? assertSafeRepositoryPath(pathResolver.rootResolve(resolve(params.continue_file)), {
-            allowMissingLeaf: true,
-          })
+        ? assertSafeRepositoryPath(
+            pathResolver.rootResolve(String(resolve(params.continue_file))),
+            {
+              allowMissingLeaf: true,
+            }
+          )
         : pathResolver.shared(`runtime/browser/${sessionId}.continue`);
       const approval = browserRuntimeHelpers.beginOperatorApproval({
         sessionId,
@@ -172,7 +191,10 @@ export async function opControl(
       return ctx;
     case 'while': {
       let iterations = 0;
-      const maxIter = params.max_iterations || 100;
+      const maxIter =
+        typeof params.max_iterations === 'number' && params.max_iterations >= 0
+          ? params.max_iterations
+          : 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
         ctx = await runNested(params.pipeline, ctx);
         iterations++;
@@ -184,8 +206,9 @@ export async function opControl(
       const setup = await setupVirtualPasskeyAuthenticator(runtime, page, {
         enableUI: params.enable_ui === true,
         replaceExisting: params.replace_existing !== false,
-        protocol: resolve(params.protocol || 'ctap2') as 'ctap2' | 'u2f',
-        transport: resolve(params.transport || 'internal') as 'usb' | 'nfc' | 'ble' | 'internal',
+        protocol: String(resolve(params.protocol || 'ctap2')) as 'ctap2' | 'u2f',
+        transport: String(resolve(params.transport || 'internal')) as
+          'usb' | 'nfc' | 'ble' | 'internal',
         hasResidentKey: params.has_resident_key !== false,
         hasUserVerification: params.has_user_verification !== false,
         hasLargeBlob: params.has_large_blob === true,
@@ -195,7 +218,9 @@ export async function opControl(
       return browserRuntimeHelpers.recordBrowserAction(
         {
           ...ctx,
-          [params.export_as || 'passkey_authenticator']: setup,
+          [typeof params.export_as === 'string' && params.export_as
+            ? params.export_as
+            : 'passkey_authenticator']: setup,
         },
         {
           kind: 'control',
@@ -215,16 +240,19 @@ export async function opControl(
     }
     case 'ref': {
       const { resolveRef } = await import('@agent/core/src/pipeline-engine');
-      const refPath = resolve(params.path);
-      const bindResolved: Record<string, any> = {};
-      if (params.bind) {
-        for (const [k, v] of Object.entries(params.bind as Record<string, any>)) {
+      const resolvedPath = resolve(params.path);
+      if (typeof resolvedPath !== 'string' || !resolvedPath.trim()) {
+        throw new Error('Browser-Actuator ref control requires a non-empty path');
+      }
+      const bindResolved: Record<string, unknown> = {};
+      if (isRecord(params.bind)) {
+        for (const [k, v] of Object.entries(params.bind)) {
           bindResolved[k] = resolve(v);
         }
       }
-      const refResult = await resolveRef(refPath, bindResolved, ctx, resolve as (val: any) => any);
+      const refResult = await resolveRef(resolvedPath, bindResolved, ctx, resolve);
       const subCtx = await runNested(refResult.steps, { ...ctx, ...refResult.mergedCtx });
-      if (params.export_as) {
+      if (typeof params.export_as === 'string' && params.export_as) {
         ctx = { ...ctx, [params.export_as]: subCtx };
       } else {
         const { _refDepth, ...subCtxClean } = subCtx || {};
@@ -239,4 +267,22 @@ export async function opControl(
     default:
       throw new Error(`Unsupported control operator in Browser-Actuator: ${op}`);
   }
+}
+
+function asAdfSteps(value: unknown, op: string): AdfStep[] {
+  if (
+    !Array.isArray(value) ||
+    !value.every(
+      (step): step is AdfStep =>
+        isRecord(step) &&
+        typeof step.op === 'string' &&
+        (step.type === 'capture' ||
+          step.type === 'transform' ||
+          step.type === 'apply' ||
+          step.type === 'control')
+    )
+  ) {
+    throw new Error(`[INVALID_PARAMS] ${op} control requires an array of ADF steps`);
+  }
+  return value;
 }
