@@ -31,6 +31,8 @@ import {
   buildReportNarrativeOutline,
   buildSpreadsheetNarrativeOutline,
   buildDiagramNarrativeOutline,
+  type MediaCompositionPreset,
+  type MediaDocumentCompositionCatalog,
 } from './media-document-helpers.js';
 import { generateDrawioDocument, normalizeFontFamily } from './media-diagram-render-helpers.js';
 import { createMediaReportPipelineHelpers } from './media-report-pipeline-helpers.js';
@@ -84,11 +86,6 @@ type ArtifactLibraryCatalog = {
   >;
 };
 
-interface MediaDocumentCompositionCatalog {
-  defaults: Record<string, unknown>;
-  profiles: Record<string, MediaCompositionPreset>;
-}
-
 interface MediaThemeCatalog {
   version: string;
   default_theme: string;
@@ -96,15 +93,6 @@ interface MediaThemeCatalog {
 }
 
 type MediaTheme = Record<string, unknown>;
-
-interface MediaCompositionPreset {
-  recommended_theme?: string;
-  branding?: Record<string, unknown>;
-  prompt_guide?: unknown[];
-  source_design?: Record<string, unknown> | null;
-  design_recommendations?: unknown[];
-  [key: string]: unknown;
-}
 
 function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   const dirPath = path.resolve(
