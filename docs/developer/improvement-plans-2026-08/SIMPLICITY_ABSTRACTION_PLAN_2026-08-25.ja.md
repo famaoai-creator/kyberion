@@ -16527,6 +16527,13 @@ SX-08／SX-09 の Chronos Knowledge workspace mutation projectionを再監査し
 検証: Chronos knowledge mutation response **1 file / 8 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 912
+
+SX-08／SX-09 の Chronos WorkItems projectionを再監査し、`/api/workitems` responseを `ok` 判定、配列 fallback、`String()` coercionだけで表示 stateへ渡す残存を修正した。専用 parser で work item、canonical context、scope/view、quality、lineage、status move response、dangerous keyと数値範囲を検証してから state更新へ渡し、不正 responseは fail-closed とする。既存の viewer scope、status move、coordination refresh、表示 semantics は変更していない。
+
+検証: Chronos work items response **1 file / 8 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
