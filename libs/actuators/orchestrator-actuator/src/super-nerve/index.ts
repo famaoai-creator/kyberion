@@ -12,12 +12,17 @@ import {
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertProjectTrustApproval } from '@agent/core/project-trust';
-import { safeExistsSync, safeExec } from '@agent/core/secure-io';
+import { safeExistsSync, safeExec, safeLstat, safeReadFile } from '@agent/core/secure-io';
 import { suggestClosestStrings } from '@agent/core/op-suggestions';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { registerSuperNerveExecutor } from '@agent/core/super-nerve-execution-port';
-import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
 import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -258,8 +263,21 @@ async function handleCoreAction(
           `[TRUST_REQUIRED] super pipeline include requires an explicit project-trust decision: ${relativePath}`
         );
       }
-      const macroDef = readJson<{ steps?: Array<Record<string, unknown>> }>(macroPath);
-      const nested = await runSteps(normalizeNestedSteps(macroDef.steps || []), ctx);
+      if (!safeExistsSync(macroPath) || !safeLstat(macroPath).isFile()) {
+        throw new Error(`Super pipeline include must be an existing regular file: ${macroPath}`);
+      }
+      const macroDef = parseSafeJsonObjectValue(
+        parseSafeJsonInput(
+          String(safeReadFile(macroPath, { encoding: 'utf8' }) || ''),
+          `super pipeline include ${relativePath}`
+        ),
+        `super pipeline include ${relativePath}`
+      );
+      const macroSteps = macroDef.steps === undefined ? [] : macroDef.steps;
+      if (!Array.isArray(macroSteps)) {
+        throw new Error(`Super pipeline include steps must be an array: ${relativePath}`);
+      }
+      const nested = await runSteps(normalizeNestedSteps(macroSteps), ctx);
       if (nested.status === 'failed') {
         throw new Error(
           nested.results.find((result: any) => result.status === 'failed')?.error ||

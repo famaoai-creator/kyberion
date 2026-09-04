@@ -1,6 +1,6 @@
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { parsePersistedPipelineStrategy, readJson } from '@agent/core/foundation';
+import { safeExistsSync, safeLstat, safeReadFile } from '@agent/core/secure-io';
+import { parsePersistedPipelineStrategy, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertProjectTrustApproval } from '@agent/core/project-trust';
 import {
@@ -119,7 +119,10 @@ async function performReconcile(input: OrchestratorAction) {
   if (!safeExistsSync(resolved.absolute))
     throw new Error(`Strategy not found: ${resolved.absolute}`);
   const config = parsePersistedPipelineStrategy(
-    readJson<unknown>(resolved.absolute),
+    parseSafeJsonInput(
+      String(safeReadFile(resolved.absolute, { encoding: 'utf8' }) || ''),
+      'orchestrator strategy'
+    ),
     'orchestrator strategy'
   );
   for (const strategy of config.strategies) {

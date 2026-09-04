@@ -1,11 +1,16 @@
 /** Execution brief archetypes, rendering, preflight, and status read-model helpers. */
 
-import { defineCatalog, readJson, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  defineCatalog,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
   safeExec,
   safeExistsSync,
+  safeLstat,
 } from '@agent/core/secure-io';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -540,7 +545,20 @@ export function renderPipelineBundleJob(
     };
   }
 
-  const raw = readJson<Record<string, unknown>>(templateFullPath) as Record<string, unknown>;
+  if (!safeLstat(templateFullPath).isFile()) {
+    return {
+      ...job,
+      output_path: renderedOutputPath,
+      skipped_reason: `template is not a regular file: ${job.template_path}`,
+    };
+  }
+  const raw = parseSafeJsonObjectValue(
+    parseSafeJsonInput(
+      String(safeReadFile(templateFullPath, { encoding: 'utf8' }) || ''),
+      `pipeline template ${job.template_path}`
+    ),
+    `pipeline template ${job.template_path}`
+  );
   const renderedPipeline = applyPathOverrides(raw, job.parameter_overrides || {}, variables);
   return {
     ...job,
