@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { derivePipelineStatus, type PipelineStepResult } from './pipeline-contract.js';
-import { handleStepError } from './src/pipeline-engine.js';
+import { handleStepError, type OnErrorConfig } from './src/pipeline-engine.js';
 import { evaluateCondition, resolveVars } from './src/logic-utils.js';
 import {
   deriveExecutionGraph,
@@ -42,6 +42,12 @@ export interface AdfStep {
   budget?: { approval_required?: boolean; approval_ref?: string };
   /** Explicit shared-resource claims used by the graph frontier scheduler. */
   resource_claims?: Array<string | ResourceClaim>;
+  /** Optional graph dependencies and conditional execution metadata. */
+  depends_on?: string[];
+  consumes?: string | string[];
+  when?: unknown;
+  /** Shared step recovery contract. */
+  on_error?: OnErrorConfig;
 }
 
 function resolveAdfResourceClaims(
@@ -250,9 +256,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
   // which is intentionally equivalent to a one-wide linear graph.
   const graphDeclared = steps.some(
     (step) =>
-      Array.isArray((step as any).depends_on) ||
-      (step as any).consumes !== undefined ||
-      (step as any).when !== undefined
+      Array.isArray(step.depends_on) || step.consumes !== undefined || step.when !== undefined
   );
   if (steps.length > 1 && (graphDeclared || (options.maxConcurrency ?? 1) > 1)) {
     const built = deriveExecutionGraph(steps as unknown as AdfStep[], Object.keys(ctx));
@@ -469,21 +473,26 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       ctx = ((await hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'success' })) ||
         ctx) as Ctx;
       if (terminalRequested) break;
-    } catch (err: any) {
-      if (err?.adfControlFlow === 'suspend') throw err;
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      const controlFlow =
+        err && typeof err === 'object' && 'adfControlFlow' in err
+          ? (err as { adfControlFlow?: unknown }).adfControlFlow
+          : undefined;
+      if (controlFlow === 'suspend') throw error;
       // Native on_error support (skip / abort / fallback via handleStepError)
       // so every runner shares one recovery semantics instead of hand-rolled
       // copies. Fallback sub-pipelines run through the same engine, so their
       // failures propagate (AR-06) and their steps count against the budget.
-      const onError = (step as any).on_error;
-      if (onError && err?.adfControlFlow !== 'preflight') {
+      const onError = step.on_error;
+      if (onError && controlFlow !== 'preflight') {
         try {
           const recovery = await handleStepError(
-            err,
+            error,
             step,
             onError,
             ctx,
-            async (fallbackSteps: any[], errCtx: any) => {
+            async (fallbackSteps: NonNullable<OnErrorConfig['fallback']>, errCtx: unknown) => {
               const res = await runNestedSteps(fallbackSteps as AdfStep[], errCtx as Ctx);
               if (res.status === 'failed') {
                 throw new Error(
@@ -500,7 +509,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
             results.push({ op: step.op, status: 'recovered' });
             ctx = ((await hooks?.afterStep?.(step, state.stepCount, ctx, {
               status: 'recovered',
-              error: err.message,
+              error: error.message,
             })) || ctx) as Ctx;
             continue;
           }
@@ -508,11 +517,11 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
           /* recovery itself failed — fall through to the failure path */
         }
       }
-      logger.error(`  ${label} Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
+      logger.error(`  ${label} Step failed (${step.op}): ${error.message}`);
+      results.push({ op: step.op, status: 'failed', error: error.message });
       ctx = ((await hooks?.afterStep?.(step, state.stepCount, ctx, {
         status: 'failed',
-        error: err.message,
+        error: error.message,
       })) || ctx) as Ctx;
       break;
     }
