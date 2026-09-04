@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-04T16:53:48.540Z",
+  "generated_at": "2026-09-04T17:04:00.957Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -100,7 +100,6 @@
     "libs/core/surface-query-helpers.ts": 6,
     "libs/core/surface-runtime-conversation-data.ts": 36,
     "libs/core/surface-runtime-helpers.ts": 25,
-    "libs/core/surface-runtime-orchestrator.ts": 2,
     "libs/core/surface-steering-authority.ts": 16,
     "libs/core/surface-ux-contract.ts": 8,
     "libs/core/surface-ux.ts": 5,
