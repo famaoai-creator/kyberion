@@ -16247,6 +16247,13 @@ SX-03／SX-04／SX-07／EG-09 の customer migration overlay loaderを再監査�
 検証: customer migration **1 file / 2 tests passed**、root typecheck、対象 Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 873
+
+SX-03／SX-04／EG-09 の voice upgrade profile merge loaderを再監査し、既存のvoice profile JSONを`readJson<Record<string, unknown>>`の型アサーションだけでtier設定へmergeしていた残存を修正した。既存のcustomer／personal profile path boundary、regular-file guard、malformed profileを空設定へ戻す semantics、tier書込みを維持し、safe JSON object loaderへ接続した。
+
+検証: voice upgrade **2 files / 6 tests passed**、root typecheck、対象 Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
