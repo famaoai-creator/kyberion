@@ -23,10 +23,25 @@ import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media-signal-entr
 import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
 import { isLegacyMediaOp } from '@agent/core/legacy-media-ops';
 import { loadJsonValue } from './media-catalog-loaders.js';
+import type { CreativeDesignTypography } from '@agent/core/creative-design-resolver';
 import * as path from 'node:path';
 
 export type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
 export type ProtocolKind = 'pptx' | 'docx' | 'pdf' | 'xlsx';
+export interface MediaThemeLayer {
+  colors?: Record<string, string>;
+  fonts?: Record<string, string>;
+  typography?: CreativeDesignTypography;
+  [key: string]: unknown;
+}
+export interface MediaTheme {
+  colors?: Record<string, string>;
+  fonts?: Record<string, string>;
+  typography?: CreativeDesignTypography;
+  theme?: MediaThemeLayer;
+  assets?: { logo_url?: string; [key: string]: unknown };
+  [key: string]: unknown;
+}
 export interface MediaCompositionBranding {
   logo_url?: string;
   brand_name?: string;
