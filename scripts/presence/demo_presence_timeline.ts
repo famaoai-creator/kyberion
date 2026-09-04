@@ -1,11 +1,13 @@
 import { parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 export function parsePresenceTimelineResponse(payload: unknown): Record<string, unknown> {
   return parseSafeJsonObjectValue(payload, 'presence timeline response');
 }
 
-async function main() {
+async function main(print: Print = () => undefined) {
   const timeline = {
     action: 'presence_timeline',
     surface_id: 'presence-studio',
@@ -39,13 +41,13 @@ async function main() {
   }
 
   const body = parsePresenceTimelineResponse(await response.json());
-  console.log(JSON.stringify(body, null, 2));
+  print(JSON.stringify(body, null, 2));
 }
 
 const runPresenceTimelineDemo = defineScript({
   name: 'presence-demo-timeline',
   flags: [],
-  run: main,
+  run: ({ print }) => main(print),
 });
 
 if (
