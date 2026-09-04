@@ -334,7 +334,8 @@ export interface BaseSurfaceMetadata {
   channel: string;
   threadTs: string;
   scope?: EventScope;
-  [key: string]: any;
+  /** Provider-specific metadata must be narrowed by the provider adapter. */
+  [key: string]: unknown;
 }
 
 export interface SlackSurfaceMetadata extends BaseSurfaceMetadata {
