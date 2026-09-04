@@ -15,6 +15,8 @@ import { createCustomer } from './customer_create.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
+type Print = (value: unknown) => void;
+
 function copyTree(srcDir: string, dstDir: string): void {
   const rootDir = pathResolver.rootDir();
   const safeSourceDir = assertSafeRepositoryPath(srcDir, { rootDir });
@@ -108,12 +110,12 @@ export function formatMigratedCustomer(root: string): string[] {
   return [`Migrated personal setup to ${path.relative(pathResolver.rootDir(), root)}`];
 }
 
-function main(argv: string[]): string[] {
+export function main(argv: string[], print: Print = () => undefined): string[] {
   const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
     const usage = 'Usage: customer_migrate_from_personal <slug>';
     if (slug) {
-      console.error(usage);
+      print(usage);
       throw new ScriptExitError(0);
     }
     throw new ScriptExitError(2, usage);
@@ -135,6 +137,6 @@ if (
     name: 'customer:migrate-from-personal',
     flags: [],
     run(context) {
-      context.print(main(context.argv).join('\n'));
+      context.print(main(context.argv, context.print).join('\n'));
     },
   })();
