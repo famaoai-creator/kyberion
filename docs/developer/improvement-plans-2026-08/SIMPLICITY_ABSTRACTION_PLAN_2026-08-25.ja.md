@@ -17668,6 +17668,23 @@ fields／anchor type を検証した record へ狭め、anchor／verify／append
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 1015
+
+SX-04／SX-10／SX-11 の media catalog loader を再監査し、design pattern、media design systems、confidential tenant
+override の `any` 戻り値を schema に対応した typed catalog contract へ移行した。layout strategy、content data、media
+engine、design-system の theme／layout mapping／metadata を明示型で公開し、`defineCatalog<T>` の検証結果をそのまま
+下流へ渡す。secure path、symlink 除外、catalog merge、tenant overlay の tier／fallback semantics は変更していない。
+
+検証:
+
+- Media catalog／layout／theme **5 files / 12 tests passed**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象 ESLint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+なお、既存の `personal-theme-overlay.test.ts` 単独実行には今回の型変更で生成されない runtime 差分とは独立した
+既存回帰（`active_theme_name` が未設定）があるため、今回の loader／layout 対象テストには含めていない。
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
