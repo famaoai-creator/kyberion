@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseConciergeSummaryEvent } from '../src/lib/summary-event';
+import { parseConciergeSummaryEvent, parseConciergeSummaryValue } from '../src/lib/summary-event';
 
 const VALID_SUMMARY = {
   generated_at: '2026-09-04T00:00:00.000Z',
@@ -16,6 +16,10 @@ const VALID_SUMMARY = {
 describe('concierge summary event boundary', () => {
   it('parses a shape-valid SSE summary', () => {
     expect(parseConciergeSummaryEvent(JSON.stringify(VALID_SUMMARY))).toEqual(VALID_SUMMARY);
+  });
+
+  it('parses a shape-valid initial HTTP summary payload', () => {
+    expect(parseConciergeSummaryValue(VALID_SUMMARY)).toEqual(VALID_SUMMARY);
   });
 
   it.each([

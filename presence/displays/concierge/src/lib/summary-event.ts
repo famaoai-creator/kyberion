@@ -89,49 +89,52 @@ function isIntentInboxItemArray(value: unknown): boolean {
   );
 }
 
+export function parseConciergeSummaryValue(value: unknown): ConciergeSummary | null {
+  if (!isRecord(value) || typeof value.generated_at !== 'string') return null;
+
+  const briefing = value.briefing;
+  if (!isRecord(briefing) || typeof briefing.sentence_ja !== 'string') return null;
+  if (!hasOptionalStringFields(briefing, ['next_action_ja'])) return null;
+  const counts = briefing.counts;
+  if (
+    !isRecord(counts) ||
+    ['active_missions', 'pending_approvals', 'unread_outcomes', 'exceptions'].some(
+      (field) =>
+        typeof counts[field] !== 'number' || !Number.isInteger(counts[field]) || counts[field] < 0
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    !isIntentInboxItemArray(value.intent_inbox) ||
+    !isSummaryItemArray(
+      value.approval_queue,
+      ['id', 'channel', 'storage_channel', 'title', 'reason', 'requested_at'],
+      ['expires_at', 'mission_id']
+    ) ||
+    !isSummaryItemArray(
+      value.outcome_feed,
+      ['entry_id', 'title', 'summary', 'status', 'updated_at'],
+      ['mission_id']
+    ) ||
+    !Array.isArray(value.outcome_feed) ||
+    value.outcome_feed.some(
+      (candidate) =>
+        !isRecord(candidate) ||
+        !Array.isArray(candidate.artifact_paths) ||
+        candidate.artifact_paths.some((path) => typeof path !== 'string')
+    ) ||
+    !isSummaryItemArray(value.exception_feed, ['id', 'title', 'text', 'surface', 'created_at'])
+  ) {
+    return null;
+  }
+  return value as ConciergeSummary;
+}
+
 export function parseConciergeSummaryEvent(raw: string): ConciergeSummary | null {
   try {
-    const value: unknown = JSON.parse(raw);
-    if (!isRecord(value) || typeof value.generated_at !== 'string') return null;
-
-    const briefing = value.briefing;
-    if (!isRecord(briefing) || typeof briefing.sentence_ja !== 'string') return null;
-    if (!hasOptionalStringFields(briefing, ['next_action_ja'])) return null;
-    const counts = briefing.counts;
-    if (
-      !isRecord(counts) ||
-      ['active_missions', 'pending_approvals', 'unread_outcomes', 'exceptions'].some(
-        (field) =>
-          typeof counts[field] !== 'number' || !Number.isInteger(counts[field]) || counts[field] < 0
-      )
-    ) {
-      return null;
-    }
-
-    if (
-      !isIntentInboxItemArray(value.intent_inbox) ||
-      !isSummaryItemArray(
-        value.approval_queue,
-        ['id', 'channel', 'storage_channel', 'title', 'reason', 'requested_at'],
-        ['expires_at', 'mission_id']
-      ) ||
-      !isSummaryItemArray(
-        value.outcome_feed,
-        ['entry_id', 'title', 'summary', 'status', 'updated_at'],
-        ['mission_id']
-      ) ||
-      !Array.isArray(value.outcome_feed) ||
-      value.outcome_feed.some(
-        (candidate) =>
-          !isRecord(candidate) ||
-          !Array.isArray(candidate.artifact_paths) ||
-          candidate.artifact_paths.some((path) => typeof path !== 'string')
-      ) ||
-      !isSummaryItemArray(value.exception_feed, ['id', 'title', 'text', 'surface', 'created_at'])
-    ) {
-      return null;
-    }
-    return value as ConciergeSummary;
+    return parseConciergeSummaryValue(JSON.parse(raw));
   } catch {
     return null;
   }

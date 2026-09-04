@@ -2,7 +2,11 @@
 
 import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
-import { parseConciergeSummaryEvent, type ConciergeSummary } from '../lib/summary-event';
+import {
+  parseConciergeSummaryEvent,
+  parseConciergeSummaryValue,
+  type ConciergeSummary,
+} from '../lib/summary-event';
 
 type HygieneInquiry = {
   mission_id: string;
@@ -83,7 +87,9 @@ export default function ConciergePage() {
       const response = await fetch('/api/summary', { cache: 'no-store' });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'summary failed');
-      setSummary(payload.summary);
+      const nextSummary = parseConciergeSummaryValue(payload.summary);
+      if (!nextSummary) throw new Error('summary shape invalid');
+      setSummary(nextSummary);
       setLoadError(null);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : String(error));
