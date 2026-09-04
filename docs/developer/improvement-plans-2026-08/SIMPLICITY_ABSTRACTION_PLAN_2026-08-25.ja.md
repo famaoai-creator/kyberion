@@ -17131,7 +17131,8 @@ SX-03／SX-10／SX-11 の A2A bridge payload boundaryを再監査し、wire payl
 provider／security scope／response textの読み出しが型保証なしに実行される残存を修正した。A2A payloadを拡張可能な
 known contractへ改め、共通のrecord／context guardを通してmission、provider、model hint、timeout、context mode、
 correlation、監査メタデータを抽出する。署名対象、task contract validation、tenant／egress scope、provider failover、
-runtime dispatchの挙動は変更していない。
+runtime dispatchの挙動は変更していない。daemon／in-process／handlerのerror boundaryも`unknown`へ揃え、busy
+retry値は有限の正数だけを採用して不正なerror detailを既定値へ閉じる。
 
 検証:
 
