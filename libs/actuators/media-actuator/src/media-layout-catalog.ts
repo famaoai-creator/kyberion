@@ -190,17 +190,25 @@ const buildRetryOptions = createGovernedRetryOptionsBuilder({
   fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
-function mergePptxShape(base: any, overrides: any): any {
+function asMediaLayoutShape(value: unknown): MediaLayoutShape {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as MediaLayoutShape)
+    : {};
+}
+
+function mergePptxShape(base: MediaLayoutShape, overrides: unknown): MediaLayoutShape {
+  const baseShape = asMediaLayoutShape(base);
+  const overrideShape = asMediaLayoutShape(overrides);
   return {
-    ...base,
-    ...(overrides || {}),
+    ...baseShape,
+    ...overrideShape,
     pos: {
-      ...(base?.pos || {}),
-      ...(overrides?.pos || {}),
+      ...(baseShape.pos || {}),
+      ...(overrideShape.pos || {}),
     },
     style: {
-      ...(base?.style || {}),
-      ...(overrides?.style || {}),
+      ...(baseShape.style || {}),
+      ...(overrideShape.style || {}),
     },
   };
 }
