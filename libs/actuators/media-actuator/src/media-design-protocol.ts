@@ -824,9 +824,8 @@ function resolveDocumentCompositionPresetCore(
 
   for (const [profileId, preset] of Object.entries(profiles)) {
     if (!preset || typeof preset !== 'object') continue;
-    if (artifactFamily && String((preset as any).artifact_family || '') !== artifactFamily)
-      continue;
-    if (documentType && String((preset as any).document_type || '') !== documentType) continue;
+    if (artifactFamily && String(preset.artifact_family || '') !== artifactFamily) continue;
+    if (documentType && String(preset.document_type || '') !== documentType) continue;
     return buildPreset(profileId, preset);
   }
 
