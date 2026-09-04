@@ -24,6 +24,7 @@ import type {
   MediaReportDocxProtocol,
   MediaReportPdfProtocol,
 } from './media-report-pipeline-helpers.js';
+import type { MediaTrackerXlsxProtocol } from './media-spreadsheet-pipeline-helpers.js';
 
 const DOCUMENT_LAYOUTS_PATH = pathResolver.rootResolve(
   'knowledge/public/design-patterns/media-templates/document-layouts.json'
@@ -113,7 +114,7 @@ export interface MediaDocumentPipelineDeps {
   buildDiagramNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any) => any;
   buildReportDocxProtocol: (rootDir: string, brief: any) => MediaReportDocxProtocol;
   buildReportPdfProtocol: (rootDir: string, brief: any) => MediaReportPdfProtocol;
-  buildTrackerSpreadsheetProtocol: (rootDir: string, brief: any) => any;
+  buildTrackerSpreadsheetProtocol: (rootDir: string, brief: any) => MediaTrackerXlsxProtocol;
   buildDocumentPdfProtocol: (rawBrief: any) => MediaInvoicePdfProtocol;
   normalizeXlsxDesignProtocol: (protocol: any) => any;
   resolveDocumentLayoutTemplate: (
