@@ -39,6 +39,8 @@ import { runDegradationWatch, type DegradationReport } from '@agent/core/health-
 import { withExecutionContext } from '@agent/core/governance';
 import { readSafeJsonFile } from './lib/json-input.js';
 
+type Print = (value: unknown) => void;
+
 export interface PatchCommandResult {
   status: number;
   stdout: string;
@@ -316,7 +318,10 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   return outcome;
 }
 
-async function main(args: string[] = currentProcessArgv().slice(2)): Promise<number> {
+export async function main(
+  args: string[] = currentProcessArgv().slice(2),
+  print: Print = () => undefined
+): Promise<number> {
   const argv = createStandardYargs(['node', 'apply_dependency_patch', ...args])
     .option('package', { type: 'string', demandOption: true, describe: 'Direct dependency name' })
     .option('to', {
@@ -345,7 +350,7 @@ async function main(args: string[] = currentProcessArgv().slice(2)): Promise<num
     })
   );
 
-  console.log(JSON.stringify(outcome, null, 2));
+  print(JSON.stringify(outcome, null, 2));
   if (outcome.status === 'patched' || outcome.status === 'proposed') {
     logger.success(`[patch] ${outcome.package_name}: ${outcome.status}`);
     return 0;
@@ -357,8 +362,8 @@ async function main(args: string[] = currentProcessArgv().slice(2)): Promise<num
 const runApplyDependencyPatch = defineScript({
   name: 'patch:dependency',
   flags: [],
-  async run({ argv }) {
-    const code = await main(argv);
+  async run({ argv, print }) {
+    const code = await main(argv, print);
     if (code !== 0) throw new ScriptExitError(code, '', true);
     return code;
   },

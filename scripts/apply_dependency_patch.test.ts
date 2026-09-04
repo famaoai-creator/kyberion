@@ -124,6 +124,17 @@ describe('applyDependencyPatch', () => {
     ).toThrow(/dangerous JSON key/);
   });
 
+  it('keeps command output behind the shared printer boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/apply_dependency_patch.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).toContain('print: Print');
+    expect(source).not.toContain('console.log');
+  });
+
   it('propose mode records the plan without touching files', () => {
     const runner = new FakeRunner(() => ok);
     const outcome = applyDependencyPatch({
