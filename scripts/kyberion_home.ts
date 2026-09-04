@@ -74,7 +74,7 @@ import {
   handleFeedbackSubcommand,
   handleImprovements,
 } from './operator-home-secondary-actions.js';
-import { printCommands, showHome } from './operator-home-view.js';
+import { printCommands, showHome, type HomePrint } from './operator-home-view.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
@@ -1209,14 +1209,14 @@ function handleProcedureRepair(procedureId: string, json: boolean): void {
   }
 }
 
-export async function main(args: string[] = []): Promise<void> {
+export async function main(args: string[] = [], print: HomePrint = () => undefined): Promise<void> {
   // The home CLI acts with the operator's own authority — same role the
   // mission controller CLI assumes (inbox/approvals live under active/shared).
   if (!process.env.MISSION_ROLE) {
     process.env.MISSION_ROLE = 'mission_controller';
   }
   if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
-    printCommands(ui);
+    printCommands(ui, print);
     return;
   }
   const localeFlagIndex = args.indexOf('--locale');
@@ -1226,7 +1226,7 @@ export async function main(args: string[] = []): Promise<void> {
   // yargs intercepts a literal `help` positional with its own dump — answer
   // with the command table (what the home screen advertises) instead.
   if (args[0] === 'help') {
-    printCommands(ui);
+    printCommands(ui, print);
     return;
   }
   const argv = await createStandardYargs(['node', 'kyberion_home', ...args])
@@ -1458,14 +1458,14 @@ export async function main(args: string[] = []): Promise<void> {
       });
       return;
     case 'help':
-      printCommands(ui);
+      printCommands(ui, print);
       return;
     case '':
-      await showHome(ui, Boolean(argv.json));
+      await showHome(ui, Boolean(argv.json), print);
       return;
     default:
       console.error(ui('recorder:recorder_unknown_subcommand', { subcommand }));
-      printCommands(ui);
+      printCommands(ui, print);
       process.exitCode = 1;
   }
 }
@@ -1478,6 +1478,6 @@ if (
     name: 'kyberion',
     flags: [],
     run(context) {
-      return main(context.argv);
+      return main(context.argv, context.print);
     },
   })();
