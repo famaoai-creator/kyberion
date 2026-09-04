@@ -15,5 +15,7 @@ describe('working-memory period resource boundary', () => {
     expect(source).toContain('function normalizeWeeklyPeriod(');
     expect(source).toContain('const journalPath = assertSafeRepositoryPath(');
     expect(source).toContain('const weeklyPath = assertSafeRepositoryPath(');
+    expect(source).toContain('parseSafeJsonInput(');
+    expect(source).not.toContain('readJson');
   });
 });
