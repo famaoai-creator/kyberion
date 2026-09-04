@@ -435,8 +435,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
         parseSafeJsonObjectInput(argv.context as string, 'pipeline --context') || {};
     } catch (err: any) {
       logger.error(`❌ [PIPELINE] Invalid --context JSON: ${err.message}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(1, '', true);
     }
   }
   const firstNonEmpty = (...candidates: (string | undefined)[]): string | undefined =>
@@ -710,7 +709,6 @@ export async function main(args?: string[], print: Print = () => undefined) {
           '   [PROCESS] Browser session kept alive per pipeline options. Terminal will remain open.'
         );
       } else {
-        process.exitCode = 0;
         return;
       }
     } else {
@@ -719,10 +717,10 @@ export async function main(args?: string[], print: Print = () => undefined) {
         logNextActionForPipelineFailure(failure!, String(argv.input));
       }
       logger.error(`❌ [PIPELINE] Failed: ${pipeline.name || argv.input}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(1, '', true);
     }
   } catch (err: any) {
+    if (err instanceof ScriptExitError) throw err;
     if (err instanceof PipelineSuspendedError) {
       trace.addEvent('pipeline.suspended', {
         step_id: err.suspension.step_id,
@@ -774,7 +772,6 @@ export async function main(args?: string[], print: Print = () => undefined) {
       logger.warn(
         `⏸️ [PIPELINE] Awaiting decision ${err.suspension.approval_request_id}. Resume with --resume ${runJournal?.runId || 'the run id'}.`
       );
-      process.exitCode = 0;
       return;
     }
     const failure = formatPipelineFailure(err);
@@ -814,7 +811,6 @@ export async function main(args?: string[], print: Print = () => undefined) {
       logger.info(
         `   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
       );
-      process.exitCode = 0;
       return;
     }
     trace.addEvent('pipeline.error', {
@@ -835,7 +831,6 @@ export async function main(args?: string[], print: Print = () => undefined) {
     );
     logger.error(`❌ [PIPELINE] Error: ${failure.summary}`);
     logNextActionForPipelineFailure(failure, String(argv.input));
-    process.exitCode = 1;
-    return;
+    throw new ScriptExitError(1, '', true);
   }
 }
