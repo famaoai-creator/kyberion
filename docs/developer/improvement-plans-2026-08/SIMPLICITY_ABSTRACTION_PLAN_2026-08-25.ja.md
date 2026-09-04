@@ -19414,6 +19414,17 @@ SX-05／SX-06 のmission memory commandを再監査し、queue一覧、review詳
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1146
+
+SX-05／SX-06 のorganization commandを再監査し、catalog一覧、profile一覧／詳細、discoveryのJSON・human-readable出力を注入printerへ統一した。organization context、customer／public overlayの選択、summary／filter、catalog解決、tenant scopeは変更していない。
+
+検証:
+
+- mission controller **1 test file / 77 tests passed**。organization各表示のprinter経路、直接console出力不在、JSON schema回帰を確認した。
+- 対象ESLint、`pnpm run typecheck`、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

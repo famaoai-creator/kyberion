@@ -1417,12 +1417,14 @@ async function mainImpl(
     purgeMissions,
     archiveMissions,
     listMissions,
-    listOrganizationCatalogs: (organizationId, jsonOutput) =>
-      listOrganizationCatalogs(organizationId, jsonOutput, args),
-    listOrganizationProfiles: (organizationId) =>
-      listOrganizationProfiles(organizationId, args, ROOT_DIR),
-    showOrganizationProfile,
-    showOrganizationDiscovery,
+    listOrganizationCatalogs: (organizationId, jsonOutput, output) =>
+      listOrganizationCatalogs(organizationId, jsonOutput, args, output),
+    listOrganizationProfiles: (organizationId, output) =>
+      listOrganizationProfiles(organizationId, args, ROOT_DIR, output),
+    showOrganizationProfile: (organizationId, summaryOnly, jsonOutput, output) =>
+      showOrganizationProfile(organizationId, summaryOnly, jsonOutput, output),
+    showOrganizationDiscovery: (jsonOutput, summaryOnly, output) =>
+      showOrganizationDiscovery(jsonOutput, summaryOnly, output),
     showMissionStatus,
     showReasoningBackendStatus,
     syncProjectLedger,

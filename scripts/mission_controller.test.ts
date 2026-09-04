@@ -33,6 +33,12 @@ import type { MissionControllerRoutingContext } from './refactor/mission-control
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
+async function captureMissionControllerOutput(): Promise<string> {
+  const output: unknown[] = [];
+  await main(undefined, (value) => output.push(value));
+  return output.map(String).join('\n');
+}
+
 function cleanupAutoTrackFixture(): void {
   safeRmSync(pathResolver.shared('runtime/projects/PRJ-TEST-AUTO-TRACK.json'), {
     force: true,
@@ -676,9 +682,20 @@ describe('mission_controller argument parsing', () => {
     expect(positionalArgs).toEqual(['organization-discovery']);
   });
 
+  it('keeps organization command output away from direct console streams', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/refactor/mission-organization-commands.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('print: Print');
+  });
+
   it('dispatches organization discovery through the mission_controller main entrypoint', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     process.argv = [
       'node',
@@ -688,21 +705,18 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main();
-      const output = logSpy.mock.calls.flat().join('\n');
+      const output = await captureMissionControllerOutput();
       expect(infoSpy).not.toHaveBeenCalled();
       expect(output).toContain('"title": "Organization Discovery"');
       expect(output).toContain('"Organization Selection Guide"');
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
       infoSpy.mockRestore();
     }
   });
 
   it('emits clean JSON for organization profile inventory', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     process.argv = [
       'node',
@@ -712,8 +726,7 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main();
-      const output = logSpy.mock.calls.flat().join('\n');
+      const output = await captureMissionControllerOutput();
       expect(infoSpy).not.toHaveBeenCalled();
       expect(() => JSON.parse(output)).not.toThrow();
       const payload = JSON.parse(output);
@@ -721,14 +734,12 @@ describe('mission_controller argument parsing', () => {
       expect(payload).toHaveProperty('profiles');
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
       infoSpy.mockRestore();
     }
   });
 
   it('emits clean JSON for organization discovery', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     process.argv = [
       'node',
@@ -738,8 +749,7 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main();
-      const output = logSpy.mock.calls.flat().join('\n');
+      const output = await captureMissionControllerOutput();
       expect(infoSpy).not.toHaveBeenCalled();
       expect(() => JSON.parse(output)).not.toThrow();
       const payload = JSON.parse(output);
@@ -770,20 +780,17 @@ describe('mission_controller argument parsing', () => {
       ]);
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
       infoSpy.mockRestore();
     }
   });
 
   it('emits canonical examples in the organization discovery text output', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-discovery'];
 
     try {
-      await main();
-      const output = logSpy.mock.calls.flat().join('\n');
+      const output = await captureMissionControllerOutput();
       expect(output).toContain('Canonical examples:');
       expect(output).toContain('Organization Discovery Example');
       expect(output).toContain('Organization Profiles Example');
@@ -793,20 +800,17 @@ describe('mission_controller argument parsing', () => {
       expect(output).toContain('organization-catalog-report.example.json');
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
       infoSpy.mockRestore();
     }
   });
 
   it('emits clean JSON for organization profile detail', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-profile', '--json'];
 
     try {
-      await main();
-      const output = logSpy.mock.calls.flat().join('\n');
+      const output = await captureMissionControllerOutput();
       expect(infoSpy).not.toHaveBeenCalled();
       expect(() => JSON.parse(output)).not.toThrow();
       const payload = JSON.parse(output);
@@ -834,14 +838,12 @@ describe('mission_controller argument parsing', () => {
       expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
       infoSpy.mockRestore();
     }
   });
 
   it('emits clean JSON for organization catalog inventory', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     process.argv = [
       'node',
@@ -851,8 +853,7 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main();
-      const output = logSpy.mock.calls.flat().join('\n');
+      const output = await captureMissionControllerOutput();
       expect(infoSpy).not.toHaveBeenCalled();
       expect(() => JSON.parse(output)).not.toThrow();
       const payload = JSON.parse(output);
@@ -871,14 +872,12 @@ describe('mission_controller argument parsing', () => {
       expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
       infoSpy.mockRestore();
     }
   });
 
   it('dispatches the compact organization discovery summary through the main entrypoint', async () => {
     const originalArgv = process.argv;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     process.argv = [
       'node',
@@ -888,8 +887,10 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main();
-      const output = [...logSpy.mock.calls, ...infoSpy.mock.calls].flat().join('\n');
+      const output = [
+        await captureMissionControllerOutput(),
+        ...infoSpy.mock.calls.flat().map(String),
+      ].join('\n');
       expect(output).toContain('Organization Discovery');
       expect(output).toContain('Organization Selection Guide');
       expect(output).toContain('Organization Discovery Reports');
@@ -899,7 +900,6 @@ describe('mission_controller argument parsing', () => {
       expect(output).not.toContain('Common questions:');
     } finally {
       process.argv = originalArgv;
-      logSpy.mockRestore();
       infoSpy.mockRestore();
     }
   });
