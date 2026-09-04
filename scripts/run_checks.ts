@@ -1,7 +1,8 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResultAsync } from '@agent/core/secure-io';
-import { defineCatalog, readJson } from '@agent/core/foundation';
+import { defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type Gate = {
   id: string;
@@ -106,8 +107,9 @@ export function validateGateManifest(manifest: GateManifest, availableScripts?: 
 
 export function loadGateManifest(): GateManifest {
   const manifest = gateManifestCatalog.load();
-  const packageJson = readJson<{ scripts?: Record<string, string> }>(
-    pathResolver.rootResolve('package.json')
+  const packageJson = readSafeJsonFile<{ scripts?: Record<string, string> }>(
+    pathResolver.rootResolve('package.json'),
+    'package manifest for check runner'
   );
   validateGateManifest(manifest, new Set(Object.keys(packageJson.scripts || {})));
   return manifest;

@@ -1,9 +1,9 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { loadGateManifest } from './run_checks.js';
 import { resolveDeclaredBaselinePath } from './lib/ci-gate-baseline.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 const WORKFLOW_SCOPE_REFS = {
   pr: '.github/workflows/pr-validation.yml',
@@ -55,8 +55,9 @@ export function checkWorkflowSetupOrder(workflowPath: string, workflow: string):
 export function checkCiGateParity(): string[] {
   const failures: string[] = [];
   const manifest = loadGateManifest();
-  const packageJson = readJson<{ scripts?: Record<string, string> }>(
-    pathResolver.rootResolve('package.json')
+  const packageJson = readSafeJsonFile<{ scripts?: Record<string, string> }>(
+    pathResolver.rootResolve('package.json'),
+    'package manifest for CI gate parity'
   );
   const declaredGates = new Set(
     manifest.gates.flatMap((gate) => [gate.id, ...(gate.script ? [gate.script] : [])])

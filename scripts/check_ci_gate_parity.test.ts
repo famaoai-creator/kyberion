@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   checkCiGateParity,
   checkWorkflowSetupOrder,
@@ -7,6 +8,16 @@ import {
 } from './check_ci_gate_parity.js';
 
 describe('ci gate parity', () => {
+  it('uses the governed package manifest loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_ci_gate_parity.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('readSafeJsonFile');
+    expect(source).not.toContain('readJson<{ scripts?: Record<string, string> }>(');
+  });
+
   it('keeps the checked-in workflows and baseline declarations aligned', () => {
     expect(checkCiGateParity()).toEqual([]);
   });
