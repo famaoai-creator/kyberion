@@ -11,6 +11,8 @@ import { parseSafeJsonInput } from '@agent/core/foundation';
 import { loadServicePidRegistryAtPath } from '@agent/core/service-pid-registry';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 const PID_FILE = pathResolver.shared('services-pids.json');
 
 type ServiceLifecycleOperation = 'list' | 'start' | 'stop';
@@ -192,7 +194,7 @@ function startService(serviceName: string) {
   }
 }
 
-async function main(args: string[] = []) {
+async function main(args: string[] = [], print: Print = () => undefined) {
   const argv = await createStandardYargs(['node', 'service_lifecycle_control', ...args])
     .option('operation', {
       type: 'string',
@@ -213,7 +215,7 @@ async function main(args: string[] = []) {
 
   if (operation === 'start') {
     if (!serviceName) {
-      console.log(
+      print(
         JSON.stringify(
           {
             status: 'selection_required',
@@ -228,13 +230,13 @@ async function main(args: string[] = []) {
     }
 
     const result = startService(serviceName);
-    console.log(JSON.stringify(result, null, 2));
+    print(JSON.stringify(result, null, 2));
     return;
   }
 
   if (operation === 'stop') {
     if (!serviceName) {
-      console.log(
+      print(
         JSON.stringify(
           {
             status: 'needs_selection',
@@ -249,7 +251,7 @@ async function main(args: string[] = []) {
     }
 
     const result = stopService(serviceName);
-    console.log(JSON.stringify(result, null, 2));
+    print(JSON.stringify(result, null, 2));
     return;
   }
 
@@ -258,13 +260,13 @@ async function main(args: string[] = []) {
     running_services: listRunningServices(),
     message: 'Choose a running service name and rerun with --operation stop --service-name <name>.',
   };
-  console.log(JSON.stringify(result, null, 2));
+  print(JSON.stringify(result, null, 2));
 }
 
 export const runServiceLifecycleControl = defineScript({
   name: 'service:lifecycle',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
