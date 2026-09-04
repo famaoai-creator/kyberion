@@ -110,7 +110,7 @@ function enforcePayloadSize(options: AxiosRequestConfig) {
   }
 }
 
-export async function secureFetch<T = any>(options: SecureFetchOptions): Promise<T> {
+export async function secureFetch<T = unknown>(options: SecureFetchOptions): Promise<T> {
   const { kyberion_allow_local_network, kyberion_egress_context, ...axiosOptions } =
     options as SecureFetchOptions & {
       authenticateRequest?: boolean;
