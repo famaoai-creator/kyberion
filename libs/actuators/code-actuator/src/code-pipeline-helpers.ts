@@ -5,6 +5,7 @@ import {
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
 } from '@agent/core/foundation';
+import type { AdfEngineContext } from '@agent/core/adf-engine';
 import { logger } from '@agent/core/core';
 import {
   safeReadFile,
@@ -32,6 +33,7 @@ import { runGovernedCommand } from '@agent/core/command-runner';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
+import type { TraceContext } from '@agent/core/src/trace';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
@@ -104,14 +106,14 @@ function assertUnsafeJsAllowed() {
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
+  params: Record<string, unknown>;
 }
 
 export interface CodeAction {
   action: 'pipeline' | 'reconcile';
   steps?: PipelineStep[];
   strategy_path?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   options?: {
     max_steps?: number;
     timeout_ms?: number;
@@ -177,11 +179,12 @@ export async function handleAction(input: CodeAction) {
     );
     traceCtx.endSpan('ok');
     return { ...result, ...finalizeActuatorTrace(traceCtx) };
-  } catch (err: any) {
-    traceCtx.endSpan('error', err?.message ?? String(err));
+  } catch (err: unknown) {
+    const message = errorMessage(err);
+    traceCtx.endSpan('error', message);
     return {
       status: 'error',
-      message: err?.message ?? String(err),
+      message,
       ...finalizeActuatorTrace(traceCtx),
     };
   }
@@ -193,20 +196,21 @@ export async function handleAction(input: CodeAction) {
 // being silently absorbed (AR-06 no-silent-failure).
 export async function executePipeline(
   steps: PipelineStep[],
-  initialCtx: any = {},
-  options: any = {},
-  traceCtx?: any
+  initialCtx: AdfEngineContext = {},
+  options: CodeAction['options'] = {},
+  traceCtx?: TraceContext
 ) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, root: rootDir };
-  const contextPath = initialCtx.context_path
-    ? assertSafeRepositoryPath(path.resolve(rootDir, initialCtx.context_path), {
-        allowMissingLeaf: true,
-      })
-    : undefined;
+  let ctx: AdfEngineContext = { ...initialCtx, root: rootDir };
+  const contextPath =
+    typeof initialCtx.context_path === 'string' && initialCtx.context_path
+      ? assertSafeRepositoryPath(path.resolve(rootDir, initialCtx.context_path), {
+          allowMissingLeaf: true,
+        })
+      : undefined;
 
   if (contextPath && safeExistsSync(contextPath)) {
     const saved = await retry(
@@ -225,8 +229,8 @@ export async function executePipeline(
       const value = await run();
       traceCtx?.endSpan?.('ok');
       return value;
-    } catch (err: any) {
-      traceCtx?.endSpan?.('error', err?.message ?? String(err));
+    } catch (err: unknown) {
+      traceCtx?.endSpan?.('error', errorMessage(err));
       throw err;
     }
   };
@@ -261,6 +265,10 @@ export async function executePipeline(
   }
 
   return result;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function opControl(
