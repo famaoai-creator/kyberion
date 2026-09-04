@@ -45,6 +45,22 @@ function normalizeGuardrailSourcePath(sourcePath: string): string {
     : relative;
 }
 
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string' &&
+    error.message
+  ) {
+    return error.message;
+  }
+  return fallback;
+}
+
 export function isBaselinedScriptWrapper(
   sourcePath: string,
   command: string,
@@ -389,7 +405,7 @@ export function validatePipelineGuardrails(
         (step.params as Record<string, unknown> | undefined)?.condition,
         (step.params as Record<string, unknown> | undefined)?.when,
         (step.params as Record<string, unknown> | undefined)?.until,
-        (step as any).when,
+        step.when,
       ]) {
         if (typeof condition === 'string' && looksLikeExpression(condition)) {
           findings.push({
@@ -652,8 +668,8 @@ export function validatePipelineGuardrails(
               path: `${hookPath}.url`,
             });
           }
-        } catch (err: any) {
-          const message = err?.message || `Invalid URL: ${url}`;
+        } catch (err: unknown) {
+          const message = errorMessage(err, `Invalid URL: ${url}`);
           findings.push({
             code: message.includes('[SANDBOX_NETWORK_DENIED]')
               ? 'sandbox-network-denied'
