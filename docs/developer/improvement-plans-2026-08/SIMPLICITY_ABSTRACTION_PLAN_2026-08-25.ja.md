@@ -18295,6 +18295,21 @@ intent contract の値は変更せず、全 surface 共通の日本語 fallback 
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1059
+
+SX-09 の mission steering approval fallback を再監査し、`surface-mission-steering.ts` に残っていた承認要求の見出し、番号操作、
+返信指示、次アクションを `bridge` vocabulary catalog へ移した。ミッションID、操縦 verb、承認record、decision token、承認ゲートの
+実行経路は変更せず、共通 catalog を使う日本語表示へ収束させた。
+
+検証:
+
+- surface mission steering **1 file / 11 tests passed**。status／checkpoint／pause／resume／approval／finish の既存 lifecycle と
+  no-bypass structural check を確認した。
+- generated vocabulary types、pseudo locale、knowledge index を再生成し、`catalogs`／`vocabulary-types`／`pseudo-locale` の個別 gate passed。
+- canonical full gate **69 gates / 0 failed** passed。i18n baseline は直書き数 69→61 の減少を反映した。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

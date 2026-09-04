@@ -79,6 +79,7 @@ import type {
   SurfaceAsyncChannel,
 } from './channel-surface-types.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
+import { t } from './t.js';
 
 // ---------------------------------------------------------------------------
 // Verb classification — rule-based, no reasoning call.
@@ -458,13 +459,18 @@ function buildApprovalPendingText(params: {
   requestId: string;
   note?: string;
 }): string {
+  const locale = 'ja' as const;
   return [
-    `状態: ミッション ${params.missionId} の${params.verbLabel}には承認が必要です。`,
+    t(
+      'bridge:mission_steering_approval_required',
+      { missionId: params.missionId, verbLabel: params.verbLabel },
+      locale
+    ),
     params.note ? `メモ: ${params.note}` : '',
-    '1: 承認する',
-    '2: 却下する',
-    `返信: appr:${params.requestId}:approve または appr:${params.requestId}:reject`,
-    `次のアクション: 上記のいずれかで承認要求(${params.requestId})に回答してください。`,
+    t('bridge:mission_steering_approve_choice', undefined, locale),
+    t('bridge:mission_steering_reject_choice', undefined, locale),
+    t('bridge:mission_steering_reply_instruction', { requestId: params.requestId }, locale),
+    t('bridge:mission_steering_next_action', { requestId: params.requestId }, locale),
   ]
     .filter(Boolean)
     .join('\n');
