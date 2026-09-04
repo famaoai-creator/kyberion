@@ -12,6 +12,8 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { isRecord, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 export function normalizeIdentityRecord(value: unknown): Record<string, unknown> | null {
   return isRecord(value) ? value : null;
 }
@@ -59,7 +61,7 @@ export function resolveAvatarRegistrationPaths(
   return { srcAvatar, destAvatarDir, destAvatar, identityJsonPath };
 }
 
-function main(argv: string[]) {
+function main(argv: string[], print: Print = () => undefined) {
   const args = parseArgs(argv);
   const { srcAvatar, destAvatarDir, destAvatar, identityJsonPath } =
     resolveAvatarRegistrationPaths(args);
@@ -76,7 +78,7 @@ function main(argv: string[]) {
     throw new Error(`Source avatar must be a regular file: ${srcAvatar}`);
   }
 
-  console.log(`Copying avatar from ${srcAvatar} to ${destAvatar}...`);
+  print(`Copying avatar from ${srcAvatar} to ${destAvatar}...`);
   if (!safeExistsSync(destAvatarDir)) {
     safeMkdir(destAvatarDir, { recursive: true });
   }
@@ -90,7 +92,7 @@ function main(argv: string[]) {
   };
 
   if (!safeExistsSync(identityJsonPath)) {
-    console.warn(`Identity file not found at ${identityJsonPath}. Creating a default one...`);
+    print(`Identity file not found at ${identityJsonPath}. Creating a default one...`);
     const defaultIdentity = {
       ...identityBase,
       created_at: nowIso(),
@@ -99,7 +101,7 @@ function main(argv: string[]) {
     };
     safeWriteFile(identityJsonPath, JSON.stringify(defaultIdentity, null, 2), { encoding: 'utf8' });
   } else {
-    console.log(`Reading identity file from ${identityJsonPath}...`);
+    print(`Reading identity file from ${identityJsonPath}...`);
     if (!safeLstat(identityJsonPath).isFile()) {
       throw new Error(`Identity file must be a regular file: ${identityJsonPath}`);
     }
@@ -114,7 +116,7 @@ function main(argv: string[]) {
       identity.avatar_path = avatarPath;
       identity.updated_at = nowIso();
 
-      console.log('Updating identity file to register avatar...');
+      print('Updating identity file to register avatar...');
       safeWriteFile(identityJsonPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });
     } catch (err: unknown) {
       throw new Error(
@@ -123,14 +125,14 @@ function main(argv: string[]) {
     }
   }
 
-  console.log('Successfully registered avatar in personal profile!');
+  print('Successfully registered avatar in personal profile!');
 }
 
 export const runRegisterAvatar = defineScript({
   name: 'avatar:register',
   flags: [],
   run(context) {
-    return main(context.argv);
+    return main(context.argv, context.print);
   },
 });
 
