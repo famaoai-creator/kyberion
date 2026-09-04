@@ -9,6 +9,7 @@ import {
   generateNativePptx,
   generateNativeXlsx,
 } from '@agent/core/media-contracts';
+import type { PptxDesignProtocol } from '@agent/core/src/types/pptx-protocol';
 import * as path from 'node:path';
 import {
   buildMediaGenerationBoundary,
@@ -32,6 +33,17 @@ interface DocumentLayoutCatalog {
       templates: Record<string, Record<string, unknown>>;
     }
   >;
+}
+
+export interface MediaPptxProtocol extends PptxDesignProtocol {
+  metadata: {
+    composition: unknown;
+    generationBoundary: unknown;
+    promptGuide: unknown[];
+    sourceDesign: Record<string, unknown> | null;
+    designRecommendations: unknown[];
+    layoutDiagnostics?: ReturnType<typeof summarizeMediaPptxLayout>;
+  };
 }
 
 const documentLayoutCatalog = defineCatalog<DocumentLayoutCatalog>({
@@ -150,7 +162,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
   function buildOutlineDrivenPptxProtocol(
     rootDir: string,
     outline: any
-  ): { protocol: any; theme: any; themeName: string } {
+  ): { protocol: MediaPptxProtocol; theme: any; themeName: string } {
     const theme = deps.resolveNamedTheme(rootDir, outline.recommended_theme);
     const themeColors = theme?.colors || theme?.theme?.colors || {};
     const canvas = { w: 10, h: 5.625 };
@@ -190,7 +202,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         contentData.splice(insertAt, 0, contentsSlide);
       }
     }
-    const protocol: any = {
+    const protocol: MediaPptxProtocol = {
       version: '3.0.0',
       generatedAt: nowIso(),
       metadata: {
@@ -238,7 +250,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
   function buildPresentationPptxProtocol(
     rootDir: string,
     brief: any
-  ): { protocol: any; outline: any; theme: any; themeName: string } {
+  ): { protocol: MediaPptxProtocol; outline: any; theme: any; themeName: string } {
     const outline = deps.buildProposalNarrativeOutline(rootDir, brief);
     const compiled = buildOutlineDrivenPptxProtocol(rootDir, outline);
     return { ...compiled, outline };
