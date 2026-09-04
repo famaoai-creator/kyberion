@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { parseSurfaceActuatorResult } from './surface-runtime-result.js';
+import { extractExternalResponseText } from './surface-runtime-external-response.js';
 import { queryKnowledgeHybrid } from './src/knowledge-index.js';
 
 import { pathResolver } from './path-resolver.js';
@@ -754,7 +755,7 @@ export async function handleTaskSessionRoute(
       logger.info(`[SURFACE] fetch-external-data: fetching ${sourceUrl} for topic "${dataTopic}"`);
 
       // 1. Fetch the external URL
-      const fetchResult = await secureFetch<string>({
+      const fetchResult: unknown = await secureFetch({
         method: 'GET',
         url: sourceUrl,
         timeout: 15000,
@@ -765,10 +766,7 @@ export async function handleTaskSessionRoute(
         },
       });
 
-      const rawHtml =
-        typeof fetchResult === 'string'
-          ? fetchResult
-          : (fetchResult as any)?.body || (fetchResult as any)?.data || JSON.stringify(fetchResult);
+      const rawHtml = extractExternalResponseText(fetchResult);
 
       // 2. Strip HTML tags and extract readable text
       const plainTextRaw = String(rawHtml)
