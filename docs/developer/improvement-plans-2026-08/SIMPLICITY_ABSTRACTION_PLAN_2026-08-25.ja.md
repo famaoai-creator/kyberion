@@ -16096,6 +16096,15 @@ safe JSON parserを備えた `scripts/lib/json-input.ts` の共通 loaderへ移�
 検証: checker／module boundary **6 files / 19 tests passed**、root typecheck、対象 Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 854
+
+SX-03／SX-04／SX-10 の core CLI input／procedure catalog loader を再監査し、`readJson<T>` の型引数だけで persisted JSON を返していた残存を修正した。
+CLI input は repository path／regular-file／safe JSON parser を通過してから利用し、procedure catalog は既存の symlink／regular-file／schema／entry filtering
+semanticsを維持したまま secure read と safe parser へ接続した。dangerous JSON key の回帰を追加し、foundation JSON module を丸ごと mock する既存テストとも独立した parser import 境界にした。
+
+検証: CLI input／procedure registry **2 files / 33 tests passed**、root typecheck、対象 Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

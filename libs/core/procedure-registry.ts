@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { logger } from './core.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { matchesAllowedOrigin } from './origin-policy.js';
 import { pathResolver } from './path-resolver.js';
 import { delegateStructured, getReasoningBackend } from './reasoning-backend.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import {
   PROCEDURE_RESOLUTION_THRESHOLDS,
   type ProcedureCatalog,
@@ -51,7 +51,10 @@ export function readProcedureCatalog(filePath: string): ProcedureCatalog {
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[PROCEDURE_REGISTRY] catalog must be a regular file: ${filePath}`);
   }
-  const parsed = readJson<unknown>(safeFilePath);
+  const parsed = parseSafeJsonInput(
+    String(safeReadFile(safeFilePath, { encoding: 'utf8' }) || ''),
+    `procedure catalog ${filePath}`
+  );
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return validateProcedureCatalog(parsed, safeFilePath);
   }
