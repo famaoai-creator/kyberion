@@ -10,7 +10,7 @@ import {
   buildComputerSurfaceManifest,
   filterHeadlessManifestForViewer,
 } from '@agent/core/headless-surface-contract';
-import type { A2UIMessage } from '@agent/core/a2ui';
+import { validateA2UIMessage, type A2UIMessage } from '@agent/core/a2ui';
 import { parseIntentResolutionContract } from '@agent/core/intent-resolution-contract';
 import {
   loadPersonalAgentIdentityAtPath,
@@ -342,7 +342,14 @@ app.post('/a2ui/dispatch', (req, res) => {
     return;
   }
   const messages = Array.isArray(body) ? body : [body];
-  for (const message of messages) applyA2UIMessage(message as A2UIMessage);
+  try {
+    for (const message of messages) applyA2UIMessage(validateA2UIMessage(message));
+  } catch (error) {
+    res
+      .status(400)
+      .json({ ok: false, error: error instanceof Error ? error.message : 'Invalid A2UI message.' });
+    return;
+  }
   emitState();
   res.json({ ok: true, applied: messages.length });
 });

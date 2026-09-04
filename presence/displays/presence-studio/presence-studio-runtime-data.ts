@@ -35,7 +35,7 @@ import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder'
 import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
 import { createCompanionWebThemePack, webThemePackToCssVars } from '@agent/core/web-design-system';
 import { installShellSpeechToTextBridgeIfAvailable } from '@agent/core/speech-to-text-bridge';
-import type { A2UIMessage } from '@agent/core/a2ui';
+import { validateA2UIMessage as validateCoreA2UIMessage, type A2UIMessage } from '@agent/core/a2ui';
 import { buildPresenceSurfaceFrame, type PresenceTimelineAdf } from '@agent/core/presence-surface';
 import { parseGuspStimulusLine, type GuspStimulus } from '../../bridge/nexus-stimulus.js';
 import { createServer } from 'node:http';
@@ -655,63 +655,8 @@ export function rememberStimulus(stimulus: Record<string, unknown>): void {
   state.lastUpdatedAt = nowIso();
 }
 
-export const A2UI_SURFACE_ID = /^[a-z0-9][a-z0-9:_-]{0,80}$/u;
-export const A2UI_COMPONENT_TYPE = /^[a-z0-9][a-z0-9:._-]{0,80}$/u;
-
 export function validateA2UIMessage(value: unknown): A2UIMessage {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('A2UI message must be an object.');
-  }
-  const message = value as Record<string, unknown>;
-  const operations = [
-    'createSurface',
-    'updateComponents',
-    'updateDataModel',
-    'deleteSurface',
-  ].filter((key) => message[key] !== undefined);
-  if (operations.length !== 1) throw new Error('A2UI message must contain exactly one operation.');
-
-  const operation = message[operations[0]];
-  if (!operation || typeof operation !== 'object' || Array.isArray(operation)) {
-    throw new Error(`A2UI ${operations[0]} payload must be an object.`);
-  }
-  const payload = operation as Record<string, unknown>;
-  const surfaceId = payload.surfaceId;
-  if (typeof surfaceId !== 'string' || !A2UI_SURFACE_ID.test(surfaceId)) {
-    throw new Error('A2UI surfaceId is invalid.');
-  }
-  if (operations[0] === 'createSurface') {
-    if (typeof payload.catalogId !== 'string' || !A2UI_SURFACE_ID.test(payload.catalogId)) {
-      throw new Error('A2UI catalogId is invalid.');
-    }
-    if (payload.title !== undefined && typeof payload.title !== 'string') {
-      throw new Error('A2UI title must be a string.');
-    }
-  }
-  if (operations[0] === 'updateComponents') {
-    if (!Array.isArray(payload.components)) throw new Error('A2UI components must be an array.');
-    for (const component of payload.components) {
-      if (!component || typeof component !== 'object' || Array.isArray(component)) {
-        throw new Error('A2UI component must be an object.');
-      }
-      const item = component as Record<string, unknown>;
-      if (typeof item.id !== 'string' || !A2UI_SURFACE_ID.test(item.id)) {
-        throw new Error('A2UI component id is invalid.');
-      }
-      if (typeof item.type !== 'string' || !A2UI_COMPONENT_TYPE.test(item.type)) {
-        throw new Error('A2UI component type is invalid.');
-      }
-      if (!item.props || typeof item.props !== 'object' || Array.isArray(item.props)) {
-        throw new Error('A2UI component props must be an object.');
-      }
-    }
-  }
-  if (operations[0] === 'updateDataModel') {
-    if (!payload.data || typeof payload.data !== 'object' || Array.isArray(payload.data)) {
-      throw new Error('A2UI data model must be an object.');
-    }
-  }
-  return value as A2UIMessage;
+  return validateCoreA2UIMessage(value);
 }
 
 export function applyA2UIMessage(message: A2UIMessage): void {
