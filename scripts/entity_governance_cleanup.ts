@@ -23,6 +23,8 @@ import { withExecutionContext } from '@agent/core/governance';
 import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 export const CLEANUP_APPROVAL_CHANNEL = 'terminal';
 export const CLEANUP_EFFECT_BINDING = 'entity-governance-cleanup:soft-delete';
 
@@ -357,7 +359,7 @@ export function runCleanup(input: {
   return receipt;
 }
 
-export function main(argv: string[] = []): void {
+export function main(argv: string[] = [], print: Print = () => undefined): void {
   const missionIndex = argv.indexOf('--mission-id');
   const missionId = missionIndex >= 0 ? argv[missionIndex + 1] : 'MSN-EG-20260809B';
   const apply = argv.includes('--apply');
@@ -368,18 +370,18 @@ export function main(argv: string[] = []): void {
   const requestedBy = requestedByIndex >= 0 ? argv[requestedByIndex + 1] : undefined;
   if (requestApproval) {
     const result = openCleanupApproval({ missionId, ...(requestedBy ? { requestedBy } : {}) });
-    console.log(JSON.stringify(result, null, 2));
+    print(JSON.stringify(result, null, 2));
     if (result.reason) throw new ScriptExitError(1, '', true);
     return;
   }
   const receipt = runCleanup({ missionId, apply, approvalRequestId });
-  console.log(JSON.stringify(receipt, null, 2));
+  print(JSON.stringify(receipt, null, 2));
 }
 
 export const runEntityGovernanceCleanup = defineScript({
   name: 'entity:cleanup',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (

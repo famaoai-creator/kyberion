@@ -5,6 +5,7 @@ import {
   decideApprovalRequest,
   listApprovalRequests,
   pathResolver,
+  safeReadFile,
   safeExistsSync,
   safeMkdir,
   safeRmSync,
@@ -56,6 +57,18 @@ function seedFixture(): void {
 }
 
 describe('EG-11 entity governance cleanup', () => {
+  it('routes CLI output through the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/entity_governance_cleanup.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+  });
+
   it('keeps dry-run safe and rejects apply without an approval request', () => {
     seedFixture();
 
