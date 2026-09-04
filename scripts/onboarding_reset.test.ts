@@ -92,4 +92,15 @@ describe('onboarding_reset', () => {
     expect(safeExistsSync(identityPath)).toBe(true);
     expect(formatResetSummary(result)).toContain('no files changed');
   });
+
+  it('keeps reset output on the injected printer boundary', () => {
+    const source = String(
+      safeReadFile(path.join(pathResolver.rootDir(), 'scripts/onboarding_reset.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+  });
 });
