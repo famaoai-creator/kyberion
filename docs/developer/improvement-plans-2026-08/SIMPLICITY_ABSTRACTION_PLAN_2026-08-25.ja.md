@@ -16873,6 +16873,12 @@ SX-10 の service actuator dynamic boundary を再監査した。service の `co
 
 検証: service actuator **1 file / 17 tests passed**、root typecheck、root lint、`git diff --check`。canonical full gate はこの追記後に実行する。残存する SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 961
+
+SX-03 の source-analysis package manifest loaderを再監査し、`readJsonIfPresent<Record<string, unknown>>` の型アサーションで `dependencies`／`devDependencies`／`peerDependencies` を読む残存を修正した。secure-io の通常ファイル境界を維持したまま、foundation の safe JSON input／object parser と `isRecord` に接続し、malformed／dangerous manifest は依存関係へ昇格させず分析の limitation として扱う。source-derived dependency 集計、symlink manifest の除外、artifact compilation semantics は変更していない。
+
+検証: source-analysis **1 file / 8 tests passed**、root typecheck、root lint、`git diff --check`。canonical full gate はこの追記後に実行する。残存する SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
