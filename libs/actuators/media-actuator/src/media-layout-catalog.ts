@@ -185,7 +185,7 @@ function loadSlideLayoutPresetCatalog(rootDir: string): MediaSlideLayoutPresetCa
   return catalog.validate(merged, directoryPath);
 }
 
-function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
+function resolveRuntimeSlidePreset(rootDir: string, slideData: any): MediaLayoutTemplate | null {
   const layoutKey = String(slideData?.layout_key || '').trim();
   const mediaKind = String(slideData?.media_kind || '').trim();
   const presetKey = layoutKey || mediaKind;
@@ -336,7 +336,7 @@ function resolveLayoutTemplate(
   designSystemId: string | undefined,
   slideData?: any,
   theme?: any
-): any {
+): MediaLayoutTemplate {
   const themeTemplateCatalog =
     theme?.layout_templates ||
     theme?.pptx?.layout_templates ||
