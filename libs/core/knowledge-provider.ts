@@ -12,7 +12,7 @@ import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from './knowledg
  * and reducing environmental dependencies.
  */
 export class KnowledgeProvider {
-  private static mockData: Record<string, any> = {};
+  private static mockData: Record<string, unknown> = {};
   private static useMock = false;
 
   /**
@@ -36,7 +36,7 @@ export class KnowledgeProvider {
    * @param relativePath Path relative to the `knowledge/` root.
    * @param defaultValue Optional default value if the file is not found.
    */
-  static getJson<T = any>(
+  static getJson<T = unknown>(
     relativePath: string,
     defaultValue?: T,
     options: { scope?: ScopeContext; systemAuthority?: boolean } = {}
@@ -59,9 +59,10 @@ export class KnowledgeProvider {
 
     try {
       return readJson<T>(fullPath);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (defaultValue !== undefined) return defaultValue;
-      throw new Error(`Failed to parse Knowledge file ${relativePath}: ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`Failed to parse Knowledge file ${relativePath}: ${message}`);
     }
   }
 

@@ -16921,6 +16921,20 @@ SX-08／SX-09 の control-plane client response boundaryを再監査し、`getJs
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 966
+
+SX-03 の公開 JSON facadeを再監査し、`KnowledgeProvider.getJson` と CLI input reader の既定 generic が
+`any` のまま残り、型を指定しない callerへ未検証の型を返す残存を修正した。両入口の既存 safe JSON／repository
+path boundaryと明示 genericの互換性を維持したまま、既定型を `unknown` へ変更し、knowledge parserの unknown
+errorも安全に文字列化した。mock、default、scope authorization、CLI inputの既存 semanticsは変更していない。
+
+検証:
+
+- knowledge provider／CLI input **2 files / 8 tests passed**。
+- root typecheck、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
