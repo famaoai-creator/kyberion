@@ -44,11 +44,15 @@ import {
   handleEmailWorkflowCommand,
   handleOffboardCommand,
   handleTaskCommand,
+  withWorkflowOutputPrinter,
 } from './cli-workflow-handlers.js';
 export { parseOffboardArgs } from './cli-workflow-handlers.js';
 import { printBranchBanner, printHeader, printHelp } from './cli-presentation.js';
 import { parseInteractionPacket } from './cli-packet-parser.js';
 export { parseInteractionPacket } from './cli-packet-parser.js';
+
+type Print = (value: unknown) => void;
+
 interface RawActuatorEntry {
   n?: string;
   name?: string;
@@ -1129,7 +1133,7 @@ export function shouldBootstrapRuntime(args: string[]): boolean {
   return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
 }
 
-export async function main(args: string[] = []) {
+export async function main(args: string[] = [], print: Print = (value) => console.log(value)) {
   activeCliArgs = [...args];
   const missionId = process.env.MISSION_ID;
   printMissionContextBanner(missionId);
@@ -1289,22 +1293,26 @@ export async function main(args: string[] = []) {
   }
 
   if (command === 'email') {
-    await handleEmailWorkflowCommand(firstArg, restArgs, locale);
+    await withWorkflowOutputPrinter(print, () =>
+      handleEmailWorkflowCommand(firstArg, restArgs, locale)
+    );
     return;
   }
 
   if (command === 'calendar') {
-    await handleCalendarWorkflowCommand(firstArg, restArgs, locale);
+    await withWorkflowOutputPrinter(print, () =>
+      handleCalendarWorkflowCommand(firstArg, restArgs, locale)
+    );
     return;
   }
 
   if (command === 'task') {
-    await handleTaskCommand(firstArg, restArgs, locale);
+    await withWorkflowOutputPrinter(print, () => handleTaskCommand(firstArg, restArgs, locale));
     return;
   }
 
   if (command === 'offboard') {
-    await handleOffboardCommand(firstArg, restArgs, locale);
+    await withWorkflowOutputPrinter(print, () => handleOffboardCommand(firstArg, restArgs, locale));
     return;
   }
 
@@ -1427,7 +1435,7 @@ export async function main(args: string[] = []) {
 export const runCli = defineScript({
   name: 'cli',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (isDirectScript(import.meta.url, 'cli.ts') || isDirectScript(import.meta.url, 'cli.js'))
