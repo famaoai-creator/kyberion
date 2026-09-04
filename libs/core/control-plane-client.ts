@@ -47,6 +47,11 @@ export interface ControlPlaneMissionSeedRecord {
       reason?: string;
       shouldPromote?: boolean;
     };
+    execution_contract?: {
+      recommended_action?: string;
+      review_target?: string;
+      repository_id?: string;
+    };
   };
 }
 
@@ -217,8 +222,52 @@ function normalizeApprovalRecord(value: unknown): ControlPlaneApprovalRecord | n
   };
 }
 
+function normalizeMissionSeedMetadata(
+  value: unknown
+): ControlPlaneMissionSeedRecord['metadata'] | undefined {
+  if (!isRecord(value)) return undefined;
+  const assessment = isRecord(value.mission_seed_assessment)
+    ? {
+        ...(optionalBoolean(value.mission_seed_assessment.eligible) !== undefined
+          ? { eligible: optionalBoolean(value.mission_seed_assessment.eligible) }
+          : {}),
+        ...(optionalString(value.mission_seed_assessment.reason) !== undefined
+          ? { reason: optionalString(value.mission_seed_assessment.reason) }
+          : {}),
+        ...(optionalBoolean(value.mission_seed_assessment.shouldPromote) !== undefined
+          ? { shouldPromote: optionalBoolean(value.mission_seed_assessment.shouldPromote) }
+          : {}),
+      }
+    : undefined;
+  const executionContract = isRecord(value.execution_contract)
+    ? {
+        ...(optionalString(value.execution_contract.recommended_action) !== undefined
+          ? { recommended_action: optionalString(value.execution_contract.recommended_action) }
+          : {}),
+        ...(optionalString(value.execution_contract.review_target) !== undefined
+          ? { review_target: optionalString(value.execution_contract.review_target) }
+          : {}),
+        ...(optionalString(value.execution_contract.repository_id) !== undefined
+          ? { repository_id: optionalString(value.execution_contract.repository_id) }
+          : {}),
+      }
+    : undefined;
+  const metadata = {
+    ...(optionalString(value.template_ref) !== undefined
+      ? { template_ref: optionalString(value.template_ref) }
+      : {}),
+    ...(optionalString(value.skeleton_path) !== undefined
+      ? { skeleton_path: optionalString(value.skeleton_path) }
+      : {}),
+    ...(assessment !== undefined ? { mission_seed_assessment: assessment } : {}),
+    ...(executionContract !== undefined ? { execution_contract: executionContract } : {}),
+  };
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
+
 function normalizeMissionSeedRecord(value: unknown): ControlPlaneMissionSeedRecord | null {
   if (!isRecord(value) || typeof value.seed_id !== 'string' || !value.seed_id) return null;
+  const metadata = normalizeMissionSeedMetadata(value.metadata);
   return {
     seed_id: value.seed_id,
     ...(optionalString(value.title) !== undefined ? { title: optionalString(value.title) } : {}),
@@ -241,7 +290,38 @@ function normalizeMissionSeedRecord(value: unknown): ControlPlaneMissionSeedReco
     ...(optionalString(value.promoted_mission_id) !== undefined
       ? { promoted_mission_id: optionalString(value.promoted_mission_id) }
       : {}),
+    ...(metadata !== undefined ? { metadata } : {}),
   };
+}
+
+function normalizeMissionSeedAssessment(
+  value: unknown
+): ChronosOverviewRecord['missionSeedAssessment'] | undefined {
+  if (!isRecord(value)) return undefined;
+  const flaggedSeedIds = stringArray(value.flagged_seed_ids);
+  const eligibleSeedIds = stringArray(value.eligible_seed_ids);
+  const promotedSeedIds = stringArray(value.promoted_seed_ids);
+  const assessment = {
+    ...(optionalFiniteNumber(value.total) !== undefined
+      ? { total: optionalFiniteNumber(value.total) }
+      : {}),
+    ...(optionalFiniteNumber(value.eligible) !== undefined
+      ? { eligible: optionalFiniteNumber(value.eligible) }
+      : {}),
+    ...(optionalFiniteNumber(value.flagged) !== undefined
+      ? { flagged: optionalFiniteNumber(value.flagged) }
+      : {}),
+    ...(optionalFiniteNumber(value.unassessed) !== undefined
+      ? { unassessed: optionalFiniteNumber(value.unassessed) }
+      : {}),
+    ...(optionalFiniteNumber(value.promotable) !== undefined
+      ? { promotable: optionalFiniteNumber(value.promotable) }
+      : {}),
+    ...(flaggedSeedIds !== undefined ? { flagged_seed_ids: flaggedSeedIds } : {}),
+    ...(eligibleSeedIds !== undefined ? { eligible_seed_ids: eligibleSeedIds } : {}),
+    ...(promotedSeedIds !== undefined ? { promoted_seed_ids: promotedSeedIds } : {}),
+  };
+  return Object.keys(assessment).length > 0 ? assessment : undefined;
 }
 
 function normalizeGateReadiness(
@@ -249,14 +329,17 @@ function normalizeGateReadiness(
 ): ControlPlaneProjectTrackRecord['gate_readiness'] | null {
   if (!isRecord(value)) return null;
   const artifacts = Array.isArray(value.next_required_artifacts)
-    ? value.next_required_artifacts.filter(isRecord).map((artifact) => ({
-        ...(optionalString(artifact.artifact_id) !== undefined
-          ? { artifact_id: optionalString(artifact.artifact_id) }
-          : {}),
-        ...(optionalString(artifact.template_ref) !== undefined
-          ? { template_ref: optionalString(artifact.template_ref) }
-          : {}),
-      }))
+    ? value.next_required_artifacts.filter(isRecord).flatMap((artifact) => {
+        const artifactId = optionalString(artifact.artifact_id);
+        const templateRef = optionalString(artifact.template_ref);
+        if (artifactId === undefined && templateRef === undefined) return [];
+        return [
+          {
+            ...(artifactId !== undefined ? { artifact_id: artifactId } : {}),
+            ...(templateRef !== undefined ? { template_ref: templateRef } : {}),
+          },
+        ];
+      })
     : undefined;
   return {
     ...(optionalFiniteNumber(value.ready_gate_count) !== undefined
@@ -640,10 +723,54 @@ export function createControlPlaneClient(
         undefined,
         options
       );
-      const normalizedBody = isRecord(body) ? body : {};
+      if (!isRecord(body)) return {};
+
+      const projects = Array.isArray(body.projects)
+        ? recordArray(body.projects)
+            .map(normalizeProjectRecord)
+            .filter((record): record is ControlPlaneProjectRecord => record !== null)
+        : undefined;
+      const projectTracks = Array.isArray(body.projectTracks)
+        ? recordArray(body.projectTracks)
+            .map(normalizeProjectTrackRecord)
+            .filter((record): record is ControlPlaneProjectTrackRecord => record !== null)
+        : undefined;
+      const gateReadiness = Array.isArray(body.gateReadiness)
+        ? recordArray(body.gateReadiness).flatMap((value) => {
+            if (typeof value.track_id !== 'string' || !value.track_id) return [];
+            const readiness = normalizeGateReadiness(value);
+            return [{ track_id: value.track_id, ...(readiness ?? {}) }];
+          })
+        : undefined;
+      const missionSeeds = Array.isArray(body.missionSeeds)
+        ? recordArray(body.missionSeeds)
+            .map(normalizeMissionSeedRecord)
+            .filter((record): record is ControlPlaneMissionSeedRecord => record !== null)
+        : undefined;
+      const pendingApprovals = Array.isArray(body.pendingApprovals)
+        ? recordArray(body.pendingApprovals)
+        : undefined;
+      const distillCandidates = Array.isArray(body.distillCandidates)
+        ? recordArray(body.distillCandidates)
+        : undefined;
+      const memoryCandidates = Array.isArray(body.memoryCandidates)
+        ? recordArray(body.memoryCandidates)
+        : undefined;
+      const missionSeedAssessment = normalizeMissionSeedAssessment(body.missionSeedAssessment);
+
       return {
-        ...normalizedBody,
-        nextActions: sanitizeNextActions(normalizedBody.nextActions),
+        ...(optionalString(body.accessRole) !== undefined
+          ? { accessRole: optionalString(body.accessRole) }
+          : {}),
+        ...(projects !== undefined ? { projects } : {}),
+        ...(projectTracks !== undefined ? { projectTracks } : {}),
+        ...(gateReadiness !== undefined ? { gateReadiness } : {}),
+        ...(missionSeeds !== undefined ? { missionSeeds } : {}),
+        ...(missionSeedAssessment !== undefined ? { missionSeedAssessment } : {}),
+        ...(pendingApprovals !== undefined ? { pendingApprovals } : {}),
+        ...(distillCandidates !== undefined ? { distillCandidates } : {}),
+        ...(memoryCandidates !== undefined ? { memoryCandidates } : {}),
+        nextActions: sanitizeNextActions(body.nextActions),
       };
     },
   };
