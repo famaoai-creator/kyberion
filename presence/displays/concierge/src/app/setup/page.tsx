@@ -5,6 +5,11 @@ import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import type { ConciergeMessageKey } from '../../lib/i18n';
 import { parseSetupResponse, type Setup as SetupPayload } from '../../lib/setup-response';
 import { parseConciergeMutationResponse } from '../../lib/mutation-response';
+import {
+  parseConfigMissionsResponse,
+  parseNotificationPreferencesResponse,
+  parsePluginListResponse,
+} from '../../lib/setup-auxiliary-response';
 
 type NotificationChannelOption = { surface: string; display_name: string; status: string };
 type NotificationTarget = { surface: string; target: string };
@@ -176,17 +181,16 @@ export default function SetupPage() {
   const refreshNotifications = React.useCallback(async () => {
     try {
       const response = await fetch('/api/notification-preferences', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'notification failed');
-      const channels = Array.isArray(payload.channels)
-        ? (payload.channels as NotificationChannelOption[])
-        : [];
-      const current = (payload.preferences?.default_channel || null) as NotificationTarget | null;
-      setNotifChannels(channels);
-      setNotifCurrent(current);
+      const parsed = parseNotificationPreferencesResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid notification preferences response');
+      setNotifChannels(parsed.channels);
+      setNotifCurrent(parsed.preferences.default_channel);
       setNotif(
-        current
-          ? { surface: current.surface, target: current.target }
+        parsed.preferences.default_channel
+          ? {
+              surface: parsed.preferences.default_channel.surface,
+              target: parsed.preferences.default_channel.target,
+            }
           : { surface: 'none', target: '' }
       );
     } catch {
@@ -198,9 +202,9 @@ export default function SetupPage() {
   const refreshPlugins = React.useCallback(async () => {
     try {
       const response = await fetch('/api/plugins', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'plugins failed');
-      setPlugins(Array.isArray(payload.plugins) ? (payload.plugins as PluginEntry[]) : []);
+      const parsed = parsePluginListResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid plugin list response');
+      setPlugins(parsed);
     } catch {
       // The plugin pane keeps its last known state; approval decisions always
       // re-read the registry server-side, so stale display never grants more.
@@ -210,13 +214,12 @@ export default function SetupPage() {
   const refreshConfigMissions = React.useCallback(async () => {
     try {
       const response = await fetch('/api/config-missions', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'config missions failed');
-      const tenants = Array.isArray(payload.tenants) ? (payload.tenants as string[]) : [];
-      setConfigPresets(Array.isArray(payload.presets) ? (payload.presets as ConfigPreset[]) : []);
-      setConfigTenants(tenants);
-      setConfigTenant((current) => current || tenants[0] || '');
-      setConfigRecent(Array.isArray(payload.recent) ? (payload.recent as ConfigMissionItem[]) : []);
+      const parsed = parseConfigMissionsResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid config missions response');
+      setConfigPresets(parsed.presets);
+      setConfigTenants(parsed.tenants);
+      setConfigTenant((current) => current || parsed.tenants[0] || '');
+      setConfigRecent(parsed.recent);
     } catch {
       // Same posture as the plugin pane: display-only degradation.
     }
