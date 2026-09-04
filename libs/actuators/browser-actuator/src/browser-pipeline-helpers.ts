@@ -7,6 +7,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/adf-engine';
 import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
 import { TraceContext, persistTrace } from '@agent/core/src/trace';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -16,7 +17,7 @@ import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { decideFromObservation, executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { getSecret } from '@agent/core/secret-guard';
-import { clamp, nowIso } from '@agent/core/foundation';
+import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { opControl } from './browser-control-helpers.js';
@@ -34,7 +35,7 @@ import {
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
+  params: Record<string, unknown>;
 }
 
 export interface BrowserRuntime {
@@ -197,14 +198,15 @@ export async function executePipeline(
   // nested control failures propagate (AR-06 no-silent-failure), and nested
   // steps (control sub-pipelines, on_error fallbacks) now emit trace spans.
   const trailDepths: number[] = [];
-  const hooks = {
-    beforeStep: (step: any, stepNumber: number, stepCtx: any) => {
+  const hooks: AdfStepHooks = {
+    beforeStep: (step, stepNumber, stepCtx) => {
       trailDepths.push(Array.isArray(stepCtx.action_trail) ? stepCtx.action_trail.length : 0);
+      const stepId = isRecord(step) && typeof step.id === 'string' ? step.id : undefined;
       traceCtx.startSpan(`${step.type}:${step.op}`, {
-        stepId: step.id || `step-${stepNumber}`,
+        stepId: stepId || `step-${stepNumber}`,
       });
     },
-    afterStep: (step: any, _stepNumber: number, stepCtx: any, outcome: any) => {
+    afterStep: (step, _stepNumber, stepCtx, outcome: AdfStepOutcome) => {
       const trailBefore = trailDepths.pop() ?? 0;
       if (outcome.status === 'failed' || outcome.status === 'recovered') {
         traceCtx.endSpan('error', outcome.error);
@@ -212,16 +214,23 @@ export async function executePipeline(
       }
 
       if (step.op === 'screenshot') {
+        const stepParams = isRecord(step.params) ? step.params : {};
+        const stepId = isRecord(step) && typeof step.id === 'string' ? step.id : 'screenshot';
         const screenshotPath =
-          stepCtx.last_screenshot || stepCtx[step.params?.export_as || 'last_screenshot'];
-        if (screenshotPath) {
-          traceCtx.addArtifact('screenshot', screenshotPath, step.id || 'screenshot');
+          stepCtx.last_screenshot ||
+          (typeof stepParams.export_as === 'string'
+            ? stepCtx[stepParams.export_as]
+            : stepCtx.last_screenshot);
+        if (typeof screenshotPath === 'string' && screenshotPath) {
+          traceCtx.addArtifact('screenshot', screenshotPath, stepId);
         }
       }
 
       // Emit each new browser action as a trace event so the trail is queryable in Chronos
-      if (Array.isArray(stepCtx.action_trail) && stepCtx.action_trail.length > trailBefore) {
-        for (const act of (stepCtx.action_trail as any[]).slice(trailBefore)) {
+      const actionTrail = Array.isArray(stepCtx.action_trail) ? stepCtx.action_trail : [];
+      if (actionTrail.length > trailBefore) {
+        for (const act of actionTrail.slice(trailBefore)) {
+          if (!isRecord(act)) continue;
           const attrs: Record<string, string | number | boolean> = {
             kind: String(act.kind || ''),
             op: String(act.op || ''),
@@ -396,8 +405,8 @@ export async function executePipeline(
   try {
     const persistedTracePath = persistTrace(trace);
     ctx.trace_persisted_path = persistedTracePath;
-  } catch (err: any) {
-    logger.warn(`[BROWSER_PIPELINE] Failed to persist trace: ${err?.message || err}`);
+  } catch (err: unknown) {
+    logger.warn(`[BROWSER_PIPELINE] Failed to persist trace: ${errorMessage(err)}`);
   }
 
   return {
@@ -406,6 +415,10 @@ export async function executePipeline(
     context: ctx,
     total_steps: engineResult.total_steps,
   };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function opCapture(
