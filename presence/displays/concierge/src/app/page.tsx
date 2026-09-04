@@ -19,6 +19,7 @@ import {
   parseConciergeOutcomePreviewResponse,
   type ConciergeOutcomePreview,
 } from '../lib/outcome-preview-response';
+import { parseConciergeMutationResponse } from '../lib/mutation-response';
 
 type HygieneInquiry = ConciergeHygieneInquiry;
 type MemoryQueueItem = ConciergeMemoryQueueItem;
@@ -176,8 +177,7 @@ export default function ConciergePage() {
             storageChannel: item.storage_channel,
           }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'approval failed');
+        if (!response.ok) throw new Error('Approval failed');
         setNotice({
           text: t(decision === 'approved' ? 'home.approved_notice' : 'home.rejected_notice', {
             title: item.title,
@@ -212,8 +212,7 @@ export default function ConciergePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status, note }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'verdict failed');
+        if (!response.ok) throw new Error('Verdict failed');
         setNotice({
           text: t(
             status === 'accepted'
@@ -247,9 +246,9 @@ export default function ConciergePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ decision, ...(note.trim() ? { note: note.trim() } : {}) }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'hygiene failed');
-        setNotice({ text: payload.result.message });
+        const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+        if (!response.ok || !parsed?.result?.message) throw new Error('Hygiene action failed');
+        setNotice({ text: parsed.result.message });
         setHygieneConfirm(null);
         setHygieneNote('');
         await refreshHygiene();
@@ -274,9 +273,9 @@ export default function ConciergePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ decision }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'memory decision failed');
-        setNotice({ text: payload.result.message });
+        const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+        if (!response.ok || !parsed?.result?.message) throw new Error('Memory decision failed');
+        setNotice({ text: parsed.result.message });
         setMemoryConfirm(null);
         await refreshMemoryQueue();
       } catch (error) {
