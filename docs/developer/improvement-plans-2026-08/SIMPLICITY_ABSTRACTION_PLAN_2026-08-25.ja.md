@@ -16688,6 +16688,13 @@ SX-08／SX-09 の Concierge setup auxiliary GET projection（`/api/notification-
 検証: Concierge setup auxiliary response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 935
+
+SX-08／SX-09 の Concierge `/api/summary` 初回 HTTP projectionを再監査し、SSE側だけに存在した summary parser と、HTTP側の `ok`／`summary` raw JSON読み取りの二重境界を統合した。専用 response parser で envelope、dangerous key、briefing／counts／各 feed itemを検証してから stateへ渡し、malformed responseは fail-closed とする。既存の SSE failover、viewer scope、polling、approval／outcome操作 semantics は変更していない。
+
+検証: Concierge summary response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

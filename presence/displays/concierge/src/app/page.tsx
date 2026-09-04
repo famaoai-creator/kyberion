@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import {
   parseConciergeSummaryEvent,
-  parseConciergeSummaryValue,
+  parseConciergeSummaryResponse,
   type ConciergeSummary,
 } from '../lib/summary-event';
 import {
@@ -52,10 +52,8 @@ export default function ConciergePage() {
   const refresh = React.useCallback(async () => {
     try {
       const response = await fetch('/api/summary', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'summary failed');
-      const nextSummary = parseConciergeSummaryValue(payload.summary);
-      if (!nextSummary) throw new Error('summary shape invalid');
+      const nextSummary = parseConciergeSummaryResponse(await response.json().catch(() => null));
+      if (!response.ok || !nextSummary) throw new Error('Invalid summary response');
       setSummary(nextSummary);
       setLoadError(null);
     } catch (error) {
