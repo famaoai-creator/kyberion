@@ -106,6 +106,10 @@ import {
 import { parsePlanPreviewResponse, type ClientPlanPreview } from '../lib/plan-preview-response';
 import { parseDeliverableReviewResponse } from '../lib/deliverable-review-response';
 import { parseConnectionReviewResponse } from '../lib/connection-review-response';
+import {
+  parseMissionApprovalResponse,
+  parseMissionProposalResponse,
+} from '../lib/agent-mutation-response';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -681,8 +685,10 @@ function ChronosMirrorV2Content() {
           requesterId: 'chronos-ui',
         }),
       });
-      const proposalPayload = await proposalResponse.json();
-      if (!proposalResponse.ok) throw new Error(proposalPayload.error || 'mission proposal failed');
+      const proposalPayload = await proposalResponse.json().catch(() => null);
+      if (!proposalResponse.ok) throw new Error('mission proposal failed');
+      const proposal = parseMissionProposalResponse(proposalPayload);
+      if (!proposal) throw new Error('Invalid mission proposal response');
 
       const confirmResponse = await fetch('/api/agent', {
         method: 'POST',
@@ -694,14 +700,12 @@ function ChronosMirrorV2Content() {
           requesterId: 'chronos-ui',
         }),
       });
-      const confirmPayload = await confirmResponse.json();
-      if (!confirmResponse.ok) throw new Error(confirmPayload.error || 'mission approval failed');
+      const confirmPayload = await confirmResponse.json().catch(() => null);
+      if (!confirmResponse.ok) throw new Error('mission approval failed');
+      const approval = parseMissionApprovalResponse(confirmPayload);
 
-      setPlanApprovalMessage(
-        confirmPayload.mission?.missionId
-          ? `Started ${confirmPayload.mission.missionId}`
-          : 'Mission started'
-      );
+      if (!approval) throw new Error('Invalid mission approval response');
+      setPlanApprovalMessage(`Started ${approval.mission.missionId}`);
       setOperatorHomeRefreshTick((value) => value + 1);
     } catch (error) {
       setPlanApprovalMessage(error instanceof Error ? error.message : String(error));
