@@ -18,6 +18,10 @@ import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /** Whitelist environment variables passed to child agent processes */
 const ENV_WHITELIST = [
   'PATH',
@@ -230,9 +234,9 @@ export class ACPMediator {
           });
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
-        `[ACP_MEDIATOR] stall watch not armed for ${this.options.threadId}: ${error?.message || error}`
+        `[ACP_MEDIATOR] stall watch not armed for ${this.options.threadId}: ${errorMessage(error)}`
       );
     }
   }
@@ -371,8 +375,8 @@ export class ACPMediator {
             exitCode: code,
             signal,
           })
-        ).catch((error: any) => {
-          logger.warn(`[ACP_MEDIATOR] crash callback failed: ${error?.message || error}`);
+        ).catch((error: unknown) => {
+          logger.warn(`[ACP_MEDIATOR] crash callback failed: ${errorMessage(error)}`);
         });
       }
     });
@@ -385,10 +389,8 @@ export class ACPMediator {
             exitCode: null,
             signal: null,
           })
-        ).catch((callbackError: any) => {
-          logger.warn(
-            `[ACP_MEDIATOR] crash callback failed: ${callbackError?.message || callbackError}`
-          );
+        ).catch((callbackError: unknown) => {
+          logger.warn(`[ACP_MEDIATOR] crash callback failed: ${errorMessage(callbackError)}`);
         });
       }
     });
@@ -552,10 +554,8 @@ export class ACPMediator {
             if (approval.allowed) {
               return { outcome: 'approved' as const };
             }
-          } catch (approvalErr: any) {
-            logger.warn(
-              `[ACP_PERMISSION] approval routing failed: ${approvalErr?.message || approvalErr}`
-            );
+          } catch (approvalErr: unknown) {
+            logger.warn(`[ACP_PERMISSION] approval routing failed: ${errorMessage(approvalErr)}`);
           }
           logger.warn(`[ACP_PERMISSION] Approval required (pending): ${title}`);
           return { outcome: 'denied' as const };
