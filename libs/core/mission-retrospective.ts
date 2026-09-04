@@ -1,8 +1,4 @@
-import {
-  appendJsonLine,
-  parseSafeJsonInput,
-  readJsonIfPresent as readFoundationJsonIfPresent,
-} from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, findMissionPath } from './path-resolver.js';
@@ -21,7 +17,9 @@ import { recordModelRoleOutcomes } from './model-performance-index.js';
 import { MetricsCollector, resolveCostRates } from './metrics.js';
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadMissionTicketDispatchManifestAtPath } from './mission-ticket-dispatch-manifest.js';
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import type { MissionState } from './mission-types.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -313,22 +311,6 @@ function readJsonl(filePath: string): JsonRecord[] {
   }
 }
 
-function readJsonIfPresent<T>(filePath: string): T | null {
-  try {
-    return readFoundationJsonIfPresent<T>(safeRepositoryPath(filePath));
-  } catch {
-    return null;
-  }
-}
-
-function readMissionJsonIfPresent<T>(missionPath: string, relativePath: string): T | null {
-  try {
-    return readJsonIfPresent<T>(safeMissionArtifactPath(missionPath, relativePath));
-  } catch {
-    return null;
-  }
-}
-
 function readMissionJsonl(
   missionPath: string,
   relativePath: string
@@ -406,20 +388,34 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
   Object.assign(stats, collectMissionUsageStats(missionId));
   if (!missionPath) return stats;
 
-  const nextTasks =
-    readMissionJsonIfPresent<Array<{ assigned_to?: { role?: string } }>>(
-      missionPath,
-      'NEXT_TASKS.json'
-    ) || [];
+  const nextTasks = (() => {
+    try {
+      return (
+        loadMissionNextTaskObjectsAtPath(
+          safeMissionArtifactPath(missionPath, 'NEXT_TASKS.json'),
+          missionId
+        ) || []
+      );
+    } catch {
+      return [];
+    }
+  })();
   stats.task_total = nextTasks.length;
   for (const task of nextTasks) {
-    const role = String(task.assigned_to?.role || 'unassigned');
+    const assignedTo = isRecord(task.assigned_to) ? task.assigned_to : undefined;
+    const role = String(assignedTo?.role || 'unassigned');
     stats.tasks_by_role[role] = (stats.tasks_by_role[role] || 0) + 1;
   }
 
-  const ticketManifest = readMissionJsonIfPresent<{
-    records?: Array<{ task_id?: string; status?: string; notes?: string[] }>;
-  }>(missionPath, 'coordination/tickets/dispatch-manifest.json');
+  const ticketManifest = (() => {
+    try {
+      return loadMissionTicketDispatchManifestAtPath(
+        safeMissionArtifactPath(missionPath, 'coordination/tickets/dispatch-manifest.json')
+      );
+    } catch {
+      return null;
+    }
+  })();
   for (const record of ticketManifest?.records || []) {
     const notes = Array.isArray(record.notes) ? record.notes.map(String) : [];
     if (record.status === 'failed') {
