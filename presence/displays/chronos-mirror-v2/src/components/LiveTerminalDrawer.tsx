@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { uxText } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
+import { parseAgentLogsResponse } from '../lib/agent-logs-response';
 
 type TerminalLine = { ts?: number | string; type?: string; content?: string };
 
@@ -32,8 +33,12 @@ export function LiveTerminalDrawer({
       body: JSON.stringify({ action: 'logs', agentId, limit: 2000 }),
     });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || 'terminal log load failed');
-    setLines(payload.logs || []);
+    if (!response.ok) throw new Error('terminal log load failed');
+    const parsed = parseAgentLogsResponse(payload);
+    if (!parsed || parsed.agentId !== agentId) {
+      throw new Error('terminal log response was invalid');
+    }
+    setLines(parsed.logs);
   }, [agentId]);
 
   React.useEffect(() => {
