@@ -45,7 +45,7 @@ import {
 } from '@agent/core/dashboard-event-parser';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
-import { readJson, readTextFile } from '@agent/core/foundation';
+import { readTextFile } from '@agent/core/foundation';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import {
@@ -53,6 +53,7 @@ import {
   loadPersonalIdentityAtPath,
 } from '@agent/core/personal-identity-reader';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 /**
  * Kyberion Sovereign Dashboard v1.0
@@ -90,7 +91,7 @@ function clearScreen() {
 }
 
 function getDashboardVersion(): string {
-  const packageJson = readJsonIfExists<{ version?: string }>(PACKAGE_JSON_PATH);
+  const packageJson = readDashboardJsonValueIfExists<{ version?: string }>(PACKAGE_JSON_PATH);
   return packageJson?.version || 'unknown';
 }
 
@@ -310,11 +311,11 @@ function drawCompanyOverview() {
   dashboardLog('');
 }
 
-function readJsonIfExists<T>(logicalPath: string): T | null {
+export function readDashboardJsonValueIfExists<T>(logicalPath: string): T | null {
   try {
     const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
-    return readJson<T>(safePath);
+    return readSafeJsonValueFile<T>(safePath, `dashboard JSON ${logicalPath}`);
   } catch {
     return null;
   }
