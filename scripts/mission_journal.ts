@@ -12,8 +12,9 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import chalk from 'chalk';
-import { isRecord, readJson } from '@agent/core/foundation';
+import { isRecord } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 interface MissionHistoryEntry {
   ts: string;
@@ -101,7 +102,7 @@ export function loadTrustScores(
   try {
     const safePath = assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return {};
-    const raw = readJson<unknown>(safePath);
+    const raw = readSafeJsonValueFile<unknown>(safePath, 'agent trust score ledger');
     if (!isRecord(raw)) return {};
     const ledger = isRecord(raw.agents) ? raw.agents : raw;
     return Object.fromEntries(

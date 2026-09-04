@@ -98,5 +98,8 @@ describe('mission journal resource boundary', () => {
     expect(loadTrustScores(ledger)).toEqual({ 'agent-a': 850 });
     safeWriteFile(ledger, '[]');
     expect(loadTrustScores(ledger)).toEqual({});
+
+    safeWriteFile(ledger, '{"__proto__":{"agent-a":{"current_score":1000}}}');
+    expect(loadTrustScores(ledger)).toEqual({});
   });
 });
