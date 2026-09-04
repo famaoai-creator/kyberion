@@ -781,20 +781,6 @@ reset hook を再確認した。`resetAgentPerformanceIndexCache` と
 (5,804 passed / 1 skipped)**、`pnpm run typecheck`、`pnpm run lint`、PR gate **31/31**、
 `git diff --check` を実行し、いずれも green だった。
 
-## 2026-09-05 再レビュー修正 1075
-
-SX-06 の interactive script を再監査し、`skill_installer.ts` に残っていた `console.log/error` の rich output を shared harness の
-printer 注入へ統一した。`--quiet`／`--json` が installer の表示を迂回せず、dependency install の失敗表示も同じ出力境界を通るようにした。
-readline の質問、capability scan、brew／pip の実行、install 判定、終了コードは変更していない。
-
-検証:
-
-- skill installer **1 file / 1 test passed**。`--help` の出力が注入 printer を通り、直接 console 出力がないことを確認した。
-- `pnpm run typecheck`、対象2ファイルの ESLint、`git diff --check` passed。
-- canonical full gate はこの slice の後段で実行する。
-
-SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
-
 ## 45. 2026-08-29 core / checker / pipeline import 境界の追加整理
 
 `libs/core` のテスト・example、`scripts/check_*`、`scripts/refactor`、`scripts/lib` と
@@ -18540,6 +18526,34 @@ SX-04 の document inference catalog を継続監査し、`document-inference-po
 
 - document inference policy **1 file / 2 tests passed**。canonical catalog の読込、推論結果、fallback 定義の不在を確認した。
 - `pnpm run typecheck`、対象2ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
+## 2026-09-05 再レビュー修正 1075
+
+SX-06 の interactive script を再監査し、`skill_installer.ts` に残っていた `console.log/error` の rich output を shared harness の
+printer 注入へ統一した。`--quiet`／`--json` が installer の表示を迂回せず、dependency install の失敗表示も同じ出力境界を通るようにした。
+readline の質問、capability scan、brew／pip の実行、install 判定、終了コードは変更していない。
+
+検証:
+
+- skill installer **1 file / 1 test passed**。`--help` の出力が注入 printer を通り、直接 console 出力がないことを確認した。
+- `pnpm run typecheck`、対象2ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
+## 2026-09-05 再レビュー修正 1076
+
+SX-06 の agent runtime manager を再監査し、agent list／manifest list／spawn record／inspect の rich output を shared harness の
+printer 注入へ統一した。`--quiet`／`--json` が一覧・JSON record・inspect結果の直接 console 出力を迂回せず、agent lifecycle、audit、
+provider選択、shutdown の実行 semantics は変更していない。既存の長寿命 agent error は logger の共通抑制境界を維持した。
+
+検証:
+
+- agent runtime manager **1 file / 6 tests passed**。一覧・manifest・spawn・inspectの printer 経路と直接 console 出力がないことを確認した。
+- `pnpm run typecheck`、対象ファイルの ESLint、`git diff --check` passed。
 - canonical full gate はこの slice の後段で実行する。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
