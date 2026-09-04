@@ -850,7 +850,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
         'pdf',
         'body'
       );
-      const pdfTokens = semanticTokens.pdf || {};
+      const pdfTokens = semanticTokens.pdf || semanticTokens;
       const isAppendix = semanticType === 'appendix';
       const sectionHeaderColor =
         pdfTokens.header_color === 'secondary'

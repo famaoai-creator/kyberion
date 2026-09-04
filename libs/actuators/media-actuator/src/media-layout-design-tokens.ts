@@ -13,10 +13,12 @@ import {
 
 export interface SemanticRenderTokenCatalog {
   version: string;
-  defaults: Record<string, Record<string, unknown>>;
-  semantics: Record<string, Record<string, unknown>>;
+  defaults: Record<string, SemanticRenderTokens>;
+  semantics: Record<string, SemanticRenderTokens>;
   signal_tones: Record<string, number>;
 }
+
+export type SemanticRenderTokens = Record<string, Record<string, unknown>>;
 
 export function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderTokenCatalog {
   const fallback = {
@@ -49,16 +51,18 @@ export function resolveSemanticRenderTokens(
   rootDir: string,
   semanticType?: string,
   designSystemId?: string
-): any {
+): SemanticRenderTokens {
   const catalog = loadSemanticRenderTokenCatalog(rootDir);
   const key = String(semanticType || 'content').trim() || 'content';
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
-  const systemOverrides = designSystemId
+  const defaultTokens: SemanticRenderTokens = catalog.defaults.content || {};
+  const semanticTokens: SemanticRenderTokens = catalog.semantics[key] || {};
+  const systemOverrides: SemanticRenderTokens = designSystemId
     ? designSystems.systems?.[designSystemId]?.semantic_overrides?.[key] || {}
     : {};
   return {
-    ...(catalog.defaults?.content || {}),
-    ...(catalog.semantics?.[key] || {}),
+    ...defaultTokens,
+    ...semanticTokens,
     ...systemOverrides,
   };
 }
