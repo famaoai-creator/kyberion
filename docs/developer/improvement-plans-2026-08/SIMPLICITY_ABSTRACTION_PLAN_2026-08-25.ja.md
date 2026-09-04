@@ -16891,6 +16891,21 @@ SX-03／SX-08 の Chronos quick-action mission projectionを再監査し、quick
 
 検証: quick-action **1 file / 3 tests passed**、intelligence observation **1 file / 3 tests passed**、mission-next-task reader **1 file / 8 tests passed**、root typecheck、root lint、`git diff --check`。canonical full gate はこの追記後に実行する。残存する SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 964
+
+SX-03 の media actuator catalog primitiveを再監査し、再帰 JSON discovery が `any[]` と
+`ReturnType<JSON['parse']>` を公開し、catalog merge全体へ型のない値を流し込む残存を修正した。
+`readJsonFilesRecursively`／`loadJsonValue` を `unknown` 境界へ変更し、`isRecord` による object merge
+判定と foundation の safe JSON parser を使う clone 経路へ統合した。専用 catalog の schema validation、
+symlink除外、配列／scalar の置換、fallback／directory merge semanticsは維持している。
+
+検証:
+
+- media catalog／layout catalog **2 files / 9 tests passed**。
+- root typecheck、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

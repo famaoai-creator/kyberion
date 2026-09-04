@@ -5,7 +5,7 @@ import {
   safeExistsSync,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { defineCatalog } from '@agent/core/foundation';
+import { defineCatalog, isRecord } from '@agent/core/foundation';
 import { loadProjectRecord } from '@agent/core/project-registry';
 import { loadServiceBindingRecord } from '@agent/core/service-binding-registry';
 import {
@@ -90,7 +90,7 @@ function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   });
   if (docs.length === 0) return catalog.load();
   const merged = docs.reduce((acc, doc) => {
-    if (!doc || typeof doc !== 'object') return acc;
+    if (!isRecord(doc)) return acc;
     return deepMergeCatalog(acc, { profiles: doc.profiles || {} });
   }, cloneJsonValue(fallback));
   return catalog.validate(merged, dirPath);
