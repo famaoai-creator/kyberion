@@ -16,6 +16,27 @@ describe('operator-learning dispatch registry', () => {
     expect(registry.rules.length).toBeGreaterThan(0);
   });
 
+  it('uses the governed catalog fallback when the base registry is missing', () => {
+    const missingPath = pathResolver.sharedTmp('operator-learning-dispatch-registry-missing.json');
+    const originalEnv = process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+    try {
+      process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = missingPath;
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+
+      const registry = getOperatorLearningDispatchRegistry();
+
+      expect(registry.version).toBe('fallback');
+      expect(registry.rules.length).toBeGreaterThan(0);
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+      } else {
+        process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = originalEnv;
+      }
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+    }
+  });
+
   it('can be extended through a registry file without code changes', () => {
     const overridePath = pathResolver.sharedTmp(
       'operator-learning-dispatch-registry-override.json'

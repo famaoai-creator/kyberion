@@ -496,6 +496,13 @@ function getDispatchRegistryCatalog(
     schema: pathResolver.knowledge(
       'product/schemas/operator-learning-dispatch-registry.schema.json'
     ),
+    fallback: FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY,
+    fallbackOnInvalid: true,
+    onFallback: (error) => {
+      logger.warn(
+        `[OPERATOR_LEARNING_DISPATCH_REGISTRY] Failed to load registry at ${safeRegistryPath}: ${String(error)}`
+      );
+    },
   });
   dispatchRegistryCatalogs.set(safeRegistryPath, catalog);
   return catalog;
@@ -567,12 +574,6 @@ export function getOperatorLearningDispatchRegistry(): OperatorLearningDispatchR
   }
 
   const safeRegistryPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
-  if (!safeExistsSync(safeRegistryPath)) {
-    operatorLearningDispatchRegistryCachePath = cacheKey;
-    operatorLearningDispatchRegistryCache = FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY;
-    return operatorLearningDispatchRegistryCache;
-  }
-
   try {
     let parsed = loadDispatchRegistryFromPath(safeRegistryPath);
     if (confidentialOverlayPath) {
