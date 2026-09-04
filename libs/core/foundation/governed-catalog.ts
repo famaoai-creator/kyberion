@@ -5,7 +5,7 @@ import { readJson } from './json.js';
 import { getFoundationIo } from './io.js';
 import type { ValidateFunction } from 'ajv';
 import { withLockSync } from '../src/lock-utils.js';
-import { assertSafeRepositoryPath } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 
 export interface GovernedCatalogOptions<T> {
   id: string;
@@ -77,6 +77,9 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
     load(): T {
       const catalogPath = assertSafeRepositoryPath(resolvePath(), { allowMissingLeaf: true });
       if (getFoundationIo().exists(catalogPath)) {
+        if (!safeLstat(catalogPath).isFile()) {
+          throw new Error(`Catalog ${options.id} must be a regular file: ${catalogPath}`);
+        }
         const stat = getFoundationIo().stat(catalogPath);
         const signature = `${stat.mtimeMs}:${stat.size}`;
         if (cached !== undefined && cachedPath === catalogPath && cachedSignature === signature) {
