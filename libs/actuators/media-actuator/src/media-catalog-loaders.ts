@@ -237,6 +237,7 @@ export interface MediaDesignSystemDefinition {
   layout_template_id?: string;
   body_zone_map?: Record<string, string>;
   slide_layout_overrides?: Record<string, unknown>;
+  semantic_overrides?: Record<string, Record<string, unknown>>;
   branding?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   [key: string]: unknown;
