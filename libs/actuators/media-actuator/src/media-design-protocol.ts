@@ -18,7 +18,11 @@ import {
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
 } from '@agent/core/document-inference-policy';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
-import { createMediaDocumentPipelineHelpers } from './media-document-pipeline-helpers.js';
+import {
+  createMediaDocumentPipelineHelpers,
+  type MediaInvoicePdfProtocol,
+  type MediaPptxProtocol,
+} from './media-document-pipeline-helpers.js';
 import {
   buildMediaGenerationBoundary,
   resolveMediaBriefCategory,
@@ -900,7 +904,7 @@ function resolveDocumentCompositionPreset(
 function buildOutlineDrivenPptxProtocol(
   rootDir: string,
   outline: any
-): { protocol: any; theme: any; themeName: string } {
+): { protocol: MediaPptxProtocol; theme: any; themeName: string } {
   return mediaDocumentPipelineHelpers.buildOutlineDrivenPptxProtocol(rootDir, outline);
 }
 
@@ -912,7 +916,7 @@ const proposalPptxFlow = createProposalPptxFlow({
 function buildPresentationPptxProtocol(
   rootDir: string,
   brief: any
-): { protocol: any; outline: any; theme: any; themeName: string } {
+): { protocol: MediaPptxProtocol; outline: any; theme: any; themeName: string } {
   return mediaDocumentPipelineHelpers.buildPresentationPptxProtocol(rootDir, brief);
 }
 
@@ -1139,7 +1143,7 @@ function resolveDocumentLayoutTemplate(
   return mediaDocumentPipelineHelpers.resolveDocumentLayoutTemplate(rootDir, brief);
 }
 
-function buildDocumentPdfProtocol(rawBrief: any): any {
+function buildDocumentPdfProtocol(rawBrief: any): MediaInvoicePdfProtocol {
   return mediaDocumentPipelineHelpers.buildDocumentPdfProtocol(rawBrief);
 }
 
