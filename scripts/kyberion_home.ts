@@ -1339,13 +1339,17 @@ async function mainImpl(args: string[] = []): Promise<void> {
       return;
     case 'deals':
       if (argv['ingest-audio']) {
-        await handleDealsIngestAudio(ui, {
-          ingestAudio: String(argv['ingest-audio']),
-          audio: argv.audio ? String(argv.audio) : undefined,
-        });
+        await handleDealsIngestAudio(
+          ui,
+          {
+            ingestAudio: String(argv['ingest-audio']),
+            audio: argv.audio ? String(argv.audio) : undefined,
+          },
+          activePrint
+        );
         return;
       }
-      handleDealsSubcommand(ui, argv as { requirements?: string; json?: boolean });
+      handleDealsSubcommand(ui, argv as { requirements?: string; json?: boolean }, activePrint);
       return;
     case 'ask':
       await handleAskSubcommand(
@@ -1428,24 +1432,32 @@ async function mainImpl(args: string[] = []): Promise<void> {
       });
       return;
     case 'feedback':
-      handleFeedbackSubcommand(ui, {
-        intentId: String(argv._[1] || ''),
-        scenarioId: argv['scenario-id'] ? String(argv['scenario-id']) : undefined,
-        outcome: argv.outcome ? String(argv.outcome) : undefined,
-        comment: argv.comment ? String(argv.comment) : undefined,
-        correction: argv.correction ? String(argv.correction) : undefined,
-        procedureId: argv['procedure-id'] ? String(argv['procedure-id']) : undefined,
-        correlationId: argv['correlation-id'] ? String(argv['correlation-id']) : undefined,
-        json: Boolean(argv.json),
-      });
+      handleFeedbackSubcommand(
+        ui,
+        {
+          intentId: String(argv._[1] || ''),
+          scenarioId: argv['scenario-id'] ? String(argv['scenario-id']) : undefined,
+          outcome: argv.outcome ? String(argv.outcome) : undefined,
+          comment: argv.comment ? String(argv.comment) : undefined,
+          correction: argv.correction ? String(argv.correction) : undefined,
+          procedureId: argv['procedure-id'] ? String(argv['procedure-id']) : undefined,
+          correlationId: argv['correlation-id'] ? String(argv['correlation-id']) : undefined,
+          json: Boolean(argv.json),
+        },
+        activePrint
+      );
       return;
     case 'improvements':
-      handleImprovements(ui, {
-        approve: argv.approve ? String(argv.approve) : undefined,
-        deny: argv.deny ? String(argv.deny) : undefined,
-        note: argv.note ? String(argv.note) : undefined,
-        json: Boolean(argv.json),
-      });
+      handleImprovements(
+        ui,
+        {
+          approve: argv.approve ? String(argv.approve) : undefined,
+          deny: argv.deny ? String(argv.deny) : undefined,
+          note: argv.note ? String(argv.note) : undefined,
+          json: Boolean(argv.json),
+        },
+        activePrint
+      );
       return;
     case 'help':
       printCommands(ui, activePrint);
