@@ -1,8 +1,17 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseArgs } from './onboarding_context.js';
+import { parseArgs, run } from './onboarding_context.js';
 
 describe('onboarding_context CLI', () => {
+  it('routes help output through the injected printer', () => {
+    const output: unknown[] = [];
+
+    run(['help'], (value) => output.push(value));
+
+    expect(output).toHaveLength(1);
+    expect(output[0]).toContain('Onboarding context binding');
+  });
+
   it('defaults binding writes to dry-run and parses first-work acceptance', () => {
     const parsed = parseArgs([
       'first-work',
