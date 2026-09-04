@@ -17157,6 +17157,21 @@ trace保存の例外を`any`で参照する残存を修正した。catch対象�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 981
+
+SX-02／SX-03／SX-10 のA2A bridge singleton境界を再監査し、`globalThis`上の共有instanceを`any`で読み書きする
+残存を修正した。symbol-keyed global registryを`unknown`として扱い、未登録時だけbridgeを生成し、公開instanceを
+明示的に`A2ABridgeImpl`へ絞り込む。プロセス内singletonの再利用、route登録、署名・payload・runtime dispatchの
+semanticsは変更していない。
+
+検証:
+
+- A2A bridge **1 file / 24 tests passed**。
+- A2A bridge production fileの型宣言・cast・catchにおける`any`残存なし、root typecheck passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
