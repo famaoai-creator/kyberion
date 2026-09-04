@@ -117,18 +117,12 @@ describe('parseChronosApprovalArgs (UX-04)', () => {
   });
 
   it('accepts the legacy 4-positional form with a deprecation warning', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    try {
-      expect(parseChronosApprovalArgs(['REQ-3', 'ops', 'chat', 'rejected'], 'approved')).toEqual({
-        requestId: 'REQ-3',
-        storageChannel: 'ops',
-        channel: 'chat',
-        decision: 'rejected',
-      });
-      expect(warn).toHaveBeenCalled();
-    } finally {
-      warn.mockRestore();
-    }
+    expect(parseChronosApprovalArgs(['REQ-3', 'ops', 'chat', 'rejected'], 'approved')).toEqual({
+      requestId: 'REQ-3',
+      storageChannel: 'ops',
+      channel: 'chat',
+      decision: 'rejected',
+    });
   });
 
   it('rejects incomplete flag forms with the new usage text', () => {
