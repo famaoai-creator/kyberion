@@ -215,29 +215,47 @@ export interface MissionControllerRoutingContext {
     deps: string[]
   ) => Awaitable<void>;
   dispatchNextMission: () => Awaitable<void>;
-  acceptRubricOverride: (id: string, reason?: string, severity?: string) => void;
-  listMemoryQueue: (filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted') => void;
-  showMemoryReview: (candidateId: string, tenantSlug?: string, jsonOutput?: boolean) => void;
-  approveMemoryCandidate: (candidateId: string, note?: string, tenantSlug?: string) => void;
+  acceptRubricOverride: (id: string, reason?: string, severity?: string, print?: Print) => void;
+  listMemoryQueue: (
+    filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted',
+    print?: Print
+  ) => void;
+  showMemoryReview: (
+    candidateId: string,
+    tenantSlug?: string,
+    jsonOutput?: boolean,
+    print?: Print
+  ) => void;
+  approveMemoryCandidate: (
+    candidateId: string,
+    note?: string,
+    tenantSlug?: string,
+    print?: Print
+  ) => void;
   rejectMemoryCandidate: (
     candidateId: string,
     note?: string,
     tenantSlug?: string,
-    allDuplicates?: boolean
+    allDuplicates?: boolean,
+    print?: Print
   ) => void;
   promoteMemoryCandidate: (
     candidateId: string,
     executionRole?: 'mission_controller' | 'chronos_gateway',
     note?: string,
     supersedes?: string,
-    tenantSlug?: string
+    tenantSlug?: string,
+    print?: Print
   ) => void;
-  promotePendingMemoryCandidates: (input: {
-    executionRole?: 'mission_controller' | 'chronos_gateway';
-    dryRun?: boolean;
-    note?: string;
-    supersedes?: string;
-  }) => void;
+  promotePendingMemoryCandidates: (
+    input: {
+      executionRole?: 'mission_controller' | 'chronos_gateway';
+      dryRun?: boolean;
+      note?: string;
+      supersedes?: string;
+    },
+    print?: Print
+  ) => void;
   finishMission: (id: string, seal?: boolean) => Awaitable<void>;
   resumeMission: (id?: string) => Awaitable<void>;
   recordTask: (missionId: string, description: string, details?: any) => Awaitable<void>;
@@ -863,26 +881,30 @@ export async function runMissionControllerAction(
       context.acceptRubricOverride(
         arg1!,
         getValue('--reason', context.argv),
-        getValue('--severity', context.argv)
+        getValue('--severity', context.argv),
+        context.print
       );
       break;
     case 'memory-queue':
       context.listMemoryQueue(
-        parseAllowedValue(arg1, 'memory-queue status', MEMORY_QUEUE_STATUSES)
+        parseAllowedValue(arg1, 'memory-queue status', MEMORY_QUEUE_STATUSES),
+        context.print
       );
       break;
     case 'memory-review':
       context.showMemoryReview(
         arg1!,
         getValue('--tenant-slug', context.argv),
-        context.argv.includes('--json')
+        context.argv.includes('--json'),
+        context.print
       );
       break;
     case 'memory-approve':
       context.approveMemoryCandidate(
         arg1!,
         getValue('--note', context.argv),
-        getValue('--tenant-slug', context.argv)
+        getValue('--tenant-slug', context.argv),
+        context.print
       );
       break;
     case 'memory-reject':
@@ -890,7 +912,8 @@ export async function runMissionControllerAction(
         arg1!,
         getValue('--note', context.argv),
         getValue('--tenant-slug', context.argv),
-        context.argv.includes('--all-duplicates')
+        context.argv.includes('--all-duplicates'),
+        context.print
       );
       break;
     case 'memory-promote':
@@ -903,21 +926,25 @@ export async function runMissionControllerAction(
         ) || 'mission_controller',
         getValue('--note', context.argv),
         getValue('--supersedes', context.argv),
-        getValue('--tenant-slug', context.argv)
+        getValue('--tenant-slug', context.argv),
+        context.print
       );
       break;
     case 'memory-promote-pending':
-      await context.promotePendingMemoryCandidates({
-        executionRole:
-          parseAllowedValue(
-            getValue('--execution-role', context.argv),
-            '--execution-role',
-            MEMORY_EXECUTION_ROLES
-          ) || 'mission_controller',
-        note: getValue('--note', context.argv),
-        supersedes: getValue('--supersedes', context.argv),
-        dryRun: context.argv.includes('--dry-run'),
-      });
+      await context.promotePendingMemoryCandidates(
+        {
+          executionRole:
+            parseAllowedValue(
+              getValue('--execution-role', context.argv),
+              '--execution-role',
+              MEMORY_EXECUTION_ROLES
+            ) || 'mission_controller',
+          note: getValue('--note', context.argv),
+          supersedes: getValue('--supersedes', context.argv),
+          dryRun: context.argv.includes('--dry-run'),
+        },
+        context.print
+      );
       break;
     case 'finish':
       await context.finishMission(arg1!, context.argv.includes('--seal'));
