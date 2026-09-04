@@ -19447,6 +19447,17 @@ SX-06／SX-09 のCLI workflow offboardを再監査し、`approval_required`／`e
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1149
+
+SX-06／SX-09 のmission alignment `read-decision` CLIを再監査し、判断JSON、承認・要修正・保留の案内を直接`console.log`せず、harnessから注入したprinterへ統一した。HTMLの判定はapproval-storeの正本ではないという安全上の案内、承認時exit 2、repository内resource path制約、mission brief読込は変更していない。
+
+検証:
+
+- mission alignment **2 test files / 5 tests passed**。resource boundary、pending／approved表示、printer伝播、承認時の終了境界を確認した。
+- `git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
