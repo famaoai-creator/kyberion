@@ -3,6 +3,7 @@ import {
   buildSpreadsheetNarrativeOutline,
   classifyRenderSemantic,
   rankSignalTone,
+  type DocumentCompositionPresetResolver,
 } from './media-document-helpers.js';
 import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media-signal-entry-policy';
 import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
@@ -13,10 +14,7 @@ import type { XlsxDesignProtocol } from '@agent/core/src/types/xlsx-protocol';
 
 export interface MediaSpreadsheetPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
-  resolveDocumentCompositionPreset: (
-    rootDir: string,
-    brief: any
-  ) => { profileId: string; preset: any };
+  resolveDocumentCompositionPreset: DocumentCompositionPresetResolver;
   resolveDocumentLayoutTemplate: (
     rootDir: string,
     brief: any

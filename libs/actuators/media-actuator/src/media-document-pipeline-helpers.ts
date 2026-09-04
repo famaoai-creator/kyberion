@@ -19,6 +19,7 @@ import {
   type MediaBriefCategory,
   type MediaDocumentCompositionCatalog,
   type MediaGenerationBoundary,
+  type DocumentCompositionPresetResolver,
   type ProtocolKind,
 } from './media-document-helpers.js';
 import type {
@@ -122,10 +123,7 @@ export interface MediaDocumentPipelineDeps {
     rootDir: string,
     brief: any
   ) => { templateId: string; template: any };
-  resolveDocumentCompositionPreset: (
-    rootDir: string,
-    brief: any
-  ) => { profileId: string; preset: any };
+  resolveDocumentCompositionPreset: DocumentCompositionPresetResolver;
   applyCompositionTemplate: (
     template: any,
     tokens: Record<string, string>,
@@ -190,7 +188,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
   function resolveDocumentCompositionPreset(
     rootDir: string,
     brief: any
-  ): { profileId: string; preset: any } {
+  ): ReturnType<DocumentCompositionPresetResolver> {
     return deps.resolveDocumentCompositionPreset(rootDir, brief);
   }
 
