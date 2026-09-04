@@ -3,6 +3,7 @@ import { resolveDocumentContentsLabel } from '@agent/core/document-contents-poli
 import { resolveReportSectionTitle } from '@agent/core/document-outline-label-policy';
 import { resolveThemeColorRole as resolveThemeColorRolePolicy } from '@agent/core/media-theme-role-policy';
 import { nowIso } from '@agent/core/foundation';
+import type { PdfDesignProtocol } from '@agent/core/src/types/pdf-protocol';
 import {
   buildMediaGenerationBoundary,
   buildReportNarrativeOutline,
@@ -31,6 +32,26 @@ export interface MediaReportPipelineDeps {
   ) => { headingFont: string; bodyFont: string; accent: string };
   themeToPptxPalette: (theme: any) => any;
   normalizeFontFamily: (input: string) => string;
+}
+
+type MediaPdfAesthetic = NonNullable<PdfDesignProtocol['aesthetic']>;
+
+export interface MediaReportPdfProtocol extends Omit<PdfDesignProtocol, 'metadata' | 'aesthetic'> {
+  metadata: {
+    title?: string;
+    subject?: string;
+    author?: string;
+    creationDate?: string;
+    composition: unknown;
+    generationBoundary: unknown;
+    recommendedTheme: string;
+    branding: Record<string, unknown>;
+    sectionSemantics: unknown[];
+  };
+  aesthetic: MediaPdfAesthetic & {
+    branding?: NonNullable<MediaPdfAesthetic['branding']> & Record<string, unknown>;
+    templateId?: string;
+  };
 }
 
 function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
@@ -654,7 +675,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
     };
   }
 
-  function buildReportPdfProtocol(rootDir: string, brief: any): any {
+  function buildReportPdfProtocol(rootDir: string, brief: any): MediaReportPdfProtocol {
     const outline = buildReportNarrativeOutline(
       rootDir,
       brief,
