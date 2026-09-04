@@ -20,6 +20,20 @@ import { parseEventScopeFromRecord, type EventScope, type EventScopeInput } from
 import { createLogger } from './logger.js';
 const logger = createLogger('agent-runtime-supervisor-client');
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+class SupervisorRemoteError extends Error {
+  constructor(
+    message: string,
+    readonly errorDetail?: Record<string, unknown>
+  ) {
+    super(message);
+    this.name = 'SupervisorRemoteError';
+  }
+}
+
 type SupervisorMethod =
   | 'health'
   | 'ensure'
@@ -434,16 +448,16 @@ async function sendSupervisorRequest<TPayload, TResult>(
         const parsed: unknown = parseSafeJsonInput(line, 'supervisor response');
         const response = normalizeSupervisorResponse<TResult>(parsed);
         if (!response.ok) {
-          const err = new Error(response.error || 'supervisor_request_failed');
-          if (response.errorDetail) {
-            (err as any).errorDetail = response.errorDetail;
-          }
+          const err = new SupervisorRemoteError(
+            response.error || 'supervisor_request_failed',
+            response.errorDetail
+          );
           return finish(() => reject(err));
         }
         return finish(() => resolve(parseResult(response.result)));
-      } catch (error: any) {
+      } catch (error: unknown) {
         return finish(() =>
-          reject(new Error(`invalid_supervisor_response: ${error?.message || error}`))
+          reject(new Error(`invalid_supervisor_response: ${errorMessage(error)}`))
         );
       }
     });
@@ -464,8 +478,8 @@ async function waitForSupervisorHealth(
         HEALTH_TIMEOUT_MS,
         parseSupervisorHealthResult
       );
-    } catch (error: any) {
-      lastError = error;
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }
@@ -505,7 +519,7 @@ export async function ensureAgentRuntimeSupervisorDaemon(): Promise<AgentRuntime
   // Multi-spawn guard: use atomic file creation as a mutex
   try {
     safeCreateExclusiveFileSync(safeSpawnLockPath, process.pid.toString());
-  } catch (err: any) {
+  } catch (err: unknown) {
     // If lock already exists, wait for health or check if it's stale
     try {
       const stats = safeStat(safeSpawnLockPath);
