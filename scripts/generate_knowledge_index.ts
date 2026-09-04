@@ -220,7 +220,7 @@ function renderKnowledgeIndexFiles(): GeneratedFile[] {
   const manifestData = {
     files: manifestEntries,
   };
-  const manifestContent = JSON.stringify(manifestData, null, 2);
+  const manifestContent = JSON.stringify(manifestData, null, 2) + '\n';
 
   const grouped: Record<string, IndexEntry[]> = {};
   for (const entry of indexEntries) {
