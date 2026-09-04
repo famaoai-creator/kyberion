@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
+  safeReadFile,
   safeExistsSync,
   safeMkdir,
   safeRmSync,
@@ -42,5 +43,18 @@ describe('extract changelog section resource boundaries', () => {
       if (safeExistsSync(link)) safeRmSync(link, { force: true });
       if (safeExistsSync(target)) safeRmSync(target, { force: true });
     }
+  });
+
+  it('routes CLI output through the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/extract_changelog_section.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).not.toContain('process.stdout.write');
+    expect(source).toContain('return main(context.argv, context.print)');
   });
 });
