@@ -261,12 +261,12 @@ describe('surface-approval-ui', () => {
       rationale: 'approval is required',
     });
 
-    expect(text).toContain('Understanding: deploy_release');
-    expect(text).toContain('Missing input: approval_scope');
-    expect(text).toContain('Authority: 人間の承認が必要');
-    expect(text).toContain('Next action: Approve this release.');
-    expect(text).toContain('Consequence: The release waits until approval is recorded.');
-    expect(text).toContain('Outcome: サービス変更');
+    expect(text).toContain('理解: deploy_release');
+    expect(text).toContain('不足入力: approval_scope');
+    expect(text).toContain('権限: 人間の承認が必要');
+    expect(text).toContain('次の操作: Approve this release.');
+    expect(text).toContain('帰結: The release waits until approval is recorded.');
+    expect(text).toContain('結果: サービス変更');
     expect(text).not.toContain('approval_required');
   });
 
