@@ -9,29 +9,26 @@ import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolve
 import { loadTenantDesignOverride } from '@agent/core/tenant-design-override';
 import {
   defineCatalog,
+  isRecord,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
 } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 export function cloneJsonValue<T>(value: T): T {
-  return value === undefined ? value : JSON.parse(JSON.stringify(value));
+  if (value === undefined) return value;
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) throw new Error('Media JSON clone must be serializable');
+  return parseSafeJsonInput(serialized, 'Media JSON clone') as T;
 }
 
-export function deepMergeCatalog(base: any, next: any): any {
+export function deepMergeCatalog(base: unknown, next: unknown): unknown {
   if (Array.isArray(base) || Array.isArray(next)) return cloneJsonValue(next);
-  if (!base || typeof base !== 'object') return cloneJsonValue(next);
-  if (!next || typeof next !== 'object') return cloneJsonValue(next);
-  const merged: Record<string, any> = { ...base };
+  if (!isRecord(base)) return cloneJsonValue(next);
+  if (!isRecord(next)) return cloneJsonValue(next);
+  const merged: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(next)) {
-    if (
-      value &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      merged[key] &&
-      typeof merged[key] === 'object' &&
-      !Array.isArray(merged[key])
-    ) {
+    if (isRecord(value) && isRecord(merged[key])) {
       merged[key] = deepMergeCatalog(merged[key], value);
     } else {
       merged[key] = cloneJsonValue(value);
@@ -40,11 +37,11 @@ export function deepMergeCatalog(base: any, next: any): any {
   return merged;
 }
 
-export function readJsonFilesRecursively(dirPath: string): any[] {
+export function readJsonFilesRecursively(dirPath: string): unknown[] {
   const safeDirPath = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
   if (!safeExistsSync(safeDirPath) || !safeLstat(safeDirPath).isDirectory()) return [];
   const entries = safeReaddir(safeDirPath).sort();
-  const docs: any[] = [];
+  const docs: unknown[] = [];
   for (const entry of entries) {
     const fullPath = path.join(safeDirPath, entry);
     const stat = safeLstat(fullPath);
@@ -60,7 +57,7 @@ export function readJsonFilesRecursively(dirPath: string): any[] {
   return docs;
 }
 
-export function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
+export function loadJsonValue(filePath: string): unknown {
   const safePath = assertSafeRepositoryPath(filePath);
   if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
     throw new Error(`Media JSON input must be an existing regular file: ${safePath}`);
