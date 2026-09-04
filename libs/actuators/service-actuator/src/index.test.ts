@@ -322,6 +322,49 @@ describe('service-actuator handleAction', () => {
     expect(mocks.executeServicePreset).not.toHaveBeenCalled();
   });
 
+  it('rejects reserved prototype keys anywhere in dynamic service input', async () => {
+    const { handleAction } = await import('./index.js');
+    const unsafeParams = JSON.parse('{"nested":{"constructor":{"polluted":true}}}');
+
+    await expect(
+      handleAction({
+        service_id: 'github',
+        mode: 'PRESET',
+        action: 'create_issue',
+        params: unsafeParams,
+        context: { safe: { value: true } },
+      })
+    ).rejects.toThrow('reserved prototype key');
+
+    await expect(
+      handleAction({
+        service_id: 'github',
+        mode: 'PRESET',
+        action: 'create_issue',
+        params: { title: 'safe' },
+        context: JSON.parse('{"nested":[{"__proto__":{"polluted":true}}]}'),
+      })
+    ).rejects.toThrow('reserved prototype key');
+
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            op: 'preset',
+            params: {
+              service_id: 'github',
+              action: 'create_issue',
+              params: { title: 'safe' },
+              steps: JSON.parse('[{"prototype":{"polluted":true}}]'),
+            },
+          },
+        ],
+      } as unknown as Parameters<typeof handleAction>[0])
+    ).rejects.toThrow('reserved prototype key');
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+  });
+
   it('accepts approval only from a trusted caller option', async () => {
     mocks.executeServicePreset.mockResolvedValue({ ok: true });
     const { handleAction } = await import('./index.js');
