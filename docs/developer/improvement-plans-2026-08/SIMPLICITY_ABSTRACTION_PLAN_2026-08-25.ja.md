@@ -17685,6 +17685,22 @@ engine、design-system の theme／layout mapping／metadata を明示型で公�
 既存回帰（`active_theme_name` が未設定）があるため、今回の loader／layout 対象テストには含めていない。
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 1016
+
+1015 の再検証で検出した `personal-theme-overlay.test.ts` の回帰を修正した。`defineCatalog.load()` が利用する
+Foundation I/O の `exists`／`stat`／`loadJson` 境界をテスト fixture に登録し、secure I/O の `lstat`／`readFile` と
+同じ仮想個人テーマを参照するようにした。これにより、実ファイルを書き込まずに personal catalog の regular-file
+判定、キャッシュ用 stat、JSON 読み込み、public／runtime／personal のマージを統合テストできる。プロダクションの
+catalog loader、tier／scope 判定、fallback semantics は変更していない。
+
+検証:
+
+- Media catalog／layout／theme／personal overlay **6 files / 13 tests passed**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
