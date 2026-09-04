@@ -25,6 +25,11 @@ import {
   type CodexExecutionEnhancerOptions,
   type CodexNativeSubagentInfo,
 } from './agent-codex-app-server-adapter.js';
+import type {
+  RequestPermissionRequest,
+  RequestPermissionResponse,
+  SessionNotification,
+} from '@agentclientprotocol/sdk';
 
 export {
   CodexAppServerAdapter,
@@ -332,7 +337,9 @@ abstract class BaseACPAdapter implements AgentAdapter {
     protected authMethod: string = 'oauth-personal'
   ) {}
 
-  protected async requestPermission(params: any): Promise<any> {
+  protected async requestPermission(
+    params: RequestPermissionRequest
+  ): Promise<RequestPermissionResponse> {
     const title = (params.toolCall?.title || '').toLowerCase();
     if (isSafeReadOnlyPermissionTitle(title)) {
       const optionId = params.options?.[0]?.optionId;
@@ -348,7 +355,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
     registerEnhancer(this.enhancers, enhancer);
   }
 
-  protected handleSessionUpdate(_params: any): void {}
+  protected handleSessionUpdate(_params: SessionNotification): void {}
 
   public async boot(): Promise<void> {
     logger.info(`[UAA] Spawning: ${this.bootCommand} ${this.bootArgs.join(' ')}`);
@@ -408,7 +415,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
     const { ClientSideConnection, ndJsonStream } = await getACPSdk();
     this.connection = new ClientSideConnection(
       (agent) => ({
-        sessionUpdate: async (params: any) => {
+        sessionUpdate: async (params: SessionNotification) => {
           logger.info(`[UAA_NOTIF] ${JSON.stringify(params)}`);
           this.handleSessionUpdate(params);
 
@@ -670,10 +677,12 @@ export class GrokAdapter extends BaseACPAdapter {
     }
   }
 
-  protected async requestPermission(params: any): Promise<any> {
+  protected async requestPermission(
+    params: RequestPermissionRequest
+  ): Promise<RequestPermissionResponse> {
     if (this.activePermissionMode === 'workspace-write') {
-      const option = params.options?.find((candidate: any) =>
-        ['allow_once', 'allow_always'].includes(candidate?.kind || candidate?.optionId)
+      const option = params.options.find((candidate) =>
+        ['allow_once', 'allow_always'].includes(candidate.kind || candidate.optionId)
       );
       if (option?.optionId) {
         return { outcome: { outcome: 'selected' as const, optionId: option.optionId } };
@@ -686,35 +695,39 @@ export class GrokAdapter extends BaseACPAdapter {
   private nativeSubagentCompleted = false;
   private nativeSubagentChildId: string | undefined;
 
-  protected handleSessionUpdate(params: any): void {
-    const update = params?.update ?? params;
+  protected handleSessionUpdate(params: SessionNotification): void {
+    const envelope = params as unknown as Record<string, unknown>;
+    const update = isRecord(envelope.update) ? envelope.update : envelope;
+    const toolCall = isRecord(envelope.toolCall) ? envelope.toolCall : undefined;
+    const updateToolCall = isRecord(update.toolCall) ? update.toolCall : undefined;
     if (
-      isNativeSubagentToolCall(params?.toolCall) ||
-      isNativeSubagentToolCall(update?.toolCall) ||
-      isNativeSubagentToolCall(update?.tool_call)
+      isNativeSubagentToolCall(toolCall) ||
+      isNativeSubagentToolCall(updateToolCall) ||
+      isNativeSubagentToolCall(update.tool_call)
     ) {
       this.nativeSubagentObserved = true;
       this.nativeSubagentChildId =
         firstStringValue(
-          params?.subagentId,
-          params?.subagent_id,
-          params?.childSessionId,
-          params?.child_session_id,
-          params?.toolCall?.subagentId,
-          params?.toolCall?.subagent_id,
-          update?.subagentId,
-          update?.subagent_id,
-          update?.childSessionId,
-          update?.child_session_id,
-          update?.threadId,
-          update?.thread_id
+          envelope.subagentId,
+          envelope.subagent_id,
+          envelope.childSessionId,
+          envelope.child_session_id,
+          toolCall?.subagentId,
+          toolCall?.subagent_id,
+          update.subagentId,
+          update.subagent_id,
+          update.childSessionId,
+          update.child_session_id,
+          update.threadId,
+          update.thread_id
         ) ?? this.nativeSubagentChildId;
     }
 
     // The available-commands notification advertises `spawn_subagent` in a
     // tools list; it is not evidence that the model invoked it. Only inspect
     // protocol updates whose kind represents an actual tool/subagent event.
-    const updateKind = String(update?.sessionUpdate ?? params?._meta?.updateType ?? '');
+    const meta = isRecord(envelope._meta) ? envelope._meta : undefined;
+    const updateKind = String(update.sessionUpdate ?? meta?.updateType ?? '');
     if (!/(tool|subagent)/i.test(updateKind)) return;
     const serialized = JSON.stringify(update);
     if (/spawn[_-]?subagent/i.test(serialized)) {
@@ -728,18 +741,18 @@ export class GrokAdapter extends BaseACPAdapter {
       this.nativeSubagentCompleted = true;
       this.nativeSubagentChildId =
         firstStringValue(
-          params?.subagentId,
-          params?.subagent_id,
-          params?.childSessionId,
-          params?.child_session_id,
-          params?.toolCall?.subagentId,
-          params?.toolCall?.subagent_id,
-          update?.subagentId,
-          update?.subagent_id,
-          update?.childSessionId,
-          update?.child_session_id,
-          update?.threadId,
-          update?.thread_id
+          envelope.subagentId,
+          envelope.subagent_id,
+          envelope.childSessionId,
+          envelope.child_session_id,
+          toolCall?.subagentId,
+          toolCall?.subagent_id,
+          update.subagentId,
+          update.subagent_id,
+          update.childSessionId,
+          update.child_session_id,
+          update.threadId,
+          update.thread_id
         ) ?? this.nativeSubagentChildId;
     }
   }
