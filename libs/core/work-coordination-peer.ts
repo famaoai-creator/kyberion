@@ -6,12 +6,9 @@ import {
   PeerMessageEnvelope,
   PeerMessageResponder,
 } from './peer-messaging.js';
-import {
-  claimWorkItem,
-  handoffWorkItem,
-  updateWorkItem,
-  WorkItemStatus,
-} from './work-coordination.js';
+import { claimWorkItem, handoffWorkItem, updateWorkItem } from './work-coordination.js';
+import type { WorkItemStatus } from './work-coordination-types.js';
+import { isRecord } from './foundation/text.js';
 
 export type WorkCoordinationPeerCommandType = 'claim_request' | 'handoff_request' | 'status_update';
 
@@ -24,11 +21,11 @@ export interface WorkCoordinationPeerCommandPayload {
   purpose?: string;
   expected_version?: number;
   idempotency_key?: string;
-  next_status?: string;
+  next_status?: WorkItemStatus;
   lease_id?: string;
   assignee_peer_id?: string;
   assignee_user_id?: string;
-  payload?: any;
+  payload?: Record<string, unknown> & { ttlMs?: number };
 }
 
 export type WorkCoordinationPeerCommandEnvelope =
@@ -38,9 +35,100 @@ export interface WorkCoordinationPeerCommandResult {
   ok: boolean;
   accepted: boolean;
   response?: {
-    result: any;
+    result: unknown;
   };
   error?: string;
+}
+
+const WORK_ITEM_STATUSES: readonly WorkItemStatus[] = [
+  'backlog',
+  'ready',
+  'in_progress',
+  'blocked',
+  'review',
+  'done',
+  'archived',
+];
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function optionalSafeInteger(value: unknown): number | undefined {
+  return value === undefined
+    ? undefined
+    : Number.isSafeInteger(value) && (value as number) >= 0
+      ? (value as number)
+      : undefined;
+}
+
+function parseWorkCoordinationPeerCommandPayload(
+  value: unknown
+): WorkCoordinationPeerCommandPayload {
+  if (!isRecord(value)) throw new Error('invalid_coordination_command_payload');
+  const commandType = value.command_type;
+  if (
+    commandType !== 'claim_request' &&
+    commandType !== 'handoff_request' &&
+    commandType !== 'status_update'
+  ) {
+    throw new Error('invalid_coordination_command_type');
+  }
+  if (!nonEmptyString(value.command_id) || !nonEmptyString(value.item_id)) {
+    throw new Error('invalid_coordination_command_identity');
+  }
+  const expectedVersion = optionalSafeInteger(value.expected_version);
+  if (value.expected_version !== undefined && expectedVersion === undefined) {
+    throw new Error('invalid_coordination_expected_version');
+  }
+  const rawPayload = value.payload;
+  let payload: WorkCoordinationPeerCommandPayload['payload'];
+  if (rawPayload === undefined) {
+    payload = undefined;
+  } else {
+    if (!isRecord(rawPayload)) throw new Error('invalid_coordination_command_data');
+    payload = rawPayload;
+  }
+  const nextStatus = value.next_status;
+  const validNextStatus =
+    typeof nextStatus === 'string' && WORK_ITEM_STATUSES.includes(nextStatus as WorkItemStatus)
+      ? (nextStatus as WorkItemStatus)
+      : undefined;
+  if (commandType === 'status_update' && validNextStatus === undefined) {
+    throw new Error('invalid_coordination_next_status');
+  }
+  if (
+    commandType === 'handoff_request' &&
+    (!nonEmptyString(value.lease_id) || !nonEmptyString(value.assignee_peer_id))
+  ) {
+    throw new Error('invalid_coordination_handoff_target');
+  }
+  const ttlMs = payload?.ttlMs;
+  if (
+    ttlMs !== undefined &&
+    (typeof ttlMs !== 'number' || !Number.isSafeInteger(ttlMs) || ttlMs < 0)
+  ) {
+    throw new Error('invalid_coordination_ttl');
+  }
+  const normalizedPayload =
+    payload === undefined
+      ? undefined
+      : { ...payload, ttlMs: typeof ttlMs === 'number' ? ttlMs : undefined };
+  return {
+    command_type: commandType,
+    command_id: value.command_id,
+    item_id: value.item_id,
+    ...(nonEmptyString(value.actor_peer_id) ? { actor_peer_id: value.actor_peer_id } : {}),
+    ...(nonEmptyString(value.actor_user_id) ? { actor_user_id: value.actor_user_id } : {}),
+    ...(nonEmptyString(value.purpose) ? { purpose: value.purpose } : {}),
+    ...(expectedVersion !== undefined ? { expected_version: expectedVersion } : {}),
+    ...(nonEmptyString(value.idempotency_key) ? { idempotency_key: value.idempotency_key } : {}),
+    ...(validNextStatus !== undefined ? { next_status: validNextStatus } : {}),
+    ...(nonEmptyString(value.lease_id) ? { lease_id: value.lease_id } : {}),
+    ...(nonEmptyString(value.assignee_peer_id) ? { assignee_peer_id: value.assignee_peer_id } : {}),
+    ...(nonEmptyString(value.assignee_user_id) ? { assignee_user_id: value.assignee_user_id } : {}),
+    ...(normalizedPayload !== undefined ? { payload: normalizedPayload } : {}),
+  };
 }
 
 export function buildWorkCoordinationPeerCommandEnvelope(input: {
@@ -76,7 +164,7 @@ export async function processWorkCoordinationPeerCommand(
     throw new Error(`untrusted_peer:${senderId}`);
   }
 
-  const payload = envelope.payload as WorkCoordinationPeerCommandPayload;
+  const payload = parseWorkCoordinationPeerCommandPayload(envelope.payload);
   const commandType = payload.command_type;
 
   logger.info(`[coordination-peer] Handling coordination command: ${commandType} from ${senderId}`);
