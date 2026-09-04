@@ -18642,6 +18642,21 @@ PreToolUse の error fail-open semanticsは維持し、正常終了は shared ha
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1083
+
+SX-06／SX-09 の `control_plane_cli` を再監査し、JSON／table-like list／doctor／help／knowledge ref／Chronos overview の直接stdout出力を
+既定printer＋harness注入printerへ統合した。CLI単体利用時の改行を維持しつつ、harness実行時は `--json` の構造化結果と通常表示を同じ
+出力境界で扱う。doctorの失敗status、ControlPlaneClientErrorのsuggested fix、legacy approval warningもscript内の直接stderr／exit code／console
+へ逃がさず、既存のsurface API、catalog query、doctor fix、approval grammar semanticsは変更していない。
+
+検証:
+
+- control plane parser／entrypoint **既存9 assertions＋entrypoint 1 test passed**。直接出力／直接exit codeの不在、default／injected printer、doctor failure boundaryを確認した。
+- `pnpm run typecheck`、対象ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
