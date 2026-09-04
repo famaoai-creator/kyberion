@@ -71,7 +71,7 @@ export async function resetOnboardingArtifacts(
     if (options.confirm) {
       proceed = await options.confirm();
     } else if (process.stdin.isTTY && process.stdout.isTTY) {
-      const print = options.print ?? console.log;
+      const print = options.print ?? (() => undefined);
       print(
         `About to reset onboarding artifacts under: ${path.relative(process.cwd(), profileRoot)}`
       );
@@ -124,7 +124,7 @@ export function formatResetSummary(result: OnboardingResetResult): string {
 
 export async function main(
   args: string[] = [],
-  print: (value: unknown) => void = (value) => console.log(value)
+  print: (value: unknown) => void = () => undefined
 ): Promise<void> {
   const force = args.includes('--force');
   const json = args.includes('--json');
