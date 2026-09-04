@@ -6,7 +6,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 export type ContractCheck = {
   id: string;
@@ -19,7 +19,7 @@ export function readGovernanceJson(relativePath: string): unknown {
   const safePath = assertSafeRepositoryPath(pathResolver.rootResolve(relativePath));
   if (!safeLstat(safePath).isFile())
     throw new Error(`Governance resource is not a file: ${relativePath}`);
-  const payload = readJson<Record<string, unknown>>(safePath);
+  const payload = readSafeJsonValueFile<unknown>(safePath, `governance JSON ${relativePath}`);
   if (payload && typeof payload === 'object' && !Array.isArray(payload) && '$schema' in payload) {
     const { $schema: _schema, ...contract } = payload;
     return contract;
