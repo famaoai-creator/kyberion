@@ -18340,6 +18340,22 @@ mission ID、mission type、tier、orchestration status、失敗理由の値と 
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1062
+
+SX-09 の issuance reply を再監査し、Slack bridge と Chronos API に残っていた開始、種別、ティア、ペルソナ、routing、
+orchestration 状態の重複文面を `buildMissionIssuanceReply` へ収束させた。locale と詳細表示の有無を renderer の引数で明示し、
+surface-neutral resolver は日本語、既存の Slack／Chronos の英語表示は英語 locale で維持した。mission issuance、権限判定、A2UI payload、
+routing 値は変更していない。
+
+検証:
+
+- mission proposal confirmation **1 file / 7 tests passed**。共有 renderer の簡易表示と queued／failed 分岐を確認した。
+- `pnpm run typecheck`、core／Slack／Chronos 対象ファイルのESLint、`git diff --check` passed。
+- generated vocabulary types、pseudo locale、knowledge index を再生成し、canonical full gate **69 gates / 0 failed** passed。
+- i18n baseline は Slack／Chronos の issuance reply 重複文面を renderer へ移した結果を反映した。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

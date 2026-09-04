@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-04T16:48:08.544Z",
+  "generated_at": "2026-09-04T16:53:48.540Z",
   "scan_roots": [
     "libs/core",
     "scripts",

@@ -37,6 +37,7 @@ import {
   parseSlackOnboardingAction,
 } from '@agent/core/slack-onboarding';
 import {
+  buildMissionIssuanceReply,
   clearSlackMissionProposalState,
   getSlackMissionProposalState,
   isSlackMissionConfirmation,
@@ -405,20 +406,10 @@ async function postAutomationReply(
 function formatSlackMissionIssuedReply(
   issued: Awaited<ReturnType<typeof issueSlackMissionFromProposal>>
 ): string {
-  return [
-    `Mission ${issued.missionId} started.`,
-    `Type: ${issued.missionType}`,
-    `Tier: ${issued.tier}`,
-    `Persona: ${issued.persona}`,
-    issued.routingDecision
-      ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`
-      : undefined,
-    issued.orchestrationStatus === 'queued'
-      ? 'Background orchestration has been queued.'
-      : 'Background orchestration could not be queued.',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  return buildMissionIssuanceReply(issued, {
+    locale: resolveOperatorLocale(),
+    includeDetails: true,
+  });
 }
 
 async function processSlackOutbox(client: SlackClient) {
