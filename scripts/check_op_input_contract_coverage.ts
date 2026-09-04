@@ -1,9 +1,9 @@
 import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 const DISCOVERY_PATH = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
 
@@ -63,7 +63,10 @@ export function findOpInputContractViolations(discovery: DiscoveryFile): string[
     );
   }
   if (safeExistsSync(baselinePath)) {
-    const baseline = readJson<ContractCoverageBaseline>(baselinePath);
+    const baseline = readSafeJsonFile<ContractCoverageBaseline>(
+      baselinePath,
+      'op input contract coverage baseline'
+    );
     if (inferredLegacyCount > baseline.inferred_legacy) {
       violations.push(
         `inferred-legacy contracts increased from ${baseline.inferred_legacy} to ${inferredLegacyCount}`

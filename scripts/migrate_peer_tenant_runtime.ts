@@ -24,9 +24,10 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const DEFAULT_MIGRATION_ROOT = 'active/shared/runtime/migrations/peer-tenant';
@@ -479,7 +480,7 @@ export function runPeerTenantMigration(
     }
     try {
       plan = parsePeerTenantMigrationPlan(
-        readJson<unknown>(safePlanPath)
+        readSafeJsonValueFile<unknown>(safePlanPath, 'peer migration plan')
       ) as PeerTenantMigrationPlan | null;
     } catch {
       throw new Error(`peer_migration_plan_invalid:${options.planPath}`);
