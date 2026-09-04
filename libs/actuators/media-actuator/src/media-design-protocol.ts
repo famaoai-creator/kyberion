@@ -87,6 +87,8 @@ interface MediaThemeCatalog {
   themes: Record<string, Record<string, unknown>>;
 }
 
+type MediaTheme = Record<string, unknown>;
+
 function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   const dirPath = path.resolve(
     rootDir,
@@ -664,7 +666,7 @@ function resolveSemanticComponentRule(
   };
 }
 
-function resolveNamedTheme(rootDir: string, preferredTheme?: string): any {
+function resolveNamedTheme(rootDir: string, preferredTheme?: string): MediaTheme | null {
   const catalog = loadThemeCatalog(rootDir);
   const themeName = String(preferredTheme || catalog.default_theme || 'kyberion-standard').trim();
 
