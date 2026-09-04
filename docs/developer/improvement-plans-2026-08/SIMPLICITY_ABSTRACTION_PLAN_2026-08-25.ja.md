@@ -16134,6 +16134,15 @@ violation／discovery skip semantics に従って処理し、catalogの既存判
 検証: governance checker **2 files / 4 tests passed**、root typecheck、対象 Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 858
+
+SX-03／SX-04／PI-12 の `apply_dependency_patch` を再監査し、patch対象の package manifest を `readJson<RootPackageJson>` の型アサーションだけで
+dependency planningへ渡していた残存を修正した。manifestは通常ファイル確認と共通 safe object parserを通してから、既存の direct dependency／override／
+backup／gate／vulnerability rescan semanticsへ渡すようにした。dangerous JSON は patch計画前に fail-closed となる回帰を追加した。
+
+検証: dependency patch **1 file / 11 tests passed**、root typecheck、対象 Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
