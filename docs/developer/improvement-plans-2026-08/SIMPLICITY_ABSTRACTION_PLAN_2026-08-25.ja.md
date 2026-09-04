@@ -18516,6 +18516,20 @@ legacy media 判定、spreadsheet style index、schema、canonical catalog の�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1074
+
+SX-04 の document inference catalog を継続監査し、`document-inference-policy` に残っていた type/profile rule の巨大な
+`FALLBACK_CATALOG`（canonical JSON と同内容）を削除した。`defineCatalog` の fallback 無し fail-closed 境界へ揃え、文書タイプ・profile候補の
+推論時に欠損 catalog が古い内蔵ルールを隠さないようにした。canonical rule、推論順序、profile候補の解決結果は変更していない。
+
+検証:
+
+- document inference policy **1 file / 2 tests passed**。canonical catalog の読込、推論結果、fallback 定義の不在を確認した。
+- `pnpm run typecheck`、対象2ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
