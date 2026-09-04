@@ -13,7 +13,7 @@ import {
 import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { RISKY_OPS } from './risky-op-ids.js';
 import { readJson } from './foundation/json.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 
 /**
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
@@ -46,6 +46,14 @@ function safeSecretPath(filePath: string, allowMissingLeaf = true): string {
   return secureIo.withSensitivePathMediation(() =>
     secureIo.assertSafeRepositoryPath(filePath, { allowMissingLeaf })
   );
+}
+
+function parseSecretRecord(value: unknown, label: string): Record<string, unknown> | null {
+  try {
+    return parseSafeJsonObjectValue(value, label);
+  } catch {
+    return null;
+  }
 }
 
 interface AuthGrant {
@@ -87,8 +95,11 @@ const _loadPersonalSecrets = () => {
         for (const subFile of subFiles) {
           const subPath = safeSecretPath(path.join(fullPath, subFile), false);
           if (!safeLstat(subPath).isFile()) continue;
-          const content = readSensitiveJson<unknown>(subPath);
-          _mapContentToSecrets(serviceName, content);
+          const content = parseSecretRecord(
+            readSensitiveJson<unknown>(subPath),
+            `personal connection ${subPath}`
+          );
+          if (content) _mapContentToSecrets(serviceName, content);
         }
       } else if (stat.isFile() && item.endsWith('.json')) {
         const serviceName = path.basename(item, '.json').toUpperCase();
@@ -103,7 +114,8 @@ const _loadPersonalSecrets = () => {
             continue;
           }
         }
-        _mapContentToSecrets(serviceName, content);
+        const record = parseSecretRecord(content, `personal connection ${fullPath}`);
+        if (record) _mapContentToSecrets(serviceName, record);
       }
     }
   } catch (_) {
@@ -111,13 +123,13 @@ const _loadPersonalSecrets = () => {
   }
 };
 
-const _mapContentToSecrets = (serviceName: string, content: any) => {
+const _mapContentToSecrets = (serviceName: string, content: Record<string, unknown>) => {
   for (const [key, value] of Object.entries(content)) {
     if (typeof value === 'string') {
       const secretKey = `${serviceName}_${key.toUpperCase()}`;
       _cachedPersonalSecrets.set(secretKey, value);
-    } else if (typeof value === 'object' && value !== null) {
-      _mapContentToSecrets(serviceName, value);
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      _mapContentToSecrets(serviceName, value as Record<string, unknown>);
     }
   }
 };
@@ -154,9 +166,11 @@ function _loadConnectionDocument(serviceId: string): Record<string, any> {
   // be decrypted must fail loudly — the data exists, silently returning {}
   // would look like a wiped connection.
   if (isEncryptedConnectionEnvelope(parsed)) {
-    return decryptConnectionDocument(parsed) as Record<string, any>;
+    return (
+      parseSecretRecord(decryptConnectionDocument(parsed), `connection document ${fullPath}`) || {}
+    );
   }
-  return parsed as Record<string, any>;
+  return parseSecretRecord(parsed, `connection document ${fullPath}`) || {};
 }
 
 _loadPersonalSecrets();
@@ -299,8 +313,12 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   if (!value) value = _cachedPersonalSecrets.get(key);
   if (!value) {
     try {
-      const secrets = readSensitiveJson<unknown>(safeSecretPath(SECRETS_FILE));
-      value = secrets[key];
+      const secrets = parseSecretRecord(
+        readSensitiveJson<unknown>(safeSecretPath(SECRETS_FILE)),
+        'vault secrets'
+      );
+      const candidate = secrets?.[key];
+      if (typeof candidate === 'string') value = candidate;
     } catch (_) {
       /* secrets file absent or corrupt: fall back to env-only resolution */
     }

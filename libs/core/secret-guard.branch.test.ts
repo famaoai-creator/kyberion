@@ -175,6 +175,28 @@ describe('secret-guard branch coverage', () => {
     expect(mod.getSecret('MISSING_VALUE')).toBeNull();
   });
 
+  it('does not flatten array-shaped connection or vault records into secrets', async () => {
+    mocks.safeExistsSync.mockImplementation(
+      (p: string) =>
+        p.endsWith('/knowledge/personal/connections') ||
+        p.endsWith('/knowledge/personal/connections/slack.json') ||
+        p.endsWith('/vault/secrets/secrets.json')
+    );
+    mocks.safeReaddir.mockImplementation((p: string) =>
+      p.endsWith('/knowledge/personal/connections') ? ['slack.json'] : []
+    );
+    mocks.safeReadFile.mockImplementation((p: string) =>
+      p.endsWith('/knowledge/personal/connections/slack.json') ||
+      p.endsWith('/vault/secrets/secrets.json')
+        ? JSON.stringify([{ token: 'should-not-be-a-secret' }])
+        : '{}'
+    );
+
+    const mod = await import('./secret-guard.js');
+    expect(mod.getSecret('SLACK_0_TOKEN')).toBeNull();
+    expect(mod.loadConnectionDocument('slack')).toEqual({});
+  });
+
   it('grantAccess/checkAuthority/storeConnectionDocument and loadConnectionDocument branches', async () => {
     mocks.safeExistsSync.mockImplementation(
       (p: string) =>
