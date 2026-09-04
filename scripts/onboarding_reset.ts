@@ -7,13 +7,17 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface OnboardingResetOptions {
   force?: boolean;
+  dryRun?: boolean;
   profileRoot?: string;
   confirm?: () => Promise<boolean>;
+  print?: (value: string) => void;
 }
 
 export interface OnboardingResetResult {
   profileRoot: string;
   removed: string[];
+  planned?: string[];
+  dryRun?: boolean;
 }
 
 function onboardingArtifactPaths(profileRoot: string): string[] {
@@ -53,7 +57,13 @@ export async function resetOnboardingArtifacts(
   const existingTargets = targets.filter((target) => safeExistsSync(target));
 
   if (existingTargets.length === 0) {
-    return { profileRoot, removed: [] };
+    return options.dryRun
+      ? { profileRoot, removed: [], planned: [], dryRun: true }
+      : { profileRoot, removed: [] };
+  }
+
+  if (options.dryRun) {
+    return { profileRoot, removed: [], planned: existingTargets, dryRun: true };
   }
 
   let proceed = options.force ?? false;
@@ -61,10 +71,11 @@ export async function resetOnboardingArtifacts(
     if (options.confirm) {
       proceed = await options.confirm();
     } else if (process.stdin.isTTY && process.stdout.isTTY) {
-      console.log(
+      const print = options.print ?? console.log;
+      print(
         `About to reset onboarding artifacts under: ${path.relative(process.cwd(), profileRoot)}`
       );
-      console.log(formatPathList(profileRoot, existingTargets));
+      print(formatPathList(profileRoot, existingTargets));
       proceed = await createPrompt();
     } else {
       throw new Error('onboard reset requires a TTY confirmation or --force');
@@ -85,6 +96,19 @@ export async function resetOnboardingArtifacts(
 }
 
 export function formatResetSummary(result: OnboardingResetResult): string {
+  if (result.dryRun) {
+    if (result.planned?.length === 0) {
+      return `No onboarding artifacts found under ${result.profileRoot}.`;
+    }
+    return [
+      'Onboarding reset preview (no files changed).',
+      `Profile root: ${result.profileRoot}`,
+      'Would remove:',
+      formatPathList(result.profileRoot, result.planned || []),
+      '',
+      'Next step: rerun without `--dry-run` or `--check` to request confirmation.',
+    ].join('\n');
+  }
   if (result.removed.length === 0) {
     return `No onboarding artifacts found under ${result.profileRoot}.`;
   }
@@ -98,21 +122,21 @@ export function formatResetSummary(result: OnboardingResetResult): string {
   ].join('\n');
 }
 
-export async function main(args: string[] = []): Promise<void> {
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = (value) => console.log(value)
+): Promise<void> {
   const force = args.includes('--force');
   const json = args.includes('--json');
+  const dryRun = args.includes('--dry-run') || args.includes('--check');
 
   if (args.includes('--help') || args.includes('-h')) {
-    console.log('Usage: pnpm onboard reset [--force] [--json]');
+    print('Usage: pnpm onboard reset [--force] [--json] [--dry-run] [--check]');
     return;
   }
 
-  const result = await resetOnboardingArtifacts({ force });
-  if (json) {
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    return;
-  }
-  console.log(formatResetSummary(result));
+  const result = await resetOnboardingArtifacts({ force, dryRun, print: (value) => print(value) });
+  print(json ? result : formatResetSummary(result));
 }
 
 if (
@@ -121,8 +145,8 @@ if (
 )
   void defineScript({
     name: 'onboard reset',
-    flags: [],
+    flags: ['json', 'dry-run', 'check'],
     run(context) {
-      return main(context.argv);
+      return main(context.argv, context.print);
     },
   })();
