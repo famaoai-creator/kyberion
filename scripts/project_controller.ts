@@ -17,6 +17,13 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ProjectTier = 'personal' | 'confidential' | 'public';
 type ProjectStatus = 'draft' | 'active' | 'paused' | 'archived';
+type Print = (value: unknown) => void;
+
+let activePrint: Print = () => undefined;
+
+function printOutput(value: unknown): void {
+  activePrint(value);
+}
 
 function optionValue(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -49,20 +56,20 @@ export function parseProjectMetadata(raw: string | undefined): Record<string, un
 }
 
 function jsonOutput(value: unknown): void {
-  console.log(JSON.stringify(value, null, 2));
+  printOutput(JSON.stringify(value, null, 2));
 }
 
 function printProjectList(): void {
   for (const view of listManagedProjects()) {
     const { project } = view;
-    console.log(
+    printOutput(
       `${project.project_id}\t${project.status}\t${project.tier}\t${project.name}\ttasks=${view.tasks.length}\tmissions=${view.missions.length}\ttask_sessions=${view.task_sessions.length}`
     );
   }
 }
 
 function printHelp(): void {
-  console.log(
+  printOutput(
     `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  scaffold <PROJECT_ID> [--json]\n  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--required-artifacts <CSV>] [--json]\n  track update --track-id <ID> --tenant-slug <SLUG> [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state.`
   );
 }
@@ -122,7 +129,7 @@ function parseTrackStatus(value: string | undefined): ProjectTrackRecord['status
   throw new Error(`Invalid track status: ${value || '(missing)'}`);
 }
 
-export async function main(args: string[] = []): Promise<void> {
+async function mainImpl(args: string[] = []): Promise<void> {
   const [command, ...argv] = args;
   const positional = argv[0] && !argv[0].startsWith('--') ? argv[0] : undefined;
   const json = hasFlag(argv, '--json');
@@ -144,14 +151,14 @@ export async function main(args: string[] = []): Promise<void> {
       const view = getProjectManagementView(projectId);
       if (json) jsonOutput(view);
       else {
-        console.log(`${view.project.project_id}: ${view.project.name}`);
-        console.log(`status=${view.project.status} tier=${view.project.tier}`);
-        console.log(
+        printOutput(`${view.project.project_id}: ${view.project.name}`);
+        printOutput(`status=${view.project.status} tier=${view.project.tier}`);
+        printOutput(
           `tracks=${view.tracks.length} tasks=${view.tasks.length} missions=${view.missions.length} task_sessions=${view.task_sessions.length} pipelines=${view.lineage.pipelines.length}`
         );
-        console.log(`operational_states=${view.operational_states.length}`);
-        console.log('hierarchy=Project -> Track -> Mission -> Task / Task Session');
-        console.log(
+        printOutput(`operational_states=${view.operational_states.length}`);
+        printOutput('hierarchy=Project -> Track -> Mission -> Task / Task Session');
+        printOutput(
           'Task is a work item; Task Session is the resumable execution context and does not own the Task.'
         );
       }
@@ -168,7 +175,7 @@ export async function main(args: string[] = []): Promise<void> {
       );
       const result = { project_id: projectId, project_path: projectPath };
       if (json) jsonOutput(result);
-      else console.log(`Scaffolded project ${projectId}: ${projectPath}`);
+      else printOutput(`Scaffolded project ${projectId}: ${projectPath}`);
       return;
     }
     case 'track': {
@@ -178,7 +185,7 @@ export async function main(args: string[] = []): Promise<void> {
           tenant_slug: requiredOption(trackArgv, '--tenant-slug'),
         });
         if (hasFlag(trackArgv, '--json')) jsonOutput(record);
-        else console.log(`Updated project track ${record.track_id}`);
+        else printOutput(`Updated project track ${record.track_id}`);
         return;
       }
       if (trackCommand !== 'create')
@@ -205,7 +212,7 @@ export async function main(args: string[] = []): Promise<void> {
           : {}),
       });
       if (hasFlag(trackArgv, '--json')) jsonOutput(record);
-      else console.log(`Created project track ${record.track_id}`);
+      else printOutput(`Created project track ${record.track_id}`);
       return;
     }
     case 'create': {
@@ -237,7 +244,7 @@ export async function main(args: string[] = []): Promise<void> {
         ? buildManagedProjectRecord(input)
         : createManagedProject(input);
       if (json) jsonOutput(record);
-      else console.log(`Created project ${record.project_id}`);
+      else printOutput(`Created project ${record.project_id}`);
       return;
     }
     case 'update':
@@ -260,14 +267,14 @@ export async function main(args: string[] = []): Promise<void> {
       };
       const record = updateManagedProject(projectId, patch);
       if (json) jsonOutput(record);
-      else console.log(`Updated project ${record.project_id}`);
+      else printOutput(`Updated project ${record.project_id}`);
       return;
     }
     case 'archive': {
       const projectId = positional || requiredOption(argv, '--project-id');
       const record = archiveManagedProject(projectId, optionValue(argv, '--reason'));
       if (json) jsonOutput(record);
-      else console.log(`Archived project ${record.project_id}`);
+      else printOutput(`Archived project ${record.project_id}`);
       return;
     }
     case 'reconcile': {
@@ -281,7 +288,7 @@ export async function main(args: string[] = []): Promise<void> {
       if (json) jsonOutput(positional ? reports[0] : reports);
       else
         for (const report of reports)
-          console.log(`${report.project_id}\t${report.status}\tissues=${report.issues.length}`);
+          printOutput(`${report.project_id}\t${report.status}\tissues=${report.issues.length}`);
       return;
     }
     case 'bootstrap': {
@@ -321,13 +328,23 @@ export async function main(args: string[] = []): Promise<void> {
       });
       if (json) jsonOutput(result);
       else
-        console.log(
+        printOutput(
           `Bootstrapped project ${result.project.project_id} with ${result.mission_seed_ids.length} mission seeds and kickoff ${result.kickoff_task_session.session_id}`
         );
       return;
     }
     default:
       throw new Error(`Unknown project command: ${command}`);
+  }
+}
+
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
+  const previousPrint = activePrint;
+  activePrint = print;
+  try {
+    await mainImpl(args);
+  } finally {
+    activePrint = previousPrint;
   }
 }
 
@@ -338,5 +355,5 @@ if (
   void defineScript({
     name: 'project',
     flags: [],
-    run: ({ argv }) => main(argv),
+    run: ({ argv, print }) => main(argv, print),
   })();
