@@ -554,24 +554,25 @@ function parseRecordedAction(value: unknown): BrowserRecordedAction | null {
     return null;
   }
 
-  const classification = value.classification;
-  const resumeStatus = value.resume_status;
-  if (
-    classification !== undefined &&
-    classification !== 'user_input' &&
-    classification !== 'secret_ref'
-  ) {
-    return null;
-  }
-  if (
-    resumeStatus !== undefined &&
-    resumeStatus !== 'pending' &&
-    resumeStatus !== 'approved' &&
-    resumeStatus !== 'rejected' &&
-    resumeStatus !== 'expired'
-  ) {
-    return null;
-  }
+  const classificationValue = value.classification;
+  const classification: BrowserRecordedAction['classification'] | null =
+    classificationValue === undefined
+      ? undefined
+      : classificationValue === 'user_input' || classificationValue === 'secret_ref'
+        ? classificationValue
+        : null;
+  if (classification === null) return null;
+  const resumeStatusValue = value.resume_status;
+  const resumeStatus: BrowserRecordedAction['resume_status'] | null =
+    resumeStatusValue === undefined
+      ? undefined
+      : resumeStatusValue === 'pending' ||
+          resumeStatusValue === 'approved' ||
+          resumeStatusValue === 'rejected' ||
+          resumeStatusValue === 'expired'
+        ? resumeStatusValue
+        : null;
+  if (resumeStatus === null) return null;
 
   const stringFields = [
     'tab_id',
