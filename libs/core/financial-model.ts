@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { readJsonIfPresent } from './foundation/json.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 
@@ -43,7 +42,17 @@ function resolveBaseDir(rootDir?: string): string {
 const FINANCIAL_MODEL_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/financial-model.schema.json'
 );
+const LEGACY_CUSTOMER_FINANCIALS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/legacy-customer-financials.schema.json'
+);
 const financialModelCatalogs = new Map<string, GovernedCatalog<FinancialModel>>();
+interface LegacyCustomerFinancials {
+  financials_prev_fy?: Record<string, unknown>;
+}
+const legacyCustomerFinancialsCatalogs = new Map<
+  string,
+  GovernedCatalog<LegacyCustomerFinancials>
+>();
 
 function loadFinancialModelCatalog(filePath: string, rootDir: string): FinancialModel | null {
   const safeFilePath = assertSafeRepositoryPath(filePath, {
@@ -101,16 +110,29 @@ function loadLegacyCustomerFinancials(
   customerPath: string,
   tenantSlug: string
 ): FinancialModel | null {
-  const customer = readJsonIfPresent<Record<string, unknown>>(customerPath);
-  if (!customer) return null;
+  let catalog = legacyCustomerFinancialsCatalogs.get(customerPath);
+  if (!catalog) {
+    catalog = defineCatalog<LegacyCustomerFinancials>({
+      id: 'legacy-customer-financials',
+      path: customerPath,
+      schema: LEGACY_CUSTOMER_FINANCIALS_SCHEMA_PATH,
+    });
+    legacyCustomerFinancialsCatalogs.set(customerPath, catalog);
+  }
+  let customer: LegacyCustomerFinancials;
+  try {
+    customer = catalog.load();
+  } catch {
+    return null;
+  }
   const legacy = customer.financials_prev_fy;
-  if (!legacy || typeof legacy !== 'object') return null;
+  if (!legacy) return null;
   return {
     company_id: tenantSlug,
     tenant_slug: tenantSlug,
     source_kind: 'customer',
     source_path: customerPath,
-    periods: [toFinancialPeriod(legacy as Record<string, unknown>, 'prev_fy', 'Previous FY')],
+    periods: [toFinancialPeriod(legacy, 'prev_fy', 'Previous FY')],
   };
 }
 

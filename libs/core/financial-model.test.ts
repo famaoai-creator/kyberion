@@ -97,6 +97,19 @@ describe('financial-model', () => {
     expect(invalidOverlay.periods).toEqual([]);
   });
 
+  it('fails closed when legacy customer financial fields are malformed', () => {
+    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/customer/acme/customer.json`,
+      JSON.stringify({ display_name: 'ACME Inc.', financials_prev_fy: 'invalid' })
+    );
+
+    const model = resolveFinancialModel('acme', tmpRoot);
+
+    expect(model.source_kind).toBe('derived');
+    expect(model.periods).toEqual([]);
+  });
+
   it('rejects a symlinked financial model before reading it', () => {
     safeMkdir(`${tmpRoot}/customer/acme/finance`, { recursive: true });
     safeMkdir(`${tmpRoot}/outside`, { recursive: true });
