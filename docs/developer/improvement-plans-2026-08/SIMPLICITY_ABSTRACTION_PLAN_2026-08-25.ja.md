@@ -17761,6 +17761,21 @@ caller が semantic token を誤って空 object として扱う不具合を修�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 1021
+
+SX-04／SX-10／SX-11 の design-system resolution 境界を再監査し、design-md recommendation、media design system、
+tenant override、branding、prompt guide、source design の出力契約を明示型化した。recommendation は catalog entry 全体
+を再公開せず、利用者へ渡す選択結果の fields と score だけを返す。prompt guide は catalog の動的値から string のみを
+採用し、fallback／design reference の選択順、tenant scope、overlay merge は変更していない。
+
+検証:
+
+- Media design-md／document composition／semantic token／actuator integration **4 files / 53 tests passed（11 skipped）**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

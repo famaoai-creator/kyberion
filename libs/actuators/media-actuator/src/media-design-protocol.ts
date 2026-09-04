@@ -8,6 +8,7 @@ import {
 import { defineCatalog, isRecord } from '@agent/core/foundation';
 import { loadProjectRecord } from '@agent/core/project-registry';
 import { loadServiceBindingRecord } from '@agent/core/service-binding-registry';
+import type { TenantDesignOverride } from '@agent/core/tenant-design-override';
 import {
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
@@ -37,6 +38,7 @@ import { buildPptxSlideFromPattern as runtimeBuildPptxSlideFromPattern } from '.
 import {
   loadConfidentialThemePack,
   type ConfidentialThemePack,
+  type MediaDesignSystemDefinition,
   resolveConfidentialTenantOverride,
 } from './media-catalog-loaders.js';
 import * as path from 'node:path';
@@ -326,6 +328,15 @@ type ImportedDesignMdIndex = {
   }>;
 };
 
+type ImportedDesignReference = ImportedDesignMdIndex['systems'][number];
+
+type ImportedDesignRecommendation = Pick<
+  ImportedDesignReference,
+  'design_system_id' | 'theme_id' | 'slug' | 'name' | 'category' | 'description' | 'source_path'
+> & {
+  recommendation_score: number;
+};
+
 function loadImportedDesignMdIndex(rootDir: string): ImportedDesignMdIndex {
   const fallback: ImportedDesignMdIndex = {
     generated_at: '1970-01-01T00:00:00.000Z',
@@ -453,7 +464,10 @@ function resolveDesignBindingHints(brief: any): {
   };
 }
 
-function resolveImportedDesignReference(rootDir: string, input: any): any | null {
+function resolveImportedDesignReference(
+  rootDir: string,
+  input: any
+): ImportedDesignReference | null {
   const catalog = loadImportedDesignMdIndex(rootDir);
   const candidates = [
     input?.design_reference,
@@ -468,7 +482,7 @@ function resolveImportedDesignReference(rootDir: string, input: any): any | null
   if (candidates.length === 0) return null;
   const systems = Array.isArray(catalog.systems) ? catalog.systems : [];
   return (
-    systems.find((entry: any) => {
+    systems.find((entry: ImportedDesignReference) => {
       const values = [
         entry?.design_system_id,
         entry?.theme_id,
@@ -490,7 +504,11 @@ function resolveImportedDesignReference(rootDir: string, input: any): any | null
   );
 }
 
-function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 3): any[] {
+function recommendImportedDesignReferences(
+  rootDir: string,
+  brief: any,
+  limit = 3
+): ImportedDesignRecommendation[] {
   const catalog = loadImportedDesignMdIndex(rootDir);
   const systems = Array.isArray(catalog.systems) ? catalog.systems : [];
   const haystack = normalizeDesignLookupKey(
@@ -519,7 +537,7 @@ function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 
   if (!haystack) return [];
 
   const scored = systems
-    .map((entry: any) => {
+    .map((entry: ImportedDesignReference) => {
       const terms = [
         entry?.slug,
         entry?.name,
@@ -542,8 +560,8 @@ function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 
         recommendation_score: score,
       };
     })
-    .filter((entry: any) => entry.recommendation_score > 0)
-    .sort((left: any, right: any) => {
+    .filter((entry) => entry.recommendation_score > 0)
+    .sort((left: ImportedDesignRecommendation, right: ImportedDesignRecommendation) => {
       if (right.recommendation_score !== left.recommendation_score)
         return right.recommendation_score - left.recommendation_score;
       return String(left.design_system_id || '').localeCompare(
@@ -551,7 +569,7 @@ function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 
       );
     });
 
-  return scored.slice(0, limit).map((entry: any) => ({
+  return scored.slice(0, limit).map((entry: ImportedDesignRecommendation) => ({
     design_system_id: entry.design_system_id,
     theme_id: entry.theme_id,
     slug: entry.slug,
@@ -568,19 +586,19 @@ function resolveMediaDesignSystem(
   brief: any
 ): {
   designSystemId: string;
-  system: any;
-  tenantOverride: any;
+  system: MediaDesignSystemDefinition;
+  tenantOverride: TenantDesignOverride | null;
   resolvedThemeName: string;
-  branding: any;
+  branding: Record<string, unknown>;
   promptGuide: string[];
-  sourceDesign?: Record<string, any> | null;
-  recommendations: any[];
+  sourceDesign?: Record<string, unknown> | null;
+  recommendations: ImportedDesignRecommendation[];
 } {
   const catalog = loadMediaDesignSystemsCatalog(rootDir);
   const bindingHints = resolveDesignBindingHints(brief);
   const recommendations = recommendImportedDesignReferences(rootDir, brief);
   const explicit = String(bindingHints.design_system_id || '').trim();
-  const resolveTenantOverride = (_system: any, designSystemId?: string) => {
+  const resolveTenantOverride = (_system: MediaDesignSystemDefinition, designSystemId?: string) => {
     const clientHint =
       bindingHints.tenant_id ||
       bindingHints.client_key ||
@@ -593,10 +611,10 @@ function resolveMediaDesignSystem(
       ? resolveConfidentialTenantOverride(rootDir, String(clientHint), designSystemId)
       : null;
   };
-  const buildResult = (designSystemId: string, system: any) => {
+  const buildResult = (designSystemId: string, system: MediaDesignSystemDefinition) => {
     const tenantOverride = resolveTenantOverride(system, designSystemId);
     const promptGuide = Array.isArray(system?.metadata?.prompt_guide)
-      ? system.metadata.prompt_guide
+      ? system.metadata.prompt_guide.filter((value): value is string => typeof value === 'string')
       : [];
     return {
       designSystemId,
@@ -640,13 +658,14 @@ function resolveMediaDesignSystem(
   }
   const profileId = String(brief?.document_profile || '').trim();
   const matched = Object.entries(catalog.systems || {}).find(
-    ([, system]: any) => Array.isArray(system?.profiles) && system.profiles.includes(profileId)
+    ([, system]: [string, MediaDesignSystemDefinition]) =>
+      Array.isArray(system?.profiles) && system.profiles.includes(profileId)
   );
   if (matched) {
     return buildResult(matched[0], matched[1]);
   }
   const fallbackId = String(catalog.default_system || 'executive-standard');
-  return buildResult(fallbackId, catalog.systems?.[fallbackId] || {});
+  return buildResult(fallbackId, catalog.systems?.[fallbackId] || { theme: 'kyberion-standard' });
 }
 
 function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderTokenCatalog {
