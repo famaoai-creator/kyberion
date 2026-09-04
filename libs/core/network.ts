@@ -13,6 +13,7 @@ import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { assertOperationPolicy } from './operation-policy-gate.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isRecord } from './foundation/text.js';
 
 /**
  * Standardized network utilities for Kyberion Components.
@@ -62,7 +63,7 @@ export function redactSensitiveString(value: string): string {
   return redacted;
 }
 
-export function redactSensitiveValue(value: any, keyPath: string[] = []): any {
+export function redactSensitiveValue(value: unknown, keyPath: string[] = []): unknown {
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') {
     return SENSITIVE_KEY_PATTERN.test(keyPath[keyPath.length - 1] || '')
@@ -75,8 +76,8 @@ export function redactSensitiveValue(value: any, keyPath: string[] = []): any {
   if (Array.isArray(value)) {
     return value.map((entry, index) => redactSensitiveValue(entry, [...keyPath, String(index)]));
   }
-  if (typeof value === 'object') {
-    const output: Record<string, any> = {};
+  if (isRecord(value)) {
+    const output: Record<string, unknown> = {};
     for (const [key, nested] of Object.entries(value)) {
       if (SENSITIVE_KEY_PATTERN.test(key)) {
         output[key] =
@@ -92,8 +93,8 @@ export function redactSensitiveValue(value: any, keyPath: string[] = []): any {
   return value;
 }
 
-export function redactSensitiveObject(data: any): any {
-  return redactSensitiveValue(data);
+export function redactSensitiveObject<T>(data: T): T {
+  return redactSensitiveValue(data) as T;
 }
 
 function enforcePayloadSize(options: AxiosRequestConfig) {
@@ -221,9 +222,11 @@ export async function secureFetch<T = unknown>(options: SecureFetchOptions): Pro
       },
     });
     return response.data;
-  } catch (err: any) {
-    const status = err.response ? ` (${err.response.status})` : '';
-    throw new Error(`Network Error: ${err.message}${status}`);
+  } catch (err: unknown) {
+    const response = isRecord(err) && isRecord(err.response) ? err.response : undefined;
+    const status = typeof response?.status === 'number' ? ` (${response.status})` : '';
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Network Error: ${message}${status}`);
   }
 }
 export interface SecureFetchOptions extends AxiosRequestConfig {

@@ -152,4 +152,15 @@ describe('secureFetch', () => {
       })
     );
   });
+
+  it('redacts unknown values without assuming an object response shape', async () => {
+    const { redactSensitiveObject } = await import('./network.js');
+
+    expect(redactSensitiveObject({ token: 'secret', nested: [{ value: 'safe' }] })).toEqual({
+      token: '[REDACTED_SECRET]',
+      nested: [{ value: 'safe' }],
+    });
+    expect(redactSensitiveObject(null)).toBeNull();
+    expect(redactSensitiveObject('plain text')).toBe('plain text');
+  });
 });
