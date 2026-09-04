@@ -453,7 +453,8 @@ async function start() {
 
   if (!appToken || !botToken) {
     logger.error('❌ Missing Slack service binding (access token or app token).');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const app = new App({
@@ -1195,7 +1196,7 @@ const directEntry = isDirectEntry(import.meta.url, 'satellites/slack-bridge/src/
 if (directEntry && !process.env.VITEST) {
   start().catch((err) => {
     logger.error(`SlackBridge crashed: ${err.message}`);
-    process.exit(1);
+    process.exitCode = 1;
   });
 } else if (directEntry) {
   logger.warn('[SlackBridge] VITEST is set — suppressing the direct-entry start.');
