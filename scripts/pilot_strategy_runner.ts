@@ -4,7 +4,9 @@ import { resolvePilotStrategyPolicy } from '@agent/core/pilot-strategy-policy';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function main() {
+type Print = (value: unknown) => void;
+
+async function main(print: Print = () => undefined) {
   const policy = resolvePilotStrategyPolicy();
   const strategy = `
 # ${policy.title}
@@ -33,14 +35,14 @@ async function main() {
 
   const outputPath = path.join(outputDir, 'gtm_strategy.md');
   safeWriteFile(outputPath, strategy.trim());
-  console.log(`✅ Strategy successfully distilled and saved to: ${outputPath}`);
+  print(`✅ Strategy successfully distilled and saved to: ${outputPath}`);
 }
 
 export const runPilotStrategy = defineScript({
   name: 'pilot-strategy',
   flags: [],
-  run() {
-    return main();
+  run({ print }) {
+    return main(print);
   },
 });
 
