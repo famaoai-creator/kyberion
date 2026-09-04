@@ -59,5 +59,26 @@ describe('agent chat response boundary', () => {
       '{"status":"ok","response":"Ready.","timestamp":"2026-09-04T00:00:00.000Z","a2ui":[{"__proto__":"bad"}]}'
     );
     expect(parseAgentChatSuccessResponse(unsafe)).toBeUndefined();
+    expect(
+      parseAgentChatSuccessResponse({
+        status: 'ok',
+        response: 'Ready.',
+        timestamp: '2026-09-04T00:00:00.000Z',
+        a2ui: [{ type: 'display:not-registered', props: {} }],
+      })
+    ).toBeUndefined();
+    expect(
+      parseAgentChatSuccessResponse({
+        status: 'ok',
+        response: 'Ready.',
+        timestamp: '2026-09-04T00:00:00.000Z',
+        a2ui: [
+          {
+            type: 'display:hero',
+            props: { nested: JSON.parse('{"__proto__":{"polluted":true}}') },
+          },
+        ],
+      })
+    ).toBeUndefined();
   });
 });
