@@ -11,6 +11,8 @@ describe('license audit entrypoint', () => {
     expect(source).toContain("flags: ['json', 'check', 'quiet']");
     expect(source).toContain('context.print(');
     expect(source).toContain('new ScriptExitError(1');
+    expect(source).toContain('readSafeJsonFile');
+    expect(source).not.toContain('readJson<Record<string, unknown>>');
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('console.error(');
   });

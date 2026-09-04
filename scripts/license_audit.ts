@@ -29,9 +29,10 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 interface PackageLicenseInfo {
   name: string;
@@ -72,7 +73,7 @@ const REPORT_PATH = path.join(ROOT, 'docs', 'legal', 'third-party-licenses.json'
 
 function readPackageJson(p: string): Record<string, unknown> | null {
   try {
-    return readJson<Record<string, unknown>>(p);
+    return readSafeJsonFile<Record<string, unknown>>(p, `license audit package manifest ${p}`);
   } catch {
     return null;
   }
