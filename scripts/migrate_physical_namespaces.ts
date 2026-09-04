@@ -33,6 +33,8 @@ import { isRecord, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 
+type Print = (value: unknown) => void;
+
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const MIGRATION_ROOT = 'active/shared/runtime/migrations/physical-namespace';
 const QUARANTINE_ROOT = `${MIGRATION_ROOT}/quarantine`;
@@ -713,7 +715,7 @@ function parseArgs(argv: string[]): { kind: MigrationSelection; apply: boolean }
   };
 }
 
-function main(argv: string[]): void {
+export function main(argv: string[], print: Print = () => undefined): void {
   const options = parseArgs(argv);
   const kinds: MigrationKind[] =
     options.kind === 'all'
@@ -722,13 +724,13 @@ function main(argv: string[]): void {
   const plans = withExecutionContext(AUTHORITY_ROLE, () =>
     kinds.map((kind) => buildPlan(kind, options.apply))
   );
-  console.log(JSON.stringify({ mode: options.apply ? 'apply' : 'dry-run', plans }, null, 2));
+  print(JSON.stringify({ mode: options.apply ? 'apply' : 'dry-run', plans }, null, 2));
 }
 
 const script = defineScript({
   name: 'migrate:physical-namespaces',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'migrate_physical_namespaces.ts') ||
