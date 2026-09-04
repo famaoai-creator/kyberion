@@ -781,6 +781,20 @@ reset hook を再確認した。`resetAgentPerformanceIndexCache` と
 (5,804 passed / 1 skipped)**、`pnpm run typecheck`、`pnpm run lint`、PR gate **31/31**、
 `git diff --check` を実行し、いずれも green だった。
 
+## 2026-09-05 再レビュー修正 1075
+
+SX-06 の interactive script を再監査し、`skill_installer.ts` に残っていた `console.log/error` の rich output を shared harness の
+printer 注入へ統一した。`--quiet`／`--json` が installer の表示を迂回せず、dependency install の失敗表示も同じ出力境界を通るようにした。
+readline の質問、capability scan、brew／pip の実行、install 判定、終了コードは変更していない。
+
+検証:
+
+- skill installer **1 file / 1 test passed**。`--help` の出力が注入 printer を通り、直接 console 出力がないことを確認した。
+- `pnpm run typecheck`、対象2ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 45. 2026-08-29 core / checker / pipeline import 境界の追加整理
 
 `libs/core` のテスト・example、`scripts/check_*`、`scripts/refactor`、`scripts/lib` と
