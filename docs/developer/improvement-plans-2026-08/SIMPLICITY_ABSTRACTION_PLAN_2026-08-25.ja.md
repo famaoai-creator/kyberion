@@ -16538,7 +16538,14 @@ SX-03の追加script／state loader、SX-04の他の非catalog loader／未参�
 
 SX-08／SX-09 の Chronos SurfaceControl projectionを再監査し、`/api/intelligence` responseを部分的な配列 fallbackとspread、`/api/intelligence` POST responseをHTTP statusだけで表示・refreshへ進める残存を修正した。専用 parser で surfaces／control actions／availability、queued action、dangerous key、列挙値と必須文字列を検証してから state更新へ渡し、不正 responseは fail-closed とする。既存の viewer scope、risk confirmation、surface control enqueue、refresh semantics は変更していない。
 
-検証: Chronos surface-control response **1 file / 9 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+検証: Chronos surface-control response **1 file / 10 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
+## 2026-09-04 再レビュー修正 914
+
+SX-08／SX-09 の Chronos AgentCollaborationBoard projectionを再監査し、`/api/collaboration` responseをHTTP statusと`ok`判定だけで表示 stateへ渡し、projectionを型アサーションしていた残存を修正した。専用 parser で revision／overview／timeline／handoff graph／attention、列挙値、dangerous key、数値範囲を検証してから live-sync stateへ渡し、不正 responseは fail-closed とする。既存のviewer scope、mission filter、SSE refresh、human intervention導線は変更していない。
+
+検証: Chronos collaboration response **1 file / 7 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 参照
