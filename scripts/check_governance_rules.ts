@@ -4,7 +4,7 @@ import { assertProcessDefinitionRegistry } from '@agent/core/process-definition-
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadSurfaceManifest } from '@agent/core/surface-runtime';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
-import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
+import { compileSchema, defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   validateActuatorCatalogDirectoryConsistency,
@@ -21,6 +21,7 @@ import {
   findMachineAbsolutePathViolations,
   scanProductJsonForPlacementDrift,
 } from './check-governance-path-scanners.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type GovernanceRuleCheck = {
   id: string;
@@ -321,7 +322,10 @@ export function discoverGovernanceRuleChecks(): GovernanceRuleCheck[] {
     const dataPath = `${GOVERNANCE_DIR}/${fileName}`;
     let payload: { $schema?: unknown };
     try {
-      payload = readJson<{ $schema?: unknown }>(pathResolver.rootResolve(dataPath));
+      payload = readSafeJsonFile<{ $schema?: unknown }>(
+        pathResolver.rootResolve(dataPath),
+        `governance catalog ${dataPath}`
+      );
     } catch {
       // The catalog-integrity gate reports malformed JSON with the precise
       // parse error; discovery should still allow the rest of this check to
@@ -356,7 +360,10 @@ function allGovernanceRuleChecks(): GovernanceRuleCheck[] {
 }
 
 function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
-  const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(check.dataPath));
+  const data = readSafeJsonFile<Record<string, unknown>>(
+    pathResolver.rootResolve(check.dataPath),
+    `governance catalog ${check.dataPath}`
+  );
   const validate = compileSchema(check.schemaPath);
   const ok = validate(data);
   if (!ok) {

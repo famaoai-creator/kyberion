@@ -10,9 +10,10 @@ import {
   safeExecResult,
   safeStat,
 } from '@agent/core/secure-io';
-import { getRegisteredEnvBool, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvBool } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 export interface EntityGovernanceReport {
   status: 'ok' | 'drift';
@@ -142,12 +143,12 @@ export function collectEntityGovernanceReport(
   let policy: any = null;
   let catalog: any = null;
   try {
-    policy = readJson<unknown>(policyPath);
+    policy = readSafeJsonFile<Record<string, unknown>>(policyPath, 'security policy');
   } catch (error) {
     violations.push(`security policy unreadable: ${String(error)}`);
   }
   try {
-    catalog = readJson<unknown>(catalogPath);
+    catalog = readSafeJsonFile<Record<string, unknown>>(catalogPath, 'retention catalog');
   } catch (error) {
     violations.push(`retention catalog unreadable: ${String(error)}`);
   }
