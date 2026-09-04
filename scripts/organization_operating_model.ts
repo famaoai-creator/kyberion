@@ -45,6 +45,8 @@ import type {
 } from '@agent/core/organization-operating-model';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 type ParsedArgs = {
   command: string;
   organizationId?: string;
@@ -442,513 +444,533 @@ function requireFlags(command: string, flags: Record<string, string | undefined>
   }
 }
 
+let activePrint: Print = () => undefined;
+
 function emit(value: unknown, json: boolean): void {
   if (json) {
-    console.log(JSON.stringify(value, null, 2));
+    activePrint(JSON.stringify(value, null, 2));
     return;
   }
-  console.log(JSON.stringify(value, null, 2));
+  activePrint(JSON.stringify(value, null, 2));
 }
 
-export function runOrganizationOperatingModelCli(args: string[] = []): void {
-  const parsed = parseArgs(args);
-  if (parsed.command === 'help') {
-    console.log(usage());
-    return;
-  }
-  if (parsed.command === 'model') {
-    emit(loadOrganizationOperatingModelCatalog(), parsed.json);
-    return;
-  }
-  const organizationId = parsed.organizationId || loadOrganizationProfile()?.organization_id;
-  if (parsed.command === 'work resolve') {
-    if (!organizationId) {
-      throw new Error('--organization-id is required when no organization profile is configured.');
+export function runOrganizationOperatingModelCli(
+  args: string[] = [],
+  print: Print = () => undefined
+): void {
+  const previousPrint = activePrint;
+  activePrint = print;
+  try {
+    const parsed = parseArgs(args);
+    if (parsed.command === 'help') {
+      activePrint(usage());
+      return;
     }
-    if (!parsed.intent) throw new Error('--intent is required for work resolve.');
-    if (!parsed.dryRun) throw new Error('work resolve is read-only and requires --dry-run.');
-    emit(
-      resolveOrganizationWork({
-        utterance: parsed.intent,
+    if (parsed.command === 'model') {
+      emit(loadOrganizationOperatingModelCatalog(), parsed.json);
+      return;
+    }
+    const organizationId = parsed.organizationId || loadOrganizationProfile()?.organization_id;
+    if (parsed.command === 'work resolve') {
+      if (!organizationId) {
+        throw new Error(
+          '--organization-id is required when no organization profile is configured.'
+        );
+      }
+      if (!parsed.intent) throw new Error('--intent is required for work resolve.');
+      if (!parsed.dryRun) throw new Error('work resolve is read-only and requires --dry-run.');
+      emit(
+        resolveOrganizationWork({
+          utterance: parsed.intent,
+          organizationId,
+          tier: parsed.tier,
+          tenantSlug: parsed.tenantSlug,
+        }),
+        parsed.json
+      );
+      return;
+    }
+    if (parsed.command === 'reconcile') {
+      if (!organizationId) {
+        throw new Error(
+          '--organization-id is required when no organization profile is configured.'
+        );
+      }
+      if (parsed.dryRun && parsed.apply) {
+        throw new Error('--dry-run and --apply cannot be used together.');
+      }
+      emit(
+        reconcileOrganizationState({
+          organizationId,
+          tier: parsed.tier,
+          tenantSlug: parsed.tenantSlug,
+          apply: parsed.apply,
+        }),
+        parsed.json
+      );
+      return;
+    }
+    if (parsed.command === 'learning enqueue') {
+      if (!organizationId) {
+        throw new Error(
+          '--organization-id is required when no organization profile is configured.'
+        );
+      }
+      if (!parsed.tier) throw new Error('--tier is required for learning enqueue.');
+      if (parsed.dryRun === parsed.apply) {
+        throw new Error('Specify exactly one of --dry-run or --apply for learning enqueue.');
+      }
+      if (
+        !parsed.learningId ||
+        !parsed.sourceType ||
+        !parsed.sourceRef ||
+        !parsed.title ||
+        !parsed.summary ||
+        !parsed.targetKind
+      ) {
+        throw new Error(
+          '--learning-id, --source-type, --source-ref, --title, --summary, and --target-kind are required.'
+        );
+      }
+      const input = {
+        learningId: parsed.learningId,
         organizationId,
+        sourceType: parsed.sourceType,
+        sourceRef: parsed.sourceRef,
+        title: parsed.title,
+        summary: parsed.summary,
+        targetKind: parsed.targetKind,
+        evidenceRefs: parsed.evidenceRefs,
         tier: parsed.tier,
         tenantSlug: parsed.tenantSlug,
-      }),
-      parsed.json
-    );
-    return;
-  }
-  if (parsed.command === 'reconcile') {
-    if (!organizationId) {
-      throw new Error('--organization-id is required when no organization profile is configured.');
+      };
+      emit(
+        parsed.apply
+          ? enqueueOrganizationLearningCandidate(input)
+          : buildOrganizationLearningCandidate(input),
+        parsed.json
+      );
+      return;
     }
-    if (parsed.dryRun && parsed.apply) {
-      throw new Error('--dry-run and --apply cannot be used together.');
-    }
-    emit(
-      reconcileOrganizationState({
+    if (parsed.command === 'init') {
+      if (!organizationId) throw new Error('--organization-id is required for init.');
+      requireFlags('init', { '--name': parsed.name, '--tier': parsed.tier });
+      const mode = resolveWriteMode(parsed, 'init');
+      const scaffold = buildOrganizationScaffold({
         organizationId,
+        name: parsed.name!,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        purpose: parsed.purposeText,
+        principles: parsed.principles,
+        ownerRole: parsed.ownerRole,
+      });
+      const savedPaths: string[] = [];
+      if (mode === 'apply') {
+        savedPaths.push(saveOrganizationOperationalState(scaffold.state));
+        if (scaffold.purpose) savedPaths.push(saveOrganizationPurpose(scaffold.purpose));
+      }
+      emit({ mode, ...scaffold, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (['pause', 'resume', 'archive'].includes(parsed.command)) {
+      if (!organizationId) throw new Error(`--organization-id is required for ${parsed.command}.`);
+      requireFlags(parsed.command, { '--tier': parsed.tier });
+      const mode = resolveWriteMode(parsed, parsed.command);
+      const next =
+        mode === 'apply'
+          ? transitionOrganizationLifecycle({
+              organizationId,
+              tier: parsed.tier!,
+              tenantSlug: parsed.tenantSlug,
+              verb: parsed.command as 'pause' | 'resume' | 'archive',
+              reason: parsed.reason,
+            })
+          : {
+              status: 'dry-run',
+              verb: parsed.command,
+              organization_id: organizationId,
+              tier: parsed.tier,
+              tenant_slug: parsed.tenantSlug,
+              reason: parsed.reason,
+            };
+      emit({ mode, state: next }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'retire' || parsed.command === 'remove') {
+      if (!organizationId) throw new Error(`--organization-id is required for ${parsed.command}.`);
+      requireFlags(parsed.command, {
+        '--tier': parsed.tier,
+        '--kind': parsed.recordKind,
+        '--record-id': parsed.recordId,
+      });
+      const mode = resolveWriteMode(parsed, parsed.command);
+      const next =
+        mode === 'apply'
+          ? parsed.command === 'retire'
+            ? retireOrganizationEntity({
+                organizationId,
+                tier: parsed.tier!,
+                tenantSlug: parsed.tenantSlug,
+                kind: parsed.recordKind!,
+                recordId: parsed.recordId!,
+                reason: parsed.reason,
+              })
+            : removeOrganizationEntity({
+                organizationId,
+                tier: parsed.tier!,
+                tenantSlug: parsed.tenantSlug,
+                kind: parsed.recordKind!,
+                recordId: parsed.recordId!,
+                reason: parsed.reason,
+              })
+          : {
+              status: 'dry-run',
+              kind: parsed.recordKind,
+              record_id: parsed.recordId,
+              organization_id: organizationId,
+              tier: parsed.tier,
+              tenant_slug: parsed.tenantSlug,
+              reason: parsed.reason,
+            };
+      emit({ mode, record: next }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'purpose set') {
+      if (!organizationId) throw new Error('--organization-id is required for purpose set.');
+      requireFlags('purpose set', {
+        '--name': parsed.name,
+        '--tier': parsed.tier,
+        '--purpose': parsed.purposeText,
+        '--owner-role': parsed.ownerRole,
+      });
+      const mode = resolveWriteMode(parsed, 'purpose set');
+      const record = buildOrganizationPurposeRecord({
+        organizationId,
+        name: parsed.name!,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        purpose: parsed.purposeText!,
+        principles: parsed.principles,
+        ownerRole: parsed.ownerRole!,
+        approvalState: parsed.approvalState,
+      });
+      const savedPaths = mode === 'apply' ? [saveOrganizationPurpose(record)] : [];
+      emit({ mode, purpose: record, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'objective add') {
+      if (!organizationId) throw new Error('--organization-id is required for objective add.');
+      requireFlags('objective add', {
+        '--tier': parsed.tier,
+        '--objective-id': parsed.objectiveId,
+        '--title': parsed.title,
+      });
+      const mode = resolveWriteMode(parsed, 'objective add');
+      const record = buildOrganizationObjectiveAddition({
+        organizationId,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        objective: {
+          objective_id: parsed.objectiveId!,
+          title: parsed.title!,
+          ...(parsed.description ? { description: parsed.description } : {}),
+          ...(parsed.horizon ? { horizon: parsed.horizon } : {}),
+          status: 'active',
+          ...(parsed.ownerRole ? { owner_role: parsed.ownerRole } : {}),
+        },
+      });
+      const savedPaths = mode === 'apply' ? [saveOrganizationPurpose(record)] : [];
+      emit({ mode, purpose: record, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'domain add') {
+      if (!organizationId) throw new Error('--organization-id is required for domain add.');
+      requireFlags('domain add', {
+        '--tier': parsed.tier,
+        '--domain-id': parsed.domainId,
+        '--name': parsed.name,
+        '--owner-role': parsed.ownerRole,
+      });
+      const mode = resolveWriteMode(parsed, 'domain add');
+      const record = buildOrganizationDomainRecord({
+        organizationId,
+        domainId: parsed.domainId!,
+        name: parsed.name!,
+        ownerRole: parsed.ownerRole!,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        purpose: parsed.purposeText,
+      });
+      const savedPaths = mode === 'apply' ? [saveOrganizationDomain(record)] : [];
+      emit({ mode, domain: record, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'service add') {
+      if (!organizationId) throw new Error('--organization-id is required for service add.');
+      requireFlags('service add', {
+        '--tier': parsed.tier,
+        '--service-id': parsed.serviceId,
+        '--domain-id': parsed.domainId,
+        '--name': parsed.name,
+        '--outcome': parsed.outcome,
+        '--owner-role': parsed.ownerRole,
+      });
+      const mode = resolveWriteMode(parsed, 'service add');
+      const addition = buildOrganizationServiceAddition({
+        organizationId,
+        serviceId: parsed.serviceId!,
+        domainId: parsed.domainId!,
+        name: parsed.name!,
+        outcome: parsed.outcome!,
+        ownerRole: parsed.ownerRole!,
+        consumers: parsed.consumers,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        sloTarget: parsed.sloTarget,
+        sloWindow: parsed.sloWindow,
+        runbookRefs: parsed.runbookRefs,
+        status: parsed.recordStatus as OrganizationServiceRecord['status'] | undefined,
+      });
+      const savedPaths =
+        mode === 'apply'
+          ? [saveOrganizationService(addition.service), saveOrganizationDomain(addition.domain)]
+          : [];
+      emit({ mode, ...addition, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'cadence add') {
+      if (!organizationId) throw new Error('--organization-id is required for cadence add.');
+      requireFlags('cadence add', {
+        '--tier': parsed.tier,
+        '--cadence-id': parsed.cadenceId,
+        '--name': parsed.name,
+        '--cadence-type': parsed.cadenceType,
+        '--schedule': parsed.schedule,
+        '--owner-role': parsed.ownerRole,
+      });
+      const mode = resolveWriteMode(parsed, 'cadence add');
+      const record = buildOrganizationCadence({
+        organizationId,
+        cadenceId: parsed.cadenceId!,
+        name: parsed.name!,
+        cadenceType: parsed.cadenceType!,
+        schedule: parsed.schedule!,
+        ownerRole: parsed.ownerRole!,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        status: parsed.recordStatus as OrganizationCadenceRecord['status'] | undefined,
+      });
+      const savedPaths = mode === 'apply' ? [saveOrganizationCadence(record)] : [];
+      emit({ mode, cadence: record, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'decision add') {
+      if (!organizationId) throw new Error('--organization-id is required for decision add.');
+      requireFlags('decision add', {
+        '--tier': parsed.tier,
+        '--decision-id': parsed.decisionId,
+        '--cadence-id': parsed.cadenceId,
+        '--title': parsed.title,
+        '--decision-owner': parsed.decisionOwner,
+        '--due-at': parsed.dueAt,
+      });
+      const mode = resolveWriteMode(parsed, 'decision add');
+      const addition = buildOrganizationDecision({
+        organizationId,
+        decisionId: parsed.decisionId!,
+        cadenceId: parsed.cadenceId!,
+        title: parsed.title!,
+        decisionOwner: parsed.decisionOwner!,
+        dueAt: parsed.dueAt!,
+        options: parsed.options,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        decisionType: parsed.decisionType,
+        status: parsed.recordStatus as OrganizationDecisionRecord['status'] | undefined,
+        requestedBy: parsed.requestedBy,
+        chosenOption: parsed.chosenOption,
+        rationale: parsed.rationale,
+        followUpRefs: parsed.followUpRefs,
+      });
+      const savedPaths =
+        mode === 'apply'
+          ? [saveOrganizationDecision(addition.decision), saveOrganizationCadence(addition.cadence)]
+          : [];
+      emit({ mode, ...addition, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'service state set') {
+      if (!organizationId) throw new Error('--organization-id is required for service state set.');
+      requireFlags('service state set', {
+        '--tier': parsed.tier,
+        '--service-id': parsed.serviceId,
+        '--health-status': parsed.healthStatus,
+      });
+      const mode = resolveWriteMode(parsed, 'service state set');
+      const state = buildOrganizationServiceState({
+        organizationId,
+        serviceId: parsed.serviceId!,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        health: parsed.healthStatus!,
+        reconcileStatus: parsed.reconcileStatus,
+        freshnessSeconds: parsed.freshnessSeconds,
+        confidence: parsed.confidence,
+        sourceTimestamp: parsed.sourceTimestamp,
+      });
+      const savedPaths = mode === 'apply' ? [saveOrganizationServiceState(state)] : [];
+      emit({ mode, service_state: state, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'operation add') {
+      if (!organizationId) throw new Error('--organization-id is required for operation add.');
+      requireFlags('operation add', {
+        '--tier': parsed.tier,
+        '--operation-id': parsed.operationId,
+        '--name': parsed.name,
+        '--operation-type': parsed.operationType,
+        '--owner-role': parsed.ownerRole,
+      });
+      const mode = resolveWriteMode(parsed, 'operation add');
+      const record = buildOrganizationOperationRecord({
+        organizationId,
+        operationId: parsed.operationId!,
+        name: parsed.name!,
+        operationType: parsed.operationType!,
+        ownerRole: parsed.ownerRole!,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        serviceId: parsed.serviceId,
+        purpose: parsed.purposeText,
+        triggerKind: parsed.triggerKind,
+        triggerExpression: parsed.triggerExpression,
+        executionKind: parsed.executionKind,
+        executionRef: parsed.executionRef,
+        evidenceOutputs: parsed.evidenceOutputs,
+      });
+      const savedPaths = mode === 'apply' ? [saveOrganizationOperation(record)] : [];
+      emit({ mode, operation: record, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'project attach' || parsed.command === 'project detach') {
+      if (!organizationId) throw new Error(`--organization-id is required for ${parsed.command}.`);
+      requireFlags(parsed.command, { '--project-id': parsed.projectId });
+      const mode = resolveWriteMode(parsed, parsed.command);
+      const record = buildOrganizationProjectLink({
+        organizationId,
+        projectId: parsed.projectId!,
         tier: parsed.tier,
         tenantSlug: parsed.tenantSlug,
-        apply: parsed.apply,
-      }),
-      parsed.json
-    );
-    return;
-  }
-  if (parsed.command === 'learning enqueue') {
-    if (!organizationId) {
-      throw new Error('--organization-id is required when no organization profile is configured.');
-    }
-    if (!parsed.tier) throw new Error('--tier is required for learning enqueue.');
-    if (parsed.dryRun === parsed.apply) {
-      throw new Error('Specify exactly one of --dry-run or --apply for learning enqueue.');
+        detach: parsed.command === 'project detach',
+      });
+      const savedPaths = mode === 'apply' ? [saveOrganizationOperationalState(record)] : [];
+      emit({ mode, state: record, saved_paths: savedPaths }, parsed.json);
+      return;
     }
     if (
-      !parsed.learningId ||
-      !parsed.sourceType ||
-      !parsed.sourceRef ||
-      !parsed.title ||
-      !parsed.summary ||
-      !parsed.targetKind
+      parsed.command === 'show' ||
+      parsed.command === 'status' ||
+      parsed.command === 'purpose show' ||
+      parsed.command === 'domain list' ||
+      parsed.command === 'service list' ||
+      parsed.command === 'operation list' ||
+      parsed.command === 'project list' ||
+      parsed.command === 'lineage' ||
+      parsed.command === 'cadence list' ||
+      parsed.command === 'decision list' ||
+      parsed.command === 'learning list'
     ) {
-      throw new Error(
-        '--learning-id, --source-type, --source-ref, --title, --summary, and --target-kind are required.'
-      );
-    }
-    const input = {
-      learningId: parsed.learningId,
-      organizationId,
-      sourceType: parsed.sourceType,
-      sourceRef: parsed.sourceRef,
-      title: parsed.title,
-      summary: parsed.summary,
-      targetKind: parsed.targetKind,
-      evidenceRefs: parsed.evidenceRefs,
-      tier: parsed.tier,
-      tenantSlug: parsed.tenantSlug,
-    };
-    emit(
-      parsed.apply
-        ? enqueueOrganizationLearningCandidate(input)
-        : buildOrganizationLearningCandidate(input),
-      parsed.json
-    );
-    return;
-  }
-  if (parsed.command === 'init') {
-    if (!organizationId) throw new Error('--organization-id is required for init.');
-    requireFlags('init', { '--name': parsed.name, '--tier': parsed.tier });
-    const mode = resolveWriteMode(parsed, 'init');
-    const scaffold = buildOrganizationScaffold({
-      organizationId,
-      name: parsed.name!,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      purpose: parsed.purposeText,
-      principles: parsed.principles,
-      ownerRole: parsed.ownerRole,
-    });
-    const savedPaths: string[] = [];
-    if (mode === 'apply') {
-      savedPaths.push(saveOrganizationOperationalState(scaffold.state));
-      if (scaffold.purpose) savedPaths.push(saveOrganizationPurpose(scaffold.purpose));
-    }
-    emit({ mode, ...scaffold, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (['pause', 'resume', 'archive'].includes(parsed.command)) {
-    if (!organizationId) throw new Error(`--organization-id is required for ${parsed.command}.`);
-    requireFlags(parsed.command, { '--tier': parsed.tier });
-    const mode = resolveWriteMode(parsed, parsed.command);
-    const next =
-      mode === 'apply'
-        ? transitionOrganizationLifecycle({
-            organizationId,
-            tier: parsed.tier!,
-            tenantSlug: parsed.tenantSlug,
-            verb: parsed.command as 'pause' | 'resume' | 'archive',
-            reason: parsed.reason,
-          })
-        : {
-            status: 'dry-run',
-            verb: parsed.command,
-            organization_id: organizationId,
-            tier: parsed.tier,
-            tenant_slug: parsed.tenantSlug,
-            reason: parsed.reason,
-          };
-    emit({ mode, state: next }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'retire' || parsed.command === 'remove') {
-    if (!organizationId) throw new Error(`--organization-id is required for ${parsed.command}.`);
-    requireFlags(parsed.command, {
-      '--tier': parsed.tier,
-      '--kind': parsed.recordKind,
-      '--record-id': parsed.recordId,
-    });
-    const mode = resolveWriteMode(parsed, parsed.command);
-    const next =
-      mode === 'apply'
-        ? parsed.command === 'retire'
-          ? retireOrganizationEntity({
-              organizationId,
-              tier: parsed.tier!,
-              tenantSlug: parsed.tenantSlug,
-              kind: parsed.recordKind!,
-              recordId: parsed.recordId!,
-              reason: parsed.reason,
-            })
-          : removeOrganizationEntity({
-              organizationId,
-              tier: parsed.tier!,
-              tenantSlug: parsed.tenantSlug,
-              kind: parsed.recordKind!,
-              recordId: parsed.recordId!,
-              reason: parsed.reason,
-            })
-        : {
-            status: 'dry-run',
-            kind: parsed.recordKind,
-            record_id: parsed.recordId,
-            organization_id: organizationId,
-            tier: parsed.tier,
-            tenant_slug: parsed.tenantSlug,
-            reason: parsed.reason,
-          };
-    emit({ mode, record: next }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'purpose set') {
-    if (!organizationId) throw new Error('--organization-id is required for purpose set.');
-    requireFlags('purpose set', {
-      '--name': parsed.name,
-      '--tier': parsed.tier,
-      '--purpose': parsed.purposeText,
-      '--owner-role': parsed.ownerRole,
-    });
-    const mode = resolveWriteMode(parsed, 'purpose set');
-    const record = buildOrganizationPurposeRecord({
-      organizationId,
-      name: parsed.name!,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      purpose: parsed.purposeText!,
-      principles: parsed.principles,
-      ownerRole: parsed.ownerRole!,
-      approvalState: parsed.approvalState,
-    });
-    const savedPaths = mode === 'apply' ? [saveOrganizationPurpose(record)] : [];
-    emit({ mode, purpose: record, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'objective add') {
-    if (!organizationId) throw new Error('--organization-id is required for objective add.');
-    requireFlags('objective add', {
-      '--tier': parsed.tier,
-      '--objective-id': parsed.objectiveId,
-      '--title': parsed.title,
-    });
-    const mode = resolveWriteMode(parsed, 'objective add');
-    const record = buildOrganizationObjectiveAddition({
-      organizationId,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      objective: {
-        objective_id: parsed.objectiveId!,
-        title: parsed.title!,
-        ...(parsed.description ? { description: parsed.description } : {}),
-        ...(parsed.horizon ? { horizon: parsed.horizon } : {}),
-        status: 'active',
-        ...(parsed.ownerRole ? { owner_role: parsed.ownerRole } : {}),
-      },
-    });
-    const savedPaths = mode === 'apply' ? [saveOrganizationPurpose(record)] : [];
-    emit({ mode, purpose: record, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'domain add') {
-    if (!organizationId) throw new Error('--organization-id is required for domain add.');
-    requireFlags('domain add', {
-      '--tier': parsed.tier,
-      '--domain-id': parsed.domainId,
-      '--name': parsed.name,
-      '--owner-role': parsed.ownerRole,
-    });
-    const mode = resolveWriteMode(parsed, 'domain add');
-    const record = buildOrganizationDomainRecord({
-      organizationId,
-      domainId: parsed.domainId!,
-      name: parsed.name!,
-      ownerRole: parsed.ownerRole!,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      purpose: parsed.purposeText,
-    });
-    const savedPaths = mode === 'apply' ? [saveOrganizationDomain(record)] : [];
-    emit({ mode, domain: record, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'service add') {
-    if (!organizationId) throw new Error('--organization-id is required for service add.');
-    requireFlags('service add', {
-      '--tier': parsed.tier,
-      '--service-id': parsed.serviceId,
-      '--domain-id': parsed.domainId,
-      '--name': parsed.name,
-      '--outcome': parsed.outcome,
-      '--owner-role': parsed.ownerRole,
-    });
-    const mode = resolveWriteMode(parsed, 'service add');
-    const addition = buildOrganizationServiceAddition({
-      organizationId,
-      serviceId: parsed.serviceId!,
-      domainId: parsed.domainId!,
-      name: parsed.name!,
-      outcome: parsed.outcome!,
-      ownerRole: parsed.ownerRole!,
-      consumers: parsed.consumers,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      sloTarget: parsed.sloTarget,
-      sloWindow: parsed.sloWindow,
-      runbookRefs: parsed.runbookRefs,
-      status: parsed.recordStatus as OrganizationServiceRecord['status'] | undefined,
-    });
-    const savedPaths =
-      mode === 'apply'
-        ? [saveOrganizationService(addition.service), saveOrganizationDomain(addition.domain)]
-        : [];
-    emit({ mode, ...addition, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'cadence add') {
-    if (!organizationId) throw new Error('--organization-id is required for cadence add.');
-    requireFlags('cadence add', {
-      '--tier': parsed.tier,
-      '--cadence-id': parsed.cadenceId,
-      '--name': parsed.name,
-      '--cadence-type': parsed.cadenceType,
-      '--schedule': parsed.schedule,
-      '--owner-role': parsed.ownerRole,
-    });
-    const mode = resolveWriteMode(parsed, 'cadence add');
-    const record = buildOrganizationCadence({
-      organizationId,
-      cadenceId: parsed.cadenceId!,
-      name: parsed.name!,
-      cadenceType: parsed.cadenceType!,
-      schedule: parsed.schedule!,
-      ownerRole: parsed.ownerRole!,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      status: parsed.recordStatus as OrganizationCadenceRecord['status'] | undefined,
-    });
-    const savedPaths = mode === 'apply' ? [saveOrganizationCadence(record)] : [];
-    emit({ mode, cadence: record, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'decision add') {
-    if (!organizationId) throw new Error('--organization-id is required for decision add.');
-    requireFlags('decision add', {
-      '--tier': parsed.tier,
-      '--decision-id': parsed.decisionId,
-      '--cadence-id': parsed.cadenceId,
-      '--title': parsed.title,
-      '--decision-owner': parsed.decisionOwner,
-      '--due-at': parsed.dueAt,
-    });
-    const mode = resolveWriteMode(parsed, 'decision add');
-    const addition = buildOrganizationDecision({
-      organizationId,
-      decisionId: parsed.decisionId!,
-      cadenceId: parsed.cadenceId!,
-      title: parsed.title!,
-      decisionOwner: parsed.decisionOwner!,
-      dueAt: parsed.dueAt!,
-      options: parsed.options,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      decisionType: parsed.decisionType,
-      status: parsed.recordStatus as OrganizationDecisionRecord['status'] | undefined,
-      requestedBy: parsed.requestedBy,
-      chosenOption: parsed.chosenOption,
-      rationale: parsed.rationale,
-      followUpRefs: parsed.followUpRefs,
-    });
-    const savedPaths =
-      mode === 'apply'
-        ? [saveOrganizationDecision(addition.decision), saveOrganizationCadence(addition.cadence)]
-        : [];
-    emit({ mode, ...addition, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'service state set') {
-    if (!organizationId) throw new Error('--organization-id is required for service state set.');
-    requireFlags('service state set', {
-      '--tier': parsed.tier,
-      '--service-id': parsed.serviceId,
-      '--health-status': parsed.healthStatus,
-    });
-    const mode = resolveWriteMode(parsed, 'service state set');
-    const state = buildOrganizationServiceState({
-      organizationId,
-      serviceId: parsed.serviceId!,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      health: parsed.healthStatus!,
-      reconcileStatus: parsed.reconcileStatus,
-      freshnessSeconds: parsed.freshnessSeconds,
-      confidence: parsed.confidence,
-      sourceTimestamp: parsed.sourceTimestamp,
-    });
-    const savedPaths = mode === 'apply' ? [saveOrganizationServiceState(state)] : [];
-    emit({ mode, service_state: state, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'operation add') {
-    if (!organizationId) throw new Error('--organization-id is required for operation add.');
-    requireFlags('operation add', {
-      '--tier': parsed.tier,
-      '--operation-id': parsed.operationId,
-      '--name': parsed.name,
-      '--operation-type': parsed.operationType,
-      '--owner-role': parsed.ownerRole,
-    });
-    const mode = resolveWriteMode(parsed, 'operation add');
-    const record = buildOrganizationOperationRecord({
-      organizationId,
-      operationId: parsed.operationId!,
-      name: parsed.name!,
-      operationType: parsed.operationType!,
-      ownerRole: parsed.ownerRole!,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      serviceId: parsed.serviceId,
-      purpose: parsed.purposeText,
-      triggerKind: parsed.triggerKind,
-      triggerExpression: parsed.triggerExpression,
-      executionKind: parsed.executionKind,
-      executionRef: parsed.executionRef,
-      evidenceOutputs: parsed.evidenceOutputs,
-    });
-    const savedPaths = mode === 'apply' ? [saveOrganizationOperation(record)] : [];
-    emit({ mode, operation: record, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (parsed.command === 'project attach' || parsed.command === 'project detach') {
-    if (!organizationId) throw new Error(`--organization-id is required for ${parsed.command}.`);
-    requireFlags(parsed.command, { '--project-id': parsed.projectId });
-    const mode = resolveWriteMode(parsed, parsed.command);
-    const record = buildOrganizationProjectLink({
-      organizationId,
-      projectId: parsed.projectId!,
-      tier: parsed.tier,
-      tenantSlug: parsed.tenantSlug,
-      detach: parsed.command === 'project detach',
-    });
-    const savedPaths = mode === 'apply' ? [saveOrganizationOperationalState(record)] : [];
-    emit({ mode, state: record, saved_paths: savedPaths }, parsed.json);
-    return;
-  }
-  if (
-    parsed.command === 'show' ||
-    parsed.command === 'status' ||
-    parsed.command === 'purpose show' ||
-    parsed.command === 'domain list' ||
-    parsed.command === 'service list' ||
-    parsed.command === 'operation list' ||
-    parsed.command === 'project list' ||
-    parsed.command === 'lineage' ||
-    parsed.command === 'cadence list' ||
-    parsed.command === 'decision list' ||
-    parsed.command === 'learning list'
-  ) {
-    if (!organizationId) {
-      throw new Error('--organization-id is required when no organization profile is configured.');
-    }
-    const view = buildOrganizationManagementView({
-      organizationId,
-      tier: parsed.tier,
-      tenantSlug: parsed.tenantSlug,
-    });
-    if (parsed.command === 'domain list') {
-      emit(view.domains, parsed.json);
+      if (!organizationId) {
+        throw new Error(
+          '--organization-id is required when no organization profile is configured.'
+        );
+      }
+      const view = buildOrganizationManagementView({
+        organizationId,
+        tier: parsed.tier,
+        tenantSlug: parsed.tenantSlug,
+      });
+      if (parsed.command === 'domain list') {
+        emit(view.domains, parsed.json);
+        return;
+      }
+      if (parsed.command === 'service list') {
+        const services = parsed.health
+          ? view.services.map((service) => ({
+              service,
+              state:
+                view.service_states.find((state) => state.service_id === service.service_id) ||
+                null,
+            }))
+          : view.services;
+        emit(services, parsed.json);
+        return;
+      }
+      if (parsed.command === 'operation list') {
+        emit(
+          parsed.status
+            ? view.operations.filter((operation) => operation.status === parsed.status)
+            : view.operations,
+          parsed.json
+        );
+        return;
+      }
+      if (parsed.command === 'project list') {
+        emit(view.solution_projects, parsed.json);
+        return;
+      }
+      if (parsed.command === 'lineage') {
+        emit(view.lineage, parsed.json);
+        return;
+      }
+      if (parsed.command === 'cadence list') {
+        emit(
+          parsed.status
+            ? view.cadences.filter((cadence) => cadence.status === parsed.status)
+            : view.cadences,
+          parsed.json
+        );
+        return;
+      }
+      if (parsed.command === 'decision list') {
+        // Ordered newest-first so "last meeting's decisions" is the head of the
+        // list rather than something the reader has to scan for.
+        const decisions = [...view.decisions].sort((left, right) =>
+          left.updated_at < right.updated_at ? 1 : left.updated_at > right.updated_at ? -1 : 0
+        );
+        emit(
+          [
+            ...(parsed.cadenceId
+              ? decisions.filter((decision) => decision.cadence_id === parsed.cadenceId)
+              : decisions),
+          ].filter((decision) => !parsed.status || decision.status === parsed.status),
+          parsed.json
+        );
+        return;
+      }
+      if (parsed.command === 'learning list') {
+        emit(
+          parsed.status
+            ? view.learning_candidates.filter((candidate) => candidate.status === parsed.status)
+            : view.learning_candidates,
+          parsed.json
+        );
+        return;
+      }
+      emit(parsed.command === 'purpose show' ? view.purpose : view, parsed.json);
       return;
     }
-    if (parsed.command === 'service list') {
-      const services = parsed.health
-        ? view.services.map((service) => ({
-            service,
-            state:
-              view.service_states.find((state) => state.service_id === service.service_id) || null,
-          }))
-        : view.services;
-      emit(services, parsed.json);
-      return;
-    }
-    if (parsed.command === 'operation list') {
-      emit(
-        parsed.status
-          ? view.operations.filter((operation) => operation.status === parsed.status)
-          : view.operations,
-        parsed.json
-      );
-      return;
-    }
-    if (parsed.command === 'project list') {
-      emit(view.solution_projects, parsed.json);
-      return;
-    }
-    if (parsed.command === 'lineage') {
-      emit(view.lineage, parsed.json);
-      return;
-    }
-    if (parsed.command === 'cadence list') {
-      emit(
-        parsed.status
-          ? view.cadences.filter((cadence) => cadence.status === parsed.status)
-          : view.cadences,
-        parsed.json
-      );
-      return;
-    }
-    if (parsed.command === 'decision list') {
-      // Ordered newest-first so "last meeting's decisions" is the head of the
-      // list rather than something the reader has to scan for.
-      const decisions = [...view.decisions].sort((left, right) =>
-        left.updated_at < right.updated_at ? 1 : left.updated_at > right.updated_at ? -1 : 0
-      );
-      emit(
-        [
-          ...(parsed.cadenceId
-            ? decisions.filter((decision) => decision.cadence_id === parsed.cadenceId)
-            : decisions),
-        ].filter((decision) => !parsed.status || decision.status === parsed.status),
-        parsed.json
-      );
-      return;
-    }
-    if (parsed.command === 'learning list') {
-      emit(
-        parsed.status
-          ? view.learning_candidates.filter((candidate) => candidate.status === parsed.status)
-          : view.learning_candidates,
-        parsed.json
-      );
-      return;
-    }
-    emit(parsed.command === 'purpose show' ? view.purpose : view, parsed.json);
-    return;
+    throw new Error(`Unknown command '${parsed.command}'.\n${usage()}`);
+  } finally {
+    activePrint = previousPrint;
   }
-  throw new Error(`Unknown command '${parsed.command}'.\n${usage()}`);
 }
 
 export const runOrganizationOperatingModel = defineScript({
   name: 'organization:operating-model',
   flags: [],
-  run: ({ argv }) => runOrganizationOperatingModelCli(argv),
+  run: ({ argv, print }) => runOrganizationOperatingModelCli(argv, print),
 });
 
 if (
