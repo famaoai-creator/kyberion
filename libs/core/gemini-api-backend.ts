@@ -1,4 +1,5 @@
 import { secureFetch, type SecureFetchOptions } from './network.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { isRecord } from './foundation/text.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { safeReadFile, safeStat, validateUrl } from './secure-io.js';
@@ -34,6 +35,10 @@ import type {
 
 export const GEMINI_API_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 export const GEMINI_API_DEFAULT_MODEL = 'gemini-3.6-flash';
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
 
 export interface GeminiApiBackendOptions {
   apiKey: string;
@@ -599,17 +604,17 @@ export function buildGeminiApiBackendFromEnv(
   modelOverride?: string,
   samplingParams?: Pick<SamplingParams, 'stop'>
 ): GeminiApiBackend | null {
-  const apiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
+  const apiKey = envText(env, 'GEMINI_API_KEY')?.trim() || envText(env, 'GOOGLE_API_KEY')?.trim();
   if (!apiKey) return null;
   return new GeminiApiBackend({
     apiKey,
     model: normalizeModel(
       modelOverride?.trim() ||
-        env.KYBERION_GEMINI_MODEL?.trim() ||
-        env.KYBERION_REASONING_MODEL?.trim() ||
+        envText(env, 'KYBERION_GEMINI_MODEL')?.trim() ||
+        envText(env, 'KYBERION_REASONING_MODEL')?.trim() ||
         GEMINI_API_DEFAULT_MODEL
     ),
-    baseURL: env.KYBERION_GEMINI_URL?.trim(),
+    baseURL: envText(env, 'KYBERION_GEMINI_URL')?.trim(),
     samplingParams,
   });
 }
@@ -618,11 +623,13 @@ export function buildGeminiApiBackendFromEnv(
 export async function probeGeminiApiBackendAvailability(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<{ available: boolean; reason?: string }> {
-  const apiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
+  const apiKey = envText(env, 'GEMINI_API_KEY')?.trim() || envText(env, 'GOOGLE_API_KEY')?.trim();
   if (!apiKey) {
     return { available: false, reason: 'GEMINI_API_KEY or GOOGLE_API_KEY is not set' };
   }
-  const baseURL = normalizeBaseUrl(env.KYBERION_GEMINI_URL?.trim() || GEMINI_API_DEFAULT_BASE_URL);
+  const baseURL = normalizeBaseUrl(
+    envText(env, 'KYBERION_GEMINI_URL')?.trim() || GEMINI_API_DEFAULT_BASE_URL
+  );
   try {
     assertReasoningEgressAllowedAtEndpoint('gemini-api', baseURL);
     await secureFetch({
