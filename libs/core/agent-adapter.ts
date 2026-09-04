@@ -14,6 +14,7 @@ import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';
 import { getRegisteredEnvText, safeChildEnv } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { resolveActiveProviderPermissionArgs } from './provider-permission-profiles.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import {
@@ -34,6 +35,10 @@ export {
 };
 
 const PROJECT_ROOT = pathResolver.rootDir();
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 interface SpawnedCliResult {
   status: number | null;
@@ -239,8 +244,8 @@ function isSafeReadOnlyPermissionTitle(title: string): boolean {
   return allowPatterns.some((pattern) => pattern.test(normalized));
 }
 
-function isNativeSubagentToolCall(toolCall: any): boolean {
-  if (!toolCall || typeof toolCall !== 'object') return false;
+function isNativeSubagentToolCall(toolCall: unknown): boolean {
+  if (!isRecord(toolCall)) return false;
   return [toolCall.name, toolCall.title, toolCall.toolName, toolCall.tool_name]
     .filter((value): value is string => typeof value === 'string')
     .some((value) => /(?:^|[_:.-])spawn[_:.-]?subagent(?:$|[_:.-])/i.test(value));
@@ -408,20 +413,32 @@ abstract class BaseACPAdapter implements AgentAdapter {
           this.handleSessionUpdate(params);
 
           // RECURSIVE SCAN for text/thought chunks
-          const findContent = (obj: any) => {
-            if (!obj || typeof obj !== 'object') return;
+          const findContent = (value: unknown): void => {
+            if (Array.isArray(value)) {
+              for (const item of value) findContent(item);
+              return;
+            }
+            if (!isRecord(value)) return;
+            const content = isRecord(value.content) ? value.content : undefined;
 
             // Look for Gemini-style update
-            if (obj.sessionUpdate === 'agent_message_chunk' && obj.content?.text) {
-              this.accumulatedResponse += obj.content.text;
-            } else if (obj.sessionUpdate === 'agent_thought_chunk' && obj.content?.text) {
-              this.accumulatedThought += obj.content.text;
+            if (
+              value.sessionUpdate === 'agent_message_chunk' &&
+              typeof content?.text === 'string'
+            ) {
+              this.accumulatedResponse += content.text;
+            } else if (
+              value.sessionUpdate === 'agent_thought_chunk' &&
+              typeof content?.text === 'string'
+            ) {
+              this.accumulatedThought += content.text;
             }
 
             // Look for Codex-style turn update
-            if (obj.turn?.items) {
-              for (const item of obj.turn.items) {
-                if (item.type === 'message' && item.text) {
+            const turn = isRecord(value.turn) ? value.turn : undefined;
+            if (Array.isArray(turn?.items)) {
+              for (const item of turn.items) {
+                if (isRecord(item) && item.type === 'message' && typeof item.text === 'string') {
                   // Only add if not already present (simplified deduplication)
                   if (!this.accumulatedResponse.includes(item.text)) {
                     this.accumulatedResponse += item.text;
@@ -431,9 +448,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
             }
 
             // Recurse into objects/arrays
-            for (const key in obj) {
-              if (typeof obj[key] === 'object') findContent(obj[key]);
-            }
+            for (const nested of Object.values(value)) findContent(nested);
           };
 
           findContent(params);
@@ -961,8 +976,8 @@ export class CodexAdapter implements AgentAdapter {
         trace,
       };
       return applyEnhancersAfterAsk(this.enhancers, agentResponse);
-    } catch (e: any) {
-      logger.error(`[UAA] Codex Exec failed: ${e.message}`);
+    } catch (e: unknown) {
+      logger.error(`[UAA] Codex Exec failed: ${errorMessage(e)}`);
       return { text: '', stopReason: 'error', trace };
     }
   }
@@ -1110,8 +1125,8 @@ export class AgyAdapter implements AgentAdapter {
         text: output,
         stopReason: res.status === 0 ? 'completed' : 'error',
       };
-    } catch (e: any) {
-      logger.error(`[UAA] Agy failed: ${e.message}`);
+    } catch (e: unknown) {
+      logger.error(`[UAA] Agy failed: ${errorMessage(e)}`);
       return { text: '', stopReason: 'error' };
     }
   }
@@ -1263,8 +1278,8 @@ export class ClaudeAdapter implements AgentAdapter {
           stopReason: result.status === 0 ? 'completed' : 'error',
         };
       }
-    } catch (e: any) {
-      logger.error(`[UAA] Claude failed: ${e.message}`);
+    } catch (e: unknown) {
+      logger.error(`[UAA] Claude failed: ${errorMessage(e)}`);
       return { text: '', stopReason: 'error' };
     }
   }
