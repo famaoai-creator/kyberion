@@ -11,14 +11,21 @@ import {
   readJsonFilesRecursively,
 } from './media-catalog-loaders.js';
 
-export function loadSemanticRenderTokenCatalog(rootDir: string): any {
+export interface SemanticRenderTokenCatalog {
+  version: string;
+  defaults: Record<string, Record<string, unknown>>;
+  semantics: Record<string, Record<string, unknown>>;
+  signal_tones: Record<string, number>;
+}
+
+export function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderTokenCatalog {
   const fallback = {
     version: '1.0.0',
     defaults: { content: {} },
     semantics: {},
     signal_tones: {},
   };
-  const catalog = defineCatalog({
+  const catalog = defineCatalog<SemanticRenderTokenCatalog>({
     id: 'semantic-render-tokens',
     path: path.resolve(
       rootDir,
