@@ -13,6 +13,15 @@ import {
   type ClientAgentManifest,
 } from '../lib/agent-manifests-response';
 import { parseAgentProvidersResponse } from '../lib/agent-providers-response';
+import {
+  parseManualCancelResponse,
+  parseManualCommandStatusResponse,
+  parseManualExecutionResponse,
+  parseManualPeekResponse,
+  parseManualQueuedResponse,
+  type ClientManualDriveAction,
+  type ClientManualExecutionStatus,
+} from '../lib/agent-manual-response';
 import { KyberionDonut } from './KyberionCharts';
 
 type AgentRecord = ClientAgentRecord;
@@ -31,19 +40,12 @@ interface ProviderOption {
   protocol: string;
 }
 
-interface ManualDriveAction {
-  action_id: string;
-  kind: string;
-  title: string;
-  description?: string;
-  status: 'ready' | 'awaiting_approval' | 'blocked';
-  approval?: { status: 'approved' | 'pending' | 'denied'; request_id?: string; message?: string };
-}
+type ManualDriveAction = ClientManualDriveAction;
 
 interface ManualDriveCommand {
   commandId: string;
   state: 'queued' | 'running' | 'completed' | 'cancelled';
-  status?: string;
+  status?: ClientManualExecutionStatus;
   approval?: { status: 'approved' | 'pending' | 'denied'; request_id?: string; message?: string };
   resumesCommandId?: string;
 }
@@ -285,11 +287,15 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           [agentId]:
             response.status === 409
               ? 'Manual drive is not available for this runtime.'
-              : payload.error,
+              : 'Manual action inspection failed.',
         }));
         return;
       }
-      setManualActions((current) => ({ ...current, [agentId]: payload.action || null }));
+      const parsed = parseManualPeekResponse(payload);
+      if (!parsed || parsed.agentId !== agentId) {
+        throw new Error('Manual action inspection returned an invalid response.');
+      }
+      setManualActions((current) => ({ ...current, [agentId]: parsed.action }));
       setManualErrors((current) => ({ ...current, [agentId]: undefined }));
     } catch (error) {
       setManualErrors((current) => ({
@@ -310,12 +316,17 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           body: JSON.stringify({ action: 'manual_status', agentId, commandId }),
         });
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'Manual command status failed');
+        if (!response.ok) throw new Error('Manual command status failed');
+        const parsed = parseManualCommandStatusResponse(payload);
+        if (!parsed || parsed.agentId !== agentId || parsed.commandId !== commandId) {
+          throw new Error('Manual command status returned an invalid response.');
+        }
         const command: ManualDriveCommand = {
           commandId,
-          state: payload.status === 'cancelled' ? 'cancelled' : payload.status || payload.state,
-          ...(payload.actionStatus ? { status: payload.actionStatus } : {}),
-          ...(payload.approval ? { approval: payload.approval } : {}),
+          state: parsed.state,
+          ...(parsed.actionStatus ? { status: parsed.actionStatus } : {}),
+          ...(parsed.approval ? { approval: parsed.approval } : {}),
+          ...(parsed.resumesCommandId ? { resumesCommandId: parsed.resumesCommandId } : {}),
         };
         setManualCommands((current) => ({ ...current, [agentId]: command }));
         if (command.state === 'completed' || command.state === 'cancelled') {
@@ -344,23 +355,35 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         body: JSON.stringify({ action: 'manual_execute', agentId, actionId: action.action_id }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Manual action execution failed');
-      if (response.status === 202 && payload.commandId) {
+      if (!response.ok) throw new Error('Manual action execution failed');
+      if (response.status === 202) {
+        const parsed = parseManualQueuedResponse(payload);
+        if (!parsed || parsed.agentId !== agentId) {
+          throw new Error('Manual action queue returned an invalid response.');
+        }
         setManualCommands((current) => ({
           ...current,
-          [agentId]: { commandId: payload.commandId, state: 'queued' },
+          [agentId]: {
+            commandId: parsed.commandId,
+            state: 'queued',
+            ...(parsed.resumesCommandId ? { resumesCommandId: parsed.resumesCommandId } : {}),
+          },
         }));
-        void pollManualCommand(agentId, payload.commandId);
+        void pollManualCommand(agentId, parsed.commandId);
       } else {
-        setManualActions((current) => ({ ...current, [agentId]: payload.action || null }));
+        const parsed = parseManualExecutionResponse(payload);
+        if (!parsed || parsed.agentId !== agentId) {
+          throw new Error('Manual action execution returned an invalid response.');
+        }
+        setManualActions((current) => ({ ...current, [agentId]: parsed.action || null }));
         setManualCommands((current) => ({
           ...current,
-          [agentId]: payload.status
+          [agentId]: parsed.status
             ? {
                 commandId: 'local',
                 state: 'completed',
-                status: payload.status,
-                ...(payload.approval ? { approval: payload.approval } : {}),
+                status: parsed.status,
+                ...(parsed.approval ? { approval: parsed.approval } : {}),
               }
             : undefined,
         }));
@@ -387,12 +410,17 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         body: JSON.stringify({ action: 'manual_cancel', agentId, commandId: command.commandId }),
       });
       const payload = await response.json();
-      if (!response.ok)
-        throw new Error(payload.error || `Cancel failed: ${payload.status || response.status}`);
-      setManualCommands((current) => ({
-        ...current,
-        [agentId]: { ...command, state: 'cancelled', status: payload.status },
-      }));
+      if (!response.ok) throw new Error('Manual command cancellation failed');
+      const parsed = parseManualCancelResponse(payload);
+      if (!parsed || parsed.agentId !== agentId || parsed.commandId !== command.commandId) {
+        throw new Error('Manual command cancellation returned an invalid response.');
+      }
+      if (parsed.status === 'cancelled') {
+        setManualCommands((current) => ({
+          ...current,
+          [agentId]: { ...command, state: 'cancelled' },
+        }));
+      }
       setManualErrors((current) => ({ ...current, [agentId]: undefined }));
     } catch (error) {
       setManualErrors((current) => ({
@@ -415,17 +443,30 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         body: JSON.stringify({ action: 'manual_resume', agentId, commandId: command.commandId }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Manual command resume failed');
-      if (response.status === 202 && payload.commandId) {
+      if (!response.ok) throw new Error('Manual command resume failed');
+      if (response.status === 202) {
+        const parsed = parseManualQueuedResponse(payload);
+        if (
+          !parsed ||
+          parsed.agentId !== agentId ||
+          parsed.resumesCommandId !== command.commandId
+        ) {
+          throw new Error('Manual command resume returned an invalid response.');
+        }
         setManualCommands((current) => ({
           ...current,
           [agentId]: {
-            commandId: payload.commandId,
+            commandId: parsed.commandId,
             state: 'queued',
-            resumesCommandId: payload.resumesCommandId,
+            ...(parsed.resumesCommandId ? { resumesCommandId: parsed.resumesCommandId } : {}),
           },
         }));
-        void pollManualCommand(agentId, payload.commandId);
+        void pollManualCommand(agentId, parsed.commandId);
+      } else {
+        const parsed = parseManualExecutionResponse(payload);
+        if (!parsed || parsed.agentId !== agentId) {
+          throw new Error('Manual command resume returned an invalid response.');
+        }
       }
       setManualErrors((current) => ({ ...current, [agentId]: undefined }));
     } catch (error) {
