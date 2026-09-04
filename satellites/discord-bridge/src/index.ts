@@ -473,7 +473,8 @@ async function main() {
 
   if (!token) {
     logger.error('❌ [DiscordBridge] DISCORD_TOKEN is required.');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const client = new Client({
@@ -496,7 +497,8 @@ async function main() {
     await client.login(token);
   } catch (err: unknown) {
     logger.error(`❌ [DiscordBridge] Login failed: ${errorDetail(err)}`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const outboxTimer = setInterval(() => {
@@ -518,7 +520,7 @@ const directEntry = isDirectEntry(import.meta.url, 'satellites/discord-bridge/sr
 if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    process.exitCode = 1;
   });
 } else if (directEntry) {
   logger.warn('[DiscordBridge] VITEST is set — suppressing the direct-entry start.');
