@@ -48,6 +48,7 @@ describe('mission proposal confirmation grammar (UX-04)', () => {
         missionId: 'MSN-TEST-123',
         missionType: 'product_development',
         tier: 'public',
+        persona: 'Ecosystem Architect',
         orchestrationStatus: 'queued',
       })
     ).toBe(
@@ -66,6 +67,7 @@ describe('mission proposal confirmation grammar (UX-04)', () => {
         missionId: 'MSN-TEST-123',
         missionType: 'product_development',
         tier: 'public',
+        persona: 'Ecosystem Architect',
         orchestrationStatus: 'failed',
         orchestrationError: 'queue unavailable',
       })

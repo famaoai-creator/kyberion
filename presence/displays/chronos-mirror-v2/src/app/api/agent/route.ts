@@ -85,6 +85,7 @@ async function loadChronosCore() {
     recordChronosSurfaceRequest: channelSurface.recordChronosSurfaceRequest,
     runSurfaceConversation: channelSurface.runSurfaceConversation,
     runSurfaceMessageConversation: channelSurface.runSurfaceMessageConversation,
+    buildMissionIssuanceReply: channelSurface.buildMissionIssuanceReply,
     reflectPresenceAgentReply: presenceBridge.reflectPresenceAgentReply,
     dispatchPresenceFrame: presenceBridge.dispatchPresenceFrame,
     listSurfaceOutboxMessages: channelSurface.listSurfaceOutboxMessages,
@@ -1202,20 +1203,10 @@ export async function POST(req: NextRequest) {
       clearChronosMissionProposalState(sessionId, core);
       return NextResponse.json({
         status: 'ok',
-        response: [
-          `Mission ${issued.missionId} started.`,
-          `Type: ${issued.missionType}`,
-          `Tier: ${issued.tier}`,
-          `Persona: ${issued.persona}`,
-          issued.routingDecision
-            ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`
-            : undefined,
-          issued.orchestrationStatus === 'queued'
-            ? 'Background orchestration has been queued.'
-            : 'Background orchestration could not be queued.',
-        ]
-          .filter(Boolean)
-          .join('\n'),
+        response: core.buildMissionIssuanceReply(issued, {
+          locale: 'en',
+          includeDetails: true,
+        }),
         a2ui: [
           {
             type: 'display:hero',
