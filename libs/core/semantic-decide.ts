@@ -1,6 +1,7 @@
 import { createLogger } from './logger.js';
 import { tryRepairJson } from './json-repair.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 // AR-07: in-loop semantic decision primitive. Deterministic ops distill an
 // observation (DOM inventory, UI tree, log tail); this helper asks the
@@ -99,13 +100,14 @@ export async function decideFromObservation(
       });
     const raw = await generate(prompt);
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = parseSafeJsonInput(jsonText, 'semantic decision response');
     } catch {
       parsed = tryRepairJson(jsonText);
     }
-    const decision = String(parsed?.decision ?? '').trim();
+    const parsedRecord = isRecord(parsed) ? parsed : undefined;
+    const decision = typeof parsedRecord?.decision === 'string' ? parsedRecord.decision.trim() : '';
     if (!decision) {
       recordDegradation('empty_decision', input.goal);
       return null;
@@ -120,10 +122,14 @@ export async function decideFromObservation(
     consecutiveModelErrors = 0;
     return {
       decision,
-      ...(parsed?.reason ? { reason: String(parsed.reason).slice(0, 300) } : {}),
+      ...(typeof parsedRecord?.reason === 'string' && parsedRecord.reason
+        ? { reason: parsedRecord.reason.slice(0, 300) }
+        : {}),
     };
-  } catch (error: any) {
-    logger.warn(`decideFromObservation failed (caller falls back): ${error?.message || error}`);
+  } catch (error: unknown) {
+    logger.warn(
+      `decideFromObservation failed (caller falls back): ${error instanceof Error ? error.message : String(error)}`
+    );
     recordDegradation('model_error', input.goal);
     return null;
   }
@@ -137,12 +143,12 @@ export async function decideFromObservation(
  * consecutive model errors (LC-09).
  */
 export async function executeLlmDecideOp(input: {
-  params: Record<string, any>;
-  ctx: Record<string, any>;
-  resolve: (value: any) => any;
+  params: Record<string, unknown>;
+  ctx: Record<string, unknown>;
+  resolve: (value: unknown) => unknown;
   /** Where the distilled observation lives when params.from is not given. */
   defaultFromKey: string;
-}): Promise<Record<string, any>> {
+}): Promise<Record<string, unknown>> {
   const { params, ctx, resolve } = input;
   const goal = String(resolve(params.goal) || '');
   if (!goal) throw new Error('llm_decide requires params.goal');
@@ -151,7 +157,7 @@ export async function executeLlmDecideOp(input: {
   const observation =
     typeof observationRaw === 'string' ? observationRaw : JSON.stringify(observationRaw ?? '');
   const options = Array.isArray(params.options)
-    ? params.options.map((option: unknown) => String(resolve(option)))
+    ? params.options.map((option) => String(resolve(option)))
     : undefined;
 
   const degradationsBefore = getSemanticDecideDegradations().length;
