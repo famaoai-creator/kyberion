@@ -4,6 +4,7 @@ import {
   extractBodyMarkdownFromDraft,
   extractFirstJsonBlock,
   generateEmailReplyDraft,
+  parseEmailDraftArtifact,
   summarizeEmailSubject,
 } from './email-workflow.js';
 
@@ -52,6 +53,15 @@ describe('email-workflow shared helpers', () => {
   it('rejects arrays and dangerous JSON keys in model email output', () => {
     expect(extractFirstJsonBlock('[{"to":"team@example.com"}]')).toBeNull();
     expect(extractFirstJsonBlock('{"to":"team@example.com","meta":{"__proto__":{}}}')).toBeNull();
+  });
+
+  it('accepts only object-root persisted email draft artifacts', () => {
+    expect(parseEmailDraftArtifact({ to: 'team@example.com' })).toEqual({
+      to: 'team@example.com',
+    });
+    expect(parseEmailDraftArtifact([])).toBeNull();
+    expect(parseEmailDraftArtifact('invalid')).toBeNull();
+    expect(parseEmailDraftArtifact(null)).toBeNull();
   });
 
   it('rejects a request id that escapes the draft artifact directory', async () => {
