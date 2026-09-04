@@ -7317,7 +7317,7 @@
     {
       "path": "product/schemas/finance-controller-cost-report.schema.json",
       "tier": "public",
-      "size": 3009,
+      "size": 2985,
       "type": "json"
     },
     {
@@ -8269,9 +8269,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-github-ticket-artifact.schema.json",
+      "tier": "public",
+      "size": 950,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-graph-run-journal-event.schema.json",
       "tier": "public",
       "size": 729,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/mission-jira-ticket-artifact.schema.json",
+      "tier": "public",
+      "size": 751,
       "type": "json"
     },
     {

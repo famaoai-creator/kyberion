@@ -7,7 +7,6 @@ import * as nodePath from 'node:path';
 import { type ArtifactReviewReceipt } from './artifact-review.js';
 import { nowIso } from './foundation/time.js';
 import { executeServicePreset } from './service-engine.js';
-import { safeExistsSync } from './secure-io.js';
 import { type WorkItem } from './work-coordination.js';
 import { formatCognitiveRouteDecision, type CognitiveRouteDecision } from './cognitive-routing.js';
 import { type TaskModelHint } from './reasoning-model-routing.js';
@@ -15,10 +14,10 @@ import { type TaskResultBlock } from './channel-surface-types.js';
 import { type OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { closeTaskArtifacts } from './mission-artifact-closure.js';
 import { revokeGrantsForTaskBestEffort } from './task-scoped-grants.js';
-import { readJsonFile as readJsonFileFromDispatchIO } from './mission-dispatch-io.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { loadMissionTicketDispatchManifestAtPath } from './mission-ticket-dispatch-manifest.js';
+import { loadMissionTicketProviderArtifactAtPath } from './mission-ticket-provider-artifact.js';
 
 /**
  * Confidential missions default to external_egress=deny. A model-backed
@@ -479,149 +478,157 @@ export async function reflectTicketOutcome(input: {
   }
 
   const githubPath = nodePath.join(ticketRoot(input.missionPath), 'github', `${taskId}.json`);
-  if (safeExistsSync(githubPath)) {
-    const githubIssue = readJsonFileFromDispatchIO<Record<string, unknown>>(githubPath);
-    if (githubIssue) {
-      const issueNumber =
-        extractGitHubIssueNumber(liveResults.github) || extractGitHubIssueNumber(githubIssue);
-      const repoInfo = extractGitHubRepoInfo(githubIssue);
-      githubIssue.state = ticketState === 'done' ? 'closed' : 'open';
-      githubIssue.state_reason = ticketState === 'done' ? 'completed' : 'reopened';
-      githubIssue.comments = appendComment(githubIssue.comments, {
-        body: reflectionBody,
-        created_at: nowIso(),
-        state: ticketState,
-        source: 'workitem-dispatch',
-      });
-      githubIssue.last_reflection = {
-        ticket_state: ticketState,
-        reflected_at: nowIso(),
-        response_path: input.responsePath,
-        response_excerpt: input.responseExcerpt,
-        cognitive_route: cognitiveRouteSummary,
-        drift_watchdog_summary: input.driftWatchdogSummary,
-      };
-      writeDispatchArtifact(githubPath, githubIssue, {
-        missionId: input.missionId,
-        missionPath: input.missionPath,
-      });
+  const githubIssue = (() => {
+    try {
+      return loadMissionTicketProviderArtifactAtPath(githubPath, 'github');
+    } catch {
+      return null;
+    }
+  })();
+  if (githubIssue) {
+    const issueNumber =
+      extractGitHubIssueNumber(liveResults.github) || extractGitHubIssueNumber(githubIssue);
+    const repoInfo = extractGitHubRepoInfo(githubIssue);
+    githubIssue.state = ticketState === 'done' ? 'closed' : 'open';
+    githubIssue.state_reason = ticketState === 'done' ? 'completed' : 'reopened';
+    githubIssue.comments = appendComment(githubIssue.comments, {
+      body: reflectionBody,
+      created_at: nowIso(),
+      state: ticketState,
+      source: 'workitem-dispatch',
+    });
+    githubIssue.last_reflection = {
+      ticket_state: ticketState,
+      reflected_at: nowIso(),
+      response_path: input.responsePath,
+      response_excerpt: input.responseExcerpt,
+      cognitive_route: cognitiveRouteSummary,
+      drift_watchdog_summary: input.driftWatchdogSummary,
+    };
+    writeDispatchArtifact(githubPath, githubIssue, {
+      missionId: input.missionId,
+      missionPath: input.missionPath,
+    });
 
-      if (repoInfo.owner && repoInfo.repo && issueNumber) {
-        try {
+    if (repoInfo.owner && repoInfo.repo && issueNumber) {
+      try {
+        await executeServicePreset(
+          'github',
+          'add_comment',
+          {
+            owner: repoInfo.owner,
+            repo: repoInfo.repo,
+            issue_number: issueNumber,
+            body: reflectionBody,
+          },
+          'secret-guard'
+        );
+        if (ticketState === 'done') {
           await executeServicePreset(
             'github',
-            'add_comment',
+            'close_issue',
             {
               owner: repoInfo.owner,
               repo: repoInfo.repo,
               issue_number: issueNumber,
-              body: reflectionBody,
             },
             'secret-guard'
           );
-          if (ticketState === 'done') {
-            await executeServicePreset(
-              'github',
-              'close_issue',
-              {
-                owner: repoInfo.owner,
-                repo: repoInfo.repo,
-                issue_number: issueNumber,
-              },
-              'secret-guard'
-            );
-          }
-        } catch (error: any) {
-          notes.push(`github reflection failed: ${error?.message || error}`);
         }
+      } catch (error: any) {
+        notes.push(`github reflection failed: ${error?.message || error}`);
       }
     }
   }
 
   const jiraPath = nodePath.join(ticketRoot(input.missionPath), 'jira', `${taskId}.json`);
-  if (safeExistsSync(jiraPath)) {
-    const jiraIssue = readJsonFileFromDispatchIO<Record<string, unknown>>(jiraPath);
-    if (jiraIssue) {
-      const issueKey = extractJiraIssueKey(liveResults.jira) || extractJiraIssueKey(jiraIssue);
-      const jiraInfo = {
-        ...extractJiraProjectInfo(jiraIssue),
-        ...extractJiraProjectInfo(liveResults.jira),
-      };
-      const fields =
-        jiraIssue.fields && typeof jiraIssue.fields === 'object'
-          ? (jiraIssue.fields as Record<string, unknown>)
-          : {};
-      fields.status = {
-        name: ticketState === 'done' ? 'Done' : ticketState === 'review' ? 'In Review' : 'Blocked',
-      };
-      jiraIssue.fields = fields;
-      jiraIssue.comments = appendComment(jiraIssue.comments, {
-        body: reflectionBody,
-        created_at: nowIso(),
-        state: ticketState,
-        source: 'workitem-dispatch',
-      });
-      jiraIssue.last_reflection = {
-        ticket_state: ticketState,
-        reflected_at: nowIso(),
-        response_path: input.responsePath,
-        response_excerpt: input.responseExcerpt,
-        cognitive_route: cognitiveRouteSummary,
-        drift_watchdog_summary: input.driftWatchdogSummary,
-      };
-      writeDispatchArtifact(jiraPath, jiraIssue, {
-        missionId: input.missionId,
-        missionPath: input.missionPath,
-      });
+  const jiraIssue = (() => {
+    try {
+      return loadMissionTicketProviderArtifactAtPath(jiraPath, 'jira');
+    } catch {
+      return null;
+    }
+  })();
+  if (jiraIssue) {
+    const issueKey = extractJiraIssueKey(liveResults.jira) || extractJiraIssueKey(jiraIssue);
+    const jiraInfo = {
+      ...extractJiraProjectInfo(jiraIssue),
+      ...extractJiraProjectInfo(liveResults.jira),
+    };
+    const fields =
+      jiraIssue.fields && typeof jiraIssue.fields === 'object'
+        ? (jiraIssue.fields as Record<string, unknown>)
+        : {};
+    fields.status = {
+      name: ticketState === 'done' ? 'Done' : ticketState === 'review' ? 'In Review' : 'Blocked',
+    };
+    jiraIssue.fields = fields;
+    jiraIssue.comments = appendComment(jiraIssue.comments, {
+      body: reflectionBody,
+      created_at: nowIso(),
+      state: ticketState,
+      source: 'workitem-dispatch',
+    });
+    jiraIssue.last_reflection = {
+      ticket_state: ticketState,
+      reflected_at: nowIso(),
+      response_path: input.responsePath,
+      response_excerpt: input.responseExcerpt,
+      cognitive_route: cognitiveRouteSummary,
+      drift_watchdog_summary: input.driftWatchdogSummary,
+    };
+    writeDispatchArtifact(jiraPath, jiraIssue, {
+      missionId: input.missionId,
+      missionPath: input.missionPath,
+    });
 
-      if (issueKey && jiraInfo.domain) {
-        try {
-          await executeServicePreset(
+    if (issueKey && jiraInfo.domain) {
+      try {
+        await executeServicePreset(
+          'jira',
+          'add_comment',
+          {
+            issue_key: issueKey,
+            body: reflectionBody,
+          },
+          'secret-guard'
+        );
+        if (ticketState === 'done') {
+          const transitions = await executeServicePreset(
             'jira',
-            'add_comment',
+            'get_transitions',
             {
               issue_key: issueKey,
-              body: reflectionBody,
             },
             'secret-guard'
           );
-          if (ticketState === 'done') {
-            const transitions = await executeServicePreset(
+          const transitionList = Array.isArray((transitions as any)?.transitions)
+            ? (transitions as any).transitions
+            : Array.isArray((transitions as any)?.body?.transitions)
+              ? (transitions as any).body.transitions
+              : [];
+          const match = transitionList.find((transition: any) => {
+            const name = String(transition?.name || transition?.to?.name || '')
+              .trim()
+              .toLowerCase();
+            return ['done', 'closed', 'resolved', 'complete', 'completed'].includes(name);
+          });
+          if (match?.id) {
+            await executeServicePreset(
               'jira',
-              'get_transitions',
+              'transition_issue',
               {
                 issue_key: issueKey,
+                transition_id: String(match.id),
               },
               'secret-guard'
             );
-            const transitionList = Array.isArray((transitions as any)?.transitions)
-              ? (transitions as any).transitions
-              : Array.isArray((transitions as any)?.body?.transitions)
-                ? (transitions as any).body.transitions
-                : [];
-            const match = transitionList.find((transition: any) => {
-              const name = String(transition?.name || transition?.to?.name || '')
-                .trim()
-                .toLowerCase();
-              return ['done', 'closed', 'resolved', 'complete', 'completed'].includes(name);
-            });
-            if (match?.id) {
-              await executeServicePreset(
-                'jira',
-                'transition_issue',
-                {
-                  issue_key: issueKey,
-                  transition_id: String(match.id),
-                },
-                'secret-guard'
-              );
-            } else {
-              notes.push(`jira reflection transition skipped: no done transition for ${issueKey}`);
-            }
+          } else {
+            notes.push(`jira reflection transition skipped: no done transition for ${issueKey}`);
           }
-        } catch (error: any) {
-          notes.push(`jira reflection failed: ${error?.message || error}`);
         }
+      } catch (error: any) {
+        notes.push(`jira reflection failed: ${error?.message || error}`);
       }
     }
   }
