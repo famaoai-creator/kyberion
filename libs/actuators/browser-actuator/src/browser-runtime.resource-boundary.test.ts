@@ -25,6 +25,8 @@ describe('browser runtime resource boundary', () => {
     expect(source).toContain('const safePath = safeBrowserRuntimePath(filePath);');
     expect(source).toContain('function isExistingRegularFile(filePath: string): boolean');
     expect(source).toContain('return safeLstat(filePath).isFile();');
+    expect(source).toContain('parseSafeJsonInput(');
+    expect(source).not.toContain('readJson');
     expect(source).toContain('browserSessionArtifactPath(BROWSER_SNAPSHOT_DIR, sessionId');
     expect(source).toContain('completeBrowserOperatorApproval(');
   });
@@ -74,6 +76,17 @@ describe('browser runtime resource boundary', () => {
           >
         ).unexpected
       ).toBeUndefined();
+    } finally {
+      safeRmSync(trailPath, { force: true });
+    }
+  });
+
+  it('fails closed when a persisted action trail contains dangerous JSON keys', () => {
+    const trailPath = browserRuntimeHelpers.saveBrowserActionTrail('dangerous-boundary-test', []);
+    safeWriteFile(trailPath, '{"constructor":{"polluted":true}}');
+
+    try {
+      expect(browserRuntimeHelpers.loadBrowserActionTrail('dangerous-boundary-test')).toEqual([]);
     } finally {
       safeRmSync(trailPath, { force: true });
     }
