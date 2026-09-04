@@ -165,7 +165,7 @@ export async function handleAction(input: PresenceAction) {
       const bridgeUrl = getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') || 'http://127.0.0.1:3031';
       const body = await retry(
         async () =>
-          secureFetch({
+          secureFetch<Record<string, unknown>>({
             method: 'POST',
             url: `${bridgeUrl}/api/timeline/dispatch`,
             headers: { 'Content-Type': 'application/json' },

@@ -16935,6 +16935,21 @@ errorも安全に文字列化した。mock、default、scope authorization、CLI
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 967
+
+SX-03／SX-09 の network response boundaryを再監査し、共有 `secureFetch` の既定 generic が `any` のため、
+network capture、service API実行、Presence timeline dispatchへ未契約の response 型が流入する残存を修正した。
+既定戻り値を `unknown` に変更し、objectとして展開する Presence dispatchだけ `Record<string, unknown>` を明示した。
+URL／egress／secret redaction／retry、network capture context、service output、timeline dispatch semanticsは変更していない。
+
+検証:
+
+- secureFetch **1 file / 4 tests passed**、service engine **1 file / 18 tests passed**、Presence actuator **1 file / 2 tests passed**。
+- root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check` passed。
+- network actuator全体テストは既存の catalog mock が `governed-catalog` の regular-file guardを差し替えないため、未知opテスト1件が失敗した。今回の型変更とは無関係で、network／service／Presenceの対象テストは単独実行で通過している。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
