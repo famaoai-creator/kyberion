@@ -40,4 +40,9 @@ describe('cli-input JSON reader', () => {
       safeRmSync(target, { force: true });
     }
   });
+
+  it('rejects dangerous JSON keys before returning CLI input', () => {
+    safeWriteFile(fixturePath, '{"__proto__":{"polluted":true}}');
+    expect(() => readJsonFile(fixturePath)).toThrow(/dangerous JSON key/);
+  });
 });

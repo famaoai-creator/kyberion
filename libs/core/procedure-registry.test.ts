@@ -182,6 +182,16 @@ describe('procedure-registry', () => {
     }
   });
 
+  it('rejects dangerous JSON keys before schema validation', () => {
+    const catalog = pathResolver.sharedTmp(`procedure-catalog-dangerous-${process.pid}.json`);
+    secureIo.safeWriteFile(catalog, '{"__proto__":{"polluted":true}}');
+    try {
+      expect(() => readProcedureCatalog(catalog)).toThrow(/dangerous JSON key/);
+    } finally {
+      secureIo.safeRmSync(catalog, { force: true });
+    }
+  });
+
   // -------------------------------------------------------------------------
   // resolveAllowlistedRecordingRef — recording_ref trust boundary (S-H1)
   // -------------------------------------------------------------------------
