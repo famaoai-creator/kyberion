@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeWriteFile: vi.fn(),
   safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeMkdir: vi.fn(),
   retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
@@ -30,6 +31,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
     safeReadFile: mocks.safeReadFile,
     safeWriteFile: mocks.safeWriteFile,
     safeExistsSync: mocks.safeExistsSync,
+    safeLstat: mocks.safeLstat,
     safeMkdir: mocks.safeMkdir,
   };
 });
