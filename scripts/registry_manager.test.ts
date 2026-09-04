@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 
 import { loadAdapterPayloadAtPath, loadCapabilityRegistryAtPath } from './registry_manager.js';
 
@@ -73,5 +73,12 @@ describe('registry manager catalog boundaries', () => {
 
     expect(harnessRegistry.capabilities.length).toBeGreaterThan(0);
     expect(gatewayRegistry.capabilities).toEqual(expect.any(Array));
+  });
+
+  it('keeps registration output behind the shared printer boundary', () => {
+    const source = String(safeReadFile(pathResolver.rootResolve('scripts/registry_manager.ts')));
+
+    expect(source).toContain('print: Print');
+    expect(source).not.toContain('console.log');
   });
 });

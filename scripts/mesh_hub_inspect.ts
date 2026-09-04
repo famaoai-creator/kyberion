@@ -3,11 +3,13 @@ import { formatMeshHubInspectionReport, inspectMeshHub } from '@agent/core/mesh-
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 type MeshHubInspectionSection =
   'all' | 'peers' | 'routes' | 'deliveries' | 'dead-letters' | 'topics';
 
-function printJson(data: unknown): void {
-  process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
+function printJson(data: unknown, print: Print): void {
+  print(JSON.stringify(data, null, 2));
 }
 
 function renderSection(
@@ -54,7 +56,7 @@ function renderSection(
   }
 }
 
-async function main(args: string[] = []): Promise<void> {
+async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
   const argv = createStandardYargs(['node', 'mesh_hub_inspect', ...args])
     .scriptName('mesh_hub_inspect')
     .usage('$0 [section]')
@@ -85,15 +87,12 @@ async function main(args: string[] = []): Promise<void> {
   });
 
   if (argv.json) {
-    printJson({
-      section,
-      ...report,
-    });
+    printJson({ section, ...report }, print);
     return;
   }
 
   for (const line of renderSection(section, report)) {
-    console.log(line);
+    print(line);
   }
 }
 
@@ -102,7 +101,7 @@ export { main as runMeshHubInspect };
 export const runMeshHubInspectScript = defineScript({
   name: 'mesh-hub:inspect',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
