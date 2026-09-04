@@ -10,6 +10,20 @@ const logger = createLogger('agent-runtime-supervisor');
 const EVENTS_DIR = pathResolver.shared('observability/mission-control');
 let eventWriteWarned = false;
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string' &&
+    error.message
+  ) {
+    return error.message;
+  }
+  return String(error);
+}
+
 /** Append a best-effort, tenant-scoped runtime supervision event. */
 export function appendSupervisorEvent(event: Record<string, unknown>): void {
   try {
@@ -26,12 +40,12 @@ export function appendSupervisorEvent(event: Record<string, unknown>): void {
         ...event,
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Runtime control must still succeed when a narrow authority cannot write
     // the optional observability stream.
     if (!eventWriteWarned) {
       eventWriteWarned = true;
-      logger.warn(`failed to write supervisor event: ${error?.message || error}`);
+      logger.warn(`failed to write supervisor event: ${errorMessage(error)}`);
     }
   }
 }
