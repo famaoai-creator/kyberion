@@ -19504,6 +19504,17 @@ SX-06／SX-07 の`pipeline-execution-part-results`を追加再監査し、通常
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1154
+
+SX-06／SX-09 の`html-to-pptx` CLIを再監査し、usageと変換完了通知の直接`console`出力を除去した。完了通知はharness printerへ、入力不足は単一の`ScriptExitError`へ統一し、既存のmedia actuator pipeline、trustResolved、出力path、失敗時の終了処理は変更していない。
+
+検証:
+
+- html-to-pptx output boundary／PR publish回帰 **2 test files / 5 tests passed**。
+- 対象ESLint、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
