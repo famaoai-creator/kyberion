@@ -6,7 +6,10 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
-import { loadTenantDesignOverride } from '@agent/core/tenant-design-override';
+import {
+  loadTenantDesignOverride,
+  type TenantDesignOverride,
+} from '@agent/core/tenant-design-override';
 import {
   defineCatalog,
   isRecord,
@@ -104,8 +107,36 @@ export function loadConfidentialThemePack(
   }).validate(raw, safePath);
 }
 
-export function loadDesignPattern(rootDir: string, filePath: string): any {
-  return defineCatalog({
+export interface MediaDesignPattern {
+  pattern_id: string;
+  category: 'strategic' | 'technical' | 'analytical' | 'operational' | 'relational';
+  target_audience: string;
+  description?: string;
+  layout_strategy: {
+    visual_weight: 'visual_heavy' | 'balanced' | 'text_heavy';
+    structure: string[];
+    color_palette?: string;
+  };
+  content_data?: Array<{
+    slide?: number;
+    title?: string;
+    subtitle?: string;
+    body?: string | string[];
+    visual?: string;
+    [key: string]: unknown;
+  }>;
+  media_actuator_config?: {
+    template_id?: string;
+    engine: 'pptx' | 'puppeteer' | 'd2' | 'mermaid' | 'chartjs';
+    output_format?: 'pptx' | 'pdf' | 'docx' | 'xlsx' | 'png' | 'svg';
+    theme?: string;
+    styles?: Record<string, unknown>;
+  };
+  [key: string]: unknown;
+}
+
+export function loadDesignPattern(rootDir: string, filePath: string): MediaDesignPattern {
+  return defineCatalog<MediaDesignPattern>({
     id: 'design-pattern',
     path: assertSafeRepositoryPath(filePath, { allowMissingLeaf: true }),
     schema: path.resolve(rootDir, 'knowledge/product/schemas/design-pattern.schema.json'),
@@ -155,7 +186,7 @@ export function resolveConfidentialTenantOverride(
   rootDir: string,
   brandName: string,
   designSystemId?: string
-): any {
+): TenantDesignOverride | null {
   if (!brandName) return null;
   try {
     cachedTenantRegistry ??= { entries: loadTenantEntries(rootDir) };
@@ -194,7 +225,34 @@ export function resolveConfidentialTenantOverride(
   return null;
 }
 
-export function loadMediaDesignSystemsCatalog(rootDir: string): any {
+export interface MediaDesignSystemDefinition {
+  theme: string;
+  profiles?: string[];
+  layout_template_id?: string;
+  body_zone_map?: Record<string, string>;
+  slide_layout_overrides?: Record<string, unknown>;
+  branding?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface MediaDesignSystemsCatalog {
+  version: string;
+  default_system: string;
+  systems: Record<string, MediaDesignSystemDefinition>;
+  style_pack?: {
+    tone_words?: string[];
+    typography_hint?: string;
+    avoid?: string[];
+    music?: {
+      mood: string;
+      bpm_range?: [number, number];
+      instrumentation_hint?: string;
+    };
+  };
+}
+
+export function loadMediaDesignSystemsCatalog(rootDir: string): MediaDesignSystemsCatalog {
   const fallback = {
     version: '1.0.0',
     default_system: 'executive-standard',
@@ -204,11 +262,7 @@ export function loadMediaDesignSystemsCatalog(rootDir: string): any {
     rootDir,
     'knowledge/public/design-patterns/media-templates/media-design-systems.json'
   );
-  const catalog = defineCatalog<{
-    version: string;
-    default_system: string;
-    systems: Record<string, Record<string, unknown>>;
-  }>({
+  const catalog = defineCatalog<MediaDesignSystemsCatalog>({
     id: 'media-design-systems',
     path: filePath,
     schema: path.resolve(rootDir, 'knowledge/product/schemas/media-design-systems.schema.json'),
