@@ -22,6 +22,7 @@ import {
   type ClientManualDriveAction,
   type ClientManualExecutionStatus,
 } from '../lib/agent-manual-response';
+import { parseAgentLogsResponse } from '../lib/agent-logs-response';
 import { KyberionDonut } from './KyberionCharts';
 
 type AgentRecord = ClientAgentRecord;
@@ -225,8 +226,9 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         body: JSON.stringify({ action: 'logs', agentId, limit: 100 }),
       });
       if (res.ok) {
-        const data = await res.json();
-        setLogs(data.logs || []);
+        const data = parseAgentLogsResponse(await res.json());
+        if (!data || data.agentId !== agentId) return;
+        setLogs(data.logs);
       }
     } catch (_) {
       /* best-effort: failure here must not break the primary flow */
