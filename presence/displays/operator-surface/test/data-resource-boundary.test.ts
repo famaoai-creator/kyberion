@@ -20,6 +20,7 @@ const auditTarget = pathResolver.sharedTmp(`operator-surface-${suffix}-audit.jso
 const providerPinsDir = pathResolver.rootResolve('active/shared/runtime/provider-pins');
 const providerPinsTarget = pathResolver.sharedTmp(`operator-surface-${suffix}-provider-pins.json`);
 const providerPinsLink = path.join(providerPinsDir, `boundary-${suffix}.json`);
+const providerPinsMalformed = path.join(providerPinsDir, `boundary-malformed-${suffix}.json`);
 const evidenceTarget = pathResolver.sharedTmp(`operator-surface-${suffix}-evidence.json`);
 const evidenceLink = path.join(missionDir, 'evidence', 'linked.json');
 
@@ -33,6 +34,7 @@ afterEach(() => {
     safeRmSync(auditTarget, { force: true });
     safeRmSync(providerPinsTarget, { force: true });
     safeRmSync(providerPinsLink, { force: true });
+    safeRmSync(providerPinsMalformed, { force: true });
     safeRmSync(evidenceTarget, { force: true });
   });
 });
@@ -190,6 +192,15 @@ describe('operator surface resource boundaries', () => {
       safeSymlinkSync(providerPinsTarget, providerPinsLink);
 
       expect(getProviderPins()).not.toHaveProperty('boundary');
+    });
+  });
+
+  it('does not project non-object provider pins', () => {
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(providerPinsDir, { recursive: true });
+      safeWriteFile(providerPinsMalformed, JSON.stringify({ pins: ['unexpected'] }));
+
+      expect(getProviderPins()).not.toHaveProperty('0');
     });
   });
 });
