@@ -17500,6 +17500,21 @@ modeling固有のcapture／transform／apply／control handlerとADF実行順序
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 1004
+
+SX-03／SX-10 のwisdom actuator control境界を再監査し、`if`／`while` のparams、nested ADF steps、engine結果を
+`any`なしで受け渡すよう修正した。不正なcontrol params／nested step配列は実行前に明示拒否し、反復回数の不正値は
+既存の既定値へ戻す。knowledge tier／tenant scope、receipt、retry、dispatch、context persistenceの意味と実行順序は
+変更していない。
+
+検証:
+
+- Wisdom actuator **4 files / 92 tests passed**。
+- `tsc -p tsconfig.actuators.json --noEmit`、対象ファイルのESLint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

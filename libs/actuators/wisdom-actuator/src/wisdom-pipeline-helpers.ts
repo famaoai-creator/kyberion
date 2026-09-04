@@ -1,4 +1,5 @@
-import { nowIso } from '@agent/core/foundation';
+import { isRecord, nowIso } from '@agent/core/foundation';
+import type { AdfRunResult, AdfStep } from '@agent/core/adf-engine';
 import { logger } from '@agent/core/core';
 import {
   safeReadFile,
@@ -359,17 +360,20 @@ export async function executePipeline(
 
 async function opControl(
   op: string,
-  params: any,
-  ctx: any,
-  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
-  _resolve: (value: any) => any
-) {
-  const runNested = async (steps: any[], seedCtx: any) => {
-    const res = await runSteps(steps, seedCtx);
+  params: unknown,
+  ctx: WisdomContext,
+  runSteps: (steps: AdfStep[], seedCtx?: WisdomContext) => Promise<AdfRunResult<WisdomContext>>,
+  _resolve: (value: unknown) => unknown
+): Promise<WisdomContext> {
+  if (!isRecord(params)) {
+    throw new Error(`[INVALID_PARAMS] ${op} control params must be an object`);
+  }
+  const runNested = async (steps: unknown, seedCtx: WisdomContext) => {
+    const nestedSteps = asAdfSteps(steps, op);
+    const res = await runSteps(nestedSteps, seedCtx);
     if (res.status === 'failed') {
       throw new Error(
-        res.results.find((entry: any) => entry.status === 'failed')?.error ||
-          'nested pipeline failed'
+        res.results.find((entry) => entry.status === 'failed')?.error || 'nested pipeline failed'
       );
     }
     return res.context;
@@ -386,7 +390,10 @@ async function opControl(
 
     case 'while': {
       let iterations = 0;
-      const maxIter = params.max_iterations || 100;
+      const maxIter =
+        typeof params.max_iterations === 'number' && params.max_iterations >= 0
+          ? params.max_iterations
+          : 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
         ctx = await runNested(params.pipeline, ctx);
         iterations++;
@@ -397,6 +404,24 @@ async function opControl(
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
+}
+
+function asAdfSteps(value: unknown, op: string): AdfStep[] {
+  if (
+    !Array.isArray(value) ||
+    !value.every(
+      (step): step is AdfStep =>
+        isRecord(step) &&
+        typeof step.op === 'string' &&
+        (step.type === 'capture' ||
+          step.type === 'transform' ||
+          step.type === 'apply' ||
+          step.type === 'control')
+    )
+  ) {
+    throw new Error(`[INVALID_PARAMS] ${op} control requires an array of ADF steps`);
+  }
+  return value;
 }
 
 async function opCapture(
