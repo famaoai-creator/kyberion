@@ -18,25 +18,10 @@ export interface MissionLedgerPolicyCatalog {
 const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-ledger-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-ledger-policy.schema.json');
 
-const FALLBACK_CATALOG: MissionLedgerPolicyCatalog = {
-  version: '1.0.0',
-  section_title: 'Mission Ledger',
-  table_headers: {
-    mission_id: 'Mission ID',
-    relationship: 'Relationship',
-    status: 'Status',
-    summary: 'Summary',
-    affected_artifacts: 'Affected Artifacts',
-    gate_impact: 'Gate Impact',
-    traceability_refs: 'Traceability Refs',
-  },
-};
-
 const catalog = defineCatalog<MissionLedgerPolicyCatalog>({
   id: 'mission-ledger-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadMissionLedgerPolicyCatalog(): MissionLedgerPolicyCatalog {
