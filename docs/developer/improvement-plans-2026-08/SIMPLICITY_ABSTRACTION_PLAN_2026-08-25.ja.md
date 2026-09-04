@@ -17075,6 +17075,23 @@ manifest fileのsecure path／symlink境界、agent discovery semanticsは変更
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 976
+
+SX-03／SX-04 の governance policy readerを再監査し、`policy-engine`がYAML全体を`any`で保持し、
+rules配列の存在だけを確認して不正operator／action／priority／rate-limitを実行対象へ残す残存を修正した。
+YAMLのroot、policy、rule、condition、rate-limitを`unknown`からknown contractへ正規化し、invalid policy／ruleは
+load前に除外する。宣言数とload数の可視性、policyが空の場合のfail-closed、既存8 policyの優先順位・regex・
+rate-limit評価 semanticsは維持した。
+
+検証:
+
+- policy-engine **1 file / 6 tests passed**。
+- 実ポリシー8件の評価、malformed policyの宣言2件／load 1件を回帰確認。
+- root typecheck、root lint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
