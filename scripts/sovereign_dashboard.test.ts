@@ -12,6 +12,7 @@ import {
   listJsonFiles,
   readMissionDashboardState,
   readDashboardOperatorIdentity,
+  readDashboardJsonValueIfExists,
   readProviderCapabilitySnapshot,
   readSurfaceDashboardState,
   safeListDir,
@@ -42,6 +43,8 @@ describe('sovereign dashboard governance loaders', () => {
     expect(source).not.toContain(
       "}>(pathResolver.knowledge('product/orchestration/global_skill_index.json'))"
     );
+    expect(source).toContain('readSafeJsonValueFile');
+    expect(source).not.toContain('readJsonIfExists<T>');
     expect(source).toContain('renderDashboardSnapshot');
     expect(source).toContain('print(snapshot)');
     expect(source).not.toContain("name: 'dashboard', flags: []");
@@ -154,5 +157,13 @@ describe('sovereign dashboard governance loaders', () => {
 
     safeWriteFile(identityPath, JSON.stringify({ name: 42 }));
     expect(readDashboardOperatorIdentity(identityPath)).toBeNull();
+  });
+
+  it('fails closed for dangerous dashboard JSON values', () => {
+    const jsonPath = path.join(resourceBoundaryRoot, 'dashboard.json');
+    safeMkdir(resourceBoundaryRoot, { recursive: true });
+    safeWriteFile(jsonPath, '{"__proto__":{"polluted":true},"version":"1.0.0"}');
+
+    expect(readDashboardJsonValueIfExists<{ version?: string }>(jsonPath)).toBeNull();
   });
 });
