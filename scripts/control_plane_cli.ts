@@ -30,6 +30,7 @@ export { summarizeMissionSeedAssessment };
 
 type SurfaceKind = 'presence' | 'chronos';
 type ControlPlaneClient = ReturnType<typeof createControlPlaneClient>;
+type ControlPlaneJsonObject = Record<string, unknown>;
 type SurfaceActionHandler = (
   client: ControlPlaneClient,
   args: string[],
@@ -625,7 +626,7 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
       ]);
     },
     bindings: async (client, _args, outputJson) => {
-      const body = await client.getJson('/api/service-bindings');
+      const body = await client.getJson<ControlPlaneJsonObject>('/api/service-bindings');
       if (outputJson) return printJson(body.items || []);
       return printItems('Service Bindings', asArray(body.items), (item) => [
         `${item.binding_id || 'binding'} [${item.service_type || 'service'}]`,
@@ -688,7 +689,7 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
         warnLegacyApprovalForm('control presence approve <requestId> / reject <requestId>');
         decision = String(legacyDecision);
       }
-      const body = await client.postJson(
+      const body = await client.postJson<ControlPlaneJsonObject>(
         `/api/approvals/${encodeURIComponent(requestId)}/decision`,
         { decision }
       );
@@ -700,7 +701,7 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
       if (!requestId) {
         throw new Error('Usage: control presence reject <requestId>');
       }
-      const body = await client.postJson(
+      const body = await client.postJson<ControlPlaneJsonObject>(
         `/api/approvals/${encodeURIComponent(requestId)}/decision`,
         { decision: 'rejected' }
       );
@@ -733,7 +734,9 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
       if (!sessionId) {
         throw new Error('Usage: control presence task <sessionId>');
       }
-      const body = await client.getJson(`/api/task-sessions/${encodeURIComponent(sessionId)}`);
+      const body = await client.getJson<ControlPlaneJsonObject>(
+        `/api/task-sessions/${encodeURIComponent(sessionId)}`
+      );
       return printJson(body.item || body);
     },
     memory: async (client, currentArgs) => {
@@ -922,7 +925,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
         currentArgs,
         'approved'
       );
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'approval_decision',
         requestId,
         storageChannel,
@@ -936,7 +939,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
         currentArgs,
         'rejected'
       );
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'approval_decision',
         requestId,
         storageChannel,
@@ -990,7 +993,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       if (!trackId) {
         throw new Error('Usage: control chronos seed-track <trackId> [artifactId]');
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'create_track_seed',
         trackId,
         artifactId,
@@ -1002,14 +1005,14 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       if (!seedId) {
         throw new Error('Usage: control chronos promote-seed <seedId>');
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'promote_mission_seed',
         seedId,
       });
       return printJson(body);
     },
     'distill-candidates': async (client, _args, outputJson) => {
-      const body = await client.getJson('/api/intelligence');
+      const body = await client.getJson<ControlPlaneJsonObject>('/api/intelligence');
       const items = asArray(body.distillCandidates);
       if (outputJson) return printJson(items);
       return printItems('Distill Candidates', items, (item) => [
@@ -1057,7 +1060,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
     },
     'promote-memory': async (client, currentArgs) => {
       const dryRun = currentArgs.includes('--dry-run');
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'memory_promote_pending',
         dryRun,
       });
@@ -1068,7 +1071,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       if (!candidateId || !['promote', 'archive'].includes(String(decision))) {
         throw new Error('Usage: control chronos distill <candidateId> <promote|archive>');
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'distill_candidate_decision',
         candidateId,
         decision,
@@ -1082,7 +1085,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
           'Usage: control chronos mission-control <missionId> <resume|refresh_team|prewarm_team|staff_team|finish>'
         );
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'mission_control',
         missionId,
         operation,
@@ -1096,7 +1099,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
           'Usage: control chronos surface-control <reconcile|status|start|stop> [surfaceId]'
         );
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'surface_control',
         operation,
         surfaceId,

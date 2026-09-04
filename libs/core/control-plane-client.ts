@@ -541,10 +541,10 @@ export function createControlPlaneClient(
   return {
     surface,
     baseUrl: getControlPlaneBaseUrl(surface, options?.baseUrl),
-    async getJson<T = any>(pathname: string): Promise<T> {
+    async getJson<T = unknown>(pathname: string): Promise<T> {
       return requestControlPlaneJson(surface, pathname, undefined, options) as Promise<T>;
     },
-    async postJson<T = any>(pathname: string, payload: unknown): Promise<T> {
+    async postJson<T = unknown>(pathname: string, payload: unknown): Promise<T> {
       return requestControlPlaneJson(
         surface,
         pathname,
