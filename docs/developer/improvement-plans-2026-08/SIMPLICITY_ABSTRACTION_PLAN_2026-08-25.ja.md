@@ -19560,6 +19560,17 @@ SX-06／SX-09 の`service_lifecycle_control`を再監査し、service選択案�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1159
+
+SX-06／SX-07／SX-09 の`scenario_storage_governance`を再監査し、top-levelで即時実行されていたAuditChain／DataVault／ProcessLogger／StorageJanitorシナリオを明示的なharness entrypointへ移した。進捗表示は注入printerへ統一し、import時の予期しないaudit・vault・log書込みを防止した。シナリオ手順、tenant mirror観測、vault TTL／invalidate、process log検証、janitor dry-runは変更していない。
+
+検証:
+
+- storage governance resource boundary **1 test file / 2 tests passed**。secure parser、top-level実行防止、printer／direct console境界を確認した。
+- 対象ESLint、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
