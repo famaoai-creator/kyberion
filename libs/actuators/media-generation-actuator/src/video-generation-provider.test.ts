@@ -84,4 +84,33 @@ describe('video generation provider abstraction', () => {
     ).rejects.toThrow(/KYBERION_RUNWAY_API_KEY/);
     expect(mocks.secureFetch).not.toHaveBeenCalled();
   });
+
+  it('rejects non-object provider responses before projecting task fields', async () => {
+    process.env.KYBERION_RUNWAY_API_KEY = 'test-runway-key';
+    mocks.secureFetch.mockResolvedValueOnce([]);
+
+    const backend = getMediaBackendRecord('media-generation.runway.gen4.5', 'video');
+    const provider = createVideoGenerationProvider(backend);
+
+    await expect(
+      provider.submit(normalizeVideoGenerationRequest({ prompt: 'test' }, backend))
+    ).rejects.toThrow('Video provider response must be a JSON object');
+  });
+
+  it('rejects non-binary download responses before writing an artifact', async () => {
+    process.env.KYBERION_RUNWAY_API_KEY = 'test-runway-key';
+    mocks.secureFetch.mockResolvedValueOnce({ not: 'binary' });
+
+    const backend = getMediaBackendRecord('media-generation.runway.gen4.5', 'video');
+    const provider = createVideoGenerationProvider(backend);
+
+    await expect(
+      provider.download({
+        provider_job_id: 'runway-task-1',
+        provider: 'runway',
+        status: 'succeeded',
+        output_url: 'https://cdn.example.test/video.mp4',
+      })
+    ).rejects.toThrow('Video provider download response must be binary data');
+  });
 });
