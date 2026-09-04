@@ -9,21 +9,21 @@ import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 let activeCleanup: (() => void) | undefined;
+type Print = (value: unknown) => void;
+const defaultPrint: Print = (value) => logger.info(String(value));
 
-async function main(args: string[] = []): Promise<void> {
+export async function main(args: string[] = [], print: Print = defaultPrint): Promise<void> {
+  const usage =
+    'Usage: KYBERION_OAUTH_SERVICE_ID=<service_name> node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts';
   if (args.includes('--help') || args.includes('-h')) {
-    console.log(
-      'Usage: KYBERION_OAUTH_SERVICE_ID=<service_name> node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts'
-    );
+    print(usage);
     throw new ScriptExitError(0, '', true);
   }
   const serviceId = String(
     getRegisteredEnvText('KYBERION_OAUTH_SERVICE_ID') || args[0] || ''
   ).trim();
   if (!serviceId) {
-    console.error(
-      'Usage: KYBERION_OAUTH_SERVICE_ID=<service_name> node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts'
-    );
+    print(usage);
     throw new ScriptExitError(1, '', true);
   }
   const callbackHost = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_HOST') || '127.0.0.1';
@@ -105,13 +105,13 @@ async function main(args: string[] = []): Promise<void> {
     ) + '\n'
   );
 
-  console.log('');
-  console.log(`Service: ${serviceId}`);
-  console.log(`Redirect URI: ${redirectUri}`);
-  console.log(`Authorization URL: ${result.authorizationUrl}`);
-  console.log('');
-  console.log('Open the URL above, approve the request, then return here.');
-  console.log('Press ENTER after the browser shows Authorization Complete.');
+  print('');
+  print(`Service: ${serviceId}`);
+  print(`Redirect URI: ${redirectUri}`);
+  print(`Authorization URL: ${result.authorizationUrl}`);
+  print('');
+  print('Open the URL above, approve the request, then return here.');
+  print('Press ENTER after the browser shows Authorization Complete.');
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -134,7 +134,7 @@ async function main(args: string[] = []): Promise<void> {
     server.once('exit', () => resolve());
   });
 
-  console.log(
+  print(
     `OAuth connection setup complete. Tokens should be stored in knowledge/personal/connections/${serviceId}.json`
   );
 }
@@ -142,14 +142,15 @@ async function main(args: string[] = []): Promise<void> {
 export const runOAuthSetup = defineScript({
   name: 'oauth:setup',
   flags: [],
-  run: async ({ argv }) => {
-    await runOAuthSetupForService(argv[0]);
-  },
+  run: ({ argv, print }) => runOAuthSetupForService(argv[0], print),
 });
 
-export async function runOAuthSetupForService(serviceId: string): Promise<void> {
+export async function runOAuthSetupForService(
+  serviceId: string,
+  print: Print = defaultPrint
+): Promise<void> {
   try {
-    await main([serviceId]);
+    await main([serviceId], print);
   } catch (error) {
     activeCleanup?.();
     throw error;
