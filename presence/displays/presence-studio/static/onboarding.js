@@ -1,3 +1,11 @@
+import {
+  parseBrowserState,
+  parseOnboardingApply,
+  parseOnboardingPreview,
+  parseVoiceSample,
+  parseVoiceSelection,
+} from './onboarding-response.js';
+
 /* global document, MediaRecorder */
 
 const steps = [
@@ -80,12 +88,21 @@ function renderReadiness() {
     ],
     ['Browser', 'ready', 'Presence Studio is connected'],
   ];
-  $('readiness-grid').innerHTML = cards
-    .map(
-      ([name, status, detail]) =>
-        `<article class="readiness-card"><span class="badge ${status === 'blocked' ? 'blocked' : ''}">${status.toUpperCase()}</span><strong>${name}</strong><small>${detail}</small></article>`
-    )
-    .join('');
+  const grid = $('readiness-grid');
+  grid.replaceChildren();
+  cards.forEach(([name, status, detail]) => {
+    const card = document.createElement('article');
+    card.className = 'readiness-card';
+    const badge = document.createElement('span');
+    badge.className = `badge${status === 'blocked' ? ' blocked' : ''}`;
+    badge.textContent = status.toUpperCase();
+    const title = document.createElement('strong');
+    title.textContent = name;
+    const description = document.createElement('small');
+    description.textContent = detail;
+    card.append(badge, title, description);
+    grid.appendChild(card);
+  });
 }
 const serviceMeta = {
   github: ['GitHub', 'Repository, issue and PR workflows', 'oauth'],
@@ -112,12 +129,36 @@ function renderServices() {
 }
 function renderProviders() {
   const models = serverState.providers?.default_models || {};
-  $('provider-list').innerHTML = providerPriority
-    .map(
-      (provider, i) =>
-        `<div class="priority-item"><span class="priority-rank">${String(i + 1).padStart(2, '0')}</span><strong>${provider}</strong><input data-model="${provider}" value="${models[provider] || ''}" placeholder="default model"/><div class="priority-actions"><button type="button" data-move="up" data-index="${i}">↑</button><button type="button" data-move="down" data-index="${i}">↓</button></div></div>`
-    )
-    .join('');
+  const list = $('provider-list');
+  list.replaceChildren();
+  providerPriority.forEach((provider, i) => {
+    const row = document.createElement('div');
+    row.className = 'priority-item';
+    const rank = document.createElement('span');
+    rank.className = 'priority-rank';
+    rank.textContent = String(i + 1).padStart(2, '0');
+    const name = document.createElement('strong');
+    name.textContent = provider;
+    const input = document.createElement('input');
+    input.dataset.model = provider;
+    input.value = models[provider] || '';
+    input.placeholder = 'default model';
+    const actions = document.createElement('div');
+    actions.className = 'priority-actions';
+    for (const [direction, label] of [
+      ['up', '↑'],
+      ['down', '↓'],
+    ]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.move = direction;
+      button.dataset.index = String(i);
+      button.textContent = label;
+      actions.appendChild(button);
+    }
+    row.append(rank, name, input, actions);
+    list.appendChild(row);
+  });
   $('provider-list')
     .querySelectorAll('[data-move]')
     .forEach(
@@ -268,6 +309,44 @@ function collectDraft() {
     },
   };
 }
+function renderReviewSummary(grouped, warnings) {
+  const summary = $('review-summary');
+  summary.replaceChildren();
+  Object.entries(grouped).forEach(([title, items]) => {
+    const section = document.createElement('section');
+    section.className = 'review-block';
+    const heading = document.createElement('h3');
+    heading.textContent = title;
+    const list = document.createElement('ul');
+    if (items.length) {
+      items.forEach((item) => {
+        const entry = document.createElement('li');
+        entry.textContent = item.description;
+        list.appendChild(entry);
+      });
+    } else {
+      const entry = document.createElement('li');
+      entry.textContent = 'No changes';
+      list.appendChild(entry);
+    }
+    section.append(heading, list);
+    summary.appendChild(section);
+  });
+  if (warnings.length) {
+    const section = document.createElement('section');
+    section.className = 'review-block warning';
+    const heading = document.createElement('h3');
+    heading.textContent = 'Warnings';
+    const list = document.createElement('ul');
+    warnings.forEach((warning) => {
+      const entry = document.createElement('li');
+      entry.textContent = warning;
+      list.appendChild(entry);
+    });
+    section.append(heading, list);
+    summary.appendChild(section);
+  }
+}
 async function preview() {
   try {
     const response = await fetch('/api/onboarding/preview', {
@@ -275,27 +354,26 @@ async function preview() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(collectDraft()),
     });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || 'Preview failed');
+    const payload = parseOnboardingPreview(await response.json().catch(() => null));
+    if (!response.ok || !payload) throw new Error('Preview failed');
     const grouped = {
       Identity: payload.effects.filter((x) => ['identity', 'vision', 'agent'].includes(x.kind)),
       Runtime: payload.effects.filter((x) => ['providers', 'tools', 'state'].includes(x.kind)),
       Connections: payload.effects.filter((x) => ['service', 'voice'].includes(x.kind)),
     };
-    $('review-summary').innerHTML =
-      Object.entries(grouped)
-        .map(
-          ([title, items]) =>
-            `<section class="review-block"><h3>${title}</h3><ul>${items.map((x) => `<li>${x.description}</li>`).join('') || '<li>No changes</li>'}</ul></section>`
-        )
-        .join('') +
-      (payload.warnings.length
-        ? `<section class="review-block warning"><h3>Warnings</h3><ul>${payload.warnings.map((x) => `<li>${x}</li>`).join('')}</ul></section>`
-        : '');
+    renderReviewSummary(grouped, payload.warnings);
     return payload;
   } catch (error) {
-    $('review-summary').innerHTML =
-      `<section class="review-block warning"><h3>Preview blocked</h3><p>${error.message}</p></section>`;
+    const summary = $('review-summary');
+    summary.replaceChildren();
+    const section = document.createElement('section');
+    section.className = 'review-block warning';
+    const heading = document.createElement('h3');
+    heading.textContent = 'Preview blocked';
+    const detail = document.createElement('p');
+    detail.textContent = error instanceof Error ? error.message : 'Preview failed';
+    section.append(heading, detail);
+    summary.appendChild(section);
     notice(error.message, true);
     throw error;
   }
@@ -309,10 +387,22 @@ async function apply() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(collectDraft()),
     });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || 'Apply failed');
-    $('review-summary').innerHTML =
-      `<div class="success-card"><p class="eyebrow">ACTIVATED</p><h3>Kyberionの設定を適用しました。</h3><p>${payload.artifacts.length} artifacts updated · ${new Date(payload.applied_at).toLocaleString()}</p><a href="/">Presence Studioへ戻る →</a></div>`;
+    const payload = parseOnboardingApply(await response.json().catch(() => null));
+    if (!response.ok || !payload) throw new Error('Apply failed');
+    const success = document.createElement('div');
+    success.className = 'success-card';
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = 'ACTIVATED';
+    const title = document.createElement('h3');
+    title.textContent = 'Kyberionの設定を適用しました。';
+    const detail = document.createElement('p');
+    detail.textContent = `${payload.artifacts.length} artifacts updated · ${new Date(payload.applied_at).toLocaleString()}`;
+    const link = document.createElement('a');
+    link.href = '/';
+    link.textContent = 'Presence Studioへ戻る →';
+    success.append(eyebrow, title, detail, link);
+    $('review-summary').replaceChildren(success);
     $('save-state').textContent = 'APPLIED';
     $('apply-consent').closest('label').classList.add('hidden');
     $('apply-button').classList.add('hidden');
@@ -349,8 +439,8 @@ async function toggleRecording() {
           `/api/onboarding/voice-sample?profile_id=${encodeURIComponent(profile)}`,
           { method: 'POST', headers: { 'Content-Type': blob.type.split(';')[0] }, body: blob }
         );
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error);
+        const payload = parseVoiceSample(await response.json().catch(() => null));
+        if (!response.ok || !payload) throw new Error('Voice sample upload failed');
         samples.push(payload);
         renderSamples();
         $('voice-enabled').checked = true;
@@ -380,8 +470,9 @@ async function loadVoiceEngines() {
   const hint = $('voice-engine-hint');
   try {
     const response = await fetch('/api/voice/selection');
-    const payload = await response.json();
-    if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    const payload = parseVoiceSelection(await response.json().catch(() => null));
+    if (!response.ok || !payload)
+      throw new Error(`Voice engine list unavailable (HTTP ${response.status})`);
     select.replaceChildren();
     for (const candidate of payload.tts?.candidates || []) {
       const option = document.createElement('option');
@@ -410,8 +501,8 @@ async function loadVoiceEngines() {
 async function load() {
   try {
     const response = await fetch('/api/onboarding/browser-state');
-    serverState = await response.json();
-    if (!response.ok) throw new Error(serverState.error);
+    serverState = parseBrowserState(await response.json().catch(() => null));
+    if (!response.ok || !serverState) throw new Error('Browser onboarding state is invalid');
     providerPriority = serverState.providers?.priority || providerPriority;
     const identity = serverState.identity || {};
     $('identity-name').value = identity.name || '';
