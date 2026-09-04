@@ -189,6 +189,35 @@ describe('probeManifest', () => {
       }
     });
   });
+
+  it('does not treat a mission-evidence directory as a satisfied file probe', async () => {
+    const missionId = 'MSN-ENV-PROBE-DIRECTORY-001';
+    const missionDir = path.join(ROOT, 'active/missions/confidential', missionId);
+    const evidenceDir = path.join(missionDir, 'evidence');
+    await withExecutionContextAsync('mission_controller', async () => {
+      safeMkdir(path.join(evidenceDir, 'ready.json'), { recursive: true });
+      try {
+        const manifest: EnvironmentManifest = {
+          manifest_id: 'unit-test-mission-evidence-directory',
+          version: 'test',
+          capabilities: [
+            {
+              capability_id: 'cap.directory',
+              kind: 'mission-evidence',
+              description: 'reject directory',
+              required_for: ['test'],
+              probe: { kind: 'mission-evidence', filename: 'ready.json' },
+            },
+          ],
+        };
+        const statuses = await probeManifest(manifest, { mission_id: missionId });
+        expect(statuses[0]).toMatchObject({ satisfied: false });
+        expect(statuses[0]?.reason).toContain('not a regular file');
+      } finally {
+        safeRmSync(missionDir, { recursive: true, force: true });
+      }
+    });
+  });
 });
 
 describe('platform-specific environment installers', () => {

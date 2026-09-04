@@ -323,6 +323,12 @@ async function runProbe(
         };
       }
       if (!safeExistsSync(file)) return { available: false, reason: `${probe.filename} missing` };
+      if (!safeLstat(file).isFile()) {
+        return {
+          available: false,
+          reason: `${probe.filename} is not a regular file`,
+        };
+      }
       if (!probe.require_field) return { available: true };
       try {
         const data = readJson<unknown>(file);
