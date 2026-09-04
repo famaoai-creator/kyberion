@@ -141,6 +141,16 @@ describe('runBestOfProviders', () => {
     expect(persisted[0].instruction_digest).toBe(result.verdictRecord.instruction_digest);
     expect(persisted[0].data_tier).toBe('public');
     expect(JSON.stringify(persisted[0])).not.toContain('null-pointer');
+
+    safeWriteFile(
+      VERDICT_LOG_PATH,
+      [
+        JSON.stringify(persisted[0]),
+        JSON.stringify({ ...persisted[0], participants: [42] }),
+        '{"constructor":{"polluted":true}}',
+      ].join('\n') + '\n'
+    );
+    expect(peekBestOfProvidersVerdictLog(VERDICT_LOG_PATH)).toHaveLength(1);
   });
 
   it('auto-excludes an egress-ineligible provider and surfaces the exclusion', async () => {
