@@ -10,7 +10,6 @@
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { readJsonIfPresent } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withLock, withLockSync } from './src/lock-utils.js';
@@ -37,7 +36,14 @@ export interface WriterLeaseMetricsSnapshot {
 }
 
 const WRITER_LEASE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/writer-lease.schema.json');
+const WRITER_LEASE_METRICS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/writer-lease-metrics.schema.json'
+);
 const writerLeaseCatalogs = new Map<string, GovernedCatalog<FencedWriterLease>>();
+const writerLeaseMetricsCatalogs = new Map<
+  string,
+  GovernedCatalog<Record<string, WriterLeaseMetricsSnapshot>>
+>();
 
 function writerLeaseCatalog(leasePath: string): GovernedCatalog<FencedWriterLease> {
   const existing = writerLeaseCatalogs.get(leasePath);
@@ -48,6 +54,22 @@ function writerLeaseCatalog(leasePath: string): GovernedCatalog<FencedWriterLeas
     schema: WRITER_LEASE_SCHEMA_PATH,
   });
   writerLeaseCatalogs.set(leasePath, catalog);
+  return catalog;
+}
+
+function writerLeaseMetricsCatalog(
+  metricsPath: string
+): GovernedCatalog<Record<string, WriterLeaseMetricsSnapshot>> {
+  const existing = writerLeaseMetricsCatalogs.get(metricsPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<Record<string, WriterLeaseMetricsSnapshot>>({
+    id: 'writer-lease-metrics',
+    path: metricsPath,
+    schema: WRITER_LEASE_METRICS_SCHEMA_PATH,
+    fallback: {},
+    fallbackOnInvalid: true,
+  });
+  writerLeaseMetricsCatalogs.set(metricsPath, catalog);
   return catalog;
 }
 
@@ -77,8 +99,8 @@ function observeWriterLeaseMetric(event: WriterLeaseEvent, metricsPath?: string)
   if (!metricsPath) return;
   try {
     const safeMetricsPath = assertSafeRepositoryPath(metricsPath, { allowMissingLeaf: true });
-    const current =
-      readJsonIfPresent<Record<string, WriterLeaseMetricsSnapshot>>(safeMetricsPath) || {};
+    const catalog = writerLeaseMetricsCatalog(safeMetricsPath);
+    const current = catalog.load();
     const durable = current[resourceId] ?? {
       resource_id: resourceId,
       acquired: 0,
@@ -90,6 +112,7 @@ function observeWriterLeaseMetric(event: WriterLeaseEvent, metricsPath?: string)
     current[resourceId] = durable;
     safeMkdir(path.dirname(safeMetricsPath), { recursive: true });
     safeWriteFile(safeMetricsPath, `${JSON.stringify(current, null, 2)}\n`);
+    catalog.reset();
   } catch {
     // Metrics are best effort and must never alter lease safety.
   }
@@ -112,8 +135,7 @@ export function loadWriterLeaseMetrics(
 ): WriterLeaseMetricsSnapshot[] {
   try {
     const safeMetricsPath = assertSafeRepositoryPath(metricsPath, { allowMissingLeaf: true });
-    const parsed =
-      readJsonIfPresent<Record<string, WriterLeaseMetricsSnapshot>>(safeMetricsPath) || {};
+    const parsed = writerLeaseMetricsCatalog(safeMetricsPath).load();
     const snapshots = resourceId ? [parsed[resourceId]] : Object.values(parsed);
     return snapshots
       .filter((snapshot): snapshot is WriterLeaseMetricsSnapshot => Boolean(snapshot))

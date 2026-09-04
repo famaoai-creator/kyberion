@@ -281,4 +281,22 @@ describe('withFencedWriterLease (PI-16)', () => {
       String(safeReadFile(writerLeaseMetricsPath(leasePath), { encoding: 'utf8' }))
     ).not.toContain('owner-metrics');
   });
+
+  it('fails closed for malformed durable metrics', () => {
+    const metricsPath = writerLeaseMetricsPath(leasePath);
+    safeWriteFile(
+      metricsPath,
+      JSON.stringify({
+        'mission:PI16-BAD': {
+          resource_id: 'mission:PI16-BAD',
+          acquired: 'one',
+          renewed: 0,
+          released: 0,
+          rejected: 0,
+        },
+      })
+    );
+
+    expect(loadWriterLeaseMetrics(metricsPath)).toEqual([]);
+  });
 });

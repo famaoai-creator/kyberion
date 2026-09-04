@@ -16762,6 +16762,12 @@ SX-04 の financial domain loaderを再監査し、`financial-model.ts` の lega
 
 検証: `pnpm exec vitest run libs/core/financial-model.test.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 946
+
+SX-04 の writer lease metrics loaderを再監査し、lease本体とは異なり durable metrics mapだけが `readJsonIfPresent` と未検証の `Record` で読み書きされる残存を修正した。動的な resource ID keyを維持した専用 `writer-lease-metrics.schema.json` と `defineCatalog` を接続し、破損metricsは既存のbest-effort空集合へ閉じる。fencing token、lock、metrics counterの更新 semantics、lease payload非公開の境界は変更していない。
+
+検証: `pnpm exec vitest run libs/core/writer-lease.test.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

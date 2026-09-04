@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/writer-lease-metrics.schema.json",
+  "title": "Fenced Writer Lease Metrics",
+  "type": "object",
+  "additionalProperties": {
+    "$ref": "#/$defs/metrics"
+  },
+  "$defs": {
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resource_id", "acquired", "renewed", "released", "rejected"],
+      "properties": {
+        "resource_id": { "type": "string", "minLength": 1 },
+        "acquired": { "type": "integer", "minimum": 0 },
+        "renewed": { "type": "integer", "minimum": 0 },
+        "released": { "type": "integer", "minimum": 0 },
+        "rejected": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
