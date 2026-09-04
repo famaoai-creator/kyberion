@@ -16845,6 +16845,17 @@ event raw JSON は `JSON.parse` 後に summary value parser へ直接渡され�
 canonical full gate はこの追記後に実行する。SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、
 SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 958
+
+SX-08／SX-09 の Concierge voice response 境界を再監査し、voice status／speech／input device／listen-once／stop
+の各 parser が型と必須値は検証するものの、voice-hub 由来の nested JSON tree に dangerous key が残る可能性を確認した。
+voice response parser 共通の safe-tree 検査を追加し、ブラウザ状態、STT transcript、server TTS 状態へ到達する前に
+fail-closed とした。既存の Tier 0／Tier 1 fallback、音声停止、transcript 表示 semantics は変更していない。
+
+検証: Concierge voice response **1 file / 3 tests passed**、root typecheck、root lint、`git diff --check`。
+canonical full gate はこの追記後に実行する。SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、
+SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
