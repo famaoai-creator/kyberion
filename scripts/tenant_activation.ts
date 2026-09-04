@@ -16,8 +16,6 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
-const defaultPrint: Print = (value) => console.log(value);
-
 function value(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
   const candidate = index >= 0 ? argv[index + 1] : undefined;
@@ -91,7 +89,7 @@ function usage(): string {
   ].join('\n');
 }
 
-export function main(argv: string[] = [], print: Print = defaultPrint): void {
+export function main(argv: string[] = [], print: Print = () => undefined): void {
   const command = argv.find((arg) => !arg.startsWith('--')) || 'help';
   if (command === 'help') {
     print(usage());
