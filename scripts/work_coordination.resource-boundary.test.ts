@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 import {
   loadWorkCoordinationIssue,
   parseWorkCoordinationJson,
@@ -35,5 +35,17 @@ describe('work coordination resource boundary', () => {
   it('fails closed for dangerous persisted issue input', () => {
     safeWriteFile(issuePath, '{"__proto__":{"polluted":true},"id":1}');
     expect(() => loadWorkCoordinationIssue(issuePath)).toThrow('dangerous JSON key');
+  });
+
+  it('routes coordination output through the shared printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/work_coordination.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 });
