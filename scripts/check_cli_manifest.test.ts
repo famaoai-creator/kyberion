@@ -8,6 +8,16 @@ import {
 } from './check_cli_manifest.js';
 
 describe('CLI manifest', () => {
+  it('uses the governed package manifest loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_cli_manifest.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('readSafeJsonFile');
+    expect(source).not.toContain('readJson<{ scripts?: Record<string, string> }>(');
+  });
+
   it('accepts the repository command map', () => {
     expect(checkCliManifest(loadCliManifest())).toEqual([]);
   });
