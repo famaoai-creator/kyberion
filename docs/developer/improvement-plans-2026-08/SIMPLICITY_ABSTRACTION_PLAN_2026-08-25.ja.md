@@ -18699,6 +18699,20 @@ activation／resume／rollback／reconcile／suspend の判定と適用 semantic
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1087
+
+SX-04 の media catalog を再監査し、`media-signal-entry-policy.ts` に残っていた canonical JSON と同内容の
+`FALLBACK_ENTRY_TYPES`／`FALLBACK_CATALOG_META` を削除した。`defineCatalog` に fallback を渡さない fail-closed 境界へ統一し、catalogの
+欠損・不正を古い内蔵定義で隠さないようにした。signal／risk／incident／control の解決結果、schema、canonical catalog は変更していない。
+
+検証:
+
+- media signal policy **1 file / 2 tests passed**。canonical catalogの解決とfallback定義の不在を確認した。
+- `pnpm run typecheck`、対象2ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
