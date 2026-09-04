@@ -8,6 +8,10 @@ import {
   type ClientAgentHealthResponse,
   type ClientAgentRecord,
 } from '../lib/agent-health-response';
+import {
+  parseAgentManifestsResponse,
+  type ClientAgentManifest,
+} from '../lib/agent-manifests-response';
 import { KyberionDonut } from './KyberionCharts';
 
 type AgentRecord = ClientAgentRecord;
@@ -15,16 +19,7 @@ type HealthSnapshot = Pick<ClientAgentHealthResponse, 'total' | 'ready' | 'busy'
 
 type ChronosAccessRole = 'readonly' | 'localadmin';
 
-interface ManifestEntry {
-  agentId: string;
-  provider: string;
-  modelId: string;
-  capabilities: string[];
-  trustRequired: number;
-  requiresEnv: string[];
-  providerStrategy?: string;
-  fallbackProviders?: string[];
-}
+type ManifestEntry = ClientAgentManifest;
 
 interface ProviderOption {
   value: string;
@@ -124,9 +119,10 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     try {
       const res = await fetch('/api/agents?manifests=true');
       if (res.ok) {
-        const data = await res.json();
-        setManifests(data.manifests || []);
-        setAccessRole(data.accessRole || 'readonly');
+        const data = parseAgentManifestsResponse(await res.json());
+        if (!data) return;
+        setManifests(data.manifests);
+        setAccessRole(data.accessRole);
       }
     } catch (_) {
       /* best-effort: failure here must not break the primary flow */
