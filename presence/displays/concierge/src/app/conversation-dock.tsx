@@ -498,9 +498,11 @@ export function ConversationDock() {
 export function parseConversationMessageResponse(
   value: unknown
 ): Partial<ConversationMessageResponse> & { error?: string } {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  if (!isSafeConversationResponseTree(value)) {
+    return { error: 'The conversation response was invalid.' };
+  }
   const raw = value as Record<string, unknown>;
-  const reply = typeof raw.reply === 'string' ? raw.reply : undefined;
+  const reply = typeof raw.reply === 'string' ? raw.reply.trim() : undefined;
   const mode =
     raw.mode === 'voice-hub' || raw.mode === 'orchestrator' || raw.mode === 'unavailable'
       ? raw.mode
@@ -514,9 +516,7 @@ export function parseConversationMessageResponse(
       ? raw.shape
       : undefined;
   if (!reply || !mode || !shape) {
-    return {
-      error: typeof raw.error === 'string' ? raw.error : 'The conversation response was invalid.',
-    };
+    return { error: 'The conversation response was invalid.' };
   }
   const intentResolution = parseIntentResolutionContract(raw.intentResolution);
   const nextActions = Array.isArray(raw.nextActions)
@@ -549,8 +549,18 @@ export function parseConversationMessageResponse(
     ...(promoted ? { promoted } : {}),
     ...(nextActions ? { nextActions } : {}),
     ...(intentResolution ? { intentResolution } : {}),
-    ...(typeof raw.error === 'string' ? { error: raw.error } : {}),
   };
+}
+
+const CONVERSATION_RESPONSE_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isSafeConversationResponseTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(isSafeConversationResponseTree);
+  if (!value || typeof value !== 'object') return true;
+  return Object.entries(value).every(
+    ([key, nested]) =>
+      !CONVERSATION_RESPONSE_DANGEROUS_KEYS.has(key) && isSafeConversationResponseTree(nested)
+  );
 }
 
 function isConversationPromotionKind(value: unknown): value is ConversationPromotion['kind'] {

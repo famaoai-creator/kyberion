@@ -58,4 +58,22 @@ describe('concierge conversation response boundary', () => {
       error: 'The conversation response was invalid.',
     });
   });
+
+  it('does not expose server error text and rejects unsafe response trees', () => {
+    const response = JSON.parse(
+      '{"reply":" Safe reply ","mode":"orchestrator","shape":"reply","error":"<script>alert(1)</script>"}'
+    );
+    expect(parseConversationMessageResponse(response)).toEqual({
+      reply: 'Safe reply',
+      mode: 'orchestrator',
+      shape: 'reply',
+    });
+
+    const unsafe = JSON.parse(
+      '{"reply":"Safe reply","mode":"orchestrator","shape":"reply","nextActions":[{"id":"confirm","label":"Proceed"}],"__proto__":{"polluted":true}}'
+    );
+    expect(parseConversationMessageResponse(unsafe)).toEqual({
+      error: 'The conversation response was invalid.',
+    });
+  });
 });

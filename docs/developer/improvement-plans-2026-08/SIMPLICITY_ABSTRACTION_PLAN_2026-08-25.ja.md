@@ -16723,6 +16723,13 @@ SX-08／SX-09 の Presence Studio onboarding static projectionを再監査し、
 検証: Presence Studio onboarding response **1 file / 2 tests passed**、root typecheck、root lint、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 940
+
+SX-08／SX-09 の Concierge conversation dock response projectionを再監査し、会話 parser が root／nested dangerous keyを検査せず、サーバー由来の `error` textを部分レスポンスへ返す残存を修正した。parserで response treeを先に fail-closed 検証し、replyはtrimして、invalid responseの表示文は固定値とする。既存の voice-hub／orchestrator failover、intent resolution、human action、会話表示 semantics は変更していない。
+
+検証: Concierge conversation response **package suite 5 files / 42 tests passed**、root typecheck、root lint、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
