@@ -1,5 +1,5 @@
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
-import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   resolveDocumentContentsLabel,
@@ -22,6 +22,7 @@ import {
 import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media-signal-entry-policy';
 import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
 import { isLegacyMediaOp } from '@agent/core/legacy-media-ops';
+import { loadJsonValue } from './media-catalog-loaders.js';
 import * as path from 'node:path';
 
 export type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
@@ -577,7 +578,7 @@ export function normalizeSpreadsheetDocumentBrief(rootDir: string, input: any): 
       { allowMissingLeaf: true }
     );
     protocol = parseSafeJsonObjectValue(
-      readJson<unknown>(protocolPath),
+      loadJsonValue(protocolPath),
       `spreadsheet protocol ${protocolPath}`
     );
   }
