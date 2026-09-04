@@ -46,6 +46,7 @@ describe('pipeline dry-run entrypoint', () => {
 
     expect(source).not.toContain('process.stdout.write');
     expect(source).not.toContain('process.stderr.write');
+    expect(source).not.toContain('process.exitCode');
     expect(source).toContain('print(report)');
     const launcherSource = String(
       safeReadFile(pathResolver.rootResolve('scripts/run_pipeline.ts'), { encoding: 'utf8' }) || ''
