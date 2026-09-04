@@ -11,6 +11,7 @@ import {
 } from '@agent/core/media-contracts';
 import type { PdfDesignProtocol } from '@agent/core/src/types/pdf-protocol';
 import type { PptxDesignProtocol, PptxSlide } from '@agent/core/src/types/pptx-protocol';
+import type { XlsxDesignProtocol } from '@agent/core/src/types/xlsx-protocol';
 import * as path from 'node:path';
 import {
   buildMediaGenerationBoundary,
@@ -116,7 +117,7 @@ export interface MediaDocumentPipelineDeps {
   buildReportPdfProtocol: (rootDir: string, brief: any) => MediaReportPdfProtocol;
   buildTrackerSpreadsheetProtocol: (rootDir: string, brief: any) => MediaTrackerXlsxProtocol;
   buildDocumentPdfProtocol: (rawBrief: any) => MediaInvoicePdfProtocol;
-  normalizeXlsxDesignProtocol: (protocol: any) => any;
+  normalizeXlsxDesignProtocol: (protocol: any) => XlsxDesignProtocol;
   resolveDocumentLayoutTemplate: (
     rootDir: string,
     brief: any
