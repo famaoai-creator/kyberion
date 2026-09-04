@@ -1,11 +1,11 @@
 import path from 'node:path';
-import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type Layer = 'foundation' | 'contracts' | 'domain' | 'orchestration';
 type BoundaryConfig = {
@@ -50,7 +50,7 @@ function matchesPattern(value: string, pattern: string): boolean {
 }
 
 function config(): BoundaryConfig {
-  return readJson<BoundaryConfig>(CONFIG_PATH);
+  return readSafeJsonFile<BoundaryConfig>(CONFIG_PATH, 'module boundary configuration');
 }
 
 function classify(filePath: string, manifest: BoundaryConfig): Layer {
@@ -362,7 +362,7 @@ export function checkModuleBoundaries(): {
   const directionExceptions = findDirectionExceptions(runtimeGraph, manifest);
   const dynamicImportEdges = collectDynamicImportEdges(files);
   const baseline = safeExistsSync(BASELINE_PATH)
-    ? readJson<BoundaryBaseline>(BASELINE_PATH)
+    ? readSafeJsonFile<BoundaryBaseline>(BASELINE_PATH, 'module boundary baseline')
     : {
         version: 1 as const,
         cycles: cycles.length,

@@ -21,9 +21,9 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 interface ShellViolation {
   file: string;
@@ -190,7 +190,7 @@ export function scanPipelineShellIndependence(
   const violations: ShellViolation[] = [];
   for (const file of files) {
     if (!safeExistsSync(file)) continue;
-    const data = readJson<unknown>(file);
+    const data = readSafeJsonValueFile<unknown>(file, `pipeline ${path.relative(ROOT, file)}`);
     scanValue(file, data, violations);
     scanScriptWrappers(file, data, violations);
   }
@@ -203,7 +203,7 @@ function violationKey(violation: ShellViolation): string {
 
 function loadBaseline(): ShellViolation[] {
   if (!safeExistsSync(BASELINE_PATH)) return [];
-  const parsed = readJson<unknown>(BASELINE_PATH);
+  const parsed = readSafeJsonValueFile<unknown>(BASELINE_PATH, 'pipeline shell baseline');
   if (!parsed || typeof parsed !== 'object') return [];
   const violations = (parsed as Record<string, unknown>).violations;
   if (!Array.isArray(violations)) return [];
