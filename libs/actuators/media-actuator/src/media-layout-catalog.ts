@@ -107,6 +107,16 @@ export interface MediaSlideTemplateData {
   [key: string]: unknown;
 }
 
+export interface MediaLayoutSlideData extends MediaSlideTemplateData {
+  layout_template_id?: string;
+  tenant_slug?: string;
+  branding?: {
+    brand_name?: string;
+    tenant_slug?: string;
+    [key: string]: unknown;
+  };
+}
+
 export type MediaLayoutMargin = [number, number, number, number];
 
 export interface MediaLayoutVisualLabel {
@@ -428,7 +438,7 @@ function loadLayoutTemplateCatalogFromPath(filePath: string): MediaLayoutTemplat
 function resolveLayoutTemplate(
   rootDir: string,
   designSystemId: string | undefined,
-  slideData?: any,
+  slideData?: MediaLayoutSlideData,
   theme?: MediaLayoutThemeInput
 ): MediaLayoutTemplate {
   const themeTemplateCatalog =
