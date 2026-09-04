@@ -371,6 +371,20 @@ describe('validateAndRepairAdf', () => {
     expect(readFixture(filePath)).toBe(original);
   });
 
+  it('does not adopt a delegated non-object repair result', async () => {
+    const delegateTask = vi.fn(async () => JSON.stringify(['not', 'an', 'ADF object']));
+    registerFakeRepairBackend(delegateTask);
+    const original = JSON.stringify({ capability: 'demo' }, null, 2);
+    const filePath = writeFixture('non-object-repair.json', original);
+
+    const result = await validateAndRepairAdf(filePath, 'capability-input');
+
+    expect(result.repaired).toBe(false);
+    expect(result.errors?.join('\n')).toContain('action');
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(readFixture(filePath)).toBe(original);
+  });
+
   it('rejects pipeline ADF guardrail violations without delegating', async () => {
     const delegateTask = vi.fn(stubReasoningBackend.delegateTask);
     registerFakeRepairBackend(delegateTask);
