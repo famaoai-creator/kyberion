@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getFoundationIo, registerFoundationIo, type FoundationIo } from './io.js';
 import {
   parseSafeJsonInput,
+  parseSafeJsonEntriesInput,
   parseSafeJsonObjectValue,
   parsePersistedPipelineStrategy,
   readJsonObjectRequest,
@@ -22,6 +23,13 @@ describe('foundation safe JSON parser', () => {
   it('requires object roots after safe-tree validation', () => {
     expect(parseSafeJsonObjectValue({ ok: true }, 'request')).toEqual({ ok: true });
     expect(() => parseSafeJsonObjectValue([], 'request')).toThrow('request must be a JSON object');
+  });
+
+  it('validates JSON entries independently so unsafe siblings are skipped', () => {
+    expect(
+      parseSafeJsonEntriesInput('[{"__proto__":{"polluted":true}},{"topic":"valid"}]', 'entries')
+    ).toEqual([{ topic: 'valid' }]);
+    expect(() => parseSafeJsonEntriesInput('{', 'entries')).toThrow('entries must be valid JSON');
   });
 
   it('validates persisted pipeline strategy steps before execution', () => {

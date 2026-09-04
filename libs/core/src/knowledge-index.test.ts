@@ -33,7 +33,7 @@ vi.mock('../secure-io.js', () => ({
 }));
 
 vi.mock('../foundation/json.js', () => ({
-  readJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+  parseSafeJsonInput: (raw: string) => JSON.parse(raw),
 }));
 
 import {
