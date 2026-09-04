@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-04T16:32:26.996Z",
+  "generated_at": "2026-09-04T16:37:18.248Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -97,7 +97,7 @@
     "libs/core/src/native-pdf-engine/primitives.ts": 1,
     "libs/core/surface-approval-ui.ts": 19,
     "libs/core/surface-mission-proposals.ts": 3,
-    "libs/core/surface-mission-steering.ts": 69,
+    "libs/core/surface-mission-steering.ts": 61,
     "libs/core/surface-query-helpers.ts": 6,
     "libs/core/surface-runtime-conversation-data.ts": 36,
     "libs/core/surface-runtime-helpers.ts": 25,
