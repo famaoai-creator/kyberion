@@ -278,17 +278,12 @@ function getActivePage(runtime: BrowserRuntime): Page {
   return page;
 }
 
-function summarizeRecentActions(trail: any): BrowserSessionMetadata['recent_actions'] {
-  const actions = Array.isArray(trail)
-    ? (trail as Array<{
-        op: string;
-        kind: 'control' | 'capture' | 'apply';
-        tab_id?: string;
-        ref?: string;
-        selector?: string;
-        ts: string;
-      }>)
-    : [];
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function summarizeRecentActions(trail: unknown): BrowserSessionMetadata['recent_actions'] {
+  const actions = parseRecordedActions(trail);
   return actions.slice(-8).map((action) => ({
     op: action.op,
     kind: action.kind,
@@ -460,9 +455,9 @@ async function discoverChromeCdpEndpoint(): Promise<ChromeCdpEndpoint | null> {
     for (const port of parseChromeRemoteDebuggingPorts(psOutput)) {
       candidatePorts.add(port);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.info(
-      `Could not inspect local process list for Chrome CDP discovery: ${error?.message || String(error)}`
+      `Could not inspect local process list for Chrome CDP discovery: ${errorMessage(error)}`
     );
   }
 
@@ -477,7 +472,11 @@ async function discoverChromeCdpEndpoint(): Promise<ChromeCdpEndpoint | null> {
 async function collectRecordedVideoPaths(runtime: BrowserRuntime): Promise<string[]> {
   const collected = new Set<string>();
   for (const page of runtime.tabs.values()) {
-    const videoHandle = typeof (page as any).video === 'function' ? (page as any).video() : null;
+    const pageWithOptionalVideo = page as Page & {
+      video?: () => { path?: () => Promise<string> } | null;
+    };
+    const videoHandle =
+      typeof pageWithOptionalVideo.video === 'function' ? pageWithOptionalVideo.video() : null;
     if (!videoHandle || typeof videoHandle.path !== 'function') continue;
     try {
       const videoPath = await videoHandle.path();
@@ -1439,9 +1438,9 @@ export const browserRuntimeHelpers = {
           cdpPort: persistedCdpPort || Number(new URL(persistedCdpUrl).port),
         });
         return context;
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.warn(
-          `⚠️ [BROWSER] Failed to reattach persisted session ${sessionId} via CDP: ${error?.message || String(error)}`
+          `⚠️ [BROWSER] Failed to reattach persisted session ${sessionId} via CDP: ${errorMessage(error)}`
         );
       }
     }
