@@ -18,21 +18,15 @@ import {
   type ClientWorkItem,
   type ClientWorkItemLineage,
 } from '../lib/workitems-response';
+import {
+  parseWorkCoordinationResponse,
+  type ClientWorkCoordinationSummary,
+} from '../lib/intelligence-work-coordination-response';
 
 type WorkItem = ClientWorkItem;
 type WorkItemLineage = ClientWorkItemLineage;
 
-type WorkCoordinationSummary = {
-  total: number;
-  backlog: number;
-  ready: number;
-  inProgress: number;
-  blocked: number;
-  review: number;
-  done: number;
-  archived: number;
-  runningAttempts: number;
-};
+type WorkCoordinationSummary = ClientWorkCoordinationSummary;
 
 const STATUS_LABEL_KEY: Record<string, string> = {
   backlog: 'chronos_status_backlog',
@@ -118,8 +112,12 @@ export function WorkItemsWorkspace({
         lineage: payload.lineage,
       });
       if (intelligenceResponse.ok) {
-        const intelligencePayload = await intelligenceResponse.json();
-        setCoordination(intelligencePayload.workCoordination || null);
+        const intelligencePayload = parseWorkCoordinationResponse(
+          await intelligenceResponse.json().catch(() => null)
+        );
+        setCoordination(intelligencePayload || null);
+      } else {
+        setCoordination(null);
       }
       setError(null);
     } catch (err) {
