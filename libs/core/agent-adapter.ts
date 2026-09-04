@@ -175,6 +175,7 @@ export interface AgentAdapter {
   boot(): Promise<void>;
   ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
   shutdown(): Promise<void>;
+  getLog?(limit?: number): { ts: number; type: string; content: string }[];
   getRuntimeInfo?(): Record<string, unknown>;
   refreshContext?(): Promise<{
     mode: 'soft' | 'stateless';

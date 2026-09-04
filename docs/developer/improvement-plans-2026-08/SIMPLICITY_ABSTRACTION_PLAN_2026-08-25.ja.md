@@ -17426,6 +17426,21 @@ health再試行、spawn lock競合の`any`境界を修正した。remote error�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
 
+## 2026-09-04 再レビュー修正 999
+
+SX-03／SX-05／SX-10 のagent lifecycle managerを再監査し、provider runtime、usage、adapter log、refreshContext、
+失敗例外、global singleton境界に残る`any`を修正した。exec adapterを共通`AgentAdapter`契約へ統一し、任意のlog能力を
+契約化、usageはrecord判定後にだけmetricsへ反映する。spawn／restart／health／shutdownのライフサイクル、runtime
+supervisor登録、global singletonの共有動作は変更していない。
+
+検証:
+
+- Agent lifecycle／runtime supervisor **3 files / 17 tests passed**。
+- root typecheck、root lint、`git diff --check` passed。
+- canonical full gateはこのsliceの後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
