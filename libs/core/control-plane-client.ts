@@ -22,11 +22,50 @@ export interface ControlPlaneProjectRecord {
 
 export interface ControlPlaneApprovalRecord {
   id: string;
+  kind?: 'channel-approval' | 'secret_mutation' | 'mission_gate';
+  channel?: string;
+  storageChannel?: string;
+  requestedAt?: string;
+  requestedBy?: string;
   title?: string;
+  summary?: string;
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical';
+  pendingRoles?: string[];
+  missionId?: string;
+  trackId?: string;
+  serviceId?: string;
   status?: string;
   expected_outcome?: string;
-  storageChannel?: string;
-  channel?: string;
+}
+
+export interface ControlPlaneDistillCandidateRecord {
+  candidate_id: string;
+  source_type: 'task_session' | 'mission' | 'artifact';
+  tier?: 'personal' | 'confidential' | 'public';
+  project_id?: string;
+  track_id?: string;
+  track_name?: string;
+  mission_id?: string;
+  task_session_id?: string;
+  artifact_ids?: string[];
+  title: string;
+  summary: string;
+  status: 'proposed' | 'promoted' | 'archived';
+  target_kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
+  specialist_id?: string;
+  locale?: string;
+  promoted_ref?: string;
+  evidence_refs?: string[];
+}
+
+export interface ControlPlaneMemoryCandidateRecord {
+  candidate_id: string;
+  status: 'queued' | 'approved' | 'rejected' | 'promoted';
+  proposed_memory_kind: string;
+  sensitivity_tier: 'public' | 'confidential' | 'personal';
+  source_ref: string;
+  evidence_refs: string[];
+  promoted_ref?: string;
 }
 
 export interface ControlPlaneMissionSeedRecord {
@@ -110,9 +149,9 @@ export interface ChronosOverviewRecord {
     eligible_seed_ids?: string[];
     promoted_seed_ids?: string[];
   };
-  pendingApprovals?: Array<Record<string, unknown>>;
-  distillCandidates?: Array<Record<string, unknown>>;
-  memoryCandidates?: Array<Record<string, unknown>>;
+  pendingApprovals?: ControlPlaneApprovalRecord[];
+  distillCandidates?: ControlPlaneDistillCandidateRecord[];
+  memoryCandidates?: ControlPlaneMemoryCandidateRecord[];
   nextActions?: Array<{
     action_id: string;
     next_action_type:
@@ -176,9 +215,17 @@ function optionalBoolean(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined;
 }
 
+function optionalEnum<const T extends string>(value: unknown, values: readonly T[]): T | undefined {
+  return typeof value === 'string' && values.includes(value as T) ? (value as T) : undefined;
+}
+
 function stringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) return undefined;
   return value;
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
 }
 
 function recordArray(value: unknown): Array<Record<string, unknown>> {
@@ -206,18 +253,149 @@ function normalizeProjectRecord(value: unknown): ControlPlaneProjectRecord | nul
 
 function normalizeApprovalRecord(value: unknown): ControlPlaneApprovalRecord | null {
   if (!isRecord(value) || typeof value.id !== 'string' || !value.id) return null;
+  const kind = optionalEnum(value.kind, [
+    'channel-approval',
+    'secret_mutation',
+    'mission_gate',
+  ] as const);
+  const riskLevel = optionalEnum(value.riskLevel, ['low', 'medium', 'high', 'critical'] as const);
   return {
     id: value.id,
-    ...(optionalString(value.title) !== undefined ? { title: optionalString(value.title) } : {}),
-    ...(optionalString(value.status) !== undefined ? { status: optionalString(value.status) } : {}),
-    ...(optionalString(value.expected_outcome) !== undefined
-      ? { expected_outcome: optionalString(value.expected_outcome) }
+    ...(kind !== undefined ? { kind } : {}),
+    ...(optionalString(value.channel) !== undefined
+      ? { channel: optionalString(value.channel) }
       : {}),
     ...(optionalString(value.storageChannel) !== undefined
       ? { storageChannel: optionalString(value.storageChannel) }
       : {}),
-    ...(optionalString(value.channel) !== undefined
-      ? { channel: optionalString(value.channel) }
+    ...(optionalString(value.requestedAt) !== undefined
+      ? { requestedAt: optionalString(value.requestedAt) }
+      : {}),
+    ...(optionalString(value.requestedBy) !== undefined
+      ? { requestedBy: optionalString(value.requestedBy) }
+      : {}),
+    ...(optionalString(value.title) !== undefined ? { title: optionalString(value.title) } : {}),
+    ...(optionalString(value.summary) !== undefined
+      ? { summary: optionalString(value.summary) }
+      : {}),
+    ...(riskLevel !== undefined ? { riskLevel } : {}),
+    ...(stringArray(value.pendingRoles) !== undefined
+      ? { pendingRoles: stringArray(value.pendingRoles) }
+      : {}),
+    ...(optionalString(value.missionId) !== undefined
+      ? { missionId: optionalString(value.missionId) }
+      : {}),
+    ...(optionalString(value.trackId) !== undefined
+      ? { trackId: optionalString(value.trackId) }
+      : {}),
+    ...(optionalString(value.serviceId) !== undefined
+      ? { serviceId: optionalString(value.serviceId) }
+      : {}),
+    ...(optionalString(value.status) !== undefined ? { status: optionalString(value.status) } : {}),
+    ...(optionalString(value.expected_outcome) !== undefined
+      ? { expected_outcome: optionalString(value.expected_outcome) }
+      : {}),
+  };
+}
+
+function normalizeDistillCandidateRecord(
+  value: unknown
+): ControlPlaneDistillCandidateRecord | null {
+  if (!isRecord(value)) return null;
+  const sourceType = optionalEnum(value.source_type, [
+    'task_session',
+    'mission',
+    'artifact',
+  ] as const);
+  const tier = optionalEnum(value.tier, ['personal', 'confidential', 'public'] as const);
+  const status = optionalEnum(value.status, ['proposed', 'promoted', 'archived'] as const);
+  const targetKind = optionalEnum(value.target_kind, [
+    'pattern',
+    'sop_candidate',
+    'knowledge_hint',
+    'report_template',
+  ] as const);
+  if (
+    !nonEmptyString(value.candidate_id) ||
+    sourceType === undefined ||
+    !nonEmptyString(value.title) ||
+    !nonEmptyString(value.summary) ||
+    status === undefined ||
+    targetKind === undefined
+  ) {
+    return null;
+  }
+  return {
+    candidate_id: value.candidate_id,
+    source_type: sourceType,
+    ...(tier !== undefined ? { tier } : {}),
+    ...(optionalString(value.project_id) !== undefined
+      ? { project_id: optionalString(value.project_id) }
+      : {}),
+    ...(optionalString(value.track_id) !== undefined
+      ? { track_id: optionalString(value.track_id) }
+      : {}),
+    ...(optionalString(value.track_name) !== undefined
+      ? { track_name: optionalString(value.track_name) }
+      : {}),
+    ...(optionalString(value.mission_id) !== undefined
+      ? { mission_id: optionalString(value.mission_id) }
+      : {}),
+    ...(optionalString(value.task_session_id) !== undefined
+      ? { task_session_id: optionalString(value.task_session_id) }
+      : {}),
+    ...(stringArray(value.artifact_ids) !== undefined
+      ? { artifact_ids: stringArray(value.artifact_ids) }
+      : {}),
+    title: value.title,
+    summary: value.summary,
+    status,
+    target_kind: targetKind,
+    ...(optionalString(value.specialist_id) !== undefined
+      ? { specialist_id: optionalString(value.specialist_id) }
+      : {}),
+    ...(optionalString(value.locale) !== undefined ? { locale: optionalString(value.locale) } : {}),
+    ...(optionalString(value.promoted_ref) !== undefined
+      ? { promoted_ref: optionalString(value.promoted_ref) }
+      : {}),
+    ...(stringArray(value.evidence_refs) !== undefined
+      ? { evidence_refs: stringArray(value.evidence_refs) }
+      : {}),
+  };
+}
+
+function normalizeMemoryCandidateRecord(value: unknown): ControlPlaneMemoryCandidateRecord | null {
+  if (!isRecord(value)) return null;
+  const status = optionalEnum(value.status, [
+    'queued',
+    'approved',
+    'rejected',
+    'promoted',
+  ] as const);
+  const sensitivityTier = optionalEnum(value.sensitivity_tier, [
+    'public',
+    'confidential',
+    'personal',
+  ] as const);
+  if (
+    !nonEmptyString(value.candidate_id) ||
+    status === undefined ||
+    !nonEmptyString(value.proposed_memory_kind) ||
+    sensitivityTier === undefined ||
+    !nonEmptyString(value.source_ref) ||
+    stringArray(value.evidence_refs) === undefined
+  ) {
+    return null;
+  }
+  return {
+    candidate_id: value.candidate_id,
+    status,
+    proposed_memory_kind: value.proposed_memory_kind,
+    sensitivity_tier: sensitivityTier,
+    source_ref: value.source_ref,
+    evidence_refs: stringArray(value.evidence_refs) as string[],
+    ...(optionalString(value.promoted_ref) !== undefined
+      ? { promoted_ref: optionalString(value.promoted_ref) }
       : {}),
   };
 }
@@ -749,12 +927,18 @@ export function createControlPlaneClient(
         : undefined;
       const pendingApprovals = Array.isArray(body.pendingApprovals)
         ? recordArray(body.pendingApprovals)
+            .map(normalizeApprovalRecord)
+            .filter((record): record is ControlPlaneApprovalRecord => record !== null)
         : undefined;
       const distillCandidates = Array.isArray(body.distillCandidates)
         ? recordArray(body.distillCandidates)
+            .map(normalizeDistillCandidateRecord)
+            .filter((record): record is ControlPlaneDistillCandidateRecord => record !== null)
         : undefined;
       const memoryCandidates = Array.isArray(body.memoryCandidates)
         ? recordArray(body.memoryCandidates)
+            .map(normalizeMemoryCandidateRecord)
+            .filter((record): record is ControlPlaneMemoryCandidateRecord => record !== null)
         : undefined;
       const missionSeedAssessment = normalizeMissionSeedAssessment(body.missionSeedAssessment);
 
