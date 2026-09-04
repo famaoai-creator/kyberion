@@ -1,7 +1,7 @@
 ---
 title: SIMPLICITY ABSTRACTION PLAN 2026 08 25
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-03
+last_updated: 2026-09-04
 status: active
 ---
 
@@ -16651,6 +16651,13 @@ SX-03の追加script／state loader、SX-04の他の非catalog loader／未参�
 SX-08／SX-09 の Chronos MissionIntelligence `/api/intelligence` GET root projectionを再監査し、`IntelligencePayload` 型アサーションと shallow error fallbackだけで live-sync stateへ渡す残存を修正した。専用 parser で revision／access role、表示対象 collection の record array、control／runtime root、optional collection、dangerous keyを検証してから stateへ渡し、不正 responseは fail-closed とする。既存の tenant scope、live-sync、各子パネルの表示 semantics は変更していない。nested collection itemの詳細 shapeは後続 sliceで継続監査する。
 
 検証: MissionIntelligence root response **1 file / 4 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
+## 2026-09-04 再レビュー修正 930
+
+SX-08／SX-09 の Concierge advisory GET projection（`/api/response-status`、`/api/hygiene`、`/api/memory-queue`）を再監査し、`ok` 判定・配列 cast・nested objectの未検証利用で response status／停滞ミッション／記憶昇格候補を表示 stateへ渡す残存を修正した。専用 parser で envelope、列挙値、必須文字列、非負カウンタ、active task／candidate shape、dangerous keyを検証してから stateへ渡し、不正 responseは各 advisory pane の fail-closed semanticsへ閉じる。既存の viewer scope、human approval、advisory refresh cadence、表示 semantics は変更していない。
+
+検証: Concierge advisory response **1 file / 3 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 参照
