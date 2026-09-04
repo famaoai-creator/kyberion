@@ -8,6 +8,7 @@ import {
   safeReaddir,
   safeStat,
 } from './secure-io.js';
+import { isRecord } from './foundation/text.js';
 import * as path from 'node:path';
 import type { AgentProvider } from './agent-registry.js';
 
@@ -50,19 +51,20 @@ export interface AgentManifest {
  * Parse YAML-like frontmatter from a .agent.md file.
  * Simplified parser — handles the subset we use (scalars, arrays).
  */
-function parseFrontmatter(content: string): { meta: Record<string, any>; body: string } {
+function parseFrontmatter(content: string): { meta: Record<string, unknown>; body: string } {
   const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!match) return { meta: {}, body: content };
 
-  const meta: Record<string, any> = {};
+  const meta: Record<string, unknown> = {};
   let currentParent: string | null = null;
 
   for (const line of match[1].split('\n')) {
     // Nested key (indented with spaces): "  env: [...]"
     const nested = line.match(/^  (\w+):\s*(.+)$/);
     if (nested && currentParent) {
-      if (!meta[currentParent]) meta[currentParent] = {};
-      meta[currentParent][nested[1]] = parseValue(nested[2].trim());
+      const parent = isRecord(meta[currentParent]) ? meta[currentParent] : {};
+      parent[nested[1]] = parseValue(nested[2].trim());
+      meta[currentParent] = parent;
       continue;
     }
 
@@ -85,14 +87,14 @@ function parseFrontmatter(content: string): { meta: Record<string, any>; body: s
   return { meta, body: match[2].trim() };
 }
 
-function parseValue(raw: string): any {
+function parseValue(raw: string): unknown {
   // Arrays: [a, b, c]
   if (raw.startsWith('[') && raw.endsWith(']')) {
     return raw
       .slice(1, -1)
       .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
+      .map((s) => parseValue(s.trim()))
+      .filter((value) => value !== '');
   }
   if (raw === 'true') return true;
   if (raw === 'false') return false;
@@ -121,9 +123,9 @@ function loadAgentProfileSelectionHints(rootDir: string): Record<string, AgentSe
       };
     }
     return result;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.warn(
-      `[AGENT_MANIFEST] Failed to load profile selection hints: ${error?.message || error}`
+      `[AGENT_MANIFEST] Failed to load profile selection hints: ${error instanceof Error ? error.message : String(error)}`
     );
     return {};
   }
@@ -177,6 +179,20 @@ function readDirMtime(dir: string): number {
   }
 }
 
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function optionalFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 /**
  * Load all agent manifests from knowledge/product/agents/ and merge the
  * selection-hint overlay from knowledge/product/orchestration/agent-profiles/.
@@ -224,7 +240,7 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
       const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       const { meta, body } = parseFrontmatter(content);
 
-      if (!meta.agentId) {
+      if (typeof meta.agentId !== 'string' || !meta.agentId) {
         logger.warn(`[AGENT_MANIFEST] Skipping ${file}: missing agentId`);
         continue;
       }
@@ -239,26 +255,31 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
 
       const profileHints = profileSelectionHints[meta.agentId] || {};
 
-      const req = meta.requires || {};
+      const req = isRecord(meta.requires) ? meta.requires : {};
       manifests.push({
         agentId: meta.agentId,
         selection_hints: profileHints,
-        capabilities: Array.isArray(meta.capabilities) ? meta.capabilities : [],
-        autoSpawn: meta.auto_spawn ?? meta.autoSpawn ?? false,
-        trustRequired: meta.trust_required ?? meta.trustRequired ?? 0,
+        capabilities: stringArray(meta.capabilities),
+        autoSpawn: optionalBoolean(meta.auto_spawn) ?? optionalBoolean(meta.autoSpawn) ?? false,
+        trustRequired:
+          optionalFiniteNumber(meta.trust_required) ??
+          optionalFiniteNumber(meta.trustRequired) ??
+          0,
         requires: {
-          env: Array.isArray(req.env) ? req.env : [],
-          services: Array.isArray(req.services) ? req.services : [],
-          actuators: Array.isArray(req.actuators) ? req.actuators : [],
-          files: Array.isArray(req.files) ? req.files : [],
+          env: stringArray(req.env),
+          services: stringArray(req.services),
+          actuators: stringArray(req.actuators),
+          files: stringArray(req.files),
         },
-        allowedActuators: Array.isArray(meta.allowed_actuators) ? meta.allowed_actuators : [],
-        deniedActuators: Array.isArray(meta.denied_actuators) ? meta.denied_actuators : [],
+        allowedActuators: stringArray(meta.allowed_actuators),
+        deniedActuators: stringArray(meta.denied_actuators),
         systemPrompt: body,
         filePath,
       });
-    } catch (err: any) {
-      logger.warn(`[AGENT_MANIFEST] Failed to parse ${file}: ${err.message}`);
+    } catch (err: unknown) {
+      logger.warn(
+        `[AGENT_MANIFEST] Failed to parse ${file}: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 
