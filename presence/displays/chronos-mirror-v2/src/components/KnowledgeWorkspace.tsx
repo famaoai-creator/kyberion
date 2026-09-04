@@ -12,19 +12,9 @@ import {
 } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
+import { parseKnowledgeResponse, type ClientKnowledgeCandidate } from '../lib/knowledge-response';
 
-type Candidate = {
-  candidate_id: string;
-  status: string;
-  proposed_memory_kind: string;
-  summary: string;
-  evidence_refs: string[];
-  sensitivity_tier: string;
-  source_ref: string;
-  tenantSlug?: string;
-  promoted_ref?: string;
-  ratification_required: boolean;
-};
+type Candidate = ClientKnowledgeCandidate;
 
 function knowledgeStatusLabel(value: string, locale: string): string {
   const labels: Record<string, string> = {
@@ -52,10 +42,10 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
     try {
       const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
       const response = await fetch(`/api/knowledge${query}`, { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to load knowledge candidates');
-      const nextItems = Array.isArray(payload.candidates) ? payload.candidates : [];
-      setAccessRole(payload.accessRole === 'localadmin' ? 'localadmin' : 'readonly');
+      const payload = parseKnowledgeResponse(await response.json().catch(() => null));
+      if (!response.ok || !payload) throw new Error('Invalid knowledge response');
+      const nextItems = payload.candidates;
+      setAccessRole(payload.accessRole);
       setItems(nextItems);
       setSelectedId((current) =>
         nextItems.some((item: Candidate) => item.candidate_id === current)
