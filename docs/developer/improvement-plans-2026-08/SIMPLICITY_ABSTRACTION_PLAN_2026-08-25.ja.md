@@ -18488,6 +18488,20 @@ Drawio の解決結果、theme role の未指定引数 fallback、canonical cata
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1072
+
+SX-04／SX-10 の Drawio boundary catalog を継続監査し、`media-drawio-boundary-policy` に残っていた palette／icon の巨大な
+`FALLBACK_CATALOG`（canonical JSON と同内容）を削除した。`defineCatalog` の fallback 無し fail-closed 境界へ揃え、boundary palette と icon rule の
+欠損時に古い内蔵定義を隠さないようにした。Drawio の palette／icon 解決結果と正規 catalog は変更していない。
+
+検証:
+
+- Drawio boundary policy **1 file / 2 tests passed**。canonical catalog の読込、palette／icon 解決、fallback 定義の不在を確認した。
+- `pnpm run typecheck`、対象2ファイルの ESLint、`git diff --check` passed。
+- canonical full gate はこの slice の後段で実行する。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
