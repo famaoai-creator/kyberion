@@ -16,14 +16,12 @@ import { sendOpsAlert } from './ops-alert.js';
 import { findMissionPath } from './path-resolver.js';
 import type { MissionState } from './mission-types.js';
 import { nowIso } from './foundation/time.js';
-import {
-  countWords as countWordsFromDispatchIO,
-  ensureDirectory,
-  readJsonFile,
-} from './mission-dispatch-io.js';
+import { countWords as countWordsFromDispatchIO, ensureDirectory } from './mission-dispatch-io.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { recordTask } from './mission-maintenance.js';
 import { loadProjectRecord } from './project-registry.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+import { loadMissionTicketDispatchManifestAtPath } from './mission-ticket-dispatch-manifest.js';
 
 export type MissionTicketDispatchTarget = 'workitem' | 'github' | 'jira';
 
@@ -92,10 +90,11 @@ interface PlannedTask {
 
 function readPlannedTasks(missionPath: string): PlannedTask[] {
   const nextTasksPath = nodePath.join(missionPath, 'NEXT_TASKS.json');
-  if (!safeExistsSync(nextTasksPath)) return [];
   try {
-    const parsed = readJsonFile<PlannedTask[]>(nextTasksPath);
-    return Array.isArray(parsed) ? parsed : [];
+    return (loadMissionNextTaskObjectsAtPath(
+      nextTasksPath,
+      nodePath.basename(nodePath.resolve(missionPath))
+    ) || []) as PlannedTask[];
   } catch (_) {
     return [];
   }
@@ -195,8 +194,7 @@ function loadExistingManifest(missionPath: string): MissionTicketDispatchManifes
   const path = manifestPath(missionPath);
   if (!safeExistsSync(path)) return null;
   try {
-    const parsed = readJsonFile<MissionTicketDispatchManifest>(path);
-    return parsed && typeof parsed === 'object' ? parsed : null;
+    return loadMissionTicketDispatchManifestAtPath(path);
   } catch (_) {
     return null;
   }

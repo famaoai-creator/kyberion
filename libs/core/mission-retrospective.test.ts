@@ -111,6 +111,8 @@ describe('mission retrospective loop', () => {
       'agent-role-outcome',
       'agent-performance-index',
       'mission-workitem-dispatch-manifest',
+      'mission-ticket-dispatch-manifest',
+      'mission-next-tasks',
       'model-role-outcome',
       'model-performance-index',
       'process-improvement-proposal',
@@ -133,6 +135,7 @@ describe('mission retrospective loop', () => {
     fs.writeFileSync(
       path.join(missionDir, 'coordination', 'tickets', 'dispatch-manifest.json'),
       JSON.stringify({
+        mission_id: MISSION,
         records: [
           { task_id: 'T-3', status: 'failed', notes: ['missing assigned_to.agent_id'] },
           {
@@ -276,6 +279,20 @@ describe('mission retrospective loop', () => {
 
     expect(stats.goal_reconciliation_rounds).toBe(0);
     expect(stats.finish_gate_failures).toEqual([]);
+  });
+
+  it('fails closed when mission task or ticket manifest roots are malformed', () => {
+    fs.writeFileSync(path.join(missionDir, 'NEXT_TASKS.json'), JSON.stringify({ tasks: [] }));
+    fs.writeFileSync(
+      path.join(missionDir, 'coordination', 'tickets', 'dispatch-manifest.json'),
+      JSON.stringify({ mission_id: MISSION, records: 'invalid' })
+    );
+
+    const stats = mod.collectMissionExecutionStats(MISSION);
+
+    expect(stats.task_total).toBe(0);
+    expect(stats.tasks_by_role).toEqual({});
+    expect(stats.ticket_failures).toEqual([]);
   });
 
   it('skips malformed JSONL records and does not count non-object events', () => {

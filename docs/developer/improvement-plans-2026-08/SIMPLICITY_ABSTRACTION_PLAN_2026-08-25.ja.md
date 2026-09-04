@@ -16768,6 +16768,12 @@ SX-04 の writer lease metrics loaderを再監査し、lease本体とは異な�
 
 検証: `pnpm exec vitest run libs/core/writer-lease.test.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 947
+
+SX-03／SX-04 の mission dispatch loaderを再監査し、`mission-retrospective.ts` と `mission-ticket-dispatch.ts` に残っていた `NEXT_TASKS.json`／ticket dispatch manifest の汎用 JSON 読み込みを修正した。既存の mission-boundary task loaderを retrospective と再 dispatchで共有し、ticket manifestには専用 `mission-ticket-dispatch-manifest.schema.json` と regular-file／schema validation loaderを追加した。壊れた task／manifest は従来の空集合・既存 manifest 無視という fail-closed semanticsを維持し、task role集計、ticket failure集計、再 dispatchの動作は変更していない。
+
+検証: `pnpm exec vitest run libs/core/mission-retrospective.test.ts libs/core/mission-ticket-dispatch-manifest.test.ts libs/core/mission-ticket-dispatch.test.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

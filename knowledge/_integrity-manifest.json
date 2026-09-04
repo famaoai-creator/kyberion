@@ -8425,6 +8425,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-ticket-dispatch-manifest.schema.json",
+      "tier": "public",
+      "size": 2141,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-work-reconciliation.example.json",
       "tier": "public",
       "size": 1254,
