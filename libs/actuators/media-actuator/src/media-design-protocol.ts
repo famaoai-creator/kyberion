@@ -46,6 +46,7 @@ import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import {
   loadSemanticRenderTokenCatalog as loadValidatedSemanticRenderTokenCatalog,
   resolveSemanticRenderTokens as resolveValidatedSemanticRenderTokens,
+  type MediaPptxPalette,
   type SemanticRenderTokenCatalog,
   type SemanticRenderTokens,
 } from './media-layout-design-tokens.js';
@@ -91,15 +92,6 @@ interface MediaThemeCatalog {
 }
 
 type MediaTheme = Record<string, unknown>;
-
-interface MediaPptxPalette {
-  dk1: string;
-  dk2: string;
-  lt1: string;
-  lt2: string;
-  accent1: string;
-  accent2: string;
-}
 
 interface MediaCompositionPreset {
   recommended_theme?: string;
