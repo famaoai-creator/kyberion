@@ -2,9 +2,10 @@ import { getAllFiles } from '@agent/core/fs-utils';
 import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePipelineInputPlaceholders } from '@agent/core/pipeline-input-contract';
-import { createAjv, readJson } from '@agent/core/foundation';
+import { createAjv } from '@agent/core/foundation';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 type JsonSchema = Record<string, unknown>;
 
@@ -111,7 +112,7 @@ function readPipelines(): PipelineDocument[] {
     const safeFile = assertSafeRepositoryPath(file);
     return {
       path: safeFile.replace(`${pathResolver.rootDir()}/`, ''),
-      value: readJson(safeFile),
+      value: readSafeJsonValueFile<unknown>(safeFile, `pipeline schema coverage ${safeFile}`),
     };
   });
 }
