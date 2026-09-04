@@ -5,11 +5,10 @@
 
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
 import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
 import { normalizeRelationships } from './mission-state.js';
 import { currentProcessArgv } from '../lib/harness.js';
-import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from '../lib/json-input.js';
+import { parseSafeJsonObjectInput, readSafeJsonFile } from '../lib/json-input.js';
 
 const RELATIONSHIP_TYPES = ['belongs_to', 'supports', 'governs', 'independent'] as const;
 const PROJECT_GATE_IMPACTS = ['none', 'informational', 'review_required', 'blocking'] as const;
@@ -201,7 +200,7 @@ export function extractFileRelationshipsOption(
   if (!safeExistsSync(safeFilePath)) {
     throw new Error(`Relationships file not found: ${filePath}`);
   }
-  const parsed = parseSafeJsonObjectValue(readJson<unknown>(safeFilePath), 'Relationships file');
+  const parsed = readSafeJsonFile<Record<string, unknown>>(safeFilePath, 'Relationships file');
   return normalizeRelationships(parsed);
 }
 
