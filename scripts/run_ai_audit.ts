@@ -18,7 +18,7 @@
  */
 
 import * as path from 'node:path';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -478,7 +478,7 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
   } else {
     print(renderReport(report, reportPath));
   }
-  process.exitCode = exitCode;
+  setProcessExitCode(exitCode);
 }
 
 export const runAiAuditScript = defineScript({

@@ -219,6 +219,8 @@ describe('runAiAudit script boundary', () => {
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
+    expect(source).not.toContain('process.exitCode =');
+    expect(source).toContain('setProcessExitCode(exitCode)');
     expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 });
