@@ -38,6 +38,8 @@ import {
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 interface ExportedSymbol {
   file: string;
   name: string;
@@ -166,14 +168,14 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function main(): void {
+function main(print: Print = () => undefined): void {
   const sourceFiles = SCAN_ROOTS.flatMap(walkTs);
   const allFiles = SEARCH_ROOTS.flatMap(walkAny).filter((p) =>
     /\.(ts|js|json|md|yml|yaml)$/.test(p)
   );
 
-  console.log(`🔎 Scanning ${sourceFiles.length} TS source files for dead-code candidates...`);
-  console.log(
+  print(`🔎 Scanning ${sourceFiles.length} TS source files for dead-code candidates...`);
+  print(
     `   Searching across ${allFiles.length} files in libs/scripts/satellites/presence/tests/pipelines/docs.\n`
   );
 
@@ -204,15 +206,15 @@ function main(): void {
     byFile.get(c.file)!.push(c);
   }
 
-  console.log(`Found ${candidates.length} candidate symbols across ${byFile.size} files.\n`);
+  print(`Found ${candidates.length} candidate symbols across ${byFile.size} files.\n`);
 
   const sortedFiles = [...byFile.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 30);
   for (const [f, syms] of sortedFiles) {
-    console.log(`  ${syms.length.toString().padStart(3)}  ${f}`);
+    print(`  ${syms.length.toString().padStart(3)}  ${f}`);
     for (const s of syms.slice(0, 5)) {
-      console.log(`        ${s.kind.padEnd(8)} ${s.name}  (line ${s.line})`);
+      print(`        ${s.kind.padEnd(8)} ${s.name}  (line ${s.line})`);
     }
-    if (syms.length > 5) console.log(`        ... and ${syms.length - 5} more`);
+    if (syms.length > 5) print(`        ... and ${syms.length - 5} more`);
   }
   void sourceFiles; // sourceFiles count is reflected in candidates; suppress unused-warning if any.
 
@@ -242,15 +244,15 @@ function main(): void {
     { encoding: 'utf8' }
   );
 
-  console.log(`\n📝 Full report: ${path.relative(ROOT, REPORT_PATH)}`);
-  console.log('\n⚠️  This is advisory. Verify each candidate by hand before deleting.');
+  print(`\n📝 Full report: ${path.relative(ROOT, REPORT_PATH)}`);
+  print('\n⚠️  This is advisory. Verify each candidate by hand before deleting.');
 }
 
 export const runDeadCodeFinder = defineScript({
   name: 'find-dead-code',
   flags: [],
-  run() {
-    main();
+  run({ print }) {
+    main(print);
   },
 });
 
