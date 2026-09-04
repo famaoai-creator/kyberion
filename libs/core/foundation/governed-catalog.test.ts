@@ -74,4 +74,24 @@ describe('governed catalog publication', () => {
     expect(() => instance.generation()).toThrow('[RESOURCE_PATH_SYMLINK]');
     expect(() => instance.publish({ version: 2 }, null)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
+
+  it('rejects a catalog directory before attempting to parse it', () => {
+    const root = 'active/shared/tmp/governed-catalog-publish-tests';
+    const directoryPath = `${root}/catalog-directory.json`;
+    safeMkdir(directoryPath, { recursive: true });
+    const instance = defineCatalog<{ version: number }>({
+      id: 'governed-catalog-directory-test',
+      path: directoryPath,
+      schema: (value: unknown): value is { version: number } =>
+        !!value &&
+        typeof value === 'object' &&
+        typeof (value as { version?: unknown }).version === 'number',
+      fallback: { version: 0 },
+      fallbackOnInvalid: true,
+    });
+
+    expect(() => instance.load()).toThrow(
+      /Catalog governed-catalog-directory-test must be a regular file/
+    );
+  });
 });
