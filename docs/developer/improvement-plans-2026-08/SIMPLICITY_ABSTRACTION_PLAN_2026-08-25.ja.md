@@ -16478,6 +16478,13 @@ PR #711 の GitHub Actions build を再監査し、actuator build でのみ露�
 検証: actuator build、browser／orchestrator対象テスト、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 905
+
+SX-08／SX-09 の Chronos operator-home summary projectionを再監査し、`/api/operator-home` responseを `summary?: any` のまま home command band・mission・cost・approval・inbox read-modelへ投影する残存を修正した。専用 parser で各 nested shape、status／tier／数値、next-action、scope metadata、dangerous keyを検証し、不正 snapshotは stateへ入れない。viewer scope、operator-home計算、表示 semantics は変更していない。
+
+検証: Chronos operator-home response **1 file / 10 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 2026-09-04 再レビュー修正 906
 
 SX-08／SX-09 の Chronos plan-preview projectionを再監査し、`/api/plan-preview` responseの `preview` を型アサーションだけで親surface stateへ渡す残存を修正した。専用 parser で goal／delivery／execution／clarification question／workflow／team assignmentと dangerous key、confidence／列挙値を検証してから表示 stateへ渡し、`planPreview` の `any` を廃止した。既存の preview signature、human approval、mission start、viewer scope semantics は変更していない。
@@ -16485,11 +16492,11 @@ SX-08／SX-09 の Chronos plan-preview projectionを再監査し、`/api/plan-pr
 検証: Chronos plan-preview response **1 file / 6 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
-## 2026-09-04 再レビュー修正 905
+## 2026-09-04 再レビュー修正 907
 
-SX-08／SX-09 の Chronos operator-home summary projectionを再監査し、`/api/operator-home` responseを `summary?: any` のまま home command band・mission・cost・approval・inbox read-modelへ投影する残存を修正した。専用 parser で各 nested shape、status／tier／数値、next-action、scope metadata、dangerous keyを検証し、不正 snapshotは stateへ入れない。viewer scope、operator-home計算、表示 semantics は変更していない。
+SX-08／SX-09 の Chronos deliverable／connection review POST projectionを再監査し、成功 responseを `payload.state`／`payload.review` の optional chainingだけで親surface stateへ反映する残存を修正した。専用 parser で review success、current artifact、action／note／reviewed_at、dangerous keyを検証してから state更新へ渡し、不正 responseは fail-closed とする。既存の review mutation、refresh、tenant scope semantics は変更していない。
 
-検証: Chronos operator-home response **1 file / 10 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+検証: Chronos review response **2 files / 12 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 参照
