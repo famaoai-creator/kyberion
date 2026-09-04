@@ -9,6 +9,7 @@ import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy'
 import { resolveSpreadsheetStyleIndex } from '@agent/core/spreadsheet-style-policy';
 import { resolveMediaToneStyle } from '@agent/core/media-tone-style-map';
 import { nowIso } from '@agent/core/foundation';
+import type { XlsxDesignProtocol } from '@agent/core/src/types/xlsx-protocol';
 
 export interface MediaSpreadsheetPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
@@ -21,6 +22,20 @@ export interface MediaSpreadsheetPipelineDeps {
     brief: any
   ) => { templateId: string; template: any };
   loadSemanticRenderTokenCatalog: (rootDir: string) => any;
+}
+
+export interface MediaTrackerXlsxProtocol extends Omit<XlsxDesignProtocol, 'sheets'> {
+  sheets: Array<Record<string, unknown>>;
+  metadata: {
+    title: string;
+    subject: string;
+    composition: unknown;
+    generationBoundary: unknown;
+    recommendedTheme: string;
+    branding: Record<string, unknown>;
+    sheetRoles: unknown[];
+    sheetSemantics: unknown[];
+  };
 }
 
 export function columnNumberToLetter(input: number): string {
@@ -164,7 +179,7 @@ export function normalizeXlsxDesignProtocol(protocol: any): any {
 }
 
 export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipelineDeps) {
-  function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
+  function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): MediaTrackerXlsxProtocol {
     const outline = buildSpreadsheetNarrativeOutline(
       rootDir,
       brief,
@@ -890,7 +905,7 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
             alignment: { vertical: 'center' },
           },
         ],
-        namedStyles: [{ name: 'Normal', xfId: 0, builtinId: 0 }],
+        namedStyles: [{ name: 'Normal', xfId: 0, builtinId: 0, style: {} }],
         dxfs,
       },
       sharedStrings: [],

@@ -44,6 +44,7 @@ import {
   createMediaSpreadsheetPipelineHelpers,
   normalizeXlsxDesignProtocol,
 } from './media-spreadsheet-pipeline-helpers.js';
+import type { MediaTrackerXlsxProtocol } from './media-spreadsheet-pipeline-helpers.js';
 import { buildPptxSlideFromPattern as runtimeBuildPptxSlideFromPattern } from './media-layout-runtime.js';
 import {
   loadConfidentialThemePack,
@@ -1125,7 +1126,7 @@ function buildReportPdfProtocol(rootDir: string, brief: any): MediaReportPdfProt
   return mediaReportPipelineHelpers.buildReportPdfProtocol(rootDir, brief);
 }
 
-function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
+function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): MediaTrackerXlsxProtocol {
   return mediaSpreadsheetPipelineHelpers.buildTrackerSpreadsheetProtocol(rootDir, brief);
 }
 function resolveDocumentLayoutTemplate(
