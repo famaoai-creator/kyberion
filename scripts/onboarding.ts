@@ -18,7 +18,7 @@ export async function main(
     return;
   }
   if (args[0] === 'reset') {
-    await resetOnboardingMain(args.slice(1));
+    await resetOnboardingMain(args.slice(1), print);
     return;
   }
   if (args[0] === 'company' && args[1] === 'bootstrap') {

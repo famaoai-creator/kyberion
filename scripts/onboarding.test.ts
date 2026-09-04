@@ -44,4 +44,12 @@ describe('onboarding facade', () => {
       ])
     ).rejects.toThrow('identity file not found');
   });
+
+  it('keeps reset preview output on the facade printer', async () => {
+    const print = vi.fn();
+
+    await main(['reset', '--dry-run', '--json'], print);
+
+    expect(print).toHaveBeenCalledWith(expect.objectContaining({ dryRun: true }));
+  });
 });

@@ -70,4 +70,26 @@ describe('onboarding_reset', () => {
     expect(result).toEqual({ profileRoot, removed: [] });
     expect(formatResetSummary(result)).toContain('No onboarding artifacts found');
   });
+
+  it('previews reset targets without prompting or deleting', async () => {
+    const profileRoot = path.join(FIXTURE_ROOT, 'personal');
+    const identityPath = writeFixture('personal/my-identity.json', '{"name":"Famao"}');
+
+    const result = await resetOnboardingArtifacts({
+      profileRoot,
+      dryRun: true,
+      confirm: async () => {
+        throw new Error('preview must not prompt');
+      },
+    });
+
+    expect(result).toEqual({
+      profileRoot,
+      removed: [],
+      planned: [identityPath],
+      dryRun: true,
+    });
+    expect(safeExistsSync(identityPath)).toBe(true);
+    expect(formatResetSummary(result)).toContain('no files changed');
+  });
 });
