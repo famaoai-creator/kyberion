@@ -3,18 +3,17 @@
 import { AlertTriangle, CheckCircle2, CircleHelp, Send, Server } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { resolveChronosLocale, uxText } from '../lib/ux-vocabulary';
+import {
+  parseDiagnosticsResponse,
+  type ClientDiagnosticsPayload,
+} from '../lib/intelligence-diagnostics-response';
 
 type DiagnosticsAttentionSummaryProps = {
   tenant?: string;
   onOpenView?: (viewId: string, missionId?: string) => void;
 };
 
-type DiagnosticsPayload = {
-  activeMissions?: Array<{ missionId?: string; status?: string; nextTaskCount?: number }>;
-  runtimeDoctor?: Array<{ agentId?: string; reason?: string; severity?: string }>;
-  surfaces?: Array<{ id?: string; health?: string; controlSummary?: string }>;
-  recentSurfaceOutbox?: Array<{ message_id?: string; surface?: string; text?: string }>;
-};
+type DiagnosticsPayload = ClientDiagnosticsPayload;
 
 type AttentionItem = {
   id: string;
@@ -30,7 +29,12 @@ export function DiagnosticsAttentionSummary({
   onOpenView,
 }: DiagnosticsAttentionSummaryProps) {
   const locale = resolveChronosLocale();
-  const [data, setData] = useState<DiagnosticsPayload>({});
+  const [data, setData] = useState<DiagnosticsPayload>({
+    activeMissions: [],
+    runtimeDoctor: [],
+    surfaces: [],
+    recentSurfaceOutbox: [],
+  });
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,9 +42,9 @@ export function DiagnosticsAttentionSummary({
     const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
     void fetch(`/api/intelligence${query}`, { cache: 'no-store' })
       .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'diagnostics failed');
-        return payload as DiagnosticsPayload;
+        const payload = parseDiagnosticsResponse(await response.json().catch(() => null));
+        if (!response.ok || !payload) throw new Error('Invalid diagnostics response');
+        return payload;
       })
       .then((payload) => {
         if (cancelled) return;
@@ -57,7 +61,7 @@ export function DiagnosticsAttentionSummary({
   }, [tenant]);
 
   const attentionItems = useMemo<AttentionItem[]>(() => {
-    const missions = (data.activeMissions || [])
+    const missions = data.activeMissions
       .filter((mission) => mission.status === 'paused' || mission.status === 'failed')
       .slice(0, 3)
       .map((mission) => ({
@@ -68,14 +72,14 @@ export function DiagnosticsAttentionSummary({
         tone: 'critical' as const,
         missionId: mission.missionId,
       }));
-    const runtimes = (data.runtimeDoctor || []).slice(0, 3).map((finding) => ({
+    const runtimes = data.runtimeDoctor.slice(0, 3).map((finding) => ({
       id: `runtime-${finding.agentId}`,
       title: finding.agentId || uxText('chronos_unknown_runtime', locale),
       detail: finding.reason || uxText('chronos_runtime_needs_review', locale),
       kind: 'runtime' as const,
       tone: finding.severity === 'critical' ? ('critical' as const) : ('warning' as const),
     }));
-    const surfaces = (data.surfaces || [])
+    const surfaces = data.surfaces
       .filter((surface) => surface.health && surface.health !== 'healthy')
       .slice(0, 3)
       .map((surface) => ({
@@ -85,7 +89,7 @@ export function DiagnosticsAttentionSummary({
         kind: 'surface' as const,
         tone: 'warning' as const,
       }));
-    const delivery = (data.recentSurfaceOutbox || []).slice(0, 2).map((message) => ({
+    const delivery = data.recentSurfaceOutbox.slice(0, 2).map((message) => ({
       id: `delivery-${message.message_id}`,
       title: message.surface || uxText('chronos_delivery', locale),
       detail: message.text || uxText('chronos_delivery_needs_review', locale),
@@ -96,12 +100,12 @@ export function DiagnosticsAttentionSummary({
   }, [data, locale]);
 
   const counts = {
-    missions: (data.activeMissions || []).filter(
+    missions: data.activeMissions.filter(
       (mission) => mission.status === 'paused' || mission.status === 'failed'
     ).length,
-    runtimes: (data.runtimeDoctor || []).length,
-    surfaces: (data.surfaces || []).filter((surface) => surface.health !== 'healthy').length,
-    delivery: (data.recentSurfaceOutbox || []).length,
+    runtimes: data.runtimeDoctor.length,
+    surfaces: data.surfaces.filter((surface) => surface.health !== 'healthy').length,
+    delivery: data.recentSurfaceOutbox.length,
   };
 
   return (
