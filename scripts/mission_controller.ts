@@ -1324,7 +1324,10 @@ async function approveScopeChange(
 /**
  * 7. Main Entry
  */
-async function mainImpl(args: string[] = currentProcessArgv()): Promise<void> {
+async function mainImpl(
+  args: string[] = currentProcessArgv(),
+  print: Print = () => undefined
+): Promise<void> {
   activeMissionControllerArgs = [...args];
   const requestedAction = args[0];
   const isHelpFlag = args.includes('--help') || args.includes('-h');
@@ -1363,6 +1366,7 @@ async function mainImpl(args: string[] = currentProcessArgv()): Promise<void> {
   const hasDryRun = args.includes('--dry-run');
   await runMissionControllerAction({
     argv: args,
+    print,
     action,
     arg1,
     arg2,
@@ -1444,7 +1448,7 @@ export async function main(
   const previousPrint = activePrint;
   activePrint = print;
   try {
-    await mainImpl(args);
+    await mainImpl(args, print);
   } finally {
     activePrint = previousPrint;
   }

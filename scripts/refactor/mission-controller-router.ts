@@ -98,6 +98,7 @@ function parseJsonArray(raw: string | undefined, flag: string): unknown[] {
 }
 
 type Awaitable<T> = T | Promise<T>;
+type Print = (value: unknown) => void;
 
 type MissionStartCreateInput = ReturnType<
   MissionControllerRoutingContext['validateMissionStartCreateInput']
@@ -105,6 +106,7 @@ type MissionStartCreateInput = ReturnType<
 
 export interface MissionControllerRoutingContext {
   argv: string[];
+  print?: Print;
   action?: string;
   arg1?: string;
   arg2?: string;
@@ -335,7 +337,7 @@ export interface MissionControllerRoutingContext {
  * enqueue progress/result messages into the terminal outbox; these helpers
  * are the CLI's read side (durable until acknowledged with --ack).
  */
-function showTerminalOutbox(options: { ack: boolean; missionId?: string }): void {
+function showTerminalOutbox(options: { ack: boolean; missionId?: string }, print: Print): void {
   const messages = listSurfaceOutboxMessages('terminal', { includeTenantNamespaces: true }).filter(
     (message) => !options.missionId || message.correlation_id === options.missionId.toUpperCase()
   );
@@ -348,9 +350,7 @@ function showTerminalOutbox(options: { ack: boolean; missionId?: string }): void
     return;
   }
   for (const message of messages) {
-    console.log(
-      [`── ${message.created_at}  ${message.correlation_id}`, message.text, ''].join('\n')
-    );
+    print([`── ${message.created_at}  ${message.correlation_id}`, message.text, ''].join('\n'));
   }
   if (options.ack) {
     for (const message of messages) {
@@ -622,7 +622,7 @@ export async function runMissionControllerAction(
         ...(visionRefSummary ? { vision_ref_summary: visionRefSummary } : {}),
       };
       if (hasDryRun) {
-        console.log(
+        context.print?.(
           JSON.stringify(
             {
               action: 'create',
@@ -682,7 +682,7 @@ export async function runMissionControllerAction(
         ...(visionRefSummary ? { vision_ref_summary: visionRefSummary } : {}),
       };
       if (hasDryRun) {
-        console.log(
+        context.print?.(
           JSON.stringify(
             {
               action: 'start',
@@ -785,21 +785,21 @@ export async function runMissionControllerAction(
         ...(staleDaysRaw ? { staleDays: Number(staleDaysRaw) } : {}),
         ...(abandonedDaysRaw ? { abandonedDays: Number(abandonedDaysRaw) } : {}),
       });
-      console.log(formatMissionHygieneLine(report));
+      context.print?.(formatMissionHygieneLine(report));
       for (const finding of [
         ...report.abandoned,
         ...report.stale,
         ...(report.active_stale || []),
         ...(report.distilling_stale || []),
       ]) {
-        console.log(
+        context.print?.(
           `  [${finding.age_days ?? '?'}d] ${finding.mission_id} (${finding.reason}, tasks=${finding.task_count})`
         );
-        console.log(`      → ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`);
+        context.print?.(`      → ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`);
       }
       if (context.argv.includes('--notify')) {
         const sent = await notifyMissionHygiene(report);
-        console.log(sent ? '通知を送信しました。' : '要対応のミッションはありません。');
+        context.print?.(sent ? '通知を送信しました。' : '要対応のミッションはありません。');
       }
       break;
     }
@@ -808,22 +808,22 @@ export async function runMissionControllerAction(
       const rejectId = getValue('--reject', context.argv);
       const applyId = getValue('--apply', context.argv);
       if (approveId) {
-        console.log(
+        context.print?.(
           JSON.stringify(decideProcessImprovementProposal(approveId, 'approved'), null, 2)
         );
       } else if (rejectId) {
-        console.log(
+        context.print?.(
           JSON.stringify(decideProcessImprovementProposal(rejectId, 'rejected'), null, 2)
         );
       } else if (applyId) {
-        console.log(JSON.stringify(applyProcessImprovementProposal(applyId), null, 2));
+        context.print?.(JSON.stringify(applyProcessImprovementProposal(applyId), null, 2));
       } else {
         const proposals = listProcessImprovementProposals();
         if (proposals.length === 0) {
-          console.log('プロセス改善提案はありません。');
+          context.print?.('プロセス改善提案はありません。');
         }
         for (const proposal of proposals) {
-          console.log(
+          context.print?.(
             `[${proposal.status}] ${proposal.proposal_id} (${proposal.kind}) ${proposal.target} — ${proposal.proposal.slice(0, 100)}`
           );
         }
@@ -832,7 +832,7 @@ export async function runMissionControllerAction(
     }
     case 'retrospective': {
       const result = await runMissionRetrospective(arg1!);
-      console.log(
+      context.print?.(
         JSON.stringify(
           {
             report_path: result.report_path,
@@ -974,7 +974,7 @@ export async function runMissionControllerAction(
           outputPath: getValue('--output', context.argv),
           reason: getValue('--reason', context.argv),
         });
-        console.log(JSON.stringify(scaffold, null, 2));
+        context.print?.(JSON.stringify(scaffold, null, 2));
         break;
       }
       const manifestPath = getValue('--manifest', context.argv);
@@ -1043,10 +1043,13 @@ export async function runMissionControllerAction(
       showTerminalOutboxHint();
       break;
     case 'outbox':
-      showTerminalOutbox({
-        ack: context.argv.includes('--ack'),
-        missionId: arg1 && !arg1.startsWith('--') ? arg1 : undefined,
-      });
+      showTerminalOutbox(
+        {
+          ack: context.argv.includes('--ack'),
+          missionId: arg1 && !arg1.startsWith('--') ? arg1 : undefined,
+        },
+        context.print ?? (() => undefined)
+      );
       break;
     case 'sync-project-ledger':
       await context.syncProjectLedger(arg1!);
@@ -1084,7 +1087,7 @@ export async function runMissionControllerAction(
           : undefined
       );
       if (teamPlan !== undefined) {
-        console.log(JSON.stringify(teamPlan, null, 2));
+        context.print?.(JSON.stringify(teamPlan, null, 2));
       }
       break;
     }
@@ -1105,7 +1108,7 @@ export async function runMissionControllerAction(
           : undefined
       );
       if (runtimePlan !== undefined) {
-        console.log(JSON.stringify(runtimePlan, null, 2));
+        context.print?.(JSON.stringify(runtimePlan, null, 2));
       }
       break;
     }
@@ -1116,7 +1119,7 @@ export async function runMissionControllerAction(
         getValue('--organization-id', context.argv) || getValue('--org', context.argv)
       );
       if (prewarmSummary !== undefined) {
-        console.log(JSON.stringify(prewarmSummary, null, 2));
+        context.print?.(JSON.stringify(prewarmSummary, null, 2));
       }
       break;
     }
