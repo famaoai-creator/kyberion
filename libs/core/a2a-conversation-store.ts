@@ -30,6 +30,10 @@ const MAX_TURNS = 500;
 const conversationLocks = new Map<string, Semaphore>();
 const JSON_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function isSafeJsonTree(value: unknown): boolean {
   if (Array.isArray(value)) return value.every(isSafeJsonTree);
   if (value === null || typeof value !== 'object') return true;
@@ -180,9 +184,9 @@ export async function appendConversationTurn(
       try {
         const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
         lines = content.split('\n').filter((l) => l.trim().length > 0);
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.warn(
-          `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${err?.message}`
+          `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${errorMessage(err)}`
         );
       }
     }
@@ -195,9 +199,9 @@ export async function appendConversationTurn(
 
     try {
       safeWriteFile(filePath, lines.join('\n') + '\n');
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.warn(
-        `[A2A_CONVERSATION_STORE] Failed to write conversation file ${filePath}: ${err?.message}`
+        `[A2A_CONVERSATION_STORE] Failed to write conversation file ${filePath}: ${errorMessage(err)}`
       );
     }
   });
@@ -219,9 +223,9 @@ export function readConversationHistory(conversationId: string): ConversationTur
       .filter((l) => l.trim().length > 0)
       .map(parseConversationTurnLine)
       .filter((turn): turn is ConversationTurn => turn !== undefined);
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.warn(
-      `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${err?.message}`
+      `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${errorMessage(err)}`
     );
     return [];
   }

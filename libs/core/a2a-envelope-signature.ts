@@ -31,6 +31,10 @@ const SECRET_RELATIVE_PATH = 'active/shared/runtime/agent-supervisor/a2a-secret'
 
 let cachedSecret: string | null = null;
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /** Test hook: forget the cached secret so key-resolution paths can be exercised. */
 export function _resetA2ASecretCacheForTests(): void {
   cachedSecret = null;
@@ -56,8 +60,8 @@ export function resolveA2ASecret(): string {
         return cachedSecret;
       }
     }
-  } catch (err: any) {
-    logger.warn(`[a2a-signature] could not read persisted secret: ${err?.message || err}`);
+  } catch (err: unknown) {
+    logger.warn(`[a2a-signature] could not read persisted secret: ${errorMessage(err)}`);
   }
 
   const generated = crypto.randomBytes(32).toString('hex');
@@ -65,11 +69,11 @@ export function resolveA2ASecret(): string {
     safeMkdir(path.dirname(secretPath), { recursive: true });
     safeWriteFile(secretPath, generated, { mode: 0o600 });
     logger.info('[a2a-signature] generated and persisted the shared A2A secret');
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Persist failure degrades to the old process-local behavior; say so
     // loudly because cross-process verification will fail until fixed.
     logger.warn(
-      `[a2a-signature] could not persist the shared secret — falling back to a process-local key (cross-process signatures will not verify): ${err?.message || err}`
+      `[a2a-signature] could not persist the shared secret — falling back to a process-local key (cross-process signatures will not verify): ${errorMessage(err)}`
     );
   }
   cachedSecret = generated;
