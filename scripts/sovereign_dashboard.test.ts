@@ -49,6 +49,8 @@ describe('sovereign dashboard governance loaders', () => {
     expect(source).toContain('print(snapshot)');
     expect(source).not.toContain("name: 'dashboard', flags: []");
     expect(source).not.toContain('console.log');
+    expect(source).not.toContain('process.stdout.write');
+    expect(source).toContain('clearOutput: print');
     expect(source).toContain('main(argv, print)');
   });
 
