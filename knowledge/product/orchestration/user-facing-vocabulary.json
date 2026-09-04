@@ -4984,6 +4984,16 @@
         "ja": "次のアクション: 上記のいずれかで承認要求({requestId})に回答してください。",
         "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: ȧñşẇėř ȧṗṗřőṽȧŀ řėɋůėşŧ {requestId} ẇïŧħ őñė őƒ ŧħė őṗŧïőñş ȧƀőṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
+      "mission_proposal_fallback": {
+        "en": "Mission proposal",
+        "ja": "ミッション提案",
+        "qps-ploc": "⟦Ɱïşşïőñ ṗřőṗőşȧŀ ŀőřėɱ⟧"
+      },
+      "mission_proposal_confirmation_choices": {
+        "en": "1) Create 2) Cancel",
+        "ja": "1) 作成する 2) やめる",
+        "qps-ploc": "⟦1) Ƈřėȧŧė 2) Ƈȧñƈėŀ ŀőřėɱ ⟧"
+      },
       "processing_note": {
         "en": "Processing. Please wait…",
         "ja": "処理中です。少々お待ちください…",
