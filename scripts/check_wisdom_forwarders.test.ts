@@ -10,7 +10,9 @@ describe('wisdom forwarder checker', () => {
       })
     );
     expect(source).toContain('loadActuatorOpRegistry()');
+    expect(source).toContain('readSafeJsonValueFile');
     expect(source).not.toContain('readJson<Registry>');
+    expect(source).not.toContain('readJson<unknown>(file)');
   });
 
   it('keeps canonical targets and pipeline kinds aligned', () => {
