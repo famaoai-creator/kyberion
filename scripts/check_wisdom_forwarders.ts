@@ -6,8 +6,9 @@ import {
 } from '@agent/core/actuator-op-registry';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 type PipelineKind = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -35,7 +36,8 @@ export function checkWisdomForwarders(): string[] {
     )) {
       let document: unknown;
       try {
-        document = readJson<unknown>(file);
+        const safeFile = assertSafeRepositoryPath(file);
+        document = readSafeJsonValueFile<unknown>(safeFile, `wisdom forwarder pipeline ${file}`);
       } catch {
         continue;
       }
