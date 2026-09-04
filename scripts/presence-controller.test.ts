@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { parsePresenceStimulus, parsePresenceStimulusLine } from './presence-controller.js';
+import { describe, expect, it, vi } from 'vitest';
+import { main, parsePresenceStimulus, parsePresenceStimulusLine } from './presence-controller.js';
 
 const validStimulus = {
   timestamp: '2026-09-01T00:00:00.000Z',
@@ -29,5 +29,23 @@ describe('presence controller stimulus boundary', () => {
     ['invalid metadata', JSON.stringify({ ...validStimulus, metadata: [] })],
   ])('rejects %s before controller handling', (_, line) => {
     expect(parsePresenceStimulusLine(line)).toBeUndefined();
+  });
+
+  it('routes usage output through the shared printer', async () => {
+    const print = vi.fn();
+
+    await main(['--help'], print);
+
+    expect(print).toHaveBeenCalledWith(
+      'Usage: pnpm presence-controller <resolve|perceive|prune> [args]'
+    );
+  });
+
+  it('routes perceived JSON through the shared printer', async () => {
+    const print = vi.fn();
+
+    await main(['perceive'], print);
+
+    expect(print).toHaveBeenCalledWith(expect.any(String));
   });
 });

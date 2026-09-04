@@ -13,6 +13,8 @@ import * as pathResolver from '@agent/core/path-resolver';
 import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 /**
  * Presence Controller v2.0 (Type-Safe TS Edition)
  */
@@ -228,15 +230,15 @@ export async function pruneStimuli(): Promise<void> {
   }
 }
 
-function printUsage(): void {
-  console.log('Usage: pnpm presence-controller <resolve|perceive|prune> [args]');
+function printUsage(print: Print): void {
+  print('Usage: pnpm presence-controller <resolve|perceive|prune> [args]');
 }
 
-export async function main(args: string[] = []): Promise<void> {
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
   const action = args[0];
 
   if (!action || action === '--help' || action === '-h' || action === 'help') {
-    printUsage();
+    printUsage(print);
     return;
   }
 
@@ -247,7 +249,7 @@ export async function main(args: string[] = []): Promise<void> {
     await resolveStimulus(ts, resp);
   } else if (action === 'perceive') {
     const pending = perceive();
-    process.stdout.write(JSON.stringify(pending, null, 2));
+    print(JSON.stringify(pending, null, 2));
   } else if (action === 'prune') {
     await pruneStimuli();
   }
@@ -256,7 +258,7 @@ export async function main(args: string[] = []): Promise<void> {
 export const runPresenceController = defineScript({
   name: 'presence:controller',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (
