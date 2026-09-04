@@ -10,6 +10,9 @@ describe('setup_oauth', () => {
     );
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('console.error(');
+    expect(source).not.toContain('process.exitCode =');
+    expect(source).toContain("new ScriptExitError(130, '', true)");
+    expect(source).toContain("new ScriptExitError(143, '', true)");
     expect(source).toContain('run: ({ argv, print }) => runOAuthSetupForService(argv[0], print)');
 
     const print = vi.fn();
