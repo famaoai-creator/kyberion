@@ -137,7 +137,6 @@ export const claudeCodeHook = defineScript({
       } else {
         process.stderr.write(`[claude_code_hook] ${String(err)}\n`);
       }
-      process.exitCode = 0;
     }
   },
 });
