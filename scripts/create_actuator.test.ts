@@ -69,4 +69,17 @@ describe('create_actuator', () => {
       })
     ).toThrow(`Directory already exists: ${existing}`);
   });
+
+  it('routes scaffold guidance through the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/create_actuator.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('print?: Print');
+    expect(source).toContain('json, quiet, print }).then');
+  });
 });

@@ -29,6 +29,8 @@ import {
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function kebab(s: string): string {
@@ -342,7 +344,13 @@ function parseCliArgs(args: string[]): ActuatorScaffoldInput {
 
 async function main(
   args: string[],
-  options: { dryRun?: boolean; check?: boolean; json?: boolean; quiet?: boolean } = {}
+  options: {
+    dryRun?: boolean;
+    check?: boolean;
+    json?: boolean;
+    quiet?: boolean;
+    print?: Print;
+  } = {}
 ): Promise<ActuatorScaffoldResult | ActuatorScaffoldMachineResult> {
   const input = parseCliArgs(args);
   const machineOutput =
@@ -360,15 +368,16 @@ async function main(
 
   const scaffold = createActuatorScaffold(input);
   if (!machineOutput) {
+    const print = options.print ?? (() => undefined);
     logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
-    console.log('  Files created:');
-    for (const file of scaffold.files) console.log(`    ${file}`);
-    console.log('\nNext steps:');
-    console.log('  1. Implement the actuator-specific op logic in src/index.ts');
-    console.log('  2. Replace the schema stub with the real contract');
-    console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
-    console.log('  4. Run: pnpm build');
-    console.log(
+    print('  Files created:');
+    for (const file of scaffold.files) print(`    ${file}`);
+    print('\nNext steps:');
+    print('  1. Implement the actuator-specific op logic in src/index.ts');
+    print('  2. Replace the schema stub with the real contract');
+    print('  3. Add an entry to CAPABILITIES_GUIDE.md');
+    print('  4. Run: pnpm build');
+    print(
       '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm generate:op-registry -- --check verifies drift)'
     );
   }
@@ -379,7 +388,7 @@ const script = defineScript({
   name: 'create:actuator',
   flags: ['json', 'dry-run', 'check', 'quiet'],
   run: ({ argv, dryRun, check, json, quiet, print }) =>
-    main(stripSharedScriptFlags(argv), { dryRun, check, json, quiet }).then((result) => {
+    main(stripSharedScriptFlags(argv), { dryRun, check, json, quiet, print }).then((result) => {
       if (json || dryRun || check) print(result);
       return result;
     }),
