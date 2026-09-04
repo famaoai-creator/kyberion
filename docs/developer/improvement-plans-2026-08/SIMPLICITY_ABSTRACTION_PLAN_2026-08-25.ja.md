@@ -18843,7 +18843,7 @@ SX-06／SX-09 の onboarding wizard／facadeを再監査し、`onboarding_wizard
 検証:
 
 - onboarding facade／wizard **3 test files / 18 tests passed**。apply dry-runのprinter転送、reset既存契約、wizardの直接console不在を確認した。
-- `pnpm exec tsc --noEmit --pretty false`、対象3ファイルの ESLint、`git diff --check` passed。
+- `pnpm exec tsc --noEmit --pretty false`、対象4ファイルの ESLint、`git diff --check` passed。
 - canonical full gate はこの slice の後段で実行する。
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
