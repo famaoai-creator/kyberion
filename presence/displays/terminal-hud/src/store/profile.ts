@@ -3,7 +3,7 @@ import { resolveOperatorDisplayName, resolveOperatorLocale } from '@agent/core/o
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { listAgentIdentities } from '@agent/core/agent-identity';
 import { loadOrganizationProfile } from '@agent/core/organization-profile';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
@@ -18,6 +18,14 @@ export interface ProfileData {
   identities: Array<{ id: string; status: string; display: string }>;
 }
 
+export function formatOnboardingState(value: unknown): string[] {
+  const state = parseSafeJsonObjectValue(value, 'onboarding state');
+  return Object.entries(state)
+    .filter(([, entry]) => typeof entry !== 'object' || entry === null)
+    .slice(0, 10)
+    .map(([key, entry]) => `${key}: ${String(entry)}`);
+}
+
 export function loadProfile(): ProfileData {
   const profileRoot = resolveActiveProfileRoot();
   let onboardingLines: string[] = [];
@@ -25,11 +33,7 @@ export function loadProfile(): ProfileData {
     const statePath = path.join(profileRoot, 'onboarding', 'onboarding-state.json');
     const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
     if (safeExistsSync(safeStatePath) && safeLstat(safeStatePath).isFile()) {
-      const state = readJson<Record<string, unknown>>(safeStatePath);
-      onboardingLines = Object.entries(state)
-        .filter(([, value]) => typeof value !== 'object' || value === null)
-        .slice(0, 10)
-        .map(([key, value]) => `${key}: ${String(value)}`);
+      onboardingLines = formatOnboardingState(readJson<unknown>(safeStatePath));
     }
   } catch {
     // unreadable onboarding state renders as empty
