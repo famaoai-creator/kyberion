@@ -1193,7 +1193,7 @@ export const warnedSystemOpAliases = new Set<string>();
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
+  params: Record<string, unknown>;
 }
 
 export function assertUnsafeShellAllowed() {

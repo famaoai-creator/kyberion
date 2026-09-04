@@ -11,6 +11,7 @@ import {
 } from '@agent/core/secure-io';
 import { nowIso, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import type { AdfEngineContext } from '@agent/core/adf-engine';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveDesktopLaunchAdapter } from '@agent/core/desktop-launch-adapter';
 import { getPathValue } from '@agent/core/src/logic-utils';
@@ -373,18 +374,23 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
 // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
 // (runAdfActuatorPipeline). Nested control failures now propagate instead of being
 // silently absorbed (AR-06 no-silent-failure).
-async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}) {
+async function executePipeline(
+  steps: PipelineStep[],
+  initialCtx: AdfEngineContext = {},
+  options: { max_steps?: number; timeout_ms?: number } = {}
+) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, timestamp: nowIso() };
+  let ctx: AdfEngineContext = { ...initialCtx, timestamp: nowIso() };
 
-  const contextPath = initialCtx.context_path
-    ? assertSafeRepositoryPath(path.resolve(rootDir, String(initialCtx.context_path)), {
-        allowMissingLeaf: true,
-      })
-    : undefined;
+  const contextPath =
+    typeof initialCtx.context_path === 'string' && initialCtx.context_path
+      ? assertSafeRepositoryPath(path.resolve(rootDir, initialCtx.context_path), {
+          allowMissingLeaf: true,
+        })
+      : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
     if (!safeLstat(contextPath).isFile()) {
       throw new Error(`system context must be an existing regular file: ${contextPath}`);
@@ -413,13 +419,8 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   });
   ctx = result.context;
 
-  if (initialCtx.context_path) {
-    safeWriteFile(
-      assertSafeRepositoryPath(path.resolve(rootDir, String(initialCtx.context_path)), {
-        allowMissingLeaf: true,
-      }),
-      JSON.stringify(ctx, null, 2)
-    );
+  if (contextPath) {
+    safeWriteFile(contextPath, JSON.stringify(ctx, null, 2));
   }
 
   return result;
