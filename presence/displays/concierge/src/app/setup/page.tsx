@@ -3,14 +3,8 @@
 import * as React from 'react';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import type { ConciergeMessageKey } from '../../lib/i18n';
+import { parseSetupResponse, type Setup as SetupPayload } from '../../lib/setup-response';
 
-type Service = { id: string; label: string; auth: string; configured: boolean };
-type Diagnostic = {
-  id: string;
-  status: 'ok' | 'incomplete' | 'error';
-  action?: { type: 'navigate'; target: string };
-  command?: string;
-};
 type NotificationChannelOption = { surface: string; display_name: string; status: string };
 type NotificationTarget = { surface: string; target: string };
 type PluginEntry = {
@@ -43,73 +37,7 @@ type ConfigMissionItem = {
   status: string;
   created_at: string;
 };
-type Setup = {
-  surface_roles: Array<{
-    id: string;
-    role_ja: string;
-    tagline_ja: string;
-    port: number;
-    enabled: boolean;
-  }>;
-  active_surfaces: Array<{ id: string; port?: number; enabled: boolean }>;
-  reasoning_mode: string;
-  model_tiers: Record<string, string>;
-  providers?: { priority?: string[]; default_models?: Record<string, string> };
-  profile: {
-    name: string;
-    language: string;
-    interaction_style: string;
-    primary_domain: string;
-    vision: string;
-    agent_id: string;
-    tenant_slug: string;
-    onboarding_complete: boolean;
-    avatar_registered: boolean;
-    avatar_source?: string;
-    voice_profiles: Array<{
-      profile_id: string;
-      display_name: string;
-      sample_count: number;
-      sample_refs?: string[];
-    }>;
-  };
-  service_catalog: Service[];
-  diagnostics: Diagnostic[];
-  capabilities: Array<{
-    id: string;
-    label: string;
-    status: string;
-    href?: string;
-  }>;
-  tenant: {
-    active_slug: string;
-    runtime_bound: boolean;
-    catalog: Array<{
-      tenant_slug: string;
-      tenant_id: string;
-      display_name: string;
-      status: string;
-      assigned_role: string;
-    }>;
-  };
-  agent_management: {
-    configured: {
-      agent_id?: string;
-      display_name?: string;
-      provider?: string;
-      model_id?: string;
-    } | null;
-    durable_identities: Array<{
-      nhi_id: string;
-      kind: string;
-      display_name: string;
-      lifecycle_status: string;
-      organization_id: string;
-      provider_hint: string;
-      model_hint: string;
-    }>;
-  };
-};
+type Setup = SetupPayload;
 
 type Notice = { text: string; error?: boolean } | null;
 
@@ -201,9 +129,8 @@ export default function SetupPage() {
   const refresh = React.useCallback(async () => {
     try {
       const response = await fetch('/api/setup', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'setup failed');
-      const next = payload.setup as Setup;
+      const next = parseSetupResponse(await response.json().catch(() => null));
+      if (!response.ok || !next) throw new Error('Invalid setup response');
       setSetup(next);
       setProfile({
         name: next.profile.name,
