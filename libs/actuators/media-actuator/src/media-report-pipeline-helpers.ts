@@ -11,6 +11,7 @@ import {
   classifyRenderSemantic,
   type DocumentCompositionPresetResolver,
 } from './media-document-helpers.js';
+import type { MediaPptxPalette } from './media-layout-design-tokens.js';
 
 export interface MediaReportPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
@@ -29,7 +30,7 @@ export interface MediaReportPipelineDeps {
     theme: any,
     locale?: string
   ) => { headingFont: string; bodyFont: string; accent: string };
-  themeToPptxPalette: (theme: any) => any;
+  themeToPptxPalette: (theme: any) => MediaPptxPalette;
   normalizeFontFamily: (input: string) => string;
 }
 
@@ -63,7 +64,11 @@ export interface MediaReportDocxProtocol extends DocxDesignProtocol {
   };
 }
 
-function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
+function resolveThemeColorRole(
+  palette: MediaPptxPalette,
+  accentHex: string,
+  role?: string
+): string {
   const resolvedRole = resolveThemeColorRolePolicy(role, 'secondary');
   switch (resolvedRole) {
     case 'accent':
