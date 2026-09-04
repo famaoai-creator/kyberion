@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
-import { readJson, readTextFile } from '@agent/core/foundation';
+import { readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 const ROOT = pathResolver.rootDir();
 const ALLOWED_CJS_FILES = new Set([
@@ -77,9 +78,9 @@ function checkPackageJson(filePath: string, violations: string[]) {
   const relativePath = toPosix(path.relative(ROOT, filePath));
   if (ALLOWED_NON_MODULE_PACKAGES.has(relativePath)) return;
 
-  const pkg = readJson<{
+  const pkg = readSafeJsonFile<{
     type?: string;
-  }>(filePath);
+  }>(filePath, `ESM package manifest ${filePath}`);
   if (pkg.type !== 'module') {
     violations.push(`${relativePath}: package.json must declare "type": "module"`);
   }
