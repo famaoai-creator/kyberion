@@ -1,8 +1,8 @@
 import type { ValidateFunction } from 'ajv';
-import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
+import { compileSchema, defineCatalog } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { parseSafeJsonObjectValue } from './json-input.js';
+import { parseSafeJsonObjectValue, readSafeJsonValueFile } from './json-input.js';
 
 export type TaskTrigger =
   | { type: 'schedule'; cron: string; timezone?: string }
@@ -70,5 +70,5 @@ export function loadTaskRecord(filePath: string, label: string): Record<string, 
   if (!safeExistsSync(safeFilePath) || !safeLstat(safeFilePath).isFile()) {
     throw new Error(`${label} must be an existing regular file: ${filePath}`);
   }
-  return parseTaskRecord(readJson<unknown>(safeFilePath), label);
+  return parseTaskRecord(readSafeJsonValueFile<unknown>(safeFilePath, label), label);
 }
