@@ -44,7 +44,7 @@ function stringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
-function parseCandidate(value: unknown): ClientKnowledgeCandidate | undefined {
+export function parseKnowledgeCandidate(value: unknown): ClientKnowledgeCandidate | undefined {
   if (!isRecord(value)) return undefined;
   if (
     !nonEmptyString(value.candidate_id) ||
@@ -87,7 +87,7 @@ export function parseKnowledgeResponse(value: unknown): KnowledgeResponse | unde
   ) {
     return undefined;
   }
-  const candidates = value.candidates.map(parseCandidate);
+  const candidates = value.candidates.map(parseKnowledgeCandidate);
   return candidates.every((entry): entry is NonNullable<typeof entry> => entry !== undefined)
     ? {
         ok: true,
