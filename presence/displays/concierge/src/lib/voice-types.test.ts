@@ -53,4 +53,18 @@ describe('voice response parsers', () => {
       })
     ).toBeUndefined();
   });
+
+  it('rejects dangerous keys across voice response boundaries', () => {
+    const unsafeStatus = JSON.parse(
+      '{"available":true,"speech":{"status":"speaking","constructor":{"text":"leak"}}}'
+    );
+    const unsafeListen = JSON.parse(
+      '{"ok":true,"stt":{"ok":true,"text":"hi","locale":"ja-JP","backend":"native","is_final":true,"elapsed_ms":1,"prototype":{}}}'
+    );
+    expect(parseVoiceStatusResponse(unsafeStatus)).toBeUndefined();
+    expect(parseVoiceListenOnceResponse(unsafeListen)).toBeUndefined();
+    expect(
+      parseVoiceStopResponse(JSON.parse('{"ok":true,"stopped":false,"__proto__":{}}'))
+    ).toBeUndefined();
+  });
 });
