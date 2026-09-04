@@ -78,7 +78,7 @@ type ArtifactLibraryCatalog = {
 
 interface MediaDocumentCompositionCatalog {
   defaults: Record<string, unknown>;
-  profiles: Record<string, unknown>;
+  profiles: Record<string, MediaCompositionPreset>;
 }
 
 interface MediaThemeCatalog {
@@ -88,6 +88,15 @@ interface MediaThemeCatalog {
 }
 
 type MediaTheme = Record<string, unknown>;
+
+interface MediaCompositionPreset {
+  recommended_theme?: string;
+  branding?: Record<string, unknown>;
+  prompt_guide?: unknown[];
+  source_design?: Record<string, unknown> | null;
+  design_recommendations?: unknown[];
+  [key: string]: unknown;
+}
 
 function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   const dirPath = path.resolve(
@@ -112,11 +121,8 @@ function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
 }
 
 function loadDocumentCompositionCatalog(rootDir: string): MediaDocumentCompositionCatalog {
-  const fallback = { defaults: {}, profiles: {} };
-  const catalog = defineCatalog<{
-    defaults: Record<string, unknown>;
-    profiles: Record<string, unknown>;
-  }>({
+  const fallback: MediaDocumentCompositionCatalog = { defaults: {}, profiles: {} };
+  const catalog = defineCatalog<MediaDocumentCompositionCatalog>({
     id: 'document-composition-presets',
     path: path.resolve(
       rootDir,
@@ -693,7 +699,7 @@ function resolveNamedTheme(rootDir: string, preferredTheme?: string): MediaTheme
 function resolveDocumentCompositionPresetCore(
   rootDir: string,
   brief: any
-): { profileId: string; preset: any } {
+): { profileId: string; preset: MediaCompositionPreset } {
   const catalog = loadDocumentCompositionCatalog(rootDir);
   const profiles = catalog.profiles || {};
   const defaults = catalog.defaults || {};
@@ -731,7 +737,7 @@ function resolveDocumentCompositionPresetCore(
     .map((value) => String(value).toLowerCase())
     .join(' ');
   const keywords = resolveDocumentProfileKeywordsPolicy(documentType, artifactFamily);
-  const buildPreset = (profileId: string, preset: any) => {
+  const buildPreset = (profileId: string, preset: MediaCompositionPreset) => {
     const designSystem = resolveMediaDesignSystem(rootDir, {
       ...brief,
       document_profile: profileId,
