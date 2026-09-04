@@ -21,6 +21,8 @@ import { runAutoCheckpoint } from './auto_checkpoint.js';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
+type Print = (value: unknown) => void;
+
 export interface SoakSample {
   cycle: number;
   timestamp: string;
@@ -663,7 +665,7 @@ function parseArgs(argv: string[]): SoakHarnessOptions & { json: boolean } {
   return options;
 }
 
-async function main(argv: string[] = []): Promise<number> {
+async function main(argv: string[] = [], print: Print = () => undefined): Promise<number> {
   const options = parseArgs(argv);
   const report = await runSoakEnduranceHarness(options);
   const validation = validateSoakEvidence(report);
@@ -674,7 +676,7 @@ async function main(argv: string[] = []): Promise<number> {
     );
   }
   if (options.json) {
-    console.log(JSON.stringify(report, null, 2));
+    print(JSON.stringify(report, null, 2));
   }
   if (options.failOnRegression && !validation.ok) {
     for (const issue of validation.issues) logger.error(`[soak-endurance] ${issue}`);
@@ -686,8 +688,8 @@ async function main(argv: string[] = []): Promise<number> {
 export const runSoakEndurance = defineScript({
   name: 'soak:endurance',
   flags: [],
-  run: async ({ argv }) => {
-    const code = await main(argv);
+  run: async ({ argv, print }) => {
+    const code = await main(argv, print);
     if (code !== 0) throw new ScriptExitError(code, '', true);
   },
 });

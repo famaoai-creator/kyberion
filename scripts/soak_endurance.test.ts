@@ -25,6 +25,8 @@ describe('soak_endurance', () => {
     expect(source).toContain('writeSoakEvidenceManifestAtPath');
     expect(source).not.toContain('readJsonIfPresent<SoakEvidenceManifest>');
     expect(source).not.toContain('JSON.stringify(manifest, null, 2)');
+    expect(source).not.toContain('console.log');
+    expect(source).toContain('const code = await main(argv, print)');
   });
   it('captures a time series with sampled file sizes', async () => {
     const sampleRoot = pathResolver.sharedTmp('soak-endurance-tests/series');
