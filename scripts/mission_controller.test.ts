@@ -628,6 +628,19 @@ describe('mission_controller argument parsing', () => {
     expect(help).toContain('scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>]');
   });
 
+  it('routes early help output through the injected script printer', async () => {
+    const output: unknown[] = [];
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await main(['--help'], (value) => output.push(value));
+      expect(output).toHaveLength(1);
+      expect(String(output[0])).toContain('Kyberion Sovereign Mission Controller (KSMC)');
+      expect(logSpy).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   it('treats --json as a boolean flag for organization profile inventory', () => {
     const positionalArgs = extractMissionControllerPositionalArgs([
       'node',
