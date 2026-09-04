@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { readPayload } from './google_workspace_meet.js';
 
 describe('google workspace meet payload boundaries', () => {
@@ -18,5 +19,17 @@ describe('google workspace meet payload boundaries', () => {
     expect(() => readPayload({ '--json': '{"constructor":{"polluted":true}}' })).toThrow(
       'Google Workspace Meet payload contains a dangerous JSON key'
     );
+  });
+
+  it('routes usage and gws output through the shared printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/google_workspace_meet.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 });
