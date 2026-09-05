@@ -1652,3 +1652,9 @@ public slide layout presetの組み込みpresetとschema不正時のfallbackを�
 semantic render tokenの組み込みtokenとschema不正時のfallbackを削除し、分割tokenを最小envelopeへ集約した上で正本schemaから検証する必須catalog境界へ統一した。semantic type／design system overrideの既存mergeとtheme role解決は変更していない。
 
 検証: media-layout-design-tokens **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 206
+
+artifact libraryとdocument composition presetの組み込み空catalogおよびschema不正時のfallbackを削除し、分割profile packを最小envelopeへ集約した上で正本schemaから検証する必須catalog境界へ統一した。任意のruntime／personal theme scope fallback、artifact profileとdocument profileの既存mergeは変更していない。
+
+検証: media-artifact-library-catalog／media-document-composition-catalog **2 files / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。

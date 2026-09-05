@@ -104,24 +104,22 @@ function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
     'knowledge/public/design-patterns/media-templates/artifact-library'
   );
   const docs = readJsonFilesRecursively(dirPath);
-  const fallback: ArtifactLibraryCatalog = { profiles: {} };
+  const aggregationSeed: ArtifactLibraryCatalog = { profiles: {} };
   const catalog = defineCatalog<ArtifactLibraryCatalog>({
     id: 'artifact-library',
     path: path.join(dirPath, 'index.json'),
     schema: path.resolve(rootDir, 'knowledge/product/schemas/artifact-library.schema.json'),
-    fallback,
-    fallbackOnInvalid: true,
   });
   if (docs.length === 0) return catalog.load();
   const merged = docs.reduce((acc, doc) => {
     if (!isRecord(doc)) return acc;
     return deepMergeCatalog(acc, { profiles: doc.profiles || {} });
-  }, cloneJsonValue(fallback));
+  }, cloneJsonValue(aggregationSeed));
   return catalog.validate(merged, dirPath);
 }
 
 function loadDocumentCompositionCatalog(rootDir: string): MediaDocumentCompositionCatalog {
-  const fallback: MediaDocumentCompositionCatalog = { defaults: {}, profiles: {} };
+  const aggregationSeed: MediaDocumentCompositionCatalog = { defaults: {}, profiles: {} };
   const catalog = defineCatalog<MediaDocumentCompositionCatalog>({
     id: 'document-composition-presets',
     path: path.resolve(
@@ -132,8 +130,6 @@ function loadDocumentCompositionCatalog(rootDir: string): MediaDocumentCompositi
       rootDir,
       'knowledge/product/schemas/document-composition-presets.schema.json'
     ),
-    fallback,
-    fallbackOnInvalid: true,
   });
   const directoryPath = path.resolve(
     rootDir,
@@ -144,7 +140,7 @@ function loadDocumentCompositionCatalog(rootDir: string): MediaDocumentCompositi
     docs.length === 0
       ? catalog.load()
       : catalog.validate(
-          docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback)),
+          docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(aggregationSeed)),
           directoryPath
         );
   const artifactLibraryCatalog = loadArtifactLibraryCatalog(rootDir);
