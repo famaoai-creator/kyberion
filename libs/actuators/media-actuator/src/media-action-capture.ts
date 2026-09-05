@@ -6,9 +6,9 @@ import {
   safeExecResult,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import * as pptxUtils from '@agent/core/src/pptx-utils';
-import * as xlsxUtils from '@agent/core/src/xlsx-utils';
-import * as docxUtils from '@agent/core/src/docx-utils';
+import * as pptxUtils from '@agent/core/pptx-utils';
+import * as xlsxUtils from '@agent/core/xlsx-utils';
+import * as docxUtils from '@agent/core/docx-utils';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   distillPdfDesign,

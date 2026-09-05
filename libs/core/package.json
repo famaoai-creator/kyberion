@@ -87,6 +87,18 @@
       "types": "./dist/native-pptx-engine/design-cascade.d.ts",
       "default": "./dist/native-pptx-engine/design-cascade.js"
     },
+    "./pptx-utils": {
+      "types": "./dist/pptx-utils.d.ts",
+      "default": "./dist/pptx-utils.js"
+    },
+    "./xlsx-utils": {
+      "types": "./dist/xlsx-utils.d.ts",
+      "default": "./dist/xlsx-utils.js"
+    },
+    "./docx-utils": {
+      "types": "./dist/docx-utils.d.ts",
+      "default": "./dist/docx-utils.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
