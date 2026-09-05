@@ -14,6 +14,8 @@ vi.mock('node:fs', async (importOriginal) => {
 
 import { execFileSync } from 'node:child_process';
 import * as nodefs from 'node:fs';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import { PythonVoiceBridge, installPythonVoiceBridgeIfAvailable } from './python-voice-bridge.js';
 import {
   resetVoiceBridge,
@@ -50,6 +52,16 @@ const BASE_OPTS = {
 };
 
 describe('PythonVoiceBridge', () => {
+  it('routes Python voice environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/python-voice-bridge.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     resetVoiceBridge();
