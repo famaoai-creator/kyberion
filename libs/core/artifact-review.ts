@@ -4,7 +4,7 @@ import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeReadFile } from './secure-io.js';
 import type { DeliverableKind } from './deliverable-quality.js';
 
 export type ArtifactReviewVerdict = 'approved' | 'changes_requested' | 'rejected';
@@ -99,8 +99,16 @@ export function artifactReviewSha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function assertRegularArtifactReviewFile(filePath: string, label: string): string {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[ARTIFACT_REVIEW_RESOURCE] ${label} must be a regular file: ${safePath}`);
+  }
+  return safePath;
+}
+
 export function hashArtifactForReview(path: string): string {
-  const safePath = assertSafeRepositoryPath(path);
+  const safePath = assertRegularArtifactReviewFile(path, 'artifact');
   return artifactReviewSha256(safeReadFile(safePath, { encoding: null }) as Buffer);
 }
 
@@ -171,7 +179,7 @@ export function validateArtifactReviewReceipt(value: unknown): {
 }
 
 export function loadArtifactReviewReceipt(path: string): ArtifactReviewReceipt {
-  const safePath = assertSafeRepositoryPath(path);
+  const safePath = assertRegularArtifactReviewFile(path, 'receipt');
   const value = artifactReviewReceiptCatalog(safePath).load();
   const validation = validateArtifactReviewReceipt(value);
   if (!validation.valid || !validation.receipt) {

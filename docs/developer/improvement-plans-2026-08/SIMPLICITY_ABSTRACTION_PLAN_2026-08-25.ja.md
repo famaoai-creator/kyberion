@@ -21981,3 +21981,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/intent-reconciliation.ts`、`libs/core/intent-reconciliation.test.ts`
 - **変更**: completion reconciliation の evidence reader に regular-file 境界を追加し、path ref 自体を成功条件の証拠として照合する fallback を削除した。directory／missing／symlink／binary resource や単なるパス名では completion を満たさず、実際に読めた text evidence と preview text のみを構造判定へ渡すようにした。
 - **検証**: intent-reconciliation **5 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1464
+
+- **対象**: `libs/core/artifact-review.ts`、`libs/core/artifact-review.test.ts`
+- **変更**: artifact hash／artifact-review receipt の read 前に operation-time の regular-file 検査を追加した。directory 等へ置換された artifact／receipt をレビュー対象として読み込まず、既存の repository path／symlink 境界と hash-bound review semantics は維持した。
+- **検証**: artifact-review **2 files / 9 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
