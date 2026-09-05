@@ -9,8 +9,8 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
 } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 
 const SPILL_DIR = pathResolver.sharedTmp('spills');
@@ -67,5 +67,5 @@ export function readSpilledText(locator: string, options: SpillTextOptions = {})
   if (!safeLstat(filePath).isFile())
     throw new Error('[SPILL_LOCATOR_INVALID] spill result is not a file');
   assertSafeRepositoryPath(filePath);
-  return String(safeReadFile(filePath, { encoding: 'utf8', cache: false }));
+  return readTextFile(filePath);
 }
