@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { z } from 'zod';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   buildShellGrokCliBackendFromEnv,
   probeShellGrokCliAvailability,
@@ -48,6 +50,16 @@ function createChild(stdoutText: string, exitCode = 0): any {
 }
 
 describe('shell-grok-cli-backend', () => {
+  it('routes Grok CLI environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/shell-grok-cli-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   afterEach(() => {
     spawnMock.mockClear();
     withWallClockBudgetMock.mockClear();
