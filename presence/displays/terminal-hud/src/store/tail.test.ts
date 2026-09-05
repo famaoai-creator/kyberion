@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { pathResolver } from '@agent/core';
 import { ensureDir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
-import { tailJsonl, tailLines } from './tail.js';
+import { MAX_TAIL_BYTES, tailJsonl, tailLines } from './tail.js';
 
 const tmpDir = pathResolver.active(`shared/tmp/terminal-hud-tail-test-${process.pid}`);
 
@@ -33,6 +33,21 @@ describe('tailLines', () => {
     const link = path.join(tmpDir, 'linked.txt');
     safeSymlinkSync(target, link);
     expect(tailLines(link, 5)).toEqual([]);
+  });
+
+  it('reads real trailing lines (not a skip sentinel) from a file over the byte cap, dropping the leading torn line', () => {
+    // A single line well over MAX_TAIL_BYTES so the tail read's start
+    // position lands in the middle of it, producing a torn leading
+    // fragment once the read is bounded to the cap.
+    const filler = 'F'.repeat(MAX_TAIL_BYTES + 500_000);
+    const content = `${filler}\nfirst-complete-line\nsecond-complete-line\nthird-complete-line\n`;
+    const filePath = writeFixture('over-cap.txt', content);
+
+    const lines = tailLines(filePath, 3);
+
+    expect(lines).toEqual(['first-complete-line', 'second-complete-line', 'third-complete-line']);
+    expect(lines.some((line) => line.includes('F'))).toBe(false);
+    expect(lines.some((line) => line.includes('tail skipped'))).toBe(false);
   });
 });
 
