@@ -14,8 +14,8 @@
  *    (commented or not) contains a high-confidence credential pattern.
  */
 
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface ClauseFailure {
@@ -36,7 +36,7 @@ function checkImageTierIsolation(): void {
     '*.pem',
     '*.key',
   ];
-  const raw = String(safeReadFile(`${pathResolver.rootDir()}/.dockerignore`, { encoding: 'utf8' }));
+  const raw = readTextFile(`${pathResolver.rootDir()}/.dockerignore`);
   const lines = new Set(
     raw
       .split('\n')
@@ -104,9 +104,7 @@ export function findDuplicatePackageExportKeys(raw: string): string[] {
 }
 
 function checkPackageExportKeys(): void {
-  const packageJson = String(
-    safeReadFile(pathResolver.rootResolve('libs/core/package.json'), { encoding: 'utf8' })
-  );
+  const packageJson = readTextFile(pathResolver.rootResolve('libs/core/package.json'));
   for (const key of findDuplicatePackageExportKeys(packageJson)) {
     failures.push({
       clause: 'package-export-keys.unique',
@@ -116,9 +114,7 @@ function checkPackageExportKeys(): void {
 }
 
 function checkNoSecretValues(): void {
-  const raw = String(
-    safeReadFile(`${pathResolver.rootDir()}/docs/developer/env.example`, { encoding: 'utf8' })
-  );
+  const raw = readTextFile(`${pathResolver.rootDir()}/docs/developer/env.example`);
   raw.split('\n').forEach((line, index) => {
     const location = `docs/developer/env.example:${index + 1}`;
     for (const { name, pattern } of HIGH_CONFIDENCE_SECRET_PATTERNS) {
