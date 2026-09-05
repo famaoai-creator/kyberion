@@ -19,6 +19,7 @@ export {
 } from './scope-context-validation.js';
 import {
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeExec,
   safeUnlinkSync,
@@ -80,6 +81,9 @@ function readScopeEnv(env: NodeJS.ProcessEnv = process.env): ScopeContextInput {
   const filePath = scopeEnvPath(env);
   if (!safeExistsSync(filePath)) return {};
   try {
+    if (!safeLstat(filePath).isFile()) {
+      throw new Error(`[SCOPE_ENV_INVALID] scope.env must be a regular file: ${filePath}`);
+    }
     const values: Record<string, string> = {};
     for (const line of String(safeReadFile(filePath, { encoding: 'utf8' })).split(/\r?\n/)) {
       const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
@@ -95,7 +99,8 @@ function readScopeEnv(env: NodeJS.ProcessEnv = process.env): ScopeContextInput {
       mission_id: values.MISSION_ID,
       task_id: values.KYBERION_TASK_ID,
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[SCOPE_ENV_INVALID]')) throw error;
     return {};
   }
 }

@@ -21909,3 +21909,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/share-grant-graph.ts`、`libs/core/share-grant-graph.test.ts`
 - **変更**: persisted share-link HMAC key と grant ledger の read 前に operation-time の regular-file 検査を追加した。既存の hash chain、tenant binding、revocation、HMAC persistence semantics は維持し、ledger が directory 等へ置換された場合に認可グラフを初期化せず拒否する回帰テストを追加した。
 - **検証**: share-grant graph／authorizer **2 files / 26 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1452
+
+- **対象**: `libs/core/scope-context.ts`、`libs/core/scope-context.test.ts`
+- **変更**: persisted `scope.env` の read 前に operation-time の regular-file 検査を追加し、directory 等の境界違反を public default scope として黙って扱わないようにした。通常の absent／valid scope.env、explicit／environment／mission-state の優先順位と provenance semantics は維持した。
+- **検証**: scope-context **2 files / 13 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
