@@ -27,7 +27,7 @@ import * as secureIo from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { readRequestObject } from '../../../lib/request-input';
-import { resolveConciergeViewer } from '../../../lib/viewer-context';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 import {
   optionalSetupBoolean,
@@ -248,10 +248,7 @@ export function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error, 500);
   }
 }
 
@@ -483,9 +480,6 @@ export async function POST(req: NextRequest) {
     if (error instanceof SetupInputError) {
       return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
     }
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error, 500);
   }
 }

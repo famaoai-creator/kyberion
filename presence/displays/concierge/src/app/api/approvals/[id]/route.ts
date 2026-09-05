@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
+import { conciergeErrorResponse } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,9 +60,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     });
     return NextResponse.json({ ok: true, approval: updated });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error, 500);
   }
 }
