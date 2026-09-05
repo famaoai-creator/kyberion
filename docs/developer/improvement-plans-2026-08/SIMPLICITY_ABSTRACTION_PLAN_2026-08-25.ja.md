@@ -22227,3 +22227,21 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_capability_seams_ast.ts`、`scripts/check_capability_seams_ast.entrypoint.test.ts`
 - **変更**: capability seam AST checker の production source／生成graph本文読込を foundation の `readTextFile` へ統一した。AST declaration／catalog backing／graph completeness判定とshared CLI failure semanticsは変更せず、entrypoint contract testで旧 `safeReadFile` 直読の再導入を検出する。
 - **検証**: capability-seams AST **reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1505
+
+- **対象**: `scripts/check_contract_semver.ts`、`scripts/check_contract_semver.test.ts`
+- **変更**: contract semver checker の actuator contract schema本文読込を foundation の `readTextFile` へ移行した。manifest／baseline JSON loader、canonical schema hashing、semver bump判定は変更せず、既存テストにcanonical readerと旧 schema直読の不在を固定した。
+- **検証**: contract-semver **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。実checkerは共有worktreeの未コミットvoice-actuator変更により `voice-actuator` のcontract schema変更／version未bumpを1件報告したため、rebaselineや当該変更の書換えは行わず残件として保持する。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1506
+
+- **対象**: `scripts/check_doc_examples.ts`、`scripts/check_doc_examples.entrypoint.test.ts`
+- **変更**: documentation examples checker の markdown本文読込を foundation の `readTextFile` へ移行した。fenced block parser、bash check／syntax／skip評価、一覧・exit semanticsは変更せず、entrypoint contract testで旧 `safeReadFile` 直読の再導入を検出する。
+- **検証**: doc-examples **reader contract passed**、対象ESLint、Prettier、`git diff --check`。実行タグ付き文書の全件評価と残るchecker移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1507
+
+- **対象**: `scripts/check_facet_purity.ts`、`scripts/check_facet_purity.test.ts`
+- **変更**: facet purity checker の facet本文読込を foundation の `readTextFile` へ移行した。facet kind／directory scan／purity validationと報告 semanticsは変更せず、既存テストにcanonical readerの採用と旧 `safeReadFile` 直読の不在を固定した。
+- **検証**: facet-purity **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
