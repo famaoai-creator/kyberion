@@ -1774,3 +1774,7 @@ mesh peer directoryのregistrations／presence／capabilities JSONL readerへope
 ## 2026-09-06 再レビュー修正 228
 
 mission graph run journalのresume readとfenced appendを共通のoperation-time regular-file検査へ統一し、既存journal fileのsymlink置換をread／append前に拒否する境界を追加した。mission／coordination pathの既存symlink境界、missing journalの作成、sequence／schema検証を維持し、**1 file / 7 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 229
+
+Slack bridgeのsurface stimulus append先を固定 absolute pathから共通の`stimuliJournalPath()`へ変更し、stimuli journalのoperation-time repository path／symlink boundaryへ接続した。Slack固有payloadとappend semanticsを維持し、**1 file / 7 tests passed**、対象lint、Prettier、`git diff --check`で確認した。

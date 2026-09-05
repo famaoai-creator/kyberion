@@ -6,8 +6,8 @@ import { appendJsonLine, getRegisteredEnvText, setRegisteredEnv } from '@agent/c
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('slack-bridge');
 import { logger } from '@agent/core/core';
-import * as pathResolver from '@agent/core/path-resolver';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { stimuliJournalPath } from '@agent/core/stimuli-journal';
 import {
   emitChannelSurfaceEvent,
   recordSlackDelivery,
@@ -110,7 +110,6 @@ function readStringAt(value: unknown, path: readonly string[]): string {
  * Ingests Slack messages as GUSP v2.0 Stimuli.
  */
 
-const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const SLACK_SURFACE_AGENT_ID = 'slack-surface-agent';
 
 function recordSlackConversationOutcome(params: {
@@ -642,7 +641,7 @@ async function start() {
         `📥 [SlackBridge] Ingesting stimulus ${artifact.stimulus.id} from ${message.user}`
       );
       recordSlackSurfaceArtifact(artifact);
-      appendJsonLine(STIMULI_PATH, artifact.stimulus);
+      appendJsonLine(stimuliJournalPath(), artifact.stimulus);
 
       const initialized = isEnvironmentInitialized();
 
