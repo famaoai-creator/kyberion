@@ -21915,3 +21915,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/scope-context.ts`、`libs/core/scope-context.test.ts`
 - **変更**: persisted `scope.env` の read 前に operation-time の regular-file 検査を追加し、directory 等の境界違反を public default scope として黙って扱わないようにした。通常の absent／valid scope.env、explicit／environment／mission-state の優先順位と provenance semantics は維持した。
 - **検証**: scope-context **2 files / 13 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1453
+
+- **対象**: `libs/core/customer-conversation.ts`、`tests/customer-dialogue-e2e.test.ts`
+- **変更**: tenant sales notes の顧客向け grounding read に operation-time の regular-file 検査を追加した。`notes.md` が directory 等へ置換された場合に customer prompt／grounded sources へ混入させず、通常の tenant notes file と customer conversation の disclosure／deal semantics は維持した。
+- **検証**: customer dialogue E2E の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

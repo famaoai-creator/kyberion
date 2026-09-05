@@ -148,7 +148,7 @@ function loadGroundingSources(tenantSlug: string): {
   const notesPath = assertSafeRepositoryPath(path.join(tenantSalesDir, 'notes.md'), {
     allowMissingLeaf: true,
   });
-  if (safeExistsSync(notesPath)) {
+  if (safeExistsSync(notesPath) && safeLstat(notesPath).isFile()) {
     tenantNotes = String(safeReadFile(notesPath, { encoding: 'utf8' })).slice(0, 4000);
     sources.push('tenant-sales-notes');
   }

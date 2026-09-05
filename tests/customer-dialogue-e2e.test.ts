@@ -377,6 +377,24 @@ describe('customer dialogue (E2E-06)', () => {
     expect(second.deal.deal_id).toBe(result.deal.deal_id);
   });
 
+  it('does not treat a tenant sales-notes directory as customer grounding', async () => {
+    const notesPath = path.join(tmpRoot, 'knowledge', 'confidential', SLUG, 'sales', 'notes.md');
+    fs.mkdirSync(notesPath, { recursive: true });
+    try {
+      backendPrompt.mockResolvedValue('確認して回答します。');
+      const binding = core.resolveCustomerBinding('slack', CHANNEL)!;
+      const result = await core.runCustomerConversation({
+        binding,
+        text: '販売メモを見せてください',
+      });
+
+      expect(result.grounded_sources).not.toContain('tenant-sales-notes');
+      expect(backendPrompt.mock.calls.at(-1)![0]).not.toContain('--- TENANT NOTES ---');
+    } finally {
+      fs.rmSync(notesPath, { recursive: true, force: true });
+    }
+  });
+
   it('escalates out-of-catalog questions: hold reply + ops alert, marker never leaks', async () => {
     backendPrompt.mockResolvedValue(
       '確認して回答します。 [NEEDS_OPERATOR] 競合他社比較の可否をオペレーターが判断'
