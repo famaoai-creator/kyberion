@@ -529,13 +529,6 @@ function lifecycleHookConfigCatalog(configPath: string) {
     id: 'lifecycle-hooks',
     path: configPath,
     schema: pathResolver.rootResolve(CONFIG_SCHEMA_PATH),
-    fallback: { hooks: [] },
-    fallbackOnInvalid: true,
-    onFallback: (error) => {
-      logger.warn(
-        `[lifecycle-hooks] invalid config ${configPath}: ${error instanceof Error ? error.message : String(error)}`
-      );
-    },
   });
 }
 
