@@ -18,7 +18,7 @@ import {
   parsePersonalAgentIdentity,
   parsePersonalSovereignIdentity,
 } from '@agent/core/personal-identity-reader';
-import { nowIso } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -69,8 +69,8 @@ export function projectComputerSurfaceData(data: Record<string, unknown>): Recor
 export const app: express.Express = express();
 export const server = createServer(app);
 const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/computer-surface/static');
-const PORT = Number(process.env.COMPUTER_SURFACE_PORT || 3040);
-const HOST = process.env.COMPUTER_SURFACE_HOST || '127.0.0.1';
+const PORT = Number(getRegisteredEnvText('COMPUTER_SURFACE_PORT') || 3040);
+const HOST = getRegisteredEnvText('COMPUTER_SURFACE_HOST') || '127.0.0.1';
 const sseClients = new Set<Client>();
 const computerSurfaceManifest = buildComputerSurfaceManifest();
 
@@ -354,7 +354,7 @@ app.post('/a2ui/dispatch', (req, res) => {
   res.json({ ok: true, applied: messages.length });
 });
 
-if (process.env.NODE_ENV !== 'test' && process.env.VITEST !== 'true') {
+if (getRegisteredEnvText('NODE_ENV') !== 'test' && getRegisteredEnvText('VITEST') !== 'true') {
   server.listen(PORT, HOST, () => {
     console.log(`[computer-surface] listening on http://${HOST}:${PORT}`);
   });
