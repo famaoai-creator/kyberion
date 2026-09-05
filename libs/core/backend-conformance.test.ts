@@ -12,8 +12,8 @@ describe('backend conformance matrix (QM-06)', () => {
       },
     });
 
-    expect(report.results).toHaveLength(6);
-    expect(calls).toHaveLength(12);
+    expect(report.results).toHaveLength(7);
+    expect(calls).toHaveLength(14);
     expect(report.results.every((result) => result.version.status === 'verified')).toBe(true);
     expect(report.results.every((result) => result.help.status === 'verified')).toBe(true);
     expect(report.results[0]?.capabilities.structured_output.status).toBe('verified');
@@ -67,10 +67,17 @@ describe('backend conformance matrix (QM-06)', () => {
       'verified',
       'verified',
       'verified',
+      'verified',
       'unsupported',
       'unsupported',
     ]);
-    expect(calls.map(({ command }) => command)).toEqual(['claude', 'codex', 'gemini', 'grok']);
+    expect(calls.map(({ command }) => command)).toEqual([
+      'claude',
+      'codex',
+      'gemini',
+      'grok',
+      'cursor-agent',
+    ]);
     expect(calls[0]?.args).toContain('--permission-mode');
     expect(calls[1]?.args).toEqual(expect.arrayContaining(['exec', '--sandbox', 'read-only', '-']));
     expect(calls[2]?.args).toEqual(
@@ -78,6 +85,9 @@ describe('backend conformance matrix (QM-06)', () => {
     );
     expect(calls[3]?.args).toEqual(
       expect.arrayContaining(['--disallowed-tools', 'run_terminal_command,write,search_replace'])
+    );
+    expect(calls[4]?.args).toEqual(
+      expect.arrayContaining(['-p', '--output-format', 'json', '--mode', 'plan'])
     );
     expect(calls.find(({ command }) => command === 'codex')?.input).toContain(
       'SANDBOX_PROBE_ATTEMPTED'
@@ -155,5 +165,37 @@ describe('backend conformance matrix (QM-06)', () => {
     });
     expect(results[0]?.status).toBe('unavailable');
     expect(calls).not.toContain('claude');
+  });
+
+  it('uses the registered CLI override for the live Cursor sandbox probe', () => {
+    const available: string[] = [];
+    const results = runBackendSandboxConformance({
+      probeId: 'cursor-override',
+      env: { KYBERION_CURSOR_CLI_BIN: '/custom/cursor-agent' },
+      binaryAvailable: (binary) => {
+        available.push(binary);
+        return binary === '/custom/cursor-agent';
+      },
+      fs: { mkdir: () => undefined, exists: () => false, remove: () => undefined },
+      exec: (_command, args) => {
+        const sentinel = args.join(' ').match(/[^\s]+\.sentinel/u)?.[0] ?? 'missing.sentinel';
+        return {
+          stdout: [
+            'SANDBOX_PROBE_ATTEMPTED',
+            `SANDBOX_PROBE_TARGET=${sentinel}`,
+            'SANDBOX_PROBE_BLOCKED',
+            'permission denied',
+          ].join('\n'),
+          stderr: '',
+          status: 1,
+        };
+      },
+    });
+
+    expect(results.find((result) => result.mode === 'cursor-cli')).toMatchObject({
+      binary: '/custom/cursor-agent',
+      status: 'verified',
+    });
+    expect(available).toContain('/custom/cursor-agent');
   });
 });

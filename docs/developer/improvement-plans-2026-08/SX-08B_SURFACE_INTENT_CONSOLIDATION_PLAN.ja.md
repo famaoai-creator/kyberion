@@ -1736,3 +1736,9 @@ reasoning provider descriptorのcapability／input modality／env keyを必須�
 未参照のprovider capability fallback catalogを削除し、primary catalogの欠損時だけ明示的空viewを使うようにした。配置済みcatalogのJSON／schema不正と、probe書込み時の既存catalog不正を黙って空catalogへ置換せず fail-closed とした。
 
 検証: provider-capability-catalog／provider-discovery／provider-capability-registry **3 files / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
+## 2026-09-06 再レビュー修正 220
+
+Cursor CLIを実際の非対話JSON invocationへ接続し、`--mode plan` とwrite-sentinel／明示denial markerを検査するlive probeを追加した。provider-specific permission projection、CLI binary override、sentinel cleanupを維持し、help広告だけではverifiedにしない契約を固定した。
+
+検証: backend-conformance **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と全provider adapterの実測は継続課題とする。
