@@ -31,6 +31,7 @@ import {
 } from './delegation-concurrency.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { GrokAdapter, type AgentAskOptions, type AgentResponse } from './agent-adapter.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
@@ -62,6 +63,10 @@ import type {
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
 
 const DEFAULT_MODEL = 'grok-4.6';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
@@ -472,7 +477,7 @@ export function probeShellGrokCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number } = {}
 ): ShellGrokCliAvailability {
-  const bin = options.bin?.trim() || env.KYBERION_GROK_CLI_BIN?.trim() || 'grok';
+  const bin = options.bin?.trim() || envText(env, 'KYBERION_GROK_CLI_BIN')?.trim() || 'grok';
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   try {
@@ -521,11 +526,11 @@ export async function runGrokCliQuery<T>({
 export function buildGrokCliOptionsFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): ShellGrokCliBackendOptions {
-  const bin = env.KYBERION_GROK_CLI_BIN?.trim();
-  const model = env.KYBERION_GROK_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_GROK_CLI_TIMEOUT_MS?.trim();
+  const bin = envText(env, 'KYBERION_GROK_CLI_BIN')?.trim();
+  const model = envText(env, 'KYBERION_GROK_CLI_MODEL')?.trim();
+  const timeoutRaw = envText(env, 'KYBERION_GROK_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const extraRaw = env.KYBERION_GROK_CLI_EXTRA_ARGS?.trim();
+  const extraRaw = envText(env, 'KYBERION_GROK_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
   return {
     ...(bin ? { bin } : {}),
@@ -542,7 +547,7 @@ export function buildShellGrokCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[shell-grok-cli] backend unavailable (bin=${env.KYBERION_GROK_CLI_BIN?.trim() || 'grok'}): ${availability.reason ?? 'failed health check'}`
+      `[shell-grok-cli] backend unavailable (bin=${envText(env, 'KYBERION_GROK_CLI_BIN')?.trim() || 'grok'}): ${availability.reason ?? 'failed health check'}`
     );
     return null;
   }
