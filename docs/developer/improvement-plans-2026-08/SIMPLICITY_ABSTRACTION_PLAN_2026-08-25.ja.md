@@ -22113,3 +22113,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/compliance_checker.ts`、`scripts/compliance_checker.test.ts`
 - **変更**: pipeline domain からも呼ばれる compliance checker の対象ファイル本文 read を foundation の `readTextFile` へ移行した。既存の tier write policy／confidential marker scan／violation report semantics は維持し、production entrypoint の clean repository scan を回帰テストで検証した。
 - **検証**: compliance-checker **2 files / 1 test passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1486
+
+- **対象**: `scripts/backup.ts`
+- **変更**: restore 後の mission git bundle manifest read を foundation の `readTextFile` へ移行した。既存の secure path／manifest parse／restore／prune／drill semantics は維持し、backup production loader の直接 `safeReadFile` を一つ削減した。
+- **検証**: backup **1 file / 18 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。

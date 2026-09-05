@@ -10,7 +10,6 @@ import {
   safeMkdir,
   safeReaddir,
   safeLstat,
-  safeReadFile,
   safeMoveSync,
   safeRmSync,
   safeStat,
@@ -22,7 +21,13 @@ import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core/protocol-service-lifecycle';
-import { getRegisteredEnvText, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  isRecord,
+  nowIso,
+  parseSafeJsonInput,
+  readTextFile,
+} from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { logger } from '@agent/core/core';
 
@@ -991,9 +996,7 @@ function findRestoredManifests(target: string): string[] {
 function restoreMissionGitBundles(target: string): void {
   const [manifestPath] = findRestoredManifests(target);
   if (!manifestPath) return;
-  const manifest = parseRestoredBackupManifest(
-    String(safeReadFile(manifestPath, { encoding: 'utf8' }))
-  );
+  const manifest = parseRestoredBackupManifest(readTextFile(manifestPath));
   if (manifest.format !== 'kyberion-backup-v1') return;
 
   for (const entry of manifest.mission_git_repos || []) {
