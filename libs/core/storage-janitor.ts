@@ -42,9 +42,30 @@ import {
   type LoadedRetentionCatalog,
   type RetentionCatalogEntry,
 } from './storage-retention-catalog.js';
+import {
+  listSupervisorEventFiles,
+  SUPERVISOR_EVENTS_FILE_PATTERN,
+  SUPERVISOR_EVENTS_LEGACY_FILE,
+} from './agent-runtime-events.js';
 
 export const DEFAULT_TMP_TTL_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_LOG_RETENTION_DAYS = 30;
+/** AC-10: default retention for the dated `agent-runtime-supervisor-events-YYYY-MM-DD.jsonl`
+ * family. See `sweepSupervisorEventFiles` and `SUPERVISOR_EVENTS_RETENTION_PATH`. */
+export const DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS = 14;
+/**
+ * AC-10: virtual (non-directory) retention-catalog lookup key for the dated
+ * supervisor-event family. Resolved by *exact* match only — the same pattern
+ * `scanTmp`/`rotateLogs` use for `active/shared/tmp` / `active/shared/logs` —
+ * never by directory-prefix walk, so it cannot shadow the real
+ * `active/shared/observability/mission-control` directory entry that still
+ * governs `task-events.jsonl` / `orchestration-events.jsonl` at their own
+ * (longer) TTL. The pre-rotation `agent-runtime-supervisor-events.jsonl`
+ * legacy file is deliberately excluded from both that entry's sweep and this
+ * one — it is never auto-deleted (see `scanEventStores`).
+ */
+export const SUPERVISOR_EVENTS_RETENTION_PATH =
+  'active/shared/observability/mission-control/agent-runtime-supervisor-events';
 
 /**
  * AL-01: TTL values are now derived from the governance retention catalog
@@ -148,6 +169,9 @@ export interface JanitorReport {
   /** EV-06: append-only event-store files expired / deleted this run. */
   expiredEventStores: number;
   deletedEventStores: number;
+  /** AC-10: dated supervisor-event files expired / deleted this run (legacy file never included). */
+  expiredSupervisorEvents: number;
+  deletedSupervisorEvents: number;
   staleDelegationChildren: number;
   killedDelegationChildren: number;
   /**
@@ -560,6 +584,20 @@ export function scanEventStores(opts: {
     const dir = nodePath.join(rootDir(), rule.repoRelativeDir);
     for (const filePath of collectFiles(dir)) {
       try {
+        // AC-10: the supervisor-event family has its own dedicated sweep
+        // (`sweepSupervisorEventFiles`) with a shorter default TTL, and the
+        // legacy unrotated file must never be auto-deleted at all. Both are
+        // filename-matched (not path-prefix-matched, see
+        // `SUPERVISOR_EVENTS_RETENTION_PATH`), so exclude them here
+        // explicitly rather than relying on catalog prefix resolution.
+        const baseName = nodePath.basename(filePath);
+        if (
+          baseName === SUPERVISOR_EVENTS_LEGACY_FILE ||
+          SUPERVISOR_EVENTS_FILE_PATTERN.test(baseName)
+        ) {
+          continue;
+        }
+
         const repoRelative = nodePath.relative(rootDir(), filePath).split(nodePath.sep).join('/');
         // collectFiles recurses, so a residual parent rule would otherwise also
         // claim files that a more specific child entry governs — applying the
@@ -578,6 +616,63 @@ export function scanEventStores(opts: {
       } catch {
         // skip
       }
+    }
+  }
+
+  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
+}
+
+export interface SweepSupervisorEventFilesOptions {
+  dryRun: boolean;
+  /** Override the resolved TTL (days). Falls back to the catalog, then `DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS`. */
+  retentionDays?: number;
+  /** Preloaded retention catalog; loaded on demand when omitted. */
+  catalog?: LoadedRetentionCatalog;
+  /** Test override for the directory to scan — forwarded to `listSupervisorEventFiles`. */
+  dir?: string;
+  /** Test override for "now" — forwarded to `listSupervisorEventFiles`'s recency math (unused here beyond that). */
+  now?: string;
+}
+
+/**
+ * AC-10: prune dated `agent-runtime-supervisor-events-YYYY-MM-DD.jsonl`
+ * files older than the retention window (default 14 days, see
+ * `SUPERVISOR_EVENTS_RETENTION_PATH`). The pre-rotation legacy file
+ * (`agent-runtime-supervisor-events.jsonl`) is NEVER included —
+ * `listSupervisorEventFiles({ includeLegacy: false })` excludes it by
+ * construction — leaving its retention to an operator's own judgment.
+ */
+export function sweepSupervisorEventFiles(
+  opts: SweepSupervisorEventFilesOptions
+): ScanRuntimeResult {
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const entry = retentionEntryForExactPath(catalog, SUPERVISOR_EVENTS_RETENTION_PATH);
+  const retentionDays =
+    opts.retentionDays ??
+    retentionTtlDaysForPath(catalog, SUPERVISOR_EVENTS_RETENTION_PATH) ??
+    DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS;
+  const retentionMs = retentionDays * RETENTION_DAY_MS;
+  const now = Date.now();
+  const expired: string[] = [];
+  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
+
+  const files = listSupervisorEventFiles({
+    includeLegacy: false,
+    dir: opts.dir,
+    now: opts.now,
+  });
+  for (const file of files) {
+    try {
+      if (!safeExistsSync(file.path)) continue;
+      const stat = safeStat(file.path);
+      if (now - stat.mtimeMs > retentionMs) {
+        expired.push(file.path);
+        if (!opts.dryRun) {
+          expireFilePerPolicy(file.path, entry, outcome);
+        }
+      }
+    } catch {
+      // skip
     }
   }
 
@@ -882,6 +977,13 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`event-stores: ${err?.message ?? String(err)}`);
   }
 
+  let supervisorEventsResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
+  try {
+    supervisorEventsResult = sweepSupervisorEventFiles({ dryRun: opts.dryRun, catalog });
+  } catch (err: any) {
+    errors.push(`supervisor-events: ${err?.message ?? String(err)}`);
+  }
+
   let trashResult: SweepTrashResult = { expired: [], purged: [] };
   try {
     trashResult = sweepTrash({ dryRun: opts.dryRun, catalog });
@@ -933,6 +1035,8 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedRuntime: runtimeResult.deleted.length,
     expiredEventStores: eventStoreResult.expired.length,
     deletedEventStores: eventStoreResult.deleted.length,
+    expiredSupervisorEvents: supervisorEventsResult.expired.length,
+    deletedSupervisorEvents: supervisorEventsResult.deleted.length,
     staleDelegationChildren: delegationChildrenResult.stale.length,
     killedDelegationChildren: delegationChildrenResult.killed.length,
     uncoveredRuntimeDirs,
@@ -942,7 +1046,8 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
       tmpResult.softDeleted.length +
       logResult.softDeleted.length +
       runtimeResult.softDeleted.length +
-      eventStoreResult.softDeleted.length,
+      eventStoreResult.softDeleted.length +
+      supervisorEventsResult.softDeleted.length,
     expiredTrash: trashResult.expired.length,
     purgedTrash: trashResult.purged.length,
     retentionCatalogSource: catalog.source,

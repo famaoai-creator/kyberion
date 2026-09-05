@@ -159,6 +159,55 @@ const MAX_DELEGATED_WORKER_RESTARTS = 3;
 let delegatedWorkerShutdown = false;
 let requestShutdown: ((exitCode: number) => void) | undefined;
 
+/**
+ * AC-10: throttle for the `a2a_inflight_metric` supervisor event.
+ *
+ * The sweep tick that samples inflight counts runs every
+ * `KYBERION_RUNTIME_SWEEP_INTERVAL_MS` (default 30s = 2,880 samples/day at
+ * steady state, dominating the supervisor event stream even after the AC-10
+ * daily rotation). Most ticks see no change in inflight load, so this only
+ * calls `appendSupervisorEvent` when the sample actually changed since the
+ * last emission, or at least `INFLIGHT_METRIC_MIN_INTERVAL_MS` elapsed —
+ * capping steady-state volume at 24h / 10min = 144 samples/day while still
+ * emitting immediately on every real change.
+ */
+const INFLIGHT_METRIC_MIN_INTERVAL_MS = 10 * 60 * 1000;
+let lastInflightMetricSampleKey: string | null = null;
+let lastInflightMetricEmittedAtMs = 0;
+
+/** Test-only: reset the module-local throttle state between test cases. */
+export function resetInflightMetricThrottleForTests(): void {
+  lastInflightMetricSampleKey = null;
+  lastInflightMetricEmittedAtMs = 0;
+}
+
+/**
+ * Emit an `a2a_inflight_metric` sample, subject to the AC-10 throttle above.
+ * Exported (rather than inlined in the sweep interval) so tests can call it
+ * directly without waiting on a real timer.
+ */
+export function recordInflightMetricSample(
+  inflightTotal: number,
+  inflightByAgent: Record<string, number>,
+  nowMs: number = Date.now()
+): void {
+  const sortedAgentEntries = Object.entries(inflightByAgent).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0
+  );
+  const sampleKey = JSON.stringify([inflightTotal, sortedAgentEntries]);
+  const changed = sampleKey !== lastInflightMetricSampleKey;
+  const elapsedMs = nowMs - lastInflightMetricEmittedAtMs;
+  if (!changed && elapsedMs < INFLIGHT_METRIC_MIN_INTERVAL_MS) return;
+
+  lastInflightMetricSampleKey = sampleKey;
+  lastInflightMetricEmittedAtMs = nowMs;
+  appendSupervisorEvent({
+    decision: 'a2a_inflight_metric',
+    inflight_total: inflightTotal,
+    inflight_by_agent: inflightByAgent,
+  });
+}
+
 setInterval(
   () => {
     try {
@@ -166,11 +215,7 @@ setInterval(
       for (const [k, v] of daemonAgentInflightMap.entries()) {
         if (v > 0) agentInflightObj[k] = v;
       }
-      appendSupervisorEvent({
-        decision: 'a2a_inflight_metric',
-        inflight_total: daemonGlobalInflight,
-        inflight_by_agent: agentInflightObj,
-      });
+      recordInflightMetricSample(daemonGlobalInflight, agentInflightObj);
     } catch (err) {
       logger.warn(`[agent_runtime_supervisor_daemon] suppressed error in best-effort step: ${err}`);
     }

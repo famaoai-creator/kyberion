@@ -23,6 +23,7 @@ import { loadMissionTicketDispatchManifestAtPath } from './mission-ticket-dispat
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import type { MissionState } from './mission-types.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { readSupervisorEvents } from './agent-runtime-events.js';
 
 function safeMissionRoot(missionPath: string): string {
   return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
@@ -147,10 +148,9 @@ function collectMissionUsageStats(
     if (entry.estimated === true) tokenUsage.estimated_entries += 1;
   }
 
-  const supervisorEventsPath = safeRepositoryPath(
-    pathResolver.shared('observability/mission-control/agent-runtime-supervisor-events.jsonl')
-  );
-  for (const entry of readJsonl(supervisorEventsPath)) {
+  // AC-10: the supervisor stream rotates daily now; read every partition
+  // (legacy + dated) rather than the single unrotated file.
+  for (const entry of readSupervisorEvents()) {
     if (entry.decision !== 'agent_runtime_ask_completed') continue;
     if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
     if (entry.correlation_id && metricCorrelationIds.has(String(entry.correlation_id))) continue;
