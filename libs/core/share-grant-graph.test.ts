@@ -6,7 +6,7 @@ import {
   parsePersistedEnvelope,
 } from './share-grant-graph.js';
 import { computeLedgerEntryHash, GENESIS_HASH } from './chain-integrity.js';
-import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const HMAC_KEY = 'os13-share-graph-test-key-123456789';
 
@@ -508,6 +508,25 @@ describe('ShareGrantGraph', () => {
       ).toThrow(ShareGrantValidationError);
     } finally {
       safeRmSync(storePath, { force: true });
+    }
+  });
+
+  it('rejects a directory replacing the persisted grant ledger', () => {
+    const storePath = 'active/shared/tmp/os13-share-grant-directory.jsonl';
+    try {
+      safeMkdir(storePath, { recursive: true });
+      expect(
+        () =>
+          new ShareGrantGraph({
+            storePath,
+            persist: true,
+            hmacKey: HMAC_KEY,
+            authorizeActor: () => undefined,
+            resolveTenant: () => ({ status: 'active' }),
+          })
+      ).toThrow(/share-grant ledger must be a regular file/);
+    } finally {
+      safeRmSync(storePath, { recursive: true, force: true });
     }
   });
 });
