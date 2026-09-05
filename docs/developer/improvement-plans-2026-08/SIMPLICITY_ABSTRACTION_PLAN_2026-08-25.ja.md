@@ -21381,3 +21381,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
 - 先行計画: [AR-09](../improvement-plans-archive/2026-07/AR-09_ACTUATOR_COMMONIZATION.ja.md)(actuator 共通実行境界 — SX-10 はその上に SDK を載せる)、[ENTITY_GOVERNANCE_UNIFICATION](./ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09.ja.md)(SX-04 の scope 二重定義解消と整合)、[MISSION_GATE_COHERENCE MG-08](../improvement-plans-archive/2026-08/MISSION_GATE_COHERENCE_PLAN_2026-08-10.ja.md)(SX-13 の語彙衝突の文書側)、[REGISTRY_SPLIT_PLAN](../REGISTRY_SPLIT_PLAN.md)(SX-04 の互換 snapshot 期限)
+
+## 2026-09-05 再レビュー修正 1364
+
+- **対象**: `libs/core/presentation-preference-registry.ts`、`libs/core/presentation-preference-registry.test.ts`、`libs/core/tenant-rate-limiter.ts`、`libs/core/tenant-rate-limiter.test.ts`、`libs/core/reasoning-provider-registry.ts`
+- **変更**: presentation preference registryの組み込みfallbackと、正本registryの欠損・schema不正をfallbackへ収束させるcatchを削除し、表示設定の正本読み込み障害をfail-closedで返す境界へ統一した。personal overlayの任意性、profile merge、default profile選択と、書き込み時のschema検証は維持・明示化している。tenant rate-limit policyを必須catalogへ変更し、quota stateは未作成時だけ明示的な空stateから開始し、既存stateのschema不正をリセットしないようにした。推論provider registryは欠損fallbackを削除し、未知・不正なprovider entryを無視せず明示エラーにした。
+- **検証**: presentation-preference-registry／tenant-rate-limiter／reasoning-provider-registry **3 files / 17 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateはこの変更群反映後に再実行する。
