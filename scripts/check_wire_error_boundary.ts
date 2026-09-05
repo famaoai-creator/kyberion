@@ -26,6 +26,7 @@ export const WIRE_ERROR_BOUNDARY_FILES = [
   'presence/displays/chronos-mirror-v2/src/app/api/workitems/route.ts',
   'presence/displays/presence-studio/server.ts',
   'presence/displays/presence-studio/presence-studio-runtime-data.ts',
+  'scripts/browser_bridge_host.ts',
 ];
 const DEFAULT_WIRE_ERROR_FILE = WIRE_ERROR_BOUNDARY_FILES[0];
 
@@ -54,6 +55,18 @@ export function findWireErrorBoundaryViolations(
       /\.json\(\s*\{[^}]{0,400}?\berror:\s*(?:err|error)(?:\.|\?\.)message\b|\.json\(\s*\{[^}]{0,400}?\berror:\s*`[^`]*\$\{(?:err|error)/gu;
     for (const match of source.matchAll(rawJsonPattern)) {
       findings.push(`${file}: raw exception message in JSON error near offset ${match.index}`);
+    }
+  }
+  if (
+    file === 'scripts/browser_bridge_host.ts' ||
+    file.endsWith('/scripts/browser_bridge_host.ts')
+  ) {
+    const rawBridgePattern =
+      /\berror:\s*(?:`[^`]*\$\{(?:err|error)[^}]*\}|(?:err|error)\s+instanceof\s+Error\s*\?\s*(?:err|error)(?:\.|\?\.)message|(?:err|error)(?:\.|\?\.)message)/gu;
+    for (const match of source.matchAll(rawBridgePattern)) {
+      findings.push(
+        `${file}: raw exception message in browser bridge response near offset ${match.index}`
+      );
     }
   }
   return findings;

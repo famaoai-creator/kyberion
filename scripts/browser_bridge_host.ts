@@ -72,6 +72,7 @@ import type {
 } from '@agent/core/browser-extension-bridge';
 import type { ProcedureEntry } from '@agent/core/procedure-types';
 import { nowIso } from '@agent/core/foundation';
+import { formatWireError } from '@agent/core/wire-error';
 import { parseBrowserBridgeMessage } from './browser-bridge-input.js';
 
 /** Load + allowlist-guard + validate a browser procedure's backing recording. */
@@ -99,7 +100,7 @@ function loadBrowserProcedure(procedureId: string): {
         return { entry, recording: loadBrowserExtensionRecordingAtPath(recordingPath) };
       } catch (err) {
         return {
-          error: `Failed to load recording: ${err instanceof Error ? err.message : String(err)}`,
+          error: formatWireError(err, 'Failed to load recording'),
         };
       }
     },
@@ -458,7 +459,7 @@ function handleSaveRecording(message: any): HostResponse {
   } catch (err) {
     return {
       ok: false,
-      error: `failed to save recording: ${err instanceof Error ? err.message : String(err)}`,
+      error: formatWireError(err, 'Failed to save recording'),
     };
   }
   return { ok: true, recording_ref: rel, recording_id: recording.value.recording_id };
@@ -528,7 +529,7 @@ function handlePromoteProcedure(message: any): HostResponse {
           procedure: promoted.procedureEntry,
         };
       } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        return { ok: false, error: formatWireError(err) };
       }
     },
     'sovereign'
@@ -566,7 +567,7 @@ function handleApplyProcedureDelta(message: any): HostResponse {
   } catch (err) {
     return {
       ok: false,
-      error: `failed to load delta recording: ${err instanceof Error ? err.message : String(err)}`,
+      error: formatWireError(err, 'Failed to load delta recording'),
     };
   }
 
@@ -844,7 +845,7 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   } catch (err) {
     return {
       ok: false,
-      error: `分析バックエンドの実行に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      error: formatWireError(err, '分析バックエンドの実行に失敗しました'),
     };
   }
 
@@ -894,7 +895,7 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   } catch (err) {
     return {
       ok: false,
-      error: `レポートの保存に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      error: formatWireError(err, 'レポートの保存に失敗しました'),
     };
   }
 
@@ -980,7 +981,7 @@ function drain(): void {
       .then(() => handle(parseBrowserBridgeMessage(body.toString('utf8'))))
       .then((response) => writeFrame(response))
       .catch((error) =>
-        writeFrame({ ok: false, error: error instanceof Error ? error.message : String(error) })
+        writeFrame({ ok: false, error: formatWireError(error, 'Browser bridge request failed') })
       )
       .finally(() => {
         pendingResponses -= 1;

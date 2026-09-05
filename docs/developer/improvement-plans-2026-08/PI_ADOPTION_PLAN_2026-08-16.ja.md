@@ -807,6 +807,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03／PI-13 の script harness 再レビューとして、共通 `defineGenerator` の declared／dynamic output pathを `assertSafeRepositoryPath` で検査してから比較・read・writeする境界を追加した。symlink経由の生成先を拒否する回帰を関連 **1 test file / 10 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。全 script harness／generator 移行とprovider CLIの実OS-level enforcement probeは継続課題である。
 - 2026-09-06: PI-03／PI-13 の provider catalog 再レビューとして、provider capability schema内の未定義 `$defs/provenance` 参照を既存の `definitions/provenance` へ修正した。baseline pipeline正常完了、catalog gate **1/1 passed**、全体 typecheck、Prettierで確認した。provider CLIの実OS-level enforcement probeと未監査direct loader全件inventoryは継続課題である。
 - 2026-09-06: PI-02／PI-03 の Presence Studio wire境界を再レビューし、Express／runtime-dataの内部例外JSON responseを共通`presenceStudioWireError`へ統一した。固定message／`error_code`／`correlation_id`以外をwireへ返さず、監査ログと明示的なvalidation／not-found文言は維持した。wire boundary checkerをPresence Studioの実ファイルへ拡張し、関連 **4 files / 13 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettierで確認した。
+- 2026-09-06: PI-02／PI-03 の Browser Native Messaging host wire境界を再レビューし、recording／delta／analysis／report保存とdispatch外側catchの内部例外を`formatWireError`へ統一した。validation／approval拒否 semanticsを維持し、wire boundary checkerをhostへ拡張した。関連 **3 files / 16 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 
