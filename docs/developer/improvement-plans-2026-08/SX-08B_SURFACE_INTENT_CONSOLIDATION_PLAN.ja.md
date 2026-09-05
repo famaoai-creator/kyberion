@@ -1246,3 +1246,9 @@ backupの暗号化／復号に残っていたpassphraseの動的環境直読を�
 actuator manifestのenv prerequisite評価に残っていた動的環境直読を、登録済み `getRegisteredEnvText` へ統一した。manifestのenv／binary／platform prerequisite、未設定時のavailability理由とinstall hintの既存semanticsは変更していない。共通environment boundary testに対象を追加した。
 
 検証: actuator capability／environment boundary **2 files / 15 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 139
+
+environment capabilityのmanifest署名鍵取得に残っていた環境直読を、env registryに登録済みの `getRegisteredEnvText` へ統一した。署名のcanonicalization、HMAC検証、鍵設定時のfail-closed、未署名時のwarn phaseと鍵非出力の既存semanticsは変更していない。共通environment boundary testに対象を追加した。
+
+検証: environment capability／environment boundary **2 files / 39 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。

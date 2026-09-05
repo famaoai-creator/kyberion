@@ -10,6 +10,7 @@ const SOURCES = [
   ['libs/core/worker-context-compaction.ts', /process\.env\[name\]/u],
   ['libs/core/media-backend-registry.ts', /process\.env\[name\]/u],
   ['libs/core/src/actuator-capability.ts', /process\.env\[envName\]/u],
+  ['libs/core/environment-capability.ts', /process\.env\[MANIFEST_SIGNING_KEY_ENV\]/u],
   ['libs/core/organization-operating-model-persistence.ts', /process\.env\.VITEST/u],
   ['libs/core/project-management.ts', /process\.env\.VITEST/u],
   ['libs/core/work-coordination.ts', /process\.env\.VITEST/u],
