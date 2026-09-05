@@ -71,8 +71,6 @@ function providerConfigCatalog(filePath: string): GovernedCatalog<SurfaceQueryPr
     id: 'surface-query-providers',
     path: safeFilePath,
     schema: CONFIG_SCHEMA_PATH,
-    fallback: {},
-    fallbackOnInvalid: true,
   });
   providerConfigCatalogs.set(safeFilePath, catalog);
   return catalog;
@@ -199,28 +197,19 @@ function getRequestedPhase(context: SurfaceQueryProviderContext): string | undef
 export function getSurfaceQueryProviderConfig(
   context: SurfaceQueryProviderContext = {}
 ): SurfaceQueryProviderConfig {
-  let configPath: string;
-  let overlayPaths: string[];
-  try {
-    configPath = safeProviderConfigPath(
-      getRegisteredEnvText('KYBERION_SURFACE_QUERY_CONFIG_PATH') || DEFAULT_CONFIG_PATH
-    );
-    loadSurfaceQueryOverlayCatalog();
-    overlayPaths = [
-      getTenantOverlayPath(context.scope),
-      ...getEntityOverlayPath(context.scope),
-      getPhaseOverlayPathForPhase(getRequestedPhase(context)),
-      getRoleOverlayPathForRole(getRequestedRole(context)),
-      getPersonalOverlayPath(),
-    ]
-      .filter((path): path is string => Boolean(path))
-      .filter((path, index, self) => self.indexOf(path) === index);
-  } catch (error) {
-    if (!String(error).includes('RESOURCE_PATH_SCOPE')) throw error;
-    cachedConfigPath = '__unsafe_surface_query_config__';
-    cachedConfig = {};
-    return cachedConfig;
-  }
+  const configPath = safeProviderConfigPath(
+    getRegisteredEnvText('KYBERION_SURFACE_QUERY_CONFIG_PATH') || DEFAULT_CONFIG_PATH
+  );
+  loadSurfaceQueryOverlayCatalog();
+  const overlayPaths = [
+    getTenantOverlayPath(context.scope),
+    ...getEntityOverlayPath(context.scope),
+    getPhaseOverlayPathForPhase(getRequestedPhase(context)),
+    getRoleOverlayPathForRole(getRequestedRole(context)),
+    getPersonalOverlayPath(),
+  ]
+    .filter((path): path is string => Boolean(path))
+    .filter((path, index, self) => self.indexOf(path) === index);
   const cacheKey = [
     configPath,
     scopeContextKey(context.scope || { tier: 'public' }),
@@ -234,17 +223,13 @@ export function getSurfaceQueryProviderConfig(
     return cachedConfig;
   }
 
-  try {
-    let config = providerConfigCatalog(configPath).load();
-    for (const overlayPath of overlayPaths) {
-      if (!safeExistsSync(overlayPath)) continue;
-      const overlay = providerConfigCatalog(overlayPath).load();
-      config = mergeConfigs(config, overlay);
-    }
-    cachedConfig = config;
-  } catch {
-    cachedConfig = {};
+  let config = providerConfigCatalog(configPath).load();
+  for (const overlayPath of overlayPaths) {
+    if (!safeExistsSync(overlayPath)) continue;
+    const overlay = providerConfigCatalog(overlayPath).load();
+    config = mergeConfigs(config, overlay);
   }
+  cachedConfig = config;
   cachedConfigPath = cacheKey;
   return cachedConfig;
 }
