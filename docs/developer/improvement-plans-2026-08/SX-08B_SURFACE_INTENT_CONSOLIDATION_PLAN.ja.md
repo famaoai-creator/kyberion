@@ -1786,3 +1786,7 @@ trace JSONL persistenceのdirectory／日次fileを共通の`assertSafeRepositor
 ## 2026-09-06 再レビュー修正 231
 
 mission dispatch event appendの共通I/O helperへoperation-timeのregular-file検査を追加し、leaf symlinkへのevent appendを拒否する境界を追加した。repository path、mission writer context、dispatch artifact leaseとpayload semanticsを維持し、**1 file / 3 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 232
+
+provider capability schemaのprovider内`provenance`参照を`#/definitions/provenance`へ修正し、baselineで発生していた未定義 `$defs/provenance` のschema compilation errorを解消した。baseline pipeline正常完了、catalog gate **1/1 passed**、全体 typecheck、対象Prettierで確認した。

@@ -21604,6 +21604,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: mission dispatch event appendの共通I/O helperへoperation-timeのregular-file検査を追加した。repository path検証、mission writer context、既存dispatch artifact leaseとpayload semanticsは維持し、leaf symlinkへのevent appendを拒否する回帰テストを追加した。
 - **検証**: mission-dispatch-lifecycle **1 file / 3 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1402
+
+- **対象**: `knowledge/product/schemas/provider-capabilities.schema.json`
+- **変更**: provider capability schema内で混在していた `$defs/provenance` 参照を既存の `definitions/provenance` へ統一した。provider discovery／capability catalog の schema compilation が provenance property を正しく解決し、未定義 `$ref` で baseline が停止しないようにした。
+- **検証**: baseline pipeline 正常完了、catalog gate **1/1 passed**、全体 typecheck、対象 Prettier。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`
