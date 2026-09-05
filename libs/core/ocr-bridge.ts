@@ -7,6 +7,7 @@ import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from './ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,
@@ -300,7 +301,9 @@ export class LlmApiOcrProvider implements OcrProvider {
 
   async isAvailable(): Promise<boolean> {
     return Boolean(
-      process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY
+      getRegisteredEnvText('GEMINI_API_KEY') ||
+      getRegisteredEnvText('ANTHROPIC_API_KEY') ||
+      getRegisteredEnvText('OPENAI_API_KEY')
     );
   }
 
@@ -311,9 +314,9 @@ export class LlmApiOcrProvider implements OcrProvider {
     const base64Data = buffer.toString('base64');
     const mimeType = getMimeType(request.path);
 
-    const apiKeyGemini = process.env.GEMINI_API_KEY;
-    const apiKeyClaude = process.env.ANTHROPIC_API_KEY;
-    const apiKeyOpenAI = process.env.OPENAI_API_KEY;
+    const apiKeyGemini = getRegisteredEnvText('GEMINI_API_KEY');
+    const apiKeyClaude = getRegisteredEnvText('ANTHROPIC_API_KEY');
+    const apiKeyOpenAI = getRegisteredEnvText('OPENAI_API_KEY');
 
     const order = request.providerPreference || ['gemini', 'claude', 'openai'];
 
@@ -505,10 +508,9 @@ export class LocalVlmOcrProvider implements OcrProvider {
   readonly dataEgress: OcrDataEgress;
 
   constructor(endpoint = 'http://localhost:11434/api/generate', model = 'llama3-vision') {
-    this.endpoint = process.env.OLLAMA_HOST
-      ? `${process.env.OLLAMA_HOST.replace(/\/$/, '')}/api/generate`
-      : endpoint;
-    this.model = process.env.OLLAMA_VLM_MODEL || model;
+    const ollamaHost = getRegisteredEnvText('OLLAMA_HOST');
+    this.endpoint = ollamaHost ? `${ollamaHost.replace(/\/$/, '')}/api/generate` : endpoint;
+    this.model = getRegisteredEnvText('OLLAMA_VLM_MODEL') || model;
     this.dataEgress = isLoopbackEndpoint(this.endpoint) ? 'loopback' : 'external';
   }
 
