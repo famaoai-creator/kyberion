@@ -31,15 +31,18 @@ import {
   normalizeSupervisorResponse,
   normalizeSupervisorResult,
 } from '@agent/core/agent-runtime-supervisor-client';
-import { parseSafeJsonInput } from '@agent/core/foundation';
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  parseSafeJsonInput,
+  readTextFile,
+  setRegisteredEnv,
+} from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
 import { pathResolver, rootDir } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeUnlinkSync,
   safeCreateExclusiveFileSync,
   safeChmodSync,
@@ -791,13 +794,13 @@ export async function startAgentRuntimeSupervisorDaemon(
     // If lock already exists, try to read the PID
     let pid: number | undefined;
     try {
-      const content = String(safeReadFile(lockPath, { encoding: 'utf8' })).trim();
+      const content = readTextFile(lockPath).trim();
       if (content) {
         pid = parseInt(content);
       } else {
         // Lock exists but empty? Wait and retry.
         await new Promise((resolve) => setTimeout(resolve, 500));
-        const retryContent = String(safeReadFile(lockPath, { encoding: 'utf8' })).trim();
+        const retryContent = readTextFile(lockPath).trim();
         if (retryContent) pid = parseInt(retryContent);
       }
     } catch (error: any) {
@@ -1028,7 +1031,7 @@ export async function startAgentRuntimeSupervisorDaemon(
     // already probes health and removes only an unresponsive stale socket.
     try {
       if (safeExistsSync(lockPath)) {
-        const currentPid = String(safeReadFile(lockPath, { encoding: 'utf8' })).trim();
+        const currentPid = readTextFile(lockPath).trim();
         if (currentPid === process.pid.toString()) {
           safeUnlinkSync(lockPath);
         }
