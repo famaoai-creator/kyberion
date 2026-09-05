@@ -5,6 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('surface-runtime');
@@ -13,7 +14,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeUnlinkSync,
   safeWriteFile,
@@ -87,7 +87,7 @@ export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
   if (!safeLstat(safeLogPath).isFile()) {
     throw new Error(`[SURFACE_RUNTIME_RESOURCE] log must be a regular file: ${safeLogPath}`);
   }
-  const content = safeReadFile(safeLogPath, { encoding: 'utf8' }) as string;
+  const content = readTextFile(safeLogPath);
   return content
     .split('\n')
     .map((line) => line.trimEnd())
