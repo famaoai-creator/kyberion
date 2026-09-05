@@ -149,6 +149,9 @@ export async function* readVideoFramesFromMp4(
   const safeInputPath = assertSafeRepositoryPath(pathResolver.rootResolve(inputPath), {
     allowMissingLeaf: true,
   });
+  if (!safeLstat(safeInputPath).isFile()) {
+    throw new Error(`[VIDEO_FRAME_ARCHIVE_RESOURCE] input must be a regular file: ${inputPath}`);
+  }
   const ffmpegBin = options.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
   const tempDir = assertSafeRepositoryPath(resolveArchiveTempDir('decode'), {
     allowMissingLeaf: true,
