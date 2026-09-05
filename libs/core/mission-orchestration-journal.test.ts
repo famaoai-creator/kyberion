@@ -269,6 +269,29 @@ describe('mission-orchestration-journal', () => {
     );
   });
 
+  it('rejects a journal stream replaced by a directory', async () => {
+    const { loadMissionOrchestrationJournal } = await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-DIRECTORY-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const journalPath = `${missionPath}/coordination/orchestration-journal.jsonl`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeMkdir(journalPath, { recursive: true });
+    });
+
+    try {
+      expect(() => loadMissionOrchestrationJournal(missionId)).toThrow(
+        'MISSION_LOG_CORRUPT:journal_file_not_regular'
+      );
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      });
+    }
+  });
+
   it('records provision intent before a native JSON write and verifies it after the write', async () => {
     const { loadProvisionedEntryRecords, provisionMissionEntry, writeProvisionedJson } =
       await import('./mission-orchestration-journal.js');

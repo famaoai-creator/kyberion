@@ -21951,3 +21951,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/task-scoped-grants.ts`、`libs/core/task-scoped-grants.test.ts`
 - **変更**: task-scoped grant store の read／append 前に operation-time の regular-file 検査を追加した。認可台帳が directory 等へ置換された場合に空のgrant集合として扱わず、発行・一覧の両経路で明示拒否する。既存の audience／tenant scope、expiry、revocation semantics は維持した。
 - **検証**: task-scoped-grants の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1459
+
+- **対象**: `libs/core/mission-orchestration-journal.ts`、`libs/core/mission-orchestration-journal.test.ts`
+- **変更**: mission orchestration journal の replay read 前に operation-time の regular-file 検査を追加した。`orchestration-journal.jsonl` が directory 等へ置換された場合に空のjournalとして扱わず `MISSION_LOG_CORRUPT` で拒否し、既存のjournal validation／replay／provisioned-entry recovery semantics は維持した。
+- **検証**: mission-orchestration-journal の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

@@ -774,6 +774,9 @@ export function loadMissionOrchestrationJournal(
 ): MissionOrchestrationJournalEntry[] {
   const filePath = journalPath(missionId, scope, missionPathHint);
   if (!safeExistsSync(filePath)) return [];
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error('MISSION_LOG_CORRUPT:journal_file_not_regular');
+  }
   const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
   return raw
     .split(/\r?\n/u)
