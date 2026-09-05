@@ -419,10 +419,10 @@ export async function runStepsInternal(
                 ...(existing?.requestedByContext?.targetStepId
                   ? { targetStepId: existing.requestedByContext.targetStepId }
                   : {}),
-                ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+                ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
               },
               source: {
-                ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+                ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
                 agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
               },
               draft: {
@@ -467,10 +467,10 @@ export async function runStepsInternal(
           stepId,
           ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
           ...(targetStepId ? { targetStepId } : {}),
-          ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+          ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
         },
         source: {
-          ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+          ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
           agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
         },
         draft: {
@@ -1225,7 +1225,7 @@ export async function runStepsInternal(
       try {
         nextCtx = compactStepOutputContext(ctx, outputKeys, {
           maxInlineChars: Number((initialCtx.__pipeline_options as any)?.max_inline_output_chars),
-          missionId: String(ctx.mission_id || process.env.MISSION_ID || 'shared'),
+          missionId: String(ctx.mission_id || registeredEnv('MISSION_ID') || 'shared'),
           stepOp: normalizedOp,
           stepNumber,
           recordArtifact: (artifactPath, description) => {
