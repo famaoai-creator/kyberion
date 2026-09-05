@@ -6,7 +6,8 @@ import {
 } from './agent-manifest.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 
 export interface SurfaceAgentCatalogEntry {
   agentId: string;
@@ -114,8 +115,7 @@ function loadAgentBody(agentId: string): string {
     return '';
   }
   if (!safeExistsSync(filePath)) return '';
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return parseFrontmatterBody(raw);
+  return parseFrontmatterBody(readTextFile(filePath));
 }
 
 export function listSurfaceAgentCatalog(): SurfaceAgentCatalogEntry[] {
