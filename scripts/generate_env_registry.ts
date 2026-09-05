@@ -25,8 +25,8 @@
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
-import { getRegisteredEnv } from '@agent/core/foundation';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { getRegisteredEnv, readTextFile } from '@agent/core/foundation';
 import { loadEnvRegistryFile } from '@agent/core/env-validator';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
@@ -242,7 +242,7 @@ export function discoverEnvNames(rootDir: string): string[] {
       ) {
         continue;
       }
-      const content = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+      const content = readTextFile(filePath);
       for (const match of content.matchAll(ENV_DISCOVERY_RE)) {
         // A trailing underscore is a dynamic prefix (for example
         // KYBERION_REASONING_ROLE_${role}), not a concrete registry key.

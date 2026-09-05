@@ -20,6 +20,8 @@ describe('generate_knowledge_index', () => {
       })
     );
     expect(source).toContain("parseSafeJsonInput(content, 'knowledge integrity manifest')");
+    expect(source).toContain('parseSafeJsonInput, readTextFile } from');
+    expect(source).not.toContain('safeReadFile(');
     expect(source).not.toContain('JSON.parse(content)');
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');

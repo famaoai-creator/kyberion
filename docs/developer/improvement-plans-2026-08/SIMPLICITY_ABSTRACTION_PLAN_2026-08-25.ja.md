@@ -22185,3 +22185,21 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/generate_project_os.ts`、`scripts/generate_project_os.test.ts`
 - **変更**: project OS generator の blueprint 本文読込を foundation の `readTextFile` へ移行した。artifact map、repository output scope、動的生成／`--check` の既存semanticsは変更せず、source contract testでcanonical readerと旧 `safeReadFile` 直読の不在を固定した。
 - **検証**: project-os generator **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残るproduction loader／generatorの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1498
+
+- **対象**: `scripts/generate_vocabulary_types.ts`、`scripts/generate_vocabulary_types.test.ts`
+- **変更**: vocabulary type generator の locale-normalize source 本文読込を foundation の `readTextFile` へ移行した。catalog loading、locale marker splice、qualified／bare key生成、生成物の `--check` semanticsは変更せず、既存テストでcanonical readerと旧 `safeReadFile` 直読の不在を固定した。
+- **検証**: vocabulary-types **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るproduction loader／generatorの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1499
+
+- **対象**: `scripts/generate_env_registry.ts`、`scripts/generate_env_registry.contract.test.ts`
+- **変更**: env registry generator の source tree scan 本文読込を foundation の `readTextFile` へ移行した。excluded path／extension filtering、registry merge、configuration／example生成、既存のcanonical loader semanticsは変更せず、contract testでcanonical readerと旧 `safeReadFile` 直読の不在を固定した。
+- **検証**: env-registry **contract／既存対象テスト passed**、対象ESLint、Prettier、`git diff --check`。残るproduction loader／generatorの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1500
+
+- **対象**: `scripts/generate_knowledge_index.ts`、`scripts/generate_knowledge_index.test.ts`
+- **変更**: knowledge index generator の markdown metadata／既存index／manifest 本文読込を foundation の `readTextFile` へ統一した。frontmatter exclusion、tier isolation、manifest／index normalization、generator `--check` semanticsは変更せず、既存テストでcanonical readerと旧 `safeReadFile` 直読の不在を固定した。
+- **検証**: knowledge-index **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るproduction loader／generatorの全件codemodは継続課題とする。
