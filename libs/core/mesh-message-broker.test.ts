@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   clearMeshMessageBrokerNamespace,
   createMeshMessageBroker,
@@ -184,6 +184,31 @@ describe('mesh-message-broker', () => {
     });
 
     await expect(listMeshDeliveries(namespace)).resolves.toHaveLength(1);
+  });
+
+  it('rejects a persisted delivery JSONL path replaced by a directory', async () => {
+    const namespace = 'mesh-message-broker-test';
+    const broker = createMeshMessageBroker({ namespace });
+    activeBroker = broker;
+    const requestTime = new Date().toISOString();
+    await broker.acceptMeshRequest(
+      buildRequest({
+        requestId: 'meshreq-regular-file',
+        idempotencyKey: 'idem-regular-file',
+        createdAt: requestTime,
+        ttlMs: 60_000,
+      }),
+      { now: requestTime }
+    );
+    const file = namespacePath(namespace, 'deliveries.jsonl');
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeRmSync(file);
+      safeMkdir(file);
+    });
+
+    await expect(listMeshDeliveries(namespace)).rejects.toThrow(
+      'mesh-hub persisted JSONL must be a regular file'
+    );
   });
 
   it('fences a second writer and rejects reentrant commands deterministically', async () => {
