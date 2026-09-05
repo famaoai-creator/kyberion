@@ -922,3 +922,9 @@ capability-brokerのmission pin pathとpin metadataに残っていた `MISSION_I
 spend-guardのmission spend集計に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。tenant override、日次／mission cap判定、warn／block posture、alert dedupeの既存 semanticsは変更していない。
 
 検証: spend／metrics／settlement **3 files / 19 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 85
+
+secret-guardのTIBA scope判定と接続文書監査記録に残っていた `MISSION_ID`／`AUTHORIZED_SCOPE` の環境直読を、登録済み `getRegisteredEnvText` へ統一した。temporal grant、scope prefix、secret resolver、暗号化接続文書、監査ledgerの既存 semanticsは変更していない。
+
+検証: secret guard／branch／bridge **3 files / 24 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
