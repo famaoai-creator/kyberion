@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { getVoiceEngineRecord, listVoiceEngines } from './voice-engine-registry.js';
 import { getVoiceProfileRegistry } from './voice-profile-registry.js';
 
@@ -178,6 +178,10 @@ export function validateVoiceProfileRegistration(
     }
     if (!safeExistsSync(resolvedPath)) {
       violations.push(`sample file does not exist (${samplePath})`);
+      continue;
+    }
+    if (!safeLstat(resolvedPath).isFile()) {
+      violations.push(`sample path is not a regular file (${samplePath})`);
       continue;
     }
 

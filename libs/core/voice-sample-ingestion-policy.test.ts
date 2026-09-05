@@ -163,4 +163,45 @@ describe('voice sample ingestion policy', () => {
     expect(result.summary.sample_count).toBe(3);
     expect(result.summary.total_sample_bytes).toBeGreaterThan(0);
   });
+
+  it('reports a sample path replaced by a directory without reading it', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeMkdir(`${tmpDir}/sample-directory.wav`, { recursive: true });
+
+    const result = validateVoiceProfileRegistration(
+      {
+        action: 'register_voice_profile',
+        request_id: 'req-directory',
+        profile: {
+          profile_id: 'personal-voice-req-directory',
+          display_name: 'Directory Sample',
+          tier: 'personal',
+          languages: ['ja'],
+          default_engine_id: 'open_voice_clone',
+        },
+        samples: [{ sample_id: 'directory', path: `${tmpDir}/sample-directory.wav` }],
+      },
+      {
+        version: 'test',
+        sample_limits: {
+          min_samples: 1,
+          max_samples: 1,
+          min_sample_bytes: 1,
+          max_sample_bytes: 1000,
+          allowed_extensions: ['wav'],
+        },
+        profile_rules: {
+          allowed_tiers: ['personal'],
+          require_unique_sample_paths: true,
+          require_language_coverage: false,
+          strict_personal_voice_registration: false,
+        },
+      }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContain(
+      `sample path is not a regular file (${tmpDir}/sample-directory.wav)`
+    );
+  });
 });
