@@ -21771,3 +21771,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/voice-sample-ingestion-policy.ts`、`libs/core/voice-sample-ingestion-policy.test.ts`
 - **変更**: voice sample registration のサンプル実体読込前に operation-time の regular-file 検査を追加した。既存の repository／symlink path boundary、拡張子・サイズ・言語 coverage の検証 semanticsは維持し、サンプル leaf がディレクトリへ置換された場合は例外化せず violation として返す回帰テストを追加した。
 - **検証**: voice-sample-ingestion-policy **2 files / 6 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1429
+
+- **対象**: `libs/core/ingest-sync-cursors.ts`、`libs/core/ingest-sync-cursors.test.ts`
+- **変更**: tenant/source watermark の state read 前に operation-time の regular-file 検査を追加した。既存の corrupt JSON と read/access failure の分類、`resetSyncCursor` を安易に案内しない fail-closed semantics、cursor の write-after-success semanticsは維持し、ディレクトリ置換を regular-file read failure として明示する回帰検証を追加した。
+- **検証**: ingest-sync-cursors **2 files / 14 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

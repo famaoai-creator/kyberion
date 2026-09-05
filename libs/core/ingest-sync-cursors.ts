@@ -30,6 +30,7 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
+  safeLstat,
   safeReadFile,
   safeUnlink,
   safeWriteFile,
@@ -185,6 +186,9 @@ export function readSyncCursor(
   // and force a full re-fetch to fix something it cannot fix.
   let source: string;
   try {
+    if (!safeLstat(file).isFile()) {
+      throw new Error('cursor state must be a regular file');
+    }
     source = String(safeReadFile(file, { encoding: 'utf8' }));
   } catch (error) {
     throw new Error(
