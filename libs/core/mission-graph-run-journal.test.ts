@@ -186,6 +186,37 @@ describe('mission-graph-run-journal', () => {
     }
   });
 
+  it('rejects a journal file that is replaced by a symbolic link before append', () => {
+    const missionId = 'MSN-GRAPH-JOURNAL-FILE-SYMLINK';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const externalPath = pathResolver.sharedTmp('graph-journal-file-external');
+    const journal = withExecutionContext('mission_controller', () =>
+      openOrCreateMissionGraphRunJournal({
+        missionId,
+        runId: 'ME-FILE-SYMLINK-1',
+        taskIds: ['task-a'],
+      })
+    );
+    withExecutionContext('mission_controller', () => {
+      safeWriteFile(externalPath, '');
+      safeRmSync(journal.path, { force: true });
+      safeSymlinkSync(externalPath, journal.path);
+    });
+    try {
+      expect(() =>
+        withExecutionContext('mission_controller', () =>
+          journal.append('node_state', { task_id: 'task-a', state: 'completed' })
+        )
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(journal.path, { recursive: true, force: true });
+        safeRmSync(missionPath, { recursive: true, force: true });
+        safeRmSync(externalPath, { force: true });
+      });
+    }
+  });
+
   it('uses an existing confidential mission root for graph recovery journals', () => {
     const missionId = 'MSN-GRAPH-JOURNAL-CONFIDENTIAL';
     const missionPath = pathResolver.missionDir(missionId, 'confidential');

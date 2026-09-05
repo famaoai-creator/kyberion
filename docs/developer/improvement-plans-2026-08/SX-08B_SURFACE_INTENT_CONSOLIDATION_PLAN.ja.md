@@ -1770,3 +1770,7 @@ memory promotion queueのcandidate discovery／status updateを共通のoperatio
 ## 2026-09-06 再レビュー修正 227
 
 mesh peer directoryのregistrations／presence／capabilities JSONL readerへoperation-timeのregular-file検査を追加し、peer record leafのsymlinkを読み込まない境界を追加した。tenant pathの既存symlink境界、missing fileの空配列、governed writerとeligibility semanticsを維持し、**1 file / 10 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 228
+
+mission graph run journalのresume readとfenced appendを共通のoperation-time regular-file検査へ統一し、既存journal fileのsymlink置換をread／append前に拒否する境界を追加した。mission／coordination pathの既存symlink境界、missing journalの作成、sequence／schema検証を維持し、**1 file / 7 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
