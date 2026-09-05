@@ -1000,3 +1000,9 @@ service procedure CLIのmission fallbackに残っていた `MISSION_ID` の環�
 procedure promotion CLIのmission attributionに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `--mission-id` 優先、未指定時の警告、catalog／recording検証、audit記録の既存 semanticsは変更していない。
 
 検証: promote procedure resource boundary **1 file / 1 test passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 98
+
+Kyberion home CLIのprocedure実行mission fallbackに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `--mission-id` 優先、既定mission ID生成、recording／desktop intent検証、approval／dispatch semanticsは変更していない。
+
+検証: Kyberion home trust boundary **1 file / 3 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
