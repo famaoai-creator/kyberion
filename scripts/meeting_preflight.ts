@@ -342,7 +342,8 @@ export async function runMeetingPreflight(
   } = {}
 ): Promise<MeetingPreflightReport> {
   installCoreEnvironmentProbes();
-  const missionId = options.missionId?.trim() || process.env.MISSION_ID?.trim() || undefined;
+  const missionId =
+    options.missionId?.trim() || getRegisteredEnvText('MISSION_ID')?.trim() || undefined;
   if (missionId) process.env.MISSION_ID = missionId;
   const platform = options.platform || process.platform;
 
