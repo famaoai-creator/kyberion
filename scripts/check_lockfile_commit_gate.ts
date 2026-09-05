@@ -4,6 +4,7 @@ import path from 'node:path';
 import { safeExec } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -57,9 +58,7 @@ export function checkLockfileCommitGate(): LockfileCommitGateResult {
     .update(safeReadFile(pathResolver.rootResolve('pnpm-lock.yaml')))
     .digest('hex');
   const evidenceText =
-    evidencePath && safeExistsSync(evidencePath)
-      ? String(safeReadFile(evidencePath, { encoding: 'utf8' }))
-      : '';
+    evidencePath && safeExistsSync(evidencePath) ? readTextFile(evidencePath) : '';
   const evidenceHash = /pnpm-lock\.yaml`?\s+sha256:\s*([a-f0-9]{64})/iu.exec(evidenceText)?.[1];
   const hasReviewEvidence = Boolean(
     evidencePath && evidenceText.trim() && evidenceHash === lockfileHash
