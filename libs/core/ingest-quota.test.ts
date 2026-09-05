@@ -257,6 +257,14 @@ describe('checkIngestQuota — warn→block staging', () => {
 });
 
 describe('shouldEnforceIngestQuota — spend-guard VITEST convention', () => {
+  it('routes the opt-in flag through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/ingest-quota.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('is off under VITEST unless the test opts in, on otherwise', () => {
     expect(shouldEnforceIngestQuota({ VITEST: 'true' } as NodeJS.ProcessEnv)).toBe(false);
     expect(
