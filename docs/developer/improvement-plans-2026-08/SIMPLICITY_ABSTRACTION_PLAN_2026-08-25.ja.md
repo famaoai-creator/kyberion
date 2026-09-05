@@ -22125,3 +22125,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/cli-workflow-handlers.ts`、`scripts/cli-workflow-handlers.entrypoint.test.ts`
 - **変更**: email workflow の triage／body file 本文読込を foundation の `readTextFile` へ移行した。既存の repository path 境界、missing／empty input のエラー、approval／draft-mode とCLI printerのsemanticsは変更せず、workflow handlerに残っていた旧 `safeReadFile` 直読を削減した。
 - **検証**: cli-workflow-handlers の entrypoint／path tests、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1488
+
+- **対象**: `scripts/service_recording.ts`、`scripts/service_recording.test.ts`
+- **変更**: service recording CLI の `--calls`／`--intent-phrases` における `@path` 本文読込を foundation の `readTextFile` へ移行した。既存の repository path 境界、JSON shape validation、recording／compile／review／promote の保存・承認 semanticsは変更せず、production scriptに残っていた旧 `safeReadFile` のJSON本文直読を削減した。
+- **検証**: service-recording **3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。

@@ -12,6 +12,8 @@ describe('service recording entrypoint', () => {
     expect(source).toContain('runServiceRecording = defineScript');
     expect(source).toContain('print(result.value)');
     expect(source).toContain('validateServiceRecording(updated)');
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(resolveServicePath');
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('process.exitCode');
   });
