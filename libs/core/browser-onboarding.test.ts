@@ -118,6 +118,16 @@ describe('browser onboarding', () => {
     expect(() => previewBrowserOnboarding(validDraft())).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
+  it('rejects a directory replacing the optional vision resource', async () => {
+    safeMkdir(path.join(PROFILE_ROOT, 'my-vision.md'), { recursive: true });
+
+    const { getBrowserOnboardingState } = await import('./browser-onboarding.js');
+
+    expect(() => getBrowserOnboardingState()).toThrow(
+      /\[BROWSER_ONBOARDING_RESOURCE\] vision must be a regular file/
+    );
+  });
+
   it('applies identity, provider, tool, service, and receipt artifacts under the active profile', async () => {
     const { applyBrowserOnboarding, loadOperatorProviderPreferences } =
       await import('./browser-onboarding.js');

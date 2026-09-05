@@ -34,6 +34,7 @@ import { listServiceBindingRecords } from './service-binding-registry.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
@@ -468,6 +469,11 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
       const toolPreference = getToolRuntimePolicy();
       const identity = loadPersonalIdentityAtPath(path.join(profileRoot(), 'my-identity.json'));
       const visionPath = path.join(profileRoot(), 'my-vision.md');
+      if (!identity?.vision && safeExistsSync(visionPath) && !safeLstat(visionPath).isFile()) {
+        throw new Error(
+          `[BROWSER_ONBOARDING_RESOURCE] vision must be a regular file: ${visionPath}`
+        );
+      }
       const vision = String(
         identity?.vision ||
           (safeExistsSync(visionPath)
