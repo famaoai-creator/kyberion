@@ -3,6 +3,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { secureFetch } from '@agent/core/network';
 import { sleep } from '@agent/core/async-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import * as path from 'node:path';
 
 export type VideoProviderStatus = 'submitted' | 'running' | 'succeeded' | 'failed' | 'canceled';
@@ -77,14 +78,14 @@ function isJsonRecord(value: unknown): value is JsonRecord {
 
 function requireEnv(...names: string[]): string {
   for (const name of names) {
-    const value = process.env[name]?.trim();
+    const value = getRegisteredEnvText(name)?.trim();
     if (value) return value;
   }
   throw new Error(`Video provider credential is missing. Set one of: ${names.join(', ')}`);
 }
 
 function baseUrl(envName: string, fallback: string): string {
-  return process.env[envName]?.trim().replace(/\/$/u, '') || fallback;
+  return getRegisteredEnvText(envName)?.trim().replace(/\/$/u, '') || fallback;
 }
 
 function egressContext(request?: Pick<VideoGenerationRequest, 'egress_tier' | 'tenant_slug'>) {
