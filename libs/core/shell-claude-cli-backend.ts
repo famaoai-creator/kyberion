@@ -76,6 +76,10 @@ import type {
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 /**
  * Task-weight → claude model mapping (①モデル振り分け): fast tasks run on
  * haiku, standard on sonnet, deep on the backend's configured heavy model.
@@ -831,7 +835,7 @@ export function probeShellClaudeCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number } = {}
 ): ShellClaudeCliAvailability {
-  const explicitBin = options.bin?.trim() || env.KYBERION_CLAUDE_CLI_BIN?.trim();
+  const explicitBin = options.bin?.trim() || envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim();
   const bin = explicitBin || 'claude';
   const timeoutMs = options.timeoutMs ?? 5_000;
 
@@ -943,18 +947,18 @@ export async function runClaudeCliQuery<T>({
 export function buildClaudeCliOptionsFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): ShellClaudeCliBackendOptions {
-  const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim();
-  const model = env.KYBERION_CLAUDE_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_CLAUDE_CLI_TIMEOUT_MS?.trim();
+  const bin = envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim();
+  const model = envText(env, 'KYBERION_CLAUDE_CLI_MODEL')?.trim();
+  const timeoutRaw = envText(env, 'KYBERION_CLAUDE_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const extraRaw = env.KYBERION_CLAUDE_CLI_EXTRA_ARGS?.trim();
+  const extraRaw = envText(env, 'KYBERION_CLAUDE_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
   return {
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
     ...(timeoutMs && !Number.isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
-    ...(env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1' ? { nativeSubagent: true } : {}),
+    ...(envText(env, 'KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1' ? { nativeSubagent: true } : {}),
   };
 }
 
@@ -966,25 +970,25 @@ export function buildShellClaudeCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[shell-claude-cli] backend unavailable (bin=${env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}. If the reason mentions "${CLAUDE_CLI_PLACEHOLDER_SIGNATURE}", run \`pnpm approve-builds\` (approve @anthropic-ai/claude-code) or set KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude.`
+      `[shell-claude-cli] backend unavailable (bin=${envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}. If the reason mentions "${CLAUDE_CLI_PLACEHOLDER_SIGNATURE}", run \`pnpm approve-builds\` (approve @anthropic-ai/claude-code) or set KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude.`
     );
     return null;
   }
 
   // Prefer an explicit pin; otherwise honor the binary the probe actually
   // validated (LC-03: may be a fallback outside node_modules/.bin).
-  const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim() || availability.bin?.trim();
-  const model = modelOverride?.trim() || env.KYBERION_CLAUDE_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_CLAUDE_CLI_TIMEOUT_MS?.trim();
+  const bin = envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim() || availability.bin?.trim();
+  const model = modelOverride?.trim() || envText(env, 'KYBERION_CLAUDE_CLI_MODEL')?.trim();
+  const timeoutRaw = envText(env, 'KYBERION_CLAUDE_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const extraRaw = env.KYBERION_CLAUDE_CLI_EXTRA_ARGS?.trim();
+  const extraRaw = envText(env, 'KYBERION_CLAUDE_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
   const backend = new ShellClaudeCliBackend({
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
-    ...(env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1' ? { nativeSubagent: true } : {}),
+    ...(envText(env, 'KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1' ? { nativeSubagent: true } : {}),
   });
   logger.info(
     `[shell-claude-cli] backend ready (bin=${bin ?? 'claude'}, model=${model ?? 'opus'})`
