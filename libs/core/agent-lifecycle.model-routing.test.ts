@@ -4,11 +4,21 @@ import { agentRegistry, resolveAgentTrustScore } from './agent-registry.js';
 import { trustEngine } from './trust-engine.js';
 import { ACPMediator } from './acp-mediator.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import { getAgentIdentity, resetAgentIdentityServiceForTests } from './agent-identity.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 
 describe('agent-lifecycle model routing', () => {
+  it('routes task model routing environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/agent-lifecycle.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('keeps the manifest model in advisory mode', () => {
     expect(
       resolveAgentLifecycleModelId(

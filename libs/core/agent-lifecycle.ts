@@ -165,7 +165,9 @@ export function resolveAgentLifecycleModelId(
   options: Pick<SpawnOptions, 'modelId' | 'runtimeMetadata'>,
   env: NodeJS.ProcessEnv = process.env
 ): string | undefined {
-  const taskRoutingMode = String(env.KYBERION_TASK_MODEL_ROUTING || 'advisory').toLowerCase();
+  const taskRoutingMode = (
+    getRegisteredEnvText('KYBERION_TASK_MODEL_ROUTING', { env }) || 'advisory'
+  ).toLowerCase();
   const taskModelHint = readTaskModelHint(options.runtimeMetadata);
   if (taskRoutingMode === 'enforce' && taskModelHint?.model_id) {
     return taskModelHint.model_id;
