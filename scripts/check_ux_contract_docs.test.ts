@@ -14,6 +14,8 @@ describe('UX contract docs', () => {
       })
     );
     expect(source).toContain('loadSurfaceRoleCatalog()');
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
     expect(source).not.toContain("pathResolver.knowledge('product/governance/surface-roles.json')");
     expect(source).not.toContain('readJson<');
   });
