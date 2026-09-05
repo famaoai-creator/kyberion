@@ -21837,3 +21837,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/customer-conversation-modes.ts`、`libs/core/customer-conversation-modes.test.ts`
 - **変更**: tenant-specific support known-issues grounding の read 前に operation-time の regular-file 検査を追加し、directory 等の resource boundary failure を public sales grounding の欠落扱いとしてフォールバックしないようにした。既存の tenant scope、public fallback、grounding truncation、requirements capture semanticsは維持し、tenant notes の directory replacement を拒否する回帰テストを追加した。
 - **検証**: customer-conversation-modes **2 files / 4 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1440
+
+- **対象**: `libs/core/mission-context-pack-knowledge.ts`、`libs/core/mission-context-pack.test.ts`
+- **変更**: pinned knowledge hint の read 前に operation-time の regular-file 検査を追加した。既存の knowledge root／symlink scope、pinned path escape rejection、slice filtering、hint budget、search fallback semanticsは維持し、pinned resource が directoryへ置換された場合に hint として採用しない回帰テストを追加した。
+- **検証**: mission-context-pack **2 files / 27 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -1194,6 +1195,50 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
     });
 
     expect(hints).toEqual([]);
+  });
+
+  it('drops pinned paths whose knowledge resource is a directory', async () => {
+    const knowledgeRoot = pathResolver.sharedTmp('knowledge-pinned-directory-test');
+    const originalRootResolve = pathResolver.rootResolve;
+    const knowledgeSpy = vi
+      .spyOn(pathResolver, 'knowledge')
+      .mockImplementation((subPath = '') => path.join(knowledgeRoot, subPath));
+    const rootResolveSpy = vi
+      .spyOn(pathResolver, 'rootResolve')
+      .mockImplementation((input) =>
+        input.startsWith('knowledge/')
+          ? path.join(knowledgeRoot, input)
+          : originalRootResolve(input)
+      );
+    try {
+      const relativePath = 'knowledge/product/architecture/pinned-directory-' + process.pid + '.md';
+      const absolutePath = rootResolveSpy(relativePath);
+      safeMkdir(absolutePath, { recursive: true });
+      const slicesPath = writeSlices('directory-pinned.json', {
+        version: '0.1.0',
+        slices: [
+          {
+            id: 'directory-pinned',
+            match: { team_role: 'implementer', phase: 'execution' },
+            pinned: [relativePath],
+          },
+        ],
+      });
+      vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+
+      const hints = await loadKnowledgeHintsIfPossible({
+        missionState: baseMissionState(),
+        teamRole: 'implementer',
+        phase: 'execution',
+        knowledgeSlicesPath: slicesPath,
+      });
+
+      expect(hints).toEqual([]);
+    } finally {
+      safeRmSync(knowledgeRoot, { recursive: true, force: true });
+      rootResolveSpy.mockRestore();
+      knowledgeSpy.mockRestore();
+    }
   });
 
   it('(b) excludes distill_* results even when the search returns them', async () => {
