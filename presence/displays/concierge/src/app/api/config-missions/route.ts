@@ -17,7 +17,7 @@ import {
 import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { readRequestObject } from '../../../lib/request-input';
-import { resolveConciergeViewer } from '../../../lib/viewer-context';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 import {
   parseConfigMissionBrief,
@@ -150,10 +150,7 @@ export function GET(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, ...payload });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error, 500);
   }
 }
 

@@ -5,7 +5,7 @@ import { listManagedPlugins } from '@agent/core/plugin-managed-install';
 import { loadApprovalRequest } from '@agent/core/approval-store';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
-import { resolveConciergeViewer } from '../../../lib/viewer-context';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,9 +81,6 @@ export function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: true, plugins: entries });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error, 500);
   }
 }
