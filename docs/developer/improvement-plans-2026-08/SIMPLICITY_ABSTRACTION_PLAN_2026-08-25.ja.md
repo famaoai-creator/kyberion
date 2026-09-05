@@ -22263,3 +22263,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_entity_governance.ts`、`scripts/check_entity_governance.entrypoint.test.ts`
 - **変更**: entity governance checker の improvement-plan STATUS／`.gitignore` 本文読込を foundation の `readTextFile` へ移行した。tenant／organization／project／mission scope、git boundary、plan ledger、strict warning semanticsは変更せず、entrypoint contract testで旧 `safeReadFile` 直読の不在を固定した。
 - **検証**: entity-governance **reader contract passed**、対象ESLint、Prettier、`git diff --check`。共有worktreeに依存するdrift報告と残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1511
+
+- **対象**: `scripts/check_catalog_integrity.ts`、`scripts/check_catalog_integrity.loader.contract.test.ts`
+- **変更**: catalog integrity checker の source／CSS／Markdown／CI manifest本文読込7箇所を foundation の `readTextFile` へ統一した。catalog JSONは既存の `readSafeJsonFile` に委ね、schema compilation、catalog／theme／vocabulary／capabilities guide drift判定、source inventory semanticsは変更せず、loader contractで旧 `safeReadFile` 直読の不在を固定した。
+- **検証**: catalog-integrity **既存テスト＋loader contract passed**、対象ESLint、Prettier、`git diff --check`。共有worktree由来のcatalog driftと残るchecker／production loaderの全件codemodは継続課題とする。
