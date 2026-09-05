@@ -10,6 +10,7 @@ import {
   safeChmodSync,
   safeCreateExclusiveFileSync,
   safeExistsSync,
+  safeLstat,
   safeFsyncFile,
   safeMkdir,
   safeReadFile,
@@ -358,6 +359,12 @@ function resolveStorePath(): string {
   return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
+function assertRegularShareGrantResource(filePath: string, label: string): void {
+  if (!safeLstat(filePath).isFile()) {
+    throw new ShareGrantValidationError(`${label} must be a regular file: ${filePath}`);
+  }
+}
+
 function resolveDefaultHmacKey(): string {
   const fromEnv = getRegisteredEnvText(SHARE_GRANTS_HMAC_KEY_ENV)?.trim();
   if (fromEnv) {
@@ -370,6 +377,7 @@ function resolveDefaultHmacKey(): string {
   }
 
   if (safeExistsSync(SHARE_GRANTS_HMAC_KEY_PATH)) {
+    assertRegularShareGrantResource(SHARE_GRANTS_HMAC_KEY_PATH, 'persisted share-link HMAC key');
     const persisted = String(safeReadFile(SHARE_GRANTS_HMAC_KEY_PATH, { encoding: 'utf8' })).trim();
     if (persisted) {
       if (persisted.length < 32) {
@@ -388,6 +396,7 @@ function resolveDefaultHmacKey(): string {
     return generated;
   } catch {
     if (safeExistsSync(SHARE_GRANTS_HMAC_KEY_PATH)) {
+      assertRegularShareGrantResource(SHARE_GRANTS_HMAC_KEY_PATH, 'persisted share-link HMAC key');
       const persisted = String(
         safeReadFile(SHARE_GRANTS_HMAC_KEY_PATH, { encoding: 'utf8' })
       ).trim();
@@ -1009,6 +1018,7 @@ export class ShareGrantGraph {
 
   #load(): void {
     if (!safeExistsSync(this.#storePath)) return;
+    assertRegularShareGrantResource(this.#storePath, 'share-grant ledger');
     const raw = String(safeReadFile(this.#storePath, { encoding: 'utf8' }));
     let previousHash = GENESIS_HASH;
     for (const line of raw.split('\n')) {
@@ -1034,6 +1044,7 @@ export class ShareGrantGraph {
 
   #readVerifiedTailHash(): string {
     if (!safeExistsSync(this.#storePath)) return GENESIS_HASH;
+    assertRegularShareGrantResource(this.#storePath, 'share-grant ledger');
     const raw = String(safeReadFile(this.#storePath, { encoding: 'utf8' }));
     let previousHash = GENESIS_HASH;
     for (const line of raw.split('\n')) {
