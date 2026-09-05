@@ -4,6 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
   safeReadFile,
 } from './secure-io.js';
@@ -928,6 +929,11 @@ export class GeminiWisdomEnhancer implements AgentEnhancer {
 
         for (const file of mdFiles) {
           const wisdomFile = assertSafeRepositoryPath(path.join(wisdomDir, file));
+          if (!safeLstat(wisdomFile).isFile()) {
+            throw new Error(
+              `[GEMINI_WISDOM_RESOURCE] lesson must be a regular file: ${wisdomFile}`
+            );
+          }
           const content = safeReadFile(wisdomFile, { encoding: 'utf8' }) as string;
           wisdomContext += `\n--- Lesson from ${file} ---\n${content}\n`;
         }
