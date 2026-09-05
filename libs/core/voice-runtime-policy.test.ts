@@ -52,9 +52,9 @@ describe('voice runtime policy', () => {
     expect(policy.routing.default_personal_voice_mode).toBe('require_personal_voice');
   });
 
-  it('falls back instead of consuming a policy outside the repository', () => {
+  it('fails closed instead of consuming a policy outside the repository', () => {
     process.env.KYBERION_VOICE_RUNTIME_POLICY_PATH = '/tmp/kyberion-voice-policy-external.json';
 
-    expect(getVoiceRuntimePolicy().version).toBe('fallback');
+    expect(() => getVoiceRuntimePolicy()).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });
