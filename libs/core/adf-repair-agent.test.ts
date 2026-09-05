@@ -135,6 +135,19 @@ describe('validateAndRepairAdf', () => {
     );
   });
 
+  it('rejects an ADF repair target replaced with a directory', async () => {
+    const filePath = writeFixture(
+      'directory-adf.json',
+      JSON.stringify({ capability: 'demo', action: 'run' })
+    );
+    safeRmSync(filePath);
+    safeMkdir(filePath);
+
+    await expect(validateAndRepairAdf(filePath, 'capability-input')).rejects.toThrow(
+      '[ADF_REPAIR] repair target must be a regular file'
+    );
+  });
+
   it('routes work-item ADF repair through the coordinated native path', async () => {
     const delegateTask = vi.fn(async () => {
       throw new Error('legacy delegateTask must not be called');

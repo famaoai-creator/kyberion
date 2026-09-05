@@ -21795,3 +21795,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/tenant-registry.ts`、`libs/core/tenant-registry.test.ts`
 - **変更**: tenant profile の state read 前に operation-time の regular-file 検査を追加した。既存の tenant path／symlink 境界、personal-tier access failure と corrupt JSON の分類、profile schema／tenant identity 検証は維持し、directory replacement の診断に regular-file 原因を含める回帰検証を追加した。
 - **検証**: tenant-registry **2 files / 18 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1433
+
+- 対象: libs/core/adf-repair-agent.ts、libs/core/adf-repair-agent.test.ts
+- 変更: ADF repair の初回read、軽量修復write、delegated repair 前後のread/write、最後のJSON recovery writeに operation-time の regular-file 検査を追加した。既存の repository／symlink path boundary、project-trust、schema／guardrail、delegation／repair output semanticsは維持し、repair target が directoryへ置換された場合に修復処理へ進まない回帰テストを追加した。
+- 検証: adf-repair-agent 2 files / 18 tests passed、対象 ESLint、Prettier、git diff --check。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

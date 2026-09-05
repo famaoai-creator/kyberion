@@ -8,7 +8,7 @@
 
 import { getReasoningBackend, type ReasoningCallOptions } from './reasoning-backend.js';
 import * as path from 'node:path';
-import { assertSafeRepositoryPath, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeReadFile, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import { validate, loadSchema } from './validate.js';
 import { pathResolver } from './path-resolver.js';
@@ -71,6 +71,12 @@ function resolveAdfRepairPath(adfPath: string): string {
   return assertSafeRepositoryPath(path.resolve(pathResolver.rootResolve(adfPath)));
 }
 
+function assertAdfRepairFile(filePath: string): void {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[ADF_REPAIR] repair target must be a regular file: ${filePath}`);
+  }
+}
+
 function assertPipelineRepairTrust(adfPath: string, options: AdfRepairOptions): void {
   const absolute = resolveAdfRepairPath(adfPath);
   const relative = path.relative(pathResolver.rootDir(), absolute).replaceAll('\\', '/');
@@ -101,6 +107,7 @@ export async function validateAndRepairAdf(
 ): Promise<AdfRepairResult> {
   const repairPath = resolveAdfRepairPath(adfPath);
   if (schemaName === 'pipeline-adf') assertPipelineRepairTrust(repairPath, options);
+  assertAdfRepairFile(repairPath);
   const content = safeReadFile(repairPath, { encoding: 'utf8' }) as string;
   let parsed: unknown;
   try {
@@ -113,6 +120,7 @@ export async function validateAndRepairAdf(
       logger.info(
         `[adf-repair] Lightweight JSON repair succeeded for ${repairPath} — skipping subagent delegation`
       );
+      assertAdfRepairFile(repairPath);
       safeWriteFile(repairPath, repairedStr, { encoding: 'utf8' });
       parsed = lightweight;
     } else {
@@ -379,6 +387,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
 
   const gaps = createGapRecorder();
   try {
+    assertAdfRepairFile(adfPath);
     const originalContent = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
     const repairContext = await gaps.measure('knowledge_slice', () =>
       buildAdfRepairKnowledgeContext(adfPath, schemaName, errorSummary, hints, backend.name)
@@ -415,6 +424,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
     logger.success(`[adf-repair] Sub-agent repair completed for ${adfPath}.`);
 
     // Re-verify after repair
+    assertAdfRepairFile(adfPath);
     let updatedContent = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
     if (updatedContent === originalContent) {
       const returnedRepair = tryRepairJson(report);
@@ -422,6 +432,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
         const returnedValidation = validateRepairTarget(returnedRepair, schemaName, adfPath);
         if (returnedValidation.valid) {
           const repairedStr = repairJsonString(report)!;
+          assertAdfRepairFile(adfPath);
           safeWriteFile(adfPath, repairedStr, { encoding: 'utf8' });
           updatedContent = repairedStr;
         }
@@ -434,6 +445,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       // Last-chance repair on what the sub-agent wrote
       const recovered = tryRepairJson(updatedContent);
       if (recovered !== null) {
+        assertAdfRepairFile(adfPath);
         safeWriteFile(adfPath, repairJsonString(updatedContent)!, { encoding: 'utf8' });
         updatedParsed = recovered;
       } else {
