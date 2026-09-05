@@ -52,9 +52,6 @@ describe('egress-policy', () => {
     process.env.KYBERION_EGRESS_POLICY_PATH = '/tmp/egress-policy-external.json';
     _resetEgressPolicyCacheForTests();
 
-    const policy = loadEgressPolicy();
-
-    expect(policy.version).toBe('unsafe-path-fallback');
-    expect(policy.manual_allowed_domains).toEqual([]);
+    expect(() => loadEgressPolicy()).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });

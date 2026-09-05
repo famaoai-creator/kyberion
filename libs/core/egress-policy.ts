@@ -55,13 +55,6 @@ const policyCatalog = defineCatalog<EgressPolicyFile>({
   id: 'egress-policy',
   path: () => getEgressPolicyPath(),
   schema: pathResolver.knowledge('product/schemas/egress-policy.schema.json'),
-  fallback: {
-    version: 'missing-policy',
-    mode: 'warn',
-    manual_allowed_domains: [],
-    blocked_domains: [],
-    tenant_allowed_domains: {},
-  },
 });
 
 function getEgressPolicyPath(): string {
@@ -206,22 +199,7 @@ export function evaluateAudienceEgress(
 }
 
 export function loadEgressPolicy(): EgressPolicyFile {
-  let policyPath: string;
-  try {
-    policyPath = getEgressPolicyPath();
-  } catch {
-    const modeOverride = getRegisteredEnvText('KYBERION_EGRESS_POLICY')?.trim();
-    const fallback: EgressPolicyFile = {
-      version: 'unsafe-path-fallback',
-      mode: modeOverride === 'enforce' ? 'enforce' : 'warn',
-      manual_allowed_domains: [],
-      blocked_domains: [],
-      tenant_allowed_domains: {},
-    };
-    cachedPolicyPath = null;
-    cachedPolicy = fallback;
-    return fallback;
-  }
+  const policyPath = getEgressPolicyPath();
   if (cachedPolicy && cachedPolicyPath === policyPath) return cachedPolicy;
   const parsed = policyCatalog.load();
   const modeOverride = getRegisteredEnvText('KYBERION_EGRESS_POLICY')?.trim();
