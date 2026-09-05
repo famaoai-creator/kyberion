@@ -777,7 +777,7 @@ export class GrokAdapter extends BaseACPAdapter {
     prompt: string,
     options: AgentAskOptions = {}
   ): Promise<AgentResponse> {
-    if (process.env.GROK_SUBAGENTS === '0') {
+    if (getRegisteredEnvText('GROK_SUBAGENTS') === '0') {
       throw new Error(
         '[SUBAGENT_UNAVAILABLE] Grok native subagents are disabled by GROK_SUBAGENTS=0.'
       );
@@ -829,7 +829,7 @@ export class GrokAdapter extends BaseACPAdapter {
   public getRuntimeInfo(): Record<string, unknown> {
     return {
       ...super.getRuntimeInfo(),
-      supportsNativeSubagents: process.env.GROK_SUBAGENTS !== '0',
+      supportsNativeSubagents: getRegisteredEnvText('GROK_SUBAGENTS') !== '0',
       lastNativeSubagent: this.lastNativeSubagentInfo,
     };
   }
