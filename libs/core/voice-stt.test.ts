@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   parseVoiceSttBackend,
   resolveVoiceSttBackendOrder,
@@ -7,6 +9,14 @@ import {
 import { resolveVoiceSttAdapter, resolveVoiceTtsAdapter } from './voice-provider-adapters.js';
 
 describe('voice STT helpers', () => {
+  it('routes STT environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/voice-stt.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toMatch(/env\.(VOICE_HUB_STT|WHISPERKIT|MLX_AUDIO)/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('parses backend aliases into canonical values', () => {
     expect(parseVoiceSttBackend('whisper.cpp')).toBe('whisper_cpp');
     expect(parseVoiceSttBackend('mlx-whisper')).toBe('mlx_whisper');

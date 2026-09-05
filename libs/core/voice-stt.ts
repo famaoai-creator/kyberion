@@ -1,4 +1,5 @@
 import { listVoiceSttAdapters, resolveVoiceSttAdapter } from './voice-provider-adapters.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export type VoiceSttBackend =
   | 'auto'
@@ -54,9 +55,9 @@ export function parseVoiceSttBackend(value: unknown): VoiceSttBackend {
 export function resolveVoiceSttServerConfig(
   env: NodeJS.ProcessEnv = process.env
 ): VoiceSttServerConfig | null {
-  const explicitBaseUrl = env.VOICE_HUB_STT_BASE_URL?.trim();
-  const whisperKitBaseUrl = env.WHISPERKIT_BASE_URL?.trim();
-  const mlxAudioBaseUrl = env.MLX_AUDIO_BASE_URL?.trim();
+  const explicitBaseUrl = getRegisteredEnvText('VOICE_HUB_STT_BASE_URL', { env })?.trim();
+  const whisperKitBaseUrl = getRegisteredEnvText('WHISPERKIT_BASE_URL', { env })?.trim();
+  const mlxAudioBaseUrl = getRegisteredEnvText('MLX_AUDIO_BASE_URL', { env })?.trim();
   const baseUrl = explicitBaseUrl || whisperKitBaseUrl || mlxAudioBaseUrl;
   if (!baseUrl) return null;
 
@@ -65,14 +66,14 @@ export function resolveVoiceSttServerConfig(
   if (!explicitBaseUrl && !whisperKitBaseUrl && mlxAudioBaseUrl) provider = 'mlx_audio_server';
 
   const model =
-    env.VOICE_HUB_STT_MODEL?.trim() ||
-    env.WHISPERKIT_MODEL?.trim() ||
-    env.MLX_AUDIO_STT_MODEL?.trim() ||
+    getRegisteredEnvText('VOICE_HUB_STT_MODEL', { env })?.trim() ||
+    getRegisteredEnvText('WHISPERKIT_MODEL', { env })?.trim() ||
+    getRegisteredEnvText('MLX_AUDIO_STT_MODEL', { env })?.trim() ||
     'openai_whisper-large-v3';
   const apiKey =
-    env.VOICE_HUB_STT_API_KEY?.trim() ||
-    env.WHISPERKIT_API_KEY?.trim() ||
-    env.MLX_AUDIO_API_KEY?.trim() ||
+    getRegisteredEnvText('VOICE_HUB_STT_API_KEY', { env })?.trim() ||
+    getRegisteredEnvText('WHISPERKIT_API_KEY', { env })?.trim() ||
+    getRegisteredEnvText('MLX_AUDIO_API_KEY', { env })?.trim() ||
     undefined;
 
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
@@ -94,7 +95,7 @@ export function resolveVoiceSttBackendOrder(
   if (requested !== 'auto') return [requested];
 
   const preference = (
-    env.VOICE_HUB_STT_PREFERENCE ||
+    getRegisteredEnvText('VOICE_HUB_STT_PREFERENCE', { env }) ||
     (process.platform === 'win32'
       ? 'server,faster_whisper,whisper_cpp,native_speech'
       : 'server,fluid_audio,mlx_whisper,whisper_cpp,native_speech')
