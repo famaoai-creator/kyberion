@@ -1,14 +1,9 @@
 import * as path from 'node:path';
 import { appendJsonLine } from './foundation/json.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeReadFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 
 const OPS_ALERT_LOG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/ops-alert-log-record.schema.json'
@@ -53,5 +48,5 @@ export function readOpsAlertLogText(filePath: string): { path: string; text: str
   const safeFilePath = resolveOpsAlertLogPath(filePath);
   if (!safeExistsSync(safeFilePath)) return null;
   ensureRegularOpsAlertLogFile(safeFilePath);
-  return { path: safeFilePath, text: safeReadFile(safeFilePath, { encoding: 'utf8' }) as string };
+  return { path: safeFilePath, text: readTextFile(safeFilePath) };
 }

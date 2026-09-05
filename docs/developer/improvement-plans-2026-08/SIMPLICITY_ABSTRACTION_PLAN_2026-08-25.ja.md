@@ -22473,3 +22473,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/project-trust.ts`、`libs/core/plugin-managed-install.ts`、`libs/core/knowledge-provider.ts`、`libs/core/project-management.ts`、`libs/core/persona-loader.ts`、`libs/core/procedure-registry.ts` と対象テスト
 - **変更**: project trust、managed plugin manifest、knowledge provider、project artifact、persona matrix、procedure catalog の本文読込を foundation の `readTextFile` へ移行した。各既存のpath／symlink／regular-file境界、catalog schema／dedup、project／procedure resolution semanticsは変更せず、procedure registry のテストseamを新しいreaderへ適応した。
 - **検証**: 対象テスト **7 files／59 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1546
+
+- **対象**: `libs/core/agent-instruction-loader.ts`、`libs/core/skill-resource-loader.ts`、`libs/core/plugin-pack.ts`、`libs/core/ops-alert-log.ts`、`libs/core/pipeline-run-journal.ts`、`libs/core/report-contract.ts`
+- **変更**: instruction override／skill resource、plugin pack manifest／import record、ops alert、pipeline journal、report schema prompt の本文読込を foundation の `readTextFile` へ移行した。各既存のpath scope／provenance、catalog・journal・report schema、append／write semanticsは変更せず、secure-io は存在・属性・書込・バイナリ用途に限定した。
+- **検証**: 対象テスト **5 files／48 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

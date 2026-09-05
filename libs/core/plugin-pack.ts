@@ -1,5 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 /**
  * Plugin packs — git-imported plugin collections (QM-07, ported from qm's
@@ -38,7 +38,6 @@ import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
   safeLstat,
@@ -248,7 +247,7 @@ export function listPackImportRecords(limit = 50, override?: string): PackImport
   const file = importLogPath(override);
   if (!safeExistsSync(file)) return [];
   const records: PackImportRecord[] = [];
-  for (const line of String(safeReadFile(file, { encoding: 'utf8' })).split('\n')) {
+  for (const line of readTextFile(file).split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
@@ -347,7 +346,7 @@ function manifestPluginId(dir: string): string | undefined {
     if (!manifestPath) continue;
     try {
       const parsed = parseSafeJsonInput(
-        String(safeReadFile(manifestPath, { encoding: 'utf8' })),
+        readTextFile(manifestPath),
         `plugin manifest ${manifestPath}`
       );
       if (!isRecord(parsed)) continue;
