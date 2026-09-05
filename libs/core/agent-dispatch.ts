@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getA2ARoute } from './a2a-route-port.js';
 import { logger } from './core.js';
 import { deriveAgentNhiId } from './agent-identity.js';
@@ -10,6 +11,10 @@ import {
   extractDelegationChainFromContext,
   type DelegationCapabilityTier,
 } from './delegation-chain.js';
+import { redactCollaborationSummary } from './agent-collaboration-events.js';
+import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   SUBAGENT_PROFILE_CLI_TOOLS,
   describeSubagentCapabilityCatalog,
@@ -22,7 +27,11 @@ import {
   createToolCallRepeatGovernorState,
   type ToolCallRepeatGovernorState,
 } from './tool-call-repeat-governor.js';
-import { getDefaultWorkerEventStream, type WorkerEventStream } from './worker-event-stream.js';
+import {
+  getDefaultWorkerEventStream,
+  type WorkerEventSource,
+  type WorkerEventStream,
+} from './worker-event-stream.js';
 import {
   withDelegationSlot,
   withWallClockBudget,
@@ -69,6 +78,179 @@ function dispatchWithConcurrencyGovernance<T>(
   wireDelegationKillSwitchIntegration();
   const provider = resolveDelegationProvider(backend);
   return withDelegationSlot({ provider }, () => withWallClockBudget({ provider }, fn));
+}
+
+/**
+ * AC-01: `resolveDelegationProvider` always resolves (falling back to the
+ * shared 'unknown' bucket) because XP-06 needs a bucket even when the
+ * provider is not recognized. Observability wants the opposite default —
+ * omit the field rather than emit a meaningless 'unknown' — so this narrows
+ * it to "known or absent".
+ */
+function resolveKnownDelegationProvider(backend: ReasoningBackend): string | undefined {
+  const provider = resolveDelegationProvider(backend);
+  return provider === 'unknown' ? undefined : provider;
+}
+
+/**
+ * AC-01: best-effort ambient mission id for the emitted worker-event
+ * envelope's `source`. Neither `ReasoningCallOptions` nor `DelegationChain`
+ * carry a mission id at this seam, so the only non-guessed source is the
+ * shared "current mission focus" file every mission-aware process already
+ * reads/writes (see `mission-system.ts` `buildMissionSystem`,
+ * `mission-state.ts` `readFocusedMissionId`/`writeFocusedMissionId`).
+ *
+ * This reads the file directly instead of calling `mission-state.ts`'s
+ * `readFocusedMissionId`: `mission-state.ts` imports `governance.ts`, whose
+ * own dependency chain (`approval-store.ts` → ... →
+ * `mission-workitem-dispatch-review.ts`) re-imports this very module,
+ * which would turn a single new import into a runtime cycle that the
+ * `check_module_boundaries.ts` SCC ratchet fails on. Best-effort by design:
+ * a missing file, unreadable file or malformed JSON all yield `undefined`
+ * rather than a guess (never the governed-catalog schema validation that
+ * `readFocusedMissionId` applies — this is observability metadata, not a
+ * governed read).
+ */
+function resolveAmbientMissionIdForEvents(): string | undefined {
+  try {
+    const focusPath = pathResolver.shared('runtime/current_mission_focus.json');
+    if (!safeExistsSync(focusPath)) return undefined;
+    const safePath = assertSafeRepositoryPath(focusPath);
+    const raw = String(safeReadFile(safePath, { encoding: 'utf8' }));
+    const parsed = parseSafeJsonInput(raw, 'current mission focus') as
+      { mission_id?: unknown } | undefined;
+    const missionId = typeof parsed?.mission_id === 'string' ? parsed.mission_id.trim() : '';
+    return missionId ? missionId.toUpperCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * AC-01: matches the placeholder actor `propagateDelegationChainThroughContext`
+ * stamps for a sub-worker that has no durable identity yet
+ * (`subagent:<dispatcher>:<tier>`, e.g. `subagent:harness-subagent:implementer`).
+ */
+const SUBAGENT_PLACEHOLDER_ACTOR_PATTERN = /^subagent:[^:]+:[^:]+$/;
+
+/**
+ * AC-01: the requesting/parent actor for the dispatch about to run, read
+ * from a delegation chain already embedded in `context` (see
+ * `delegation-chain.ts`). Absent, empty or malformed chains all yield
+ * `undefined` (never guessed); `propagateDelegationChainThroughContext`
+ * already fails the whole dispatch closed on a malformed chain before any
+ * dispatcher runs, so this only ever sees a well-formed chain or none.
+ *
+ * In the main production path (`DispatchingReasoningBackend.delegateTask`),
+ * `propagateDelegationChainThroughContext` has already appended *this
+ * dispatch's own* sub-worker placeholder link
+ * (`subagent:<dispatcher>:<tier>`) as the chain's last actor BEFORE calling
+ * `dispatch()` — so "last actor" there names the child about to run, not
+ * its parent. When the last link looks like that placeholder and a prior
+ * link exists, walk back one hop to the actor that actually requested this
+ * delegation (which may itself be a placeholder for a nested delegation —
+ * acceptable, since that nested placeholder is a real distinct parent
+ * agent from this dispatch's point of view).
+ */
+function resolveParentAgentIdFromContext(context: string | undefined): string | undefined {
+  const extracted = extractDelegationChainFromContext(context);
+  if (extracted.malformed || !extracted.chain || extracted.chain.length === 0) return undefined;
+  const chain = extracted.chain;
+  const lastActor = chain[chain.length - 1]?.actor;
+  if (lastActor && SUBAGENT_PLACEHOLDER_ACTOR_PATTERN.test(lastActor) && chain.length > 1) {
+    return chain[chain.length - 2]?.actor;
+  }
+  return lastActor;
+}
+
+/** AC-01: first 120 chars of the instruction, redacted the same way the shared collaboration projection redacts summaries — this is observability-only text and must never leak secrets either. */
+function summarizeInstructionForEvents(instruction: string): string {
+  return redactCollaborationSummary(instruction.slice(0, 120));
+}
+
+/**
+ * AC-01: one `delegation_id` correlates every `subagent_begin` /
+ * `subagent_end` / `subagent_unavailable` envelope for a single dispatch
+ * (KC-02 worker-event stream). Constructed once per `dispatch()` call and
+ * threaded through every emit site for that call.
+ */
+interface DelegationObservability {
+  readonly delegationId: string;
+  readonly startedAtMs: number;
+  /** Envelope `source`; `undefined` when neither mission nor parent agent is known. */
+  readonly source: WorkerEventSource | undefined;
+  /** Fields common to begin/end/unavailable for this one dispatch. */
+  readonly sharedFields: Record<string, unknown>;
+}
+
+function beginDelegationObservability(
+  instruction: string,
+  context: string | undefined,
+  backend: ReasoningBackend,
+  teamRole: string
+): DelegationObservability {
+  const delegationId = randomUUID();
+  const parentAgentId = resolveParentAgentIdFromContext(context);
+  const provider = resolveKnownDelegationProvider(backend);
+  const missionId = resolveAmbientMissionIdForEvents();
+  const sharedFields: Record<string, unknown> = {
+    delegation_id: delegationId,
+    team_role: teamRole,
+    // NI-03/AC-04: synthesized child identity — a process-spawned or
+    // generic-runtime sub-agent has no durable identity at this seam (see
+    // `propagateDelegationChainThroughContext`'s doc comment). Stays the
+    // same value on both `subagent_begin` and `subagent_end` so the
+    // projection sees one agent node per delegation; a native identity (when
+    // known) is carried separately in the existing `thread_id` field, never
+    // by overriding `agent_id`.
+    agent_id: `${teamRole}:${delegationId.slice(0, 8)}`,
+    instruction_summary: summarizeInstructionForEvents(instruction),
+    ...(parentAgentId ? { parent_agent_id: parentAgentId } : {}),
+    ...(provider ? { provider } : {}),
+  };
+  const source: WorkerEventSource = {};
+  if (missionId) source.mission_id = missionId;
+  // Per the multi-provider co-execution / EV-09 envelope contract: `source.agent_id`
+  // names the *emitting* actor (the parent doing the dispatching), distinct
+  // from `payload.agent_id` which names the child being spawned.
+  if (parentAgentId) source.agent_id = parentAgentId;
+  return {
+    delegationId,
+    startedAtMs: Date.now(),
+    source: Object.keys(source).length > 0 ? source : undefined,
+    sharedFields,
+  };
+}
+
+/**
+ * AC-01: end-only fields — `elapsed_ms`. `agent_id` is intentionally left
+ * as-is from `obs.sharedFields` (the synthesized child id, stable across
+ * begin/end); a native identity is carried separately via the existing
+ * `thread_id` field so the projection never sees two different agent nodes
+ * for one delegation.
+ */
+function endDelegationFields(obs: DelegationObservability): Record<string, unknown> {
+  return {
+    ...obs.sharedFields,
+    elapsed_ms: Date.now() - obs.startedAtMs,
+  };
+}
+
+/**
+ * Best-effort broadcast shared by every dispatcher that reports
+ * `subagent_*` events — a broken/absent stream must never break dispatch.
+ */
+function emitDelegationEvent(
+  stream: WorkerEventStream,
+  type: 'subagent_begin' | 'subagent_end' | 'subagent_unavailable',
+  payload: Record<string, unknown>,
+  source?: WorkerEventSource
+): void {
+  try {
+    stream.emit(type, payload, source);
+  } catch {
+    // Event stream projection is best-effort; it must never break dispatch.
+  }
 }
 
 /** Preserve the legacy two-argument call shape when no routing options exist. */
@@ -126,8 +308,64 @@ export class ProcessSpawnDispatcher implements AgentDispatcher {
     options?: ReasoningCallOptions
   ): Promise<string> {
     return dispatchWithConcurrencyGovernance(backend, () =>
-      delegateWithOptions(backend, instruction, context, options)
+      this.dispatchInner(instruction, context, backend, options)
     );
+  }
+
+  /**
+   * AC-01: begin/end observability around the same call this dispatcher has
+   * always made — dispatch args, ordering and result are unchanged; only
+   * the KC-02 worker-event envelope around it is new. `ProcessSpawnDispatcher`
+   * never fails closed on its own (no adopter/runtime concept), so it never
+   * has a `subagent_unavailable` case to report.
+   */
+  private async dispatchInner(
+    instruction: string,
+    context: string | undefined,
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    const stream = getDefaultWorkerEventStream();
+    const teamRole = resolveDelegationTier(options);
+    const obs = beginDelegationObservability(instruction, context, backend, teamRole);
+
+    emitDelegationEvent(
+      stream,
+      'subagent_begin',
+      { dispatcher: this.name, profile: teamRole, ...obs.sharedFields },
+      obs.source
+    );
+
+    try {
+      const result = await delegateWithOptions(backend, instruction, context, options);
+      emitDelegationEvent(
+        stream,
+        'subagent_end',
+        {
+          dispatcher: this.name,
+          profile: teamRole,
+          status: 'success',
+          ...endDelegationFields(obs),
+        },
+        obs.source
+      );
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      emitDelegationEvent(
+        stream,
+        'subagent_end',
+        {
+          dispatcher: this.name,
+          profile: teamRole,
+          status: 'failure',
+          error: message,
+          ...endDelegationFields(obs),
+        },
+        obs.source
+      );
+      throw err;
+    }
   }
 }
 
@@ -398,11 +636,15 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
   ): Promise<string> {
     const stream = getDefaultWorkerEventStream();
     const profile = this.resolveProfile(options);
+    // AC-01: one delegation_id correlates every event this dispatch emits.
+    const obs = beginDelegationObservability(instruction, context, backend, profile.name);
 
-    this.emit(stream, 'subagent_begin', {
-      dispatcher: this.name,
-      profile: profile.name,
-    });
+    this.emit(
+      stream,
+      'subagent_begin',
+      { dispatcher: this.name, profile: profile.name, ...obs.sharedFields },
+      obs.source
+    );
 
     const nativeAdopter = backend.getNativeSubagentAdopter?.();
     if (nativeAdopter) {
@@ -411,27 +653,40 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
           ...options,
           profile: profile.name,
         });
-        this.emit(stream, 'subagent_end', {
-          dispatcher: this.name,
-          adopter_id: nativeAdopter.id,
-          profile: profile.name,
-          status: 'success',
-          native: true,
-          ...nativeHarnessEventFields(nativeAdopter.id, nativeAdopter.getInfo?.()),
-        });
+        const nativeInfo = nativeHarnessEventFields(nativeAdopter.id, nativeAdopter.getInfo?.());
+        this.emit(
+          stream,
+          'subagent_end',
+          {
+            dispatcher: this.name,
+            adopter_id: nativeAdopter.id,
+            profile: profile.name,
+            status: 'success',
+            native: true,
+            ...endDelegationFields(obs),
+            ...nativeInfo,
+          },
+          obs.source
+        );
         return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) {
-          this.emitUnavailable(stream, profile.name, message, nativeAdopter.id);
+          this.emitUnavailable(stream, profile.name, message, obs, nativeAdopter.id);
         } else {
-          this.emit(stream, 'subagent_end', {
-            dispatcher: this.name,
-            adopter_id: nativeAdopter.id,
-            profile: profile.name,
-            status: 'failure',
-            error: message,
-          });
+          this.emit(
+            stream,
+            'subagent_end',
+            {
+              dispatcher: this.name,
+              adopter_id: nativeAdopter.id,
+              profile: profile.name,
+              status: 'failure',
+              error: message,
+              ...endDelegationFields(obs),
+            },
+            obs.source
+          );
         }
         throw err;
       }
@@ -440,19 +695,25 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
     if (backend.requiresNativeSubagent?.()) {
       const reason =
         'The selected backend requires a native subagent adopter, but none is available.';
-      this.emitUnavailable(stream, profile.name, reason);
+      this.emitUnavailable(stream, profile.name, reason, obs);
       throw new Error(`[SUBAGENT_UNAVAILABLE] ${reason}`);
     }
 
     if (!this.loadRuntime) {
       const reason = 'No provider-native adopter or governed runtime is configured.';
-      this.emit(stream, 'subagent_end', {
-        dispatcher: this.name,
-        profile: profile.name,
-        status: 'fallback',
-        fallback_to: this.fallback.name,
-        reason,
-      });
+      this.emit(
+        stream,
+        'subagent_end',
+        {
+          dispatcher: this.name,
+          profile: profile.name,
+          status: 'fallback',
+          fallback_to: this.fallback.name,
+          reason,
+          ...endDelegationFields(obs),
+        },
+        obs.source
+      );
       return delegateWithOptions(backend, instruction, context, options);
     }
 
@@ -464,13 +725,19 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
       logger.warn(
         `[agent-dispatch:harness-subagent] Agent SDK unavailable (${message}) — falling back to process-spawn delegation.`
       );
-      this.emit(stream, 'subagent_end', {
-        dispatcher: this.name,
-        profile: profile.name,
-        status: 'fallback',
-        fallback_to: this.fallback.name,
-        reason: message,
-      });
+      this.emit(
+        stream,
+        'subagent_end',
+        {
+          dispatcher: this.name,
+          profile: profile.name,
+          status: 'fallback',
+          fallback_to: this.fallback.name,
+          reason: message,
+          ...endDelegationFields(obs),
+        },
+        obs.source
+      );
       // XP-06: call the backend directly rather than `this.fallback.dispatch`
       // — this method already runs inside `dispatchWithConcurrencyGovernance`
       // (see `dispatch()` below), and nesting it via `ProcessSpawnDispatcher`
@@ -490,21 +757,33 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
         allowedTools: resolveHarnessAllowedTools(profile.name, runtime.allowedTools),
         canUseTool: runtime.createKyberionCanUseTool(),
       });
-      this.emit(stream, 'subagent_end', {
-        dispatcher: this.name,
-        profile: profile.name,
-        status: 'success',
-      });
+      this.emit(
+        stream,
+        'subagent_end',
+        {
+          dispatcher: this.name,
+          profile: profile.name,
+          status: 'success',
+          ...endDelegationFields(obs),
+        },
+        obs.source
+      );
       return result.text;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error(`[agent-dispatch:harness-subagent] Delegation failed: ${message}`);
-      this.emit(stream, 'subagent_end', {
-        dispatcher: this.name,
-        profile: profile.name,
-        status: 'failure',
-        error: message,
-      });
+      this.emit(
+        stream,
+        'subagent_end',
+        {
+          dispatcher: this.name,
+          profile: profile.name,
+          status: 'failure',
+          error: message,
+          ...endDelegationFields(obs),
+        },
+        obs.source
+      );
       throw err;
     }
   }
@@ -531,30 +810,34 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
   private emit(
     stream: WorkerEventStream,
     type: 'subagent_begin' | 'subagent_end' | 'subagent_unavailable',
-    payload: Record<string, unknown>
+    payload: Record<string, unknown>,
+    source?: WorkerEventSource
   ): void {
-    try {
-      stream.emit(type, payload);
-    } catch {
-      // Event stream projection is best-effort; it must never break dispatch.
-    }
+    emitDelegationEvent(stream, type, payload, source);
   }
 
   private emitUnavailable(
     stream: WorkerEventStream,
     profile: string,
     reason: string,
+    obs: DelegationObservability,
     adopterId?: string
   ): void {
     logger.warn(`[agent-dispatch:harness-subagent] Native subagent unavailable: ${reason}`);
-    this.emit(stream, 'subagent_unavailable', {
-      dispatcher: this.name,
-      profile,
-      ...(adopterId ? { adopter_id: adopterId } : {}),
-      reason,
-      fallback_allowed: false,
-      native_unavailable: true,
-    });
+    this.emit(
+      stream,
+      'subagent_unavailable',
+      {
+        dispatcher: this.name,
+        profile,
+        ...(adopterId ? { adopter_id: adopterId } : {}),
+        reason,
+        fallback_allowed: false,
+        native_unavailable: true,
+        ...obs.sharedFields,
+      },
+      obs.source
+    );
   }
 }
 
