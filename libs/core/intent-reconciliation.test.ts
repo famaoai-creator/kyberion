@@ -79,4 +79,21 @@ describe('intent reconciliation', () => {
     expect(result.satisfied).toBe(false);
     expect(result.gaps.length).toBeGreaterThan(0);
   });
+
+  it('does not treat a directory or path name as completion evidence', async () => {
+    safeMkdir(tmpDir, { recursive: true });
+    const directoryPath = `${tmpDir}/evidence-directory.md`;
+    safeMkdir(directoryPath, { recursive: true });
+
+    const result = await reconcileCompletion({
+      goal: {
+        summary: 'evidence-directory.md',
+        success_condition: 'evidence-directory.md',
+      },
+      evidenceRefs: [directoryPath],
+    });
+
+    expect(result.satisfied).toBe(false);
+    expect(result.gaps).toContain('evidence-directory.md');
+  });
 });

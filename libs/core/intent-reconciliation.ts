@@ -5,7 +5,7 @@ import {
 } from './reasoning-backend.js';
 import { logger } from './core.js';
 import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { clamp } from './foundation/text.js';
 import {
@@ -148,6 +148,7 @@ function readEvidenceText(ref: string): string {
     return '';
   }
   if (!safeExistsSync(safeRef)) return '';
+  if (!safeLstat(safeRef).isFile()) return '';
   const dotIndex = normalizedRef.lastIndexOf('.');
   if (dotIndex >= 0) {
     const ext = normalizedRef.slice(dotIndex).toLowerCase();
@@ -177,7 +178,7 @@ function collectEvidenceBundle(
   const bundle = [
     ...pathRefs.map((ref) => ({
       ref,
-      text: readEvidenceText(ref) || normalizeReconciliationText(ref),
+      text: readEvidenceText(ref),
     })),
     ...previewRefs,
   ];
@@ -202,7 +203,6 @@ function structuralReconcile(input: IntentReconciliationInput): CompletionReconc
 
   for (const segment of segments) {
     const matched = evidenceBundle.find((entry) => {
-      if (entry.ref.includes(segment)) return true;
       return segmentMatchesEvidence(segment, entry.text);
     });
     if (matched) {
