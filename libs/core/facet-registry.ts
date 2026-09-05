@@ -2,7 +2,7 @@ import * as path from 'node:path';
 
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { isManagedPluginActivationAllowed, listManagedPlugins } from './plugin-managed-install.js';
 import { type ResourceProvenance, type ResourceTrust } from './resource-provenance.js';
 
@@ -206,6 +206,9 @@ function readFacet(
   pluginId?: string
 ): ResolvedFacet {
   const safeFilePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[FACET_RESOURCE] facet must be a regular file: ${safeFilePath}`);
+  }
   const parsed = parseFrontmatter(safeReadFile(safeFilePath, { encoding: 'utf8' }) as string);
   return {
     kind,

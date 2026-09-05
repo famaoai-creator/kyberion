@@ -22029,3 +22029,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/promoted-memory.ts`、`libs/core/promoted-memory.test.ts`
 - **変更**: promoted memory の governance HINTS／superseded record read 前に operation-time の regular-file 検査を追加した。既存 knowledge artifact が directory 等へ置換された場合に空の hints や未存在 record として処理せず拒否し、通常の tier-aware promotion、hint rotation、superseded backlink semantics は維持した。
 - **検証**: promoted-memory **2 files / 18 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1472
+
+- **対象**: `libs/core/facet-registry.ts`、`libs/core/facet-registry.test.ts`
+- **変更**: managed／tenant／product facet の content read 前に operation-time の regular-file 検査を追加した。facet resource が directory 等へ置換された場合に内容 reader へ渡さず明示拒否し、既存の tier／tenant precedence、managed-pack provenance、symlink boundary semantics は維持した。
+- **検証**: facet-registry **2 files / 7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
