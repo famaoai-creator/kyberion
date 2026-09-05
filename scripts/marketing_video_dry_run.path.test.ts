@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { runMarketingVideoDryRun } from './marketing_video_dry_run.js';
@@ -22,6 +23,11 @@ afterEach(() => {
 });
 
 describe('marketing video dry-run path boundaries', () => {
+  it('uses the foundation reader for approved text artifacts', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/marketing_video_dry_run.ts'));
+    expect(source).toContain('parseSafeJsonObjectInput, readTextFile');
+  });
+
   it('rejects a campaign brief outside the repository', () => {
     expect(() =>
       runMarketingVideoDryRun({

@@ -18,13 +18,12 @@ import {
   safeExistsSync,
   safeMkdir,
   safeMoveSync,
-  safeReadFile,
   safeReaddir,
   safeLstat,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { readSafeJsonValueFile } from './lib/json-input.js';
@@ -249,7 +248,7 @@ function requireRegularMigrationFile(source: string): string {
 }
 
 function parseRows(source: string): ParsedRow[] {
-  const raw = String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' }) || '');
+  const raw = readTextFile(requireRegularMigrationFile(source));
   if (source.endsWith('.jsonl')) {
     return raw
       .split(/\r?\n/u)
@@ -334,7 +333,7 @@ function buildSourceItem(
     tenantIdOverride?: string;
   }
 ): SourceItem {
-  const raw = String(safeReadFile(source, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(source);
   const rows = parseRows(source);
   const byTenant = new Map<string, ParsedRow[]>();
   let unknown = 0;
@@ -431,7 +430,7 @@ export function applyPeerTenantMigrationPlan(
       for (const item of plan.sources) {
         if (!safeExistsSync(item.source))
           throw new Error(`peer_migration_source_missing:${item.source}`);
-        const currentRaw = String(safeReadFile(item.source, { encoding: 'utf8' }) || '');
+        const currentRaw = readTextFile(item.source);
         if (sha256(currentRaw) !== item.source_sha256) {
           throw new Error(`peer_migration_source_changed:${item.source}`);
         }
