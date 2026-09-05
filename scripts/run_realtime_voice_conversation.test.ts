@@ -282,5 +282,7 @@ describe('run_realtime_voice_conversation cli', () => {
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('process.stdout.write');
     expect(source).not.toContain('process.stderr.write');
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 });
