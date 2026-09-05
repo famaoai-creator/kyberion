@@ -1360,3 +1360,9 @@ voice task profile catalogに残っていた空配列fallbackを削除し、必�
 actuator op registryに残っていた空registry fallbackとconfig fallback記録経路を削除し、必須のgovernance registryが欠損・不正な場合は `defineCatalog` のmissing／validation errorを実行解決へ伝播するfail-closed境界へ統一した。plugin operation登録、built-in control op、manifest／capability検証、未知opのsuggestionは変更していない。
 
 検証: actuator-op-registry **1 file / 13 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 158
+
+service bootstrapのpublic正本とservice onboarding catalogに残っていた空配列fallbackを削除し、必須のgovernance catalogが欠損・不正な場合はmissing／validation errorを返すfail-closed境界へ統一した。未配置が許容されたpersonal bootstrap overlay、サービス選択・utterance matching・onboarding metadataの既存semanticsは変更していない。
+
+検証: service-bootstrap／service-onboarding **2 files / 8 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
