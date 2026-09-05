@@ -22155,3 +22155,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_script_integrity.ts`、`scripts/check_script_integrity.test.ts`
 - **変更**: script integrity checker の production source／package entrypoint／docs scan 本文読込を foundation の `readTextFile` へ統一した。direct-script guard、harness判定、package／pipeline／documentation path検査のsemanticsは変更せず、SX-07 gate自身に残っていた旧 `safeReadFile` 直読4箇所を削減し、source contract testで再導入を検出する。
 - **検証**: check-script-integrity **7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1493
+
+- **対象**: `scripts/check_i18n_hardcoding.ts`、`scripts/check_i18n_hardcoding.test.ts`
+- **変更**: SX-14 i18n hardcoding checker の workspace scan 本文読込を foundation の `readTextFile` へ移行した。AST検出、baseline ratchet、exemption、JSON／human-readable reportのsemanticsは変更せず、checkerに残っていた旧 `safeReadFile` 直読を削減し、source contract testで再導入を検出する。
+- **検証**: i18n-hardcoding **既存テスト＋reader contract**、対象 ESLint、Prettier、`git diff --check`。現行の未関連meeting selector変更によりchecker実測は別途 baseline増加を報告するため、全体i18n gate greenとは扱わない。

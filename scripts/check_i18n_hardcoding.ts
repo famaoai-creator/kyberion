@@ -13,8 +13,8 @@
 import * as path from 'node:path';
 import ts from 'typescript';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeStat, safeReaddir } from '@agent/core/secure-io';
-import { nowIso } from '@agent/core/foundation';
+import { safeExistsSync, safeStat, safeReaddir } from '@agent/core/secure-io';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import {
   loadI18nHardcodingBaselineAtPath,
   writeI18nHardcodingBaselineAtPath,
@@ -189,7 +189,7 @@ function scanTree(scanRoots: string[]): {
 
       checkedFiles += 1;
       scannedFiles.add(repoRelativePath);
-      const text = String(safeReadFile(filePath, { encoding: 'utf8' }));
+      const text = readTextFile(filePath);
       const { count, exemptions } = scanFileForKanaLiterals(text, repoRelativePath);
       exemptionCount += exemptions;
       if (count > 0) currentCounts[repoRelativePath] = count;

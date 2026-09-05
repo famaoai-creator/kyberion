@@ -114,6 +114,17 @@ describe('isTestFile / isExcludedFile', () => {
 });
 
 describe('checkI18nHardcoding', () => {
+  it('uses the foundation text reader for workspace scans', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_i18n_hardcoding.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(filePath');
+  });
+
   afterEach(() => {
     if (safeExistsSync(FIXTURE_DIR)) {
       safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
