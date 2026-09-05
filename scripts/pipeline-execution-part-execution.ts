@@ -1,7 +1,8 @@
 import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { classifyError } from '@agent/core/error-classifier';
 import { logger } from '@agent/core/core';
-import { safeReadFile, safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning-backend';
@@ -930,7 +931,7 @@ export async function runStepsInternal(
           `core:include: circular reference detected — ${fragmentRef} is already in the include chain`
         );
       }
-      const fragmentRaw = String(safeReadFile(fragmentPath, { encoding: 'utf8' }));
+      const fragmentRaw = readTextFile(fragmentPath);
       const fragmentJson = parseFragmentJson(fragmentRaw, fragmentRef);
       const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({
         ...s,

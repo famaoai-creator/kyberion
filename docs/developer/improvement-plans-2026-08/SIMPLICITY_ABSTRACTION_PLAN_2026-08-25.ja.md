@@ -22437,3 +22437,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/scenario_storage_governance.ts`、`scripts/source_archive.ts`、`scripts/claude_code_hook.ts`、`scripts/mission-alignment-gate/read-decision.ts` と対象テスト
 - **変更**: scenario log、source archive checksum manifest、Claude hook transcript、mission alignment HTML の本文読込を foundation の `readTextFile` へ移行した。archive／screen recordingのバイナリ読込、scenario／hook／alignmentの既存境界・出力 semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **4 files／12 tests passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1540
+
+- **対象**: `scripts/run_baseline_check.ts`、`scripts/soak_endurance.ts`、`scripts/pipeline-execution-part-execution.ts` と対象テスト
+- **変更**: baseline config、soak evidence、pipeline fragment の本文読込を foundation の `readTextFile` へ移行した。baseline／soak／pipelineの既存実行・環境境界・evidence semanticsは変更せず、reader contract を追加した。
+- **検証**: 対象テスト **3 files／40 tests passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
