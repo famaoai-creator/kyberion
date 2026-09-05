@@ -1,12 +1,12 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { SPECIALIST_IDS } from './specialist-ids.js';
@@ -395,7 +395,7 @@ export function materializeTrackArtifactSkeleton(input: {
     safeMkdir(targetDir, { recursive: true });
   }
   if (!safeExistsSync(targetPath)) {
-    const templateBody = safeReadFile(templatePath, { encoding: 'utf8' }) as string;
+    const templateBody = readTextFile(templatePath);
     safeWriteFile(
       targetPath,
       `<!-- Instantiated from ${input.proposal.template_ref} -->\n${templateBody}`
