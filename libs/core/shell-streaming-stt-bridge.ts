@@ -209,7 +209,7 @@ export function installShellStreamingSttBridgeFromEnv(): { installed: boolean; r
 export function installManagedMlxWhisperStreamingSttBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): { installed: boolean; reason?: string; bridge_id?: string } {
-  if (env.KYBERION_STT_COMMAND?.trim()) {
+  if (getRegisteredEnvText('KYBERION_STT_COMMAND', { env })?.trim()) {
     return { installed: false, reason: 'KYBERION_STT_COMMAND already configured' };
   }
   const command = resolveManagedToolPythonBin('mlx_whisper');
