@@ -73,4 +73,13 @@ describe('wire error boundary checker', () => {
       )
     ).toEqual([]);
   });
+
+  it('rejects raw exception messages in Computer Surface JSON responses', () => {
+    expect(
+      findWireErrorBoundaryViolations(
+        'return res.status(403).json({ ok: false, error: error instanceof Error ? error.message : "Forbidden." });',
+        'presence/displays/computer-surface/server.ts'
+      )
+    ).toEqual([expect.stringContaining('raw exception message')]);
+  });
 });

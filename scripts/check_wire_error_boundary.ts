@@ -27,6 +27,7 @@ export const WIRE_ERROR_BOUNDARY_FILES = [
   'presence/displays/presence-studio/server.ts',
   'presence/displays/presence-studio/presence-studio-runtime-data.ts',
   'scripts/browser_bridge_host.ts',
+  'presence/displays/computer-surface/server.ts',
 ];
 const DEFAULT_WIRE_ERROR_FILE = WIRE_ERROR_BOUNDARY_FILES[0];
 
@@ -50,9 +51,9 @@ export function findWireErrorBoundaryViolations(
   if (file.includes('/app/api/') && /\bdebug(?:Error|Stack)\s*:/u.test(source)) {
     findings.push(`${file}: raw debug error fields are exposed on the wire`);
   }
-  if (file.includes('/presence-studio/')) {
+  if (file.includes('/presence-studio/') || file.includes('/computer-surface/')) {
     const rawJsonPattern =
-      /\.json\(\s*\{[^}]{0,400}?\berror:\s*(?:err|error)(?:\.|\?\.)message\b|\.json\(\s*\{[^}]{0,400}?\berror:\s*`[^`]*\$\{(?:err|error)/gu;
+      /\.json\(\s*\{[^}]{0,400}?\berror:\s*(?:err|error)(?:\.|\?\.)message\b|\.json\(\s*\{[^}]{0,400}?\berror:\s*(?:err|error)\s+instanceof\s+Error\s*\?\s*(?:err|error)(?:\.|\?\.)message\b|\.json\(\s*\{[^}]{0,400}?\berror:\s*`[^`]*\$\{(?:err|error)/gu;
     for (const match of source.matchAll(rawJsonPattern)) {
       findings.push(`${file}: raw exception message in JSON error near offset ${match.index}`);
     }
