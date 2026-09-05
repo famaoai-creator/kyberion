@@ -233,6 +233,9 @@ export function draftContractForDeal(input: {
     );
   }
   if (!safeExistsSync(templateFile)) throw new Error(`contract_template_missing:${templateFile}`);
+  if (!safeLstat(templateFile).isFile()) {
+    throw new Error(`contract_template_must_be_a_regular_file:${templateFile}`);
+  }
   const template = String(safeReadFile(templateFile, { encoding: 'utf8' }));
   const rendered = template
     .split('{{DATE}}')

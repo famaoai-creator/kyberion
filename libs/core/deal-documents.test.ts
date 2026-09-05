@@ -1,8 +1,9 @@
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from './authority.js';
-import { openDeal } from './deal-store.js';
+import { advanceDealStage, openDeal } from './deal-store.js';
 import {
+  draftContractForDeal,
   generateQuoteForDeal,
   loadContractReviewAtPath,
   recordContractReview,
@@ -90,6 +91,50 @@ describe('deal document contract review loader', () => {
     withExecutionContext('mission_controller', () => safeMkdir(filePath, { recursive: true }));
 
     expect(() => loadContractReviewAtPath(filePath, TENANT, DEAL_ID, 1)).toThrow('regular file');
+  });
+
+  it('rejects a directory used as a contract template', () => {
+    const knowledgeRoot = pathResolver.sharedTmp('deal-documents-template-test');
+    const templatePath = path.join(knowledgeRoot, 'templates', 'contract.md');
+    const knowledgeSpy = vi
+      .spyOn(pathResolver, 'knowledge')
+      .mockImplementation((subPath = '') => path.join(knowledgeRoot, subPath));
+    safeMkdir(templatePath, { recursive: true });
+
+    try {
+      const deal = withExecutionContext('mission_controller', () =>
+        openDeal({
+          tenantSlug: TENANT,
+          surface: 'test',
+          channelId: 'channel-template',
+          summary: 'contract template boundary test',
+        })
+      );
+      withExecutionContext('mission_controller', () =>
+        advanceDealStage({
+          tenantSlug: TENANT,
+          dealId: deal.deal_id,
+          stage: 'quote',
+          agreed: {
+            scope: ['template boundary'],
+            amount: { value: 1000, currency: 'JPY' },
+          },
+        })
+      );
+
+      expect(() =>
+        withExecutionContext('mission_controller', () =>
+          draftContractForDeal({
+            tenantSlug: TENANT,
+            dealId: deal.deal_id,
+            templatePath: 'templates/contract.md',
+          })
+        )
+      ).toThrow('contract_template_must_be_a_regular_file');
+    } finally {
+      safeRmSync(knowledgeRoot, { recursive: true, force: true });
+      knowledgeSpy.mockRestore();
+    }
   });
 
   it('persists deterministic quotes through the quote schema boundary', () => {
