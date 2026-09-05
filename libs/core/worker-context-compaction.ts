@@ -20,16 +20,11 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { readTextFile } from './foundation/text.js';
 import { metrics } from './metrics.js';
 import type { MissionWorkingMemory } from './mission-working-memory.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { notifyAllDynamicInjectionRegistries } from './dynamic-injection.js';
 import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from './lifecycle-hook-engine.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
@@ -302,7 +297,7 @@ function extractPreviousSummary(messages: readonly WorkerContextMessage[]): stri
 
 function loadUpdateSummaryPrompt(): string {
   if (!safeExistsSync(UPDATE_SUMMARY_PROMPT_PATH)) return FALLBACK_UPDATE_SUMMARY_PROMPT;
-  return String(safeReadFile(UPDATE_SUMMARY_PROMPT_PATH, { encoding: 'utf8' }) || '').trim();
+  return readTextFile(UPDATE_SUMMARY_PROMPT_PATH).trim();
 }
 
 function renderUpdateSummaryInput(transcript: string, context: CompactionSummaryContext): string {

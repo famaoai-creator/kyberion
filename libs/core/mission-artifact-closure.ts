@@ -1,6 +1,7 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
 /**
  * AL-03: mission finish / task completion artifact closure.
  *
@@ -36,7 +37,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -164,7 +164,7 @@ function readIndexLines(indexPath: string): IndexLine[] {
   if (!safeExistsSync(indexPath)) return [];
   ensureRegularScopedArtifactIndex(indexPath);
   const catalog = scopedArtifactIndexCatalog(indexPath);
-  return String(safeReadFile(indexPath, { encoding: 'utf8' }))
+  return readTextFile(indexPath)
     .split('\n')
     .filter((line) => line.trim().length > 0)
     .map((raw, index) => {

@@ -29,6 +29,14 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('./foundation/text.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./foundation/text.js')>();
+  return {
+    ...actual,
+    readTextFile: (filePath: string) => mocks.safeReadFile(filePath),
+  };
+});
+
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
   return { ...actual, spawn: mocks.spawnMock };
