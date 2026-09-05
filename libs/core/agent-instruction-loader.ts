@@ -53,6 +53,14 @@ function provenanceFor(filePath: string, replaced: boolean): ResourceProvenance 
   };
 }
 
+function assertInstructionRegularFile(filePath: string): void {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(
+      `[AGENT_INSTRUCTION_RESOURCE] instruction contract must be a regular file: ${filePath}`
+    );
+  }
+}
+
 /**
  * Resolve the nearest contract without allowing an override file inside a
  * git worktree to shadow the repository contract. An override at the nearest
@@ -84,6 +92,7 @@ export function loadAgentInstructionResource(
     // input. A pre-trust caller may still discover the canonical contract,
     // but must not consume an override before project trust is resolved.
     if (options.trustResolved === true && !worktree && safeExistsSync(overridePath)) {
+      assertInstructionRegularFile(overridePath);
       return {
         path: overridePath,
         content: String(safeReadFile(overridePath, { encoding: 'utf8' }) || ''),
@@ -92,6 +101,7 @@ export function loadAgentInstructionResource(
       };
     }
     if (safeExistsSync(basePath)) {
+      assertInstructionRegularFile(basePath);
       return {
         path: basePath,
         content: String(safeReadFile(basePath, { encoding: 'utf8' }) || ''),
