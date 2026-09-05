@@ -7,6 +7,7 @@
  */
 
 import { logger } from '../core.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExec, safeExistsSync, assertSafeRepositoryPath } from '../secure-io.js';
@@ -130,7 +131,7 @@ function evaluateManifestCapability(capability: ManifestCapability): ActuatorCap
     if (!hasBinary(binary)) missing.push(`missing binary: ${binary}`);
   }
   for (const envName of envRequirements) {
-    if (!process.env[envName]) missing.push(`missing env: ${envName}`);
+    if (!getRegisteredEnvText(envName)) missing.push(`missing env: ${envName}`);
   }
   for (const service of serviceRequirements) {
     missing.push(`service prerequisite requires a dedicated probe: ${service}`);
