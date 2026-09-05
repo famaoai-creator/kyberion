@@ -3,7 +3,7 @@ import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
 import { validateService } from '@agent/core/service-validator';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { isVitestProcess, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, isVitestProcess, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -691,7 +691,7 @@ export function resolveProviderCapabilitiesSnapshot(deps: {
 
 function getProviderCapabilitiesSnapshot(): ProviderCapabilitiesSnapshot {
   return resolveProviderCapabilitiesSnapshot({
-    probingEnabled: process.env[PROVIDER_CAPABILITY_PROBE_ENV] !== '0',
+    probingEnabled: getRegisteredEnvText(PROVIDER_CAPABILITY_PROBE_ENV) !== '0',
     peek: () => peekProviderCapabilityRegistry(),
     load: () => loadProviderCapabilityRegistry({ maxAgeMs: DEFAULT_PROVIDER_CAPABILITY_TTL_MS }),
   });
@@ -730,7 +730,7 @@ export async function runBaselineCheck() {
     summary: EMPTY_PROVIDER_CAPABILITIES_SUMMARY,
     cached: false,
     age_ms: null,
-    probing_enabled: process.env[PROVIDER_CAPABILITY_PROBE_ENV] !== '0',
+    probing_enabled: getRegisteredEnvText(PROVIDER_CAPABILITY_PROBE_ENV) !== '0',
   };
   try {
     providerCapabilities = getProviderCapabilitiesSnapshot();
