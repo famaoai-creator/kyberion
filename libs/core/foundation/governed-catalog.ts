@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { compileSchema } from './ajv.js';
 import { readJson } from './json.js';
 import { getFoundationIo } from './io.js';
+import { readTextFile } from './text.js';
 import type { ValidateFunction } from 'ajv';
 import { withLockSync } from '../src/lock-utils.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
@@ -114,7 +115,7 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
       const catalogPath = assertSafeRepositoryPath(resolvePath(), { allowMissingLeaf: true });
       const io = getFoundationIo();
       if (!io.exists(catalogPath)) return null;
-      return contentGeneration(io.readFile(catalogPath));
+      return contentGeneration(readTextFile(catalogPath));
     },
     publish(value: unknown, expectedGeneration: string | null): string {
       const catalogPath = assertSafeRepositoryPath(resolvePath(), { allowMissingLeaf: true });
@@ -125,7 +126,7 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
         const currentGeneration = (() => {
           const io = getFoundationIo();
           if (!io.exists(catalogPath)) return null;
-          return contentGeneration(io.readFile(catalogPath));
+          return contentGeneration(readTextFile(catalogPath));
         })();
         if (currentGeneration !== expectedGeneration) {
           throw new Error(
