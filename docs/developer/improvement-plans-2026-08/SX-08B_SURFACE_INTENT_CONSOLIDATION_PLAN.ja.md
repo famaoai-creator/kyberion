@@ -892,3 +892,9 @@ untrusted-contentのmission state更新で残っていた `MISSION_ID` の環境
 ingest commitのidentity fallbackとsecret actuatorのephemeral mission／ledger roleに残っていた `MISSION_ROLE`／`MISSION_ID` の環境直読を、登録済みenv accessorへ移行した。明示identity、persona優先、ephemeral mission生成、監査ledgerのrole、既存のsecure mutation境界は変更しない。
 
 検証: ingest／secret actuator関連テスト、actuator build、root typecheck、対象ESLint、Prettier、`git diff --check`。残るactuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 80
+
+service actuatorのsecurity scope mission bindingとmeeting actuatorのvoice-consent／実行fallbackに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。security scopeの照合、voice-consentのmission evidence解決、明示 `mission_id` 優先の既存 semanticsは変更していない。
+
+検証: service／meeting actuator **2 files / 37 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るactuator／scriptの環境境界と外部provider実機確認は継続課題とする。
