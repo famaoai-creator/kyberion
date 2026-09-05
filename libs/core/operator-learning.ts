@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
-import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
@@ -292,193 +291,6 @@ const OPERATOR_LEARNING_PROMOTION_RECORD_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/operator-learning-promotion-record.schema.json'
 );
 
-const FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY: OperatorLearningDispatchRegistry = {
-  version: 'fallback',
-  rules: [
-    {
-      rule_id: 'executive-decision-support',
-      priority: 100,
-      match: {
-        intent_ids: [
-          'executive-strategy-brief',
-          'executive-prioritization',
-          'executive-reporting',
-          'stakeholder-communication',
-          'sales-account-strategy',
-        ],
-      },
-      dispatch: {
-        decision_style_observed: 'executive_options_with_recommendation',
-        recurring_task_candidate: ['executive_decision_support'],
-      },
-    },
-    {
-      rule_id: 'technical-decision-support',
-      priority: 95,
-      match: {
-        intent_ids: ['technical-decision-memo'],
-      },
-      dispatch: {
-        decision_style_observed: 'decision_memo_with_tradeoffs',
-        recurring_task_candidate: ['technical_decision_support'],
-      },
-    },
-    {
-      rule_id: 'llm-provider-selection',
-      priority: 90,
-      match: {
-        intent_ids: ['llm-provider-selection'],
-      },
-      dispatch: {
-        decision_style_observed: 'technical_evaluation',
-        recurring_task_candidate: ['provider_selection'],
-      },
-    },
-    {
-      rule_id: 'agent-runtime-tuning',
-      priority: 90,
-      match: {
-        intent_ids: ['agent-runtime-tuning'],
-      },
-      dispatch: {
-        decision_style_observed: 'technical_evaluation',
-        recurring_task_candidate: ['runtime_tuning'],
-      },
-    },
-    {
-      rule_id: 'knowledge-query',
-      priority: 90,
-      match: {
-        intent_ids: ['knowledge-query'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['knowledge_query'],
-      },
-    },
-    {
-      rule_id: 'browser-navigation',
-      priority: 90,
-      match: {
-        intent_ids: ['open-site', 'browser-step'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['browser_navigation'],
-      },
-    },
-    {
-      rule_id: 'approval-workflow',
-      priority: 90,
-      match: {
-        intent_ids: ['request-approval', 'resolve-approval'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['approval_workflow'],
-      },
-    },
-    {
-      rule_id: 'kyberion-runtime-expansion',
-      priority: 87,
-      match: {
-        intent_ids: [
-          'bootstrap-kyberion-runtime',
-          'verify-environment-readiness',
-          'configure-reasoning-backend',
-          'register-actuator-adapter',
-        ],
-      },
-      dispatch: {
-        recurring_task_candidate: ['kyberion_runtime_expansion'],
-      },
-    },
-    {
-      rule_id: 'onboarding-toolchain-setup',
-      priority: 86,
-      match: {
-        intent_ids: ['configure-organization-toolchain'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['onboarding_setup'],
-      },
-    },
-    {
-      rule_id: 'onboarding-first-run',
-      priority: 86,
-      match: {
-        intent_ids: ['launch-first-run-onboarding'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['onboarding_setup'],
-      },
-    },
-    {
-      rule_id: 'onboarding-presentation-preferences',
-      priority: 86,
-      match: {
-        intent_ids: ['register-presentation-preference-profile'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['onboarding_setup'],
-      },
-    },
-    {
-      rule_id: 'kyberion-system-observability',
-      priority: 87,
-      match: {
-        intent_ids: [
-          'check-kyberion-baseline',
-          'check-kyberion-vital',
-          'diagnose-kyberion-system',
-          'inspect-runtime-supervisor',
-          'inspect-mission-state',
-        ],
-      },
-      dispatch: {
-        recurring_task_candidate: ['kyberion_system_observability'],
-      },
-    },
-    {
-      rule_id: 'service-lifecycle',
-      priority: 88,
-      match: {
-        intent_ids: ['start-service', 'stop-service'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['service_lifecycle'],
-      },
-    },
-    {
-      rule_id: 'approval-threshold-risk',
-      priority: 80,
-      match: {
-        risk_profiles: ['approval_required', 'high_stakes'],
-      },
-      dispatch: {
-        approval_threshold_observed: ['high_risk_action'],
-      },
-    },
-    {
-      rule_id: 'approval-threshold-external-service',
-      priority: 75,
-      match: {
-        targets: ['external_service'],
-      },
-      dispatch: {
-        approval_threshold_observed: ['external_side_effect'],
-      },
-    },
-    {
-      rule_id: 'approval-threshold-llm',
-      priority: 70,
-      match: {
-        categories: ['llm_reasoning_setup'],
-      },
-      dispatch: {
-        approval_threshold_observed: ['org_policy_change'],
-      },
-    },
-  ],
-};
-
 const dispatchRegistryCatalogs = new Map<
   string,
   GovernedCatalog<OperatorLearningDispatchRegistry>
@@ -487,7 +299,7 @@ const dispatchRegistryCatalogs = new Map<
 function getDispatchRegistryCatalog(
   registryPath: string
 ): GovernedCatalog<OperatorLearningDispatchRegistry> {
-  const safeRegistryPath = assertSafeRepositoryPath(registryPath);
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
   const existing = dispatchRegistryCatalogs.get(safeRegistryPath);
   if (existing) return existing;
   const catalog = defineCatalog<OperatorLearningDispatchRegistry>({
@@ -496,13 +308,6 @@ function getDispatchRegistryCatalog(
     schema: pathResolver.knowledge(
       'product/schemas/operator-learning-dispatch-registry.schema.json'
     ),
-    fallback: FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY,
-    fallbackOnInvalid: true,
-    onFallback: (error) => {
-      logger.warn(
-        `[OPERATOR_LEARNING_DISPATCH_REGISTRY] Failed to load registry at ${safeRegistryPath}: ${String(error)}`
-      );
-    },
   });
   dispatchRegistryCatalogs.set(safeRegistryPath, catalog);
   return catalog;
@@ -537,7 +342,9 @@ function getConfidentialOperatorLearningDispatchRegistryPath(): string | null {
 }
 
 function loadDispatchRegistryFromPath(registryPath: string): OperatorLearningDispatchRegistry {
-  return getDispatchRegistryCatalog(assertSafeRepositoryPath(registryPath)).load();
+  return getDispatchRegistryCatalog(
+    assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true })
+  ).load();
 }
 
 function mergeDispatchRegistries(
@@ -574,28 +381,16 @@ export function getOperatorLearningDispatchRegistry(): OperatorLearningDispatchR
   }
 
   const safeRegistryPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
-  try {
-    let parsed = loadDispatchRegistryFromPath(safeRegistryPath);
-    if (confidentialOverlayPath) {
-      parsed = mergeDispatchRegistries(
-        parsed,
-        loadDispatchRegistryFromPath(confidentialOverlayPath)
-      );
-    }
-    if (personalOverlayPath) {
-      parsed = mergeDispatchRegistries(parsed, loadDispatchRegistryFromPath(personalOverlayPath));
-    }
-    operatorLearningDispatchRegistryCachePath = cacheKey;
-    operatorLearningDispatchRegistryCache = parsed;
-    return parsed;
-  } catch (error: any) {
-    logger.warn(
-      `[OPERATOR_LEARNING_DISPATCH_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
-    );
-    operatorLearningDispatchRegistryCachePath = cacheKey;
-    operatorLearningDispatchRegistryCache = FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY;
-    return operatorLearningDispatchRegistryCache;
+  let parsed = loadDispatchRegistryFromPath(safeRegistryPath);
+  if (confidentialOverlayPath) {
+    parsed = mergeDispatchRegistries(parsed, loadDispatchRegistryFromPath(confidentialOverlayPath));
   }
+  if (personalOverlayPath) {
+    parsed = mergeDispatchRegistries(parsed, loadDispatchRegistryFromPath(personalOverlayPath));
+  }
+  operatorLearningDispatchRegistryCachePath = cacheKey;
+  operatorLearningDispatchRegistryCache = parsed;
+  return parsed;
 }
 
 function matchDispatchRule(

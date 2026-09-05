@@ -16,23 +16,44 @@ describe('operator-learning dispatch registry', () => {
     expect(registry.rules.length).toBeGreaterThan(0);
   });
 
-  it('uses the governed catalog fallback when the base registry is missing', () => {
+  it('fails closed when the base registry is missing', () => {
     const missingPath = pathResolver.sharedTmp('operator-learning-dispatch-registry-missing.json');
     const originalEnv = process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
     try {
       process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = missingPath;
       _resetOperatorLearningDispatchRegistryCacheForTests();
 
-      const registry = getOperatorLearningDispatchRegistry();
-
-      expect(registry.version).toBe('fallback');
-      expect(registry.rules.length).toBeGreaterThan(0);
+      expect(() => getOperatorLearningDispatchRegistry()).toThrow(
+        'Catalog operator-learning-dispatch-registry is missing'
+      );
     } finally {
       if (originalEnv === undefined) {
         delete process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
       } else {
         process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = originalEnv;
       }
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+    }
+  });
+
+  it('fails closed when the base registry violates its schema', () => {
+    const invalidPath = pathResolver.sharedTmp('operator-learning-dispatch-registry-invalid.json');
+    const originalEnv = process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+    try {
+      safeWriteFile(invalidPath, '{"version":"1.0.0","rules":[{"rule_id":42}]}\n');
+      process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = invalidPath;
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+
+      expect(() => getOperatorLearningDispatchRegistry()).toThrow(
+        'Invalid catalog operator-learning-dispatch-registry'
+      );
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+      } else {
+        process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = originalEnv;
+      }
+      safeRmSync(invalidPath, { force: true });
       _resetOperatorLearningDispatchRegistryCacheForTests();
     }
   });
