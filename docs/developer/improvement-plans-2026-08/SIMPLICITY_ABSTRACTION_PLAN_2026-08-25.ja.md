@@ -21580,6 +21580,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: mesh peer directoryのregistrations／presence／capabilities JSONL readerにoperation-timeのregular-file検査を追加した。tenant pathの既存symlink境界、missing fileの空配列、governed writerとpeer eligibility semanticsは維持し、peer record leaf symlinkを拒否する回帰テストを追加した。
 - **検証**: mesh-peer-directory **1 file / 10 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1398
+
+- **対象**: `libs/core/mission-graph-run-journal.ts`、`libs/core/mission-graph-run-journal.test.ts`
+- **変更**: mission graph run journalのresume readとfenced appendへ共通のoperation-time regular-file検査を導入した。既存mission／coordination pathのsymlink境界、missing journalの作成、sequence／schema検証は維持し、既存journal fileのsymlink置換をappend前に拒否する回帰テストを追加した。
+- **検証**: mission-graph-run-journal **1 file / 7 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`
