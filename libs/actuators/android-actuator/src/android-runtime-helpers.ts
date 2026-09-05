@@ -49,28 +49,10 @@ interface AndroidUiDefaults {
   };
 }
 
-const FALLBACK_ANDROID_UI_DEFAULTS: AndroidUiDefaults = {
-  login: {
-    email: { resource_id: 'email', class_name: 'EditText' },
-    password: { resource_id: 'password', class_name: 'EditText' },
-    submit: { text: 'sign in', resource_id: 'sign_in', class_name: 'Button' },
-  },
-  passkey: {
-    trigger: { text: 'passkey', class_name: 'Button' },
-  },
-};
-
 const androidUiDefaultsCatalog = defineCatalog<AndroidUiDefaults>({
   id: 'android-ui-defaults',
   path: ANDROID_UI_DEFAULTS_PATH,
   schema: ANDROID_UI_DEFAULTS_SCHEMA_PATH,
-  fallback: FALLBACK_ANDROID_UI_DEFAULTS,
-  fallbackOnInvalid: true,
-  onFallback: (error) => {
-    if (!String(error).includes(' is missing: ')) {
-      logger.warn(`[android-runtime-helpers] suppressed error in loadAndroidUiDefaults: ${error}`);
-    }
-  },
 });
 
 export interface PipelineStep {
