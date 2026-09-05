@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale } from './locale-normalize.js';
@@ -149,7 +150,7 @@ function loadGroundingSources(tenantSlug: string): {
     allowMissingLeaf: true,
   });
   if (safeExistsSync(notesPath) && safeLstat(notesPath).isFile()) {
-    tenantNotes = String(safeReadFile(notesPath, { encoding: 'utf8' })).slice(0, 4000);
+    tenantNotes = readTextFile(notesPath).slice(0, 4000);
     sources.push('tenant-sales-notes');
   }
 

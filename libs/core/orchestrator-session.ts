@@ -44,8 +44,9 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
@@ -324,7 +325,7 @@ export class OrchestratorSessionJournal {
         `[ORCHESTRATOR_SESSION_RESOURCE] journal must be a regular file: ${this.journalPath}`
       );
     }
-    const raw = String(safeReadFile(this.journalPath, { encoding: 'utf-8' }));
+    const raw = readTextFile(this.journalPath);
     const events: JournalEventEnvelope[] = [];
     let maxSeq = -1;
     for (const line of raw.split('\n')) {

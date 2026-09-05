@@ -1,11 +1,11 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import { defineActuator, type ActuatorDefinition } from './actuator-sdk.js';
 import { createAjv } from './foundation/ajv.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { assertCapabilityAllowed } from './capability-restriction-policy.js';
 
 /**
@@ -185,7 +185,7 @@ export async function runActuatorCli(opts: {
 
   let inputContent: string;
   try {
-    inputContent = String(safeReadFile(inputPath, { encoding: 'utf8' }) || '');
+    inputContent = readTextFile(inputPath);
   } catch (err: any) {
     console.error(`[${opts.name}] failed to read input: ${err?.message || err}`);
     throw new Error(`failed to read input: ${err?.message || err}`);

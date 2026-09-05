@@ -22522,6 +22522,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: software quality の defect transition JSONL 本文読込を foundation の `readTextFile` へ移行した。defect event の解析・状態遷移・監査記録 semanticsは変更せず、secure-io は存在確認・ディレクトリ・書込用途に限定した。
 - **検証**: 対象テスト **1 file／9 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1561
+
+- **対象**: `libs/core/customer-conversation.ts`、`libs/core/cli-utils.ts`、`libs/core/mesh-hub-peer-messaging-adapter.ts`、`libs/core/orchestrator-session.ts`、`libs/core/classifier.ts`、`libs/core/entropy-gate.ts` と既存対象テスト
+- **変更**: customer notes、CLI input、mesh JSONL、orchestrator journal、classifier input、entropy hash の本文読込を foundation の `readTextFile` へ移行した。customer tenant scope、mesh／journal replay、classifier result、entropy cache semanticsは変更せず、バイナリ・個別サイズ上限付きreaderは対象外として保持した。
+- **検証**: 対象既存テスト **6 files／52 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。classifier は専用テストファイルが存在しないため静的検査と既存利用経路で確認した。残るchecker／production loaderの全件codemodは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
