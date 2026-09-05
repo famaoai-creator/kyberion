@@ -874,3 +874,9 @@ Windows local-assist bridgeの外部status応答を再監査し、endpoint disco
 Chronosのintent contract A2UI helperに残っていた `string` 型とenum型アサーションを、共有 `IntentResolutionContract` 型へ統一した。contract parser後のauthority／outcome／next actionを表示投影で再び未検証型に戻さず、既存のlocale labelと6項目のA2UI表示を維持する。
 
 検証: Chronos agent route helper **2 tests passed**、core typecheck、対象ESLint、Prettier、`git diff --check`。surface contractの表示境界を一つ狭め、残る全surfaceの実ブラウザ受入は継続課題とする。
+
+## 2026-09-05 再レビュー修正 77
+
+service actuatorに残っていた `@agent/core/src/pfc/ServiceValidator` の内部パス参照を、既存の公開 `@agent/core/service-validator` subpathへ移行した。service auth validationの実装・戻り値・認可境界は変更せず、production sourceがcoreの公開契約だけを利用する状態に揃えた。
+
+検証: service actuator build、root typecheck、対象ESLint、Prettier、`git diff --check`。今回のproduction internal-path残差は0件となった。
