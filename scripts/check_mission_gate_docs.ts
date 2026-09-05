@@ -6,7 +6,8 @@
  * reintroduce the retired Rule 7 / five-condition gate.
  */
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -80,7 +81,7 @@ function loadMissionGateDocuments(): Record<string, string> {
   return Object.fromEntries(
     collectMissionGateDocumentPaths().map((relativePath) => [
       relativePath,
-      String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) || ''),
+      readTextFile(pathResolver.rootResolve(relativePath)),
     ])
   );
 }

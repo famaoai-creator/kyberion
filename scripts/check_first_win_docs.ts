@@ -1,5 +1,5 @@
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const FIRST_WIN_DOCS = [
@@ -17,7 +17,7 @@ export const FIRST_WIN_COMMANDS = [
 ] as const;
 
 function read(relativePath: string): string {
-  return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) || '');
+  return readTextFile(pathResolver.rootResolve(relativePath));
 }
 
 function fenceIsBalanced(markdown: string): boolean {

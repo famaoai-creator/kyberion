@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   validateDocumentationSourceMap,
   checkDocumentationSourceMap,
@@ -77,6 +78,16 @@ const validManifest = {
 };
 
 describe('documentation source map', () => {
+  it('uses the foundation text reader for documentation sources', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_documentation_source_map.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   it('accepts the checked-in category and scope contract', () => {
     expect(validateDocumentationSourceMap(validManifest, existingPaths)).toEqual([]);
   });
