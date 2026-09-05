@@ -1378,3 +1378,9 @@ tool runtime registryに残っていた大規模なコード内registry fallback
 approval policyの欠損・schema不正時に「承認不要」の空policyへ落ちる復旧経路を削除し、customer／governance正本のload errorをfail-closedで返す境界へ統一した。strict posture、injection suspected override、危険操作のhard-coded safety ruleと通常のpolicy rule解決は変更していない。
 
 検証: approval-policy **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 161
+
+provider configに残っていた大規模なコード内default catalogとfallback記録経路を削除し、必須のgovernance configの欠損・不正をそのまま返すfail-closed境界へ統一した。provider role対応表によるmodel解決、lifecycle／obsolete provider metadataの既存semanticsは変更していない。
+
+検証: provider-config **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
