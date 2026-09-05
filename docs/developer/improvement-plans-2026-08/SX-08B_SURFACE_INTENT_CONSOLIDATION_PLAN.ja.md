@@ -1622,3 +1622,9 @@ media style policyの空policy fallbackとconfig fallback telemetryを削除し�
 tenant design override indexについて、未配置時は呼び出し側の明示的な空indexから開始し、存在するconfidential tenant indexのschema不正を空indexへ戻すfallbackを削除した。tenant path containment、symlink拒否、customer／confidential overrideの優先順位とpublic defaultへの解決は変更していない。
 
 検証: tenant-design-resolver **1 file / 14 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 201
+
+project standards catalogの組み込みignoreルールとschema不正時のfallbackを削除し、repository walkerの正本設定欠損・不正をfail-closedで返す境界へ統一した。symlink除外、再帰探索、ignore directory／extensionの正本解決は変更していない。
+
+検証: fs-utils **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
