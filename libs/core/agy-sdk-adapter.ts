@@ -149,7 +149,8 @@ export class AgySdkAdapter {
         resolveManagedToolPythonBin('agy_sdk') ??
         'python3';
       const script = this.options.scriptPath ?? pathResolver.scripts('agy_sdk_subagent_bridge.py');
-      const sdkApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+      const sdkApiKey =
+        getRegisteredEnvText('GEMINI_API_KEY') ?? getRegisteredEnvText('GOOGLE_API_KEY');
       child = (this.options.spawnProcess ?? spawn)(python, [script], {
         cwd: this.options.cwd,
         env: {
