@@ -70,6 +70,7 @@ describe('media catalog loaders', () => {
     expect(source).toContain(
       "schema: path.resolve(rootDir, 'knowledge/product/schemas/media-design-systems.schema.json')"
     );
+    expect(source).not.toContain('fallbackOnInvalid: true');
     expect(source).toContain('return catalog.validate(merged, directoryPath);');
 
     const catalog = loadMediaDesignSystemsCatalog(pathResolver.rootDir());
