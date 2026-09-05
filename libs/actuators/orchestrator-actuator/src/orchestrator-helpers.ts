@@ -4,6 +4,7 @@ import {
   nowIso,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
+  getRegisteredEnvText,
 } from '@agent/core/foundation';
 import {
   safeReadFile,
@@ -165,7 +166,7 @@ export async function executePipeline(
   let ctx: AdfEngineContext = {
     ...initialCtx,
     root: rootDir,
-    HOME: process.env.HOME || '/Users',
+    HOME: getRegisteredEnvText('HOME') || '/Users',
   };
 
   const contextPath =
