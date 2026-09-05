@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
 export interface ServiceBootstrapCatalogEntry {
@@ -38,7 +39,6 @@ const personalCatalog = defineCatalog<ServiceBootstrapCatalog>({
   id: 'service-bootstrap-catalog.personal',
   path: PERSONAL_CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: { version: '1.0.0', entries: [] },
 });
 
 function mergeCatalogs(
@@ -56,7 +56,9 @@ function mergeCatalogs(
 
 export function loadServiceBootstrapCatalog(): ServiceBootstrapCatalog {
   const base = publicCatalog.load();
-  const personal = personalCatalog.load();
+  const personal = safeExistsSync(PERSONAL_CATALOG_PATH)
+    ? personalCatalog.load()
+    : { version: base.version, entries: [] };
   return mergeCatalogs(base, {
     ...personal,
     version: personal.version || base.version,
