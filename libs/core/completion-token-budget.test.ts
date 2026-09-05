@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   DEFAULT_SAFETY_MARGIN_TOKENS,
   computeCompletionTokenBudget,
@@ -95,6 +97,16 @@ describe('estimateRequestInputTokens', () => {
 });
 
 describe('resolveConfiguredContextWindowTokens', () => {
+  it('routes context window environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/completion-token-budget.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('returns the explicitly configured window', () => {
     expect(resolveConfiguredContextWindowTokens({ KYBERION_CONTEXT_WINDOW_TOKENS: '32000' })).toBe(
       32_000
