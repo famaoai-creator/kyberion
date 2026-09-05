@@ -35,6 +35,8 @@ describe('resolveIdentityContext', () => {
     );
     expect(source).not.toContain('process.env.MISSION_ID');
     expect(source).toContain("getRegisteredEnvText('MISSION_ID')");
+    expect(source).not.toContain('process.env.TASK_ID');
+    expect(source).toContain("getRegisteredEnvText('TASK_ID')");
   });
 
   it('keeps persona and authority role separate', () => {

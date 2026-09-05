@@ -1126,3 +1126,9 @@ voice upgradeのcloud provider availability判定に残っていた API key の�
 AGY SDK bridgeのcredential注入に残っていた `GEMINI_API_KEY`／`GOOGLE_API_KEY` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。Gemini互換keyの優先順位、provider child env、SDK unavailable／shutdown semanticsは変更していない。
 
 検証: AGY SDK adapter **1 file / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 119
+
+authorityのtask-scoped grant audience判定に残っていた `TASK_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。mission／task audience照合、期限・revoke判定、fail-closed semanticsは変更していない。
+
+検証: authority **2 files / 21 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
