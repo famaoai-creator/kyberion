@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core';
 
 describe('storage governance scenario resource boundary', () => {
+  it('uses the foundation reader for scenario text logs', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/scenario_storage_governance.ts'));
+    expect(source).toContain('nowIso, parseSafeJsonInput, readTextFile');
+  });
+
   it('runs only through the harness entrypoint and injected printer', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/scenario_storage_governance.ts'), {
-        encoding: 'utf8',
-      }) || ''
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/scenario_storage_governance.ts'));
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
@@ -15,11 +17,7 @@ describe('storage governance scenario resource boundary', () => {
     expect(source).toContain("isDirectScript(import.meta.url, 'scenario_storage_governance.ts')");
   });
   it('uses the governed parser for process log JSONL entries', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/scenario_storage_governance.ts'), {
-        encoding: 'utf8',
-      })
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/scenario_storage_governance.ts'));
     expect(source).toContain("parseSafeJsonInput(line, 'scenario process log entry')");
     expect(source).not.toContain('JSON.parse(line)');
   });

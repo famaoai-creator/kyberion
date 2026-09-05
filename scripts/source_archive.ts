@@ -12,6 +12,7 @@ import {
   safeWriteFile,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const DEFAULT_OUTPUT = pathResolver.rootResolve(
@@ -143,7 +144,7 @@ export function verifySourceArchive(
   }
   const archive = safeReadFile(safeArchivePath, { encoding: null }) as Buffer;
   const expected = parseSha256Sums(
-    String(safeReadFile(resolvedChecksumsPath, { encoding: 'utf8' })),
+    readTextFile(resolvedChecksumsPath),
     path.basename(safeArchivePath)
   );
   const actual = archiveSha256(archive);
