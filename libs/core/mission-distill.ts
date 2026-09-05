@@ -14,6 +14,7 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeExec,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
@@ -100,6 +101,11 @@ export function gatherDistillContext(
     }
   );
   if (safeExistsSync(ledgerPath)) {
+    if (!safeLstat(ledgerPath).isFile()) {
+      throw new Error(
+        `[MISSION_DISTILL_RESOURCE] evidence ledger must be a regular file: ${ledgerPath}`
+      );
+    }
     const ledgerContent = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
     const lines = ledgerContent.trim().split('\n');
     parts.push('');
