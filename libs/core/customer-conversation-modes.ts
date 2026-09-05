@@ -2,13 +2,13 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { logger } from './core.js';
@@ -129,7 +129,7 @@ export function loadSupportGrounding(tenantSlug: string): { knownIssues: string;
           );
         }
         return {
-          knownIssues: String(safeReadFile(candidate, { encoding: 'utf8' })).slice(0, 4000),
+          knownIssues: readTextFile(candidate).slice(0, 4000),
           found: true,
         };
       }

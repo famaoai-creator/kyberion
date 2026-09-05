@@ -2,13 +2,13 @@ import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 
@@ -92,7 +92,7 @@ export function recordRuntimeHealthSample(input: {
 function pruneIfOversized(filePath: string): void {
   try {
     ensureRegularHistoryFile(filePath);
-    const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+    const raw = readTextFile(filePath);
     const lines = raw.split('\n').filter(Boolean);
     if (lines.length <= MAX_LINES) return;
     safeWriteFile(filePath, `${lines.slice(-KEEP_LINES).join('\n')}\n`);

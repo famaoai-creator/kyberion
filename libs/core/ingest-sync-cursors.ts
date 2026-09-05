@@ -24,14 +24,13 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeLstat,
-  safeReadFile,
   safeUnlink,
   safeWriteFile,
 } from './secure-io.js';
@@ -189,7 +188,7 @@ export function readSyncCursor(
     if (!safeLstat(file).isFile()) {
       throw new Error('cursor state must be a regular file');
     }
-    source = String(safeReadFile(file, { encoding: 'utf8' }));
+    source = readTextFile(file);
   } catch (error) {
     throw new Error(
       `[ingest-sync-cursors] cursor state at ${file} could not be read: ${String(
