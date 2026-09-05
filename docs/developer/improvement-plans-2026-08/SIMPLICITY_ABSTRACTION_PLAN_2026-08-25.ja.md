@@ -22131,3 +22131,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/service_recording.ts`、`scripts/service_recording.test.ts`
 - **変更**: service recording CLI の `--calls`／`--intent-phrases` における `@path` 本文読込を foundation の `readTextFile` へ移行した。既存の repository path 境界、JSON shape validation、recording／compile／review／promote の保存・承認 semanticsは変更せず、production scriptに残っていた旧 `safeReadFile` のJSON本文直読を削減した。
 - **検証**: service-recording **3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1489
+
+- **対象**: `scripts/intent_trace.ts`、`scripts/intent_trace.test.ts`
+- **変更**: intent trace JSONL の本文読込を foundation の `readTextFile` へ移行した。既存の repository／regular-file 境界、malformed行のskip、trace／snapshot／auditの正規化 semanticsは変更せず、intent trace CLIに残っていた旧 `safeReadFile` 直読を削減した。
+- **検証**: intent-trace **既存テスト**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
