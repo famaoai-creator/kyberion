@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { AgySdkAdapter, normalizeAgySdkBridgeMessage } from './agy-sdk-adapter.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 
 function fakeBridge(responseFor: (request: Record<string, unknown>) => Record<string, unknown>) {
   const child = new EventEmitter() as any;
@@ -138,5 +140,17 @@ describe('AgySdkAdapter', () => {
 
     await expect(request).rejects.toThrow('[SUBAGENT_UNAVAILABLE] AGY SDK request aborted.');
     expect(cancellationSeen).toBe(true);
+  });
+
+  it('resolves SDK credentials through the registered environment boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/agy-sdk-adapter.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toContain('process.env.GEMINI_API_KEY');
+    expect(source).not.toContain('process.env.GOOGLE_API_KEY');
+    expect(source).toContain("getRegisteredEnvText('GEMINI_API_KEY')");
+    expect(source).toContain("getRegisteredEnvText('GOOGLE_API_KEY')");
   });
 });
