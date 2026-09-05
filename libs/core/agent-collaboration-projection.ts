@@ -784,6 +784,19 @@ const ATTENTION_BY_KIND: Partial<
   },
 };
 
+/** Approval states that mean a human already answered (mirrors agent-collaboration-tree). */
+const APPROVAL_CLOSED_STATES = new Set([
+  'approved',
+  'cancelled',
+  'canceled',
+  'declined',
+  'denied',
+  'expired',
+  'rejected',
+  'timeout',
+  'withdrawn',
+]);
+
 function attentionForEvent(event: AgentCollaborationEvent): CollaborationAttentionItem | null {
   const template = ATTENTION_BY_KIND[event.kind];
   if (!template) return null;
@@ -873,6 +886,8 @@ export function composeAgentCollaborationProjection(
   const nodes = new Map<string, CollaborationGraphNode>();
   const edges: CollaborationGraphEdge[] = [];
   const attention: CollaborationAttentionItem[] = [];
+  const openApprovalAttention = new Map<string, number>();
+  const closedAttentionIndexes = new Set<number>();
   const missions = new Set<string>();
   const tasks = new Set<string>();
   const agents = new Set<string>();
@@ -979,8 +994,34 @@ export function composeAgentCollaborationProjection(
     if (event.native === true) nativeSubagents += 1;
     if (event.native_unavailable === true) unavailableSubagents += 1;
     const attentionItem = attentionForEvent(event);
-    if (attentionItem) attention.push(attentionItem);
+    if (attentionItem) {
+      if (event.kind === 'approval') {
+        // An answered request is no longer attention: the response closes the
+        // request it correlates with (same rule as agent-collaboration-tree).
+        const key = event.request_id || event.correlation_id || event.source_event_id;
+        const closed = APPROVAL_CLOSED_STATES.has(
+          (event.state_after || event.summary || '').toLowerCase()
+        );
+        const openIndex = openApprovalAttention.get(key);
+        if (openIndex !== undefined) {
+          closedAttentionIndexes.add(openIndex);
+          openApprovalAttention.delete(key);
+          // The original request was counted as a human wait when it arrived.
+          waitingHuman = Math.max(0, waitingHuman - 1);
+        }
+        if (closed) {
+          // The response itself was counted above; it is not a wait either.
+          waitingHuman = Math.max(0, waitingHuman - 1);
+        } else {
+          openApprovalAttention.set(key, attention.length);
+          attention.push(attentionItem);
+        }
+      } else {
+        attention.push(attentionItem);
+      }
+    }
   }
+  const openAttention = attention.filter((_, index) => !closedAttentionIndexes.has(index));
   if (options.runGraph) {
     const graphId = `run-graph:${options.runGraph.run_id || 'run'}`;
     addNode(nodes, graphId, 'artifact', graphId, 'completed');
@@ -1045,7 +1086,7 @@ export function composeAgentCollaborationProjection(
     events: events.slice().reverse(),
     nodes: [...nodes.values()],
     edges,
-    attention: attention.slice(-50).reverse(),
+    attention: openAttention.slice(-50).reverse(),
   };
 }
 
