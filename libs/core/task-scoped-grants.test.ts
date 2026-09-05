@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeAppendFileSync, safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
 import { resolveIdentityContext, withExecutionContext } from './authority.js';
 import {
   issueTaskGrant,
@@ -118,6 +118,14 @@ describe('task-scoped grants: issuance', () => {
     process.env[TASK_GRANTS_PATH_ENV] = '/tmp/task-grants-external.jsonl';
 
     expect(() => listActiveGrants()).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
+  it('fails closed when the grant store is replaced by a directory', () => {
+    const storePath = pathResolver.rootResolve(process.env[TASK_GRANTS_PATH_ENV]!);
+    safeMkdir(storePath, { recursive: true });
+
+    expect(() => listActiveGrants()).toThrow('store must be a regular file');
+    expect(() => issueGoverned()).toThrow('store must be a regular file');
   });
 
   it('refuses the governed default store path under vitest', () => {

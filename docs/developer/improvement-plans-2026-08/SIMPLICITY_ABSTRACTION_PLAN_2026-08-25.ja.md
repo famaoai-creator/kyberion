@@ -21945,3 +21945,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/ledger.ts`、`libs/core/ledger.test.ts`
 - **変更**: global audit ledger の record／integrity verify／scope projection 前に operation-time の regular-file 検査を追加した。directory 等への置換を `_getLastHash()` の genesis fallback や空 projection として扱わず拒否し、既存のHMAC chain、legacy record normalization、scope filtering semantics は維持した。
 - **検証**: ledger **8 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1458
+
+- **対象**: `libs/core/task-scoped-grants.ts`、`libs/core/task-scoped-grants.test.ts`
+- **変更**: task-scoped grant store の read／append 前に operation-time の regular-file 検査を追加した。認可台帳が directory 等へ置換された場合に空のgrant集合として扱わず、発行・一覧の両経路で明示拒否する。既存の audience／tenant scope、expiry、revocation semantics は維持した。
+- **検証**: task-scoped-grants の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
