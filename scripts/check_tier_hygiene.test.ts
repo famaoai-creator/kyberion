@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { scan } from './check_tier_hygiene.js';
 
 /**
@@ -22,6 +23,16 @@ function writePublicFile(relPath: string, body: string): string {
 }
 
 describe.sequential('check_tier_hygiene', () => {
+  it('uses the foundation text reader for tier scan inputs', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_tier_hygiene.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain('defineCatalog, readTextFile');
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   it('passes on the current tree (baseline)', async () => {
     const violations = await scan();
     expect(violations).toEqual([]);
