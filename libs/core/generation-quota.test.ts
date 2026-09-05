@@ -22,6 +22,12 @@ const POLICY: GenerationQuotaPolicy = {
 };
 
 describe('generation quota', () => {
+  it('fails closed when the governed policy is missing', () => {
+    safeRmSync(ROOT, { recursive: true, force: true });
+
+    expect(() => loadGenerationQuotaPolicy({ rootDir: ROOT })).toThrowError(/missing/iu);
+  });
+
   it('loads the governed policy through its dedicated schema', () => {
     safeRmSync(ROOT, { recursive: true, force: true });
     const policyPath = path.join(ROOT, ...GENERATION_QUOTA_POLICY_REPO_PATH.split('/'));
