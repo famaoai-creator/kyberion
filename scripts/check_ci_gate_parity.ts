@@ -1,5 +1,6 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { loadGateManifest } from './run_checks.js';
 import { resolveDeclaredBaselinePath } from './lib/ci-gate-baseline.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -14,7 +15,7 @@ const WORKFLOW_PATHS = [...Object.values(WORKFLOW_SCOPE_REFS), '.github/workflow
 const SETUP_ACTION_MARKER = 'uses: ./.github/actions/setup-kyberion';
 
 function read(relativePath: string): string {
-  return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }));
+  return readTextFile(pathResolver.rootResolve(relativePath));
 }
 
 export function collectPnpmScriptReferences(value: string): string[] {
