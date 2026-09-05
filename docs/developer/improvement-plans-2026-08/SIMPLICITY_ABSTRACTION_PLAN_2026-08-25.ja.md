@@ -21239,6 +21239,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: media semantic mapに残っていた正本JSONと重複するlayout／media／proposal rule fallbackを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。semantic typeの未一致時`content`、proposal evidence／keywordの未一致時空値という表示側の既存semanticsは変更していない。
 - **検証**: media-semantic-map **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1341
+
+- **対象**: `libs/core/media-drawio-policy.ts`、`libs/core/media-drawio-policy.test.ts`
+- **変更**: media drawio policyに残っていた正本JSONと重複するboundary palette／node size fallbackとfallback telemetryを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。boundary override、catalog内のboundary／type優先順位、未一致時の呼び出し側paletteおよびnode size空値という表示側の既存semanticsは変更していない。
+- **検証**: media-drawio-policy **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
