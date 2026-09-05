@@ -22041,3 +22041,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/in-room-minutes-recorder.ts`、`libs/core/in-room-minutes-recorder.test.ts`
 - **変更**: in-room minutes の transcript read／append 前に operation-time の regular-file 検査を追加した。transcript が directory 等へ置換された場合は mic capture を開始せず拒否し、通常の VAD／STT／minutes pipeline と recording consent semantics は維持した。
 - **検証**: in-room-minutes-recorder **2 files / 3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1474
+
+- **対象**: `libs/core/mission-orchestration-worker-part-results.ts`、`libs/core/mission-draft-refine-persistence.test.ts`
+- **変更**: draft-refine の deliverable read 前に operation-time の regular-file 検査を追加した。directory 等の deliverable を refinement backend へ渡さず、既存の mission scope、missing／outside-path skip、provisioned receipt semantics は維持した。
+- **検証**: mission-draft-refine-persistence **2 files / 3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

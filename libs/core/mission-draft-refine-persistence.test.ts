@@ -70,4 +70,18 @@ describe('applyDraftRefineToDeliverable', () => {
     expect(String(safeReadFile(outsidePath, { encoding: 'utf8' }))).toBe('# Original\n');
     withExecutionContext('mission_controller', () => safeRmSync(outsidePath, { force: true }));
   });
+
+  it('does not send a directory deliverable to the refinement backend', async () => {
+    const directoryPath = nodePath.join(missionPath, 'evidence', 'directory.md');
+    await withExecutionContextAsync('mission_controller', async () => {
+      safeMkdir(directoryPath, { recursive: true });
+      await applyDraftRefineToDeliverable({
+        missionId,
+        task: { task_id: 'TASK-REFINE-DIRECTORY', deliverable: 'evidence/directory.md' } as never,
+        teamRole: 'implementer',
+      });
+    });
+
+    expect(draftRefineMock.draftRefine).not.toHaveBeenCalled();
+  });
 });

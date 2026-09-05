@@ -16,6 +16,7 @@ import {
   assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
 } from './secure-io.js';
@@ -207,6 +208,11 @@ export async function applyDraftRefineToDeliverable(input: {
       throw new Error('[DRAFT_REFINE] deliverable must be inside the mission path');
     }
     if (!safeExistsSync(deliverablePath)) return;
+    if (!safeLstat(deliverablePath).isFile()) {
+      throw new Error(
+        `[DRAFT_REFINE_RESOURCE] deliverable must be a regular file: ${deliverablePath}`
+      );
+    }
     const original = String(safeReadFile(deliverablePath, { encoding: 'utf8' }) || '');
     if (!original.trim()) return;
     const outcome = await draftRefine({
