@@ -23,6 +23,7 @@ import { toWireError } from './wire-error.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeRmSync,
   safeWriteFile,
@@ -424,6 +425,7 @@ export function loadPeerNetworkCatalog(
   const catalogPath = resolvePeerNetworkCatalogPath(options);
   try {
     if (!safeExistsSync(catalogPath)) return null;
+    ensureRegularPeerStorageFile(catalogPath);
     const parsed = peerNetworkCatalogFor(catalogPath).load();
     if (parsed.tenant_id && !isValidTenantSlug(parsed.tenant_id)) {
       throw new Error(`peer_catalog_invalid_tenant:${parsed.tenant_id}`);
@@ -466,6 +468,12 @@ function safePeerStoragePath(logicalPath: string): string {
   return assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
     allowMissingLeaf: true,
   });
+}
+
+function ensureRegularPeerStorageFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[PEER_MESSAGING] peer storage must be a regular file: ${filePath}`);
+  }
 }
 
 export function peerNetworkCatalogPath(tenantId: string): string {
@@ -664,6 +672,7 @@ function appendObservabilityJsonl(
 
 function readJsonlRecords<T>(logicalPath: string, map: (value: unknown) => T): T[] {
   const resolved = pathResolver.resolve(logicalPath);
+  ensureRegularPeerStorageFile(resolved);
   return readJsonLines<T>(resolved, { map, onMalformed: 'skip' });
 }
 
@@ -1199,6 +1208,7 @@ export function persistPeerRuntimeState(
   state: Record<string, unknown>
 ): string {
   const logicalPath = runtimeLogicalPath(tenantId, peerId, 'state.json');
+  ensureRegularPeerStorageFile(pathResolver.resolve(logicalPath));
   safeWriteFile(logicalPath, JSON.stringify(state, null, 2));
   return pathResolver.resolve(logicalPath);
 }
