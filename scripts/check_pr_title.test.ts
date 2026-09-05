@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeWriteFile, safeRmSync } from '@agent/core/secure-io';
+import { safeMkdir, safeWriteFile, safeRmSync, safeReadFile } from '@agent/core/secure-io';
 import { checkPullRequestTitle, checkTitle } from './check_pr_title.js';
 
 const TMP_DIR = pathResolver.sharedTmp('check-pr-title-tests');
@@ -9,6 +9,14 @@ const TMP_DIR = pathResolver.sharedTmp('check-pr-title-tests');
 describe('check_pr_title', () => {
   beforeEach(() => {
     safeRmSync(TMP_DIR, { recursive: true, force: true });
+  });
+
+  it('reads the GitHub event fallback through the environment registry', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_pr_title.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain('process.env.GITHUB_EVENT_PATH');
+    expect(source).toContain("getRegisteredEnvText('GITHUB_EVENT_PATH')");
   });
 
   it('accepts a conventional commit title', () => {
