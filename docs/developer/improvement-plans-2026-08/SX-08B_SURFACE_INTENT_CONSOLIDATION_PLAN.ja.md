@@ -1706,3 +1706,9 @@ Cursor Agent CLIのreasoning backendをprovider permission、route policy、prov
 Cursor CLIの追加引数が`--force`／`--mode`／`--sandbox`などのpolicy引数を後勝ちで上書きできる残存を修正し、governed execution flagを`extraArgs`から拒否するようにした。通常の追加引数、permission profile、timeout、egress、credential分離は維持している。
 
 検証: Cursor CLI **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは直前sliceで69/69 gates passed。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
+## 2026-09-06 再レビュー修正 215
+
+Cursor CLIを明示指定だけでなく、既定のreasoning provider failover chainにも登録した。provider capability routingによるbinary／authentication判定、既存providerの順序、Cursorの明示routeは維持している。
+
+検証: reasoning-backend-policy／reasoning-bootstrap **2 files / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。

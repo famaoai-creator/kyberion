@@ -152,6 +152,10 @@
     {
       "provider": "copilot",
       "mode": "copilot"
+    },
+    {
+      "provider": "cursor",
+      "mode": "cursor-cli"
     }
   ],
   "default_mode": "claude-cli",
