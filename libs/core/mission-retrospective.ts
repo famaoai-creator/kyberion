@@ -5,6 +5,7 @@ import { pathResolver, findMissionPath } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
@@ -36,6 +37,14 @@ function safeMissionArtifactPath(missionPath: string, relativePath: string): str
 
 function safeRepositoryPath(filePath: string, allowMissingLeaf = true): string {
   return assertSafeRepositoryPath(filePath, { allowMissingLeaf });
+}
+
+function regularProcessImprovementQueuePath(filePath: string): string {
+  const safePath = safeRepositoryPath(filePath);
+  if (safeExistsSync(safePath) && !safeLstat(safePath).isFile()) {
+    throw new Error(`[process-improvement] queue must be a regular file: ${filePath}`);
+  }
+  return safePath;
 }
 
 /**
@@ -292,9 +301,9 @@ function processImprovementProposalCatalog(filePath: string) {
 }
 
 function readJsonl(filePath: string): JsonRecord[] {
+  const safePath = regularProcessImprovementQueuePath(filePath);
+  if (!safeExistsSync(safePath)) return [];
   try {
-    const safePath = safeRepositoryPath(filePath);
-    if (!safeExistsSync(safePath)) return [];
     return String(safeReadFile(safePath, { encoding: 'utf8' }))
       .split('\n')
       .filter((line) => line.trim())
@@ -501,7 +510,7 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
 }
 
 function enqueueProposal(proposal: ProcessImprovementProposal): void {
-  const queuePath = processImprovementQueuePath();
+  const queuePath = regularProcessImprovementQueuePath(processImprovementQueuePath());
   safeMkdir(path.dirname(queuePath), { recursive: true });
   appendJsonLine(
     queuePath,
@@ -526,10 +535,11 @@ function writeProcessImprovementQueue(
   queuePath: string,
   proposals: ProcessImprovementProposal[]
 ): void {
-  const catalog = processImprovementProposalCatalog(queuePath);
-  const canonical = proposals.map((proposal) => catalog.validate(proposal, queuePath));
-  safeMkdir(path.dirname(queuePath), { recursive: true });
-  safeWriteFile(queuePath, canonical.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
+  const safeQueuePath = regularProcessImprovementQueuePath(queuePath);
+  const catalog = processImprovementProposalCatalog(safeQueuePath);
+  const canonical = proposals.map((proposal) => catalog.validate(proposal, safeQueuePath));
+  safeMkdir(path.dirname(safeQueuePath), { recursive: true });
+  safeWriteFile(safeQueuePath, canonical.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
 }
 
 /**

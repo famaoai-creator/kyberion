@@ -331,6 +331,21 @@ describe('mission retrospective loop', () => {
     }
   });
 
+  it('fails closed when the process improvement queue is a symlink', () => {
+    const queuePath = mod.processImprovementQueuePath();
+    const externalQueuePath = path.join(tmpRoot, 'external-process-improvements.jsonl');
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    fs.writeFileSync(externalQueuePath, '');
+    fs.symlinkSync(externalQueuePath, queuePath, 'file');
+
+    try {
+      expect(() => mod.listProcessImprovementProposals()).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.unlinkSync(queuePath);
+      fs.unlinkSync(externalQueuePath);
+    }
+  });
+
   it('queues LLM proposals for operator ratification and notifies', async () => {
     backendPrompt.mockResolvedValue(
       JSON.stringify({
