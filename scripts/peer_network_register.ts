@@ -1,4 +1,5 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { registerPeerNetworkPeer, type PeerNetworkExposure } from '@agent/core/peer-messaging';
 import { withExecutionContext } from '@agent/core/authority';
@@ -52,7 +53,7 @@ export async function main(
     .parseSync();
 
   const secretEnv = String(argv['shared-secret-env']);
-  const sharedSecret = process.env[secretEnv] || '';
+  const sharedSecret = getRegisteredEnvText(secretEnv) || '';
   if (!sharedSecret) {
     throw new Error(`Missing shared secret in environment variable ${secretEnv}`);
   }
