@@ -14,6 +14,7 @@ export type ReasoningBackendMode =
   | 'grok-cli'
   | 'grok-api'
   | 'copilot'
+  | 'cursor-cli'
   | 'local'
   | 'ollama'
   | 'vllm'

@@ -27,6 +27,7 @@ import {
 import { GrokCliIntentExtractor } from './grok-cli-intent-extractor.js';
 import { GrokCliVoiceBridge } from './grok-cli-voice-bridge.js';
 import { buildCopilotAcpBackendFromEnv } from './copilot-acp-reasoning-backend.js';
+import { buildCursorCliBackendFromEnv } from './cursor-cli-reasoning-backend.js';
 import { maybeWrapWithDispatcher } from './agent-dispatch.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
@@ -204,6 +205,15 @@ export function buildCliProviderBundle(
       return {
         mode,
         backend: { backend, provider, label: mode },
+      };
+    }
+    case 'cursor-cli': {
+      const backend = buildCursorCliBackendFromEnv(env, undefined, options.model);
+      if (!backend && !options.force) return null;
+      if (!backend) return null;
+      return {
+        mode,
+        backend: { backend: maybeWrapWithDispatcher(backend), provider, label: mode },
       };
     }
     default:

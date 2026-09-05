@@ -1694,3 +1694,9 @@ browser passkey providerの組み込みwebauthn.io catalog／loader fallbackを�
 registry managerのcapability registry fallbackを削除し、未作成registryの空初期化を登録処理の呼び出し側へ移した。配置済みregistryのschema不正は空registryへ戻さず拒否し、adapter schema検証、tier選択、既存capability更新は維持している。
 
 検証: registry-manager **1 file / 4 tests passed**、対象ESLint、Prettier、`git diff --check`。typecheckは別作業の未コミットcursor-cli／runtime-model-defaults変更に起因する2エラーで未完了。canonical full gateは同変更の整理後に再実行する。
+
+## 2026-09-06 再レビュー修正 213
+
+Cursor Agent CLIのreasoning backendをprovider permission、route policy、provider discovery、capability probe、runtime model、sandbox／egress境界へ接続し、構造化応答のenvelope検証、timeout、abort、credential分離、permission profileの型境界を追加した。Cursor CLIの利用可能性と実行引数を実際のspawn seamで検証し、provider capability cacheのgoverned catalog mockも正規ファイル境界へ揃えた。未作成のoptional theme scopeは明示的な型付き空catalogへ固定した。
+
+検証: Cursor／egress／provider config／permission／route／capability registry **8 files / 78 tests passed**、core／actuator build、typecheck、対象ESLint、Prettier、`git diff --check`、canonical check **68/69 gates passed**。残る1 gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandboxで`EPERM`となる実行環境制約。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。

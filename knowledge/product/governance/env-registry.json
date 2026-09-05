@@ -832,6 +832,42 @@
       "subsystem": "knowledge"
     },
     {
+      "name": "KYBERION_CURSOR_CLI_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for the Cursor Agent CLI binary (`cursor-agent`); leave unset to resolve from PATH.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CURSOR_CLI_EXTRA_ARGS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional whitespace-separated extra argv passed to cursor-agent headless invocations.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CURSOR_CLI_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Model id for the Cursor Agent CLI reasoning backend; defaults to auto (Free-plan compatible).",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CURSOR_CLI_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Optional wall-clock timeout in milliseconds for a single cursor-agent reasoning call; leave unset to use the governed default.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_CUSTOMER",
       "category": "runtime",
       "type": "string",

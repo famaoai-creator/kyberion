@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeWriteFile: vi.fn(),
   safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(),
   safeMkdir: vi.fn(),
   safeExecResult: vi.fn(),
   shared: vi.fn((relPath: string) => `/repo/active/shared/${relPath}`),
@@ -23,6 +24,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./secure-io.js', () => ({
   assertSafeRepositoryPath: (filePath: string) => filePath,
   safeReadFile: mocks.safeReadFile,
+  safeLstat: mocks.safeLstat,
   safeWriteFile: mocks.safeWriteFile,
   safeExistsSync: mocks.safeExistsSync,
   safeMkdir: mocks.safeMkdir,
@@ -68,12 +70,14 @@ function resetMocks() {
   mocks.safeReadFile.mockReset();
   mocks.safeWriteFile.mockReset();
   mocks.safeExistsSync.mockReset();
+  mocks.safeLstat.mockReset();
   mocks.safeMkdir.mockReset();
   mocks.safeExecResult.mockReset();
   mocks.safeReadFile.mockImplementation(() => {
     throw new Error('ENOENT');
   });
   mocks.safeExistsSync.mockReturnValue(false);
+  mocks.safeLstat.mockReturnValue({ isFile: () => true });
   mocks.safeMkdir.mockReturnValue(undefined);
   mocks.safeWriteFile.mockReturnValue(undefined);
 }

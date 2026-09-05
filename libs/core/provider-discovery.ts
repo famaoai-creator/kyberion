@@ -574,6 +574,32 @@ function checkGrok(): ProviderInfo {
   };
 }
 
+function checkCursor(): ProviderInfo {
+  const which = run('which', ['cursor-agent']);
+  if (!which.ok)
+    return {
+      provider: 'cursor',
+      installed: false,
+      version: null,
+      protocol: 'print-json',
+      models: [],
+      healthy: false,
+    };
+
+  const ver = run('cursor-agent', ['--version']);
+  const entry = capabilityEntryFor('cursor');
+  return {
+    provider: 'cursor',
+    installed: true,
+    version: ver.ok ? ver.stdout || null : null,
+    protocol: 'print-json',
+    models: entry.models,
+    capabilities: entry.capabilities,
+    modelCapabilities: entry.modelCapabilities,
+    healthy: ver.ok,
+  };
+}
+
 /**
  * Discover all available providers. Cached for 5 minutes.
  */
@@ -608,6 +634,7 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
     checkCodex(),
     checkAgy(),
     checkGrok(),
+    checkCursor(),
   ];
 
   const available = providers.filter((p) => p.installed);

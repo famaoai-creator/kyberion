@@ -654,7 +654,15 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   // Only CLI-backed candidates can be probed via provider discovery; API-key /
   // URL-backed candidates (anthropic, openrouter, local, nemotron) only enter
   // the chain when their credential exists, so they count as usable.
-  const CLI_PROBED_PROVIDERS = new Set(['claude', 'codex', 'gemini', 'agy', 'grok', 'copilot']);
+  const CLI_PROBED_PROVIDERS = new Set([
+    'claude',
+    'codex',
+    'gemini',
+    'agy',
+    'grok',
+    'copilot',
+    'cursor',
+  ]);
   const chainUsable = chain.some((candidate) => {
     const provider = providerForReasoningMode(candidate.mode);
     if (!provider || !CLI_PROBED_PROVIDERS.has(provider)) return true;

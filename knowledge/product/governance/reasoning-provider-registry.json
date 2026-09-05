@@ -133,6 +133,19 @@
       "env_keys": ["GH_TOKEN"]
     },
     {
+      "mode": "cursor-cli",
+      "provider": "cursor",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "input_modalities": ["text"]
+      },
+      "env_keys": ["CURSOR_API_KEY", "CURSOR_CLI", "CURSOR_AGENT", "KYBERION_CURSOR_CLI_BIN"]
+    },
+    {
       "mode": "local",
       "provider": "local",
       "module": "./reasoning-openai-compatible-provider",
