@@ -304,7 +304,7 @@ describe('pipeline scheduler', () => {
       expect(() => loadScheduleRegistry({ rootDir })).toThrowError(/non-empty/);
     });
 
-    it('falls back to an empty registry when persisted schedule data violates its schema', () => {
+    it('fails closed when persisted schedule data violates its schema', () => {
       const rootDir = makeRootDir();
       const registryPath = path.join(rootDir, 'active/shared/runtime/pipeline-schedules.json');
       safeWriteFile(
@@ -325,7 +325,9 @@ describe('pipeline scheduler', () => {
         })
       );
 
-      expect(loadScheduleRegistry({ rootDir })).toEqual({ version: '1.0', schedules: [] });
+      expect(() => loadScheduleRegistry({ rootDir })).toThrowError(
+        /Invalid catalog pipeline-schedule-registry/
+      );
     });
 
     it('validates the registry before writing it', () => {
