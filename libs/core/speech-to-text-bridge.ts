@@ -342,7 +342,7 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
     const cmd = this.options.command
       .replace(/\{\{audio\}\}/gu, audioAbs)
       .replace(/\{\{language\}\}/gu, resolvedLanguage);
-    const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
+    const shell = this.options.shell ?? envText(process.env, 'SHELL') ?? '/bin/sh';
     const stdout = execFileSync(shell, ['-c', cmd], {
       encoding: 'utf8',
       timeout: this.options.timeoutMs ?? 5 * 60 * 1000,
