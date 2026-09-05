@@ -22588,6 +22588,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: `defineCatalog` の content generation と publish の本文ハッシュ読込を低レベル `getFoundationIo().readFile` から canonical `readTextFile` へ移行した。catalog の存在・regular-file・JSON／schema validation、generation compare-and-publish、lock semanticsは変更していない。
 - **検証**: 対象テスト **2 files／15 tests passed**、`pnpm run typecheck`、`git diff --check`。残る foundation の JSON内部 reader と domain catalog統合は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1572
+
+- **対象**: `libs/core/foundation/json.ts`
+- **変更**: canonical JSONL reader `readJsonLines` の本文読込を低レベル `getFoundationIo().readFile` から `readTextFile` へ移行した。空行処理、safe JSON parse、malformed row の throw／skip／callback semanticsは変更していない。
+- **検証**: 対象テスト **2 files／19 tests passed**、`pnpm run typecheck`、`git diff --check`。残る foundation の JSON load bridge と domain catalog統合は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
