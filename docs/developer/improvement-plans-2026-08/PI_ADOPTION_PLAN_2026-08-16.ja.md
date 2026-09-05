@@ -789,6 +789,8 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 
 - 2026-09-06: PI-03 の provider registry 再レビューとして、reasoning provider descriptorのcapability／input modality／env keyを必須メタデータへ変更した。欠損・型不正・text modalityなしのdescriptorを保守的既定値へ補正せず拒否し、schemaとruntime parserを一致させた。関連 **1 test file / 4 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、knowledge index更新後のcanonical full gate **69/69 passed** で確認した。provider CLIの実OS-level enforcement probeと未監査direct loader全件inventoryは継続課題である。
 
+- 2026-09-06: PI-03／SX-04 の provider capability catalog 再レビューとして、未参照のfallback catalogを削除し、primary catalogの欠損時だけ明示的空viewを使うようにした。配置済みcatalogのJSON／schema不正と、probe書込み時の既存catalog不正を黙って空catalogへ置換せず fail-closed とした。関連 **3 test files / 22 tests passed**、typecheck、対象 lint、`git diff --check` で確認した。provider CLIの実OS-level enforcement probeと未監査direct loader全件inventoryは継続課題である。
+
 ## 7. 検証コマンド(実装時)
 
 - PI-01: `pnpm vitest run libs/core/spend-guard.test.ts libs/core/metrics.test.ts libs/core/cost-report.test.ts` + tier 境界 fixture
