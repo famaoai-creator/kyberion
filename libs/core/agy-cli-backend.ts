@@ -595,7 +595,7 @@ export class AgyCliBackend implements ReasoningBackend {
    */
   private resolveModelArgs(): string[] {
     if (!this.model) return [];
-    if (this.model === 'agy' && process.env.NODE_ENV !== 'test') {
+    if (this.model === 'agy' && getRegisteredEnvText('NODE_ENV') !== 'test') {
       return [];
     }
     return ['--model', this.model];
