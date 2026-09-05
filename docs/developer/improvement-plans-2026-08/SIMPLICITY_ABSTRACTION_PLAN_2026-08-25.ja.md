@@ -20867,6 +20867,18 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: secret resolver／audit forwarderのshell実行に残っていた `SHELL` の環境直読を、登録済み `getRegisteredEnvText` へ統一した。明示shell option優先、`/bin/sh` fallback、secret／auditのredaction、resolver／forwarder failure semanticsは変更していない。
 - **検証**: secret resolver／audit forwarder **2 files / 24 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
+## 2026-09-05 再レビュー修正 1279
+
+- **対象**: `libs/core/locale.ts`
+- **変更**: locale解決のOS fallbackに残っていた `LANG` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示locale、surface preference、identity、`KYBERION_LOCALE`／deprecated alias、navigator、catalog defaultの優先順位は変更していない。
+- **検証**: locale **1 file / 19 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
+
+## 2026-09-05 再レビュー修正 1280
+
+- **対象**: `libs/core/sensitive-path-policy.ts`、`libs/core/sensitive-path-policy.test.ts`
+- **変更**: 機密パス判定のホームルート解決に残っていた `HOME` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。SSH／AWS／Kubernetes／GnuPG／provider credential、Kyberion connections／vaultのdeny判定と、secure-io初期化時の再帰防止は変更していない。
+- **検証**: sensitive path／secure-io **2 files / 42 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

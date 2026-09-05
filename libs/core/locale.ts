@@ -143,7 +143,7 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
  *    `resolveActiveProfileRoot()`).
  * 4. the canonical `KYBERION_LOCALE` setting, then the deprecated
  *    `KYBERION_UI_LOCALE` alias (warns once).
- * 5. OS/browser locale: `process.env.LANG`, then `ctx.navigatorLanguage`
+ * 5. OS/browser locale: the registered `LANG` setting, then `ctx.navigatorLanguage`
  *    when a browser caller supplies it.
  * 6. The vocabulary catalog's `default_locale`.
  *
@@ -187,7 +187,7 @@ function resolveWithoutExplicit(ctx: LocaleContext): SupportedLocale {
   const aliasEnv = readDeprecatedUiLocaleAlias();
   if (aliasEnv) return aliasEnv;
 
-  const osLocale = normalizeLocale(process.env.LANG);
+  const osLocale = normalizeLocale(getRegisteredEnvText('LANG'));
   if (osLocale) return osLocale;
 
   const navigatorLocale = normalizeLocale(ctx.navigatorLanguage);

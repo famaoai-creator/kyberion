@@ -6,6 +6,8 @@ import {
   findSensitivePathMatch,
   getSensitivePathRuleIds,
 } from './sensitive-path-policy.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 
 describe('sensitive-path-policy', () => {
   it('keeps the OH-02 credential registry explicit and unique', () => {
@@ -34,5 +36,15 @@ describe('sensitive-path-policy', () => {
     );
     expect(findSensitivePathInText('cat ~/.ssh/id_ed25519')?.ruleId).toBe('credential.ssh');
     expect(findSensitivePathMatch(path.resolve('active/shared/tmp/example.txt'))).toBeNull();
+  });
+
+  it('resolves the home root through the registered environment boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/sensitive-path-policy.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain("getRegisteredEnvText('HOME')");
+    expect(source).not.toContain('process.env.HOME');
   });
 });
