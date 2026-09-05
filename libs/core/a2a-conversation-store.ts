@@ -6,6 +6,7 @@ import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
@@ -131,6 +132,14 @@ function resolveConversationFilePath(conversationId: string): string {
   return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
 }
 
+function assertRegularConversationFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(
+      `[A2A_CONVERSATION_STORE] conversation file must be a regular file: ${filePath}`
+    );
+  }
+}
+
 function resolveMissionTier(
   missionId: string | undefined
 ): 'public' | 'confidential' | 'personal' | undefined {
@@ -181,6 +190,7 @@ export async function appendConversationTurn(
 
     let lines: string[] = [];
     if (safeExistsSync(filePath)) {
+      assertRegularConversationFile(filePath);
       try {
         const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
         lines = content.split('\n').filter((l) => l.trim().length > 0);
@@ -215,6 +225,7 @@ export function readConversationHistory(conversationId: string): ConversationTur
   const filePath = resolveConversationFilePath(conversationId);
 
   if (!safeExistsSync(filePath)) return [];
+  assertRegularConversationFile(filePath);
 
   try {
     const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
