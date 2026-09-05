@@ -1540,3 +1540,9 @@ contextual intent learning storeとexecution feedback storeについて、未作
 knowledge feedback policyの既存policyがschema不正のときに組み込みcapへ戻るcatalog fallbackを削除し、使用量上限policyの読み込み障害をfail-closedで返す境界へ統一した。policy未配置時の明示的な初期cap、tenant override、usage aggregateの保存・上限処理は変更していない。
 
 検証: knowledge-feedback-loop **1 file / 12 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 188
+
+voice profile promotionの未作成registry初期化をcatalog fallbackから呼び出し側の明示的な空registry生成へ移し、既存registryのschema不正を空registryへ置換しない境界へ統一した。pending receipt検証、personal／public registry選択、sample移送とpromotion receipt生成は変更していない。
+
+検証: voice-profile-promotion **1 file / 4 tests passed**、voice-profile-registry **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
