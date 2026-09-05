@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   formatReasoningBackendMenu,
   listReasoningBackendChoices,
@@ -9,6 +11,11 @@ import {
 } from './reasoning_backend_selection.js';
 
 describe('reasoning_backend_selection', () => {
+  it('uses the foundation reader for persisted operator preferences', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/reasoning_backend_selection.ts'));
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
+  });
+
   it('derives the catalog from the reasoning-backend policy (LC-04c SSoT)', () => {
     const choices = listReasoningBackendChoices();
     // Spot-check the members the guidance/menu previously dropped.

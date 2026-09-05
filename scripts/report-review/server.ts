@@ -18,13 +18,13 @@
  */
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycle,
 } from '@agent/core/protocol-service-lifecycle';
-import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readTextFile } from '@agent/core/foundation';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
@@ -116,7 +116,7 @@ export async function main(
     return stripBetween(stripBetween(html, CFG_OPEN, CFG_CLOSE), RV_LAYER_OPEN, RV_LAYER_CLOSE);
   }
   function serveHtml(): string {
-    let html = stripInjected(safeReadFile(target, { encoding: 'utf8' }) as string);
+    let html = stripInjected(readTextFile(target));
     const cfg = `${CFG_OPEN}<script>window.__RV_SAVE__={url:'/save',token:'${TOKEN}'};</script>${CFG_CLOSE}`;
     html = /<head[^>]*>/i.test(html)
       ? html.replace(/<head[^>]*>/i, (m) => `${m}\n${cfg}`)
@@ -176,7 +176,7 @@ export async function main(
               return;
             }
             const backup = `${target}.bak-${ts()}`;
-            safeWriteFile(backup, safeReadFile(target, { encoding: 'utf8' }) as string, {
+            safeWriteFile(backup, readTextFile(target), {
               mkdir: true,
               encoding: 'utf8',
             });

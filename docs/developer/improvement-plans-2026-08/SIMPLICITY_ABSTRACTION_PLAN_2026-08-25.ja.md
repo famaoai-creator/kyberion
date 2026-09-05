@@ -22419,3 +22419,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/marketing_publish_dry_run.ts`、`scripts/export_validation_bundle.ts`、`scripts/apply_dependency_patch.ts` と対象テスト
 - **変更**: marketing text artifact、validation bundle audit JSONL、dependency patch package manifest の本文読込を foundation の `readTextFile` へ移行した。artifact SHA-256／bundle binary copy、approval／audit projection、dependency patch proposal/apply semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／24 tests passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1537
+
+- **対象**: `scripts/report-review/server.ts`、`scripts/report-review/stamp.ts`、`scripts/audit_mirror_reconcile.ts`、`scripts/reasoning_backend_selection.ts` と対象テスト
+- **変更**: report-review HTML、audit mirror JSONL、reasoning backend の `.env.local` 本文読込を foundation の `readTextFile` へ移行した。review injection／backup、audit reconcile、backend preference persistence semanticsは変更せず、reader contract を追加した。
+- **検証**: 対象テスト **4 files／17 tests passed**、audit mirror の `--help` プローブ passed、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
