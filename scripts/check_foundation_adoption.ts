@@ -1,7 +1,7 @@
 import path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
@@ -61,7 +61,7 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
   let catalogDefinitionsWithoutSchema = 0;
 
   for (const filePath of files) {
-    const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+    const source = readTextFile(filePath);
     const relativePath = path
       .relative(pathResolver.rootResolve('.'), filePath)
       .split(path.sep)

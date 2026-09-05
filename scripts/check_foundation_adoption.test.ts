@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
@@ -7,6 +8,12 @@ import {
 } from './check_foundation_adoption.js';
 
 describe('checkFoundationAdoption', () => {
+  it('uses the foundation text reader for source inspection', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/check_foundation_adoption.ts'));
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain("from '@agent/core/secure-io'");
+  });
+
   it('detects multiline foundation JSON loader bypasses', () => {
     const filePath = pathResolver.sharedTmp('foundation-adoption-violation.ts');
     safeWriteFile(

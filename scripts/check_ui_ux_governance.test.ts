@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   collectUiUxGovernanceReport,
   findHardcodedColorViolations,
@@ -21,5 +23,11 @@ describe('UI/UX governance audit', () => {
     expect(report.status, JSON.stringify(report.violations, null, 2)).toBe('pass');
     expect(report.owner).toBe('design-system-steward');
     expect(report.checked_files).toBeGreaterThan(10);
+  });
+
+  it('uses the foundation text reader for source inspection', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/check_ui_ux_governance.ts'));
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile');
   });
 });
