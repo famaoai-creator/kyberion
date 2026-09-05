@@ -6,13 +6,12 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
 } from './secure-io.js';
 import { nowIso } from './foundation/time.js';
 import { parseSafeJsonInput } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
   MeshDeliveryRecord,
@@ -176,7 +175,7 @@ function readJsonl<T>(logicalPath: string, normalize: (value: unknown) => T | un
   if (!safeLstat(safePath).isFile()) {
     throw new Error(`mesh-hub persisted JSONL must be a regular file: ${safePath}`);
   }
-  const raw = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(safePath);
   const records: T[] = [];
   for (const line of raw
     .split(/\r?\n/u)

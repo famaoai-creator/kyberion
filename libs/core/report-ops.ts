@@ -8,19 +8,13 @@
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { GLOBAL_LEDGER_PATH, verifyLedgerIntegrityDetailed } from './ledger.js';
 import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-promotion-queue.js';
 import { summarizeHeuristics, type HeuristicReport } from './heuristic-feedback.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import type { TaskModelEffort, TaskModelHint, TaskModelTier } from './reasoning-model-routing.js';
@@ -662,7 +656,7 @@ function readJsonlEvents(filePath: string): unknown[] {
   if (!safeLstat(safePath).isFile()) {
     throw new Error(`[REPORT_OPS_RESOURCE] event stream must be a regular file: ${safePath}`);
   }
-  return parseJsonl(safeReadFile(safePath, { encoding: 'utf8' }) as string);
+  return parseJsonl(readTextFile(safePath));
 }
 
 /** Op-shaped entry: collect samples from the observability JSONL streams. */
