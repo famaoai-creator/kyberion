@@ -6,6 +6,7 @@ const SOURCES = [
   ['libs/core/core.ts', /process\.env\.(?:LOG_LEVEL|NODE_ENV|DEBUG)/u],
   ['libs/core/agy-cli-backend.ts', /process\.env\.NODE_ENV/u],
   ['libs/core/memory-promotion-queue.ts', /process\.env\.NODE_ENV/u],
+  ['libs/core/ops-alert.ts', /process\.env\[OPS_ALERT_WEBHOOK_ENV\]/u],
   ['libs/core/organization-operating-model-persistence.ts', /process\.env\.VITEST/u],
   ['libs/core/project-management.ts', /process\.env\.VITEST/u],
   ['libs/core/work-coordination.ts', /process\.env\.VITEST/u],

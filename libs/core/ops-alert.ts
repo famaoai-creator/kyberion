@@ -1,4 +1,5 @@
 import { parseSafeJsonInput } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExec } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
@@ -77,7 +78,7 @@ export function resolveOpsAlertChannelStatus(
   options: { webhookUrl?: string; operatorRouteConfigured?: boolean } = {}
 ): OpsAlertChannelStatus {
   const webhookConfigured = Boolean(
-    (options.webhookUrl ?? process.env[OPS_ALERT_WEBHOOK_ENV] ?? '').trim()
+    (options.webhookUrl ?? getRegisteredEnvText(OPS_ALERT_WEBHOOK_ENV) ?? '').trim()
   );
   const operatorRouteConfigured = options.operatorRouteConfigured ?? false;
   return {
@@ -164,7 +165,7 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
   }
   lastSentAt.set(key, now.getTime());
 
-  const webhookUrl = options.webhookUrl ?? process.env[OPS_ALERT_WEBHOOK_ENV];
+  const webhookUrl = options.webhookUrl ?? getRegisteredEnvText(OPS_ALERT_WEBHOOK_ENV);
   if (!webhookUrl) {
     const operatorRoute = resolveOperatorNotificationRoute(
       'ops_alert',
@@ -538,7 +539,7 @@ export function redeliverUndeliveredOpsAlerts(
 ): OpsAlertRedeliveryReport {
   const now = options.now ?? new Date();
   const alertLogPath = options.alertLogPath ?? defaultAlertLogPath();
-  const webhookUrl = options.webhookUrl ?? process.env[OPS_ALERT_WEBHOOK_ENV];
+  const webhookUrl = options.webhookUrl ?? getRegisteredEnvText(OPS_ALERT_WEBHOOK_ENV);
   const deliver =
     options.deliver ??
     (webhookUrl ? (payload: string) => postOpsAlertWebhook(payload, webhookUrl) : null);
