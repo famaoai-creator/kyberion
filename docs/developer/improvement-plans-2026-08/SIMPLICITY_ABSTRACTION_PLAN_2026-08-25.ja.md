@@ -20681,6 +20681,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: production sourceに残っていた `@agent/core/src/pfc/ServiceValidator` の内部パス参照を、既存公開subpath `@agent/core/service-validator` へ移行した。service auth validationの実装・戻り値・認可境界は変更していない。
 - **検証**: service actuator build、root typecheck、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。production sourceの対象 internal-path参照は0件となった。
 
+## 2026-09-05 再レビュー修正 1248
+
+- **対象**: `libs/core/untrusted-content.ts`
+- **変更**: injection suspected stateをmission stateへ反映する経路の `MISSION_ID` 直読を、登録済み `getRegisteredEnvText` へ移行した。mission path解決、injection signal、quarantine、state更新の既存 semanticsは変更していない。
+- **検証**: untrusted-content関連テスト、core typecheck、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
