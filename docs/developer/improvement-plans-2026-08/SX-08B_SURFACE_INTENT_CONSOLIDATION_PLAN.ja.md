@@ -964,3 +964,9 @@ audit-chainのcurrent tenant解決でmission stateを探索する際に残って
 history-search-indexのprivate mission access checkに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。mission path／tier検証、SUDO bypass、同一mission制約、history／handoff検索の既存 semanticsは変更していない。
 
 検証: history／handoff／runtime history **3 files / 20 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 92
+
+Anthropic SDK usage meteringのmission attributionに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。provider usage／cache statsの記録、best-effort metering、既存のreasoning semanticsは変更していない。
+
+検証: Anthropic backend **1 file / 9 tests passed（1 skipped）**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。

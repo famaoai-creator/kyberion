@@ -426,7 +426,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
         model: String(model || this.model),
         agent: 'anthropic-sdk',
         cause: 'assistant',
-        mission_id: process.env.MISSION_ID || undefined,
+        mission_id: getRegisteredEnvText('MISSION_ID') || undefined,
         ...(cacheStats ? { cacheStats } : {}),
         ...(usage
           ? {
