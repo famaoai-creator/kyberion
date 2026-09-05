@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import { safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -48,7 +49,7 @@ export interface PlanFrontmatterDefaults {
 }
 
 function read(filePath: string): string {
-  return String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  return readTextFile(filePath);
 }
 
 export function parseFrontmatter(markdown: string): Record<string, string> | null {
