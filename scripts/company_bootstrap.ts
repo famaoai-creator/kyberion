@@ -22,10 +22,9 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnvText, readTextFile, setRegisteredEnv } from '@agent/core/foundation';
 import { loadOrganizationProfileAtPath } from '@agent/core/organization-profile';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -110,7 +109,7 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
       rootDir: templateRoot,
     });
     if (!safeLstat(sourcePath).isFile()) continue;
-    const raw = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
+    const raw = readTextFile(sourcePath);
     const materialized = raw
       .replaceAll('{COMPANY_SLUG}', slug)
       .replaceAll('{COMPANY_NAME}', companyName);
