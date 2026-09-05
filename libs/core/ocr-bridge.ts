@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { secureFetch } from './network.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
@@ -55,9 +55,13 @@ function getMimeType(filePath: string): string {
 }
 
 function resolveOcrImagePath(requestPath: string): string {
-  return assertSafeRepositoryPath(pathResolver.rootResolve(requestPath), {
+  const resolvedPath = assertSafeRepositoryPath(pathResolver.rootResolve(requestPath), {
     allowMissingLeaf: true,
   });
+  if (!safeLstat(resolvedPath).isFile()) {
+    throw new Error(`[OCR_RESOURCE] input must be a regular file: ${requestPath}`);
+  }
+  return resolvedPath;
 }
 
 function nonEmptyString(value: unknown): string | undefined {
