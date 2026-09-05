@@ -151,11 +151,6 @@ const knowledgeFeedbackPolicyCatalog = defineCatalog<KnowledgeFeedbackPolicyFile
   id: 'knowledge-feedback-policy',
   path: feedbackPolicyPath,
   schema: pathResolver.knowledge('product/schemas/knowledge-feedback-policy.schema.json'),
-  fallback: { defaults: { ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP }, tenant_overrides: {} },
-  fallbackOnInvalid: true,
-  onFallback: (error) => {
-    logger.warn(`[KP-05] knowledge feedback policy fallback: ${String(error)}`);
-  },
 });
 
 export function loadKnowledgeFeedbackCap(scope?: ScopeContext): KnowledgeFeedbackCap {

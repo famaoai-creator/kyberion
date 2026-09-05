@@ -91,7 +91,7 @@ describe('knowledge feedback policy', () => {
     expect(knowledgeUsageAggregatePath()).toContain('active/shared/runtime/feedback-loop');
   });
 
-  it('loads governed defaults and tenant overrides, then fails closed to caps on invalid input', () => {
+  it('loads governed defaults and tenant overrides, then rejects invalid policy input', () => {
     safeWriteFile(
       policyPathOverride,
       JSON.stringify({
@@ -111,10 +111,7 @@ describe('knowledge feedback policy', () => {
     });
 
     safeWriteFile(policyPathOverride, JSON.stringify({ defaults: { max_usage_entries: 0 } }));
-    expect(loadKnowledgeFeedbackCap()).toEqual({
-      max_usage_entries: 10_000,
-      max_usage_bytes: 10 * 1024 * 1024,
-    });
+    expect(() => loadKnowledgeFeedbackCap()).toThrow('Invalid catalog knowledge-feedback-policy');
   });
 });
 

@@ -1534,3 +1534,9 @@ service bootstrapとwork coordination importの任意overlayについて、未�
 contextual intent learning storeとexecution feedback storeについて、未作成時は明示的に空storeから開始し、既存ファイルのschema不正を空storeへ戻すcatalog fallbackを削除した。学習・feedbackの記録、上限件数、候補昇格、既存storeのschema検証は変更していない。
 
 検証: contextual-intent-learning **1 file / 4 tests passed**、execution-feedback **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 187
+
+knowledge feedback policyの既存policyがschema不正のときに組み込みcapへ戻るcatalog fallbackを削除し、使用量上限policyの読み込み障害をfail-closedで返す境界へ統一した。policy未配置時の明示的な初期cap、tenant override、usage aggregateの保存・上限処理は変更していない。
+
+検証: knowledge-feedback-loop **1 file / 12 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。

@@ -21335,6 +21335,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: contextual intent learning storeとexecution feedback storeについて、未作成時は明示的に空storeから開始し、既存ファイルのschema不正を空storeへ戻すcatalog fallbackを削除した。学習・feedbackの記録、上限件数、候補昇格、既存storeのschema検証は変更していない。
 - **検証**: contextual-intent-learning **1 file / 4 tests passed**、execution-feedback **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1357
+
+- **対象**: `libs/core/src/knowledge-feedback-loop.ts`、`libs/core/src/knowledge-feedback-loop.test.ts`
+- **変更**: knowledge feedback policyの既存policyがschema不正のときに組み込みcapへ戻るcatalog fallbackを削除し、使用量上限policyの読み込み障害をfail-closedで返す境界へ統一した。policy未配置時の明示的な初期cap、tenant override、usage aggregateの保存・上限処理は変更していない。
+- **検証**: knowledge-feedback-loop **1 file / 12 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
