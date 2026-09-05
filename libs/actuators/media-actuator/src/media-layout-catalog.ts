@@ -265,7 +265,11 @@ function resolveSlideTemplate(
 }
 
 function loadSlideLayoutPresetCatalog(rootDir: string): MediaSlideLayoutPresetCatalog {
-  const fallback: MediaSlideLayoutPresetCatalog = { version: '1.0.0', defaults: {}, presets: {} };
+  const aggregationSeed: MediaSlideLayoutPresetCatalog = {
+    version: '1.0.0',
+    defaults: {},
+    presets: {},
+  };
   const catalog = defineCatalog<MediaSlideLayoutPresetCatalog>({
     id: 'slide-layout-presets',
     path: path.resolve(
@@ -273,8 +277,6 @@ function loadSlideLayoutPresetCatalog(rootDir: string): MediaSlideLayoutPresetCa
       'knowledge/public/design-patterns/media-templates/slide-layout-presets.json'
     ),
     schema: path.resolve(rootDir, 'knowledge/product/schemas/slide-layout-presets.schema.json'),
-    fallback,
-    fallbackOnInvalid: true,
   });
   const directoryPath = path.resolve(
     rootDir,
@@ -282,7 +284,10 @@ function loadSlideLayoutPresetCatalog(rootDir: string): MediaSlideLayoutPresetCa
   );
   const docs = readJsonFilesRecursively(directoryPath);
   if (docs.length === 0) return catalog.load();
-  const merged = docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback));
+  const merged = docs.reduce(
+    (acc, doc) => deepMergeCatalog(acc, doc),
+    cloneJsonValue(aggregationSeed)
+  );
   return catalog.validate(merged, directoryPath);
 }
 
@@ -419,19 +424,12 @@ function loadLayoutTemplateCatalog(rootDir: string): MediaLayoutTemplateCatalog 
 
 function loadLayoutTemplateCatalogFromPath(filePath: string): MediaLayoutTemplateCatalog {
   const catalogPath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  const fallback: MediaLayoutTemplateCatalog = {
-    version: '1.0.0',
-    default: 'corporate-standard',
-    templates: {},
-  };
   return defineCatalog<MediaLayoutTemplateCatalog>({
     id: 'layout-template-catalog',
     path: catalogPath,
     schema: pathResolver.rootResolve(
       'knowledge/product/schemas/layout-template-catalog.schema.json'
     ),
-    fallback,
-    fallbackOnInvalid: true,
   }).load();
 }
 

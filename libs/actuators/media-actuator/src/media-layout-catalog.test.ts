@@ -29,6 +29,7 @@ describe('media slide layout catalog boundary', () => {
     expect(source).toContain('knowledge/product/schemas/slide-layout-presets.schema.json');
     expect(source).toContain('return catalog.validate(merged, directoryPath);');
     expect(source).toContain('const catalog = loadSlideLayoutPresetCatalog(rootDir);');
+    expect(source).not.toContain('fallbackOnInvalid: true');
     expect(source).not.toContain('_cachedBzl = loadJsonValue(p);');
     expect(source).not.toContain('_cachedLayoutTemplates = loadJsonValue(p);');
 
