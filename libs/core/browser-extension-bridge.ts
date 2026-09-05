@@ -12,13 +12,13 @@ import {
   safeLstat,
   safeMkdir,
   safeExistsSync,
-  safeReadFile,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
 import { validateOpInput } from './op-input-contracts.js';
 import { resolveBrowserRecordingPipelineOp, normalizeBrowserPipelineOp } from './op-vocabulary.js';
 import { compileSchema } from './foundation/ajv.js';
+import { readTextFile } from './foundation/text.js';
 
 /** Approval-gate operation id for governed Chrome extension execution. */
 export const BROWSER_EXTENSION_EXECUTE_OP = 'browser:extension_execute';
@@ -1184,7 +1184,7 @@ export function loadBrowserExtensionObservations(
   let raw: string;
   try {
     if (safeStat(filePath).size > MAX_OBSERVATION_STORE_BYTES) return [];
-    raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    raw = readTextFile(filePath);
   } catch {
     return [];
   }

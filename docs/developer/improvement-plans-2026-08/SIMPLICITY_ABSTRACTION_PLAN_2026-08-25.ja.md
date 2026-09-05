@@ -22461,3 +22461,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/shared-nerve/src/reflex-engine.ts`、`libs/core/deliverable-inbox.ts`、`libs/core/agent-adapter.ts`、`libs/shared-network/src/mcp-server-engine.ts` と対象テスト
 - **変更**: reflex定義、deliverable lock、Gemini wisdom、MCP pipeline／actuator manifest の本文読込を foundation の `readTextFile` へ移行した。secure path／regular-file検証、JSON／catalog解析、lock stale判定、MCPのallowlist・caller scope・approval semanticsは変更せず、既存テストのFoundation I/Oモックを新しい読取経路へ適応した。
 - **検証**: 対象テスト **4 files／80 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1544
+
+- **対象**: `libs/core/skill-plugin-loader.ts`、`libs/core/adf-repair-agent.ts`、`libs/core/browser-extension-bridge.ts` と対象テスト
+- **変更**: plugin config／manifest、ADF input／schema／recheck、browser observation JSONL の本文読込を foundation の `readTextFile` へ移行した。provenance／symlink／regular-file境界、ADF repair の validation・repair cascade、browser observation のサイズ／承認／監査 semanticsは変更せず、secure-io はバイナリ・書込用途に限定した。
+- **検証**: 対象テスト **4 files／72 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

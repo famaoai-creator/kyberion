@@ -29,10 +29,10 @@ import { pathToFileURL } from 'node:url';
 import type { ValidateFunction } from 'ajv';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { compileSchema } from './foundation/ajv.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import {
   derivePluginTrustLabel,
@@ -207,7 +207,7 @@ export function loadSkillPluginsConfigAtPath(filePath: string): SkillPluginsConf
     throw new Error(`[PLUGIN_CONFIG_INVALID] config must be a regular file: ${filePath}`);
   }
   const parsed = parseSafeJsonInput(
-    String(safeReadFile(safeFilePath, { encoding: 'utf8' })),
+    readTextFile(safeFilePath),
     `skill plugin config ${safeFilePath}`
   );
   const validate = ensureSkillPluginsConfigValidator();
@@ -330,7 +330,7 @@ function readPluginManifestProvides(resolvedPath: string): {
           throw new Error(`plugin manifest must be a regular file: ${manifestPath}`);
         }
         const parsed = parseSafeJsonInput(
-          String(safeReadFile(manifestPath, { encoding: 'utf8' })),
+          readTextFile(manifestPath),
           `plugin manifest ${manifestPath}`
         );
         if (!isRecord(parsed)) throw new Error('plugin manifest root must be a JSON object');

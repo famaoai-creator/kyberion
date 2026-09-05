@@ -8,7 +8,7 @@
 
 import { getReasoningBackend, type ReasoningCallOptions } from './reasoning-backend.js';
 import * as path from 'node:path';
-import { assertSafeRepositoryPath, safeLstat, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import { validate, loadSchema } from './validate.js';
 import { pathResolver } from './path-resolver.js';
@@ -31,7 +31,7 @@ import {
 import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
 import { getWorkItem } from './work-coordination.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { truncateNormalizedText } from './foundation/text.js';
+import { readTextFile, truncateNormalizedText } from './foundation/text.js';
 import { assertProjectTrustApproval } from './project-trust.js';
 import { isBuiltinPipelineResource } from './trust-requiring-resources.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
@@ -108,7 +108,7 @@ export async function validateAndRepairAdf(
   const repairPath = resolveAdfRepairPath(adfPath);
   if (schemaName === 'pipeline-adf') assertPipelineRepairTrust(repairPath, options);
   assertAdfRepairFile(repairPath);
-  const content = safeReadFile(repairPath, { encoding: 'utf8' }) as string;
+  const content = readTextFile(repairPath);
   let parsed: unknown;
   try {
     parsed = parseSafeJsonInput(content, 'ADF input');
@@ -239,7 +239,7 @@ function validateRepairTarget(
  * this schema/error topic.
  *
  * (a) The failing op's own contract/schema doc is already resolved by the
- * caller as `schemaContent` (via `loadSchema`/`safeReadFile` against the
+ * caller as `schemaContent` (via `loadSchema`/`readTextFile` against the
  * real `${schemaName}.schema.json` or the pipeline-adf schema file) and
  * embedded directly in `instruction`'s "## Expected Schema" section — that
  * is the repair agent's existing ground truth for the op, so there is
@@ -345,10 +345,8 @@ async function attemptSubagentRepair(
   let schemaContent = '(schema not available)';
   try {
     if (schemaName === 'pipeline-adf') {
-      schemaContent = String(
-        safeReadFile(pathResolver.knowledge('product/schemas/pipeline-adf.schema.json'), {
-          encoding: 'utf8',
-        })
+      schemaContent = readTextFile(
+        pathResolver.knowledge('product/schemas/pipeline-adf.schema.json')
       );
     } else {
       schemaContent = JSON.stringify(loadSchema(schemaName), null, 2);
@@ -388,7 +386,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
   const gaps = createGapRecorder();
   try {
     assertAdfRepairFile(adfPath);
-    const originalContent = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
+    const originalContent = readTextFile(adfPath);
     const repairContext = await gaps.measure('knowledge_slice', () =>
       buildAdfRepairKnowledgeContext(adfPath, schemaName, errorSummary, hints, backend.name)
     );
@@ -425,7 +423,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
 
     // Re-verify after repair
     assertAdfRepairFile(adfPath);
-    let updatedContent = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
+    let updatedContent = readTextFile(adfPath);
     if (updatedContent === originalContent) {
       const returnedRepair = tryRepairJson(report);
       if (returnedRepair !== null) {
