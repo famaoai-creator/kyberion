@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const profileRoot = vi.hoisted(() => ({ value: '' }));
 
@@ -12,6 +12,16 @@ vi.mock('./profile-root.js', () => ({
 import { loadVoiceSelectionPreferences } from './voice-selection-preferences.js';
 
 describe('voice-selection-preferences persistence boundary', () => {
+  it('routes STT availability environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/voice-selection-preferences.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/process\.env\.(VOICE_HUB_STT|WHISPERKIT|MLX_AUDIO)/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   beforeEach(() => {
     profileRoot.value = pathResolver.sharedTmp(`voice-selection-test-${process.pid}`);
     safeRmSync(profileRoot.value, { recursive: true, force: true });
