@@ -96,6 +96,16 @@ describe('plugin contribution manifest boundary', () => {
       'provides.hooks must be a non-empty string array'
     );
   });
+
+  it('checks contribution manifests as regular files before reading them', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/skill-plugin-loader.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('safeLstat(manifestPath).isFile()');
+    expect(source).toContain('plugin manifest must be a regular file');
+  });
 });
 
 /** Writes an ESM plugin whose hooks append to `markerPath` when actually called. */
