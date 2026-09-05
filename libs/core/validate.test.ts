@@ -1,23 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { parseSchemaDocument } from './validate.js';
+import { loadSchema, validateCapabilityInput } from './validate.js';
 
-describe('legacy schema loader boundary', () => {
-  it('accepts object-root schema documents', () => {
-    expect(parseSchemaDocument({ type: 'object', required: ['name'] }, 'example')).toEqual({
-      type: 'object',
-      required: ['name'],
-    });
+describe('schema validation loader', () => {
+  it('loads a governed capability schema and keeps validation behavior', () => {
+    expect(loadSchema('capability-input')).toMatchObject({ type: 'object' });
+    expect(validateCapabilityInput({}).valid).toBe(false);
   });
 
-  it.each([null, [], 'invalid', 42])('rejects non-object schema roots: %p', (value) => {
-    expect(() => parseSchemaDocument(value, 'example')).toThrow(
-      'example schema must be a JSON object'
+  it('rejects schema names that attempt path traversal', () => {
+    expect(() => loadSchema('../active/shared/runtime/secret')).toThrow(
+      'schema name must be a single filename segment'
     );
   });
 
-  it('rejects dangerous keys before schema consumers receive the document', () => {
-    const properties = Object.create(null) as Record<string, unknown>;
-    properties.__proto__ = {};
-    expect(() => parseSchemaDocument({ properties }, 'example')).toThrow('dangerous JSON key');
+  it('does not expose object prototype properties as schemas', () => {
+    expect(() => loadSchema('toString')).toThrow('schema not found: toString');
   });
 });
