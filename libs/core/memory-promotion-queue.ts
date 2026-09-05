@@ -286,8 +286,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   const contentHash = resolveContentHash(normalizedCandidate);
   const normalizedSourceRef = String(normalizedCandidate.source_ref || '').trim();
   const normalizedScopeKey = resolveScopeKey(normalizedCandidate.scope);
-  const now =
-    normalizedCandidate.last_seen || normalizedCandidate.queued_at || nowIso();
+  const now = normalizedCandidate.last_seen || normalizedCandidate.queued_at || nowIso();
   const existingIndex = rows.findIndex(
     (row) =>
       String(row.source_ref || '').trim() === normalizedSourceRef &&
@@ -337,7 +336,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
     occurrences: normalizeOccurrenceCount(candidate.occurrences),
     last_seen: now,
   };
-  if (!nextCandidate.audit_ref && process.env.NODE_ENV !== 'test') {
+  if (!nextCandidate.audit_ref && getRegisteredEnvText('NODE_ENV') !== 'test') {
     try {
       const audit = auditChain.record({
         agentId: getRegisteredEnvText('KYBERION_AGENT_ID') || 'knowledge-promotion-queue',

@@ -1192,3 +1192,9 @@ mission contextを設定する13個のCLI／daemon入口に残っていた `MISS
 共通 `authority` の同期／非同期 execution context、logger、script harness、Telegram demo に残っていた `MISSION_ROLE`／`LOG_LEVEL`／`NODE_ENV`／`DEBUG` の直接環境アクセスを、登録済み `getRegisteredEnvText`／`setRegisteredEnv` へ統一した。role／personaの scoped restore、quiet／json output、test guard、debug loggingの既存 semanticsは変更していない。共通層とdemoの直接アクセスを走査する境界テストを追加した。
 
 検証: authority／environment boundary／harness **4 files / 21 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck、foundation adoption check。残る provider／test-only guard と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 130
+
+AGY CLI backend と memory promotion queue に残っていた `NODE_ENV` の直接参照を、登録済み `getRegisteredEnvText` へ移行した。AGYの live／test model argv、memory promotion auditの test guardと通常時の監査記録 semanticsは変更していない。共通 environment boundary test に対象を追加した。
+
+検証: AGY CLI／memory queue／environment boundary **3 files / 41 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck、foundation adoption check。残る provider／test-only guard と外部provider実機確認は継続課題とする。

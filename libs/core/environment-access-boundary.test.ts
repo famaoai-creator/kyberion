@@ -4,6 +4,8 @@ import { safeReadFile } from './secure-io.js';
 
 const SOURCES = [
   ['libs/core/core.ts', /process\.env\.(?:LOG_LEVEL|NODE_ENV|DEBUG)/u],
+  ['libs/core/agy-cli-backend.ts', /process\.env\.NODE_ENV/u],
+  ['libs/core/memory-promotion-queue.ts', /process\.env\.NODE_ENV/u],
   ['scripts/lib/harness.ts', /process\.env\.LOG_LEVEL/u],
   ['scripts/demos/demo_telegram_flow.ts', /process\.env\.MISSION_ROLE/u],
 ] as const;
