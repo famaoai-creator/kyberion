@@ -17,7 +17,8 @@ import { OcrProvider } from './ocr-types.js';
 
 const mocks = vi.hoisted(() => {
   const spawn = vi.fn();
-  return { spawn };
+  const safeLstat = vi.fn(() => ({ isFile: () => true }));
+  return { safeLstat, spawn };
 });
 
 vi.mock('node:child_process', () => ({
@@ -47,6 +48,7 @@ vi.mock('./secure-io.js', async () => {
   const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
     ...actual,
+    safeLstat: mocks.safeLstat,
     safeReadFile: () => Buffer.from('dummy_png_bytes'),
   };
 });
@@ -525,6 +527,20 @@ describe('OCR input path boundary', () => {
       await expect(provider.recognize({ path: '/tmp/outside-ocr.png' })).rejects.toThrow(
         '[RESOURCE_PATH_SCOPE]'
       );
+    }
+  });
+
+  it('rejects a repository image path replaced by a directory before provider access', async () => {
+    networkMocks.secureFetch.mockClear();
+    mocks.safeLstat.mockReturnValue({ isFile: () => false });
+
+    try {
+      await expect(new LlmApiOcrProvider().recognize({ path: 'directory.png' })).rejects.toThrow(
+        '[OCR_RESOURCE] input must be a regular file'
+      );
+      expect(networkMocks.secureFetch).not.toHaveBeenCalled();
+    } finally {
+      mocks.safeLstat.mockReturnValue({ isFile: () => true });
     }
   });
 });
