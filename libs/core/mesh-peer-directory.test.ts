@@ -151,6 +151,20 @@ describe('mesh-peer-directory', () => {
     }
   });
 
+  it('rejects a peer record file that is replaced by a symbolic link', () => {
+    const tenantDir = path.join(TEST_RUNTIME_ROOT_ABS, 'tenants/tenant-acme');
+    const targetPath = path.join(TEST_RUNTIME_ROOT_ABS, 'registrations-target.jsonl');
+    const linkedPath = path.join(tenantDir, 'registrations.jsonl');
+    safeMkdir(tenantDir, { recursive: true });
+    safeWriteFile(
+      targetPath,
+      JSON.stringify({ peer_id: 'peer-a1', tenant_id: 'tenant-acme', status: 'enrolled' }) + '\n'
+    );
+    safeSymlinkSync(targetPath, linkedPath);
+
+    expect(() => resolveMeshPeer('tenant-acme', 'peer-a1')).toThrow('[RESOURCE_PATH_SYMLINK]');
+  });
+
   it('excludes stale heartbeats and tenant mismatches from eligibility', () => {
     registerMeshPeer({
       peer_id: 'peer-a1',

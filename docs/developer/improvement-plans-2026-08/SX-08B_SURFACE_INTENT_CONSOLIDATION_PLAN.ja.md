@@ -1766,3 +1766,7 @@ mesh topic registryのsubscriptions JSONL readerを`assertSafeRepositoryPath`／
 ## 2026-09-06 再レビュー修正 226
 
 memory promotion queueのcandidate discovery／status updateを共通のoperation-time readerへ統一し、scope queueのsymlink／非regular fileをJSONL read前に拒否する境界を追加した。scope列挙、legacy queue、重複統合、ratification semanticsを維持し、**1 file / 13 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 227
+
+mesh peer directoryのregistrations／presence／capabilities JSONL readerへoperation-timeのregular-file検査を追加し、peer record leafのsymlinkを読み込まない境界を追加した。tenant pathの既存symlink境界、missing fileの空配列、governed writerとeligibility semanticsを維持し、**1 file / 10 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
