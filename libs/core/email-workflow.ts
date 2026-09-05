@@ -6,6 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { clamp } from './foundation/text.js';
+import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { processUntrustedContent } from './untrusted-content.js';
 import {
@@ -13,7 +14,6 @@ import {
   safeExistsSync,
   safeExec,
   safeMkdir,
-  safeReadFile,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -690,7 +690,7 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
     }
   }
   if (safeExistsSync(markdown)) {
-    const draftMarkdown = String(safeReadFile(markdown, { encoding: 'utf8' }) || '');
+    const draftMarkdown = readTextFile(markdown);
     const markdownStat = safeStat(markdown);
     return {
       exists: true,

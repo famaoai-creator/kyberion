@@ -6,8 +6,9 @@ import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readTextFile } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExecResult, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExecResult, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
@@ -135,7 +136,7 @@ class CodexCliQuery {
         throw err;
       }
 
-      const raw = safeReadFile(outputPath, { encoding: 'utf8' }) as string;
+      const raw = readTextFile(outputPath);
       recordEstimatedCliUsage(
         'codex-cli',
         this.model,

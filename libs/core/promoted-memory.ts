@@ -5,12 +5,12 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
@@ -425,7 +425,7 @@ function appendGovernanceHintRecord(
     ? hintsPath
     : null;
   const existing = existingHintsPath
-    ? (safeReadFile(existingHintsPath, { encoding: 'utf8' }) as string)
+    ? readTextFile(existingHintsPath)
     : [
         '# Operational Hints',
         '',
@@ -488,7 +488,7 @@ function resolvePromotedRecordPath(ref: string): string | null {
 function updateFrontmatterField(absPath: string, key: string, value: string): void {
   const existingPath = existingRegularPromotedMemoryFile(absPath, 'promoted record');
   if (!existingPath) return;
-  const raw = safeReadFile(existingPath, { encoding: 'utf8' }) as string;
+  const raw = readTextFile(existingPath);
   const lines = raw.split(/\r?\n/);
   const start = lines.indexOf('---');
   if (start < 0) return;
