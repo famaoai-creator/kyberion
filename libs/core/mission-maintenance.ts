@@ -113,7 +113,9 @@ function isPathInside(parent: string, candidate: string): boolean {
 
 function resolveApprovalActor(requestedBy?: string): string {
   const resolvedActor =
-    getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller';
+    getRegisteredEnvText('KYBERION_PERSONA') ||
+    getRegisteredEnvText('USER') ||
+    'mission_controller';
   const requested = String(requestedBy || '').trim();
   if (requested && requested !== resolvedActor) {
     throw new Error(
