@@ -123,12 +123,20 @@ export function loadSupportGrounding(tenantSlug: string): { knownIssues: string;
   for (const candidate of candidates) {
     try {
       if (safeExistsSync(candidate)) {
+        if (!safeLstat(candidate).isFile()) {
+          throw new Error(
+            '[CUSTOMER_GROUNDING] known-issues resource must be a regular file: ' + candidate
+          );
+        }
         return {
           knownIssues: String(safeReadFile(candidate, { encoding: 'utf8' })).slice(0, 4000),
           found: true,
         };
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('[CUSTOMER_GROUNDING]')) {
+        throw error;
+      }
       // unreadable grounding is the same as missing grounding
     }
   }
