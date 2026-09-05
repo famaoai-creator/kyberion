@@ -161,7 +161,7 @@ function recordReasoningPromptVisibility(
  * at the call site and can carry task/context-pack/knowledge references.
  */
 function inferAmbientPromptVisibility(): ReasoningPromptVisibilityContext | undefined {
-  const missionId = String(process.env.MISSION_ID || '').trim();
+  const missionId = String(getRegisteredEnvText('MISSION_ID') || '').trim();
   if (!missionId) return undefined;
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return undefined;
