@@ -10,15 +10,12 @@ import {
   collectPendingSecretApprovals,
   collectRecentEvents,
 } from '../intelligence-control-data';
-import {
-  getChronosAccessRoleOrThrow,
-  guardRequest,
-  roleToMissionRole,
-} from '../../../../lib/api-guard';
+import { getChronosAccessRoleOrThrow, guardRequest } from '../../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
   viewerErrorResponse,
+  withViewerExecutionContextAsync,
 } from '../../../../lib/viewer-context';
 import {
   listAgentRuntimeLeaseSummaries,
@@ -224,7 +221,6 @@ export async function GET(req: NextRequest) {
   const tierAccess = resolvedViewer.context.tierAccess ?? ['public', 'confidential'];
 
   const accessRole = getChronosAccessRoleOrThrow(req);
-  process.env.MISSION_ROLE = roleToMissionRole(accessRole);
   const broadOperationalAccess = tenantSlugs === 'all' && tierAccess.includes('confidential');
 
   const encoder = new TextEncoder();
@@ -243,92 +239,96 @@ export async function GET(req: NextRequest) {
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const push = async () => {
-        if (closed) return;
-        const agentMessages = safeCollect('collectAgentMessages', [], collectAgentMessages).filter(
-          (message) =>
+      const push = async () =>
+        withViewerExecutionContextAsync(resolvedViewer.context, async () => {
+          if (closed) return;
+          const agentMessages = safeCollect(
+            'collectAgentMessages',
+            [],
+            collectAgentMessages
+          ).filter((message) =>
             intelligenceData.missionVisibleToScope(message.missionId, tenantSlugs, tierAccess)
-        );
-        const a2aHandoffs = safeCollect('collectA2AHandoffs', [], collectA2AHandoffs).filter(
-          (handoff) =>
-            intelligenceData.missionVisibleToScope(handoff.missionId, tenantSlugs, tierAccess)
-        );
-        const runtimeTopology = await (async () => {
+          );
+          const a2aHandoffs = safeCollect('collectA2AHandoffs', [], collectA2AHandoffs).filter(
+            (handoff) =>
+              intelligenceData.missionVisibleToScope(handoff.missionId, tenantSlugs, tierAccess)
+          );
+          const runtimeTopology = await (async () => {
+            try {
+              return await collectManagedRuntimeTopology(tierAccess);
+            } catch (err) {
+              console.warn('[chronos-mirror-v2] collectManagedRuntimeTopology failed', err);
+              return {
+                managedRuntimes: [],
+                surfaces: [],
+                runtimeSummary: { total: 0, ready: 0, busy: 0, error: 0 },
+              };
+            }
+          })();
+          const { managedRuntimes, surfaces, runtimeSummary } = runtimeTopology;
+          if (closed) return;
+          const scopedView = tenantSlugs !== 'all';
+          const payload = {
+            revision: nextIntelligenceStreamRevision(),
+            ts: nowIso(),
+            accessRole,
+            ...(scopedView
+              ? {}
+              : {
+                  recentEvents: safeCollect('collectRecentEvents', [], () =>
+                    collectRecentEvents(tenantSlugs, tierAccess)
+                  ),
+                  agentMessages,
+                  a2aHandoffs,
+                }),
+            secretApprovals: safeCollect('collectPendingSecretApprovals', [], () =>
+              collectPendingSecretApprovals(tenantSlugs, tierAccess)
+            ),
+            ...(scopedView
+              ? {
+                  controlActions: [],
+                  controlActionDetails: {},
+                  ownerSummaries: [],
+                  browserSessions: [],
+                  runtime: { total: 0, ready: 0, busy: 0, error: 0 },
+                  runtimeTopology: buildRuntimeTopology({
+                    surfaces: [],
+                    runtimes: [],
+                    handoffs: [],
+                    messages: [],
+                  }),
+                }
+              : {
+                  controlActions: safeCollect('collectControlActions', [], () =>
+                    collectControlActions(tenantSlugs, tierAccess)
+                  ),
+                  controlActionDetails: safeCollect('collectControlActionDetails', {}, () =>
+                    collectControlActionDetails(tenantSlugs, tierAccess)
+                  ),
+                  ownerSummaries: safeCollect('collectOwnerSummaries', [], () =>
+                    collectOwnerSummaries(tenantSlugs, tierAccess)
+                  ),
+                  browserSessions: broadOperationalAccess
+                    ? safeCollect('collectBrowserSessions', [], collectBrowserSessions)
+                    : [],
+                  runtime: runtimeSummary,
+                  runtimeTopology: buildRuntimeTopology({
+                    surfaces,
+                    runtimes: managedRuntimes,
+                    handoffs: a2aHandoffs,
+                    messages: agentMessages,
+                  }),
+                }),
+          };
+          const serialized = JSON.stringify(payload);
+          if (serialized === previousPayload) return;
+          previousPayload = serialized;
           try {
-            return await collectManagedRuntimeTopology(tierAccess);
-          } catch (err) {
-            console.warn('[chronos-mirror-v2] collectManagedRuntimeTopology failed', err);
-            return {
-              managedRuntimes: [],
-              surfaces: [],
-              runtimeSummary: { total: 0, ready: 0, busy: 0, error: 0 },
-            };
+            controller.enqueue(encoder.encode(sseChunk(payload)));
+          } catch {
+            closeStream();
           }
-        })();
-        const { managedRuntimes, surfaces, runtimeSummary } = runtimeTopology;
-        if (closed) return;
-        const scopedView = tenantSlugs !== 'all';
-        const payload = {
-          revision: nextIntelligenceStreamRevision(),
-          ts: nowIso(),
-          accessRole,
-          ...(scopedView
-            ? {}
-            : {
-                recentEvents: safeCollect('collectRecentEvents', [], () =>
-                  collectRecentEvents(tenantSlugs, tierAccess)
-                ),
-                agentMessages,
-                a2aHandoffs,
-              }),
-          secretApprovals: safeCollect('collectPendingSecretApprovals', [], () =>
-            collectPendingSecretApprovals(tenantSlugs, tierAccess)
-          ),
-          ...(scopedView
-            ? {
-                controlActions: [],
-                controlActionDetails: {},
-                ownerSummaries: [],
-                browserSessions: [],
-                runtime: { total: 0, ready: 0, busy: 0, error: 0 },
-                runtimeTopology: buildRuntimeTopology({
-                  surfaces: [],
-                  runtimes: [],
-                  handoffs: [],
-                  messages: [],
-                }),
-              }
-            : {
-                controlActions: safeCollect('collectControlActions', [], () =>
-                  collectControlActions(tenantSlugs, tierAccess)
-                ),
-                controlActionDetails: safeCollect('collectControlActionDetails', {}, () =>
-                  collectControlActionDetails(tenantSlugs, tierAccess)
-                ),
-                ownerSummaries: safeCollect('collectOwnerSummaries', [], () =>
-                  collectOwnerSummaries(tenantSlugs, tierAccess)
-                ),
-                browserSessions: broadOperationalAccess
-                  ? safeCollect('collectBrowserSessions', [], collectBrowserSessions)
-                  : [],
-                runtime: runtimeSummary,
-                runtimeTopology: buildRuntimeTopology({
-                  surfaces,
-                  runtimes: managedRuntimes,
-                  handoffs: a2aHandoffs,
-                  messages: agentMessages,
-                }),
-              }),
-        };
-        const serialized = JSON.stringify(payload);
-        if (serialized === previousPayload) return;
-        previousPayload = serialized;
-        try {
-          controller.enqueue(encoder.encode(sseChunk(payload)));
-        } catch {
-          closeStream();
-        }
-      };
+        });
 
       try {
         controller.enqueue(encoder.encode('retry: 3000\n\n'));
