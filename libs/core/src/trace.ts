@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
-import { safeMkdir, safeExistsSync } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning-egress-scope.js';
 import {
   sanitizeTraceForPersistence,
@@ -245,8 +245,12 @@ export function traceLogDir(): string {
   } else {
     baseDir = path.join(pathResolver.shared('logs/traces'));
   }
-  if (!safeExistsSync(baseDir)) safeMkdir(baseDir, { recursive: true });
-  return baseDir;
+  const safeDir = assertSafeRepositoryPath(baseDir, { allowMissingLeaf: true });
+  if (safeExistsSync(safeDir) && !safeLstat(safeDir).isDirectory()) {
+    throw new Error(`[TRACE_PATH] trace log root must be a directory: ${safeDir}`);
+  }
+  if (!safeExistsSync(safeDir)) safeMkdir(safeDir, { recursive: true });
+  return safeDir;
 }
 
 /**
@@ -266,10 +270,18 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
         .join('; ')}`
     );
   }
-  const dir = opts?.dir ?? traceLogDir();
+  const dir = assertSafeRepositoryPath(opts?.dir ?? traceLogDir(), { allowMissingLeaf: true });
+  if (safeExistsSync(dir) && !safeLstat(dir).isDirectory()) {
+    throw new Error(`[TRACE_PATH] trace log root must be a directory: ${dir}`);
+  }
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   const day = nowIso().slice(0, 10); // YYYY-MM-DD
-  const file = path.join(dir, `traces-${day}.jsonl`);
+  const file = assertSafeRepositoryPath(path.join(dir, `traces-${day}.jsonl`), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(file) && !safeLstat(file).isFile()) {
+    throw new Error(`[TRACE_PATH] trace log must be a regular file: ${file}`);
+  }
   const safeTrace = sanitizeTraceForPersistence(trace);
   const record = { ...safeTrace, _persistedAt: nowIso() };
   appendJsonLine(file, record);
