@@ -9,6 +9,8 @@ describe('catalog integrity schema loader boundary', () => {
       })
     );
     expect(source).toContain('compileSchema(pathResolver.rootResolve(check.schemaPath))');
+    expect(source).toContain('compileSchema, readTextFile');
+    expect(source).not.toContain('safeReadFile(');
     expect(source).not.toContain('createAjv');
     expect(source).not.toContain('ajv.compile');
     expect(source).not.toContain('ajv.addSchema');

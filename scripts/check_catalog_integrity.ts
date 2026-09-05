@@ -3,8 +3,8 @@ import { extractPlaceholderNames } from '@agent/core/message-format';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
-import { compileSchema } from '@agent/core/foundation';
+import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { compileSchema, readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { generateIndex } from './generate_knowledge_index.js';
 import {
@@ -485,7 +485,7 @@ function findUndefinedKeyReferences(files: string[]): string[] {
   const sources: Record<string, string> = {};
   for (const file of files) {
     const label = path.relative(pathResolver.rootDir(), file);
-    sources[label] = String(safeReadFile(file, { encoding: 'utf8' }) || '');
+    sources[label] = readTextFile(file);
   }
   return collectUndefinedKeyReferenceViolations(sources);
 }
@@ -603,9 +603,7 @@ function validateUserFacingVocabulary(
   const files = collectSourceFiles(VOCABULARY_SCAN_DIRS);
   violations.push(...findUndefinedKeyReferences(files));
 
-  const haystack = files
-    .map((file) => String(safeReadFile(file, { encoding: 'utf8' }) || ''))
-    .join('\n');
+  const haystack = files.map((file) => readTextFile(file)).join('\n');
   warnings.push(...findUnusedVocabularyKeys(data as VocabularyCatalogShape, haystack));
 }
 
@@ -675,7 +673,7 @@ function validateDesignTokenCatalog(violations: string[]) {
       );
       continue;
     }
-    const actual = String(safeReadFile(filePath, { encoding: 'utf8' }) || '').trim();
+    const actual = readTextFile(filePath).trim();
     if (filePath.endsWith('globals.css')) {
       const tokenBlock = extractKyberionTokenBlock(actual);
       if (tokenBlock !== expectedTokenBlock) {
@@ -698,7 +696,7 @@ function validateDesignTokenCatalog(violations: string[]) {
   if (!safeExistsSync(tailwindPath)) {
     violations.push('design-tokens: missing tailwind.config.cjs');
   } else {
-    const tailwindText = String(safeReadFile(tailwindPath, { encoding: 'utf8' }) || '');
+    const tailwindText = readTextFile(tailwindPath);
     if (!tailwindText.includes(expectedTailwindBlock)) {
       violations.push('design-tokens: kyberion tailwind color block drift');
     }
@@ -756,7 +754,7 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
     violations.push('capabilities-guide: CAPABILITIES_GUIDE.md is missing');
     return;
   }
-  const guide = safeReadFile(guidePath, { encoding: 'utf8' }) as string;
+  const guide = readTextFile(guidePath);
   const catalog = loadActuatorManifestCatalog();
   const totalMatch = guide.match(/Total Actuators:\s*(\d+)/u);
   const guideTotal = totalMatch ? Number(totalMatch[1]) : NaN;
@@ -828,7 +826,7 @@ function collectGovernanceRuntimeSourceFiles(): Record<string, string> {
       )
         continue;
       const relative = path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
-      sourceFiles[relative] = String(safeReadFile(file, { encoding: 'utf8' }));
+      sourceFiles[relative] = readTextFile(file);
     }
   }
   // Manifest-driven checkers resolve their governed catalogs from the CI gate
@@ -836,9 +834,7 @@ function collectGovernanceRuntimeSourceFiles(): Record<string, string> {
   // those declarations visible to the unreferenced-catalog audit.
   const gateManifestPath = pathResolver.rootResolve('knowledge/product/governance/ci-gates.json');
   if (safeExistsSync(gateManifestPath)) {
-    sourceFiles['knowledge/product/governance/ci-gates.json'] = String(
-      safeReadFile(gateManifestPath, { encoding: 'utf8' })
-    );
+    sourceFiles['knowledge/product/governance/ci-gates.json'] = readTextFile(gateManifestPath);
   }
   return sourceFiles;
 }
