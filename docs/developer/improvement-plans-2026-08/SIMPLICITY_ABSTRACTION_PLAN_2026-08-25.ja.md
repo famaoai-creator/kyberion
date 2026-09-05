@@ -22095,3 +22095,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/extract_changelog_section.ts`、`scripts/extract_changelog_section.resource-boundary.test.ts`
 - **変更**: release changelog section の本文 read を foundation の `readTextFile` へ移行した。既存の repository scope／regular-file／symlink 境界と shared script printer 契約は維持し、source contract test で旧 `safeReadFile` 直読の再導入を検出するようにした。
 - **検証**: extract-changelog-section **2 files / 4 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1483
+
+- **対象**: `scripts/generate_changelog.ts`、`scripts/generate_changelog.test.ts`
+- **変更**: changelog prepend の既存本文 read を foundation の `readTextFile` へ移行した。dry-run／check／prepend の既存出力と write semantics は維持し、source contract test で canonical foundation reader と旧 `safeReadFile` 直読の不在を固定した。
+- **検証**: generate-changelog **2 files / 6 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
