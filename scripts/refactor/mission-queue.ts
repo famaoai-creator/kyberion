@@ -4,7 +4,12 @@
  */
 
 import { logger } from '@agent/core/core';
-import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { withLock } from '@agent/core/lock-utils';
 import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
 
@@ -66,6 +71,14 @@ function parseMissionQueueEntry(value: unknown): MissionQueueEntry | null {
   };
 }
 
+function resolveMissionQueuePath(queuePath: string): string {
+  const resolved = assertSafeRepositoryPath(queuePath, { allowMissingLeaf: true });
+  if (safeExistsSync(resolved) && !safeLstat(resolved).isFile()) {
+    throw new Error(`Mission queue must be an existing regular file: ${queuePath}`);
+  }
+  return resolved;
+}
+
 export async function enqueueMission(
   queuePath: string,
   missionId: string,
@@ -83,7 +96,7 @@ export async function enqueueMission(
   };
 
   await withLock('mission-queue', async () => {
-    appendJsonLine(queuePath, entry);
+    appendJsonLine(resolveMissionQueuePath(queuePath), entry);
   });
   logger.success(`📥 Mission ${entry.mission_id} added to queue (Priority: ${priority}).`);
 }
@@ -94,15 +107,18 @@ export async function dispatchNextQueuedMission(
   onDispatch: (missionId: string, tier: MissionQueueEntry['tier']) => Promise<void>
 ): Promise<void> {
   await withLock('mission-queue', async () => {
-    if (!safeExistsSync(queuePath)) {
+    const resolvedQueuePath = resolveMissionQueuePath(queuePath);
+    if (!safeExistsSync(resolvedQueuePath)) {
       logger.info('Queue is empty.');
       return;
     }
 
-    const queue = readJsonLines<unknown>(queuePath, { onMalformed: 'skip' }).flatMap((value) => {
-      const entry = parseMissionQueueEntry(value);
-      return entry ? [entry] : [];
-    });
+    const queue = readJsonLines<unknown>(resolvedQueuePath, { onMalformed: 'skip' }).flatMap(
+      (value) => {
+        const entry = parseMissionQueueEntry(value);
+        return entry ? [entry] : [];
+      }
+    );
     const pending = queue.filter((mission) => mission.status === 'pending');
 
     if (pending.length === 0) {
@@ -121,7 +137,10 @@ export async function dispatchNextQueuedMission(
 
       logger.info(`🚀 Dispatching Mission: ${mission.mission_id}...`);
       mission.status = 'dispatched';
-      safeWriteFile(queuePath, queue.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
+      safeWriteFile(
+        resolvedQueuePath,
+        queue.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
+      );
       await onDispatch(mission.mission_id, mission.tier);
       return;
     }
