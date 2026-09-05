@@ -20667,7 +20667,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 - **対象**: `libs/core/windows-local-assist-bridge.ts`、`libs/core/windows-local-assist-bridge.test.ts`
 - **変更**: Windows local-assistの外部status応答をendpoint discoveryへ投影する前に、共通 `parseSafeJsonObjectValue` でrootと危険キーを検証するようにした。malformed／危険キーを含むstatus応答は既定endpointへfail-closedとし、既存のendpoint候補とchat response parserの境界は維持した。
-- **検証**: Windows local-assist bridge 4 tests、`pnpm --filter @agent/core run typecheck`、対象ESLint、Prettier、`git diff --check`。フル `pnpm run validate` はこのslice反映後に実行する。
+- **検証**: Windows local-assist bridge 4 tests、`pnpm --filter @agent/core run typecheck`、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
 
 ## 参照
 
