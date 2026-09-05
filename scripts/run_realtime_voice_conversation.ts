@@ -109,8 +109,8 @@ export interface RealtimeVoiceConversationLoopDeps {
 
 function resolvePythonBin(env: NodeJS.ProcessEnv = process.env): string {
   const candidates = [
-    env.KYBERION_PYTHON_BIN,
-    env.KYBERION_PYTHON,
+    getRegisteredEnvText('KYBERION_PYTHON_BIN', { env }),
+    getRegisteredEnvText('KYBERION_PYTHON', { env }),
     resolveManagedToolPythonBin('mlx_whisper'),
     resolveManagedToolPythonBin('mlx_audio'),
     '.venv/bin/python3',
