@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { GeminiCliBackend } from './gemini-cli-backend.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
+import { buildGeminiCliBackendFromEnv, GeminiCliBackend } from './gemini-cli-backend.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
@@ -67,6 +69,33 @@ describe('gemini-cli-backend sandbox projection', () => {
     expect(args).not.toContain('-y');
     expect(args).not.toContain('--sandbox=false');
     expect(args).toContain('--debug');
+  });
+
+  it('routes Gemini CLI environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/gemini-cli-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  it('uses an injected environment when constructing the CLI backend', async () => {
+    spawnMock.mockReturnValue(createChild('{"response":"ok"}'));
+    const backend = buildGeminiCliBackendFromEnv({
+      KYBERION_GEMINI_CLI_BIN: 'gemini-test',
+      KYBERION_GEMINI_CLI_MODEL: 'gemini-model',
+      KYBERION_GEMINI_CLI_TIMEOUT: '2500',
+    });
+
+    await backend?.prompt('inspect the thing');
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      'gemini-test',
+      expect.arrayContaining(['--model', 'gemini-model']),
+      expect.anything()
+    );
   });
 
   it('keeps the historical YOLO delegation default without an active policy', async () => {
