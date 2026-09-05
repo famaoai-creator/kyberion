@@ -142,4 +142,16 @@ describe('ledger core', () => {
       'line:3:parent_hash_mismatch',
     ]);
   });
+
+  it('fails closed when the ledger path is replaced by a directory', () => {
+    fs.unlinkSync(LEDGER_FILE);
+    fs.mkdirSync(LEDGER_FILE, { recursive: true });
+    try {
+      expect(() => record('DIRECTORY_LEDGER_EVENT', {})).toThrow('ledger must be a regular file');
+      expect(() => verifyLedgerIntegrityDetailed()).toThrow('ledger must be a regular file');
+      expect(() => loadForScope({ scope_kind: 'system' })).toThrow('ledger must be a regular file');
+    } finally {
+      fs.rmSync(LEDGER_FILE, { recursive: true, force: true });
+    }
+  });
 });

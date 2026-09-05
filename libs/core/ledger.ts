@@ -1,5 +1,11 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeReadFile, safeMkdir, safeExistsSync } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeReadFile,
+  safeMkdir,
+  safeExistsSync,
+  safeLstat,
+} from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -80,6 +86,12 @@ function safeLedgerPath(ledgerPath: string): string {
   return assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
 }
 
+function ensureRegularLedgerFile(ledgerPath: string): void {
+  if (safeExistsSync(ledgerPath) && !safeLstat(ledgerPath).isFile()) {
+    throw new Error(`[LEDGER_RESOURCE] ledger must be a regular file: ${ledgerPath}`);
+  }
+}
+
 export const record = (type: string, data: any) => {
   const timestamp = nowIso();
   const missionId = data.mission_id;
@@ -156,6 +168,7 @@ function _writeToLedger(ledgerPath: string, entryData: any): string {
 function _getLastHash(ledgerPath: string) {
   ledgerPath = safeLedgerPath(ledgerPath);
   if (!safeExistsSync(ledgerPath)) return GENESIS_HASH;
+  ensureRegularLedgerFile(ledgerPath);
   try {
     const content = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
     const trimmed = content.trim();
@@ -191,6 +204,7 @@ export const verifyLedgerIntegrityDetailed = (
   if (!safeExistsSync(safePath)) {
     return { ok: true, total: 0, corrupted: [], missingKey: false };
   }
+  ensureRegularLedgerFile(safePath);
 
   const content = safeReadFile(safePath, { encoding: 'utf8' }) as string;
   const lines = content.trim().split('\n');
@@ -241,6 +255,7 @@ export const loadForScope = (
 ): Record<string, unknown>[] => {
   const safePath = safeLedgerPath(ledgerPath);
   if (!safeExistsSync(safePath)) return [];
+  ensureRegularLedgerFile(safePath);
   const content = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
   return content
     .split(/\r?\n/u)
