@@ -222,6 +222,22 @@ describe('mission process planning', () => {
     expect(preserved[0].task_id).toBe('planner-task-1');
   });
 
+  it('fails closed instead of replacing malformed NEXT_TASKS.json', () => {
+    const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
+    safeWriteFile(nextTasksPath, JSON.stringify({ malformed: true }));
+
+    expect(() =>
+      applyProcessTemplatePlan({
+        missionId,
+        missionDir: missionPath,
+        design: presentationDesign(),
+      })
+    ).toThrow('Invalid catalog mission-next-tasks');
+    expect(safeReadFile(nextTasksPath, { encoding: 'utf8' })).toBe(
+      JSON.stringify({ malformed: true })
+    );
+  });
+
   it('overwrites with force and re-plans template-authored files without force', () => {
     const first = applyProcessTemplatePlan({
       missionId,
