@@ -1318,3 +1318,9 @@ voice sample ingestion policyに残っていたコード内fallbackを削除し�
 service runtime registryに残っていたコード内catalog fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorを返すfail-closed境界へ統一した。ComfyUIのruntime record、platform／mode選択、managed path、probeとstateの既存semanticsは変更していない。
 
 検証: service-runtime-registry **1 file / 9 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 151
+
+video render runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorを返すfail-closed境界へ統一した。queue、progress、bundle、render backendと出力形式の既存設定は変更していない。
+
+検証: video-render-runtime-policy **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
