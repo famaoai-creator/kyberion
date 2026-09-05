@@ -8,6 +8,7 @@
  */
 
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { validateUrl } from './secure-io.js';
 import {
@@ -21,11 +22,17 @@ export const GROK_API_DEFAULT_BASE_URL = 'https://api.x.ai/v1';
 export const GROK_API_DEFAULT_MODEL = 'grok-4.6';
 
 export function resolveGrokApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return env.XAI_API_KEY?.trim() || env.KYBERION_GROK_API_KEY?.trim() || undefined;
+  return (
+    getRegisteredEnvText('XAI_API_KEY', { env })?.trim() ||
+    getRegisteredEnvText('KYBERION_GROK_API_KEY', { env })?.trim() ||
+    undefined
+  );
 }
 
 export function resolveGrokApiBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
-  return env.KYBERION_GROK_API_URL?.trim() || GROK_API_DEFAULT_BASE_URL;
+  return (
+    getRegisteredEnvText('KYBERION_GROK_API_URL', { env })?.trim() || GROK_API_DEFAULT_BASE_URL
+  );
 }
 
 export function resolveGrokApiModel(
@@ -34,8 +41,8 @@ export function resolveGrokApiModel(
 ): string {
   return (
     modelOverride?.trim() ||
-    env.KYBERION_GROK_API_MODEL?.trim() ||
-    env.KYBERION_REASONING_MODEL?.trim() ||
+    getRegisteredEnvText('KYBERION_GROK_API_MODEL', { env })?.trim() ||
+    getRegisteredEnvText('KYBERION_REASONING_MODEL', { env })?.trim() ||
     GROK_API_DEFAULT_MODEL
   );
 }
