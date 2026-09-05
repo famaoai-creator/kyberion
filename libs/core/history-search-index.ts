@@ -688,7 +688,7 @@ export function resolveMissionHistoryScope(missionIdInput: string): MissionHisto
 }
 
 function assertMissionHistoryAccess(scope: MissionHistorySearchScope): void {
-  const activeMission = process.env.MISSION_ID?.trim();
+  const activeMission = getRegisteredEnvText('MISSION_ID')?.trim();
   const sudo = getRegisteredEnvText('KYBERION_SUDO');
   if (sudo === '1' || sudo === 'true' || activeMission === scope.missionId) return;
   throw new Error(

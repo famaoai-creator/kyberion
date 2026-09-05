@@ -958,3 +958,9 @@ nerve-bridgeのstimulus metadataとCLI usage meteringのmission telemetryに残�
 audit-chainのcurrent tenant解決でmission stateを探索する際に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。tenant mirror、scope解析、chain integrity、監査entryの既存 semanticsは変更していない。
 
 検証: tenant audit／parser／forwarder／approval **4 files / 36 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 91
+
+history-search-indexのprivate mission access checkに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。mission path／tier検証、SUDO bypass、同一mission制約、history／handoff検索の既存 semanticsは変更していない。
+
+検証: history／handoff／runtime history **3 files / 20 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
