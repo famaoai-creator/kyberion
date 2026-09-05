@@ -20777,6 +20777,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: authorityのmission identity／grant audience解決に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。mission state探索、authority grant照合、tenant override、fail-closed semanticsは変更していない。
 - **検証**: authority **2 files / 21 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
 
+## 2026-09-05 再レビュー修正 1264
+
+- **対象**: `libs/core/core.ts`
+- **変更**: coreのlogger／role configが参照する `MISSION_ID` の環境直読3箇所を、登録済み `getRegisteredEnvText` へ統一した。mission付きログ表示、role-state優先探索、shared／personal fallback、既存の静音・エラー出力 semanticsは変更していない。
+- **検証**: core bundle **1 file / 19 tests passed**、対象ESLint、Prettier、`git diff --check`、build／typecheck通過。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

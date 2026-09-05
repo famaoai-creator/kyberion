@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveVision } from './vision-resolver.js';
 import {
   rawExistsSync,
@@ -41,6 +42,11 @@ function color(code: keyof typeof ANSI, text: string): string {
   return `${ANSI[code]}${text}${ANSI.reset}`;
 }
 
+function missionLogPrefix(): string {
+  const missionId = getRegisteredEnvText('MISSION_ID');
+  return missionId ? color('magenta', ` [${missionId}]`) : '';
+}
+
 function isQuietProcess(): boolean {
   return (
     process.env.LOG_LEVEL === 'silent' ||
@@ -54,7 +60,7 @@ export const logger = {
     if (isQuietProcess() && level !== 'error') return;
     if (process.env.NODE_ENV === 'test' && level !== 'error') return;
     const ts = color('dim', nowIso());
-    const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
+    const mid = missionLogPrefix();
     const prefix =
       level === 'error'
         ? color('red', ' [ERROR] ')
@@ -75,7 +81,7 @@ export const logger = {
   success: (msg: string) => {
     if (isQuietProcess()) return;
     const ts = color('dim', nowIso());
-    const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
+    const mid = missionLogPrefix();
     console.log(ts + mid + color('green', ' [SUCCESS] ') + msg);
   },
 };
@@ -418,7 +424,7 @@ export const fileUtils = {
     return config ? config.active_role || config.role : 'Unknown';
   },
   getFullRoleConfig: () => {
-    const mid = process.env.MISSION_ID;
+    const mid = getRegisteredEnvText('MISSION_ID');
     const priorityPaths: string[] = [];
     if (mid) priorityPaths.push(pathResolver.active(`missions/${mid}/role-state.json`));
     priorityPaths.push(pathResolver.shared('governance/session.json'));
