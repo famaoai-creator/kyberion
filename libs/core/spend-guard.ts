@@ -166,7 +166,7 @@ export function checkSpendGuard(
   const tenantId = options.tenantId ?? getRegisteredEnvText('KYBERION_TENANT');
   const policy = resolveSpendPolicyForTenant(options.policy ?? loadSpendPolicy(), tenantId);
   const startOfUtcDay = new Date(now).setUTCHours(0, 0, 0, 0);
-  const missionId = options.missionId || process.env.MISSION_ID || undefined;
+  const missionId = options.missionId || getRegisteredEnvText('MISSION_ID') || undefined;
   const entries = options.entries ?? loadUsageEntries(now);
   const spend = sumSpend(entries, { sinceMs: startOfUtcDay, missionId });
 

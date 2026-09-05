@@ -916,3 +916,9 @@ tier-guardのtenant／tier認可パス展開に残っていた `MISSION_ID` の�
 capability-brokerのmission pin pathとpin metadataに残っていた `MISSION_ID` の環境直読2箇所を、登録済み `getRegisteredEnvText` へ統一した。missionごとのprovider pin配置、path escape防止、pin再利用とaudit actorの既存 semanticsは変更していない。
 
 検証: capability-broker **1 file / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 84
+
+spend-guardのmission spend集計に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。tenant override、日次／mission cap判定、warn／block posture、alert dedupeの既存 semanticsは変更していない。
+
+検証: spend／metrics／settlement **3 files / 19 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
