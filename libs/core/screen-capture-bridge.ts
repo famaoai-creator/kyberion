@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   assertSafeRepositoryPath,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -214,6 +215,11 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
           capture_mode: input.capture_mode,
           subject_hint: input.subject_hint,
         });
+        if (!safeLstat(result.save_path).isFile()) {
+          throw new Error(
+            `[SCREEN_CAPTURE_RESOURCE] captured frame must be a regular file: ${result.save_path}`
+          );
+        }
         const payload = safeReadFile(result.save_path, { encoding: null });
         const framePayload = Buffer.isBuffer(payload)
           ? new Uint8Array(payload)
@@ -224,7 +230,11 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
           ts_ms: index * intervalMs,
         };
       } finally {
-        safeRmSync(tempPath, { force: true });
+        try {
+          if (!safeLstat(tempPath).isDirectory()) safeRmSync(tempPath, { force: true });
+        } catch {
+          // A missing or non-removable frame must not mask the capture result.
+        }
       }
       if (index < frameCount - 1 && intervalMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, intervalMs));

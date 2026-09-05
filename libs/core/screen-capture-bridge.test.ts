@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from './secure-io.js';
 import { createScreenCaptureBridge, SCREEN_CAPTURE_BRIDGE_ID } from './screen-capture-bridge.js';
 import { StubVideoFrameBus } from './video-frame-bus.js';
 
@@ -55,6 +56,35 @@ describe('createScreenCaptureBridge', () => {
       })
     );
     expect(frames[0].payload.byteLength).toBeGreaterThan(0);
+  });
+
+  it('rejects a captured frame path replaced by a directory', async () => {
+    const bridge = createScreenCaptureBridge({ preferred_backend: 'stub' });
+    const resultPath = pathResolver.sharedTmp('screen-stream-tests/directory-result');
+    safeRmSync(resultPath, { recursive: true, force: true });
+    safeMkdir(resultPath, { recursive: true });
+    vi.spyOn(bridge, 'captureScreenshot').mockResolvedValue({
+      bridge_id: SCREEN_CAPTURE_BRIDGE_ID,
+      platform: process.platform,
+      backend: 'stub',
+      save_path: resultPath,
+    });
+
+    try {
+      await expect(
+        (async () => {
+          for await (const _frame of bridge.captureStream({
+            max_frames: 1,
+            frame_interval_ms: 0,
+          })) {
+            // The directory result must fail before a frame is yielded.
+          }
+        })()
+      ).rejects.toThrow('[SCREEN_CAPTURE_RESOURCE] captured frame must be a regular file');
+      expect(safeExistsSync(resultPath)).toBe(true);
+    } finally {
+      safeRmSync(resultPath, { recursive: true, force: true });
+    }
   });
 
   it('pipes screen frames into a video frame bus', async () => {
