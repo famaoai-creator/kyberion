@@ -3,7 +3,7 @@ import fc from 'fast-check';
 
 // Mock @agent/core before importing the module under test.
 // ReflexEngine's constructor calls reloadReflexes(), which uses safeExistsSync,
-// safeReaddir, safeReadFile, pathResolver, and logger — all must be mocked.
+// safeReaddir, readTextFile, pathResolver, and logger — all must be mocked.
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
   return {
@@ -11,7 +11,6 @@ vi.mock('@agent/core', async (importOriginal) => {
     safeExistsSync: vi.fn().mockReturnValue(false), // reflexes directory does not exist
     safeReaddir: vi.fn().mockReturnValue([]),
     safeLstat: vi.fn().mockReturnValue({ isFile: () => true }),
-    safeReadFile: vi.fn().mockReturnValue('{}'),
     assertSafeRepositoryPath: vi.fn((p: string) => p),
     logger: {
       info: vi.fn(),
@@ -36,8 +35,15 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
     safeExistsSync: vi.fn().mockReturnValue(false),
     safeReaddir: vi.fn().mockReturnValue([]),
     safeLstat: vi.fn().mockReturnValue({ isFile: () => true }),
-    safeReadFile: vi.fn().mockReturnValue('{}'),
     assertSafeRepositoryPath: vi.fn((p: string) => p),
+  };
+});
+
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    readTextFile: vi.fn().mockReturnValue('{}'),
   };
 });
 
@@ -129,9 +135,10 @@ describe('ReflexEngine', () => {
 
   it('skips reflex definitions rejected by the repository or symlink boundary', async () => {
     const secure = await import('@agent/core/secure-io');
+    const foundation = await import('@agent/core/foundation');
     vi.mocked(secure.safeExistsSync).mockReturnValue(true);
     vi.mocked(secure.safeReaddir).mockReturnValue(['safe.adf.json', 'linked.adf.json']);
-    vi.mocked(secure.safeReadFile).mockReturnValue(JSON.stringify(makeReflex('safe-intent')));
+    vi.mocked(foundation.readTextFile).mockReturnValue(JSON.stringify(makeReflex('safe-intent')));
     vi.mocked(secure.assertSafeRepositoryPath).mockImplementation((candidate: string) => {
       if (candidate.endsWith('linked.adf.json')) {
         throw new Error('[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link');
@@ -146,7 +153,7 @@ describe('ReflexEngine', () => {
     } finally {
       vi.mocked(secure.safeExistsSync).mockReturnValue(false);
       vi.mocked(secure.safeReaddir).mockReturnValue([]);
-      vi.mocked(secure.safeReadFile).mockReturnValue('{}');
+      vi.mocked(foundation.readTextFile).mockReturnValue('{}');
       vi.mocked(secure.assertSafeRepositoryPath).mockImplementation(
         (candidate: string) => candidate
       );

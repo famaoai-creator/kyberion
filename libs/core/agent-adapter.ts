@@ -1,13 +1,7 @@
 import { createLogger } from './logger.js';
 const logger = createLogger('agent-adapter');
 import { pathResolver } from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReaddir,
-  safeReadFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type { ChildProcess } from 'node:child_process';
@@ -15,7 +9,7 @@ import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';
 import { getRegisteredEnvText, safeChildEnv } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { resolveActiveProviderPermissionArgs } from './provider-permission-profiles.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import {
@@ -934,7 +928,7 @@ export class GeminiWisdomEnhancer implements AgentEnhancer {
               `[GEMINI_WISDOM_RESOURCE] lesson must be a regular file: ${wisdomFile}`
             );
           }
-          const content = safeReadFile(wisdomFile, { encoding: 'utf8' }) as string;
+          const content = readTextFile(wisdomFile);
           wisdomContext += `\n--- Lesson from ${file} ---\n${content}\n`;
         }
       }

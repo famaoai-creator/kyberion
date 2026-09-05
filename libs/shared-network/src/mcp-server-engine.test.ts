@@ -194,7 +194,7 @@ const testFoundationIo: FoundationIo = {
     filePath.endsWith('knowledge/product/governance/mcp-tool-catalog.json')
       ? mockSafeExistsSync(filePath)
       : originalFoundationIo.exists(filePath),
-  readFile: (filePath: string) => originalFoundationIo.readFile(filePath),
+  readFile: (filePath: string) => String(mockSafeReadFile(filePath)),
   stat: (filePath: string) =>
     filePath.endsWith('knowledge/product/governance/mcp-tool-catalog.json')
       ? { mtimeMs: ++foundationStatVersion, size: 1 }
