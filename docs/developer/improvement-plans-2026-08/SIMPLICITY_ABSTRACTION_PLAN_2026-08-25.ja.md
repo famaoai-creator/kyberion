@@ -22077,3 +22077,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/video-frame-archive.ts`、`libs/core/video-frame-archive.test.ts`
 - **変更**: MP4 decode の input path を ffmpeg 実行前に operation-time の regular-file として検査するようにした。input video が directory 等へ置換された場合に外部 decoder を起動せず、既存の frame output regular-file 検査と archive cleanup semantics は維持した。
 - **検証**: video-frame-archive **2 files / 4 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1480
+
+- **対象**: `libs/core/ocr-bridge.ts`、`libs/core/ocr-bridge.test.ts`
+- **変更**: OCR の全 provider が共有する image path resolver に operation-time の regular-file 検査を追加した。画像 path が directory 等へ置換された場合は provider read／native process／network egress 前に拒否し、既存の repository scope と egress routing semantics は維持した。
+- **検証**: ocr-bridge **2 files / 24 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
