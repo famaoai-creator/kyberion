@@ -260,7 +260,7 @@ export interface MediaDesignSystemsCatalog {
 }
 
 export function loadMediaDesignSystemsCatalog(rootDir: string): MediaDesignSystemsCatalog {
-  const fallback = {
+  const aggregationSeed: MediaDesignSystemsCatalog = {
     version: '1.0.0',
     default_system: 'executive-standard',
     systems: {},
@@ -273,8 +273,6 @@ export function loadMediaDesignSystemsCatalog(rootDir: string): MediaDesignSyste
     id: 'media-design-systems',
     path: filePath,
     schema: path.resolve(rootDir, 'knowledge/product/schemas/media-design-systems.schema.json'),
-    fallback,
-    fallbackOnInvalid: true,
   });
   const directoryPath = path.resolve(
     rootDir,
@@ -282,6 +280,9 @@ export function loadMediaDesignSystemsCatalog(rootDir: string): MediaDesignSyste
   );
   const docs = readJsonFilesRecursively(directoryPath);
   if (docs.length === 0) return catalog.load();
-  const merged = docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback));
+  const merged = docs.reduce(
+    (acc, doc) => deepMergeCatalog(acc, doc),
+    cloneJsonValue(aggregationSeed)
+  );
   return catalog.validate(merged, directoryPath);
 }
