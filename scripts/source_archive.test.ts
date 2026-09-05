@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   checksumLine,
   parseSha256Sums,
@@ -8,6 +10,11 @@ import {
 } from './source_archive.js';
 
 describe('source archive supply-chain artifact', () => {
+  it('uses the foundation reader for checksum manifests', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/source_archive.ts'));
+    expect(source).toContain('readTextFile(resolvedChecksumsPath)');
+  });
+
   it('emits and parses the standard SHA256SUMS line', () => {
     const { archivePath } = resolveSourceArchivePaths('active/shared/tmp/example.tar.gz');
     const digest = 'a'.repeat(64);

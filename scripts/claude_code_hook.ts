@@ -25,7 +25,8 @@ import {
   recordPostToolUse,
   summarizeTranscriptUsage,
 } from '@agent/core/claude-code-hook';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
@@ -93,9 +94,7 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         const transcriptPath =
           typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
         if (transcriptPath && safeExistsSync(transcriptPath)) {
-          recordCliUsage(
-            summarizeTranscriptUsage(safeReadFile(transcriptPath, { encoding: 'utf8' }) as string)
-          );
+          recordCliUsage(summarizeTranscriptUsage(readTextFile(transcriptPath)));
         }
       } catch {
         // usage capture is best-effort; never block session close
