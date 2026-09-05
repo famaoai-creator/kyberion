@@ -21993,3 +21993,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/analysis-corpus.ts`、`libs/core/analysis-corpus.test.ts`
 - **変更**: model-visible な analysis corpus snippet の read 前に operation-time の regular-file 検査を追加した。allowed lexical ref が directory 等へ置換された場合は snippet 化せず、既存の repository／symlink 境界と ref ranking semantics は維持した。
 - **検証**: analysis-corpus **2 files / 5 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1466
+
+- **対象**: `libs/core/distill-knowledge-injector.ts`、`libs/core/distill-knowledge-injector.test.ts`
+- **変更**: distill catalog の markdown entry read 前に operation-time の regular-file 検査を追加した。ファイル名だけが `distill_*.md` に一致する directory 等を knowledge injection 対象へ含めず、既存の tenant scope／symlink／placeholder quarantine と ranking semantics は維持した。
+- **検証**: distill-knowledge-injector **2 files / 12 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
