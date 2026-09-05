@@ -17,7 +17,11 @@ import {
   hashArtifactForReview,
   inferArtifactReviewKind,
 } from './artifact-review.js';
-import { updateMissionMemorySidecar } from './mission-lifecycle-completion.js';
+import { createActuatorTrace } from './actuator-trace.js';
+import {
+  publishMeetingDeliverablesIfNeeded,
+  updateMissionMemorySidecar,
+} from './mission-lifecycle-completion.js';
 import * as customerResolver from './customer-resolver.js';
 import { emitIntentSnapshot } from './intent-snapshot-store.js';
 import * as pathResolver from './path-resolver.js';
@@ -1020,6 +1024,31 @@ describe('mission lifecycle finish gate', () => {
       'invalidated by artifact change'
     );
     expect(tasks.some((task) => task.task_id === 'repair-finish-quality')).toBe(false);
+  });
+
+  it('rejects a directory replacing meeting evidence before customer delivery', () => {
+    const previousCustomer = process.env.KYBERION_CUSTOMER;
+    process.env.KYBERION_CUSTOMER = 'demo';
+    try {
+      const customerRoot = customerResolver.customerRoot('', process.env);
+      if (!customerRoot) throw new Error('Expected demo customer root to resolve.');
+      safeMkdir(path.join(customerRoot, 'deliverables'), { recursive: true });
+      prepareMissionState('completed', 'meeting_facilitation', 'demo');
+      safeMkdir(path.join(missionPath, 'evidence', 'minutes.md'), { recursive: true });
+
+      expect(() =>
+        publishMeetingDeliverablesIfNeeded({
+          missionId,
+          missionDir: missionPath,
+          state: { mission_type: 'meeting_facilitation', tenant_slug: 'demo' },
+          completionNextAction: {},
+          traceCtx: createActuatorTrace('mission-lifecycle-test', 'publish-deliverables'),
+        })
+      ).toThrow('[DELIVERY_RESOURCE] evidence must be a regular file');
+    } finally {
+      if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
+      else process.env.KYBERION_CUSTOMER = previousCustomer;
+    }
   });
 
   it('publishes meeting_facilitation deliverables into the active customer root on finish', async () => {

@@ -21873,3 +21873,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/skill-plugin-loader.ts`、`libs/core/skill-plugin-loader.test.ts`
 - **変更**: plugin contribution manifest の content read 前に operation-time の regular-file 検査を追加した。既存の provenance／managed-copy／human approval gate と manifest parse failure の skip semantics は維持し、manifest が directory 等へ置換された場合の診断を明示した。
 - **検証**: skill-plugin-loader の contribution manifest boundary **3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1446
+
+- **対象**: `libs/core/mission-lifecycle-completion.ts`、`libs/core/mission-lifecycle.test.ts`
+- **変更**: meeting follow-up evidence の customer delivery copy と minutes excerpt read 前に operation-time の regular-file 検査を追加した。既存の tenant/customer 一致、delivery artifact、summary、audit log semantics は維持し、evidence の directory replacement を delivery 前に拒否する回帰テストを追加した。
+- **検証**: 新規 boundary test **1 passed**、対象 ESLint、Prettier、`git diff --check`。mission-lifecycle 全体は既存4件（latest_commit期待値差分1件、10秒timeout 3件）が残存。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
