@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   checkChannelAdapterAdoption,
   hasSharedThreadFormatterImport,
 } from './check_channel_adapter_adoption.js';
 
 describe('channel adapter adoption checker', () => {
+  it('uses the foundation text reader for bridge source files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_channel_adapter_adoption.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   it('requires the shared thread formatter to be imported from the canonical module', () => {
     expect(
       hasSharedThreadFormatterImport(
