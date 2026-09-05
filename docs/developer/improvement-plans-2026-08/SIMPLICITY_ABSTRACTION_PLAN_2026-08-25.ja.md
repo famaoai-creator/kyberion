@@ -22179,3 +22179,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/generate_subagent_definitions.ts`、`scripts/generate_subagent_definitions.test.ts`
 - **変更**: subagent definition generator の authority procedure 本文読込を foundation の `readTextFile` へ移行した。team-role／profile projection、procedure condensation、Claude／AGY生成物、drift check の既存semanticsは変更せず、既存テストにcanonical readerと旧 `safeReadFile` 直読の不在を追加固定した。
 - **検証**: subagent-definitions **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残るproduction loader／generatorの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1497
+
+- **対象**: `scripts/generate_project_os.ts`、`scripts/generate_project_os.test.ts`
+- **変更**: project OS generator の blueprint 本文読込を foundation の `readTextFile` へ移行した。artifact map、repository output scope、動的生成／`--check` の既存semanticsは変更せず、source contract testでcanonical readerと旧 `safeReadFile` 直読の不在を固定した。
+- **検証**: project-os generator **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残るproduction loader／generatorの全件codemodは継続課題とする。
