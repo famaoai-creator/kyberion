@@ -5,8 +5,8 @@ import {
   resetWriterLeaseMetrics,
   writerLeaseResourceId,
 } from './writer-lease.js';
-import { safeReadFile, safeRmSync } from './secure-io.js';
-import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
+import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { pathResolver } from './path-resolver.js';
 
 const missionPath = pathResolver.shared(`tmp/dispatch-artifact-lease-${process.pid}`);
@@ -64,5 +64,16 @@ describe('mission-dispatch-lifecycle', () => {
         }
       )
     ).toThrow('[DISPATCH_ARTIFACT] missionPath is required');
+  });
+
+  it('rejects a dispatch event file that is replaced by a symbolic link', () => {
+    const targetPath = nodePath.join(missionPath, 'events-target.jsonl');
+    const linkedPath = nodePath.join(missionPath, 'events.jsonl');
+    safeWriteFile(targetPath, '');
+    safeSymlinkSync(targetPath, linkedPath);
+
+    expect(() => appendDispatchEvent(linkedPath, { event: 'dispatch_started' })).toThrow(
+      '[RESOURCE_PATH_SYMLINK]'
+    );
   });
 });

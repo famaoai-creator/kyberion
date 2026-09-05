@@ -803,6 +803,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 の direct-loader 再レビューとして、mission graph run journalのresume readとfenced appendへ共通のoperation-time regular-file検査を導入した。既存journal fileのsymlink置換をappend前に拒否する回帰を関連 **1 test file / 7 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査direct loader全件inventory、全script harness／generator移行、provider CLIの実OS-level enforcement probeは継続課題である。
 - 2026-09-06: PI-03 の direct-loader 再レビューとして、Slack bridgeのsurface stimulus append先を固定 absolute pathから共通の`stimuliJournalPath()`へ変更し、stimuli journalのoperation-time repository path／symlink boundaryへ接続した。関連 **1 test file / 7 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査direct loader全件inventory、全script harness／generator移行、provider CLIの実OS-level enforcement probeは継続課題である。
 - 2026-09-06: PI-03 の direct-loader 再レビューとして、trace JSONL persistenceのdirectory／日次fileを共通の`assertSafeRepositoryPath`とoperation-timeのregular-file／directory検査へ接続した。symlink経由のtrace log rootを拒否する回帰を関連 **1 test file / 5 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査direct loader全件inventory、全script harness／generator移行、provider CLIの実OS-level enforcement probeは継続課題である。
+- 2026-09-06: PI-03 の direct-loader 再レビューとして、mission dispatch event appendの共通I/O helperへoperation-timeのregular-file検査を追加し、leaf symlinkへのevent appendを拒否する回帰を関連 **1 test file / 3 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査direct loader全件inventory、全script harness／generator移行、provider CLIの実OS-level enforcement probeは継続課題である。
 
 ## 7. 検証コマンド(実装時)
 
