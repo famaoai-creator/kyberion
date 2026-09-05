@@ -22479,3 +22479,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/agent-instruction-loader.ts`、`libs/core/skill-resource-loader.ts`、`libs/core/plugin-pack.ts`、`libs/core/ops-alert-log.ts`、`libs/core/pipeline-run-journal.ts`、`libs/core/report-contract.ts`
 - **変更**: instruction override／skill resource、plugin pack manifest／import record、ops alert、pipeline journal、report schema prompt の本文読込を foundation の `readTextFile` へ移行した。各既存のpath scope／provenance、catalog・journal・report schema、append／write semanticsは変更せず、secure-io は存在・属性・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **5 files／48 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1547
+
+- **対象**: `libs/core/agent-manifest.ts`、`libs/core/a2a-conversation-store.ts`、`libs/core/scope-context.ts`、`libs/core/src/knowledge-curation-report.ts`、`libs/core/tenant-registry.ts`、`libs/core/mission-project-ledger.ts`、`libs/core/mission-process-planning.ts`
+- **変更**: agent manifest、A2A conversation、scope context、knowledge curation、tenant registry、mission ledger／task board の本文読込を foundation の `readTextFile` へ移行した。tenant／tier／path scope、conversation retention、catalog／ledger／task expansion semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
+- **検証**: 対象テスト **7 files／88 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

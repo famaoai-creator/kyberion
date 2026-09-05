@@ -1,6 +1,7 @@
 import type { TierLevel } from './types.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
@@ -20,7 +21,6 @@ export {
 import {
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeExec,
   safeUnlinkSync,
   safeWriteFile,
@@ -85,7 +85,7 @@ function readScopeEnv(env: NodeJS.ProcessEnv = process.env): ScopeContextInput {
       throw new Error(`[SCOPE_ENV_INVALID] scope.env must be a regular file: ${filePath}`);
     }
     const values: Record<string, string> = {};
-    for (const line of String(safeReadFile(filePath, { encoding: 'utf8' })).split(/\r?\n/)) {
+    for (const line of readTextFile(filePath).split(/\r?\n/)) {
       const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
       if (match && SCOPE_ENV_KEYS.includes(match[1] as (typeof SCOPE_ENV_KEYS)[number])) {
         values[match[1]] = match[2].trim();

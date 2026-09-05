@@ -3,14 +3,13 @@ import { customerDirForSlug } from './customer-resolver.js';
 import * as pathResolver from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   safeExistsSync,
   safeMkdir,
   safeLstat,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
   assertSafeRepositoryPath,
@@ -285,7 +284,7 @@ export function readTenantProfile(
     if (!safeLstat(safeFile).isFile()) {
       throw new Error('tenant profile must be a regular file');
     }
-    source = safeReadFile(safeFile, { encoding: 'utf8' }) as string;
+    source = readTextFile(safeFile);
   } catch (error) {
     throw new Error(
       `[tenant-registry] tenant profile '${slug}' could not be read (${file}): ${describeCause(

@@ -3,13 +3,12 @@ import { loadAgentProfileIndex } from './mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
-  safeReadFile,
   safeExistsSync,
   safeReaddir,
   safeLstat,
   safeStat,
 } from './secure-io.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import * as path from 'node:path';
 import type { AgentProvider } from './agent-registry.js';
@@ -243,7 +242,7 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
         logger.warn(`[AGENT_MANIFEST] Skipping ${file}: manifest must be a regular file`);
         continue;
       }
-      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      const content = readTextFile(filePath);
       const { meta, body } = parseFrontmatter(content);
 
       if (typeof meta.agentId !== 'string' || !meta.agentId) {

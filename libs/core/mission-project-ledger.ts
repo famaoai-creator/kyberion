@@ -7,13 +7,7 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
 import { resolveMissionLedgerPolicy } from './mission-ledger-policy.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { loadState } from './mission-state.js';
 import {
   loadProjectMissionLedgerAtPath,
@@ -52,7 +46,7 @@ export function ensureProjectMissionLedgerExists(ledgerPath: string): void {
     allowMissingLeaf: true,
   });
   if (!safeExistsSync(ledgerDir)) safeMkdir(ledgerDir, { recursive: true });
-  const blueprint = safeReadFile(blueprintPath, { encoding: 'utf8' }) as string;
+  const blueprint = readTextFile(blueprintPath);
   safeWriteFile(safeLedgerPath, blueprint);
 }
 

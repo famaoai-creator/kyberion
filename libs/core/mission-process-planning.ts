@@ -10,6 +10,7 @@
 
 import * as path from 'node:path';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 
 import {
@@ -29,13 +30,7 @@ import {
   resolveMissionWorkflowDesign,
   type MissionWorkflowDesign,
 } from './mission-workflow-catalog.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-  safeReadFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReaddir } from './secure-io.js';
 import { loadMissionPhaseGateDefinitionAtPath } from './mission-phase-gate-definition-reader.js';
 import {
   type MissionClass,
@@ -188,7 +183,7 @@ function renderPhaseChecklist(
 ): boolean {
   const taskBoardPath = safeMissionArtifactPath(missionDir, 'TASK_BOARD.md');
   if (!safeExistsSync(taskBoardPath)) return false;
-  const board = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+  const board = readTextFile(taskBoardPath);
   if (board.includes(CHECKLIST_HEADER)) return false;
 
   const lines: string[] = ['', CHECKLIST_HEADER, ''];
