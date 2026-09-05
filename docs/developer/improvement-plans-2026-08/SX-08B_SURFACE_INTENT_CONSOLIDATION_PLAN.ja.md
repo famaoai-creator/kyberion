@@ -898,3 +898,9 @@ ingest commitのidentity fallbackとsecret actuatorのephemeral mission／ledger
 service actuatorのsecurity scope mission bindingとmeeting actuatorのvoice-consent／実行fallbackに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。security scopeの照合、voice-consentのmission evidence解決、明示 `mission_id` 優先の既存 semanticsは変更していない。
 
 検証: service／meeting actuator **2 files / 37 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るactuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 81
+
+system actuatorのshell実行で残っていた `SHELL` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。unsafe shell gate、既定 `/bin/zsh` fallback、コマンド解決とretry semanticsは変更していない。
+
+検証: system actuator **3 files / 98 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るactuator／scriptの環境境界と外部provider実機確認は継続課題とする。

@@ -55,6 +55,7 @@ import {
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import {
   getRegisteredEnv,
+  getRegisteredEnvText,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
 } from '@agent/core/foundation';
@@ -370,7 +371,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         ...ctx,
         [params.export_as || 'last_capture']: await retry(
           async () =>
-            safeExec(process.env.SHELL || '/bin/zsh', ['-lc', resolve(params.cmd)], {
+            safeExec(getRegisteredEnvText('SHELL') || '/bin/zsh', ['-lc', resolve(params.cmd)], {
               cwd: rootDir,
               env: params.env || {},
             }).trim(),
