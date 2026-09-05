@@ -19,7 +19,13 @@ import {
   buildWorkCoordinationPeerCommandEnvelope,
   type WorkCoordinationPeerCommandEnvelope,
 } from './work-coordination-peer.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeRmSync,
+} from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { signA2AMessage } from './a2a-bridge.js';
@@ -232,8 +238,12 @@ export function parseMeshHubRecipientProposalDecision(
 }
 
 function readJsonl<T>(logicalPath: string, parse: (value: unknown) => T): T[] {
-  if (!safeExistsSync(logicalPath)) return [];
-  const raw = String(safeReadFile(logicalPath, { encoding: 'utf8' }) || '');
+  const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`mesh-hub persisted JSONL must be a regular file: ${safePath}`);
+  }
+  const raw = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
   return raw
     .split(/\r?\n/u)
     .map((line) => line.trim())

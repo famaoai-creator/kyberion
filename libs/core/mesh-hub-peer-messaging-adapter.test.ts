@@ -8,7 +8,7 @@ import {
   listPeerInboxRecords,
   buildPeerMessageEnvelope,
 } from './peer-messaging.js';
-import { pathResolver, safeReadFile, safeRmSync, safeWriteFile } from './index.js';
+import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './index.js';
 import {
   clearMeshHubPeerMessagingAdapterNamespace,
   createMeshHubPeerMessagingAdapter,
@@ -147,6 +147,41 @@ describe('mesh-hub-peer-messaging-adapter', () => {
         namespace: 'mesh-hub-adapter-tests',
       })
     ).toHaveLength(1);
+  });
+
+  it('rejects a proposal JSONL path replaced by a directory', () => {
+    const adapter = createMeshHubPeerMessagingAdapter({
+      peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
+      sharedSecret: 'recipient-secret',
+      namespace: 'mesh-hub-adapter-tests',
+    });
+    const request = buildRequest('meshreq-regular-file', 'review.request', {
+      kind: 'peer',
+      peer_id: 'peer-recipient',
+    });
+    request.created_at = new Date(Date.now() - 1_000).toISOString();
+    adapter.proposeLocalRequest(request, 'message-regular-file');
+
+    const proposalsPath = path.join(
+      ROOT,
+      TEST_RUNTIME_ROOT,
+      'mesh-hub-adapter-tests',
+      'tenants',
+      TENANT_ID,
+      'adapters',
+      'peer-recipient',
+      'proposals.jsonl'
+    );
+    safeRmSync(proposalsPath);
+    safeMkdir(proposalsPath);
+
+    expect(() =>
+      listMeshHubRecipientProposals('peer-recipient', {
+        tenantId: TENANT_ID,
+        namespace: 'mesh-hub-adapter-tests',
+      })
+    ).toThrow('mesh-hub persisted JSONL must be a regular file');
   });
 
   it('dispatches a signed mesh request through peer-messaging', async () => {

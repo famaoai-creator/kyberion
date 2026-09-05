@@ -21699,3 +21699,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_script_integrity.ts`、`scripts/check_script_integrity.test.ts`
 - **変更**: package script が直接起動する authored TypeScript の harness／generator 使用を `check:script-integrity` で機械検査するようにした。dist 生成前に実行される `clean_entrypoint.ts` の bootstrap 例外だけを明示 allowlist とし、未移行 entrypoint が追加された場合は package script の整合性検査を fail-closed にする。既存の path／build output／direct-entry guard 検査は維持した。
 - **検証**: check_script_integrity **1 file / 6 tests passed**、実 package manifest の `check_script_integrity.ts` が `OK`、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1417
+
+- **対象**: `libs/core/mesh-hub-peer-messaging-adapter.ts`、`libs/core/mesh-hub-peer-messaging-adapter.test.ts`
+- **変更**: mesh-hub recipient proposal／decision の JSONL reader を operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。repository 外・symlink・ディレクトリ置換された JSONL leaf を tenant projection 前に読まず、既存の malformed row skip、proposal／decision lifecycle、governed artifact write semanticsは維持した。
+- **検証**: mesh-hub-peer-messaging-adapter **1 file / 8 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
