@@ -220,7 +220,7 @@ export class ShellSecretResolver implements SecretResolver {
     const cmd = this.options.command
       .replace(/\{\{key\}\}/gu, input.key)
       .replace(/\{\{scope\}\}/gu, input.scope ?? '');
-    const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
+    const shell = this.options.shell ?? getRegisteredEnvText('SHELL') ?? '/bin/sh';
     try {
       const stdout = execFileSync(shell, ['-c', cmd], {
         encoding: 'utf8',
