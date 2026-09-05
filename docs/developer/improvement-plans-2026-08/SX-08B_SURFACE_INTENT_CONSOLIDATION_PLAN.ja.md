@@ -1676,3 +1676,9 @@ imported DESIGN.md indexの組み込み空indexとschema不正時のfallbackを�
 lifecycle hook設定のschema不正を空hooksへ収束させるcatalog fallbackを削除した。正本configの欠損時は空engine、読み込み・schema不正時は既存の警告付きfail-openで空engineへ戻る契約、pre-tool security blockの実行とhook entryの検証は維持している。
 
 検証: lifecycle-hook-engine **1 file / 20 tests passed**、対象ESLint、Prettier、`git diff --check`。typecheckは別作業の未コミットcursor-cli変更に起因する既存2エラーで未完了。canonical full gateは同変更の整理後に再実行する。
+
+## 2026-09-06 再レビュー修正 210
+
+modeling actuatorのbrowser execution presetについて、組み込みpreset・認証情報・catalog不正時のretry／fallbackを削除した。正本presetの欠損・schema不正、未知preset、email／password未設定は明示拒否し、正本presetからbrowser pipelineを生成する既存経路は維持している。
+
+検証: modeling preset resource boundary **1 file / 1 test passed**、対象ESLint、Prettier、`git diff --check`。typecheckは別作業の未コミットcursor-cli／runtime-model-defaults変更に起因する2エラーで未完了。canonical full gateは同変更の整理後に再実行する。
