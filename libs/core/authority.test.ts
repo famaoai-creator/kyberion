@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   buildExecutionEnv,
   inferPersonaFromRole,
@@ -25,6 +27,14 @@ describe('resolveIdentityContext', () => {
     else process.env.KYBERION_SUDO = originalSudo;
     if (originalSudoScope === undefined) delete process.env.KYBERION_SUDO_SCOPE;
     else process.env.KYBERION_SUDO_SCOPE = originalSudoScope;
+  });
+
+  it('routes mission identity reads through the governed environment accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/authority.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain('process.env.MISSION_ID');
+    expect(source).toContain("getRegisteredEnvText('MISSION_ID')");
   });
 
   it('keeps persona and authority role separate', () => {
