@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver, safeExistsSync, safeRmSync, safeWriteFile } from '@agent/core';
 import {
   applyPeerTenantMigrationPlan,
   buildPeerTenantMigrationPlan,
@@ -160,14 +161,11 @@ describe('peer tenant runtime migration', () => {
   });
 
   it('routes the migration plan through the shared script printer', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/migrate_peer_tenant_runtime.ts'), {
-        encoding: 'utf8',
-      }) || ''
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/migrate_peer_tenant_runtime.ts'));
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
     expect(source).toContain('run: ({ argv, print }) =>');
+    expect(source).toContain('isRecord, nowIso, parseSafeJsonInput, readTextFile');
   });
 });
