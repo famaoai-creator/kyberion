@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams.",
   "entries": [
     {
@@ -388,6 +388,14 @@
       "action": "delete",
       "audit": true,
       "note": "EV-06: cross-mission task-events.jsonl / orchestration-events.jsonl. Aligned with audit retention (90d) because agent-collaboration-projection reads these as the operator-visible history. The mission-local copy under active/missions/**/coordination/events/ is the durable record; this is the shared projection source."
+    },
+    {
+      "path": "active/shared/observability/mission-control/agent-runtime-supervisor-events",
+      "artifact_class": "log",
+      "ttl_days": 14,
+      "action": "delete",
+      "audit": true,
+      "note": "AC-10: virtual (non-directory) lookup key for the dated agent-runtime-supervisor-events-YYYY-MM-DD.jsonl family written by agent-runtime-events.ts's appendSupervisorEvent (rotated daily; storage-janitor.ts's sweepSupervisorEventFiles resolves this entry by exact match only, never by directory-prefix walk, so it never shadows the mission-control entry above that still governs task-events.jsonl / orchestration-events.jsonl at 90d). The pre-rotation legacy agent-runtime-supervisor-events.jsonl file is excluded from both this entry and the mission-control entry above — the janitor never auto-deletes it; an operator may archive/remove it by hand once no longer needed."
     },
     {
       "path": "active/shared/observability/channels",
