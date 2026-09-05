@@ -21,6 +21,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { redactSensitiveObject } from './network.js';
 import { registerAuditForwarderPublisher, type AuditEntry } from './audit-chain.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
@@ -232,28 +233,28 @@ export class HttpAuditForwarder implements AuditForwarder {
  *                                        as a JSON string of headers)
  */
 export function installAuditForwarderIfAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
-  const command = env.KYBERION_AUDIT_FORWARDER_COMMAND?.trim();
-  const url = env.KYBERION_AUDIT_FORWARDER_URL?.trim();
+  const command = getRegisteredEnvText('KYBERION_AUDIT_FORWARDER_COMMAND', { env })?.trim();
+  const url = getRegisteredEnvText('KYBERION_AUDIT_FORWARDER_URL', { env })?.trim();
+  const timeoutRaw = getRegisteredEnvText('KYBERION_AUDIT_FORWARDER_TIMEOUT_MS', { env })?.trim();
+  const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
   const forwarders: AuditForwarder[] = [];
   if (command) {
     forwarders.push(
       new ShellAuditForwarder({
         command,
-        ...(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS
-          ? { timeoutMs: parseInt(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS, 10) }
-          : {}),
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       })
     );
   }
   if (url) {
-    const headers = parseAuditForwarderHeaders(env.KYBERION_AUDIT_FORWARDER_HEADERS);
+    const headers = parseAuditForwarderHeaders(
+      getRegisteredEnvText('KYBERION_AUDIT_FORWARDER_HEADERS', { env })
+    );
     forwarders.push(
       new HttpAuditForwarder({
         url,
         headers,
-        ...(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS
-          ? { timeoutMs: parseInt(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS, 10) }
-          : {}),
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       })
     );
   }
