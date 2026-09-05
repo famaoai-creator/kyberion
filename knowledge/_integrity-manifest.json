@@ -7581,7 +7581,7 @@
     {
       "path": "product/schemas/ingest-quota-policy.schema.json",
       "tier": "public",
-      "size": 917,
+      "size": 1000,
       "type": "json"
     },
     {

@@ -61,12 +61,6 @@ export interface IngestQuotaPolicy extends IngestQuotaLimits {
   tenant_overrides?: Record<string, IngestQuotaOverride>;
 }
 
-export const DEFAULT_INGEST_QUOTA_POLICY: IngestQuotaPolicy = Object.freeze({
-  max_files_per_day: 200,
-  max_bytes_per_day: 50 * 1024 * 1024,
-  warn_ratio: 0.8,
-});
-
 const INGEST_QUOTA_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/ingest-quota-policy.schema.json'
 );
@@ -90,8 +84,6 @@ function createIngestQuotaPolicyCatalog(rootDir: string) {
       { allowMissingLeaf: true, rootDir }
     ),
     schema: INGEST_QUOTA_POLICY_SCHEMA_PATH,
-    fallback: DEFAULT_INGEST_QUOTA_POLICY,
-    fallbackOnInvalid: true,
   });
 }
 
@@ -178,9 +170,9 @@ function isPositive(value: unknown): value is number {
 }
 
 /**
- * Load the governed quota policy. A missing or broken policy file must not
- * silently disable the guard — it falls back to the defaults, exactly like
- * `loadSpendPolicy`.
+ * Load the governed quota policy. A missing or broken policy file is an
+ * operator-visible configuration error; the quota guard never substitutes a
+ * second policy embedded in code.
  */
 export function loadIngestQuotaPolicy(options: IngestQuotaOptions = {}): IngestQuotaPolicy {
   const catalog =
@@ -198,16 +190,9 @@ export function loadIngestQuotaPolicy(options: IngestQuotaOptions = {}): IngestQ
     if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
   }
   return {
-    max_files_per_day: isPositive(parsed.max_files_per_day)
-      ? parsed.max_files_per_day
-      : DEFAULT_INGEST_QUOTA_POLICY.max_files_per_day,
-    max_bytes_per_day: isPositive(parsed.max_bytes_per_day)
-      ? parsed.max_bytes_per_day
-      : DEFAULT_INGEST_QUOTA_POLICY.max_bytes_per_day,
-    warn_ratio:
-      isPositive(parsed.warn_ratio) && parsed.warn_ratio <= 1
-        ? parsed.warn_ratio
-        : DEFAULT_INGEST_QUOTA_POLICY.warn_ratio,
+    max_files_per_day: parsed.max_files_per_day,
+    max_bytes_per_day: parsed.max_bytes_per_day,
+    warn_ratio: parsed.warn_ratio,
     ...(Object.keys(tenantOverrides).length > 0 ? { tenant_overrides: tenantOverrides } : {}),
   };
 }
