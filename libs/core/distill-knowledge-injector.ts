@@ -27,7 +27,8 @@
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import { safeReadFile, safeReaddir, safeExistsSync, safeLstat } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { safeReaddir, safeExistsSync, safeLstat } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
@@ -207,7 +208,7 @@ function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
       }
       let text: string;
       try {
-        text = safeReadFile(abs, { encoding: 'utf8' }) as string;
+        text = readTextFile(abs);
       } catch {
         continue;
       }

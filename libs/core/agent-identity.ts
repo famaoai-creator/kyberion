@@ -46,9 +46,10 @@
 import { z } from 'zod';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import { isVitestProcess } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -453,7 +454,7 @@ export class AgentIdentityJournal {
         `[AGENT_IDENTITY_RESOURCE] journal must be a regular file: ${this.journalPath}`
       );
     }
-    const raw = String(safeReadFile(this.journalPath, { encoding: 'utf-8' }));
+    const raw = readTextFile(this.journalPath);
     const events: JournalEventEnvelope[] = [];
     let maxSeq = -1;
     for (const line of raw.split('\n')) {
