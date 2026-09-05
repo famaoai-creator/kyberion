@@ -21227,6 +21227,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: voice profile registryの基底registry欠損・schema不正時に組み込み英語profileへ戻る経路を削除し、正本snapshot／canonical directoryの読み込み障害をfail-closedで返す境界へ統一した。personal／customer overlayの任意性、profile ID・tier・sample refs検証、directory優先順位は変更していない。
 - **検証**: voice-profile-registry **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1339
+
+- **対象**: `libs/core/media-aws-icon-rules.ts`、`libs/core/media-aws-icon-rules.test.ts`
+- **変更**: AWS icon rule catalogに残っていた正本JSONと重複する大規模な組み込みrules／exact resource fallbackを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。resource typeのexact優先、starts_with／contains rule解決、未知resourceの空候補という表示側の既存semanticsは変更していない。
+- **検証**: media-aws-icon-rules **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
