@@ -1012,3 +1012,9 @@ Kyberion home CLIのprocedure実行mission fallbackに残っていた `MISSION_I
 pipeline reasoning visibilityのambient mission fallbackに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `ctx.mission_id` 優先、mission path解決、knowledge refsの絞り込み、prompt visibility contextの既存 semanticsは変更していない。
 
 検証: pipeline reasoning visibility environment boundary **1 file / 1 test passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 100
+
+doctor CLIのmission scoped manifest／hint解決に残っていた `MISSION_ID` の環境直読2箇所を、登録済み `getRegisteredEnvText` へ統一した。明示 `--mission` 優先、doctor内の既存環境設定、副作用、capability／next-action semanticsは変更していない。
+
+検証: doctor **2 files / 10 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
