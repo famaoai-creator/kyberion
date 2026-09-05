@@ -16,6 +16,7 @@ import {
 } from './backend-capability-profile.js';
 import { requireSandboxEnforcement, resolveSandboxPolicy } from './sandbox-policy.js';
 import { resolveProviderPermissionArgs, type ProviderId } from './provider-permission-profiles.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import * as pathResolver from './path-resolver.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
@@ -117,6 +118,7 @@ export interface BackendSandboxConformanceOptions {
   exec?: BackendSandboxConformanceExec;
   now?: string;
   probeId?: string;
+  env?: NodeJS.ProcessEnv;
   binaryAvailable?: (binary: string) => boolean;
   fs?: {
     mkdir: (directory: string) => void;
@@ -144,6 +146,17 @@ const SANDBOX_BLOCKED_MARKER = 'SANDBOX_PROBE_BLOCKED';
 const SANDBOX_TARGET_PREFIX = 'SANDBOX_PROBE_TARGET=';
 const SANDBOX_DENIAL_PATTERN =
   /(?:permission denied|read[- ]only(?: file system| filesystem| mode)?|not allowed|cannot (?:write|create)|can't (?:write|create)|operation not permitted|access denied)/iu;
+
+const SANDBOX_PROBE_BINARY_ENV_KEYS: Readonly<
+  Partial<Record<(typeof SANDBOX_PROBE_PROVIDERS)[number]['mode'], string>>
+> = {
+  'claude-cli': 'KYBERION_CLAUDE_CLI_BIN',
+  'codex-cli': 'KYBERION_CODEX_CLI_BIN',
+  'gemini-cli': 'KYBERION_GEMINI_CLI_BIN',
+  'grok-cli': 'KYBERION_GROK_CLI_BIN',
+  'cursor-cli': 'KYBERION_CURSOR_CLI_BIN',
+  'agy-cli': 'KYBERION_AGY_CLI_BIN',
+};
 
 function sandboxProbePrompt(sentinelPath: string): string {
   return [
@@ -191,9 +204,20 @@ function sandboxCommandArgs(
       return ['-p', prompt, ...permissionArgs];
     case 'grok-cli':
       return ['-p', prompt, '--output-format', 'plain', ...permissionArgs];
+    case 'cursor-cli':
+      return ['-p', '--output-format', 'json', ...permissionArgs, prompt];
     default:
       return [];
   }
+}
+
+function resolveSandboxProbeBinary(
+  mode: (typeof SANDBOX_PROBE_PROVIDERS)[number]['mode'],
+  binary: string,
+  env: NodeJS.ProcessEnv
+): string {
+  const envKey = SANDBOX_PROBE_BINARY_ENV_KEYS[mode];
+  return (envKey ? getRegisteredEnvText(envKey, { env })?.trim() : undefined) || binary;
 }
 
 function sandboxEvidence(result: BackendSandboxConformanceExecResult): string {
@@ -241,6 +265,7 @@ export function runBackendSandboxConformance(
     exists: (file: string) => safeExistsSync(file),
     remove: (fileOrDirectory: string) => safeRmSync(fileOrDirectory),
   };
+  const env = options.env ?? process.env;
   const probeId = (options.probeId || options.now || nowIso())
     .replace(/[^a-zA-Z0-9_-]/gu, '-')
     .slice(0, 80);
@@ -249,7 +274,8 @@ export function runBackendSandboxConformance(
   fs.mkdir(probeDirectory);
 
   try {
-    return SANDBOX_PROBE_PROVIDERS.map(({ mode, provider, binary }) => {
+    return SANDBOX_PROBE_PROVIDERS.map(({ mode, provider, binary: defaultBinary }) => {
+      const binary = resolveSandboxProbeBinary(mode, defaultBinary, env);
       if (!provider) {
         return sandboxResultForUnsupported(
           mode,

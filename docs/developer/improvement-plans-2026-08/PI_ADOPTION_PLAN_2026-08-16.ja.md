@@ -791,6 +791,8 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 
 - 2026-09-06: PI-03／SX-04 の provider capability catalog 再レビューとして、未参照のfallback catalogを削除し、primary catalogの欠損時だけ明示的空viewを使うようにした。配置済みcatalogのJSON／schema不正と、probe書込み時の既存catalog不正を黙って空catalogへ置換せず fail-closed とした。関連 **3 test files / 22 tests passed**、typecheck、対象 lint、`git diff --check` で確認した。provider CLIの実OS-level enforcement probeと未監査direct loader全件inventoryは継続課題である。
 
+- 2026-09-06: PI-13／DH-11 の provider sandbox probe 再レビューとして、Cursor CLIを実際の非対話JSON invocationへ接続し、`--mode plan` とwrite-sentinel／明示denial markerを検査するlive probeを追加した。provider-specific permission projection、CLI binary override、sentinel cleanupを維持し、help広告だけではverifiedにしない契約を固定した。関連 **1 test file / 7 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。実CLI実機でのenforcement結果と全provider adapterの実測は継続課題である。
+
 ## 7. 検証コマンド(実装時)
 
 - PI-01: `pnpm vitest run libs/core/spend-guard.test.ts libs/core/metrics.test.ts libs/core/cost-report.test.ts` + tier 境界 fixture
