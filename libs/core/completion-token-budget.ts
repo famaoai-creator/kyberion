@@ -12,6 +12,7 @@
  */
 
 import { estimateTokens } from './worker-context-compaction.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export const DEFAULT_SAFETY_MARGIN_TOKENS = 1_024;
 export const DEFAULT_COMPLETION_FLOOR_TOKENS = 1_024;
@@ -67,7 +68,7 @@ export function estimateRequestInputTokens(payload: unknown): number {
 export function resolveConfiguredContextWindowTokens(
   env: NodeJS.ProcessEnv = process.env
 ): number | undefined {
-  const raw = env.KYBERION_CONTEXT_WINDOW_TOKENS?.trim();
+  const raw = getRegisteredEnvText('KYBERION_CONTEXT_WINDOW_TOKENS', { env })?.trim();
   if (!raw) return undefined;
   const value = Number(raw);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
