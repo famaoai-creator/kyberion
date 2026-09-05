@@ -22209,3 +22209,21 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_documentation_links.ts`、`scripts/check_documentation_links.entrypoint.test.ts`
 - **変更**: documentation links checker の markdown 本文読込を foundation の `readTextFile` へ移行した。docs／knowledge の走査範囲、外部・画像・root-relative linkの判定、broken-link報告、CLI exit semanticsは変更せず、entrypoint contract testで旧 `safeReadFile` 直読の再導入を検出するようにした。
 - **検証**: documentation-links **reader contract passed**、対象ESLint、Prettier、`git diff --check`。レビュー由来のリンク解決・文書修正残件と、残るproduction loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1502
+
+- **対象**: `scripts/check_channel_adapter_adoption.ts`、`scripts/check_channel_adapter_adoption.test.ts`
+- **変更**: channel adapter adoption checker の bridge source 本文読込を foundation の `readTextFile` へ移行した。4 bridgeの `runChannelTurn`／delivery／approval gate／thread formatter判定は変更せず、既存テストにreader contractを追加した。
+- **検証**: channel-adapter adoption **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1503
+
+- **対象**: `scripts/check_design_ledger.ts`、`scripts/check_design_ledger.test.ts`
+- **変更**: design ledger／postmortem frontmatter本文読込を foundation の `readTextFile` へ移行した。required fields、status／evidence／rationale判定と違反報告は変更せず、既存テストにreader contractを追加した。
+- **検証**: design-ledger **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1504
+
+- **対象**: `scripts/check_capability_seams_ast.ts`、`scripts/check_capability_seams_ast.entrypoint.test.ts`
+- **変更**: capability seam AST checker の production source／生成graph本文読込を foundation の `readTextFile` へ統一した。AST declaration／catalog backing／graph completeness判定とshared CLI failure semanticsは変更せず、entrypoint contract testで旧 `safeReadFile` 直読の再導入を検出する。
+- **検証**: capability-seams AST **reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
