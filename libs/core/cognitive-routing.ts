@@ -1,7 +1,8 @@
 import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 
@@ -331,7 +332,7 @@ export function loadCognitiveRoutingSchema(): unknown {
   if (!safeLstat(safeSchemaPath).isFile()) {
     throw new Error(`Cognitive routing schema must be a regular file at ${SCHEMA_PATH}`);
   }
-  const raw = safeReadFile(safeSchemaPath, { encoding: 'utf8' }) as string;
+  const raw = readTextFile(safeSchemaPath);
   if (cachedSchemaRaw === raw && cachedSchemaPath === safeSchemaPath) {
     return parseSafeJsonInput(raw, 'cognitive routing schema');
   }
