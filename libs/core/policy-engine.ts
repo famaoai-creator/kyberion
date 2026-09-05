@@ -1,7 +1,7 @@
 import * as yaml from 'js-yaml';
 import { createLogger } from './logger.js';
 import { getFoundationIo } from './foundation/io.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 
@@ -183,7 +183,7 @@ class PolicyEngineImpl {
       return;
     }
 
-    const content = getFoundationIo().readFile(policyPath);
+    const content = readTextFile(policyPath);
     // SA-05: a hand-rolled "simple YAML" parser silently produced empty
     // rules arrays for every policy (nested lists were unsupported), so the
     // engine never enforced anything. Parse with js-yaml; a parse failure
