@@ -6,7 +6,7 @@ import { createSurfaceApprovalRequest } from '@agent/core/channel-surface';
 import { withExecutionContext } from '@agent/core/authority';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import * as pathResolver from '@agent/core/path-resolver';
-import { safeRmSync } from '@agent/core/secure-io';
+import { safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import type {
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
@@ -46,6 +46,7 @@ import {
   parseTelegramSendInput,
   readTelegramJsonObject,
   resolveTelegramBridgeInputPath,
+  resolveTelegramThreadHistoryPath,
   type TelegramThreadHistoryEntry,
 } from './index.js';
 
@@ -92,6 +93,24 @@ describe('telegram bridge thread context', () => {
         receivedAt: '2026-05-15T00:00:00.000Z',
       })
     ).toMatchObject({ role: 'user', text: 'hello' });
+  });
+
+  it('rejects a symlinked persisted thread history path before reading it', () => {
+    const threadTs = `symlink-${RUN_ID}`;
+    const linkedPath = resolveTelegramThreadHistoryPath(threadTs);
+    const targetPath = pathResolver.resolve(
+      `active/shared/tmp/telegram-thread-history-target-${RUN_ID}.jsonl`
+    );
+    withExecutionContext('surface_runtime', () => {
+      safeWriteFile(targetPath, '{"role":"assistant"}\n');
+      safeSymlinkSync(targetPath, linkedPath);
+      try {
+        expect(() => resolveTelegramThreadHistoryPath(threadTs)).toThrow('[RESOURCE_PATH_SYMLINK]');
+      } finally {
+        safeRmSync(linkedPath, { force: true });
+        safeRmSync(targetPath, { force: true });
+      }
+    });
   });
 
   it('keeps file input inside the repository and limited to regular files', () => {

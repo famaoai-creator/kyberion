@@ -1741,4 +1741,8 @@ reasoning provider descriptorのcapability／input modality／env keyを必須�
 
 Cursor CLIを実際の非対話JSON invocationへ接続し、`--mode plan` とwrite-sentinel／明示denial markerを検査するlive probeを追加した。provider-specific permission projection、CLI binary override、sentinel cleanupを維持し、help広告だけではverifiedにしない契約を固定した。
 
+## 2026-09-06 再レビュー修正 221
+
+Discord／Telegram bridgeのthread history loader／writerをoperation-timeの`assertSafeRepositoryPath`／`safeLstat`へ統一し、symlink／非regular fileをsurface conversation contextへ読み込まず、append対象にも到達させない境界を追加した。各bridgeのsymlink regression testを含む**4 files / 19 tests passed**、typecheck、対象lint、Prettier、`git diff --check`で確認した。
+
 検証: backend-conformance **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と全provider adapterの実測は継続課題とする。
