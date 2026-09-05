@@ -65,6 +65,18 @@ describe('PI-09 AGENTS override loader', () => {
     expect(resource?.replaced).toBe(false);
   });
 
+  it('rejects a directory used as a trusted override contract', () => {
+    safeMkdir(path.join(root, 'src', 'AGENTS.override.md'), { recursive: true });
+    safeWriteFile(path.join(root, 'AGENTS.md'), 'root contract');
+
+    expect(() =>
+      loadAgentInstructionResource(path.join(root, 'src'), {
+        rootDir: root,
+        trustResolved: true,
+      })
+    ).toThrow('[AGENT_INSTRUCTION_RESOURCE] instruction contract must be a regular file');
+  });
+
   it('rejects symlinked instruction targets and contracts', () => {
     const realDir = path.join(root, 'real');
     const linkedDir = path.join(root, 'linked');
