@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 
-import {
-  getChronosAccessRoleOrThrow,
-  guardRequest,
-  roleToMissionRole,
-} from '../../../lib/api-guard';
+import { guardRequest } from '../../../lib/api-guard';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
 import { loadState } from '@agent/core/mission-state';
@@ -200,8 +196,8 @@ export async function GET(req: NextRequest) {
     const resolvedViewer = resolveViewerContextForRequest(req);
     if (resolvedViewer.response) return resolvedViewer.response;
 
-    const accessRole = getChronosAccessRoleOrThrow(req);
-    process.env.MISSION_ROLE = roleToMissionRole(accessRole);
+    const withViewerContext = <T>(operation: () => T): T =>
+      withViewerExecutionContext(resolvedViewer.context, operation);
 
     const missionId = req.nextUrl.searchParams.get('missionId') || '';
     const relativePath = req.nextUrl.searchParams.get('path') || '';
@@ -212,7 +208,7 @@ export async function GET(req: NextRequest) {
       req.nextUrl.searchParams.get('tenant') || undefined
     );
     if (artifactId) {
-      artifact = loadArtifactRecord(artifactId);
+      artifact = withViewerContext(() => loadArtifactRecord(artifactId));
       if (!artifact) return NextResponse.json({ error: 'Artifact not found' }, { status: 404 });
       if (
         tenantSlugs !== 'all' &&
@@ -231,16 +227,18 @@ export async function GET(req: NextRequest) {
       if (!isAllowedMissionAssetPath(relativePath)) {
         return NextResponse.json({ error: 'Invalid mission asset request' }, { status: 400 });
       }
-      const missionRoot = resolveMissionRoot(missionId);
+      const missionRoot = withViewerContext(() => resolveMissionRoot(missionId));
       if (!missionRoot) {
         return NextResponse.json({ error: 'Mission not found' }, { status: 404 });
       }
       assetPath = path.join(missionRoot, relativePath);
-      assetTier = resolveMissionAssetTier({
-        artifact: artifactId ? artifact : undefined,
-        assetPath,
-        missionId,
-      });
+      assetTier = withViewerContext(() =>
+        resolveMissionAssetTier({
+          artifact: artifactId ? artifact : undefined,
+          assetPath,
+          missionId,
+        })
+      );
     } else {
       // repo-relative artifact mode: deliverables live in exports/tmp/missions;
       // tier enforcement stays with secure-io on the actual read below.
@@ -249,21 +247,27 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid mission asset request' }, { status: 400 });
       }
       assetPath = path.join(pathResolver.rootDir(), repoRelative);
-      assetTier = resolveMissionAssetTier({
-        artifact: artifactId ? artifact : undefined,
-        assetPath,
-      });
+      assetTier = withViewerContext(() =>
+        resolveMissionAssetTier({
+          artifact: artifactId ? artifact : undefined,
+          assetPath,
+        })
+      );
     }
     try {
-      assetPath = assertSafeRepositoryPath(assetPath, { allowMissingLeaf: true });
+      assetPath = withViewerContext(() =>
+        assertSafeRepositoryPath(assetPath, { allowMissingLeaf: true })
+      );
     } catch {
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
     }
     const pathTenant = tenantFromPath(assetPath);
-    const boundTenant = resolveMissionAssetTenant({
-      artifact: artifactId ? artifact : undefined,
-      missionId: missionId || undefined,
-    });
+    const boundTenant = withViewerContext(() =>
+      resolveMissionAssetTenant({
+        artifact: artifactId ? artifact : undefined,
+        missionId: missionId || undefined,
+      })
+    );
     if (pathTenant && boundTenant && pathTenant !== boundTenant) {
       return NextResponse.json(
         { error: 'Asset tenant binding does not match its path' },
