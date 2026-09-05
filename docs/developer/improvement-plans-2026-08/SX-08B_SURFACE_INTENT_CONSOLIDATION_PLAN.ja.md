@@ -1414,3 +1414,9 @@ dynamic permission policyのschema不正時にcatalog fallbackを生成する経
 service endpoint registryのcanonical directory読み込み障害を互換snapshotへ黙って戻す経路と、空services fallbackを削除した。正本snapshot／directoryのschema・service ID・version／default pattern整合、path scope、endpoint／credential metadataの既存semanticsは変更していない。
 
 検証: service-endpoint-registry／sync **2 files / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 167
+
+voice TTS registryのunsafe path／invalid catalog時の組み込み英語fallbackと、正本languagesへの組み込み設定混在を削除した。検証済みregistry内のdefault language解決、voice／rate／token metadata、cache resetの既存semanticsは変更していない。空languagesは明示的にエラーとする。
+
+検証: voice-tts-config **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
