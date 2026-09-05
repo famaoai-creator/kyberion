@@ -46,6 +46,11 @@ function contentHash(absolutePath: string): string {
   if (!safeExistsSync(absolutePath)) {
     throw new Error(`[PROJECT_TRUST_SCOPE] pipeline resource does not exist: ${absolutePath}`);
   }
+  if (!safeLstat(absolutePath).isFile()) {
+    throw new Error(
+      `[PROJECT_TRUST_SCOPE] pipeline resource must be a regular file: ${absolutePath}`
+    );
+  }
   const raw = safeReadFile(absolutePath, { encoding: 'utf8' });
   return createHash('sha256').update(String(raw)).digest('hex');
 }
