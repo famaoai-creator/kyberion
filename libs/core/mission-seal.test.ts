@@ -17,6 +17,8 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+const mockSealState = vi.hoisted(() => ({ encryptedOutputDirectory: false }));
+
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
   return {
@@ -35,7 +37,11 @@ vi.mock('./secure-io.js', async () => {
       if (command === 'openssl' && args[0] === 'enc') {
         const inPath = args[args.indexOf('-in') + 1]!;
         const outPath = args[args.indexOf('-out') + 1]!;
-        fs.writeFileSync(outPath, `ENC(${fs.readFileSync(inPath, 'utf8')})`);
+        if (mockSealState.encryptedOutputDirectory) {
+          fs.mkdirSync(outPath, { recursive: true });
+        } else {
+          fs.writeFileSync(outPath, `ENC(${fs.readFileSync(inPath, 'utf8')})`);
+        }
         return '';
       }
       if (command === 'openssl' && args[0] === 'rsautl') {
@@ -188,6 +194,18 @@ describe('sealMission (AL-02)', () => {
       expect(await mod.sealMission(MISSION_ID)).toBeUndefined();
     } finally {
       fs.writeFileSync(keyPath, backup);
+    }
+  });
+
+  it('rejects a non-file encrypted output before hashing or anchoring it', async () => {
+    const sealDir = path.join(tmpRoot, 'active', 'missions', MISSION_ID, 'seal');
+    mockSealState.encryptedOutputDirectory = true;
+    try {
+      await expect(mod.sealMission(MISSION_ID)).resolves.toBeUndefined();
+      expect(fs.statSync(path.join(sealDir, `${MISSION_ID}.enc`)).isDirectory()).toBe(true);
+    } finally {
+      mockSealState.encryptedOutputDirectory = false;
+      fs.rmSync(sealDir, { recursive: true, force: true });
     }
   });
 });

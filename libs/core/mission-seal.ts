@@ -12,6 +12,7 @@ import {
   assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -127,6 +128,17 @@ export async function sealMission(id: string): Promise<string | undefined> {
       '-out',
       encKeyPath,
     ]);
+
+    if (!safeLstat(encryptedPath).isFile()) {
+      throw new Error(
+        `[MISSION_SEAL_RESOURCE] encrypted archive must be a regular file: ${encryptedPath}`
+      );
+    }
+    if (!safeLstat(encKeyPath).isFile()) {
+      throw new Error(
+        `[MISSION_SEAL_RESOURCE] encrypted key must be a regular file: ${encKeyPath}`
+      );
+    }
 
     logger.success(
       `✅ Mission ${upperId} sealed cryptographically (Encrypted key: ${path.basename(encKeyPath)}).`
