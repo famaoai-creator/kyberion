@@ -1,9 +1,5 @@
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
@@ -184,7 +180,7 @@ export function defineGenerator(options: {
         .filter((file, index) => {
           const safePath = safeFiles[index]?.safePath as string;
           if (!safeExistsSync(safePath)) return true;
-          return normalize(String(safeReadFile(safePath))) !== normalize(file.content);
+          return normalize(readTextFile(safePath)) !== normalize(file.content);
         })
         .map((file) => file.path);
       const unexpected = files
