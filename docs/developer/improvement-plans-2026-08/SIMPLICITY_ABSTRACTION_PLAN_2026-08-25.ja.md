@@ -21645,3 +21645,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`
 - **変更**: provider capability probeがprovider discovery／実行backendと異なりCLI binary overrideを無視していた残存を修正し、登録済みのClaude／Codex／AGY／Grok／Cursor／Gemini／Copilot binaryをversion・auth・helpの全probeへ伝播するようにした。明示Claude binaryのplaceholder fallbackへの勝手な置換も抑止した。
 - **検証**: provider-capability-registry **1 file / 16 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1408
+
+- **対象**: `libs/core/agent-input-queue.ts`、`libs/core/agent-input-queue.test.ts`
+- **変更**: durable `next_run` queueのread／append前にoperation-timeのregular-file検査を追加した。既存のrepository path検証、append-only reducer、lock、scope filtering、volatile laneのsemanticsは維持し、queue pathがディレクトリへ置換された場合に読み書きを拒否する回帰テストを追加した。
+- **検証**: AgentInputQueue **1 file / 15 tests passed**、全体typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

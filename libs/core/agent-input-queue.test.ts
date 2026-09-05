@@ -64,6 +64,18 @@ describe('AgentInputQueue', () => {
     }
   });
 
+  it('rejects a durable queue path that is a directory', async () => {
+    safeMkdir(queuePath, { recursive: true });
+    const queue = new AgentInputQueue({ missionId: 'PI15-DIRECTORY', queuePath });
+
+    await expect(queue.enqueue({ delivery: 'next_run', text: 'must not write' })).rejects.toThrow(
+      '[AGENT_INPUT_QUEUE] durable queue must be a regular file'
+    );
+    await expect(queue.consume('next_run')).rejects.toThrow(
+      '[AGENT_INPUT_QUEUE] durable queue must be a regular file'
+    );
+  });
+
   it('provides an explicit surface delivery API with provenance and no implicit promotion', async () => {
     const entry = await enqueueSurfaceAgentInput({
       missionId: 'PI15-SURFACE-API',
