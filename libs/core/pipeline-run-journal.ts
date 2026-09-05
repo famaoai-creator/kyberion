@@ -10,12 +10,12 @@ import * as path from 'node:path';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
 } from './secure-io.js';
 import { findMissionPath, knowledge, rootDir, shared } from './path-resolver.js';
@@ -327,7 +327,7 @@ export function readPipelineRunJournal(filePath: string): PipelineRunJournalStat
   if (!safeExistsSync(safeFilePath))
     throw new Error(`[PIPELINE_JOURNAL] not found: ${safeFilePath}`);
   ensureRegularPipelineJournalFile(safeFilePath);
-  const lines = String(safeReadFile(safeFilePath, { encoding: 'utf8' }))
+  const lines = readTextFile(safeFilePath)
     .split('\n')
     .filter((line) => line.trim().length > 0);
   const events: PipelineRunJournalEvent[] = [];

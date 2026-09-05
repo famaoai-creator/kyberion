@@ -2,7 +2,8 @@
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import {
   appendPromptVisibilityRecord,
   type PromptVisibilityRecord,
@@ -194,10 +195,7 @@ export function loadSkillResourceDescriptor(
   if (!safeLstat(filePath).isFile()) {
     throw new Error(`[SKILL_RESOURCE_INVALID] skill resource must be a regular file: ${filePath}`);
   }
-  const frontmatter = parseSkillDocument(
-    String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
-    filePath
-  );
+  const frontmatter = parseSkillDocument(readTextFile(filePath), filePath);
   return {
     name: frontmatter.name,
     description: frontmatter.description,
@@ -302,7 +300,7 @@ export function readSkillResourceBody(
       `[SKILL_RESOURCE_INVALID] skill resource must be a regular file: ${descriptor.path}`
     );
   }
-  return String(safeReadFile(descriptor.path, { encoding: 'utf8' }) || '')
+  return readTextFile(descriptor.path)
     .replace(/^---\n[\s\S]*?\n---\n/u, '')
     .trim();
 }
