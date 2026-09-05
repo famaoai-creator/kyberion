@@ -1468,3 +1468,9 @@ pipeline schedulerの存在するschedule registryがschema不正時に空regist
 network security policyの欠損・schema不正時に空objectへ落ちるcatalog fallbackを削除し、security policyの読み込み障害をfail-closedで返す境界へ統一した。policy内の`max_request_size_kb`未指定時に安全な2048KB上限を使う既存semantics、egress／secret redaction／payload size判定は変更していない。
 
 検証: network **1 file / 6 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 176
+
+surface query provider configのschema不正・unsafe path・overlay読み込み障害を空objectへ収束させるfallback／catchを削除し、正本base／overlayの読み込み障害をfail-closedで返す境界へ統一した。base config未配置時のquery機能無効化、tenant／entity／phase／role／personal overlayの任意性、intent分類とquery抽出は変更していない。
+
+検証: surface-query **1 file / 10 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。

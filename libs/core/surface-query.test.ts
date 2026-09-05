@@ -62,7 +62,7 @@ describe('surface-query', () => {
     expect(config.knowledge?.provider).toBe('context_ranker');
   });
 
-  it('falls back to an empty config when the base provider catalog is schema-invalid', () => {
+  it('fails closed when the base provider catalog is schema-invalid', () => {
     safeMkdir(tmpDir, { recursive: true });
     safeWriteFile(overridePath, JSON.stringify({ web_search: 'not-a-provider-section' }));
     process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH = overridePath;
@@ -72,14 +72,16 @@ describe('surface-query', () => {
     );
     _resetSurfaceQueryProviderConfigCacheForTests();
 
-    expect(getSurfaceQueryProviderConfig()).toEqual({});
+    expect(() => getSurfaceQueryProviderConfig()).toThrowError(
+      /Invalid catalog surface-query-providers/
+    );
   });
 
-  it('falls back to an empty config when the base provider path is outside the repository', () => {
+  it('rejects a base provider path outside the repository', () => {
     process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH = '/tmp/surface-query-external.json';
     _resetSurfaceQueryProviderConfigCacheForTests();
 
-    expect(getSurfaceQueryProviderConfig()).toEqual({});
+    expect(() => getSurfaceQueryProviderConfig()).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('merges personal overlay provider settings', () => {
