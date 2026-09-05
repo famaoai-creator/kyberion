@@ -28,6 +28,13 @@ describe('service-endpoint-registry', () => {
     expect(loadServiceEndpointsCatalog().services.slack.base_url).toBe('https://slack.com/api');
   });
 
+  it('loads the canonical split directory when entries omit an optional version', () => {
+    const catalog = loadServiceEndpointsCatalog();
+
+    expect(catalog.version).toBe('1.0.0');
+    expect(Object.keys(catalog.services).length).toBeGreaterThan(0);
+  });
+
   it('fails closed for a schema-invalid configured snapshot', () => {
     safeMkdir(tmpDir, { recursive: true });
     const snapshotPath = path.join(tmpDir, 'invalid.json');

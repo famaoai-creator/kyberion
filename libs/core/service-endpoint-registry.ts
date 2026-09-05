@@ -137,7 +137,7 @@ function loadServiceEndpointsDirectory(catalogDir: string): ServiceEndpointsCata
     services[serviceId] = serviceEntries[serviceId];
   }
 
-  if (!version) {
+  if (Object.keys(services).length === 0) {
     throw new Error(`Service endpoints directory produced no services: ${dir}`);
   }
 
