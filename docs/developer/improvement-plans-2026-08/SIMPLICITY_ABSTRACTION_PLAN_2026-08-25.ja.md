@@ -22570,6 +22570,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: generator output comparison と lockfile hash の本文読込を foundation の `readTextFile` へ移行した。generator output のpath／symlink boundary、lockfile hash・review evidence・commit gate semanticsは変更していない。
 - **検証**: 対象テスト **3 files／19 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るバイナリhash用途と個別専用readerは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1569
+
+- **対象**: `libs/core/cli-input.ts`、`libs/core/cli-input.test.ts`、`libs/core/package.json`
+- **変更**: production consumerがなく、canonical foundation readerへの互換shimだけが残っていた `cli-input` の実装・専用テスト・package exportを削除した。既存の `foundation/{json,text}`、secure path、CLI boundary semanticsは変更せず、未参照のcompatibility surfaceをadopt-or-delete方針で除去した。
+- **検証**: 対象テスト **3 files／29 tests passed**、`pnpm run typecheck`、foundation-adoption **passed**、improvement-plan metadata **passed**。残るdomain loader／CLI／catalog統合は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
