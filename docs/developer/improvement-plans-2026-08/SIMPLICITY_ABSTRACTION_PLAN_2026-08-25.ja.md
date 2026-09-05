@@ -20663,6 +20663,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: 実routeを通るvoice-hub応答fixtureで、`approval_required` の `IntentResolutionContract` が `execution_preview` と approve next actionへ投影される本番相当回帰を追加した。
 - **検証**: Concierge message route 4 tests、対象lint、Prettier、`git diff --check`。フルvalidateはこのslice反映後に実行する。
 
+## 2026-09-05 再レビュー修正 1245
+
+- **対象**: `libs/core/windows-local-assist-bridge.ts`、`libs/core/windows-local-assist-bridge.test.ts`
+- **変更**: Windows local-assistの外部status応答をendpoint discoveryへ投影する前に、共通 `parseSafeJsonObjectValue` でrootと危険キーを検証するようにした。malformed／危険キーを含むstatus応答は既定endpointへfail-closedとし、既存のendpoint候補とchat response parserの境界は維持した。
+- **検証**: Windows local-assist bridge 4 tests、`pnpm --filter @agent/core run typecheck`、対象ESLint、Prettier、`git diff --check`。フル `pnpm run validate` はこのslice反映後に実行する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
