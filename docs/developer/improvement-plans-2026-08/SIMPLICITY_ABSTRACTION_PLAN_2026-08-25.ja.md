@@ -20166,6 +20166,21 @@ Playwrightの環境overrideは維持し、backend probeの選択順序・fail-cl
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1210
+
+SX-03／SX-08／SX-09のaccess boundaryを再監査し、share-grant graphのstore／HMAC／audit guard、
+surface allowlistのlegacy key、task-scoped grantsのstore／audit guardを`getRegisteredEnvText`
+経由へ統一した。share-linkの署名・revocation、tenant／audience制約、allowlistのdefault deny、
+grantのTTL・governed writeは変更していない。
+
+検証:
+
+- share grant／surface access／task grants **3 files / 47 tests passed**。
+- core typecheck、対象ESLint、`git diff --check` passed。
+- 対象production sourceの直接 `process.env` 参照 **0 occurrences**（diagnostic message内の設定名表示を除く）。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
