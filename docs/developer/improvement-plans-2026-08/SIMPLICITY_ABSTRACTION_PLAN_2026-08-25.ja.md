@@ -22558,6 +22558,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: scripts全体が利用する `readSafeJsonValueFile` の本文読込を foundation の `readTextFile` へ移行した。regular-file検証、safe JSON parser、object boundary、各scriptの公開helper名は維持した。
 - **検証**: 対象テスト **2 files／6 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残る個別バイナリreaderと非JSONの専用境界は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1567
+
+- **対象**: `scripts/refactor/adf-input.ts` と対象テスト
+- **変更**: `core:include` の pipeline fragment 本文読込を foundation の `readTextFile` へ移行した。project trust、regular-file／path boundary、circular include検出、ADF validation／repair semanticsは変更していない。
+- **検証**: 対象テスト **1 file／15 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るADF語彙統一とバイナリreaderは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
