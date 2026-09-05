@@ -5,9 +5,9 @@ import { getReasoningBackend } from './reasoning-backend.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir } from './secure-io.js';
 import { parseTestInventoryItem } from './software-quality.js';
 import type {
   DefectCandidate,
@@ -362,7 +362,7 @@ const DEFECT_TRANSITIONS: Record<DefectStatus, DefectStatus[]> = {
 
 function readDefectEvents(filePath: string): DefectTransitionEvent[] {
   if (!safeExistsSync(filePath)) return [];
-  return (safeReadFile(filePath, { encoding: 'utf8' }) as string)
+  return readTextFile(filePath)
     .split('\n')
     .filter((line) => line.trim() !== '')
     .flatMap((line) => {
