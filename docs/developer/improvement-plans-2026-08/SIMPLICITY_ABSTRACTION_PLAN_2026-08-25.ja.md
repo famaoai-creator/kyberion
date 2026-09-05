@@ -22119,3 +22119,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/backup.ts`
 - **変更**: restore 後の mission git bundle manifest read を foundation の `readTextFile` へ移行した。既存の secure path／manifest parse／restore／prune／drill semantics は維持し、backup production loader の直接 `safeReadFile` を一つ削減した。
 - **検証**: backup **1 file / 18 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1487
+
+- **対象**: `scripts/cli-workflow-handlers.ts`、`scripts/cli-workflow-handlers.entrypoint.test.ts`
+- **変更**: email workflow の triage／body file 本文読込を foundation の `readTextFile` へ移行した。既存の repository path 境界、missing／empty input のエラー、approval／draft-mode とCLI printerのsemanticsは変更せず、workflow handlerに残っていた旧 `safeReadFile` 直読を削減した。
+- **検証**: cli-workflow-handlers の entrypoint／path tests、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
