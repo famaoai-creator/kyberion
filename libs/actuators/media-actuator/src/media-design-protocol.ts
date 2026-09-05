@@ -340,7 +340,7 @@ type ImportedDesignRecommendation = Pick<
 };
 
 function loadImportedDesignMdIndex(rootDir: string): ImportedDesignMdIndex {
-  const fallback: ImportedDesignMdIndex = {
+  const aggregationSeed: ImportedDesignMdIndex = {
     generated_at: '1970-01-01T00:00:00.000Z',
     source_repo: 'unavailable',
     source_dir: 'unavailable',
@@ -354,8 +354,6 @@ function loadImportedDesignMdIndex(rootDir: string): ImportedDesignMdIndex {
       'knowledge/public/design-patterns/media-templates/design-md-catalog/index.json'
     ),
     schema: path.resolve(rootDir, 'knowledge/product/schemas/imported-design-md-index.schema.json'),
-    fallback,
-    fallbackOnInvalid: true,
   });
   const directoryPath = path.resolve(
     rootDir,
@@ -363,7 +361,10 @@ function loadImportedDesignMdIndex(rootDir: string): ImportedDesignMdIndex {
   );
   const docs = readJsonFilesRecursively(directoryPath);
   if (docs.length === 0) return catalog.load();
-  const merged = docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback));
+  const merged = docs.reduce(
+    (acc, doc) => deepMergeCatalog(acc, doc),
+    cloneJsonValue(aggregationSeed)
+  );
   return catalog.validate(merged, directoryPath);
 }
 
