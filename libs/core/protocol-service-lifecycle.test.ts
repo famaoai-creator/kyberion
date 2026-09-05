@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
-import { pathResolver, safeExistsSync, safeRmSync, safeWriteFile } from './index.js';
+import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './index.js';
 import {
   protocolServiceLifecycleLogicalPath,
   portableProtocolServicePathRef,
@@ -106,6 +106,24 @@ describe('protocol service lifecycle receipts', () => {
     });
     expect(() => readProtocolServiceLifecycleReceipts('peer-messaging', scope)).toThrow(
       'PROTOCOL_LIFECYCLE_RECEIPT_INVALID'
+    );
+  });
+
+  it('fails closed when the receipt stream is replaced by a directory', () => {
+    const logicalPath = protocolServiceLifecycleLogicalPath('peer-messaging', scope);
+    recordProtocolServiceLifecycle({
+      serviceId: 'peer-messaging',
+      action: 'start',
+      status: 'started',
+      scope,
+    });
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeRmSync(logicalPath, { force: true });
+      safeMkdir(logicalPath);
+    });
+
+    expect(() => readProtocolServiceLifecycleReceipts('peer-messaging', scope)).toThrow(
+      'receipt stream must be a regular file'
     );
   });
 
