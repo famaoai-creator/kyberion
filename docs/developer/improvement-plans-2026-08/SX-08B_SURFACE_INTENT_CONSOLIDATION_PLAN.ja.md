@@ -1462,3 +1462,9 @@ media tone style mapに残っていた正本JSONと重複するtone map fallback
 pipeline schedulerの存在するschedule registryがschema不正時に空registryへ戻るfallbackを削除し、永続化されたscheduleの読み込み障害をfail-closedで返す境界へ統一した。registryファイル自体が未作成の場合の空schedule、pipeline pathのrepo-relative検証、run lock／catch-upの既存semanticsは変更していない。
 
 検証: pipeline-scheduler **1 file / 15 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 175
+
+network security policyの欠損・schema不正時に空objectへ落ちるcatalog fallbackを削除し、security policyの読み込み障害をfail-closedで返す境界へ統一した。policy内の`max_request_size_kb`未指定時に安全な2048KB上限を使う既存semantics、egress／secret redaction／payload size判定は変更していない。
+
+検証: network **1 file / 6 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
