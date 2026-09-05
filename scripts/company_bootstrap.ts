@@ -173,7 +173,9 @@ function getFlag(argv: string[], name: string): string | undefined {
 export function main(argv: string[], print: (value: unknown) => void = () => undefined): number {
   // Operator-run scaffolding CLI: same execution context as the onboarding
   // wizard, which also writes under customer/ (see scripts/onboarding_wizard.ts).
-  process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+  }
   setRegisteredEnv('KYBERION_PERSONA', getRegisteredEnvText('KYBERION_PERSONA') || 'sovereign');
   const vertical = getFlag(argv, '--vertical');
   const slug = getFlag(argv, '--slug');

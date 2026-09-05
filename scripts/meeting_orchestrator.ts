@@ -52,7 +52,7 @@ import {
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { parseSafeJsonInput, setRegisteredEnv } from '@agent/core/foundation';
 
 interface OrchestratorOptions {
   mission: string;
@@ -222,7 +222,7 @@ async function main(args: string[] = []): Promise<void> {
     skipTracking: Boolean(argv['skip-tracking']),
   };
 
-  process.env.MISSION_ID = options.mission;
+  setRegisteredEnv('MISSION_ID', options.mission);
 
   logger.info(
     `🎙️ meeting_orchestrator start (mission=${options.mission}, platform=${options.platform})`

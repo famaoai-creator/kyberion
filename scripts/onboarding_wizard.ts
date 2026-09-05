@@ -1010,7 +1010,7 @@ export async function runOnboarding(
   args: string[] = [],
   print: Print = () => undefined
 ): Promise<void> {
-  process.env.MISSION_ROLE = 'sovereign_concierge';
+  setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const rootDir = pathResolver.rootDir();
   let customerSlug = customerResolver.activeCustomer();

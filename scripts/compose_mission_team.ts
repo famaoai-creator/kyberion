@@ -21,10 +21,12 @@ export const MISSION_TEAM_COMPOSITION_USAGE =
   'Usage: pnpm mission:compose-team --mission-id <id> [--request <text>] [--write]';
 
 function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () => T): T {
-  const previousRole = process.env.MISSION_ROLE;
+  const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
 
-  process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+  }
   if (!getRegisteredEnvText('KYBERION_PERSONA') && assignedPersona) {
     setRegisteredEnv('KYBERION_PERSONA', assignedPersona);
   }
@@ -32,8 +34,7 @@ function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () 
   try {
     return fn();
   } finally {
-    if (previousRole === undefined) delete process.env.MISSION_ROLE;
-    else process.env.MISSION_ROLE = previousRole;
+    setRegisteredEnv('MISSION_ROLE', previousRole);
     setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }

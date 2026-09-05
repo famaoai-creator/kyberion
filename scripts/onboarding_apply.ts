@@ -445,7 +445,7 @@ export async function applyOnboardingInput(input: ApplyInput, print: Print = () 
     pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
   );
 
-  process.env.MISSION_ROLE = 'sovereign_concierge';
+  setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const now = nowIso();
   const persona = resolveInputPersona(input);
@@ -508,7 +508,7 @@ export async function main(argv: string[] = [], print: Print = () => undefined) 
     .strict()
     .parse();
 
-  process.env.MISSION_ROLE = 'sovereign_concierge';
+  setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
 
   const input = await readInput(parsed.identity as string | undefined);

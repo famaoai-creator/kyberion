@@ -20981,6 +20981,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: pipeline実行入口に残っていた `NODE_OPTIONS` の環境直読と、identity／mission context継承用の `MISSION_ROLE`／`MISSION_ID` raw assignmentを、登録済み `getRegisteredEnvText`／`setRegisteredEnv` へ統一した。既存の明示context優先、subprocess継承、tier guard向け mission contextと dry-run semanticsは変更していない。
 - **検証**: pipeline context boundary **1 file / 1 test passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
+## 2026-09-05 再レビュー修正 1298
+
+- **対象**: mission contextを設定する13個のCLI／daemon入口、`scripts/mission-context-env-boundary.test.ts`
+- **変更**: `MISSION_ID`／`MISSION_ROLE` の直接環境アクセスを、登録済み `getRegisteredEnvText`／`setRegisteredEnv` へ統一した。既存の既定role、明示mission優先、scoped restore、onboarding／meeting／supervisorの実行 semanticsは変更していない。対象全入口を走査する境界テストを追加した。
+- **検証**: mission context boundaryを含む **6 files / 100 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck、foundation adoption check。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
