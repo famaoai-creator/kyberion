@@ -783,8 +783,8 @@ export function generateMissionWorkReconciliationScaffold(input: {
   }
   const repository = pathResolver.rootDir();
   const branch =
-    process.env.GITHUB_HEAD_REF?.trim() ||
-    process.env.GITHUB_REF_NAME?.trim() ||
+    getRegisteredEnvText('GITHUB_HEAD_REF')?.trim() ||
+    getRegisteredEnvText('GITHUB_REF_NAME')?.trim() ||
     (() => {
       try {
         return safeExec('git', ['branch', '--show-current'], { cwd: repository }).trim();
@@ -800,7 +800,7 @@ export function generateMissionWorkReconciliationScaffold(input: {
         return '';
       }
     })() ||
-    process.env.GITHUB_SHA?.trim() ||
+    getRegisteredEnvText('GITHUB_SHA')?.trim() ||
     '';
   if (!branch || !commit) throw new Error('Unable to resolve repository branch and commit');
   const tasks = readPlannedTasks(missionId);

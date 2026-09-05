@@ -6,8 +6,13 @@ const SOURCES = [
   ['libs/core/core.ts', /process\.env\.(?:LOG_LEVEL|NODE_ENV|DEBUG)/u],
   ['libs/core/agy-cli-backend.ts', /process\.env\.NODE_ENV/u],
   ['libs/core/memory-promotion-queue.ts', /process\.env\.NODE_ENV/u],
+  ['libs/core/mission-work-reconciliation.ts', /process\.env\.GITHUB_(?:HEAD_REF|REF_NAME|SHA)/u],
   ['scripts/lib/harness.ts', /process\.env\.LOG_LEVEL/u],
   ['scripts/demos/demo_telegram_flow.ts', /process\.env\.MISSION_ROLE/u],
+  [
+    'scripts/generate_avatar.ts',
+    /process\.env\.(?:CODEX_CLI|CODEX_VERSION|TERM_PROGRAM|AGY_CLI|ANTIGRAVITY_CLI)/u,
+  ],
 ] as const;
 
 describe('environment access boundary', () => {

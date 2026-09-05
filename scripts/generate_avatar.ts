@@ -2,6 +2,7 @@ import { generateImage } from '@agent/core/image-generation-bridge';
 import type { ImageGenerationMode } from '@agent/core/image-generation-types';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
@@ -37,9 +38,11 @@ function splitPreference(value: string | boolean | undefined, fallback: string[]
 
 function deriveAutoPreference(requireHostBridge: boolean): string[] {
   const bridgePreference =
-    process.env.CODEX_CLI || process.env.CODEX_VERSION || process.env.TERM_PROGRAM === 'codex'
+    getRegisteredEnvText('CODEX_CLI') ||
+    getRegisteredEnvText('CODEX_VERSION') ||
+    getRegisteredEnvText('TERM_PROGRAM') === 'codex'
       ? ['codex_host_bridge', 'agy_host_bridge', 'host_agent']
-      : process.env.AGY_CLI || process.env.ANTIGRAVITY_CLI
+      : getRegisteredEnvText('AGY_CLI') || getRegisteredEnvText('ANTIGRAVITY_CLI')
         ? ['agy_host_bridge', 'codex_host_bridge', 'host_agent']
         : ['host_agent', 'codex_host_bridge', 'agy_host_bridge'];
   if (requireHostBridge) return bridgePreference;
