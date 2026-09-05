@@ -21107,6 +21107,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: tool-actuator routing policyの設定障害時fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合はfail-closedとした。未知toolに対する通常の `llm_reasoning`／`orchestrator-actuator` fallback routeは仕様として維持し、policy matchと設定障害の区別を明確化した。
 - **検証**: tool-actuator-routing **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1319
+
+- **対象**: `libs/core/voice-sample-ingestion-policy.ts`、`libs/core/voice-sample-ingestion-policy.test.ts`
+- **変更**: voice sample ingestion policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorを返すfail-closed境界へ統一した。sample limits、許可tier、重複path、言語coverage、personal voiceの厳格性は変更していない。
+- **検証**: voice-sample-ingestion-policy **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

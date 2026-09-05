@@ -48,14 +48,14 @@ describe('voice sample ingestion policy', () => {
     expect(policy.sample_limits.min_samples).toBe(1);
   });
 
-  it('falls back when an override fails schema validation', () => {
+  it('fails closed when an override fails schema validation', () => {
     safeMkdir(tmpDir, { recursive: true });
     safeWriteFile(overridePath, JSON.stringify({ version: 'invalid' }));
     process.env.KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH = overridePath;
 
-    const policy = getVoiceSampleIngestionPolicy();
-    expect(policy.version).toBe('fallback');
-    expect(policy.sample_limits.min_samples).toBe(3);
+    expect(() => getVoiceSampleIngestionPolicy()).toThrow(
+      /Invalid catalog voice-sample-ingestion-policy/
+    );
   });
 
   it('rejects policy overrides that traverse a symbolic link', () => {

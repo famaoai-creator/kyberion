@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
@@ -63,23 +62,6 @@ const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/voice-sample-ingestion-policy.schema.json'
 );
 
-const FALLBACK_POLICY: VoiceSampleIngestionPolicy = {
-  version: 'fallback',
-  sample_limits: {
-    min_samples: 3,
-    max_samples: 20,
-    min_sample_bytes: 4096,
-    max_sample_bytes: 25 * 1024 * 1024,
-    allowed_extensions: ['wav', 'aiff', 'mp3', 'ogg', 'm4a', 'flac'],
-  },
-  profile_rules: {
-    allowed_tiers: ['personal', 'confidential'],
-    require_unique_sample_paths: true,
-    require_language_coverage: true,
-    strict_personal_voice_registration: true,
-  },
-};
-
 let cachedPolicyPath: string | null = null;
 let cachedPolicy: VoiceSampleIngestionPolicy | null = null;
 
@@ -94,15 +76,6 @@ const policyCatalog = defineCatalog<VoiceSampleIngestionPolicy>({
   id: 'voice-sample-ingestion-policy',
   path: getPolicyPath,
   schema: POLICY_SCHEMA_PATH,
-  fallback: FALLBACK_POLICY,
-  fallbackOnInvalid: true,
-  onFallback: (error) => {
-    if (!/missing:/u.test(String(error))) {
-      logger.warn(
-        `[VOICE_SAMPLE_INGESTION_POLICY] Failed to load policy at ${getPolicyPath()}: ${String(error)}`
-      );
-    }
-  },
 });
 
 export function _resetVoiceSampleIngestionPolicyCacheForTests(): void {
