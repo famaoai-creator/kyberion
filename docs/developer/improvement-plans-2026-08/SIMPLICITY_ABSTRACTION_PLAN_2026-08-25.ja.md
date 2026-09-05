@@ -20627,6 +20627,18 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: 長寿命surface初期化に残っていた `process.env.MISSION_ROLE ||= 'surface_runtime'` を、登録済み環境の読み取りと `setRegisteredEnv` に置き換えた。既存の明示的なroleを維持し、未設定時だけsurface既定値を設定する挙動は保つ。
 - **検証**: 各 `*.boundary.test.ts` で直接process setterの不在と登録済みsetter利用を固定する。
 
+## 2026-09-05 再レビュー修正 1239
+
+- **対象**: `libs/core/capability-broker.ts`、`libs/core/secret-guard.ts`、`libs/core/mission-lifecycle-service.ts`、`libs/core/reasoning-bootstrap.ts`、`libs/core/trigger-runner.ts`
+- **変更**: core本番コードの `MISSION_ROLE` 読み取りを登録済みenv accessorへ統一した。authority本体のprocess環境境界とテスト用の明示的な環境設定は変更せず、周辺domainがraw process環境へ直接依存しないようにした。
+- **検証**: 各domainの既存テストとfull validateで、role fallback・trigger gate・secret audit・reasoning bootstrapの挙動を確認する。
+
+## 2026-09-05 再レビュー修正 1240
+
+- **対象**: `libs/core/authority.ts`、`libs/core/delegated-task-observability.ts`
+- **変更**: `SYSTEM_ROLE`／`MISSION_ROLE` の読み取りを登録済みenv accessorへ統一した。authorityのscoped setterとテストでの環境操作は、実行コンテキストの互換境界として維持している。
+- **検証**: authority、delegation、role fallback関連テストとfull validateを実行する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

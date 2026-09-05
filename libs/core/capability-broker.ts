@@ -70,7 +70,9 @@ const PROVIDER_PINS_SCHEMA_PATH = pathResolver.rootResolve(
 
 function actorId(): string {
   return (
-    getRegisteredEnvText('KYBERION_PERSONA') || process.env.MISSION_ROLE || 'capability-broker'
+    getRegisteredEnvText('KYBERION_PERSONA') ||
+    getRegisteredEnvText('MISSION_ROLE') ||
+    'capability-broker'
   );
 }
 

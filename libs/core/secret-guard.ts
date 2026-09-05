@@ -13,6 +13,7 @@ import {
 import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { RISKY_OPS } from './risky-op-ids.js';
 import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 
 /**
@@ -373,7 +374,7 @@ export const storeConnectionDocument = (
 
   ledger.record('CONFIG_CHANGE', {
     mission_id: options.missionId || process.env.MISSION_ID || 'None',
-    role: options.actor || process.env.MISSION_ROLE || 'secret_guard',
+    role: options.actor || getRegisteredEnvText('MISSION_ROLE') || 'secret_guard',
     config_target: path.relative(pathResolver.rootDir(), fullPath),
     config_scope: 'connection',
     service_id: serviceId,

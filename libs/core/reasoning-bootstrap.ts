@@ -541,7 +541,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   const brokerSelection = lastBrokerSelection;
   try {
     auditChain.record({
-      agentId: process.env.MISSION_ROLE || 'reasoning-bootstrap',
+      agentId: getRegisteredEnvText('MISSION_ROLE') || 'reasoning-bootstrap',
       action: 'reasoning_runtime_selection',
       operation: `${primaryMode}/${chain[0]!.backend.label || primaryMode}`,
       result: 'completed',

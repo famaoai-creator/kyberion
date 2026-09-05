@@ -11,6 +11,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { clamp, isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
@@ -161,7 +162,7 @@ function resolveGovernedAuthority(authority: TriggerAuthoritySnapshot): TriggerA
       `[POLICY_VIOLATION] Trigger authority level does not match role registry: role=${normalized.authority_role} expected=${governedLevel} received=${normalized.level}`
     );
   }
-  const activeRole = process.env.MISSION_ROLE?.trim() || resolveRole();
+  const activeRole = getRegisteredEnvText('MISSION_ROLE')?.trim() || resolveRole();
   if (activeRole && activeRole !== normalized.authority_role) {
     throw new Error(
       `[POLICY_VIOLATION] Trigger authority is not bound to the active execution role: active=${activeRole} requested=${normalized.authority_role}`
@@ -184,7 +185,7 @@ function resolveGovernedAuthority(authority: TriggerAuthoritySnapshot): TriggerA
  * Throws when no role is bound, because an unattributable trigger must not run.
  */
 export function resolveCurrentTriggerAuthority(tenantSlug?: string): TriggerAuthoritySnapshot {
-  const activeRole = process.env.MISSION_ROLE?.trim() || resolveRole();
+  const activeRole = getRegisteredEnvText('MISSION_ROLE')?.trim() || resolveRole();
   if (!activeRole) {
     throw new Error('[AUTHORITY_UNBOUND] Trigger execution requires an active MISSION_ROLE.');
   }
