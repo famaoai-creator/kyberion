@@ -21005,6 +21005,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: mission-work reconciliation の GitHub branch／commit metadata と avatar generator の provider detection に残っていた直接環境参照を、登録済み `getRegisteredEnvText` へ移行した。GitHub metadataの優先順位、local git fallback、Codex／AGY bridgeの自動選択、既存の安全なartifact path境界は変更していない。
 - **検証**: avatar／mission reconciliation／environment boundary **4 files / 30 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck、foundation adoption check。残る test-only guard、未移行の個別設定、外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1302
+
+- **対象**: `VITEST` の実行ガードを持つ core／script 19モジュール、`libs/core/foundation/env.ts`、関連境界テスト
+- **変更**: `VITEST` の直接環境参照を、テスト用マーカーとして副作用なく判定する共通 `isVitestProcess` へ統一した。テストfixtureがrepository rootを差し替える場合に環境registryを再帰的に読まない境界を明示し、NHI lifecycle fixtureには既存schemaをseedして実行条件を再現した。プロダクションの認証・権限・監査semanticsは変更していない。
+- **検証**: 対象 **14 files / 179 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`、foundation adoption check。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

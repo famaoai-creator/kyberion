@@ -3,7 +3,7 @@ import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
 import { validateService } from '@agent/core/service-validator';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isVitestProcess, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -808,7 +808,7 @@ export async function runBaselineCheck() {
     scheduler_alive: OpsAlertReceipt | null;
     failed_schedules: OpsAlertReceipt | null;
   } = { scheduler_alive: null, failed_schedules: null };
-  if (!process.env.VITEST) {
+  if (!isVitestProcess()) {
     try {
       const marker = readSchedulerOpsAlertDays();
       if (

@@ -17,6 +17,7 @@ import {
 } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 import {
   assertProvenanceShareAllowed,
   combineProvenanceTaint,
@@ -962,7 +963,7 @@ export class ShareGrantGraph {
     try {
       if (this.#auditSink) {
         this.#auditSink(event);
-      } else if (!getRegisteredEnvText('VITEST')) {
+      } else if (!isVitestProcess()) {
         auditChain.record({
           agentId: event.actor,
           action: `share_grant_${event.action}`,
