@@ -22011,3 +22011,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/history-search-index.ts`、`libs/core/history-search-index.test.ts`
 - **変更**: history search の source directory／JSONL file と SQLite database path に operation-time の regular-file／directory 検査を追加した。ファイル名だけが履歴 entry に一致する directory や、directory に置換された検索DBを空結果・既定状態として扱わず、既存の tier isolation／malformed-line skip／local-source rebuild semantics は維持した。
 - **検証**: history-search-index **2 files / 14 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1469
+
+- **対象**: `libs/core/screen-frame-redaction.ts`、`libs/core/screen-frame-redaction.test.ts`
+- **変更**: raw screen capture の read 前に operation-time の regular-file 検査を追加し、directory 等の異常入力を明示拒否するようにした。拒否対象を cleanup で再帰削除せず、入力エラーが cleanup error に置き換わらないよう raw capture cleanup を保護した。通常の redacted output、OCR failure、raw capture cleanup semantics は維持した。
+- **検証**: screen-frame-redaction **2 files / 3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
