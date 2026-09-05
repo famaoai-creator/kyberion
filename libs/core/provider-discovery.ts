@@ -189,8 +189,8 @@ function writeDiskCache(providers: ProviderInfo[]): void {
  *
  * Capabilities are knowledge-driven (knowledge/product/orchestration/provider-capabilities.json)
  * rather than hardcoded, so they can evolve — by hand or by dynamic probing — without code
- * changes. FALLBACK_CATALOG below is the conservative built-in baseline used only when the
- * knowledge file is missing or malformed, so discovery still works offline.
+ * changes. A missing catalog is represented by an explicit empty view; a present but malformed
+ * catalog is rejected so discovery cannot advertise unverified capabilities.
  */
 export interface ProviderCapabilityEntry {
   models: string[];
@@ -207,8 +207,6 @@ interface ProviderCapabilityCatalog {
 }
 
 const CAPABILITY_CATALOG_PATH = 'knowledge/product/orchestration/provider-capabilities.json';
-const FALLBACK_CAPABILITY_CATALOG_PATH =
-  'knowledge/product/orchestration/provider-capabilities.fallback.json';
 const CAPABILITY_CATALOG_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/provider-capabilities.schema.json'
 );
@@ -241,18 +239,15 @@ function isCapabilityEntry(value: unknown): value is ProviderCapabilityEntry {
 }
 
 function readCapabilityCatalog(filePath: string): ProviderCapabilityCatalog | null {
-  try {
-    return capabilityCatalogFor(filePath).load();
-  } catch {
-    /* ignore */
-  }
-  return null;
+  const resolvedPath = pathResolver.rootResolve(filePath);
+  if (!safeExistsSync(resolvedPath)) return null;
+  return capabilityCatalogFor(filePath).load();
 }
 
 function mergeCatalogInto(
   target: Record<string, ProviderCapabilityEntry>,
   source: ProviderCapabilityCatalog | null,
-  fallbackLabel: string
+  sourceLabel: string
 ): void {
   if (!source?.providers || typeof source.providers !== 'object') return;
   for (const [provider, entry] of Object.entries(source.providers)) {
@@ -260,33 +255,28 @@ function mergeCatalogInto(
       target[provider] = entry;
     } else {
       logger.warn(
-        `[PROVIDER_DISCOVERY] capability entry for '${provider}' is malformed in ${fallbackLabel}`
+        `[PROVIDER_DISCOVERY] capability entry for '${provider}' is malformed in ${sourceLabel}`
       );
     }
   }
 }
 
 /**
- * Load the provider capability catalog from knowledge, merged over the built-in fallback.
- * Invalid or missing entries silently fall back so discovery never hard-fails on a bad edit.
+ * Load the provider capability catalog from knowledge.
+ * A missing catalog starts from an explicit empty view; invalid content fails closed instead of
+ * silently substituting an unverified capability baseline.
  */
 export function loadProviderCapabilityCatalog(
   forceRefresh = false
 ): Record<string, ProviderCapabilityEntry> {
   if (!forceRefresh && catalogCache) return catalogCache;
   const merged: Record<string, ProviderCapabilityEntry> = {};
-  mergeCatalogInto(
-    merged,
-    readCapabilityCatalog(FALLBACK_CAPABILITY_CATALOG_PATH),
-    FALLBACK_CAPABILITY_CATALOG_PATH
-  );
-
   const primary = readCapabilityCatalog(CAPABILITY_CATALOG_PATH);
   if (primary) {
     mergeCatalogInto(merged, primary, CAPABILITY_CATALOG_PATH);
   } else {
     logger.info(
-      '[PROVIDER_DISCOVERY] provider-capabilities.json unavailable — using built-in capability fallback catalog'
+      '[PROVIDER_DISCOVERY] provider-capabilities.json unavailable — using an explicit empty capability catalog'
     );
   }
   catalogCache = merged;
@@ -332,12 +322,12 @@ export function mergeProbedCapabilitiesIntoCatalog(
   const timestamp = opts.timestamp || nowIso();
   const updatedBy = opts.updatedBy || 'probe';
 
-  // Read the raw on-disk catalog (NOT merged with fallback) so we preserve its exact structure.
+  // Read the raw on-disk catalog so we preserve its exact structure. A present malformed catalog
+  // is rejected rather than being replaced by an empty write target.
   let catalog: ProviderCapabilityCatalog = { version: '1.0', providers: {} };
-  try {
+  const filePath = pathResolver.rootResolve(CAPABILITY_CATALOG_PATH);
+  if (safeExistsSync(filePath)) {
     catalog = capabilityCatalogFor(CAPABILITY_CATALOG_PATH).load();
-  } catch {
-    /* start from an empty catalog */
   }
 
   for (const [provider, entry] of Object.entries(probed)) {
@@ -375,7 +365,6 @@ export function mergeProbedCapabilitiesIntoCatalog(
     ...(opts.note ? { note: opts.note } : {}),
   };
 
-  const filePath = pathResolver.rootResolve(CAPABILITY_CATALOG_PATH);
   const validatedCatalog = capabilityCatalogFor(CAPABILITY_CATALOG_PATH).validate(
     catalog,
     filePath

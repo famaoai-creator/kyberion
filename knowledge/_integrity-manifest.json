@@ -4111,12 +4111,6 @@
       "type": "md"
     },
     {
-      "path": "product/orchestration/provider-capabilities.fallback.json",
-      "tier": "public",
-      "size": 12981,
-      "type": "json"
-    },
-    {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
       "size": 15648,

@@ -85,9 +85,6 @@ vi.mock('./path-resolver.js', () => ({
 }));
 
 const CATALOG_PATH = '/repo/knowledge/product/orchestration/provider-capabilities.json';
-const FALLBACK_CATALOG_PATH =
-  '/repo/knowledge/product/orchestration/provider-capabilities.fallback.json';
-
 function claudeInstalled() {
   mocks.spawnSync.mockImplementation((cmd: string, args: string[]) => {
     if (cmd === 'which' && args[0] === 'claude')
@@ -96,9 +93,7 @@ function claudeInstalled() {
       return { status: 0, stdout: 'claude 1.0.0', stderr: '' };
     return { status: 1, stdout: '', stderr: '' };
   });
-  mocks.safeExistsSync.mockImplementation(
-    (filePath: string) => filePath === CATALOG_PATH || filePath === FALLBACK_CATALOG_PATH
-  );
+  mocks.safeExistsSync.mockImplementation((filePath: string) => filePath === CATALOG_PATH);
   mocks.safeWriteFile.mockReturnValue(undefined);
   mocks.safeMkdir.mockReturnValue(undefined);
   mocks.safeUnlinkSync.mockReturnValue(undefined);
@@ -126,50 +121,6 @@ describe('provider capability catalog (knowledge-driven)', () => {
           },
         });
       }
-      if (p === FALLBACK_CATALOG_PATH) {
-        return JSON.stringify({
-          version: '1.0',
-          providers: {
-            claude: {
-              models: ['sonnet', 'opus', 'haiku'],
-              capabilities: [
-                'reasoning',
-                'planning',
-                'coordination',
-                'analysis',
-                'review',
-                'code',
-                'long_context',
-                'structured_json',
-              ],
-              modelCapabilities: {
-                sonnet: [
-                  'reasoning',
-                  'planning',
-                  'coordination',
-                  'analysis',
-                  'review',
-                  'code',
-                  'long_context',
-                  'structured_json',
-                ],
-                opus: [
-                  'reasoning',
-                  'planning',
-                  'coordination',
-                  'analysis',
-                  'review',
-                  'code',
-                  'long_context',
-                  'structured_json',
-                  'deep_reasoning',
-                ],
-                haiku: ['conversation', 'summarization', 'low_latency', 'structured_json'],
-              },
-            },
-          },
-        });
-      }
       throw new Error('ENOENT'); // disk cache miss
     });
 
@@ -180,65 +131,18 @@ describe('provider capability catalog (knowledge-driven)', () => {
     expect(claude?.modelCapabilities?.opus).toContain('deep_reasoning');
   });
 
-  it('falls back to the built-in baseline when the catalog is malformed', async () => {
+  it('fails closed when the present catalog is malformed', async () => {
     claudeInstalled();
     mocks.safeReadFile.mockImplementation((p: string) => {
       if (p === CATALOG_PATH) return '{ this is not json';
-      if (p === FALLBACK_CATALOG_PATH) {
-        return JSON.stringify({
-          version: '1.0',
-          providers: {
-            claude: {
-              models: ['sonnet', 'opus', 'haiku'],
-              capabilities: [
-                'reasoning',
-                'planning',
-                'coordination',
-                'analysis',
-                'review',
-                'code',
-                'long_context',
-                'structured_json',
-              ],
-              modelCapabilities: {
-                sonnet: [
-                  'reasoning',
-                  'planning',
-                  'coordination',
-                  'analysis',
-                  'review',
-                  'code',
-                  'long_context',
-                  'structured_json',
-                ],
-                opus: [
-                  'reasoning',
-                  'planning',
-                  'coordination',
-                  'analysis',
-                  'review',
-                  'code',
-                  'long_context',
-                  'structured_json',
-                  'deep_reasoning',
-                ],
-                haiku: ['conversation', 'summarization', 'low_latency', 'structured_json'],
-              },
-            },
-          },
-        });
-      }
       throw new Error('ENOENT');
     });
 
     const { discoverProviders } = await import('./provider-discovery.js');
-    const claude = discoverProviders(true).find((p) => p.provider === 'claude');
-    // built-in baseline ships sonnet/opus/haiku and the reasoning capability
-    expect(claude?.capabilities).toContain('reasoning');
-    expect(claude?.models).toContain('sonnet');
+    expect(() => discoverProviders(true)).toThrow();
   });
 
-  it('keeps the built-in baseline for a provider entry that is malformed', async () => {
+  it('fails closed when a provider entry is malformed', async () => {
     claudeInstalled();
     mocks.safeReadFile.mockImplementation((p: string) => {
       if (p === CATALOG_PATH) {
@@ -247,56 +151,10 @@ describe('provider capability catalog (knowledge-driven)', () => {
           providers: { claude: { models: 'not-an-array' } },
         });
       }
-      if (p === FALLBACK_CATALOG_PATH) {
-        return JSON.stringify({
-          version: '1.0',
-          providers: {
-            claude: {
-              models: ['sonnet', 'opus', 'haiku'],
-              capabilities: [
-                'reasoning',
-                'planning',
-                'coordination',
-                'analysis',
-                'review',
-                'code',
-                'long_context',
-                'structured_json',
-              ],
-              modelCapabilities: {
-                sonnet: [
-                  'reasoning',
-                  'planning',
-                  'coordination',
-                  'analysis',
-                  'review',
-                  'code',
-                  'long_context',
-                  'structured_json',
-                ],
-                opus: [
-                  'reasoning',
-                  'planning',
-                  'coordination',
-                  'analysis',
-                  'review',
-                  'code',
-                  'long_context',
-                  'structured_json',
-                  'deep_reasoning',
-                ],
-                haiku: ['conversation', 'summarization', 'low_latency', 'structured_json'],
-              },
-            },
-          },
-        });
-      }
       throw new Error('ENOENT');
     });
 
     const { discoverProviders } = await import('./provider-discovery.js');
-    const claude = discoverProviders(true).find((p) => p.provider === 'claude');
-    expect(Array.isArray(claude?.models)).toBe(true);
-    expect(claude?.models).toContain('sonnet');
+    expect(() => discoverProviders(true)).toThrow();
   });
 });
