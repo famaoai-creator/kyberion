@@ -45,6 +45,16 @@ describe('agent collaboration events (AC-02)', () => {
     expect(redacted.thread).toBeUndefined();
   });
 
+  it('keeps approval correlation keys through shared metadata redaction (AC-04)', () => {
+    const redacted = redactCollaborationMetadata({
+      request_id: 'REQ-1',
+      channel: 'slack',
+      status: 'pending',
+    });
+
+    expect(redacted).toMatchObject({ request_id: 'REQ-1', channel: 'slack', status: 'pending' });
+  });
+
   it('constructs a collaboration event carrying the new a2a and delegation fields', () => {
     const event = createAgentCollaborationEvent({
       source_event_id: 'a2a-1',
@@ -63,6 +73,9 @@ describe('agent collaboration events (AC-02)', () => {
       team_role: 'implementer',
       instruction_summary: 'implement AC-02 edges',
       elapsed_ms: 4210,
+      // AC-04 lift: approval request/response correlation.
+      request_id: 'REQ-1',
+      channel: 'slack',
     });
 
     expect(event).toMatchObject({
@@ -74,6 +87,8 @@ describe('agent collaboration events (AC-02)', () => {
       team_role: 'implementer',
       instruction_summary: 'implement AC-02 edges',
       elapsed_ms: 4210,
+      request_id: 'REQ-1',
+      channel: 'slack',
     });
   });
 });

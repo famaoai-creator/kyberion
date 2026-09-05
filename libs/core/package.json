@@ -171,6 +171,10 @@
       "types": "./dist/agent-collaboration-projection.d.ts",
       "default": "./dist/agent-collaboration-projection.js"
     },
+    "./agent-collaboration-tree": {
+      "types": "./dist/agent-collaboration-tree.d.ts",
+      "default": "./dist/agent-collaboration-tree.js"
+    },
     "./a2ui": {
       "types": "./dist/a2ui.d.ts",
       "default": "./dist/a2ui.js"
