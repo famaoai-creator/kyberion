@@ -1024,3 +1024,9 @@ doctor CLIのmission scoped manifest／hint解決に残っていた `MISSION_ID`
 pipeline executionのapproval escalation／output artifact mission attributionに残っていた `MISSION_ID` の環境直読5箇所を、既存の `registeredEnv` helper へ統一した。approval request／escalationのmission binding、output offloadのshared fallback、既存のpipeline execution semanticsは変更していない。
 
 検証: pipeline execution **2 files / 72 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 102
+
+pipeline resultsのexecute／resume／context mission解決に残っていた `MISSION_ID` の環境直読3箇所を、登録済み `getRegisteredEnvText` へ統一した。明示context優先、resume journalのmission binding、未指定時の環境設定、副作用、pipeline result／trace semanticsは変更していない。
+
+検証: pipeline results **2 files / 72 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
