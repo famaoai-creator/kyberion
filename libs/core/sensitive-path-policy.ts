@@ -20,7 +20,7 @@ export interface SensitivePathMatch {
 }
 
 function homeRoot(): string {
-  return path.resolve(process.env.HOME?.trim() || os.homedir());
+  return path.resolve(getRegisteredEnvText('HOME')?.trim() || os.homedir());
 }
 
 function projectRoot(): string {
