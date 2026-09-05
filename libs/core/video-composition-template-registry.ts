@@ -1,4 +1,3 @@
-import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
@@ -16,22 +15,6 @@ const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/video-composition-template-registry.schema.json'
 );
 
-const FALLBACK_REGISTRY: VideoCompositionTemplateRegistry = {
-  version: 'fallback',
-  default_template_id: 'basic-title-card',
-  templates: [
-    {
-      template_id: 'basic-title-card',
-      display_name: 'Basic Title Card',
-      status: 'active',
-      renderer: 'builtin_html',
-      supported_roles: ['hook', 'generic', 'cta'],
-      required_content_fields: ['headline'],
-      supported_output_formats: ['mp4', 'mov', 'webm'],
-    },
-  ],
-};
-
 let cachedRegistryPath: string | null = null;
 let cachedRegistry: VideoCompositionTemplateRegistry | null = null;
 
@@ -47,15 +30,6 @@ const registryCatalog = defineCatalog<VideoCompositionTemplateRegistry>({
   id: 'video-composition-template-registry',
   path: getRegistryPath,
   schema: REGISTRY_SCHEMA_PATH,
-  fallback: FALLBACK_REGISTRY,
-  fallbackOnInvalid: true,
-  onFallback: (error) => {
-    if (!/missing:/u.test(String(error))) {
-      logger.warn(
-        `[VIDEO_TEMPLATE_REGISTRY] Failed to load registry at ${getRegistryPath()}: ${String(error)}`
-      );
-    }
-  },
 });
 
 export function _resetVideoCompositionTemplateRegistryCacheForTests(): void {
@@ -88,6 +62,6 @@ export function getVideoCompositionTemplateRecord(
   return (
     registry.templates.find((template) => template.template_id === resolvedTemplateId) ||
     registry.templates.find((template) => template.template_id === registry.default_template_id) ||
-    FALLBACK_REGISTRY.templates[0]
+    registry.templates[0]
   );
 }
