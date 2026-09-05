@@ -248,6 +248,7 @@ describe('resolveTenant (DA-01 spine)', () => {
     }
     expect(message).toMatch(/could not be read/);
     expect(message).not.toMatch(/not valid JSON/);
+    expect(message).toMatch(/regular file/);
     // The hint is keyed off the personal-tier location, not the error text.
     expect(message).toMatch(/KYBERION_PERSONA/);
   });
