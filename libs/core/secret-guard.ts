@@ -310,7 +310,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
     return upstream;
   }
 
-  let value = process.env[key];
+  let value = getRegisteredEnvText(key);
   if (!value) value = _cachedPersonalSecrets.get(key);
   if (!value) {
     try {
