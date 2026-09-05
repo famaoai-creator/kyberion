@@ -22269,3 +22269,21 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_catalog_integrity.ts`、`scripts/check_catalog_integrity.loader.contract.test.ts`
 - **変更**: catalog integrity checker の source／CSS／Markdown／CI manifest本文読込7箇所を foundation の `readTextFile` へ統一した。catalog JSONは既存の `readSafeJsonFile` に委ね、schema compilation、catalog／theme／vocabulary／capabilities guide drift判定、source inventory semanticsは変更せず、loader contractで旧 `safeReadFile` 直読の不在を固定した。
 - **検証**: catalog-integrity **既存テスト＋loader contract passed**、対象ESLint、Prettier、`git diff --check`。共有worktree由来のcatalog driftと残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1512
+
+- **対象**: `scripts/check_documentation_source_map.ts`、`scripts/check_documentation_source_map.test.ts`
+- **変更**: documentation source map checker の参照文書本文読込を foundation の `readTextFile` へ移行した。source-map catalog／category／scope／entrypoint検証と違反報告は変更せず、既存テストにreader contractを追加した。
+- **検証**: documentation-source-map **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1513
+
+- **対象**: `scripts/check_first_win_docs.ts`、`scripts/check_first_win_docs.test.ts`
+- **変更**: first-win documentation checker のREADME／entry document本文読込を foundation の `readTextFile` へ移行した。5 command contract、fence balance、entrypoint ordering、shared CLI semanticsは変更せず、既存テストにreader contractを追加した。
+- **検証**: first-win-docs **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1514
+
+- **対象**: `scripts/check_mission_gate_docs.ts`、`scripts/check_mission_gate_docs.test.ts`
+- **変更**: mission-gate documentation checker の対象Markdown本文読込を foundation の `readTextFile` へ移行した。scan root／historical exclusion、retired wording検出、violation line reporting、shared CLI semanticsは変更せず、既存テストにreader contractを追加した。
+- **検証**: mission-gate-docs **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
