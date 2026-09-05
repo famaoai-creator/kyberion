@@ -52,12 +52,19 @@ export type ClientCollaborationProjection = {
     task_id?: string;
     agent_id?: string;
     kind: string;
+    code: ClientCollaborationAttentionCode;
     title: string;
     reason: string;
     next_action: string;
   }>;
   tree: ClientCollaborationTree;
 };
+
+// AC-09: mirrors `@agent/core/agent-collaboration-projection`'s
+// `CollaborationAttentionCode`. The surface translates from `code`, not the
+// developer-facing English `title` / `next_action` core sends alongside it.
+export type ClientCollaborationAttentionCode =
+  'blocked' | 'waiting_human' | 'review_pending' | 'failure';
 
 // AC-06: mirrors `@agent/core/agent-collaboration-tree`'s `CollaborationTree`.
 // Re-declared (not imported) so this file keeps validating every field it
@@ -105,6 +112,7 @@ export type ClientCollaborationTree = {
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const STATUS_FLAGS = new Set(['sequence_gap', 'unknown_event', 'stale_runtime']);
 const EFFORTS = new Set(['low', 'medium', 'high', 'ultra']);
+const ATTENTION_CODES = new Set(['blocked', 'waiting_human', 'review_pending', 'failure']);
 const WAIT_REASONS = new Set([
   'approval_pending',
   'child_running',
@@ -221,6 +229,8 @@ function parseAttention(
     !isRecord(value) ||
     !nonEmptyString(value.event_id) ||
     !nonEmptyString(value.kind) ||
+    typeof value.code !== 'string' ||
+    !ATTENTION_CODES.has(value.code) ||
     !nonEmptyString(value.title) ||
     !nonEmptyString(value.reason) ||
     !nonEmptyString(value.next_action) ||
@@ -236,6 +246,7 @@ function parseAttention(
     ...(value.task_id !== undefined ? { task_id: value.task_id } : {}),
     ...(value.agent_id !== undefined ? { agent_id: value.agent_id } : {}),
     kind: value.kind,
+    code: value.code as ClientCollaborationAttentionCode,
     title: value.title,
     reason: value.reason,
     next_action: value.next_action,

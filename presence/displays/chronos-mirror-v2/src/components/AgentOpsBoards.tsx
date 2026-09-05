@@ -5,10 +5,35 @@ import { AgentCollaborationBoard } from './AgentCollaborationBoard';
 import { ChronosOffice } from './ChronosOffice';
 import { LiveTerminalDrawer } from './LiveTerminalDrawer';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText } from '../lib/ux-vocabulary';
+import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import { parseAgentActivityBoardResponse } from '../lib/agent-activity-response';
 
+// AC-09: mirrors `@agent/core/agent-activity-board`'s `UNASSIGNED_AGENT_ID`.
+// Re-declared, not imported: `agent-activity-board.ts` pulls in server-only
+// modules (work-coordination, mission-state, …) that a client component
+// bundle cannot resolve — the same reason `collaboration-response.ts`
+// re-declares its core types instead of importing them.
+const UNASSIGNED_AGENT_ID = 'unassigned';
+
 type Blocker = { kind: string; reason: string };
+
+// AC-09: `blocker.reason` on the wire is developer-facing English — the
+// board renders from `kind` through this vocabulary instead.
+const BLOCKER_LABEL_KEY: Record<string, string> = {
+  blocked: 'chronos_blocker_blocked',
+  dependency: 'chronos_blocker_dependency',
+  review_wait: 'chronos_blocker_review_wait',
+  unassigned: 'chronos_blocker_unassigned',
+};
+
+function blockerLabel(blocker: Blocker, locale: SupportedLocale): string {
+  const key = BLOCKER_LABEL_KEY[blocker.kind];
+  return key ? uxText(key, locale) : blocker.reason;
+}
+
+function agentIdLabel(agentId: string, locale: SupportedLocale): string {
+  return agentId === UNASSIGNED_AGENT_ID ? uxText('chronos_agent_unassigned', locale) : agentId;
+}
 type Entry = {
   agent_id: string;
   team_role?: string;
@@ -233,7 +258,9 @@ export function AgentOpsBoards({
             key={agent.agent_id}
             className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px]"
           >
-            <span className="font-bold kb-text-primary">{agent.agent_id}</span>
+            <span className="font-bold kb-text-primary">
+              {agentIdLabel(agent.agent_id, locale)}
+            </span>
             <span className="ml-2 kb-text-accent">稼働 {agent.active}</span>
             <span className="ml-2 kb-status-warning">
               {uxText('chronos_blocked_count', locale)} {agent.blocked}
@@ -258,7 +285,9 @@ export function AgentOpsBoards({
             className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px]"
           >
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold kb-text-primary">{entry.agent_id}</span>
+              <span className="font-bold kb-text-primary">
+                {agentIdLabel(entry.agent_id, locale)}
+              </span>
               {entry.team_role ? (
                 <span className="rounded-full border kb-border-subtle px-2 text-[10px] kb-text-muted">
                   {entry.team_role}
@@ -301,12 +330,12 @@ export function AgentOpsBoards({
                         : 'kb-status-warning-surface kb-status-warning'
                     }`}
                   >
-                    🚧 {blocker.reason}
+                    🚧 {blockerLabel(blocker, locale)}
                   </span>
                 ))}
               </div>
             ) : null}
-            {entry.agent_id !== '(未割当)' ? (
+            {entry.agent_id !== UNASSIGNED_AGENT_ID ? (
               <button
                 type="button"
                 onClick={() =>

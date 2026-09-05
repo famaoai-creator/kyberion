@@ -135,11 +135,41 @@ describe('coordinationViewModel', () => {
       runtimes: null,
       providerLines: [],
       outboxLines: [],
-      attentionLines: [],
+      attention: [],
     };
     const vm = coordinationViewModel(data, ja);
     expect(vm.rows).toEqual([]);
     expect(vm.sections?.[0]?.lines[0]).toContain('スーパーバイザーデーモン停止中');
+  });
+
+  it('translates attention items by code and attaches next-action to the matching runtime row (AC-09)', () => {
+    const data: CoordinationData = {
+      runtimes: [
+        { agent_id: 'agent-a', provider: 'claude-cli', status: 'running' },
+      ] as CoordinationData['runtimes'],
+      providerLines: [],
+      outboxLines: [],
+      attention: [
+        {
+          event_id: 'event-1',
+          mission_id: 'MSN-1',
+          agent_id: 'agent-a',
+          kind: 'blocked',
+          code: 'blocked',
+          title: 'blocked',
+          reason: 'work item is blocked',
+          next_action: 'resolve the block',
+        },
+      ],
+    };
+    const vm = coordinationViewModel(data, ja);
+    const label = ja.tr('tui:tui_attention_blocked');
+    const attentionSection = vm.sections?.find((section) => section.lines[0]?.includes(label));
+    expect(attentionSection?.lines[0]).toBe(
+      `${label} · work item is blocked (mission=MSN-1 agent=agent-a)`
+    );
+    const detail = vm.rows?.[0]?.detail;
+    expect(detail?.[0]?.value).toContain(ja.tr('tui:tui_attention_next_blocked'));
   });
 });
 
@@ -241,6 +271,7 @@ describe('agentGraphViewModel', () => {
       events: [],
       statusFlags: [],
       truncatedSources: [],
+      peerTranscripts: [],
     };
     const vm = agentGraphViewModel(data, ja);
     expect(vm.rows?.map((row) => row.id)).toEqual([
@@ -262,6 +293,7 @@ describe('agentGraphViewModel', () => {
       events: [],
       statusFlags: [],
       truncatedSources: [],
+      peerTranscripts: [],
     };
     const vm = agentGraphViewModel(data, ja);
     const parentRow = vm.rows?.find((row) => row.id === 'agent:A1');
@@ -279,6 +311,7 @@ describe('agentGraphViewModel', () => {
       events: [],
       statusFlags: ['bounded_read'],
       truncatedSources: ['worker-events-2026-09-04.jsonl'],
+      peerTranscripts: [],
     };
     const vm = agentGraphViewModel(data, ja);
     const boundedLine = vm.sections
@@ -307,9 +340,91 @@ describe('agentGraphViewModel', () => {
       events: [],
       statusFlags: [],
       truncatedSources: [],
+      peerTranscripts: [],
     };
     const vm = agentGraphViewModel(data, ja);
     expect(vm.rows).toEqual([]);
     expect(vm.sections?.[0]?.lines).toEqual(['待ちはありません']);
+  });
+
+  it('translates activity-board blockers and the unassigned sentinel in node detail (AC-09)', () => {
+    const data: AgentGraphData = {
+      tree: fixtureTree(),
+      events: [],
+      statusFlags: [],
+      truncatedSources: [],
+      peerTranscripts: [],
+      activityBoard: {
+        generated_at: '2026-09-06T00:00:00.000Z',
+        entries: [
+          {
+            agent_id: 'unassigned',
+            item_id: 'witem-1',
+            task_id: 'T1',
+            title: 'Do work',
+            status: 'backlog',
+            blockers: [
+              {
+                kind: 'dependency',
+                reason: 'Waiting on unfinished dependency tasks',
+                dependency_ids: ['T0'],
+              },
+              { kind: 'unassigned', reason: 'No agent is assigned to this work item' },
+            ],
+            updated_at: '2026-09-06T00:00:00.000Z',
+          },
+        ],
+        agents: [],
+      },
+    };
+    const vm = agentGraphViewModel(data, ja);
+    const taskRow = vm.rows?.find((row) => row.id === 'task:T1');
+    const blockerValues = taskRow?.detail
+      ?.filter((line) => line.label === 'blocker')
+      .map((l) => l.value);
+    expect(blockerValues).toEqual([
+      ja.tr('tui:tui_blocker_dependency', { ids: 'T0' }),
+      ja.tr('tui:tui_blocker_unassigned'),
+    ]);
+    const agentLine = taskRow?.detail?.find((line) => line.label === 'agent');
+    expect(agentLine?.value).toBe(ja.tr('tui:tui_agent_unassigned'));
+  });
+
+  it('appends peer transcript tail lines to a matching agent node (AC-11)', () => {
+    const data: AgentGraphData = {
+      tree: fixtureTree(),
+      events: [],
+      statusFlags: [],
+      truncatedSources: [],
+      peerTranscripts: [
+        {
+          peer_id: 'Claude',
+          remote_peer_id: 'peer-remote',
+          session_id: 'sess-1',
+          status: 'open',
+          updated_at: '2026-09-06T00:00:10.000Z',
+          lines: [
+            {
+              at: '2026-09-06T00:03:00.000Z',
+              direction: 'outbound',
+              sender_peer_id: 'Claude',
+              text: 'hello',
+            },
+            {
+              at: '2026-09-06T00:07:00.000Z',
+              direction: 'inbound',
+              sender_peer_id: 'peer-remote',
+              text: 'hi back',
+            },
+          ],
+        },
+      ],
+    };
+    const vm = agentGraphViewModel(data, ja);
+    const agentRow = vm.rows?.find((row) => row.id === 'agent:A1');
+    const peerLines = agentRow?.detail
+      ?.filter((line) => line.label === 'ピア会話')
+      .map((l) => l.value);
+    expect(peerLines).toEqual(['00:07 ← peer-remote: hi back', '00:03 → Claude: hello']);
   });
 });

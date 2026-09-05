@@ -5,6 +5,7 @@ import { useChronosLocale } from '../lib/hooks';
 import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
 import {
   parseCollaborationResponse,
+  type ClientCollaborationAttentionCode,
   type ClientCollaborationProjection,
   type ClientCollaborationTree,
   type ClientCollaborationTreeNode,
@@ -81,6 +82,36 @@ const KIND_LABEL_KEY: Record<string, string> = {
 export function collaborationKindLabel(kind: string, locale: SupportedLocale): string {
   const key = KIND_LABEL_KEY[kind];
   return key ? uxText(key, locale) : kind;
+}
+
+// AC-09: `title` / `next_action` on the wire are developer-facing English —
+// the board renders from `code` through this vocabulary instead.
+const ATTENTION_TITLE_KEY: Record<ClientCollaborationAttentionCode, string> = {
+  blocked: 'chronos_ac_attention_blocked',
+  waiting_human: 'chronos_ac_attention_waiting_human',
+  review_pending: 'chronos_ac_attention_review_pending',
+  failure: 'chronos_ac_attention_failure',
+};
+
+const ATTENTION_NEXT_KEY: Record<ClientCollaborationAttentionCode, string> = {
+  blocked: 'chronos_ac_attention_next_blocked',
+  waiting_human: 'chronos_ac_attention_next_waiting_human',
+  review_pending: 'chronos_ac_attention_next_review_pending',
+  failure: 'chronos_ac_attention_next_failure',
+};
+
+export function collaborationAttentionTitle(
+  code: ClientCollaborationAttentionCode,
+  locale: SupportedLocale
+): string {
+  return uxText(ATTENTION_TITLE_KEY[code], locale);
+}
+
+export function collaborationAttentionNextAction(
+  code: ClientCollaborationAttentionCode,
+  locale: SupportedLocale
+): string {
+  return uxText(ATTENTION_NEXT_KEY[code], locale);
 }
 
 const ACTION_LABEL_KEY: Record<string, string> = {
@@ -517,7 +548,9 @@ export function AgentCollaborationBoard({
                   return (
                     <>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold kb-status-warning">{item.title}</span>
+                        <span className="font-semibold kb-status-warning">
+                          {collaborationAttentionTitle(item.code, locale)}
+                        </span>
                         <span className="rounded-full border kb-border-subtle px-2 text-[9px] kb-text-muted">
                           {collaborationKindLabel(item.kind, locale)}
                         </span>
@@ -529,7 +562,8 @@ export function AgentCollaborationBoard({
                         {uxText('chronos_ac_reason', locale)}: {item.reason}
                       </div>
                       <div className="mt-1 kb-text-accent">
-                        {uxText('chronos_ac_next', locale)}: {item.next_action}
+                        {uxText('chronos_ac_next', locale)}:{' '}
+                        {collaborationAttentionNextAction(item.code, locale)}
                       </div>
                       {event?.causation_id || evidenceRefs.length > 0 ? (
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] kb-text-muted">

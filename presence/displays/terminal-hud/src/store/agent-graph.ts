@@ -1,5 +1,10 @@
 import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
-import { buildAgentActivityBoard, type AgentActivityBoard } from '@agent/core/agent-activity-board';
+import {
+  buildAgentActivityBoard,
+  UNASSIGNED_AGENT_ID,
+  type AgentActivityBoard,
+  type AgentActivityBlocker,
+} from '@agent/core/agent-activity-board';
 import {
   composeCollaborationTree,
   flattenCollaborationTree,
@@ -8,6 +13,8 @@ import {
   type CollaborationWaitReason,
 } from '@agent/core/agent-collaboration-tree';
 import type { AgentCollaborationEvent } from '@agent/core/agent-collaboration-events';
+import { collectPeerTranscriptTails, type PeerTranscriptTail } from '@agent/core/peer-conversation';
+import { currentScope } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { statusColor, theme } from '../theme.js';
 import type { I18n } from '../i18n.js';
@@ -21,6 +28,12 @@ export interface AgentGraphData {
   events: AgentCollaborationEvent[];
   statusFlags: string[];
   truncatedSources: string[];
+  /** AC-09: entries carry `blockers` (kind + reason) the tree's `waiting_on`
+   * abstraction already folds into a `CollaborationWaitReason`; kept here too
+   * so the node detail can show the raw blocker kind, translated. */
+  activityBoard?: AgentActivityBoard;
+  /** AC-11: latest lines per peer, when the tenant scope is known. */
+  peerTranscripts: PeerTranscriptTail[];
 }
 
 // Both the agent-graph panel (5s poll) and the operator cockpit (15s poll,
@@ -46,11 +59,22 @@ async function loadAgentGraphUncached(): Promise<AgentGraphData> {
     activityBoard = undefined;
   }
   const tree = composeCollaborationTree(projection, { activityBoard });
+  // AC-11: peer conversations are tenant-scoped; an unscoped operator run has
+  // no tenant to look up and simply shows no peer transcripts.
+  let peerTranscripts: PeerTranscriptTail[] = [];
+  try {
+    const tenant = currentScope().tenant_slug;
+    if (tenant) peerTranscripts = collectPeerTranscriptTails(tenant, { maxPerPeer: 5 });
+  } catch {
+    peerTranscripts = [];
+  }
   return {
     tree,
     events: projection.events,
     statusFlags: projection.status_flags,
     truncatedSources: projection.truncated_sources,
+    activityBoard,
+    peerTranscripts,
   };
 }
 
@@ -140,6 +164,84 @@ function bareId(id: string): string {
   return id.slice(id.indexOf(':') + 1);
 }
 
+const BLOCKER_LABEL_KEYS: Record<AgentActivityBlocker['kind'], VocabularyKey> = {
+  blocked: 'tui:tui_blocker_blocked',
+  dependency: 'tui:tui_blocker_dependency',
+  review_wait: 'tui:tui_blocker_review_wait',
+  unassigned: 'tui:tui_blocker_unassigned',
+};
+
+function blockerLabel(blocker: AgentActivityBlocker, i18n: I18n): string {
+  if (blocker.kind === 'dependency') {
+    return i18n.tr('tui:tui_blocker_dependency', {
+      ids: (blocker.dependency_ids ?? []).join(', '),
+    });
+  }
+  return i18n.tr(BLOCKER_LABEL_KEYS[blocker.kind]);
+}
+
+/**
+ * AC-09: `node.waiting_on` already folds an activity-board blocker into a
+ * closed `CollaborationWaitReason`; this renders the underlying blocker
+ * `kind` (and, for `unassigned`, the assignee) directly so the
+ * `tui_blocker_<kind>` / `tui_agent_unassigned` vocabulary is exercised too.
+ */
+function activityDetailLines(
+  node: CollaborationTreeNode,
+  activityBoard: AgentActivityBoard | undefined,
+  i18n: I18n
+): DetailLine[] {
+  if (!activityBoard) return [];
+  const bare = bareId(node.id);
+  const matches = activityBoard.entries.filter((entry) => {
+    if (node.type === 'agent') return entry.agent_id === bare;
+    if (node.type === 'task') return entry.task_id === bare;
+    return entry.mission_id === bare;
+  });
+  const lines: DetailLine[] = [];
+  for (const entry of matches) {
+    if (entry.agent_id === UNASSIGNED_AGENT_ID) {
+      lines.push({ label: 'agent', value: i18n.tr('tui:tui_agent_unassigned') });
+    }
+    for (const blocker of entry.blockers) {
+      lines.push({ label: 'blocker', value: blockerLabel(blocker, i18n) });
+    }
+  }
+  return lines;
+}
+
+/** `text` truncated to `maxLength` with an ellipsis marker when it overflows. */
+function truncatePeerText(text: string, maxLength: number): string {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+}
+
+/**
+ * AC-11: an agent node whose label is a local or remote peer id gets the
+ * tail of that peer's most recent conversation appended to its detail.
+ */
+function peerTranscriptDetailLines(
+  node: CollaborationTreeNode,
+  peerTranscripts: PeerTranscriptTail[],
+  i18n: I18n
+): DetailLine[] {
+  if (node.type !== 'agent') return [];
+  const tails = peerTranscripts.filter(
+    (tail) => tail.peer_id === node.label || tail.remote_peer_id === node.label
+  );
+  const lines: DetailLine[] = [];
+  for (const tail of tails) {
+    for (const line of [...tail.lines].reverse()) {
+      const glyph = line.direction === 'inbound' ? '←' : '→';
+      const at = line.at.length >= 16 ? line.at.slice(11, 16) : line.at;
+      lines.push({
+        label: i18n.tr('tui:tui_agents_peer_line'),
+        value: `${at} ${glyph} ${line.sender_peer_id}: ${truncatePeerText(line.text, 120)}`,
+      });
+    }
+  }
+  return lines;
+}
+
 function eventMatchesNode(event: AgentCollaborationEvent, node: CollaborationTreeNode): boolean {
   const id = bareId(node.id);
   if (node.type === 'mission') return event.mission_id === id;
@@ -161,6 +263,8 @@ function eventsDetailLines(
 function nodeDetail(
   node: CollaborationTreeNode,
   events: AgentCollaborationEvent[],
+  activityBoard: AgentActivityBoard | undefined,
+  peerTranscripts: PeerTranscriptTail[],
   i18n: I18n
 ): DetailLine[] {
   const lines: DetailLine[] = [
@@ -181,6 +285,8 @@ function nodeDetail(
       value: `→ ${shortTargetLabel(handoff.to_agent_id)}${performative} at ${handoff.at}`,
     });
   }
+  lines.push(...activityDetailLines(node, activityBoard, i18n));
+  lines.push(...peerTranscriptDetailLines(node, peerTranscripts, i18n));
   lines.push(...eventsDetailLines(events, node));
   return lines;
 }
@@ -218,7 +324,7 @@ export function agentGraphViewModel(data: AgentGraphData, i18n: I18n): PanelView
         formatElapsedDuration(node.elapsed_ms),
         providerRoleCell(node),
       ],
-      detail: nodeDetail(node, data.events, i18n),
+      detail: nodeDetail(node, data.events, data.activityBoard, data.peerTranscripts, i18n),
     };
   });
 
