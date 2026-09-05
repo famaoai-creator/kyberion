@@ -21489,3 +21489,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/actuators/browser-actuator/src/browser-passkey-helpers.ts`、`libs/actuators/browser-actuator/src/browser-passkey.resource-boundary.test.ts`
 - **変更**: browser passkey providerの組み込みwebauthn.io catalog／loader fallbackを削除し、正本catalogの欠損・schema不正を明示拒否する必須境界へ統一した。未知providerの拒否、navigation policy、virtual authenticator、選択providerの結果返却は維持している。
 - **検証**: browser-passkey-catalog／browser-passkey resource boundary **2 files / 3 tests passed**、対象ESLint、Prettier、`git diff --check`。typecheckは別作業の未コミットcursor-cli／runtime-model-defaults変更に起因する2エラーで未完了。canonical full gateは同変更の整理後に再実行する。
+
+## 2026-09-06 再レビュー修正 1382
+
+- **対象**: `scripts/registry_manager.ts`、`scripts/registry_manager.test.ts`
+- **変更**: registry managerのcapability registry fallbackを削除し、未作成registryの空初期化を登録処理の呼び出し側へ移した。配置済みregistryのschema不正は空registryへ戻さず拒否し、adapter schema検証、tier選択、既存capability更新は維持している。
+- **検証**: registry-manager **1 file / 4 tests passed**、対象ESLint、Prettier、`git diff --check`。typecheckは別作業の未コミットcursor-cli／runtime-model-defaults変更に起因する2エラーで未完了。canonical full gateは同変更の整理後に再実行する。

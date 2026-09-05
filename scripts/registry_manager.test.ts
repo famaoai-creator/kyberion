@@ -80,5 +80,6 @@ describe('registry manager catalog boundaries', () => {
 
     expect(source).toContain('print: Print');
     expect(source).not.toContain('console.log');
+    expect(source).not.toContain('fallback: { version:');
   });
 });
