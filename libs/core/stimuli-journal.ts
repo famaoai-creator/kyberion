@@ -15,8 +15,12 @@ const logger = createLogger('stimuli-journal');
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 
+export function resolveStimuliJournalPath(filePath: string = STIMULI_PATH): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+}
+
 function safeStimuliPath(): string {
-  return assertSafeRepositoryPath(STIMULI_PATH, { allowMissingLeaf: true });
+  return resolveStimuliJournalPath();
 }
 
 /**
@@ -182,7 +186,7 @@ export function rotateStimuliJournalIfNeeded(maxBytes: number = STIMULI_MAX_BYTE
 }
 
 export function appendStimulus(stimulus: NerveMessage): void {
-  appendJsonLine(STIMULI_PATH, stimulus);
+  appendJsonLine(safeStimuliPath(), stimulus);
   rotateStimuliJournalIfNeeded();
 }
 
