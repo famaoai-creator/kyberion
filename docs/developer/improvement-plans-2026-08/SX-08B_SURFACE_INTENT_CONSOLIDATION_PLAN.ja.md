@@ -850,3 +850,9 @@ Concierge のsummary event parserに残っていた直接 `JSON.parse` を share
 Chronosの共有 `json-record` parser に残っていた独自 `JSON.parse` と危険キー走査を、Node依存を含まない `@agent/core/foundation/safe-json` の `parseSafeJsonInput` に統一した。record／valueの既存の戻り値契約と、malformed JSON・primitive・array・危険キーを拒否する挙動は維持した。
 
 検証: Chronos `json-record` test、対象lint、Prettier、`git diff --check`。surface内の直接JSON parser重複を一つ閉じ、残るframework-specific parsing／provider実機受入は継続課題である。
+
+## 2026-09-05 再レビュー修正 73
+
+`libs/core/detectors.ts` の形式判定に残っていた直接 `JSON.parse` を `foundation/safe-json` の共通parserへ移行した。判定用途でもmalformed JSONと危険キーをJSONとして受理しない境界を揃え、正常なJSON判定は維持した。
+
+検証: detector test 3 tests、対象lint、Prettier、`git diff --check`。外部文字列の直接JSON parser残差を一つ閉じた。
