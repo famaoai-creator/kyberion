@@ -56,47 +56,29 @@ export class SpendCapExceededError extends Error {
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/spend-policy.json');
 
-const DEFAULT_POLICY: SpendPolicy = {
-  posture: 'warn',
-  daily_cap_usd: 50,
-  mission_cap_usd: 20,
-};
-
 const spendPolicyCatalog = defineCatalog<SpendPolicy>({
   id: 'spend-policy',
   path: POLICY_PATH,
   schema: pathResolver.knowledge('product/schemas/spend-policy.schema.json'),
-  fallback: DEFAULT_POLICY,
 });
 
 export function loadSpendPolicy(): SpendPolicy {
   const parsed = spendPolicyCatalog.load();
-  try {
-    const tenantOverrides: Record<string, SpendPolicyOverride> = {};
-    for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
-      if (!raw || typeof raw !== 'object') continue;
-      const override: SpendPolicyOverride = {};
-      if (raw.posture === 'block' || raw.posture === 'warn') override.posture = raw.posture;
-      if (Number(raw.daily_cap_usd) > 0) override.daily_cap_usd = Number(raw.daily_cap_usd);
-      if (Number(raw.mission_cap_usd) > 0) override.mission_cap_usd = Number(raw.mission_cap_usd);
-      if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
-    }
-    return {
-      posture: parsed.posture === 'block' ? 'block' : 'warn',
-      daily_cap_usd:
-        Number(parsed.daily_cap_usd) > 0
-          ? Number(parsed.daily_cap_usd)
-          : DEFAULT_POLICY.daily_cap_usd,
-      mission_cap_usd:
-        Number(parsed.mission_cap_usd) > 0
-          ? Number(parsed.mission_cap_usd)
-          : DEFAULT_POLICY.mission_cap_usd,
-      ...(Object.keys(tenantOverrides).length > 0 ? { tenant_overrides: tenantOverrides } : {}),
-    };
-  } catch {
-    // A broken policy file must not silently disable the guard.
-    return DEFAULT_POLICY;
+  const tenantOverrides: Record<string, SpendPolicyOverride> = {};
+  for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
+    if (!raw || typeof raw !== 'object') continue;
+    const override: SpendPolicyOverride = {};
+    if (raw.posture === 'block' || raw.posture === 'warn') override.posture = raw.posture;
+    if (Number(raw.daily_cap_usd) > 0) override.daily_cap_usd = Number(raw.daily_cap_usd);
+    if (Number(raw.mission_cap_usd) > 0) override.mission_cap_usd = Number(raw.mission_cap_usd);
+    if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
   }
+  return {
+    posture: parsed.posture === 'block' ? 'block' : 'warn',
+    daily_cap_usd: parsed.daily_cap_usd,
+    mission_cap_usd: parsed.mission_cap_usd,
+    ...(Object.keys(tenantOverrides).length > 0 ? { tenant_overrides: tenantOverrides } : {}),
+  };
 }
 
 /**
