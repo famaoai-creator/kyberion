@@ -1778,3 +1778,7 @@ mission graph run journalのresume readとfenced appendを共通のoperation-tim
 ## 2026-09-06 再レビュー修正 229
 
 Slack bridgeのsurface stimulus append先を固定 absolute pathから共通の`stimuliJournalPath()`へ変更し、stimuli journalのoperation-time repository path／symlink boundaryへ接続した。Slack固有payloadとappend semanticsを維持し、**1 file / 7 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 230
+
+trace JSONL persistenceのdirectory／日次fileを共通の`assertSafeRepositoryPath`とoperation-timeのregular-file／directory検査へ接続し、symlink経由のtrace log rootを拒否する境界を追加した。shared／customer root、日次 rotation、trace schema、OTLP export semanticsを維持し、**1 file / 5 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
