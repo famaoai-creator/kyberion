@@ -72,6 +72,16 @@ describe('vision-resolver', () => {
     expect(() => resolveVision('acme', tmpRoot)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
+  it('rejects a tenant vision candidate replaced with a directory', () => {
+    safeMkdir(`${tmpRoot}/customer/acme/vision.md`, { recursive: true });
+    safeMkdir(`${tmpRoot}/vision`, { recursive: true });
+    safeWriteFile(`${tmpRoot}/vision/_default.md`, '# Default Vision');
+
+    expect(() => resolveVision('acme', tmpRoot)).toThrow(
+      '[VISION_RESOURCE] vision must be a regular file'
+    );
+  });
+
   // CO-01: getGoldenRule() (libs/core/core.ts) calls resolveVision() with no
   // tenantSlug at all — it relies entirely on this env-var fallback to be
   // tenant-aware. That fallback path itself had no test coverage until now.
