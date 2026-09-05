@@ -616,8 +616,14 @@ function normalizeTaskSessionRecord(value: unknown): ControlPlaneTaskSessionReco
 }
 
 const DEFAULT_BASE_URLS: Record<ControlPlaneSurface, string> = {
-  presence: String(process.env.PRESENCE_STUDIO_URL || 'http://127.0.0.1:3031').replace(/\/$/, ''),
-  chronos: String(process.env.CHRONOS_URL || 'http://127.0.0.1:3000').replace(/\/$/, ''),
+  presence: String(getRegisteredEnvText('PRESENCE_STUDIO_URL') || 'http://127.0.0.1:3031').replace(
+    /\/$/,
+    ''
+  ),
+  chronos: String(getRegisteredEnvText('CHRONOS_URL') || 'http://127.0.0.1:3000').replace(
+    /\/$/,
+    ''
+  ),
 };
 
 const DEFAULT_REMEDIATION_PLANS: Record<ControlPlaneSurface, ControlPlaneRemediationPlan> = {
