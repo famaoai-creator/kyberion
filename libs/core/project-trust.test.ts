@@ -9,6 +9,7 @@ import {
   safeUnlinkSync,
   withExecutionContext,
 } from './index.js';
+import { safeMkdir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertProjectTrustApproval,
@@ -86,6 +87,22 @@ describe('project trust approvals', () => {
       withExecutionContext('mission_controller', () => {
         safeUnlinkSync(linkPath);
         safeRmSync(targetPath, { force: true });
+      });
+    }
+  });
+
+  it('rejects a pipeline path replaced with a directory', () => {
+    const directoryPath = pathResolver.sharedTmp(
+      `project-trust-directory-${process.pid}-${Date.now()}.json`
+    );
+    safeMkdir(directoryPath, { recursive: true });
+    try {
+      expect(() => createProjectTrustApprovalRequest({ inputPath: directoryPath })).toThrow(
+        'pipeline resource must be a regular file'
+      );
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(directoryPath, { recursive: true, force: true });
       });
     }
   });

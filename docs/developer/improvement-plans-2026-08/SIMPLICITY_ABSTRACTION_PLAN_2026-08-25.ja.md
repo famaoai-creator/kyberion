@@ -21819,3 +21819,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/agent-manifest.ts`、`libs/core/agent-manifest.test.ts`
 - **変更**: agent manifest 列挙後の content read 前に operation-time の regular-file 検査を追加した。既存の repository／symlink boundary、filename traversal rejection、frontmatter defaulting、selection-hint overlay semanticsは維持し、manifest entry が directoryへ置換された場合に明示 skip する回帰テストを追加した。
 - **検証**: agent-manifest **2 files / 7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1437
+
+- **対象**: `libs/core/project-trust.ts`、`libs/core/project-trust.test.ts`
+- **変更**: project-local pipeline の approval payload hash 算出前に operation-time の regular-file 検査を追加した。既存の repository scope、symlink traversal rejection、built-in pipeline exemption、content drift／human approval binding semanticsは維持し、pipeline resource が directoryへ置換された場合に approval request を作成しない回帰テストを追加した。
+- **検証**: project-trust **2 files / 4 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
