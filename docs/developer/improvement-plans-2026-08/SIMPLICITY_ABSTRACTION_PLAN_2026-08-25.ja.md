@@ -21544,6 +21544,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Discord／Telegram bridgeの永続thread historyについて、JSONLのread／append前にrepository pathのsymlink traversalとleafのregular file性をoperation-timeで再検査するようにした。履歴未作成時の空配列、thread keyのsanitize、malformed entryのskip semanticsは維持し、symlink経由の外部scope read／writeを拒否する回帰テストを追加した。
 - **検証**: Discord／Telegram bridge **4 files / 19 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全provider adapterの実測は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1392
+
+- **対象**: `scripts/refactor/mission-queue.ts`、`scripts/refactor/mission-queue.test.ts`
+- **変更**: mission queueのJSONL read／append／rewrite前に、`queuePath`をrepository内のsymlinkなし regular fileとしてoperation-timeで再検査するようにした。未作成queueの初期化、malformed entryのskip、priority／dependency dispatch semanticsは維持し、symlink queueをread／writeしない回帰テストを追加した。
+- **検証**: mission-queue **2 files / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全provider adapterの実測は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`

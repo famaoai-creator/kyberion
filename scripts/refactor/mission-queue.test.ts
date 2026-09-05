@@ -9,6 +9,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
 } from '@agent/core';
 import { dispatchNextQueuedMission, enqueueMission } from './mission-queue.js';
@@ -72,5 +73,27 @@ describe('mission-queue', () => {
     );
 
     expect(dispatched).toEqual(['MSN-GOOD']);
+  });
+
+  it('rejects a symlinked queue before reading or appending it', async () => {
+    const targetPath = path.join(QUEUE_DIR, `mission-queue-target-${Date.now()}.jsonl`);
+    const linkPath = path.join(QUEUE_DIR, `mission-queue-link-${Date.now()}.jsonl`);
+    safeWriteFile(targetPath, '');
+    safeSymlinkSync(targetPath, linkPath);
+    try {
+      await expect(enqueueMission(linkPath, 'MSN-SYMLINK', 'confidential')).rejects.toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+      await expect(
+        dispatchNextQueuedMission(
+          linkPath,
+          () => ({ ok: true, missing: [] }),
+          async () => undefined
+        )
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(linkPath, { force: true });
+      safeRmSync(targetPath, { force: true });
+    }
   });
 });
