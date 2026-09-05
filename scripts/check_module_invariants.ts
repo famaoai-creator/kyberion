@@ -1,7 +1,7 @@
 /** DH-06: major runtime modules must declare an attributed invariant. */
 import { pathResolver } from '@agent/core/path-resolver';
 import { listModuleInvariants } from '@agent/core/invariants';
-import { safeReadFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const required = [
@@ -18,9 +18,7 @@ export function checkModuleInvariants(): { registeredInvariants: number } {
   for (const target of required) {
     const owned = entries.filter((entry) => entry.module === target.module);
     if (owned.length === 0) missing.push(target.module);
-    const source = String(
-      safeReadFile(pathResolver.rootResolve(target.source), { encoding: 'utf8' })
-    );
+    const source = readTextFile(pathResolver.rootResolve(target.source));
     if (!source.includes('assertModuleInvariant')) sourceMissing.push(target.source);
     for (const entry of owned) {
       if (entry.enforcement === 'runtime' && !entry.check) {

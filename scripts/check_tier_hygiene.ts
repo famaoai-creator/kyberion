@@ -8,8 +8,8 @@
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
-import { defineCatalog } from '@agent/core/foundation';
+import { defineCatalog, readTextFile } from '@agent/core/foundation';
+import { safeLstat, safeReaddir } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -237,7 +237,7 @@ export function scanPersistentTierFixturePollution(root: string, files: string[]
   for (const rel of targets) {
     let content: string;
     try {
-      content = safeReadFile(path.join(root, rel), { encoding: 'utf8' }) as string;
+      content = readTextFile(path.join(root, rel));
     } catch {
       // Fail-open: an unreadable file is not this check's concern.
       continue;
@@ -315,7 +315,7 @@ export async function scan(): Promise<Violation[]> {
     const absolute = path.join(root, rel);
     let content: string;
     try {
-      content = safeReadFile(absolute, { encoding: 'utf8' }) as string;
+      content = readTextFile(absolute);
     } catch {
       continue;
     }
