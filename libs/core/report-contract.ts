@@ -16,7 +16,7 @@ import {
   type StructuredOutputSchemaRef,
 } from './structured-output-contracts.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
 
@@ -55,10 +55,17 @@ function schemaPathFromRef(schemaRef: string): string {
       `[REPORT_SCHEMA_INVALID] schema_ref escapes the product schema root: ${schemaRef}`
     );
   }
-  if (!candidate.endsWith('.json') || !safeExistsSync(candidate)) {
+  if (!candidate.endsWith('.json')) {
     throw new Error(`[REPORT_SCHEMA_NOT_FOUND] report schema not found: ${schemaRef}`);
   }
-  return candidate;
+  const safeCandidate = assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeCandidate)) {
+    throw new Error(`[REPORT_SCHEMA_NOT_FOUND] report schema not found: ${schemaRef}`);
+  }
+  if (!safeLstat(safeCandidate).isFile()) {
+    throw new Error(`[REPORT_SCHEMA_INVALID] report schema must be a regular file: ${schemaRef}`);
+  }
+  return safeCandidate;
 }
 
 function compileReportSchema(schemaRef: string): CompiledReportSchema {
