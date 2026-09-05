@@ -21520,6 +21520,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Cursor CLIのprovider discoveryが`KYBERION_CURSOR_CLI_BIN`を無視して`cursor-agent`を固定実行していた残存を修正し、backend probeと同じ登録済みbinary overrideを使うようにした。未指定時のPATH discovery、version health判定、capability cacheとfailover routingは維持している。
 - **検証**: provider-discovery **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1388
+
+- **対象**: `libs/core/reasoning-provider-registry.ts`、`libs/core/reasoning-provider-registry.test.ts`、`knowledge/product/schemas/reasoning-provider-registry.schema.json`
+- **変更**: reasoning provider descriptorのcapability／input modality／env keyを必須メタデータへ変更した。欠損・型不正・text modalityなしのdescriptorを保守的既定値へ補正せず拒否し、schemaとruntime parserを一致させた。
+- **検証**: reasoning-provider-registry **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`、knowledge index更新後のcanonical full gate **69/69 passed**。provider CLIの実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`

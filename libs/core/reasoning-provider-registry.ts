@@ -122,14 +122,6 @@ const KNOWN_MODES = new Set<ReasoningBackendMode>([
   'stub',
 ]);
 
-const FALLBACK_CAPABILITIES: ReasoningProviderCapabilities = {
-  reasoning: true,
-  structured_output: true,
-  abort: false,
-  session_continuity: false,
-  input_modalities: ['text'],
-};
-
 const INPUT_MODALITIES = new Set<BackendInputModality>(['text', 'image', 'audio']);
 
 const reasoningProviderCatalog = defineCatalog<RegistryFile>({
@@ -151,28 +143,26 @@ const CONFORMANCE_CHECK_NAMES = [
 ] as const;
 const CONFORMANCE_STATUSES = ['verified', 'declared', 'unavailable', 'failed'] as const;
 
-function parseBoolean(value: unknown, fallback: boolean): boolean {
-  return typeof value === 'boolean' ? value : fallback;
-}
-
 function isInputModality(value: unknown): value is BackendInputModality {
   return typeof value === 'string' && INPUT_MODALITIES.has(value as BackendInputModality);
 }
 
 function parseInputModalities(
   rawCapabilities: Record<string, unknown>
-): readonly BackendInputModality[] {
-  if (Array.isArray(rawCapabilities.input_modalities)) {
-    const modalities = rawCapabilities.input_modalities.filter(isInputModality);
-    if (modalities.includes('text')) return modalities;
+): readonly BackendInputModality[] | null {
+  if (
+    !Array.isArray(rawCapabilities.input_modalities) ||
+    !rawCapabilities.input_modalities.every(isInputModality)
+  ) {
+    return null;
   }
-
-  // Read legacy registries during the migration window, but never expose the
-  // legacy boolean as part of the runtime capability contract.
-  return parseBoolean(rawCapabilities.images, false) ? ['text', 'image'] : ['text'];
+  const modalities = rawCapabilities.input_modalities as BackendInputModality[];
+  return modalities.includes('text') ? modalities : null;
 }
 
-function parseDescriptor(value: unknown): ReasoningProviderDescriptor | null {
+export function parseReasoningProviderDescriptor(
+  value: unknown
+): ReasoningProviderDescriptor | null {
   if (
     !isRecord(value) ||
     typeof value.mode !== 'string' ||
@@ -180,27 +170,38 @@ function parseDescriptor(value: unknown): ReasoningProviderDescriptor | null {
   ) {
     return null;
   }
-  if (typeof value.provider !== 'string' || typeof value.module !== 'string') return null;
-  const rawCapabilities = isRecord(value.capabilities) ? value.capabilities : {};
-  const rawEnvKeys = Array.isArray(value.env_keys) ? value.env_keys : [];
+  if (
+    typeof value.provider !== 'string' ||
+    !value.provider.trim() ||
+    typeof value.module !== 'string' ||
+    !value.module.trim() ||
+    !isRecord(value.capabilities) ||
+    !Array.isArray(value.env_keys) ||
+    value.env_keys.some((entry) => typeof entry !== 'string' || !entry.trim())
+  ) {
+    return null;
+  }
+  const rawCapabilities = value.capabilities;
+  const reasoning = rawCapabilities.reasoning;
+  const structuredOutput = rawCapabilities.structured_output;
+  const abort = rawCapabilities.abort;
+  const sessionContinuity = rawCapabilities.session_continuity;
+  const requiredBooleanCapabilities = [reasoning, structuredOutput, abort, sessionContinuity];
+  if (requiredBooleanCapabilities.some((entry) => typeof entry !== 'boolean')) return null;
+  const inputModalities = parseInputModalities(rawCapabilities);
+  if (!inputModalities) return null;
   const descriptor: ReasoningProviderDescriptor = {
     mode: value.mode as ReasoningBackendMode,
-    provider: value.provider,
-    module: value.module,
+    provider: value.provider.trim(),
+    module: value.module.trim(),
     capabilities: {
-      reasoning: parseBoolean(rawCapabilities.reasoning, FALLBACK_CAPABILITIES.reasoning),
-      structured_output: parseBoolean(
-        rawCapabilities.structured_output,
-        FALLBACK_CAPABILITIES.structured_output
-      ),
-      abort: parseBoolean(rawCapabilities.abort, FALLBACK_CAPABILITIES.abort),
-      session_continuity: parseBoolean(
-        rawCapabilities.session_continuity,
-        FALLBACK_CAPABILITIES.session_continuity
-      ),
-      input_modalities: parseInputModalities(rawCapabilities),
+      reasoning: reasoning as boolean,
+      structured_output: structuredOutput as boolean,
+      abort: abort as boolean,
+      session_continuity: sessionContinuity as boolean,
+      input_modalities: inputModalities,
     },
-    env_keys: rawEnvKeys.filter((entry): entry is string => typeof entry === 'string'),
+    env_keys: value.env_keys.map((entry) => entry.trim()),
   };
   // The prompt-reconstruction invariant is documented until PI-05 supplies
   // the durable request log; descriptor validation remains runtime-owned.
@@ -267,7 +268,7 @@ function assertConformanceEvidence(
 function loadDescriptors(): readonly ReasoningProviderDescriptor[] {
   const parsed = reasoningProviderCatalog.load();
   const descriptors = parsed.providers.map((entry, index) => {
-    const descriptor = parseDescriptor(entry);
+    const descriptor = parseReasoningProviderDescriptor(entry);
     if (!descriptor) {
       throw new Error(
         `[REASONING_PROVIDER_REGISTRY_INVALID] provider entry ${index} is not a valid governed descriptor`

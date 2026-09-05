@@ -9435,7 +9435,7 @@
     {
       "path": "product/schemas/reasoning-provider-registry.schema.json",
       "tier": "public",
-      "size": 442,
+      "size": 1648,
       "type": "json"
     },
     {
