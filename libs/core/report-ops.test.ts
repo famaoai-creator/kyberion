@@ -106,6 +106,18 @@ describe('runKnowledgeValidationSweep', () => {
     ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
+  it('rejects a task event stream path replaced by a directory', () => {
+    const directoryPath = pathResolver.sharedTmp(`report-ops-directory-${process.pid}.jsonl`);
+    safeMkdir(directoryPath, { recursive: true });
+    try {
+      expect(() => runTaskModelRoutingSummary({ task_events_path: directoryPath })).toThrow(
+        '[REPORT_OPS_RESOURCE] event stream must be a regular file'
+      );
+    } finally {
+      safeRmSync(directoryPath, { recursive: true, force: true });
+    }
+  });
+
   it('filters shared routing telemetry to the authoritative tenant scope', () => {
     const suffix = `report-ops-tenant-${process.pid}`;
     const taskEventsPath = pathResolver.sharedTmp(`${suffix}-tasks.jsonl`);

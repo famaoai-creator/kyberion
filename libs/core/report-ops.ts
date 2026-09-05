@@ -11,6 +11,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
@@ -658,6 +659,9 @@ export interface TaskModelRoutingSummaryResult {
 function readJsonlEvents(filePath: string): unknown[] {
   const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (!safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[REPORT_OPS_RESOURCE] event stream must be a regular file: ${safePath}`);
+  }
   return parseJsonl(safeReadFile(safePath, { encoding: 'utf8' }) as string);
 }
 
