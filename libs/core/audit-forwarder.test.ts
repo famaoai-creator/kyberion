@@ -56,6 +56,7 @@ describe('audit-forwarder', () => {
       })
     );
     expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).not.toContain('process.env.SHELL');
     expect(source).toContain('getRegisteredEnvText');
   });
 

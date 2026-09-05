@@ -20861,6 +20861,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: platform command adapterのPOSIX shellをmodule load時に固定していた `SHELL` 直読を、実行時の登録済み `getRegisteredEnvText` へ移行した。Windows shell、POSIX args、current environmentの変更反映、terminal actuatorのadapter契約は変更していない。
 - **検証**: platform command adapter／terminal actuator **2 files / 30 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
+## 2026-09-05 再レビュー修正 1278
+
+- **対象**: `libs/core/secret-resolver.ts`、`libs/core/audit-forwarder.ts`
+- **変更**: secret resolver／audit forwarderのshell実行に残っていた `SHELL` の環境直読を、登録済み `getRegisteredEnvText` へ統一した。明示shell option優先、`/bin/sh` fallback、secret／auditのredaction、resolver／forwarder failure semanticsは変更していない。
+- **検証**: secret resolver／audit forwarder **2 files / 24 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
