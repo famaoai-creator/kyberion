@@ -15,6 +15,8 @@ describe('ci gate parity', () => {
       })
     );
     expect(source).toContain('readSafeJsonFile');
+    expect(source).toContain('readTextFile');
+    expect(source).not.toContain('safeReadFile(pathResolver.rootResolve(relativePath)');
     expect(source).not.toContain('readJson<{ scripts?: Record<string, string> }>(');
   });
 
