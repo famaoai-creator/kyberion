@@ -36,11 +36,11 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeStat,
   safeLstat,
   safeWriteFile,
 } from '../secure-io.js';
+import { readTextFile } from '../foundation/text.js';
 import { loadKnowledgeUsageAggregate } from './knowledge-feedback-loop.js';
 import {
   computeTenantIngestCuration,
@@ -492,7 +492,7 @@ function scanMarkdownDocs(
     if (!entry.endsWith('.md')) continue;
     let content: string;
     try {
-      content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
+      content = readTextFile(fullPath);
     } catch {
       continue;
     }

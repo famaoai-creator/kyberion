@@ -1,15 +1,9 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import { findMissionPath } from './path-resolver.js';
 import { Semaphore } from './semaphore.js';
@@ -192,7 +186,7 @@ export async function appendConversationTurn(
     if (safeExistsSync(filePath)) {
       assertRegularConversationFile(filePath);
       try {
-        const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+        const content = readTextFile(filePath);
         lines = content.split('\n').filter((l) => l.trim().length > 0);
       } catch (err: unknown) {
         logger.warn(
@@ -228,7 +222,7 @@ export function readConversationHistory(conversationId: string): ConversationTur
   assertRegularConversationFile(filePath);
 
   try {
-    const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    const content = readTextFile(filePath);
     return content
       .split('\n')
       .filter((l) => l.trim().length > 0)
