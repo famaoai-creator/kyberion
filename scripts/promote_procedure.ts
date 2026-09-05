@@ -35,7 +35,7 @@ import {
   safeLstat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import type { ProcedureEntry } from '@agent/core/procedure-types';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -85,7 +85,7 @@ export function main(argv: string[] = []): void {
   // mission-gated). Promotion is registration of a re-executable procedure, so
   // it should run within a mission. We don't hard-fail without one (to keep the
   // pipeline runnable in dev), but we warn and record what we got for audit.
-  const missionId = args['mission-id'] || process.env.MISSION_ID || '';
+  const missionId = args['mission-id'] || getRegisteredEnvText('MISSION_ID') || '';
   if (!missionId) {
     process.stderr.write(
       '[promote-procedure] WARNING: no --mission-id / MISSION_ID — promotion is not mission-attributed. ' +
