@@ -21705,3 +21705,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mesh-hub-peer-messaging-adapter.ts`、`libs/core/mesh-hub-peer-messaging-adapter.test.ts`
 - **変更**: mesh-hub recipient proposal／decision の JSONL reader を operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。repository 外・symlink・ディレクトリ置換された JSONL leaf を tenant projection 前に読まず、既存の malformed row skip、proposal／decision lifecycle、governed artifact write semanticsは維持した。
 - **検証**: mesh-hub-peer-messaging-adapter **1 file / 8 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1418
+
+- **対象**: `libs/core/mesh-message-broker.ts`、`libs/core/mesh-message-broker.test.ts`
+- **変更**: mesh message broker の tenant root 列挙と delivery／dead-letter JSONL reader を operation-time の `assertSafeRepositoryPath`／`safeLstat` 境界へ接続した。symlink・repository 外・非 regular file／directory replacement を delivery projection 前に拒否し、既存の malformed row skip、tenant filter、retry／dead-letter lifecycle、governed artifact write semanticsは維持した。
+- **検証**: mesh-message-broker **1 file / 7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
