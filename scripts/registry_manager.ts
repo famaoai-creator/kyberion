@@ -48,7 +48,6 @@ export function loadCapabilityRegistryAtPath(
     id: `registry-manager-${type}-registry`,
     path: assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true }),
     schema: REGISTRY_SCHEMA_PATHS[type],
-    fallback: { version: '1.0.0', capabilities: [] },
   }).load();
 }
 
@@ -122,7 +121,9 @@ export async function main(args: string[] = [], print: Print = () => undefined) 
       throw new Error(`Capability registry must be a regular file: ${absRegistryPath}`);
     }
   }
-  let registry = loadCapabilityRegistryAtPath(absRegistryPath, type);
+  let registry: CapabilityRegistry = safeExistsSync(absRegistryPath)
+    ? loadCapabilityRegistryAtPath(absRegistryPath, type)
+    : { version: '1.0.0', capabilities: [] };
 
   const existingIndex = registry.capabilities.findIndex(
     (c: any) => c.capability_id === capabilityId
