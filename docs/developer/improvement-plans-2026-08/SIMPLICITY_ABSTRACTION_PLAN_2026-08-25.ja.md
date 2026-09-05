@@ -21663,3 +21663,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/metrics.ts`、`libs/core/metrics.test.ts`
 - **変更**: MetricsCollector の metrics／resource usage JSONL read／append 前に operation-time の regular-file 検査を追加した。既存の best-effort 観測書き込み、symlink／repository path 検証、cost registry、usage accounting semanticsは維持し、history leaf がディレクトリへ置換された場合も読み書きしない回帰テストを追加した。
 - **検証**: metrics **1 file / 17 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1411
+
+- **対象**: `libs/core/agent-collaboration-projection.ts`、`libs/core/agent-collaboration-projection.test.ts`
+- **変更**: agent collaboration projection の worker event JSONL reader に operation-time の regular-file 検査を追加した。repository／symlink boundary、tenant projection の fail-closed filter、malformed event の既存スキップ、worker event の列挙 semantics は維持し、`.jsonl` 名のディレクトリをイベントとして読まない回帰テストを追加した。
+- **検証**: agent-collaboration-projection **1 file / 11 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
