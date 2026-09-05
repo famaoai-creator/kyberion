@@ -1,7 +1,7 @@
 import { App, LogLevel } from '@slack/bolt';
 import { installProcessGuards } from '@agent/core/process-guards';
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { appendJsonLine } from '@agent/core/foundation';
+import { appendJsonLine, getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('slack-bridge');
@@ -437,7 +437,9 @@ async function processSlackOutbox(client: SlackClient) {
 const runSlackOutbox = createSurfaceOutboxDrainGuard('slack');
 
 async function start() {
-  process.env.MISSION_ROLE ||= 'slack_bridge';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'slack_bridge');
+  }
   const binding = resolveServiceBinding('slack', 'secret-guard');
   const appToken = binding.appToken;
   const botToken = binding.accessToken;
@@ -1184,7 +1186,7 @@ async function start() {
 // starts the bridge, so importing this module in a test cannot open a Socket
 // Mode connection — and a leaked VITEST env cannot silently no-op a real start.
 const directEntry = isDirectEntry(import.meta.url, 'satellites/slack-bridge/src/index.ts');
-if (directEntry && !process.env.VITEST) {
+if (directEntry && !getRegisteredEnvText('VITEST')) {
   start().catch((err) => {
     logger.error(`SlackBridge crashed: ${err.message}`);
     process.exitCode = 1;
