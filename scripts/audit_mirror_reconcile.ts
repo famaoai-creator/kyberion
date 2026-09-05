@@ -23,14 +23,13 @@ import {
   safeExistsSync,
   safeMkdir,
   safeMoveSync,
-  safeReadFile,
   safeReaddir,
   safeLstat,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import type { AuditEntry } from '@agent/core/audit-chain';
-import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const AUDIT_MIRROR_APPROVAL_CHANNEL = 'terminal';
@@ -100,7 +99,7 @@ function entryFingerprint(entries: AuditEntry[]): string {
 
 function parseMirrorFile(filePath: string, rootDir = pathResolver.rootDir()): AuditEntry[] {
   const safePath = assertSafeRepositoryPath(filePath, { rootDir });
-  const raw = safeReadFile(safePath, { encoding: 'utf8' }) as string;
+  const raw = readTextFile(safePath);
   const entries: AuditEntry[] = [];
   for (const [index, line] of raw.split(/\r?\n/).entries()) {
     if (!line.trim()) continue;

@@ -15,7 +15,8 @@ import {
   type ReasoningBackendMode,
 } from '@agent/core/reasoning-backend-policy';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 
 export const REASONING_BACKEND_ENV_KEY = 'KYBERION_REASONING_BACKEND';
 export const PERSONA_ENV_KEY = 'KYBERION_PERSONA';
@@ -86,7 +87,7 @@ export function readPersistedEnvValue(
   envLocalPath: string = defaultEnvLocalPath()
 ): string | null {
   if (!safeExistsSync(envLocalPath)) return null;
-  const content = String(safeReadFile(envLocalPath, { encoding: 'utf8' }) ?? '');
+  const content = readTextFile(envLocalPath);
   const match = new RegExp(`^\\s*${key}=(.*)$`, 'm').exec(content);
   const value = match?.[1]?.trim();
   return value || null;
@@ -100,7 +101,7 @@ export function persistEnvValue(
 ): string {
   let content = '';
   if (safeExistsSync(envLocalPath)) {
-    content = String(safeReadFile(envLocalPath, { encoding: 'utf8' }) ?? '');
+    content = readTextFile(envLocalPath);
   }
   safeWriteFile(envLocalPath, upsertEnvVarLine(content, key, value));
   return envLocalPath;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
 import { main, runReportReviewServer } from './server.js';
 
 describe('report review server harness boundary', () => {
@@ -50,12 +50,11 @@ describe('report review server harness boundary', () => {
   });
 
   it('keeps runtime output and exit handling behind the harness boundary', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/report-review/server.ts'))
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/report-review/server.ts'));
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
     expect(source).not.toContain('process.exitCode');
+    expect(source).toContain('getRegisteredEnvText, nowIso, readTextFile');
   });
 });
