@@ -65,6 +65,13 @@ describe('facet-registry', () => {
       );
       expect(resolved.persona?.source).toBe('managed');
       expect(resolved.persona?.content).toContain('Managed pack');
+
+      const managedFacetPath = path.join(pluginRoot, 'facets', 'personas', 'pack-persona.md');
+      safeRmSync(managedFacetPath, { force: true });
+      safeMkdir(managedFacetPath, { recursive: true });
+      expect(() =>
+        resolveFacets({ persona: 'pack-persona' }, { tier: 'public', managedRoot: root })
+      ).toThrow('[FACET_RESOURCE] facet must be a regular file');
     } finally {
       safeRmSync(root);
     }
