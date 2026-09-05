@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { validateWritePermission, scanForConfidentialMarkers } from '@agent/core/tier-guard';
-import { safeReadFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import yargs from 'yargs';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -36,7 +36,7 @@ export async function runComplianceScan(args: string[] = []): Promise<{
 
     // 2. Check Content-based Markers (PII, Secrets, Confidentiality)
     try {
-      const content = String(safeReadFile(file, { encoding: 'utf8' }));
+      const content = readTextFile(file);
       const scan = scanForConfidentialMarkers(content);
       if (scan.hasMarkers) {
         violations.push(
