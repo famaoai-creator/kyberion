@@ -1,9 +1,17 @@
 import * as path from 'node:path';
-import { readJsonLines } from './foundation/json.js';
+import { readJsonLines, parseSafeJsonInput } from './foundation/json.js';
 import { clamp } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+  safeReadFile,
+  safeStat,
+} from './secure-io.js';
+import { splitCompleteLines } from './jsonl-tail.js';
 import {
   collaborationKindFromEventType,
   createAgentCollaborationEvent,
@@ -43,7 +51,8 @@ export interface CollaborationAttentionItem {
   next_action: string;
 }
 
-export type CollaborationStatusFlag = 'sequence_gap' | 'unknown_event' | 'stale_runtime';
+export type CollaborationStatusFlag =
+  'sequence_gap' | 'unknown_event' | 'stale_runtime' | 'bounded_read';
 
 export interface CollaborationSequenceGap {
   source: CollaborationSource;
@@ -59,6 +68,13 @@ export interface AgentCollaborationProjection {
   status_flags: CollaborationStatusFlag[];
   sequence_gaps: CollaborationSequenceGap[];
   sources: string[];
+  /**
+   * Basenames of source files a bounded read truncated to their byte cap
+   * (AC-03). Populated by `buildAgentCollaborationProjection`; always `[]`
+   * for a direct `composeAgentCollaborationProjection` call, since compose
+   * never touches the filesystem.
+   */
+  truncated_sources: string[];
   overview: {
     events: number;
     missions: number;
@@ -78,6 +94,18 @@ export interface AgentCollaborationProjection {
   attention: CollaborationAttentionItem[];
 }
 
+/** AC-03: byte-capped, recent-window read of the on-disk JSONL sources. */
+export interface CollaborationBoundedReadOptions {
+  /** Byte cap applied to the tail of each source file. Default 2MiB. */
+  maxBytesPerFile?: number;
+  /** Worker-event dated files (`worker-events-YYYY-MM-DD.jsonl`) older than
+   * this many days (relative to `options.now`) are skipped entirely. Default 2. */
+  recentDays?: number;
+  /** step_begin/step_end are ~95% of worker-event volume and irrelevant to
+   * the collaboration graph; excluded by default. */
+  includeStepEvents?: boolean;
+}
+
 export interface ComposeCollaborationProjectionOptions {
   missionId?: string;
   tenant?: string;
@@ -89,14 +117,60 @@ export interface ComposeCollaborationProjectionOptions {
   staleAfterMs?: number;
   /** Optional pipeline DAG artifact projected into the operator graph. */
   runGraph?: GraphRunArtifact;
+  /**
+   * AC-03: bound the on-disk read `buildAgentCollaborationProjection` performs.
+   * Omitted = bounded with defaults (2MiB/file, last 2 days of worker-event
+   * files, step events excluded). `false` = legacy unbounded full read.
+   * Only `buildAgentCollaborationProjection` consults this; it has no effect
+   * on `composeAgentCollaborationProjection`, which never does I/O.
+   */
+  bounded?: false | CollaborationBoundedReadOptions;
+  /**
+   * Test/diagnostic override for the on-disk roots `buildAgentCollaborationProjection`
+   * reads from. Production callers must not pass this — it exists so tests can
+   * point at an isolated fixture directory instead of writing into the real,
+   * potentially large (29MB+), shared observability files that other suites
+   * and processes read concurrently. Each override path is re-validated
+   * through `safeOptionalRepositoryPath` and silently falls back to the real
+   * root if it would resolve outside the repository. Only
+   * `buildAgentCollaborationProjection` consults this.
+   */
+  roots?: { observabilityDir?: string; workerEventsDir?: string };
+}
+
+const DEFAULT_BOUNDED_READ: Required<CollaborationBoundedReadOptions> = {
+  maxBytesPerFile: 2 * 1024 * 1024,
+  recentDays: 2,
+  includeStepEvents: false,
+};
+
+function resolveBoundedReadOptions(
+  bounded: ComposeCollaborationProjectionOptions['bounded']
+): Required<CollaborationBoundedReadOptions> | null {
+  if (bounded === false) return null;
+  return { ...DEFAULT_BOUNDED_READ, ...(bounded || {}) };
+}
+
+/**
+ * Resolve a `roots` override (test/diagnostic only, see
+ * `ComposeCollaborationProjectionOptions.roots`). Routed through
+ * `safeOptionalRepositoryPath` so a caller cannot point the reader outside the
+ * repository; an override that fails that check is silently ignored in favour
+ * of the real default root rather than allowed through unchecked.
+ */
+function resolveRootDir(overridePath: string | undefined, defaultDir: string): string {
+  if (!overridePath) return defaultDir;
+  return safeOptionalRepositoryPath(overridePath) ?? defaultDir;
 }
 
 const OBSERVABILITY_DIR = pathResolver.shared('observability/mission-control');
 const WORKER_EVENTS_DIR = pathResolver.shared('logs/worker-events');
+const WORKER_DATED_FILE_PATTERN = /^worker-events-(\d{4}-\d{2}-\d{2})\.jsonl$/u;
 const JSONL_SOURCES: Array<{ file: string; source: CollaborationSource }> = [
   { file: 'task-events.jsonl', source: 'task' },
   { file: 'orchestration-events.jsonl', source: 'orchestration' },
   { file: 'agent-runtime-supervisor-events.jsonl', source: 'runtime' },
+  { file: 'agent-runtime-events.jsonl', source: 'runtime' },
 ];
 
 function safeOptionalRepositoryPath(filePath: string): string | undefined {
@@ -122,6 +196,57 @@ function readJsonl(filePath: string): JsonRecord[] {
     }).filter((value): value is JsonRecord => value !== null);
   } catch {
     return [];
+  }
+}
+
+/**
+ * AC-03: read at most `maxBytesPerFile` from the end of `filePath`.
+ *
+ * `secure-io` has no partial/range read primitive, so this still loads the
+ * whole file into memory (bounded by `safeReadFile`'s own maxSizeMB guard,
+ * raised here to the file's actual size) and slices to the tail in-process.
+ * That keeps the *parsed record volume* bounded — which is what makes the
+ * 29MB supervisor log expensive to compose — even though the disk read
+ * itself is not partial. The first line after the byte cut is always a torn
+ * fragment of whatever preceded it, so it is dropped; a trailing fragment
+ * (no closing newline) is dropped the same way via `splitCompleteLines`.
+ * Follow-up: a true range/tail read needs a secure-io primitive that can
+ * open+seek without loading the whole file — this is a known gap, not an
+ * oversight, tracked for whoever adds that primitive next.
+ */
+function readJsonlBounded(
+  filePath: string,
+  maxBytesPerFile: number
+): { records: JsonRecord[]; truncated: boolean } {
+  const safePath = safeOptionalRepositoryPath(filePath);
+  if (!safePath || !safeExistsSync(safePath)) return { records: [], truncated: false };
+  try {
+    const size = safeStat(safePath).size;
+    if (size <= maxBytesPerFile) {
+      return { records: readJsonl(filePath), truncated: false };
+    }
+    const buffer = safeReadFile(safePath, {
+      encoding: null,
+      maxSizeMB: Math.ceil(size / (1024 * 1024)) + 1,
+    }) as Buffer;
+    const tailStart = Math.max(0, buffer.length - maxBytesPerFile);
+    const tailText = buffer.subarray(tailStart).toString('utf8');
+    const firstNewline = tailText.indexOf('\n');
+    const withoutLeadingFragment = firstNewline >= 0 ? tailText.slice(firstNewline + 1) : '';
+    const { lines } = splitCompleteLines(withoutLeadingFragment);
+    const records: JsonRecord[] = [];
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const record = toRecordOrNull(parseSafeJsonInput(line, 'bounded jsonl tail entry'));
+        if (record) records.push(record);
+      } catch {
+        /* a torn or malformed tail line must not stop the rest of the batch */
+      }
+    }
+    return { records, truncated: true };
+  } catch {
+    return { records: [], truncated: false };
   }
 }
 
@@ -154,7 +279,7 @@ function eventFromRecord(
   seq: number
 ): AgentCollaborationEvent | null {
   const payload = toRecordOrNull(record.payload) || {};
-  const eventType = stringValue(record, 'event_type', 'type', 'decision') || 'unknown';
+  const eventType = stringValue(record, 'event_type', 'type', 'decision', 'event') || 'unknown';
   const sourceEventId =
     stringValue(record, 'event_id', 'source_event_id', 'request_id') || `${source}:${seq}`;
   const missionId = stringValue(record, 'mission_id')?.toUpperCase();
@@ -189,6 +314,22 @@ function eventFromRecord(
     eventType.toLowerCase().includes('subagent_unavailable') ||
     booleanValue(record, 'native_unavailable') === true ||
     booleanValue(payload, 'native_unavailable') === true;
+  // AC-02: a2a envelope + delegation correlation fields, carried through from
+  // either the flat record (orchestration-events.jsonl) or a nested worker
+  // event payload (readWorkerEvents lifts source.* but leaves payload.* to be
+  // read here, same as thread_id/native above).
+  const parentAgentId =
+    stringValue(record, 'parent_agent_id') || stringValue(payload, 'parent_agent_id');
+  const sender = stringValue(record, 'sender') || stringValue(payload, 'sender');
+  const receiver = stringValue(record, 'receiver') || stringValue(payload, 'receiver');
+  const performative = stringValue(record, 'performative') || stringValue(payload, 'performative');
+  const delegationId =
+    stringValue(record, 'delegation_id') || stringValue(payload, 'delegation_id');
+  const teamRole = stringValue(record, 'team_role') || stringValue(payload, 'team_role');
+  const instructionSummary =
+    stringValue(record, 'instruction_summary') || stringValue(payload, 'instruction_summary');
+  const elapsedMsRaw = record.elapsed_ms ?? payload.elapsed_ms;
+  const elapsedMs = typeof elapsedMsRaw === 'number' ? elapsedMsRaw : undefined;
   const evidence = stringArray(record, 'evidence');
   const relatedIds = [
     ...stringArray(record, 'related_ids'),
@@ -211,9 +352,14 @@ function eventFromRecord(
     ...(missionId ? { mission_id: missionId } : {}),
     ...(taskId ? { task_id: taskId } : {}),
     ...(agentId ? { agent_id: agentId } : {}),
-    ...(stringValue(record, 'parent_agent_id')
-      ? { parent_agent_id: stringValue(record, 'parent_agent_id') }
-      : {}),
+    ...(parentAgentId ? { parent_agent_id: parentAgentId } : {}),
+    ...(sender ? { sender } : {}),
+    ...(receiver ? { receiver } : {}),
+    ...(performative ? { performative } : {}),
+    ...(delegationId ? { delegation_id: delegationId } : {}),
+    ...(teamRole ? { team_role: teamRole } : {}),
+    ...(instructionSummary ? { instruction_summary: instructionSummary } : {}),
+    ...(elapsedMs !== undefined ? { elapsed_ms: elapsedMs } : {}),
     ...(stringValue(record, 'session_id') ? { session_id: stringValue(record, 'session_id') } : {}),
     ...(provider ? { provider } : {}),
     ...(adopterId ? { adopter_id: adopterId } : {}),
@@ -253,28 +399,102 @@ function eventFromRecord(
   });
 }
 
-function readWorkerEvents(): AgentCollaborationEvent[] {
-  const safeWorkerEventsDir = safeOptionalRepositoryPath(WORKER_EVENTS_DIR);
-  if (!safeWorkerEventsDir || !safeExistsSync(safeWorkerEventsDir)) return [];
+/** AC-03: is a `worker-events-YYYY-MM-DD.jsonl` date within `recentDays` of `now` (inclusive)? */
+function isWorkerFileWithinRecentDays(
+  dateStr: string,
+  nowIsoValue: string,
+  recentDays: number
+): boolean {
+  const fileDayMs = Date.parse(`${dateStr}T00:00:00.000Z`);
+  const nowMs = Date.parse(nowIsoValue);
+  if (!Number.isFinite(fileDayMs) || !Number.isFinite(nowMs)) return true;
+  const nowDayMs = Math.floor(nowMs / 86_400_000) * 86_400_000;
+  const diffDays = Math.round((nowDayMs - fileDayMs) / 86_400_000);
+  return diffDays >= 0 && diffDays <= recentDays;
+}
+
+interface ReadResult {
+  events: AgentCollaborationEvent[];
+  truncatedSources: string[];
+}
+
+function readWorkerEvents(
+  bound: Required<CollaborationBoundedReadOptions> | null,
+  nowIsoValue: string,
+  workerEventsDir: string,
+  missionScopeId?: string
+): ReadResult {
+  const safeWorkerEventsDir = safeOptionalRepositoryPath(workerEventsDir);
+  if (!safeWorkerEventsDir || !safeExistsSync(safeWorkerEventsDir)) {
+    return { events: [], truncatedSources: [] };
+  }
+  const scopedMissionUpper = missionScopeId?.trim().toUpperCase();
   const files: string[] = [];
   for (const entry of safeReaddir(safeWorkerEventsDir)) {
     const entryPath = safeOptionalRepositoryPath(path.join(safeWorkerEventsDir, entry));
     if (!entryPath) continue;
-    if (entry.endsWith('.jsonl')) files.push(entryPath);
+    if (entry.endsWith('.jsonl')) {
+      // Only dated `worker-events-YYYY-MM-DD.jsonl` files are subject to the
+      // recent-window filter; other worker-event files (legacy or
+      // mission-scoped, handled below) have no date in their name to filter on.
+      const dated = WORKER_DATED_FILE_PATTERN.exec(entry);
+      if (
+        bound &&
+        dated &&
+        !isWorkerFileWithinRecentDays(dated[1], nowIsoValue, bound.recentDays)
+      ) {
+        continue;
+      }
+      files.push(entryPath);
+    }
     if (entry === 'missions' && safeExistsSync(entryPath)) {
       for (const mission of safeReaddir(entryPath)) {
         const missionPath = safeOptionalRepositoryPath(path.join(entryPath, mission));
         if (!missionPath || !safeExistsSync(missionPath)) continue;
+        // AC-03 follow-up: a mission-scoped lookup (options.missionId) must
+        // always see that mission's own history — the recent-days window
+        // would otherwise silently hide an older mission's worker events even
+        // though the caller asked for it by id. Only the byte cap still
+        // applies to it. Every *other* mission's partition stays windowed
+        // exactly like the top-level daily files, so an unscoped or
+        // differently-scoped read doesn't pay for every mission's full
+        // history.
+        const isScopedMission = Boolean(
+          scopedMissionUpper && mission.toUpperCase() === scopedMissionUpper
+        );
         for (const file of safeReaddir(missionPath)) {
           if (!file.endsWith('.jsonl')) continue;
+          if (!isScopedMission) {
+            const dated = WORKER_DATED_FILE_PATTERN.exec(file);
+            if (
+              bound &&
+              dated &&
+              !isWorkerFileWithinRecentDays(dated[1], nowIsoValue, bound.recentDays)
+            ) {
+              continue;
+            }
+          }
           const filePath = safeOptionalRepositoryPath(path.join(missionPath, file));
           if (filePath) files.push(filePath);
         }
       }
     }
   }
-  return files.flatMap((file, fileIndex) =>
-    readJsonl(file).flatMap((record, index) => {
+  const truncatedSources = new Set<string>();
+  const events = files.flatMap((file, fileIndex) => {
+    const { records, truncated } = bound
+      ? readJsonlBounded(file, bound.maxBytesPerFile)
+      : { records: readJsonl(file), truncated: false };
+    if (truncated) truncatedSources.add(path.basename(file));
+    return records.flatMap((record, index) => {
+      const eventTypeValue = typeof record.type === 'string' ? record.type : undefined;
+      if (
+        bound &&
+        !bound.includeStepEvents &&
+        (eventTypeValue === 'step_begin' || eventTypeValue === 'step_end')
+      ) {
+        return [];
+      }
       const source = toRecordOrNull(record.source) || {};
       const payload = toRecordOrNull(record.payload) || {};
       const event = eventFromRecord(
@@ -282,8 +502,14 @@ function readWorkerEvents(): AgentCollaborationEvent[] {
           ...record,
           mission_id: record.mission_id || source.mission_id,
           task_id: record.task_id || source.task_id,
-          agent_id: record.agent_id || source.agent_id,
+          // AC-01 envelopes name the *child* in `payload.agent_id` and the
+          // emitting parent in `source.agent_id`; the child is the subject.
+          agent_id: record.agent_id || stringValue(payload, 'agent_id') || source.agent_id,
           event_type: record.type,
+          // Worker envelopes keep `status` inside `payload`; lift it so
+          // `state_after` (and therefore the spawn child state) reflects
+          // `subagent_end` outcomes such as `fallback` / `failure`.
+          ...(stringValue(payload, 'status') ? { status: stringValue(payload, 'status') } : {}),
           summary: stringValue(payload, 'summary', 'op', 'status', 'reason') || record.type,
           seq: record.seq,
         },
@@ -291,18 +517,36 @@ function readWorkerEvents(): AgentCollaborationEvent[] {
         fileIndex * 100000 + index
       );
       return event ? [event] : [];
-    })
-  );
+    });
+  });
+  return { events, truncatedSources: [...truncatedSources] };
 }
 
-function readSourceEvents(): AgentCollaborationEvent[] {
-  const events = JSONL_SOURCES.flatMap(({ file, source }) =>
-    readJsonl(path.join(OBSERVABILITY_DIR, file)).flatMap((record, index) => {
+function readSourceEvents(
+  bound: Required<CollaborationBoundedReadOptions> | null,
+  nowIsoValue: string,
+  observabilityDir: string,
+  workerEventsDir: string,
+  missionScopeId?: string
+): ReadResult {
+  const truncatedSources = new Set<string>();
+  const events = JSONL_SOURCES.flatMap(({ file, source }) => {
+    const filePath = path.join(observabilityDir, file);
+    const { records, truncated } = bound
+      ? readJsonlBounded(filePath, bound.maxBytesPerFile)
+      : { records: readJsonl(filePath), truncated: false };
+    if (truncated) truncatedSources.add(file);
+    return records.flatMap((record, index) => {
       const event = eventFromRecord(record, source, index);
       return event ? [event] : [];
-    })
-  );
-  return [...events, ...readWorkerEvents()];
+    });
+  });
+  const workerResult = readWorkerEvents(bound, nowIsoValue, workerEventsDir, missionScopeId);
+  for (const name of workerResult.truncatedSources) truncatedSources.add(name);
+  return {
+    events: [...events, ...workerResult.events],
+    truncatedSources: [...truncatedSources],
+  };
 }
 
 function eventMatches(
@@ -495,6 +739,17 @@ export function composeAgentCollaborationProjection(
   let failures = 0;
   let nativeSubagents = 0;
   let unavailableSubagents = 0;
+  // AC-02: index delegation lifecycle terminals (subagent_end / _unavailable,
+  // kind 'completion' / 'failure') by delegation_id so a spawn edge's child
+  // node can show the outcome instead of staying 'running' forever.
+  const delegationEndState = new Map<string, string>();
+  for (const event of events) {
+    if (!event.delegation_id || event.kind === 'spawn') continue;
+    delegationEndState.set(
+      event.delegation_id,
+      event.state_after || (event.kind === 'failure' ? 'failed' : 'success')
+    );
+  }
   for (const event of events) {
     if (event.mission_id) {
       missions.add(event.mission_id);
@@ -529,6 +784,43 @@ export function composeAgentCollaborationProjection(
         kind: event.kind,
         event_id: event.event_id,
       });
+    // AC-02(a): a2a_message_routed → agent:sender → agent:receiver, kind
+    // handoff. The sender node becomes a human node if this specific event
+    // was attributed to a human actor (same check the mission/task/agent
+    // block above uses for event.actor_type === 'human').
+    if (event.sender && event.receiver) {
+      const senderIsHuman = event.actor_type === 'human';
+      const senderId = senderIsHuman ? `human:${event.sender}` : `agent:${event.sender}`;
+      addNode(nodes, senderId, senderIsHuman ? 'human' : 'agent', event.sender);
+      addNode(nodes, `agent:${event.receiver}`, 'agent', event.receiver);
+      edges.push({
+        from: senderId,
+        to: `agent:${event.receiver}`,
+        kind: 'handoff',
+        event_id: event.event_id,
+      });
+    }
+    // AC-02(b): subagent_begin → agent:parent_agent_id → agent:agent_id, kind
+    // spawn. The child node's state reflects the matching subagent_end /
+    // _unavailable (same delegation_id) when one has already been observed,
+    // otherwise the child is still running.
+    if (event.kind === 'spawn' && event.parent_agent_id && event.agent_id) {
+      const childId = `agent:${event.agent_id}`;
+      addNode(nodes, `agent:${event.parent_agent_id}`, 'agent', event.parent_agent_id);
+      addNode(nodes, childId, 'agent', event.agent_id);
+      const childNode = nodes.get(childId);
+      if (childNode) {
+        childNode.state = event.delegation_id
+          ? (delegationEndState.get(event.delegation_id) ?? 'running')
+          : (event.state_after ?? 'running');
+      }
+      edges.push({
+        from: `agent:${event.parent_agent_id}`,
+        to: childId,
+        kind: 'spawn',
+        event_id: event.event_id,
+      });
+    }
     if (
       event.kind === 'progress' ||
       event.kind === 'dispatch' ||
@@ -589,6 +881,10 @@ export function composeAgentCollaborationProjection(
     status_flags: status.flags,
     sequence_gaps: status.gaps,
     sources: [...new Set(events.map((event) => event.source))].sort(),
+    // Never set by compose itself — it never touches the filesystem. Populated
+    // additively by buildAgentCollaborationProjection when a bounded read (AC-03)
+    // truncated a source file.
+    truncated_sources: [],
     overview: {
       events: events.length,
       missions: missions.size,
@@ -612,5 +908,23 @@ export function composeAgentCollaborationProjection(
 export function buildAgentCollaborationProjection(
   options: ComposeCollaborationProjectionOptions = {}
 ): AgentCollaborationProjection {
-  return composeAgentCollaborationProjection(readSourceEvents(), options);
+  const nowValue = options.now ?? nowIso();
+  const bound = resolveBoundedReadOptions(options.bounded);
+  const observabilityDir = resolveRootDir(options.roots?.observabilityDir, OBSERVABILITY_DIR);
+  const workerEventsDir = resolveRootDir(options.roots?.workerEventsDir, WORKER_EVENTS_DIR);
+  const { events, truncatedSources } = readSourceEvents(
+    bound,
+    nowValue,
+    observabilityDir,
+    workerEventsDir,
+    options.missionId
+  );
+  const projection = composeAgentCollaborationProjection(events, { ...options, now: nowValue });
+  if (truncatedSources.length === 0) return projection;
+  return {
+    ...projection,
+    partial: true,
+    status_flags: [...new Set([...projection.status_flags, 'bounded_read' as const])].sort(),
+    truncated_sources: truncatedSources,
+  };
 }
