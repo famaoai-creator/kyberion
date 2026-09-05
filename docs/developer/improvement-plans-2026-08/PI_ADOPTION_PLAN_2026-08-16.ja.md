@@ -785,6 +785,8 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 
 - 2026-09-01: PI-03／SX-08B の intent fallback 再レビューとして、free-text の canonical `resolveIntentResolutionPacket` を compiler／task-session／super-nerve の service operation へ接続し、service 名を typed parameter として後段へ渡した。併せて distill candidate registry の governed validator を共有し、552 件の毎回 schema 再読込による contract convergence timeout を解消した。関連 **6 test files / 79 tests passed**、typecheck、対象 lint、type-ratchet、`git diff --check`、canonical full gate **68/68 passed** で確認した。12 surface の全面 contract 描画、未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+- 2026-09-06: PI-03 の provider capability probe 再レビューとして、provider discovery／実行backendと同じ登録済みCLI binary overrideをcapability probeへ接続した。Cursor／Gemini／Claude等の明示バイナリをversion・auth・helpの全probeで使用し、明示Claude binaryがplaceholder fallbackへ勝手に置換されないことを回帰確認した。関連 **1 test file / 16 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLIの実OS-level enforcement probeと未監査direct loader全件inventoryは継続課題である。
+
 ## 7. 検証コマンド(実装時)
 
 - PI-01: `pnpm vitest run libs/core/spend-guard.test.ts libs/core/metrics.test.ts libs/core/cost-report.test.ts` + tier 境界 fixture

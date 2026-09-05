@@ -30,6 +30,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { loadProviderCapabilityCatalog } from './provider-discovery.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
@@ -198,6 +199,29 @@ const DEFAULT_PROBE_TIMEOUT_MS = 5000;
 export const DEFAULT_PROVIDER_CAPABILITY_TTL_MS = 15 * 60 * 1000; // 15 minutes — cheap probes, but not free
 const REGISTRY_CACHE_RELATIVE_PATH = 'runtime/provider-capability-registry.json';
 
+const PROVIDER_BINARY_ENV_KEYS: Readonly<Record<string, string>> = {
+  claude: 'KYBERION_CLAUDE_CLI_BIN',
+  codex: 'KYBERION_CODEX_CLI_BIN',
+  agy: 'KYBERION_AGY_CLI_BIN',
+  grok: 'KYBERION_GROK_CLI_BIN',
+  cursor: 'KYBERION_CURSOR_CLI_BIN',
+  gemini: 'KYBERION_GEMINI_CLI_BIN',
+  copilot: 'KYBERION_COPILOT_CLI_BIN',
+};
+
+function resolveProbeBinary(
+  providerId: string,
+  spec: ProviderProbeSpec,
+  env: NodeJS.ProcessEnv
+): { command: string; explicit: boolean } {
+  const envKey = PROVIDER_BINARY_ENV_KEYS[providerId];
+  const configured = envKey ? getRegisteredEnvText(envKey, { env })?.trim() : undefined;
+  return {
+    command: configured || spec.binaryCommand,
+    explicit: Boolean(configured),
+  };
+}
+
 function defaultProbeExec(
   command: string,
   args: string[],
@@ -286,7 +310,8 @@ function probeSingleProvider(
   exec: ProbeExecFn,
   timeoutMs: number,
   probedAt: string,
-  claudeFallbackCandidates: () => string[]
+  claudeFallbackCandidates: () => string[],
+  env: NodeJS.ProcessEnv
 ): ProviderCapability {
   const spec = PROVIDER_PROBE_TABLE[providerId];
   if (!spec) {
@@ -302,10 +327,12 @@ function probeSingleProvider(
     };
   }
 
-  let binaryCommand = spec.binaryCommand;
+  const resolvedBinary = resolveProbeBinary(providerId, spec, env);
+  let binaryCommand = resolvedBinary.command;
   let versionResult = runProbe(exec, binaryCommand, spec.binaryArgs, timeoutMs);
   if (
     providerId === 'claude' &&
+    !resolvedBinary.explicit &&
     !versionResult.ok &&
     isClaudeCliPlaceholderFailure(versionResult.stderr)
   ) {
@@ -357,6 +384,8 @@ export interface ProbeProviderCapabilitiesOptions {
   /** Injectable exec seam. Production default calls out via secure-io. Tests MUST inject a fake. */
   exec?: ProbeExecFn;
   timeoutMs?: number;
+  /** Environment used to resolve registered provider CLI binary overrides. */
+  env?: NodeJS.ProcessEnv;
   /** Injectable clock for deterministic `probed_at` in tests. */
   now?: () => Date;
   /** Injectable Claude fallback resolver for hermetic tests. */
@@ -374,6 +403,7 @@ export function probeProviderCapabilities(
 ): ProviderCapability[] {
   const exec = opts.exec ?? defaultProbeExec;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
+  const env = opts.env ?? process.env;
   const providerIds = opts.providerIds ?? Object.keys(PROVIDER_PROBE_TABLE);
   const now = opts.now ?? (() => new Date());
   const probedAt = now().toISOString();
@@ -382,7 +412,14 @@ export function probeProviderCapabilities(
 
   return providerIds.map((providerId) => {
     try {
-      return probeSingleProvider(providerId, exec, timeoutMs, probedAt, claudeFallbackCandidates);
+      return probeSingleProvider(
+        providerId,
+        exec,
+        timeoutMs,
+        probedAt,
+        claudeFallbackCandidates,
+        env
+      );
     } catch (err) {
       // Belt-and-braces: probeSingleProvider already catches exec errors,
       // but nothing about the probe path may ever throw out to the caller.
@@ -489,6 +526,7 @@ export function loadProviderCapabilityRegistry(
     providerIds: opts.providerIds,
     exec: opts.exec,
     timeoutMs: opts.timeoutMs,
+    env: opts.env,
     now,
   });
   writeRegistryCache(value, ttlMs, now);
