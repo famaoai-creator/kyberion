@@ -82,6 +82,8 @@ describe('generate_changelog', () => {
     );
     expect(source).not.toContain("from 'node:child_process'");
     expect(source).toContain("safeExec('git'");
+    expect(source).toContain('readTextFile');
+    expect(source).not.toContain('safeReadFile(CHANGELOG_PATH');
 
     process.exitCode = undefined;
     const report = await main(['--from', 'HEAD', '--to', 'HEAD', '--json', '--quiet']);
