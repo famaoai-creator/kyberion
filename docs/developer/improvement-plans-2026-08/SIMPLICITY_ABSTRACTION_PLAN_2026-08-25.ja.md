@@ -21657,3 +21657,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/artifact-registry.ts`、`libs/core/artifact-registry.test.ts`
 - **変更**: 共有 artifact ownership registry の append／read 前に operation-time の regular-file 検査を追加した。既存の repository path／symlink 検証、catalog validation、ownership query、tmp delivery 制約は維持し、registry leaf がディレクトリへ置換された場合に fail-closed となる回帰テストを追加した。
 - **検証**: artifact-registry **1 file / 9 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1410
+
+- **対象**: `libs/core/metrics.ts`、`libs/core/metrics.test.ts`
+- **変更**: MetricsCollector の metrics／resource usage JSONL read／append 前に operation-time の regular-file 検査を追加した。既存の best-effort 観測書き込み、symlink／repository path 検証、cost registry、usage accounting semanticsは維持し、history leaf がディレクトリへ置換された場合も読み書きしない回帰テストを追加した。
+- **検証**: metrics **1 file / 17 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

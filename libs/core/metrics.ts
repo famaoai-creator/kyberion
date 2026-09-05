@@ -1,5 +1,5 @@
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import chalk from 'chalk';
@@ -266,6 +266,12 @@ export class MetricsCollector {
     });
   }
 
+  private _ensureRegularMetricsFile(filePath: string): void {
+    if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+      throw new Error(`metrics file must be a regular file: ${filePath}`);
+    }
+  }
+
   /** Append a normalized, actor-neutral resource usage ledger entry. */
   recordResourceUsage(
     input: Omit<ResourceUsageRecord, 'type' | 'usage_id' | 'timestamp' | 'cost_usd' | 'scope'> & {
@@ -504,6 +510,7 @@ export class MetricsCollector {
     try {
       const filePath = this._metricsPath(this._metricsFile);
       if (!safeExistsSync(filePath)) return [];
+      this._ensureRegularMetricsFile(filePath);
       return readJsonLines<Record<string, any>>(assertSafeRepositoryPath(filePath));
     } catch (_) {
       return [];
@@ -514,6 +521,7 @@ export class MetricsCollector {
     try {
       const filePath = this._metricsPath(this._resourceUsageFile);
       if (!safeExistsSync(filePath)) return [];
+      this._ensureRegularMetricsFile(filePath);
       return readJsonLines<ResourceUsageRecord>(assertSafeRepositoryPath(filePath));
     } catch {
       return [];
@@ -661,6 +669,7 @@ export class MetricsCollector {
         safeMkdir(metricsDir, { recursive: true });
       }
       const filePath = this._metricsPath(this._metricsFile);
+      this._ensureRegularMetricsFile(filePath);
       appendJsonLine(filePath, entry);
     } catch (err) {
       logger.warn(`suppressed error in _appendToFile: ${err}`);
@@ -671,7 +680,9 @@ export class MetricsCollector {
     try {
       const metricsDir = assertSafeRepositoryPath(this._metricsDir, { allowMissingLeaf: true });
       if (!safeExistsSync(metricsDir)) safeMkdir(metricsDir, { recursive: true });
-      appendJsonLine(this._metricsPath(this._resourceUsageFile), entry);
+      const filePath = this._metricsPath(this._resourceUsageFile);
+      this._ensureRegularMetricsFile(filePath);
+      appendJsonLine(filePath, entry);
     } catch (_) {
       /* metrics are best-effort and must not block the operation */
     }

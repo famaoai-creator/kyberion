@@ -210,6 +210,27 @@ describe('metrics core', () => {
     }
   });
 
+  it('does not read or append through a directory used as metrics history', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-directory');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    fs.mkdirSync(metricsDir, { recursive: true });
+    const historyPath = path.join(metricsDir, 'history.jsonl');
+    fs.mkdirSync(historyPath);
+
+    try {
+      const mc = new MetricsCollector({
+        metricsDir,
+        metricsFile: 'history.jsonl',
+        persist: true,
+      });
+      expect(mc.loadHistory()).toEqual([]);
+      mc.record('must-not-append', 1, 'success');
+      expect(fs.statSync(historyPath).isDirectory()).toBe(true);
+    } finally {
+      fs.rmSync(metricsDir, { recursive: true, force: true });
+    }
+  });
+
   it('persists a normalized usage cause for backward-compatible ledgers', () => {
     const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-cause');
     fs.rmSync(metricsDir, { recursive: true, force: true });
