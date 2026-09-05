@@ -22546,6 +22546,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: SQLite検索データベースのmetadata取得で本文全体を読んでサイズを測っていた経路を `safeStat().size` に置き換えた。SQLite／FTS検索、tier scope、rebuild semanticsは変更せず、不要な本文I/Oとreader依存を削減した。
 - **検証**: 対象テスト **1 file／14 tests passed**、対象ESLint、Prettier、`git diff --check`。残るバイナリreaderおよび共有worktreeの未変更対象は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1565
+
+- **対象**: `libs/core/environment-capability-probes.ts` の audit-chain 本文読込
+- **変更**: audit-chain JSONL の本文読込を foundation の `readTextFile` へ移行した。共有worktreeにあった `opencode-cli` probe のユーザー変更はステージせず、監査チェーンの解析・line error reporting・capability semanticsだけを変更対象とした。
+- **検証**: 対象テスト **1 file／25 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るバイナリreaderおよび共有worktreeの未変更対象は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`

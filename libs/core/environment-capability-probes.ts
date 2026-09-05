@@ -23,7 +23,8 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat, safeExec } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { safeExistsSync, safeReaddir, safeStat, safeExec } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { normalizePersistedAuditEntry } from './audit-chain.js';
@@ -318,7 +319,7 @@ async function probeAuditChain(): Promise<{ available: boolean; reason?: string 
   }
   let lineNumber = 0;
   try {
-    const text = safeReadFile(chainPath, { encoding: 'utf8' }) as string;
+    const text = readTextFile(chainPath);
     for (const raw of text.split('\n')) {
       lineNumber += 1;
       const line = raw.trim();
