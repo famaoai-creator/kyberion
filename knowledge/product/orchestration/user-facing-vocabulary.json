@@ -466,6 +466,46 @@
         "ja": "次",
         "qps-ploc": "⟦Ñėẋŧ ŀőř⟧"
       },
+      "chronos_ac_attention_blocked": {
+        "en": "Blocked",
+        "ja": "ブロック中",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "chronos_ac_attention_waiting_human": {
+        "en": "Waiting for human approval",
+        "ja": "人間の承認待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ħůɱȧñ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_ac_attention_review_pending": {
+        "en": "Review pending",
+        "ja": "レビュー待ち",
+        "qps-ploc": "⟦Řėṽïėẇ ṗėñḓïñɠ ŀőřė⟧"
+      },
+      "chronos_ac_attention_failure": {
+        "en": "Failed",
+        "ja": "失敗",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŀőř⟧"
+      },
+      "chronos_ac_attention_next_blocked": {
+        "en": "Check the cause and resolve the input, dependency task, or assignment",
+        "ja": "原因を確認して入力・依存タスク・担当を解消",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ƈȧůşė ȧñḓ řėşőŀṽė ŧħė ïñṗůŧ, ḓėṗėñḓėñƈẏ ŧȧşķ, őř ȧşşïɠñɱėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "chronos_ac_attention_next_waiting_human": {
+        "en": "Check the target and blast radius in the approval queue",
+        "ja": "承認キューで対象と影響範囲を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ŧȧřɠėŧ ȧñḓ ƀŀȧşŧ řȧḓïůş ïñ ŧħė ȧṗṗřőṽȧŀ ɋůėůė ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "chronos_ac_attention_next_review_pending": {
+        "en": "Review the deliverable and evidence ref",
+        "ja": "成果物と evidence ref をレビュー",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ḓėŀïṽėřȧƀŀė ȧñḓ ėṽïḓėñƈė řėƒ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "chronos_ac_attention_next_failure": {
+        "en": "Check the failure classification and retry conditions",
+        "ja": "失敗分類と再実行条件を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ƒȧïŀůřė ƈŀȧşşïƒïƈȧŧïőñ ȧñḓ řėŧřẏ ƈőñḓïŧïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "chronos_ac_open_mission": {
         "en": "Open mission",
         "ja": "ミッションを開く",
@@ -8358,6 +8398,31 @@
         "ja": "ブロック",
         "qps-ploc": "⟦ƀŀőƈķėḓ ŀőř⟧"
       },
+      "chronos_agent_unassigned": {
+        "en": "Unassigned",
+        "ja": "未割当",
+        "qps-ploc": "⟦Ůñȧşşïɠñėḓ ŀőř⟧"
+      },
+      "chronos_blocker_blocked": {
+        "en": "Blocked",
+        "ja": "ブロック中",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "chronos_blocker_dependency": {
+        "en": "Waiting on dependency tasks",
+        "ja": "依存タスク待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ őñ ḓėṗėñḓėñƈẏ ŧȧşķş ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_blocker_review_wait": {
+        "en": "Waiting for review/gate approval",
+        "ja": "レビュー・ゲート承認待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř řėṽïėẇ/ɠȧŧė ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_blocker_unassigned": {
+        "en": "No agent assigned",
+        "ja": "担当エージェント未割当",
+        "qps-ploc": "⟦Ñő ȧɠėñŧ ȧşşïɠñėḓ ŀőřėɱ⟧"
+      },
       "chronos_review_waiting": {
         "en": "awaiting review",
         "ja": "レビュー待ち",
@@ -9493,6 +9558,36 @@
         "ja": "有界読み込みで切り詰め: {sources}",
         "qps-ploc": "⟦Ƀőůñḓėḓ řėȧḓ ŧřůñƈȧŧėḓ: {sources} ŀőřėɱ ïṗşůɱ⟧"
       },
+      "tui_blocker_blocked": {
+        "en": "Blocked",
+        "ja": "ブロック中",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "tui_blocker_dependency": {
+        "en": "Waiting on dependency tasks: {ids}",
+        "ja": "依存タスク待ち: {ids}",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ őñ ḓėṗėñḓėñƈẏ ŧȧşķş: {ids} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "tui_blocker_review_wait": {
+        "en": "Waiting for review/gate approval",
+        "ja": "レビュー・ゲート承認待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř řėṽïėẇ/ɠȧŧė ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşů⟧"
+      },
+      "tui_blocker_unassigned": {
+        "en": "No agent assigned",
+        "ja": "担当エージェント未割当",
+        "qps-ploc": "⟦Ñő ȧɠėñŧ ȧşşïɠñėḓ ŀőřėɱ⟧"
+      },
+      "tui_agent_unassigned": {
+        "en": "Unassigned",
+        "ja": "未割当",
+        "qps-ploc": "⟦Ůñȧşşïɠñėḓ ŀőř⟧"
+      },
+      "tui_agents_peer_line": {
+        "en": "Peer message",
+        "ja": "ピア会話",
+        "qps-ploc": "⟦Ṗėėř ɱėşşȧɠė ŀőř⟧"
+      },
       "tui_home_agents_waiting": {
         "en": "{waiting} agents waiting · {humans} waiting on a human",
         "ja": "エージェント待ち {waiting} 件 · 人間待ち {humans} 件",
@@ -9857,6 +9952,46 @@
         "en": "Attention",
         "ja": "要注意",
         "qps-ploc": "⟦Ȧŧŧėñŧïőñ ŀőř⟧"
+      },
+      "tui_attention_blocked": {
+        "en": "Blocked",
+        "ja": "ブロック中",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "tui_attention_waiting_human": {
+        "en": "Waiting for human approval",
+        "ja": "人間の承認待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ħůɱȧñ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗ⟧"
+      },
+      "tui_attention_review_pending": {
+        "en": "Review pending",
+        "ja": "レビュー待ち",
+        "qps-ploc": "⟦Řėṽïėẇ ṗėñḓïñɠ ŀőřė⟧"
+      },
+      "tui_attention_failure": {
+        "en": "Failed",
+        "ja": "失敗",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŀőř⟧"
+      },
+      "tui_attention_next_blocked": {
+        "en": "Check the cause and resolve the input, dependency task, or assignment",
+        "ja": "原因を確認して入力・依存タスク・担当を解消",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ƈȧůşė ȧñḓ řėşőŀṽė ŧħė ïñṗůŧ, ḓėṗėñḓėñƈẏ ŧȧşķ, őř ȧşşïɠñɱėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "tui_attention_next_waiting_human": {
+        "en": "Check the target and blast radius in the approval queue",
+        "ja": "承認キューで対象と影響範囲を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ŧȧřɠėŧ ȧñḓ ƀŀȧşŧ řȧḓïůş ïñ ŧħė ȧṗṗřőṽȧŀ ɋůėůė ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "tui_attention_next_review_pending": {
+        "en": "Review the deliverable and evidence ref",
+        "ja": "成果物と evidence ref をレビュー",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ḓėŀïṽėřȧƀŀė ȧñḓ ėṽïḓėñƈė řėƒ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "tui_attention_next_failure": {
+        "en": "Check the failure classification and retry conditions",
+        "ja": "失敗分類と再実行条件を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ƒȧïŀůřė ƈŀȧşşïƒïƈȧŧïőñ ȧñḓ řėŧřẏ ƈőñḓïŧïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "tui_coord_daemon_offline": {
         "en": "Supervisor daemon offline (E to start)",

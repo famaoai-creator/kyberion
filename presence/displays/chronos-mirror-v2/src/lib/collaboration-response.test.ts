@@ -37,6 +37,7 @@ const projection = {
     {
       event_id: 'event-1',
       kind: 'handoff',
+      code: 'review_pending',
       title: 'Review handoff',
       reason: 'review is pending',
       next_action: 'open trace',
@@ -123,6 +124,25 @@ describe('collaboration response boundary', () => {
       parseCollaborationResponse({
         ok: true,
         projection: { ...projection, events: [{ ...projection.events[0], effort: 'extreme' }] },
+      })
+    ).toBeUndefined();
+  });
+
+  it('rejects an attention item with a missing or invalid code (AC-09)', () => {
+    const { code: _omitted, ...attentionWithoutCode } = projection.attention[0];
+    expect(
+      parseCollaborationResponse({
+        ok: true,
+        projection: { ...projection, attention: [attentionWithoutCode] },
+      })
+    ).toBeUndefined();
+    expect(
+      parseCollaborationResponse({
+        ok: true,
+        projection: {
+          ...projection,
+          attention: [{ ...projection.attention[0], code: 'unexpected' }],
+        },
       })
     ).toBeUndefined();
   });
