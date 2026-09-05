@@ -13,7 +13,12 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import { startBridgeTypingLoop } from '@agent/core/bridge-typing';
 import * as pathResolver from '@agent/core/path-resolver';
-import { safeMkdir } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+} from '@agent/core/secure-io';
 import {
   formatChannelThreadContext,
   runChannelTurn,
@@ -186,14 +191,19 @@ function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
-function resolveDiscordThreadHistoryPath(threadTs: string): string {
-  return pathResolver.resolve(
-    `${DISCORD_THREAD_HISTORY_ROOT}/${sanitizePathSegment(threadTs)}.jsonl`
+export function resolveDiscordThreadHistoryPath(threadTs: string): string {
+  return assertSafeRepositoryPath(
+    pathResolver.resolve(`${DISCORD_THREAD_HISTORY_ROOT}/${sanitizePathSegment(threadTs)}.jsonl`),
+    { allowMissingLeaf: true }
   );
 }
 
 function readDiscordThreadHistory(threadTs: string): DiscordThreadHistoryEntry[] {
   const resolved = resolveDiscordThreadHistoryPath(threadTs);
+  if (!safeExistsSync(resolved)) return [];
+  if (!safeLstat(resolved).isFile()) {
+    throw new Error(`Discord thread history must be an existing regular file: ${threadTs}`);
+  }
   return readJsonLines<DiscordThreadHistoryEntry>(resolved, {
     onMalformed: 'skip',
     map: (value) => {
