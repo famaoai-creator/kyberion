@@ -940,3 +940,9 @@ metricsのresource usage／execution metrics記録に残っていた `MISSION_ID
 reasoning-backendのambient prompt visibilityが参照する `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示prompt visibility優先、mission path存在確認、task／context pack／knowledge refsの収集、provider failoverの既存 semanticsは変更していない。
 
 検証: reasoning／summary retry／failover／prompt visibility **4 files / 42 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 88
+
+pipeline-run-journalの再開候補探索に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。mission journalの候補発見、path boundary、JSONL event復元、approval resumeの既存 semanticsは変更していない。
+
+検証: journal／mission graph／approval resume **3 files / 17 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。

@@ -8,6 +8,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
@@ -247,7 +248,7 @@ function candidateJournalPaths(runId: string): string[] {
       if (safeExistsSync(candidate)) candidates.push(candidate);
     }
   }
-  const missionId = process.env.MISSION_ID?.trim();
+  const missionId = getRegisteredEnvText('MISSION_ID')?.trim();
   if (missionId) candidates.push(pipelineRunJournalPath(id, missionId));
   return [...new Set(candidates)];
 }
