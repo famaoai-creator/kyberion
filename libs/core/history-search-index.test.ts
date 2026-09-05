@@ -70,6 +70,18 @@ describe('history-search-index', () => {
     expect(() => historySearchDatabasePath()).toThrow(/must stay under active\/shared/);
   });
 
+  it('rejects a configured database path replaced by a directory', () => {
+    process.env.KYBERION_HISTORY_SEARCH_DB = DB_PATH;
+    safeMkdir(DB_PATH, { recursive: true });
+    try {
+      expect(() => historySearchDatabasePath()).toThrow(
+        '[HISTORY_SEARCH] database must be a regular file'
+      );
+    } finally {
+      safeRmSync(DB_PATH, { recursive: true, force: true });
+    }
+  });
+
   it('keeps the FTS triggers usable under sqlite trusted_schema=0', () => {
     // Apple's bundled sqlite3 defaults to trusted_schema=0, which forbids using
     // a virtual table inside a trigger body. The index syncs history_fts from
@@ -273,6 +285,21 @@ describe('history-search-index', () => {
       expect.objectContaining({ sourceType: 'trace', tier: 'public' }),
     ]);
     expect(searchHistory({ query: INVALID_TRACE_TOKEN, tiers: ['public'] }).results).toEqual([]);
+  });
+
+  it('skips directory entries that only look like persisted history files', () => {
+    const directoryPath = pathResolver.rootResolve(PRIVATE_CONVERSATION_PATH);
+    const directoryToken = `historydirectorytoken${process.pid}${Date.now()}`;
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(directoryPath, { recursive: true });
+    });
+    process.env.KYBERION_HISTORY_SEARCH_DB = DB_PATH;
+    try {
+      rebuildPublicHistorySearchIndexFromLocalSources();
+      expect(searchHistory({ query: directoryToken, tiers: ['public'] }).results).toEqual([]);
+    } finally {
+      safeRmSync(directoryPath, { recursive: true, force: true });
+    }
   });
 
   it('rebuilds and searches an isolated private mission index only with matching mission authority', () => {

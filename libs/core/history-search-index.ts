@@ -6,6 +6,7 @@ import {
   safeExistsSync,
   safeExecResult,
   safeMkdir,
+  safeLstat,
   safeReaddir,
   safeReadFile,
 } from './secure-io.js';
@@ -97,7 +98,7 @@ const VALID_TIERS = new Set<HistorySearchTier>(['public', 'confidential', 'perso
 function safeHistoryDirectory(filePath: string): string | undefined {
   try {
     const resolved = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-    return safeExistsSync(resolved) ? resolved : undefined;
+    return safeExistsSync(resolved) && safeLstat(resolved).isDirectory() ? resolved : undefined;
   } catch {
     return undefined;
   }
@@ -105,7 +106,8 @@ function safeHistoryDirectory(filePath: string): string | undefined {
 
 function safeHistoryFile(filePath: string): string | undefined {
   try {
-    return assertSafeRepositoryPath(filePath);
+    const resolved = assertSafeRepositoryPath(filePath);
+    return safeLstat(resolved).isFile() ? resolved : undefined;
   } catch {
     return undefined;
   }
@@ -139,7 +141,11 @@ function databasePath(): string {
   if (!absolute.startsWith(sharedRoot)) {
     throw new Error(`history search database must stay under active/shared (received ${absolute})`);
   }
-  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
+  const safePath = assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
+  if (safeExistsSync(safePath) && !safeLstat(safePath).isFile()) {
+    throw new Error(`[HISTORY_SEARCH] database must be a regular file: ${safePath}`);
+  }
+  return safePath;
 }
 
 function sqlLiteral(value: unknown): string {
