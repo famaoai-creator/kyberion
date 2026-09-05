@@ -17,19 +17,14 @@ import { initializeMissionTeamBindings } from './mission-team-binding.js';
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
+import { readTextFile } from './foundation/text.js';
 import { inferMissionOutcomeContract } from './outcome-contract.js';
 import { ensureDefaultTenantProfile, resolveTenant } from './tenant-registry.js';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign } from './mission-review-gates.js';
 import { consumeIntentGoalHandoff } from './intent-handoff.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { transitionStatus } from './mission-status.js';
 import { withExecutionContext } from './authority.js';
 import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js';
@@ -328,7 +323,7 @@ export async function createMission(args: {
     const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
     const safeTaskBoardPath = assertSafeRepositoryPath(taskBoardPath, { allowMissingLeaf: true });
     if (safeExistsSync(safeTaskBoardPath)) {
-      const board = safeReadFile(safeTaskBoardPath, { encoding: 'utf8' }) as string;
+      const board = readTextFile(safeTaskBoardPath);
       const headerLine =
         `> Class: \`${classification.mission_class}\` (risk: ${classification.risk_profile}) · ` +
         `Process: \`${workflowDesign.workflow_id}\` — ${workflowDesign.phases.join(' → ')}`;

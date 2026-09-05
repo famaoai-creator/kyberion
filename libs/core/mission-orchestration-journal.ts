@@ -1,6 +1,6 @@
 import { appendJsonLine, parseSafeJsonInput, readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import * as crypto from 'node:crypto';
 import * as nodePath from 'node:path';
@@ -9,7 +9,6 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   safeReaddir,
   safeLstat,
@@ -354,7 +353,7 @@ export function loadProvisionedEntryRecords(
   if (!safeLstat(filePath).isFile()) {
     throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_record_file`);
   }
-  const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(filePath);
   return raw
     .split(/\r?\n/u)
     .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
@@ -443,7 +442,7 @@ export function findMissingProvisionedEntries(
 
     let raw: string;
     try {
-      raw = String(safeReadFile(targetPath, { encoding: 'utf8' }) || '');
+      raw = readTextFile(targetPath);
     } catch (error) {
       throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_unreadable:${record.entry_id}`, {
         cause: error,
@@ -543,7 +542,7 @@ export function writeProvisionedText(input: {
       });
       const safeFilePath = artifactPath(input.filePath);
       safeWriteFile(safeFilePath, input.provisioned.content);
-      const content = String(safeReadFile(safeFilePath, { encoding: 'utf8' }) || '');
+      const content = readTextFile(safeFilePath);
       if (content !== input.provisioned.content) {
         throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_mismatch');
       }
@@ -777,7 +776,7 @@ export function loadMissionOrchestrationJournal(
   if (!safeLstat(filePath).isFile()) {
     throw new Error('MISSION_LOG_CORRUPT:journal_file_not_regular');
   }
-  const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(filePath);
   return raw
     .split(/\r?\n/u)
     .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
