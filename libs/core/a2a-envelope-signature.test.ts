@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   canonicalA2AEnvelopeContent,
   _resetA2ASecretCacheForTests,
@@ -55,6 +57,16 @@ describe('a2a-envelope-signature (AA-03)', () => {
 
   it('resolves env secrets without touching the persisted key file', () => {
     expect(resolveA2ASecret()).toBe('test-secret-key');
+  });
+
+  it('fails closed when the persisted secret resource is not a regular file', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/a2a-envelope-signature.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('safeLstat(secretPath).isFile()');
+    expect(source).toContain('[A2A_SECRET_RESOURCE]');
   });
 
   it('defaults to warn mode; enforce only when explicitly set', () => {
