@@ -1,4 +1,4 @@
-import * as pptxUtils from '@agent/core/src/pptx-utils';
+import * as pptxUtils from '@agent/core/pptx-utils';
 import { runGovernedCommand } from '@agent/core/command-runner';
 import type { ExtractionMode, ExtractionOptions, ExtractionResult } from './extraction-engine.js';
 import { collectXmlCaptures } from './xml-utils.js';
