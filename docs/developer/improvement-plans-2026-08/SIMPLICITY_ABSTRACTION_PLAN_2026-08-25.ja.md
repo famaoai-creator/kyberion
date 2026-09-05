@@ -22167,3 +22167,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/generate_design_tokens.ts`、`scripts/generate_design_tokens.entrypoint.test.ts`
 - **変更**: design token generator のCSS／Tailwind／themes本文読込を foundation の `readTextFile` へ統一した。生成対象、token replacement、theme merge、`--check`／renderの既存semanticsは変更せず、SX-06 generatorに残っていた旧 `safeReadFile` 直読4箇所を削減し、entrypoint contract testを追加した。
 - **検証**: design-token generator contract **1 test passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残るproduction loader／generatorの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1495
+
+- **対象**: `scripts/generate_capability_seams.ts`、`scripts/generate_capability_seams.entrypoint.test.ts`
+- **変更**: capability seam generator の declaration source 本文読込を foundation の `readTextFile` へ移行した。既存の seam catalog 検証、consumer existence check、生成文書の `--check`／normalize semantics は変更せず、entrypoint contract testでcanonical readerと旧 `safeReadFile` 直読の不在を固定した。
+- **検証**: capability-seams generator contract **1 test passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残るproduction loader／generatorの全件codemodは継続課題とする。
