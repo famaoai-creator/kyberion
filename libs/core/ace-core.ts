@@ -1,6 +1,20 @@
 import { createHash } from 'node:crypto';
-import { safeAppendFileSync, safeExistsSync, safeReadFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeAppendFileSync,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from './secure-io.js';
 import { nowIso } from './foundation/time.js';
+
+function safeMinutesPath(minutesPath: string): string {
+  const safePath = assertSafeRepositoryPath(minutesPath, { allowMissingLeaf: true });
+  if (safeExistsSync(safePath) && !safeLstat(safePath).isFile()) {
+    throw new Error(`[ACE_MINUTES] minutes path must be a regular file: ${minutesPath}`);
+  }
+  return safePath;
+}
 
 /**
  * ACE (Autonomous Consensus Engine) Core Utility
@@ -18,9 +32,10 @@ export const aceCore = {
   },
 
   appendThought: (minutesPath: string, role: string, thought: string, _metadata = {}) => {
+    const safePath = safeMinutesPath(minutesPath);
     let content = '';
-    if (safeExistsSync(minutesPath)) {
-      content = safeReadFile(minutesPath, { encoding: 'utf8' }) as string;
+    if (safeExistsSync(safePath)) {
+      content = safeReadFile(safePath, { encoding: 'utf8' }) as string;
     }
 
     const prevHash = aceCore.calculateHash(content);
@@ -32,13 +47,14 @@ export const aceCore = {
     const entryHash = aceCore.calculateHash(entryHeader + entryBody);
     const finalEntry = entryHeader + entryHash.substring(0, 8) + entryBody;
 
-    safeAppendFileSync(minutesPath, finalEntry);
+    safeAppendFileSync(safePath, finalEntry);
     return entryHash;
   },
 
   validateIntegrity: (minutesPath: string) => {
-    if (!safeExistsSync(minutesPath)) return true;
-    const content = safeReadFile(minutesPath, { encoding: 'utf8' }) as string;
+    const safePath = safeMinutesPath(minutesPath);
+    if (!safeExistsSync(safePath)) return true;
+    const content = safeReadFile(safePath, { encoding: 'utf8' }) as string;
     const entries = content.split(/\n(?=### \[)/).filter(Boolean);
     let prefixContent = '';
 
@@ -49,7 +65,10 @@ export const aceCore = {
       if (!headerMatch) return false;
 
       const [, role, timestamp, prevHash, storedHash] = headerMatch;
-      const body = entry.slice(headerMatch[0].length);
+      // The header matcher consumes the newline separating the hash field from
+      // the thought body; restore it so verification hashes the same bytes as
+      // appendThought().
+      const body = `\n${entry.slice(headerMatch[0].length)}`;
       const expectedPrevHash = aceCore.calculateHash(prefixContent).substring(0, 8);
       if (prevHash !== expectedPrevHash) return false;
 
