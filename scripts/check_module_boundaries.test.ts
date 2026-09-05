@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { checkModuleBoundaries } from './check_module_boundaries.js';
 
 describe('module boundary ratchet', () => {
+  it('uses the foundation text reader for module source files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_module_boundaries.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   it('does not allow cycles or forbidden direction edges to grow', () => {
     const report = checkModuleBoundaries();
     expect(report.violations).toEqual([]);

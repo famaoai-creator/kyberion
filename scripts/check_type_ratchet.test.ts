@@ -22,6 +22,16 @@ function writeFixture(relativePath: string, content: string): string {
 }
 
 describe('check_type_ratchet', () => {
+  it('uses the foundation text reader for TypeScript source files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_type_ratchet.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain('getRegisteredEnvText, nowIso, readTextFile');
+    expect(source).not.toContain('safeReadFile(filePath');
+  });
+
   afterEach(() => {
     if (safeExistsSync(FIXTURE_DIR)) {
       safeRmSync(FIXTURE_DIR, { recursive: true, force: true });

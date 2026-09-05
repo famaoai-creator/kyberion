@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -203,7 +204,7 @@ export function extractCanonicalFirstWinCommands(source: string): string[] | nul
 export function validateCanonicalFirstWinDocumentation(
   documents: ReadonlyArray<{ file: string; source: string }> = FIRST_WIN_DOCUMENTS.map((file) => ({
     file,
-    source: String(safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' }) || ''),
+    source: readTextFile(pathResolver.rootResolve(file)),
   }))
 ): string[] {
   const violations: string[] = [];
@@ -247,7 +248,7 @@ export function checkFirstWinSmoke(): string[] {
       violations.push(`${rule.file}: missing`);
       continue;
     }
-    const text = String(safeReadFile(abs, { encoding: 'utf8' }) || '');
+    const text = readTextFile(abs);
     for (const needle of rule.required) {
       if (!text.includes(needle)) {
         violations.push(`${rule.file}: missing "${needle}"`);
