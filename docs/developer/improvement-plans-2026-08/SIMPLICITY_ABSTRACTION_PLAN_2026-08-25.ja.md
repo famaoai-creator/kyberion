@@ -19769,6 +19769,17 @@ SX-03のCLI provider組み立て境界を再監査し、Claude／Codex／Gemini�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1178
+
+SX-03のGrok CLI backend境界を再監査し、probeのbinary、model、timeout、extra args、availability診断における環境直読を`getRegisteredEnvText(name, { env })`へ移行した。明示binの優先、version probe、provider child env allowlist、structured output、wall-clock／session制御は変更していない。
+
+検証:
+
+- `shell-grok-cli-backend.test.ts` **13 tests passed**。availability、structured output、session／native subagent、spawn env allowlist、env accessor境界を確認した。
+- 対象ESLint、`git diff --check` passed。対象Grok CLI moduleの`env.KYBERION_*`直接参照は0件。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
