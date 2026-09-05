@@ -6,6 +6,7 @@ import {
   safeReadFile,
   safeExistsSync,
   safeReaddir,
+  safeLstat,
   safeStat,
 } from './secure-io.js';
 import { isRecord } from './foundation/text.js';
@@ -238,6 +239,10 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
     }
     try {
       const filePath = assertSafeRepositoryPath(path.join(agentsDir, file));
+      if (!safeLstat(filePath).isFile()) {
+        logger.warn(`[AGENT_MANIFEST] Skipping ${file}: manifest must be a regular file`);
+        continue;
+      }
       const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       const { meta, body } = parseFrontmatter(content);
 
