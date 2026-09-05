@@ -426,7 +426,10 @@ async function probeMediaBackendAvailabilityUncached(
       ?.split('|')
       .map((name) => name.trim())
       .filter(Boolean) || [];
-  if (credentialNames.length > 0 && !credentialNames.some((name) => process.env[name]?.trim())) {
+  if (
+    credentialNames.length > 0 &&
+    !credentialNames.some((name) => getRegisteredEnvText(name)?.trim())
+  ) {
     return {
       backend_id: backend.backend_id,
       modality: backend.modality,

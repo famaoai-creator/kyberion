@@ -18,6 +18,7 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { metrics } from './metrics.js';
 import type { MissionWorkingMemory } from './mission-working-memory.js';
@@ -191,7 +192,7 @@ export function isPromptTooLongError(error: unknown): boolean {
 }
 
 function readEnvTokens(name: string): number | undefined {
-  const raw = process.env[name];
+  const raw = getRegisteredEnvText(name);
   if (!raw?.trim()) return undefined;
   const value = Number(raw);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
