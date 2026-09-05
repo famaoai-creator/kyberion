@@ -22455,3 +22455,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/agent_runtime_supervisor_daemon.ts`、`scripts/refactor/prune_unused_imports.ts` と reader contract tests
 - **変更**: supervisor daemon のロックPID本文と import-pruning refactor の対象ソース本文を foundation の `readTextFile` へ移行した。バイナリ用途の secure-io 読取、daemon の stale-lock 判定／cleanup、import pruning の AST解析・write semanticsは変更せず、両エントリポイントに reader contract を追加した。
 - **検証**: supervisor daemon **既存テスト＋reader contract passed**（11 tests）、prune refactor の dry-run probe passed、foundation-adoption **passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1543
+
+- **対象**: `libs/shared-nerve/src/reflex-engine.ts`、`libs/core/deliverable-inbox.ts`、`libs/core/agent-adapter.ts`、`libs/shared-network/src/mcp-server-engine.ts` と対象テスト
+- **変更**: reflex定義、deliverable lock、Gemini wisdom、MCP pipeline／actuator manifest の本文読込を foundation の `readTextFile` へ移行した。secure path／regular-file検証、JSON／catalog解析、lock stale判定、MCPのallowlist・caller scope・approval semanticsは変更せず、既存テストのFoundation I/Oモックを新しい読取経路へ適応した。
+- **検証**: 対象テスト **4 files／80 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

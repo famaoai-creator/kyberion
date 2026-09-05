@@ -6,6 +6,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { pathResolver } from './path-resolver.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
+import { readTextFile } from './foundation/text.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeSymlinkSync } from './secure-io.js';
 
 const codexMocks = vi.hoisted(() => ({
@@ -207,9 +208,7 @@ describe('AgyAdapter', () => {
 
 describe('GeminiWisdomEnhancer path boundary', () => {
   it('revalidates the evolution directory and each lesson before reading', async () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('libs/core/agent-adapter.ts'), { encoding: 'utf8' })
-    );
+    const source = readTextFile(pathResolver.rootResolve('libs/core/agent-adapter.ts'));
     expect(source).toContain('assertSafeRepositoryPath(');
     expect(source).toContain('const wisdomFile = assertSafeRepositoryPath');
     expect(source).toContain('safeLstat(wisdomFile).isFile()');

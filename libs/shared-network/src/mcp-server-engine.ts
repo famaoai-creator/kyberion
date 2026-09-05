@@ -33,7 +33,6 @@ import {
   safeExistsSync,
   safeExec,
   safeLstat,
-  safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -43,7 +42,13 @@ import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-re
 import { normalizeEventScope } from '@agent/core/event-scope';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
 import { logger } from '@agent/core/core';
-import { defineCatalog, getRegisteredEnvText, isRecord, nowIso } from '@agent/core/foundation';
+import {
+  defineCatalog,
+  getRegisteredEnvText,
+  isRecord,
+  nowIso,
+  readTextFile,
+} from '@agent/core/foundation';
 import {
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -410,7 +415,7 @@ function listPipelines(catalog: ToolCatalog): PipelineListEntry[] {
     const runnable = isPipelineAllowed(relPath, catalog);
     try {
       const safePath = resolveRegularRepositoryFile(fullPath, `Pipeline '${relPath}'`);
-      const raw = safeReadFile(safePath, { encoding: 'utf8' }) as string;
+      const raw = readTextFile(safePath);
       const parsed = parseSafeJsonObject(raw);
       if (!parsed) throw new Error(`Invalid pipeline metadata: ${relPath}`);
       results.push({
@@ -558,7 +563,7 @@ function listCapabilities(): { actuator: string; ops: string[] }[] {
         nodePath.join(actuatorsDir, dir, 'manifest.json'),
         `Actuator '${dir}' manifest`
       );
-      const raw = safeReadFile(manifestPath, { encoding: 'utf8' }) as string;
+      const raw = readTextFile(manifestPath);
       const manifest = parseSafeJsonObject(raw);
       if (!manifest) throw new Error(`Invalid actuator manifest: ${dir}`);
       const capabilities = Array.isArray(manifest.capabilities)
