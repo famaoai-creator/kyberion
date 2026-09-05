@@ -99,12 +99,14 @@ describe('loadRestrictedActionRules', () => {
     ]);
   });
 
-  it('returns an empty rule set for schema-invalid policy records', () => {
+  it('fails closed for schema-invalid policy records', () => {
     const file = path.join(tmpDir, 'invalid.json');
     safeMkdir(tmpDir, { recursive: true });
     safeWriteFile(file, JSON.stringify({ version: '2026-08-29', rules: [{ id: 'broken' }] }));
 
-    expect(loadRestrictedActionRules({ path: file })).toEqual([]);
+    expect(() => loadRestrictedActionRules({ path: file })).toThrow(
+      'Invalid catalog restricted-action-kinds-policy'
+    );
   });
 
   it('rejects an override outside the repository before it can disable restrictions', () => {
