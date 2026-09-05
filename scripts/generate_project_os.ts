@@ -1,13 +1,8 @@
 import * as path from 'node:path';
 import { loadProjectOperatingSystemArtifactMap } from '@agent/core/project-management';
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-} from '@agent/core/secure-io';
-import { slugify } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { readTextFile, slugify } from '@agent/core/foundation';
 import {
   defineGenerator,
   isDirectScript,
@@ -187,7 +182,7 @@ export function renderProjectOs(argv: readonly string[]): GeneratedFile[] {
       if (!safeExistsSync(sourcePath) || !safeLstat(sourcePath).isFile()) continue;
 
       const targetPath = path.join(phaseDir, blueprintName);
-      const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
+      const content = readTextFile(sourcePath);
       const sourceReference = path
         .relative(pathResolver.rootDir(), sourcePath)
         .split(path.sep)
