@@ -7,6 +7,7 @@
 import { safeExecResult } from '@agent/core/secure-io';
 import { secretGuard } from '@agent/core/secret-guard';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type AppPreflightStatus = 'pass' | 'fail' | 'warn';
@@ -68,13 +69,10 @@ function probeIosRuntimes(): AppPreflightItem {
 }
 
 function probeAndroidEnv(): AppPreflightItem {
-  if (process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT) {
-    return item(
-      'android.env',
-      'pass',
-      `ANDROID_HOME=${process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT}`,
-      'none'
-    );
+  const androidHome =
+    getRegisteredEnvText('ANDROID_HOME') || getRegisteredEnvText('ANDROID_SDK_ROOT');
+  if (androidHome) {
+    return item('android.env', 'pass', `ANDROID_HOME=${androidHome}`, 'none');
   }
   return item(
     'android.env',
