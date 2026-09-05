@@ -34,7 +34,12 @@ import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import chalk from 'chalk';
-import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonInput,
+  readTextFile,
+} from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   handleCalendarWorkflowCommand,
@@ -1137,7 +1142,7 @@ export function shouldBootstrapRuntime(args: string[]): boolean {
 
 async function mainImpl(args: string[] = [], print: Print = () => undefined) {
   activeCliArgs = [...args];
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   printMissionContextBanner(missionId);
 
   const actuators = loadActuators();
