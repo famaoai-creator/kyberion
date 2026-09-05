@@ -1,7 +1,7 @@
 ---
 title: SX-08b surface intent consolidation follow-up
 tags: [simplicity, surface, intent, 2026-08]
-last_updated: 2026-09-01
+last_updated: 2026-09-06
 status: active
 ---
 
@@ -1810,3 +1810,9 @@ Computer Surfaceの認証・OS projection・A2UI・identity read境界を共通w
 ## 2026-09-06 再レビュー修正 237
 
 Conciergeのviewer／主要API境界を共通wire-safe projectionへ統一し、内部例外のmessage／stackを外部JSONへ返さないようにした。rate limit、validation、not-found、既存の認証拒否 semanticsを維持し、wire checkerの実ファイル監査対象へConciergeを追加した。関連 **12 files / 33 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 238
+
+`KYBERION_ALLOW_UNAUTH_REMOTE=1` の意味変更について、実装済みの移行注記を `CHANGELOG.md` の Unreleased Security / migration notes と計画の完了条件へ接続した。registered env accessor が `1`／`true`／`yes`／`on` を受け付け、API token／localadmin token が未設定の場合だけ未認証 remote readonly を許可すること、既存環境は値を監査して意図しない場合は unset または `false` にすることを明記した。tokenが設定済みの環境と loopback／proxy の既存境界は変更していない。
+
+検証: Chronos API guard **1 file / 9 tests passed**。残る SX-08b の自由文入口統合、12 surface の全面 contract 描画、approval 本番相当テスト、Slack context／typing の共通化は継続課題とする。
