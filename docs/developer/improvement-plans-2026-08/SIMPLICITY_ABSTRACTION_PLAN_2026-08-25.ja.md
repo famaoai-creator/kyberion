@@ -21483,3 +21483,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/actuators/modeling-actuator/src/modeling-pipeline-helpers.ts`、`libs/actuators/modeling-actuator/src/modeling-preset.resource-boundary.test.ts`
 - **変更**: modeling actuatorのbrowser execution presetについて、組み込みpreset・認証情報・catalog不正時のretry／fallbackを削除した。正本presetの欠損・schema不正、未知preset、email／password未設定は明示拒否し、正本presetからbrowser pipelineを生成する既存経路は維持している。
 - **検証**: modeling preset resource boundary **1 file / 1 test passed**、対象ESLint、Prettier、`git diff --check`。typecheckは別作業の未コミットcursor-cli／runtime-model-defaults変更に起因する2エラーで未完了。canonical full gateは同変更の整理後に再実行する。
+
+## 2026-09-06 再レビュー修正 1381
+
+- **対象**: `libs/actuators/browser-actuator/src/browser-passkey-helpers.ts`、`libs/actuators/browser-actuator/src/browser-passkey.resource-boundary.test.ts`
+- **変更**: browser passkey providerの組み込みwebauthn.io catalog／loader fallbackを削除し、正本catalogの欠損・schema不正を明示拒否する必須境界へ統一した。未知providerの拒否、navigation policy、virtual authenticator、選択providerの結果返却は維持している。
+- **検証**: browser-passkey-catalog／browser-passkey resource boundary **2 files / 3 tests passed**、対象ESLint、Prettier、`git diff --check`。typecheckは別作業の未コミットcursor-cli／runtime-model-defaults変更に起因する2エラーで未完了。canonical full gateは同変更の整理後に再実行する。
