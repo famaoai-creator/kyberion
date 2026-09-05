@@ -1570,3 +1570,9 @@ video motion patternの大規模な組み込みcatalogと、正本catalogの欠�
 trust engineの組み込みdefault trust policyと、正本policyの欠損・schema不正をdefaultへ収束させるfallback／telemetryを削除し、信頼スコア計算・decay・propagation・tier判定を正本policyからのみ解決する境界へ統一した。trust ledger未作成時の初期状態、score更新、history保存と外部root拒否は変更していない。
 
 検証: trust-engine **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 193
+
+external service registryのpublic seed／provider catalogを必須化し、personal overlayとruntime storeは未作成時のみ明示的な空catalogを使う構造へ整理した。既存registryのschema不正は空registryへ戻さず拒否し、runtime登録・統計更新とprovider URL解決の既存優先順位は維持している。
+
+検証: external-service-registry **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
