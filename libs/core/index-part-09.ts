@@ -144,6 +144,8 @@ export * from './agent-collaboration-events.js';
 
 export * from './agent-collaboration-projection.js';
 
+export * from './agent-collaboration-tree.js';
+
 export * from './native-subagent-adopter.js';
 // Surface-level type definitions (importable without pulling in channel-surface implementation)
 

@@ -71,6 +71,14 @@ export interface AgentCollaborationEvent {
   summary: string;
   correlation_id?: string;
   causation_id?: string;
+  /**
+   * AC-04: approval correlation. `approval_request` / `approval_response`
+   * carry these inside their worker-event payload; the collaboration tree
+   * matches an open request to its answer by `request_id` and names the human
+   * it is waiting on by `channel`.
+   */
+  request_id?: string;
+  channel?: string;
   related_ids: string[];
   evidence_refs: string[];
   tier?: 'personal' | 'confidential' | 'public';
@@ -269,6 +277,8 @@ export function createAgentCollaborationEvent(
     summary: redactCollaborationSummary(input.summary),
     ...(input.correlation_id ? { correlation_id: input.correlation_id } : {}),
     ...(input.causation_id ? { causation_id: input.causation_id } : {}),
+    ...(input.request_id ? { request_id: input.request_id } : {}),
+    ...(input.channel ? { channel: input.channel } : {}),
     related_ids: [...new Set(input.related_ids || [])],
     evidence_refs: [...new Set(input.evidence_refs || [])],
     ...(scope?.tier ? { tier: scope.tier } : {}),
