@@ -21622,6 +21622,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Presence Studioの内部例外JSON応答を共通`presenceStudioWireError`へ統一し、固定message／`error_code`／`correlation_id`だけをwireへ返すようにした。監査ログの診断情報、既存の明示的なvalidation／not-found文言、HTTP statusは維持し、wire checkerの対象へPresence Studioを追加してoptional chainingとtemplate interpolationも検出するようにした。
 - **検証**: Presence Studio／wire boundary **4 files / 13 tests passed**、実ファイルwire checker `OK`、typecheck、対象ESLint、Prettier。全 script harness／generator 移行、provider CLIの実機enforcement結果は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1405
+
+- **対象**: `scripts/browser_bridge_host.ts`、`scripts/check_wire_error_boundary.ts`、`scripts/check_wire_error_boundary.test.ts`
+- **変更**: Browser Native Messaging hostのrecording／delta／analysis／report保存とdispatch外側catchに残っていた内部例外のraw messageを`formatWireError`へ統一した。既存の入力検証・承認拒否・not-foundなどの利用者向けエラーは維持し、wire checkerをhostへ拡張して例外message／template interpolationの再発を検出するようにした。
+- **検証**: Browser Bridge／wire boundary **3 files / 16 tests passed**、実ファイルwire checker `OK`、typecheck、対象ESLint、Prettier、`git diff --check`。全 script harness／generator 移行、provider CLIの実機enforcement結果は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`
