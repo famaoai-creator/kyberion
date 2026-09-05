@@ -41,7 +41,7 @@ export function findWireErrorBoundaryViolations(
   }
   if (file.includes('/app/api/')) {
     const rawObjectPattern =
-      /\berror:\s*(?:err|error)(?:\?\.)?\.message\b|\berror:\s*(?:err|error)\s+instanceof\s+Error\s*\?\s*(?:err|error)\.message\b/gu;
+      /\berror:\s*(?:err|error)(?:\.|\?\.)message\b|\berror:\s*(?:err|error)\s+instanceof\s+Error\s*\?\s*(?:err|error)(?:\.|\?\.)message\b/gu;
     for (const match of source.matchAll(rawObjectPattern)) {
       findings.push(`${file}: raw exception message in JSON error near offset ${match.index}`);
     }
