@@ -16,6 +16,7 @@
  */
 
 import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { loadServiceRecordingAtPath } from '@agent/core/service-recording';
 import { withExecutionContext } from '@agent/core/authority';
 import { loadProcedures, resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
@@ -85,7 +86,8 @@ export const main = defineScript({
       }
     }
 
-    const missionId = args['mission-id'] || process.env.MISSION_ID || `MSN-PROC-${procedureId}`;
+    const missionId =
+      args['mission-id'] || getRegisteredEnvText('MISSION_ID') || `MSN-PROC-${procedureId}`;
     const result = await withExecutionContext('surface_runtime', () =>
       dispatchProcedure({
         procedure: entry!,
