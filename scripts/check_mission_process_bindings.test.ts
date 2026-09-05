@@ -17,6 +17,8 @@ describe('mission process bindings checker', () => {
     expect(source).toContain('loadMissionClassificationPolicy()');
     expect(source).toContain('loadMissionReviewGateRegistry()');
     expect(source).toContain('loadMissionProcessRegistry()');
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
     expect(source).not.toContain('readFoundationJson');
     expect(source).not.toContain('function readJson(');
   });

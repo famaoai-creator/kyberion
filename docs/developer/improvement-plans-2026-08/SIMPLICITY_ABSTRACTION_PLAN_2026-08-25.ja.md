@@ -22287,3 +22287,21 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_mission_gate_docs.ts`、`scripts/check_mission_gate_docs.test.ts`
 - **変更**: mission-gate documentation checker の対象Markdown本文読込を foundation の `readTextFile` へ移行した。scan root／historical exclusion、retired wording検出、violation line reporting、shared CLI semanticsは変更せず、既存テストにreader contractを追加した。
 - **検証**: mission-gate-docs **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1515
+
+- **対象**: `scripts/check_op_preflight_coverage.ts`、`scripts/check_op_preflight_coverage.test.ts`
+- **変更**: op preflight coverage checker の boundary／shared helper source本文読込を foundation の `readTextFile` へ統一した。preflight coverage rule、comment／literal masking、missing connection報告は変更せず、既存テストにreader contractを追加した。
+- **検証**: op-preflight-coverage **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1516
+
+- **対象**: `scripts/check_mission_process_bindings.ts`、`scripts/check_mission_process_bindings.test.ts`
+- **変更**: mission process binding checker の governance frontmatter本文読込を foundation の `readTextFile` へ移行した。mission／gate／workflow governed loaders、YAML frontmatter抽出、binding violation semanticsは変更せず、既存テストにreader contractを追加した。
+- **検証**: mission-process-bindings **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1517
+
+- **対象**: `scripts/check_max_file_lines.ts`、`scripts/check_max_file_lines.entrypoint.test.ts`
+- **変更**: max file lines checker の source本文読込を foundation の `readTextFile` へ移行した。comment masking、configured roots／exceptions、line-count threshold、violation sort semanticsは変更せず、entrypoint contract testで旧 `safeReadFile` 直読の再導入を検出する。
+- **検証**: max-file-lines **reader contract passed**、対象ESLint、Prettier、`git diff --check`。実checkerは共有worktreeの未コミットvoice-actuator変更により `libs/actuators/voice-actuator/src/index.ts` が **1685行（上限1500）** と報告したため、当該実装の分割・書換えは行わず残件として保持する。残るchecker移行は継続課題とする。
