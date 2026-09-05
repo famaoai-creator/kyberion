@@ -1,4 +1,5 @@
 import { eventScopeMatches, type EventScope, type EventScopeInput } from '@agent/core/event-scope';
+import { withExecutionContext } from '@agent/core/authority';
 import { isRecord } from '@agent/core/foundation';
 import { t } from '@agent/core/t';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
@@ -358,17 +359,7 @@ export function intentResolutionA2ui(
 }
 
 export function withMissionRole<T>(role: string, fn: () => T): T {
-  const previousRole = process.env.MISSION_ROLE;
-  process.env.MISSION_ROLE = role;
-  try {
-    return fn();
-  } finally {
-    if (previousRole === undefined) {
-      delete process.env.MISSION_ROLE;
-    } else {
-      process.env.MISSION_ROLE = previousRole;
-    }
-  }
+  return withExecutionContext(role, fn);
 }
 
 export function sanitizeMissionSlug(value: string): string {
