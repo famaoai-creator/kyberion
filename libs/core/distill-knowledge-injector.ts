@@ -201,6 +201,10 @@ function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
         seenKeys.add(key);
         continue;
       }
+      if (!safeLstat(abs).isFile()) {
+        seenKeys.add(key);
+        continue;
+      }
       let text: string;
       try {
         text = safeReadFile(abs, { encoding: 'utf8' }) as string;
