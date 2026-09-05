@@ -1102,3 +1102,9 @@ structured loggerのquiet／level／format設定に残っていた `LOG_LEVEL`�
 traceのOTLP exporterに残っていた `OTEL_EXPORTER_OTLP_ENDPOINT`／`OTEL_EXPORTER_OTLP_HEADERS` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。OTLP opt-in、endpoint補完、egress policy、header parsing、export failureの非干渉性は変更していない。
 
 検証: trace OTLP bridge **1 file / 4 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 115
+
+ingest CLIの実行者 fallbackに残っていた `MISSION_ROLE` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `--ingested-by`、`KYBERION_PERSONA` 優先、匿名 ingest 拒否、ledger記録の既存 semanticsは変更していない。
+
+検証: ingest entrypoint **1 file / 2 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
