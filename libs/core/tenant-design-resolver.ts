@@ -2,7 +2,13 @@ import * as path from 'node:path';
 import { customerRoot } from './customer-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat, safeReaddir, safeStat } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+  safeStat,
+} from './secure-io.js';
 import {
   loadTenantDesignOverride,
   loadTenantDesignThemeOverlay,
@@ -34,29 +40,32 @@ export interface TenantDesignOverrideIndex {
   tenants: TenantDesignOverrideIndexEntry[];
 }
 
-export interface TenantDesignOverrideIndexLoadOptions {
-  /** When false, a present but invalid index throws instead of becoming empty. */
-  fallbackOnInvalid?: boolean;
-}
-
 export { loadTenantDesignOverride, type TenantDesignOverride } from './tenant-design-override.js';
 export {
   loadTenantDesignThemeOverlay,
   type TenantDesignThemeOverlay,
 } from './tenant-design-override.js';
 
+export interface TenantDesignOverrideIndexLoadOptions {
+  /** @deprecated Invalid catalogs always throw; retained for caller compatibility. */
+  fallbackOnInvalid?: boolean;
+}
+
 export function loadTenantDesignOverrideIndex(
   rootDir = pathResolver.rootDir(),
-  options: TenantDesignOverrideIndexLoadOptions = {}
+  _options: TenantDesignOverrideIndexLoadOptions = {}
 ): TenantDesignOverrideIndex {
+  const indexPath = assertSafeRepositoryPath(
+    path.join(rootDir, 'knowledge/confidential/tenants/index.json'),
+    { allowMissingLeaf: true }
+  );
+  if (!safeExistsSync(indexPath)) return { tenants: [] };
   const catalog = defineCatalog<TenantDesignOverrideIndex>({
     id: 'tenant-design-override-index',
-    path: path.join(rootDir, 'knowledge/confidential/tenants/index.json'),
+    path: indexPath,
     schema: pathResolver.rootResolve(
       'knowledge/product/schemas/tenant-design-override-index.schema.json'
     ),
-    fallback: { tenants: [] },
-    fallbackOnInvalid: options.fallbackOnInvalid ?? true,
   });
   return catalog.load();
 }
