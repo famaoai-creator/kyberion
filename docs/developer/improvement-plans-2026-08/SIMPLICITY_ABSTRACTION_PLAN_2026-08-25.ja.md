@@ -20711,6 +20711,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: tier-guardのtenant／tier認可パス展開に残っていた `MISSION_ID` の環境直読9箇所を、登録済み `getRegisteredEnvText` へ統一した。authority／persona permissionのmission placeholder展開、missing／corrupt policyのfail-closed、tenant scope判定の既存 semanticsは変更していない。
 - **検証**: tier-guard関連 **3 files / 45 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
 
+## 2026-09-05 再レビュー修正 1253
+
+- **対象**: `libs/core/capability-broker.ts`
+- **変更**: capability-brokerのmission pin pathとpin metadataに残っていた `MISSION_ID` の環境直読2箇所を、登録済み `getRegisteredEnvText` へ統一した。missionごとのprovider pin配置、path escape防止、pin再利用とaudit actorの既存 semanticsは変更していない。
+- **検証**: capability-broker **1 file / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

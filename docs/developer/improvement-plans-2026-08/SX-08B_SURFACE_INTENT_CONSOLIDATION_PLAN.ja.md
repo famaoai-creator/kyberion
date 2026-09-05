@@ -910,3 +910,9 @@ system actuatorのshell実行で残っていた `SHELL` の環境直読を、登
 tier-guardのtenant／tier認可パス展開に残っていた `MISSION_ID` の環境直読9箇所を、登録済み `getRegisteredEnvText` へ統一した。authority／persona permissionのmission placeholder展開、missing／corrupt policyのfail-closed、tenant scope判定の既存 semanticsは変更していない。
 
 検証: tier-guard関連 **3 files / 45 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 83
+
+capability-brokerのmission pin pathとpin metadataに残っていた `MISSION_ID` の環境直読2箇所を、登録済み `getRegisteredEnvText` へ統一した。missionごとのprovider pin配置、path escape防止、pin再利用とaudit actorの既存 semanticsは変更していない。
+
+検証: capability-broker **1 file / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
