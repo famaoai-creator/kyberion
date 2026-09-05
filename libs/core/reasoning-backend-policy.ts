@@ -86,87 +86,10 @@ export interface ReasoningBackendSelection {
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-backend-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-backend-policy.schema.json');
 
-const FALLBACK_POLICY: ReasoningBackendPolicy = {
-  version: '1.0.0',
-  mode_aliases: {
-    nemotron: 'nemotron-api',
-    grok: 'grok-cli',
-    'grok-build': 'grok-cli',
-    xai: 'grok-api',
-  },
-  allowed_modes: [
-    'claude-cli',
-    'codex-cli',
-    'claude-agent',
-    'anthropic',
-    'gemini-cli',
-    'gemini-api',
-    'agy-cli',
-    'grok-cli',
-    'grok-api',
-    'copilot',
-    'local',
-    'ollama',
-    'vllm',
-    'lmstudio',
-    'llamacpp',
-    'mlx',
-    'localai',
-    'nemotron-api',
-    'openrouter',
-    'stub',
-  ],
-  auto_select_env_priority: [
-    { env: 'ANTHROPIC_API_KEY', mode: 'anthropic' },
-    { env: 'GEMINI_API_KEY', mode: 'gemini-api' },
-    { env: 'GOOGLE_API_KEY', mode: 'gemini-api' },
-    { env: 'XAI_API_KEY', mode: 'grok-api' },
-    { env: 'KYBERION_GROK_API_KEY', mode: 'grok-api' },
-    { env: 'KYBERION_NEMOTRON_URL', mode: 'nemotron-api' },
-    { env: 'KYBERION_OLLAMA_URL', mode: 'ollama' },
-    { env: 'KYBERION_VLLM_URL', mode: 'vllm' },
-    { env: 'KYBERION_LMSTUDIO_URL', mode: 'lmstudio' },
-    { env: 'KYBERION_LM_STUDIO_URL', mode: 'lmstudio' },
-    { env: 'KYBERION_LLAMACPP_URL', mode: 'llamacpp' },
-    { env: 'KYBERION_MLX_URL', mode: 'mlx' },
-    { env: 'KYBERION_LOCALAI_URL', mode: 'localai' },
-    { env: 'KYBERION_LOCAL_LLM_URL', mode: 'local' },
-    { env: 'KYBERION_OPENROUTER_KEY', mode: 'openrouter' },
-    { env: 'OPENROUTER_API_KEY', mode: 'openrouter' },
-    // Running inside a Claude Code harness: prefer the in-session claude-agent
-    // sub-agent (inherits the host session's auth, no new CLI spawn) over the
-    // CLI-spawn fallback. Explicit API-key signals above still win.
-    { env: 'CLAUDECODE', mode: 'claude-agent' },
-  ],
-  cli_preference_rules: [
-    {
-      env_any: ['CODEX_CLI', 'CODEX_VERSION'],
-      env_equals: { TERM_PROGRAM: 'codex' },
-      provider: 'codex',
-      mode: 'codex-cli',
-    },
-    { env_any: ['AGY_CLI', 'ANTIGRAVITY_CLI'], provider: 'agy', mode: 'agy-cli' },
-    { env_any: ['GROK_CLI', 'GROK_VERSION'], provider: 'grok', mode: 'grok-cli' },
-  ],
-  provider_fallback_order: [
-    { provider: 'codex', mode: 'codex-cli' },
-    { provider: 'agy', mode: 'agy-cli' },
-    { provider: 'grok', mode: 'grok-cli' },
-    { provider: 'copilot', mode: 'copilot' },
-  ],
-  default_mode: 'codex-cli',
-  openrouter: {
-    default_profile: 'free-router',
-    default_cost_policy: 'free-only',
-    required_parameters: ['tools', 'tool_choice'],
-  },
-};
-
 const policyCatalog = defineCatalog<ReasoningBackendPolicy>({
   id: 'reasoning-backend-policy',
   path: POLICY_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_POLICY,
 });
 
 export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
