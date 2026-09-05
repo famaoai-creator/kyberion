@@ -1670,3 +1670,9 @@ media theme catalogをscope別に整理し、public themeは正本必須、runti
 imported DESIGN.md indexの組み込み空indexとschema不正時のfallbackを削除し、public生成indexを正本schemaからのみ解決する必須catalog境界へ統一した。design systemの検索・推薦と外部参照の既存merge semanticsは変更していない。
 
 検証: media-design-md-catalog **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 209
+
+lifecycle hook設定のschema不正を空hooksへ収束させるcatalog fallbackを削除した。正本configの欠損時は空engine、読み込み・schema不正時は既存の警告付きfail-openで空engineへ戻る契約、pre-tool security blockの実行とhook entryの検証は維持している。
+
+検証: lifecycle-hook-engine **1 file / 20 tests passed**、対象ESLint、Prettier、`git diff --check`。typecheckは別作業の未コミットcursor-cli変更に起因する既存2エラーで未完了。canonical full gateは同変更の整理後に再実行する。
