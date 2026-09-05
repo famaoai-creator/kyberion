@@ -22137,3 +22137,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/intent_trace.ts`、`scripts/intent_trace.test.ts`
 - **変更**: intent trace JSONL の本文読込を foundation の `readTextFile` へ移行した。既存の repository／regular-file 境界、malformed行のskip、trace／snapshot／auditの正規化 semanticsは変更せず、intent trace CLIに残っていた旧 `safeReadFile` 直読を削減した。
 - **検証**: intent-trace **既存テスト**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1490
+
+- **対象**: `scripts/check_improvement_plan_metadata.ts`
+- **変更**: improvement plan metadata checker の本文読込を foundation の `readTextFile` へ移行した。既存の frontmatter 追加・status 正規化・secure write semanticsは変更せず、計画走査CLIに残っていた旧 `safeReadFile` 直読を削減した。
+- **検証**: improvement-plan-metadata **3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
