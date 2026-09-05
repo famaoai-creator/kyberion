@@ -6,7 +6,8 @@ import {
   readEmailDraftArtifact,
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -57,7 +58,7 @@ function getBoolean(args: ArgMap, key: string): boolean {
 
 function readTextFileIfExists(filePath: string): string {
   if (!safeExistsSync(filePath)) return '';
-  return String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  return readTextFile(filePath);
 }
 
 async function main(argv: string[], dryRun = false) {
