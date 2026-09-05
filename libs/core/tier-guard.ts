@@ -580,7 +580,7 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
     };
   }
   const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
-  const currentMission = process.env.MISSION_ID;
+  const currentMission = getRegisteredEnvText('MISSION_ID');
 
   if (isOutsideProjectRoot(relativePath)) {
     return {
@@ -717,6 +717,7 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   if (loaded.status === 'missing') return { allowed: true };
   if (loaded.status === 'corrupt') return CORRUPT_POLICY_DENIAL;
   const policy = loaded.policy;
+  const currentMission = getRegisteredEnvText('MISSION_ID');
 
   const {
     persona: currentPersona,
@@ -741,21 +742,21 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
 
   if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope))
     return { allowed: true };
-  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_read'))
+  if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_read'))
     return { allowed: true };
-  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_write'))
+  if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write'))
     return { allowed: true };
 
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
   if (
     roleRules?.allow_read?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
     )
   )
     return { allowed: true };
   if (
     roleRules?.allow_write?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
     )
   )
     return { allowed: true };
@@ -763,13 +764,13 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const personaRules = policy.persona_permissions?.[currentPersona];
   if (
     personaRules?.allow_read?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
     )
   )
     return { allowed: true };
   if (
     personaRules?.allow_write?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
     )
   )
     return { allowed: true };
