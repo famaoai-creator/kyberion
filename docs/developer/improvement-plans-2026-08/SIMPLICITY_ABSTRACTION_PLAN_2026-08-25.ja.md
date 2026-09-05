@@ -21885,3 +21885,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-distill.ts`、`libs/core/mission-distill.test.ts`
 - **変更**: mission evidence ledger の read 前に operation-time の regular-file 検査を追加した。既存の mission-local scope、末尾イベント抽出、structural/LLM distillation、promotion queue semantics は維持し、ledger が directory 等へ置換された場合に distillation を拒否する回帰テストを追加した。
 - **検証**: mission-distill **2 files / 4 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1448
+
+- **対象**: `libs/core/mission-gate-engine.ts`、`libs/core/mission-gate-engine.test.ts`
+- **変更**: `evidence_exists`、`deliverable_quality`、`llm_review` の artifact boundary で operation-time の regular-file 検査を追加した。既存の path scope、missing／quality／stub backend の fail-closed semantics は維持し、directory を evidence／deliverable として通過させない回帰テストを追加した。
+- **検証**: mission-gate-engine **2 files / 12 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
