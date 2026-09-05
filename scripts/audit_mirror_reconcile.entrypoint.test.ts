@@ -1,21 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
 import { main } from './audit_mirror_reconcile.js';
 
 describe('audit mirror reconcile entrypoint', () => {
   it('keeps reconcile results and approval failures behind the shared harness', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/audit_mirror_reconcile.ts'), {
-        encoding: 'utf8',
-      })
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/audit_mirror_reconcile.ts'));
 
     expect(source).toContain('context.print(outcome.result)');
     expect(source).toContain('new ScriptExitError(');
     expect(source).toContain('parseSafeJsonInput(line,');
     expect(source).not.toContain('JSON.parse(line)');
     expect(source).not.toContain('console.log(');
+    expect(source).toContain('nowIso, parseSafeJsonInput, readTextFile');
   });
 
   it('handles help without entering the reconciliation write path', () => {
