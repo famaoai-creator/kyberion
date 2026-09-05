@@ -13,5 +13,7 @@ describe('promote procedure resource boundaries', () => {
     expect(source).toContain('readProcedureCatalog(catalogAbs)');
     expect(source).toContain('validateProcedureCatalog(catalog, catalogAbs)');
     expect(source).not.toContain('readJson<ProcedureCatalog>');
+    expect(source).not.toContain('process.env.MISSION_ID');
+    expect(source).toContain("getRegisteredEnvText('MISSION_ID')");
   });
 });
