@@ -20,6 +20,7 @@ import {
   getDefaultLifecycleHookEngine,
   resetDefaultLifecycleHookEngine,
 } from './lifecycle-hook-engine.js';
+import { safeReadFile } from './secure-io.js';
 
 const fixtureRoot = pathResolver.shared('tmp/external-hook-discovery-test');
 
@@ -235,6 +236,16 @@ describe('external hook discovery', () => {
       safeRmSync(projectRoot, { recursive: true, force: true });
       safeRmSync(outsideRoot, { recursive: true, force: true });
     }
+  });
+
+  it('resolves the implicit global home through the registered environment boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/external-hook-discovery.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain("getRegisteredEnvText('HOME')");
+    expect(source).not.toContain('process.env.HOME');
   });
 });
 

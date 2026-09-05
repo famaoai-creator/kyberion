@@ -9,6 +9,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
 import { assertProjectTrustApproval } from './project-trust.js';
 import {
@@ -110,7 +111,7 @@ export function discoverExternalHookConfigs(
     );
   if (options.includeGlobal !== true) return project;
 
-  const rawHomeDir = options.globalHomeDir || process.env.HOME;
+  const rawHomeDir = options.globalHomeDir || getRegisteredEnvText('HOME');
   if (!rawHomeDir?.trim()) return project;
   const homeDir = path.resolve(rawHomeDir);
   const global = GLOBAL_CANDIDATES.filter((candidate) => sources.has(candidate.source)).map(

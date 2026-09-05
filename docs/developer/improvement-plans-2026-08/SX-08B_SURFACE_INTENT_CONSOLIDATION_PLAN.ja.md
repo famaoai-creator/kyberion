@@ -1078,3 +1078,9 @@ locale解決のOS fallbackに残っていた `LANG` の環境直読を、登録�
 機密パス判定のホームルート解決に残っていた `HOME` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。SSH／AWS／Kubernetes／GnuPG／provider credential、Kyberion connections／vaultのdeny判定と、secure-io初期化時の再帰防止は変更していない。
 
 検証: sensitive path／secure-io **2 files / 42 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 111
+
+external hook discoveryのglobal config fallbackに残っていた `HOME` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `globalHomeDir` の優先、global opt-in／別trust、project／globalのpath containmentとsymlink拒否は変更していない。
+
+検証: external hook discovery **1 file / 8 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
