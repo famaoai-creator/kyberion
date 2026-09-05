@@ -10,6 +10,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -34,6 +35,12 @@ import {
 
 const PROCEDURE_ID_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
 const PERSONAL_CATALOG_PATH = pathResolver.knowledge('personal/procedures.json');
+
+function assertRegularDesktopResource(filePath: string, label: string): void {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[DESKTOP_PROMOTION_RESOURCE] ${label} must be a regular file: ${filePath}`);
+  }
+}
 
 export interface CompileDesktopRecordingOptions {
   procedureId: string;
@@ -235,6 +242,7 @@ function promoteDesktopProcedureFromRecording(
     const artifactAbs = resolveAllowlistedRecordingRef(screenArtifact.recording_ref);
     if (!artifactAbs)
       throw new Error('screen recording artifact is outside the allowlisted recording stores');
+    assertRegularDesktopResource(artifactAbs, 'screen recording artifact');
     const artifact = safeReadFile(artifactAbs, { encoding: null }) as Buffer;
     const digest = createHash('sha256').update(artifact).digest('hex');
     if (digest !== screenArtifact.sha256)
@@ -257,6 +265,8 @@ function promoteDesktopProcedureFromRecording(
     assertNoPendingDesktopPromotion(options.procedureId, { lockHeld: true });
     let catalog: ProcedureCatalog = { schema_version: 'procedures.v1', procedures: [] };
     try {
+      if (safeExistsSync(catalogPath))
+        assertRegularDesktopResource(catalogPath, 'procedure catalog');
       catalog = readProcedureCatalog(catalogPath);
     } catch (error) {
       if (safeExistsSync(catalogPath)) {
@@ -275,9 +285,11 @@ function promoteDesktopProcedureFromRecording(
       pathResolver.rootResolve(compiled.procedureEntry.pipeline_ref),
       { allowMissingLeaf: true }
     );
+    if (safeExistsSync(pipelinePath)) assertRegularDesktopResource(pipelinePath, 'pipeline');
     const previousPipeline = safeExistsSync(pipelinePath)
       ? (safeReadFile(pipelinePath, { encoding: 'utf8' }) as string)
       : null;
+    if (safeExistsSync(catalogPath)) assertRegularDesktopResource(catalogPath, 'procedure catalog');
     const previousCatalog = safeExistsSync(catalogPath)
       ? (safeReadFile(catalogPath, { encoding: 'utf8' }) as string)
       : null;

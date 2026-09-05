@@ -18,7 +18,7 @@ import {
 import { assertObservationOpMappingsValid, chooseNativeOps } from './native-op-mapping.js';
 import { compileDesktopRecording } from './desktop-recording-compiler.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const RECORDING_TEST_ROOT = pathResolver.sharedTmp('desktop-recording-loader-test');
 
@@ -279,6 +279,17 @@ describe('desktop recording and distillation', () => {
       pipeline_ref: 'pipelines/desktop/desktop.notes.capture.json',
     });
     expect(compiled.pipeline.steps[0]?.op).toBe('system:screenshot');
+  });
+
+  it('guards desktop promotion resource reads as regular files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/desktop-recording-compiler.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('assertRegularDesktopResource(artifactAbs');
+    expect(source).toContain("assertRegularDesktopResource(catalogPath, 'procedure catalog')");
+    expect(source).toContain("assertRegularDesktopResource(pipelinePath, 'pipeline')");
   });
 
   it('keeps inferred native suggestions in intent without turning them into an execution binding', () => {
