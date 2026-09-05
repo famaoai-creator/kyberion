@@ -9,6 +9,8 @@ describe('env registry generator catalog boundary', () => {
       })
     );
     expect(source).toContain('loadEnvRegistryFile()');
+    expect(source).toContain("getRegisteredEnv, readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(filePath');
     expect(source).not.toContain('readJson<EnvRegistryFile>');
   });
 });

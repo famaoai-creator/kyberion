@@ -28,7 +28,7 @@
 
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { loadVocabularyCatalog } from '@agent/core/vocabulary-catalog';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
@@ -139,9 +139,7 @@ export async function buildArtifacts(): Promise<BuiltArtifacts> {
   const requiredLocales = catalog.required_locales?.length
     ? catalog.required_locales
     : [catalog.default_locale];
-  const currentLocaleNormalize = String(
-    safeReadFile(LOCALE_NORMALIZE_PATH, { encoding: 'utf8' }) || ''
-  );
+  const currentLocaleNormalize = readTextFile(LOCALE_NORMALIZE_PATH);
   const localeNormalizeSource = await formatTs(
     spliceLocalesBlock(currentLocaleNormalize, requiredLocales),
     LOCALE_NORMALIZE_PATH

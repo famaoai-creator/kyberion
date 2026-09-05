@@ -15,6 +15,8 @@ describe('generate_vocabulary_types (I18N-02)', () => {
       })
     );
     expect(source).toContain('loadVocabularyCatalog()');
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
     expect(source).not.toContain('readJson<');
   });
 
