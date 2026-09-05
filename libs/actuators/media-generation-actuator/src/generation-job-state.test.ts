@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { GenerationJob } from '@agent/core/src/types/generation-job';
+import type { GenerationJob } from '@agent/core/types/generation-job';
 import { canTransitionGenerationJob, transitionGenerationJob } from './generation-job-state.js';
 
 const job: GenerationJob = {

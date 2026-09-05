@@ -24,7 +24,7 @@ import {
 } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { GenerationJob } from '@agent/core/src/types/generation-job';
+import type { GenerationJob } from '@agent/core/types/generation-job';
 import {
   getGenerationHistoryAdapter,
   getGenerationHistoryAdapterForAction,
