@@ -1,7 +1,7 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -523,7 +523,10 @@ async function pollIMessages() {
 async function main() {
   const argv = await createStandardYargs(process.argv)
     .option('input', { alias: 'i', type: 'string' })
-    .option('port', { type: 'number', default: Number(process.env.IMESSAGE_BRIDGE_PORT || '3034') })
+    .option('port', {
+      type: 'number',
+      default: Number(getRegisteredEnvText('IMESSAGE_BRIDGE_PORT') || '3034'),
+    })
     .option('poll', {
       type: 'boolean',
       default: true,
@@ -639,7 +642,7 @@ async function main() {
     }
   });
 
-  const port = Number(argv.port || process.env.IMESSAGE_BRIDGE_PORT || 3034);
+  const port = Number(argv.port || getRegisteredEnvText('IMESSAGE_BRIDGE_PORT') || 3034);
   app.listen(port, '127.0.0.1', () => {
     logger.success(`📨 [iMessageBridge] listening on http://127.0.0.1:${port}`);
   });
@@ -650,7 +653,7 @@ async function main() {
 // listener or the poll loop — and a leaked VITEST env cannot silently no-op a
 // real start.
 const directEntry = isDirectEntry(import.meta.url, 'satellites/imessage-bridge/src/index.ts');
-if (directEntry && !process.env.VITEST) {
+if (directEntry && !getRegisteredEnvText('VITEST')) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
