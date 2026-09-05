@@ -2,11 +2,11 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonEntriesInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
+import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExistsSync,
-  safeReadFile,
   safeReaddir,
   safeMkdir,
   safeStat,
@@ -951,7 +951,7 @@ function _loadJsonHints(
     if (!isSafeScannerPath(knowledgeBase, filePath)) continue;
     try {
       const entries = parseSafeJsonEntriesInput(
-        String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
+        readTextFile(filePath),
         `knowledge hint file ${filePath}`
       );
       const relSource = scannerSource(knowledgeBase, filePath);
@@ -997,7 +997,7 @@ function _scanMarkdownHints(
 
     if (entry.endsWith('.md')) {
       try {
-        const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
+        const content = readTextFile(fullPath);
         const title = _extractMarkdownTitle(content, entry);
         if (title) {
           const relSource = scannerSource(knowledgeBase, fullPath);

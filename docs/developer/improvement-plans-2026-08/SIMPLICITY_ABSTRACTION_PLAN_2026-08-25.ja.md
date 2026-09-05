@@ -22491,3 +22491,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/vision-resolver.ts`、`libs/core/mission-distill.ts`、`libs/core/in-room-minutes-recorder.ts`、`libs/core/ace-core.ts`、`libs/core/ledger.ts`、`libs/core/facet-registry.ts`
 - **変更**: vision、mission distill／prompt、in-room transcript、ACE minutes、ledger、facet Markdown の本文読込を foundation の `readTextFile` へ移行した。tenant／path scope、ledger hash／audit、distill validation、recording／facet boundary semanticsは変更せず、secure-io は属性検証・追記／書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **7 files／35 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1549
+
+- **対象**: `libs/core/src/knowledge-curation-tenant-ingest.ts`、`libs/core/src/knowledge-index.ts`、`libs/core/cowork-knowledge-bridge.ts`、`libs/core/deal-documents.ts`、`libs/core/mission-context-pack-knowledge.ts`、`libs/core/locale.ts` と対象テスト
+- **変更**: tenant curation card、knowledge indexのhint／Markdown、Cowork knowledge、deal document、mission context、locale catalog の本文読込を foundation の `readTextFile` へ移行した。tier／tenant／path scope、ranking／embedding、Cowork promotion、document／locale semanticsは変更せず、knowledge-indexテストのreader mockを新APIへ適応した。
+- **検証**: 対象テスト **7 files／67 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

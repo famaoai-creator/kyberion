@@ -29,12 +29,12 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
   safeMkdir,
 } from './secure-io.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -268,7 +268,7 @@ export function ingestCoworkArtifacts(
 
     let content: string;
     try {
-      content = safeReadFile(absPath, { encoding: 'utf8' }) as string;
+      content = readTextFile(absPath);
     } catch (err) {
       result.errors.push(`Cannot read ${sourceRef}: ${err}`);
       continue;
@@ -445,7 +445,7 @@ function collectMarkdownFiles(
     }
     if (entry.endsWith('.md') || entry.endsWith('.txt')) {
       try {
-        const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
+        const content = readTextFile(fullPath);
         const hash = sha256(content);
         if (state.supplied[fullPath] === hash) {
           result.skipped_unchanged++;
