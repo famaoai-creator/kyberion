@@ -5,6 +5,7 @@ import { isSimpleGreetingText } from '@agent/core/intent-contract';
 import { checkAndRepairSurfaceUxContract } from '@agent/core/surface-ux-contract';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { readRequestObject } from '../../../lib/request-input';
+import { voiceHubUrl } from '../../../lib/voice-hub';
 import { conciergeConversationScope, resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeLocale } from '../../../lib/i18n';
 import {
@@ -33,7 +34,6 @@ export const dynamic = 'force-dynamic';
  *                   still work without a second daemon.
  *   Both fail     — a clear, actionable user message (never a silent failure).
  */
-const VOICE_HUB_URL = process.env.VOICE_HUB_URL || 'http://127.0.0.1:3032';
 const VOICE_HUB_TIMEOUT_MS = 3000;
 
 /** Primary path: voice-hub (rich reply + TTS + presence reflection). */
@@ -42,7 +42,7 @@ async function replyViaVoiceHub(
   speaker: string,
   scope: import('@agent/core/event-scope').EventScopeInput
 ): Promise<{ reply: string; intentResolution?: IntentResolutionContract }> {
-  const resp = await fetch(`${VOICE_HUB_URL}/api/ingest-text`, {
+  const resp = await fetch(`${voiceHubUrl()}/api/ingest-text`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
