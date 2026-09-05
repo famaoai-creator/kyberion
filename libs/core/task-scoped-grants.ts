@@ -59,7 +59,13 @@ import { z } from 'zod';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isVitestProcess } from './foundation/env.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReadFile,
+} from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
@@ -265,6 +271,9 @@ function readGrantRecords(): Map<string, TaskScopedGrant> {
   const storePath = resolveTaskGrantsStorePath();
   const latest = new Map<string, TaskScopedGrant>();
   if (!safeExistsSync(storePath)) return latest;
+  if (!safeLstat(storePath).isFile()) {
+    throw new Error(`[TASK_GRANTS_RESOURCE] store must be a regular file: ${storePath}`);
+  }
   const raw = String(safeReadFile(storePath, { encoding: 'utf-8' }));
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
@@ -296,6 +305,9 @@ function appendGrantRecord(record: TaskScopedGrant): void {
     const dir = storePath.replace(/[/\\][^/\\]+$/, '');
     if (dir && dir !== storePath && !safeExistsSync(dir)) {
       safeMkdir(dir, { recursive: true });
+    }
+    if (safeExistsSync(storePath) && !safeLstat(storePath).isFile()) {
+      throw new Error(`[TASK_GRANTS_RESOURCE] store must be a regular file: ${storePath}`);
     }
     appendJsonLine(storePath, validated);
   });
