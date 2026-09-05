@@ -21281,6 +21281,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: ADF execution policyの欠損・schema不正時に空objectへ落ちるcatalog fallbackを削除し、実行guardrail policyの読み込み障害をfail-closedで返す境界へ統一した。policyで未指定の個別値に対する既存の安全な上限補完、shell／egress／sandbox検査、script wrapper・git co-execution mutation検出は変更していない。
 - **検証**: adf-guardrails **1 file / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1348
+
+- **対象**: `libs/core/analysis-config.ts`、`libs/core/analysis-config.test.ts`
+- **変更**: analysis configに残っていた正本JSONと重複する大規模な組み込みdefault configと、欠損・schema不正時のfallbackを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。analysis configのschema-validなロード、repository path境界、呼び出し側の分析アルゴリズム解決は変更していない。
+- **検証**: analysis-config **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

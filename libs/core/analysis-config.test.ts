@@ -30,13 +30,16 @@ describe('analysis config contract', () => {
     expect(loadAnalysisConfigAtPath(TEST_PATH)).toEqual(validConfig);
   });
 
-  it('uses the governed fallback for missing and schema-invalid configs', () => {
-    const missing = loadAnalysisConfigAtPath(TEST_PATH);
-    expect(missing.version).toBe('fallback');
+  it('fails closed for a missing config', () => {
+    expect(() => loadAnalysisConfigAtPath(TEST_PATH)).toThrowError(/missing/iu);
+  });
 
+  it('fails closed for a schema-invalid config', () => {
     safeMkdir(TEST_ROOT, { recursive: true });
     safeWriteFile(TEST_PATH, JSON.stringify({ algorithms: { ranking: { weights: [] } } }));
-    expect(loadAnalysisConfigAtPath(TEST_PATH).version).toBe('fallback');
+    expect(() => loadAnalysisConfigAtPath(TEST_PATH)).toThrowError(
+      /Invalid catalog analysis-config/
+    );
   });
 
   it('rejects a config path outside the repository', () => {

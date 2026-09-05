@@ -32,43 +32,11 @@ const ANALYSIS_CONFIG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/analysis-config.schema.json'
 );
 
-const DEFAULT_ANALYSIS_CONFIG: AnalysisConfig = {
-  version: 'fallback',
-  name: 'Context Analysis Configuration',
-  description: 'Safe defaults for context analysis.',
-  algorithms: {
-    cooccurrence: { pipeline_dir: 'pipelines', capability_dir: 'libs/actuators', threshold: 1 },
-    ranking: {
-      index_path: 'knowledge/orchestration/knowledge_index.json',
-      weights: {
-        title: 10,
-        id: 5,
-        tag: 15,
-        category: 3,
-        role: 25,
-        phase: 18,
-        scope: 12,
-        kind: 10,
-        authority: 8,
-        usage_yield: 4,
-      },
-    },
-    graph: {
-      knowledge_dir: 'knowledge',
-      output_path: 'knowledge/Ecosystem_Map.md',
-      mermaid_theme: 'base',
-    },
-  },
-  auto_update: { related_capabilities: true, related_knowledge: true },
-};
-
 function analysisConfigCatalog(filePath: string) {
   return defineCatalog<AnalysisConfig>({
     id: 'analysis-config',
     path: filePath,
     schema: ANALYSIS_CONFIG_SCHEMA_PATH,
-    fallback: DEFAULT_ANALYSIS_CONFIG,
-    fallbackOnInvalid: true,
   });
 }
 
