@@ -33,6 +33,8 @@ describe('Kyberion CLI helpers', () => {
     expect(source).toContain("parseSafeJsonInput(content, 'Packet file')");
     expect(source).toContain("parseSafeJsonInput(content, 'Pipeline preview file')");
     expect(source).not.toContain('JSON.parse(content)');
+    expect(source).not.toContain('process.env.MISSION_ID');
+    expect(source).toContain("getRegisteredEnvText('MISSION_ID')");
   });
 
   it('routes legacy intent resolution to the canonical ask explanation path', async () => {
