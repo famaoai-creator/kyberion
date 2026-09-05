@@ -1712,3 +1712,9 @@ Cursor CLIの追加引数が`--force`／`--mode`／`--sandbox`などのpolicy引
 Cursor CLIを明示指定だけでなく、既定のreasoning provider failover chainにも登録した。provider capability routingによるbinary／authentication判定、既存providerの順序、Cursorの明示routeは維持している。
 
 検証: reasoning-backend-policy／reasoning-bootstrap **2 files / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
+## 2026-09-06 再レビュー修正 216
+
+Cursor CLIのprovider discoveryが`KYBERION_CURSOR_CLI_BIN`を無視して`cursor-agent`を固定実行していた残存を修正し、backend probeと同じ登録済みbinary overrideを使うようにした。未指定時のPATH discovery、version health判定、capability cacheとfailover routingは維持している。
+
+検証: provider-discovery **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
