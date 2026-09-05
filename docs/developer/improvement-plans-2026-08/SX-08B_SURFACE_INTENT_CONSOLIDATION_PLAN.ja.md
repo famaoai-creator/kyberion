@@ -1628,3 +1628,9 @@ tenant design override indexについて、未配置時は呼び出し側の明�
 project standards catalogの組み込みignoreルールとschema不正時のfallbackを削除し、repository walkerの正本設定欠損・不正をfail-closedで返す境界へ統一した。symlink除外、再帰探索、ignore directory／extensionの正本解決は変更していない。
 
 検証: fs-utils **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 202
+
+media design systemsの大規模な組み込みfallbackと、正本catalogの欠損・schema不正をfallbackへ収束させる設定を削除した。分割catalogを集約するための最小envelope seedは維持し、正本ファイルを読む経路と分割JSONをschema検証する境界は変更していない。
+
+検証: media-catalog-loaders **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
