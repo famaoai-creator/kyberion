@@ -55,7 +55,11 @@ import {
 } from './memory-promotion-queue.js';
 import { loadDistillCandidateRecord } from './distill-candidate-registry.js';
 import { loadState } from './mission-state.js';
-import { distillMission, resolveWisdomOutputPath } from './mission-distill.js';
+import {
+  gatherDistillContext,
+  distillMission,
+  resolveWisdomOutputPath,
+} from './mission-distill.js';
 import { promoteMemoryCandidateToKnowledge } from './memory-promotion-workflow.js';
 import { safeExec } from './secure-io.js';
 
@@ -222,6 +226,14 @@ describe('mission-distill end-to-end promotion flow', () => {
     expect(hints).toContain('Distilled wisdom from mission');
     expect(hints).toContain(`source_ref: ${queued.candidate_id}`);
     expect(hints).toContain(`knowledge/product/evolution/${wisdomFileName}`);
+  });
+
+  it('rejects a directory replacing the evidence ledger before distillation reads it', () => {
+    safeMkdir(`${missionPath}/evidence/ledger.jsonl`, { recursive: true });
+
+    expect(() => gatherDistillContext(missionId, loadState(missionId)!, missionPath)).toThrow(
+      '[MISSION_DISTILL_RESOURCE] evidence ledger must be a regular file'
+    );
   });
 });
 
