@@ -30,6 +30,7 @@ import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import {
@@ -37,7 +38,6 @@ import {
   safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
@@ -791,7 +791,7 @@ interface LedgerAssetLine {
 function readJsonlLines(absPath: string): Array<Record<string, unknown>> {
   const safePath = safeOptionalRepositoryPath(absPath);
   if (!safePath || !safeExistsSync(safePath)) return [];
-  const raw = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(safePath);
   const records: Array<Record<string, unknown>> = [];
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
@@ -839,7 +839,7 @@ function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
     }
   }
 
-  const raw = String(safeReadFile(registryAbs, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(registryAbs);
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
