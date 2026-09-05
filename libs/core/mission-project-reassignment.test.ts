@@ -4,7 +4,11 @@ import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
 import { saveProjectTrackRecord } from './project-track-registry.js';
 import { saveState, loadState } from './mission-state.js';
 import { reassignMissionToProject } from './project-management.js';
-import { resolveProjectLedgerPath, syncProjectLedger } from './mission-project-ledger.js';
+import {
+  resolveProjectLedgerJsonPath,
+  resolveProjectLedgerPath,
+  syncProjectLedger,
+} from './mission-project-ledger.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -208,5 +212,15 @@ describe('mission Project reassignment', () => {
       safeUnlinkSync(linkPath);
       safeRmSync(targetPath, { force: true, recursive: true });
     }
+  });
+
+  it('does not treat a directory JSON ledger as a missing ledger', async () => {
+    await saveState(MISSION_ID, fixtureMission());
+    const ledgerJsonPath = resolveProjectLedgerJsonPath(SOURCE_PATH);
+    safeMkdir(ledgerJsonPath, { recursive: true });
+
+    await expect(syncProjectLedger(MISSION_ID, pathResolver.rootDir())).rejects.toThrow(
+      '[PROJECT_MISSION_LEDGER] ledger must be a regular file'
+    );
   });
 });

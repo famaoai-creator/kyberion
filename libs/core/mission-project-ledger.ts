@@ -63,7 +63,10 @@ export function escapeTableCell(value: string): string {
 function readProjectMissionLedger(filePath: string): ProjectMissionLedger | null {
   try {
     return loadProjectMissionLedgerAtPath(filePath);
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[PROJECT_MISSION_LEDGER]')) {
+      throw error;
+    }
     return null;
   }
 }
