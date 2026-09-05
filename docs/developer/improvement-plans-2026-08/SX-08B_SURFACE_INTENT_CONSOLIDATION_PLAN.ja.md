@@ -1782,3 +1782,7 @@ Slack bridgeのsurface stimulus append先を固定 absolute pathから共通の`
 ## 2026-09-06 再レビュー修正 230
 
 trace JSONL persistenceのdirectory／日次fileを共通の`assertSafeRepositoryPath`とoperation-timeのregular-file／directory検査へ接続し、symlink経由のtrace log rootを拒否する境界を追加した。shared／customer root、日次 rotation、trace schema、OTLP export semanticsを維持し、**1 file / 5 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 231
+
+mission dispatch event appendの共通I/O helperへoperation-timeのregular-file検査を追加し、leaf symlinkへのevent appendを拒否する境界を追加した。repository path、mission writer context、dispatch artifact leaseとpayload semanticsを維持し、**1 file / 3 tests passed**、対象lint、Prettier、`git diff --check`で確認した。

@@ -21598,6 +21598,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: trace JSONL persistenceのdirectory／日次fileを共通の`assertSafeRepositoryPath`とoperation-timeのregular-file／directory検査へ接続した。既定のshared／customer trace root、日次 rotation、trace schema検証、OTLP export semanticsは維持し、symlink経由のtrace log rootを拒否する回帰テストを追加した。
 - **検証**: trace **1 file / 5 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1401
+
+- **対象**: `libs/core/mission-dispatch-io.ts`、`libs/core/mission-dispatch-lifecycle.test.ts`
+- **変更**: mission dispatch event appendの共通I/O helperへoperation-timeのregular-file検査を追加した。repository path検証、mission writer context、既存dispatch artifact leaseとpayload semanticsは維持し、leaf symlinkへのevent appendを拒否する回帰テストを追加した。
+- **検証**: mission-dispatch-lifecycle **1 file / 3 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`
