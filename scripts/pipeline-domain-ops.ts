@@ -1,6 +1,6 @@
 import { grantVoiceConsent } from '@agent/core/voice-consent';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveVars } from '@agent/core/src/logic-utils';
+import { resolveVars } from '@agent/core/logic-utils';
 import { safeExecResult } from '@agent/core/secure-io';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline-contract';

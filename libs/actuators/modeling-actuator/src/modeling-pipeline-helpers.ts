@@ -14,11 +14,7 @@ import {
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  evaluateCondition,
-  getPathValue,
-  resolveWriteArtifactSpec,
-} from '@agent/core/src/logic-utils';
+import { evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { runGovernedCommand } from '@agent/core/command-runner';

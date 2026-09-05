@@ -2,7 +2,7 @@ import * as nodePath from 'node:path';
 import { logger } from '@agent/core/core';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { resolveVars } from '@agent/core/src/logic-utils';
+import { resolveVars } from '@agent/core/logic-utils';
 import { capabilityEntry } from '@agent/core/path-resolver';
 import {
   getReasoningRuntimeInstructions,
