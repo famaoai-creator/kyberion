@@ -1,7 +1,8 @@
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DOCUMENT_ROOTS = ['docs', 'knowledge'] as const;
@@ -61,7 +62,7 @@ export function checkDocumentationLinks(files = markdownFiles()): string[] {
   const failures: string[] = [];
   for (const filePath of files) {
     if (isVendoredDocumentation(filePath)) continue;
-    const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+    const source = readTextFile(filePath);
     const relativeSource = path.relative(pathResolver.rootDir(), filePath);
     for (const match of source.matchAll(MARKDOWN_LINK)) {
       // Image examples in theme guides are illustrative asset names, not
