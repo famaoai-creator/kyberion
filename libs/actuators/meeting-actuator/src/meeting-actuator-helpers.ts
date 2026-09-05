@@ -236,7 +236,7 @@ export function parseMeetingActionResult(value: unknown): MeetingActionResult | 
 
 export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
   if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   if (!missionId) {
     return {
       allowed: false,
@@ -392,7 +392,7 @@ async function executeMeetingPipeline(
       },
       apply: async (op, rawParams, context) => {
         const params = resolveMeetingParams(rawParams, context) as Record<string, any>;
-        const missionId = String(params.mission_id || process.env.MISSION_ID || '');
+        const missionId = String(params.mission_id || getRegisteredEnvText('MISSION_ID') || '');
         const workItemId =
           String(params.work_item_id || context.work_item_id || '').trim() || undefined;
         switch (op) {

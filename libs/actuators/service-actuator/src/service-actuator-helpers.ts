@@ -2,6 +2,7 @@ import {
   appendJsonLine,
   defineCatalog,
   getRegisteredEnv,
+  getRegisteredEnvText,
   isRecord,
   parseSafeJsonInput,
   type GovernedCatalog,
@@ -607,7 +608,7 @@ function resolveTrustedScope(
   if (errors.length > 0) {
     throw new Error(`[POLICY_VIOLATION] Invalid service security_scope: ${errors.join('; ')}`);
   }
-  const runtimeMissionId = String(process.env.MISSION_ID || '').trim();
+  const runtimeMissionId = String(getRegisteredEnvText('MISSION_ID') || '').trim();
   if (required && (!runtimeMissionId || runtimeMissionId !== scope.mission_id)) {
     throw new Error('[POLICY_VIOLATION] Service security_scope is not bound to the active mission');
   }
