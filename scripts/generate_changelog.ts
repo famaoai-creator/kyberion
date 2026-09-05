@@ -18,8 +18,9 @@
 
 import * as path from 'node:path';
 import { resolveChangelogPolicy } from '@agent/core/changelog-policy';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExec, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeExec, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
@@ -190,9 +191,7 @@ export const main = defineScript({
     const section = renderSection(commits, from, to);
 
     if (prepend) {
-      const existing = safeExistsSync(CHANGELOG_PATH)
-        ? (safeReadFile(CHANGELOG_PATH, { encoding: 'utf8' }) as string)
-        : null;
+      const existing = safeExistsSync(CHANGELOG_PATH) ? readTextFile(CHANGELOG_PATH) : null;
       const updated = buildPrependedChangelog(existing, section);
       const changed = existing !== updated;
       if (context.check && changed) {
