@@ -19,6 +19,11 @@ describe('media document composition catalog boundary', () => {
 
     expect(source).toContain("id: 'document-composition-presets'");
     expect(source).toContain('knowledge/product/schemas/document-composition-presets.schema.json');
+    const loaderSource = source.slice(
+      source.indexOf('function loadDocumentCompositionCatalog'),
+      source.indexOf('function loadThemeCatalog')
+    );
+    expect(loaderSource).not.toContain('fallbackOnInvalid: true');
     expect(source).toContain('return catalog.validate(');
 
     const catalog = loadDocumentCompositionCatalog(pathResolver.rootDir());
