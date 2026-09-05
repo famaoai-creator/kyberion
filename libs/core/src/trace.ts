@@ -302,7 +302,7 @@ function otlpHeaders(raw: string | undefined): Record<string, string> {
 
 /** Export the stable Kyberion trace projection as OTLP/HTTP JSON when enabled. */
 export async function exportTraceOtlp(trace: Trace): Promise<boolean> {
-  const configured = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
+  const configured = getRegisteredEnvText('OTEL_EXPORTER_OTLP_ENDPOINT')?.trim();
   if (!configured) return false;
   const base = configured.replace(/\/$/u, '');
   const endpoint = /\/v1\/traces$/u.test(base) ? base : `${base}/v1/traces`;
@@ -350,7 +350,7 @@ export async function exportTraceOtlp(trace: Trace): Promise<boolean> {
   visit(trace.rootSpan);
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: otlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
+    headers: otlpHeaders(getRegisteredEnvText('OTEL_EXPORTER_OTLP_HEADERS')),
     body: JSON.stringify({
       resourceSpans: [
         {
