@@ -16,6 +16,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeRmSync,
   safeWriteFile,
@@ -157,6 +158,14 @@ function ensureBridgeRoot(): void {
   safeMkdir(BRIDGE_ROOT, { recursive: true });
 }
 
+function ensureRegularBridgeFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(
+      `[MANUAL_DRIVE_BRIDGE_CORRUPT] bridge record must be a regular file: ${filePath}`
+    );
+  }
+}
+
 function isoNow(): string {
   return nowIso();
 }
@@ -273,6 +282,7 @@ export function readManualDriverDescriptor(agentId: string): DurableManualDriver
   const normalized = normalizeAgentId(agentId);
   const { descriptorPath } = bridgePaths(normalized);
   if (!safeExistsSync(descriptorPath)) return null;
+  ensureRegularBridgeFile(descriptorPath);
   const descriptor = loadManualDriverDescriptorRecord(descriptorPath, normalized);
   const updatedAt = Date.parse(descriptor.updated_at);
   const expiresAt = Date.parse(descriptor.expires_at);
@@ -289,6 +299,7 @@ function writeDescriptor(input: {
   action: ManualDriveActionInfo | null;
 }): void {
   const { descriptorPath } = bridgePaths(input.agentId);
+  ensureRegularBridgeFile(descriptorPath);
   const action = projectBridgeActionInfo(input.action);
   const updatedAt = isoNow();
   const descriptor = manualDriverDescriptorCatalog(descriptorPath).validate(
@@ -309,6 +320,7 @@ function writeDescriptor(input: {
 
 function readCommands(agentId: string): ManualDriverCommandRecord[] {
   const { commandPath } = bridgePaths(agentId);
+  ensureRegularBridgeFile(commandPath);
   return readJsonLines<ManualDriverCommandRecord>(commandPath, {
     map: (value) => {
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -353,6 +365,7 @@ function readCommands(agentId: string): ManualDriverCommandRecord[] {
 
 function readResultRecords(agentId: string): ManualDriverCommandResultRecord[] {
   const { resultPath } = bridgePaths(agentId);
+  ensureRegularBridgeFile(resultPath);
   return readJsonLines<ManualDriverCommandResultRecord>(resultPath, {
     map: (value) => {
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -413,6 +426,7 @@ interface ManualDriverCommandCancellationRecord {
 
 function readCancellationRecords(agentId: string): ManualDriverCommandCancellationRecord[] {
   const { cancellationPath } = bridgePaths(agentId);
+  ensureRegularBridgeFile(cancellationPath);
   return readJsonLines<ManualDriverCommandCancellationRecord>(cancellationPath, {
     map: (value) => {
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -508,7 +522,9 @@ async function appendResult(
 ): Promise<void> {
   await withLock(lockId, async () => {
     ensureBridgeRoot();
-    appendJsonLine(bridgePaths(record.agent_id).resultPath, record);
+    const resultPath = bridgePaths(record.agent_id).resultPath;
+    ensureRegularBridgeFile(resultPath);
+    appendJsonLine(resultPath, record);
   });
 }
 
@@ -528,7 +544,9 @@ async function processPendingCommands(input: {
       // Mark started before invoking the local executor. If the process dies
       // during an external effect, a later process will not duplicate it.
       ensureBridgeRoot();
-      appendJsonLine(bridgePaths(command.agent_id).resultPath, {
+      const resultPath = bridgePaths(command.agent_id).resultPath;
+      ensureRegularBridgeFile(resultPath);
+      appendJsonLine(resultPath, {
         command_id: command.command_id,
         agent_id: command.agent_id,
         action_id: command.action_id,
@@ -625,6 +643,7 @@ export async function enqueueManualDriverCommand(input: {
   const { commandPath, lockId } = bridgePaths(agentId);
   await withLock(lockId, async () => {
     ensureBridgeRoot();
+    ensureRegularBridgeFile(commandPath);
     appendJsonLine(commandPath, command);
   });
   return {
@@ -686,6 +705,7 @@ export async function resumeManualDriverCommand(input: {
       resumes_command_id: command.command_id,
     };
     ensureBridgeRoot();
+    ensureRegularBridgeFile(commandPath);
     appendJsonLine(commandPath, resumed);
     return {
       commandId: resumed.command_id,
@@ -722,6 +742,7 @@ export async function cancelManualDriverCommand(input: {
       return 'already_cleared';
     }
     ensureBridgeRoot();
+    ensureRegularBridgeFile(cancellationPath);
     appendJsonLine(cancellationPath, {
       command_id: commandId,
       agent_id: agentId,

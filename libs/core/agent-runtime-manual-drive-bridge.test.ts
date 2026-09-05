@@ -54,6 +54,31 @@ describe('durable manual-drive bridge', () => {
     });
   });
 
+  it('rejects bridge records whose durable path is a directory', async () => {
+    const agentId = `bridge-directory-${process.pid}-${Date.now()}`;
+    const commandPath = bridgeFiles(agentId)[1];
+    withExecutionContext('mission_controller', () => safeMkdir(commandPath, { recursive: true }));
+
+    try {
+      expect(() => readManualDriverCommandStatus(agentId, 'missing-command')).toThrow(
+        '[MANUAL_DRIVE_BRIDGE_CORRUPT] bridge record must be a regular file'
+      );
+      await expect(
+        withExecutionContextAsync('mission_controller', () =>
+          enqueueManualDriverCommand({
+            agentId,
+            actionId: 'step-directory',
+            requestedBy: 'test',
+          })
+        )
+      ).rejects.toThrow('[MANUAL_DRIVE_BRIDGE_CORRUPT] bridge record must be a regular file');
+    } finally {
+      withExecutionContext('mission_controller', () =>
+        safeRmSync(commandPath, { recursive: true, force: true })
+      );
+    }
+  });
+
   it('publishes only safe action data and completes a queued command', async () => {
     return withExecutionContextAsync('mission_controller', async () => {
       const agentId = `bridge-test-${process.pid}-${Date.now()}`;
