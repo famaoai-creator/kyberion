@@ -8,7 +8,7 @@ import {
   safeMkdir,
   safeLstat,
   safeReaddir,
-  safeReadFile,
+  safeStat,
 } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
@@ -628,8 +628,7 @@ export function readHistorySearchDatabaseMetadata(): { exists: boolean; bytes?: 
   const file = databasePath();
   if (!safeExistsSync(file)) return { exists: false };
   try {
-    const raw = safeReadFile(file);
-    return { exists: true, bytes: Buffer.byteLength(raw as string) };
+    return { exists: true, bytes: safeStat(file).size };
   } catch {
     return { exists: true };
   }
