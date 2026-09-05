@@ -880,3 +880,9 @@ Chronosのintent contract A2UI helperに残っていた `string` 型とenum型�
 service actuatorに残っていた `@agent/core/src/pfc/ServiceValidator` の内部パス参照を、既存の公開 `@agent/core/service-validator` subpathへ移行した。service auth validationの実装・戻り値・認可境界は変更せず、production sourceがcoreの公開契約だけを利用する状態に揃えた。
 
 検証: service actuator build、root typecheck、対象ESLint、Prettier、`git diff --check`。今回のproduction internal-path残差は0件となった。
+
+## 2026-09-05 再レビュー修正 78
+
+untrusted-contentのmission state更新で残っていた `MISSION_ID` の環境直読を、登録済みenv accessorへ移行した。mission path解決、injection signal、quarantine、state更新の既存 semanticsは変更せず、untrusted-content経路も他のcore scope境界と同じenv読み取り契約に揃えた。
+
+検証: untrusted-content関連テスト、core typecheck、対象ESLint、Prettier、`git diff --check`。残る全surfaceの実ブラウザ受入と外部provider実機確認は継続課題とする。

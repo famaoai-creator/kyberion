@@ -4,7 +4,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secur
 import { auditChain } from './audit-chain.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
-import { setRegisteredEnv } from './foundation/env.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import {
@@ -227,7 +227,7 @@ export function setInjectionSuspected(suspected: boolean = true, scope: string =
     // ignore
   }
 
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   if (missionId) {
     const tierPath = pathResolver.findMissionPath(missionId);
     if (tierPath) {
