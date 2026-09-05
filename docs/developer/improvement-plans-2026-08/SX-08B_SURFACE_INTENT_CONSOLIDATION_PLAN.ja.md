@@ -886,3 +886,9 @@ service actuatorに残っていた `@agent/core/src/pfc/ServiceValidator` の内
 untrusted-contentのmission state更新で残っていた `MISSION_ID` の環境直読を、登録済みenv accessorへ移行した。mission path解決、injection signal、quarantine、state更新の既存 semanticsは変更せず、untrusted-content経路も他のcore scope境界と同じenv読み取り契約に揃えた。
 
 検証: untrusted-content関連テスト、core typecheck、対象ESLint、Prettier、`git diff --check`。残る全surfaceの実ブラウザ受入と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 79
+
+ingest commitのidentity fallbackとsecret actuatorのephemeral mission／ledger roleに残っていた `MISSION_ROLE`／`MISSION_ID` の環境直読を、登録済みenv accessorへ移行した。明示identity、persona優先、ephemeral mission生成、監査ledgerのrole、既存のsecure mutation境界は変更しない。
+
+検証: ingest／secret actuator関連テスト、actuator build、root typecheck、対象ESLint、Prettier、`git diff --check`。残るactuator／scriptの環境境界と外部provider実機確認は継続課題とする。

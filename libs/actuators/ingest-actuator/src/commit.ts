@@ -179,7 +179,7 @@ function resolveIngestedBy(input: IngestCommitInput): string {
   if (explicit) return explicit;
   const persona = String(getRegisteredEnvText('KYBERION_PERSONA') || '').trim();
   if (persona) return persona;
-  const role = String(process.env.MISSION_ROLE || '').trim();
+  const role = String(getRegisteredEnvText('MISSION_ROLE') || '').trim();
   if (role) return role;
   fail(
     'ingested_by is required and no identity context is active — pass ingested_by explicitly ' +

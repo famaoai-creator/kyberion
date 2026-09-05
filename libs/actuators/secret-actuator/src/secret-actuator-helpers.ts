@@ -7,7 +7,7 @@ import {
 } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
-import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { ledger } from '@agent/core/ledger';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
@@ -123,7 +123,7 @@ async function withGovernedMutation(
   platform: string,
   logic: () => Promise<any>
 ) {
-  const existingMissionId = process.env.MISSION_ID;
+  const existingMissionId = getRegisteredEnvText('MISSION_ID');
   const isEphemeral = !existingMissionId;
   const missionId = existingMissionId || `MSN-SEC-${Date.now().toString(36).toUpperCase()}`;
 
@@ -164,7 +164,7 @@ async function withGovernedMutation(
     if (result.status === 'success') {
       ledger.record('CONFIG_CHANGE', {
         mission_id: missionId,
-        role: process.env.MISSION_ROLE || 'secret_guard',
+        role: getRegisteredEnvText('MISSION_ROLE') || 'secret_guard',
         service_id: params.service,
         config_target: 'os-keychain',
         action: actionType,
