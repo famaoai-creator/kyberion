@@ -11,6 +11,8 @@ describe('ingest CLI output boundary', () => {
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('process.stdout');
     expect(source).not.toContain('process.stderr');
+    expect(source).not.toContain('process.env.MISSION_ROLE');
+    expect(source).toContain("getRegisteredEnvText('MISSION_ROLE')");
     expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 
