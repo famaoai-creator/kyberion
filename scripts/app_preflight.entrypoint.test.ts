@@ -12,6 +12,10 @@ describe('app preflight entrypoint', () => {
     expect(source).toContain('context.print(');
     expect(source).toContain('new ScriptExitError(');
     expect(source).not.toContain('console.log(');
+    expect(source).not.toContain('process.env.ANDROID_HOME');
+    expect(source).not.toContain('process.env.ANDROID_SDK_ROOT');
+    expect(source).toContain("getRegisteredEnvText('ANDROID_HOME')");
+    expect(source).toContain("getRegisteredEnvText('ANDROID_SDK_ROOT')");
   });
 
   it('handles help without probing platform prerequisites', async () => {

@@ -5,7 +5,10 @@ const mocks = vi.hoisted(() => ({
   getSecret: vi.fn(),
 }));
 
-vi.mock('@agent/core/secure-io', () => ({ safeExecResult: mocks.safeExecResult }));
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  safeExecResult: mocks.safeExecResult,
+}));
 vi.mock('@agent/core/secret-guard', () => ({ secretGuard: { getSecret: mocks.getSecret } }));
 
 import { runAppPreflight } from './app_preflight.js';
