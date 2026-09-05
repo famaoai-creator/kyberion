@@ -16,8 +16,9 @@ import {
   type StructuredOutputSchemaRef,
 } from './structured-output-contracts.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
+import { readTextFile } from './foundation/text.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
 
 export interface PipelineReportContract {
@@ -87,7 +88,7 @@ function compileReportSchema(schemaRef: string): CompiledReportSchema {
       (validate.errors || []).map(
         (error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`
       ),
-    prompt: String(safeReadFile(schemaPath, { encoding: 'utf8' })),
+    prompt: readTextFile(schemaPath),
   };
 }
 

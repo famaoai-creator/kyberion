@@ -2,7 +2,8 @@
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import type { ResourceProvenance } from './resource-provenance.js';
 
 export interface AgentInstructionResource {
@@ -95,7 +96,7 @@ export function loadAgentInstructionResource(
       assertInstructionRegularFile(overridePath);
       return {
         path: overridePath,
-        content: String(safeReadFile(overridePath, { encoding: 'utf8' }) || ''),
+        content: readTextFile(overridePath),
         replaced: true,
         provenance: provenanceFor(overridePath, true),
       };
@@ -104,7 +105,7 @@ export function loadAgentInstructionResource(
       assertInstructionRegularFile(basePath);
       return {
         path: basePath,
-        content: String(safeReadFile(basePath, { encoding: 'utf8' }) || ''),
+        content: readTextFile(basePath),
         replaced: false,
         provenance: provenanceFor(basePath, false),
       };
