@@ -122,9 +122,9 @@ const app = express();
 const server = createServer(app);
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-const PORT = Number(process.env.VOICE_HUB_PORT || 3032);
-const HOST = process.env.VOICE_HUB_HOST || '127.0.0.1';
-const PRESENCE_STUDIO_URL = process.env.PRESENCE_STUDIO_URL || 'http://127.0.0.1:3031';
+const PORT = Number(getRegisteredEnvText('VOICE_HUB_PORT') || 3032);
+const HOST = getRegisteredEnvText('VOICE_HUB_HOST') || '127.0.0.1';
+const PRESENCE_STUDIO_URL = getRegisteredEnvText('PRESENCE_STUDIO_URL') || 'http://127.0.0.1:3031';
 const PRESENCE_SURFACE_WARMUP_QUERY = 'Reply with exactly: Ready.';
 
 process.env.MISSION_ROLE ||= 'surface_runtime';
