@@ -168,14 +168,14 @@ export function applyProcessTemplatePlan(input: {
 }
 
 function readTasksSafe(nextTasksPath: string): Array<Record<string, unknown>> {
-  try {
-    return (
-      loadMissionNextTaskObjectsAtPath(nextTasksPath, path.basename(path.dirname(nextTasksPath))) ||
-      []
-    );
-  } catch {
-    return [];
+  const tasks = loadMissionNextTaskObjectsAtPath(
+    nextTasksPath,
+    path.basename(path.dirname(nextTasksPath))
+  );
+  if (!tasks) {
+    throw new Error(`[MISSION_PROCESS_PLAN] invalid NEXT_TASKS.json: ${nextTasksPath}`);
   }
+  return tasks;
 }
 
 const CHECKLIST_HEADER = '## Process Phases';
