@@ -79,6 +79,15 @@ describe('speech-to-text-bridge', () => {
     );
   });
 
+  it('rejects a directory used as a transcript sidecar', async () => {
+    const audioAbs = path.join(tmpDir, 'directory-sidecar.wav');
+    fs.writeFileSync(audioAbs, 'fake-audio');
+    fs.mkdirSync(`${audioAbs}.transcript.txt`);
+
+    await expect(
+      stubSpeechToTextBridge.transcribe({ audioPath: 'directory-sidecar.wav' })
+    ).rejects.toThrow('[stt-bridge] transcript sidecar must be a regular file');
+  });
   it('rejects audio paths outside the repository', async () => {
     await expect(
       stubSpeechToTextBridge.transcribe({ audioPath: '/tmp/external-call.wav' })
@@ -107,6 +116,14 @@ describe('speech-to-text-bridge', () => {
     ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
+  it('rejects a directory passed as shell audio input', async () => {
+    fs.mkdirSync(path.join(tmpDir, 'audio-directory'));
+    const bridge = new ShellSpeechToTextBridge({ command: "printf 'hello'" });
+
+    await expect(bridge.transcribe({ audioPath: 'audio-directory' })).rejects.toThrow(
+      '[stt-bridge] audio input must be a regular file'
+    );
+  });
   it('normalizes structured shell output and drops malformed segments', async () => {
     const audioPath = path.join(tmpDir, 'structured.wav');
     fs.writeFileSync(audioPath, 'fake-audio');

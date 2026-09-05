@@ -25,6 +25,7 @@ import { isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeExecResult,
   safeReadFile,
   safeWriteFile,
@@ -255,6 +256,12 @@ function resolveTranscriptPath(outputPath: string | undefined, audioAbs: string)
   return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
+function assertRegularFile(filePath: string, label: string): void {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[stt-bridge] ${label} must be a regular file: ${filePath}`);
+  }
+}
+
 /**
  * Stub bridge — accepts a sidecar `<audio>.transcript.txt` next to the
  * audio file as a pre-baked transcript. Never tries to actually decode
@@ -265,10 +272,12 @@ export const stubSpeechToTextBridge: SpeechToTextBridge = {
   capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
   async transcribe(input) {
     const audioAbs = resolveAudioPath(input.audioPath);
+    if (safeExistsSync(audioAbs)) assertRegularFile(audioAbs, 'audio input');
     const sidecar = assertSafeRepositoryPath(deriveSidecar(audioAbs), {
       allowMissingLeaf: true,
     });
     if (safeExistsSync(sidecar)) {
+      assertRegularFile(sidecar, 'transcript sidecar');
       const text = safeReadFile(sidecar, { encoding: 'utf8' }) as string;
       logger.warn(
         `[stt-bridge:stub] using pre-baked sidecar ${sidecar} — register a real SpeechToTextBridge to decode audio.`
@@ -335,6 +344,7 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
     if (!safeExistsSync(audioAbs)) {
       throw new Error(`[stt-bridge:shell] audio file not found: ${input.audioPath}`);
     }
+    assertRegularFile(audioAbs, 'audio input');
     // I18N-06: an unset transcribe language falls back to the resolved
     // locale (identity/env/OS) instead of an empty string, matching the
     // stub bridge above and `python-voice-bridge.ts`'s TTS language (I18N-01).
@@ -361,6 +371,7 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
     }
     const text = String(structured.text || stdout).trim();
     const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+    if (safeExistsSync(outputPath)) assertRegularFile(outputPath, 'transcript output');
     safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
     return {
       text,
