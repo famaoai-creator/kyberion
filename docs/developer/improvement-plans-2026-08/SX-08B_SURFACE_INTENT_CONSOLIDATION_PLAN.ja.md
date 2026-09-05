@@ -1640,3 +1640,9 @@ media design systemsの大規模な組み込みfallbackと、正本catalogの欠
 android UI defaultsの組み込みselectorとschema不正時のfallbackを削除し、ログイン／passkey操作のselectorを正本JSONからのみ解決する必須catalog境界へ統一した。android actuatorの実機操作、retry policy、ADF input contractは変更していない。
 
 検証: android catalog resource boundary **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 204
+
+public slide layout presetの組み込みpresetとschema不正時のfallbackを削除し、分割presetを最小envelopeへ集約した上で正本schemaから検証する必須catalog境界へ統一した。confidential layout templateの不正時にpublic catalogへ戻る既存のtenant override優先順位は維持している。
+
+検証: media-layout-catalog／body-zones **2 files / 31 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
