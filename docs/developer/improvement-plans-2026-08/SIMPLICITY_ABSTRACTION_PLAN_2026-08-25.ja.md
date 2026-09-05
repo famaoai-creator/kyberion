@@ -21387,3 +21387,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/presentation-preference-registry.ts`、`libs/core/presentation-preference-registry.test.ts`、`libs/core/tenant-rate-limiter.ts`、`libs/core/tenant-rate-limiter.test.ts`、`libs/core/reasoning-provider-registry.ts`
 - **変更**: presentation preference registryの組み込みfallbackと、正本registryの欠損・schema不正をfallbackへ収束させるcatchを削除し、表示設定の正本読み込み障害をfail-closedで返す境界へ統一した。personal overlayの任意性、profile merge、default profile選択と、書き込み時のschema検証は維持・明示化している。tenant rate-limit policyを必須catalogへ変更し、quota stateは未作成時だけ明示的な空stateから開始し、既存stateのschema不正をリセットしないようにした。推論provider registryは欠損fallbackを削除し、未知・不正なprovider entryを無視せず明示エラーにした。
 - **検証**: presentation-preference-registry／tenant-rate-limiter／reasoning-provider-registry **3 files / 17 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateはこの変更群反映後に再実行する。
+
+## 2026-09-06 再レビュー修正 1365
+
+- **対象**: `libs/core/src/knowledge-curation-report.ts`、`libs/core/src/knowledge-curation-report.test.ts`
+- **変更**: knowledge curation SLOのcatalog fallbackを削除し、SLO config未作成時は呼び出し側の明示的な保守的既定値から開始し、存在するconfigのschema不正はそのまま拒否する境界へ整理した。freshness／low-yield判定、tenant ingest advisory、archive historyの既存semanticsは変更していない。
+- **検証**: knowledge-curation-report **1 file / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
