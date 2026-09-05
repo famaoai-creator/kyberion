@@ -14,6 +14,7 @@ describe('deployment adapter resource boundary', () => {
     expect(source).toContain("pathResolver.knowledge(path.join('personal/deployments'");
     expect(source).toContain('{ allowMissingLeaf: true }');
     expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).not.toContain('process.env.SHELL');
     expect(source).toContain('getRegisteredEnvText');
   });
 });
