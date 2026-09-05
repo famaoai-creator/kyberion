@@ -1,5 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 /**
  * DA-05 Hybrid Sovereign Ledger — per-tenant information-asset ledger.
  *
@@ -28,13 +28,7 @@ import * as pathResolver from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeReadFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 
 const SHA256_RE = /^[a-f0-9]{64}$/;
 
@@ -313,7 +307,7 @@ export function readAssetLedger(
   const ledgerFile = assetLedgerPath(tenantSlug, options);
   if (!safeExistsSync(ledgerFile)) return [];
   ensureRegularAssetLedgerFile(ledgerFile);
-  const raw = String(safeReadFile(ledgerFile, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(ledgerFile);
   const records: IngestAssetRecord[] = [];
   const catalog = ingestAssetCatalog(ledgerFile);
   for (const [index, line] of raw.split('\n').entries()) {

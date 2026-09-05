@@ -37,12 +37,12 @@ import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeLstat,
-  safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -674,12 +674,7 @@ export function applyOnboardingContextBinding(
     const savedPaths: string[] = [];
     const previousFiles = new Map<string, string | undefined>();
     for (const filePath of [statePath, purposePath, contextPath(binding.customer_slug, rootDir)]) {
-      previousFiles.set(
-        filePath,
-        safeExistsSync(filePath)
-          ? (safeReadFile(filePath, { encoding: 'utf8' }) as string)
-          : undefined
-      );
+      previousFiles.set(filePath, safeExistsSync(filePath) ? readTextFile(filePath) : undefined);
     }
     try {
       if (!organizationState) {
@@ -818,7 +813,7 @@ export function applyOnboardingFirstWork(
           updated_at: nowIso(),
         };
         const bindingPath = contextPath(nextBinding.customer_slug, rootDir);
-        const previousBinding = safeReadFile(bindingPath, { encoding: 'utf8' }) as string;
+        const previousBinding = readTextFile(bindingPath);
         safeWriteFile(bindingPath, `${JSON.stringify(nextBinding, null, 2)}\n`, {
           encoding: 'utf8',
         });
@@ -888,7 +883,7 @@ export function applyOnboardingFirstWork(
         onCommit: (bootstrapped) => {
           const bindingPath = contextPath(resolved.binding.customer_slug, rootDir);
           const previousBinding = safeExistsSync(bindingPath)
-            ? (safeReadFile(bindingPath, { encoding: 'utf8' }) as string)
+            ? readTextFile(bindingPath)
             : undefined;
           let firstWorkPath: string | undefined;
           let workItem: WorkItem | undefined;

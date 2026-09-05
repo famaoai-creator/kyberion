@@ -22510,6 +22510,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: 共有リンクの persisted HMAC key と share-grant ledger の本文読込を foundation の `readTextFile` へ移行した。key／ledger の検証、ハッシュチェーン、lock／scope／grant authorization semanticsは変更せず、バイナリ用途の `safeReadFile` は引き続き用途限定で保持する。
 - **検証**: 対象テスト **1 file／18 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1559
+
+- **対象**: `libs/core/ingest-asset-ledger.ts`、`libs/core/onboarding-context.ts`、`libs/core/spill-result.ts` と対象テスト
+- **変更**: ingest asset ledger、onboarding context binding、spill locator の本文読込を foundation の `readTextFile` へ移行した。tenant／organization／project context、ledger lineage、spill path／permission semanticsは変更せず、個別サイズ上限を持つ他のreaderやバイナリ用途は対象外として保持した。
+- **検証**: 対象テスト **3 files／29 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
