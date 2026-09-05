@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import {
   loadJson,
   pathResolver,
@@ -213,14 +214,13 @@ describe('runAiAudit deterministic guards', () => {
 
 describe('runAiAudit script boundary', () => {
   it('routes report output through the shared script printer', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/run_ai_audit.ts'), { encoding: 'utf8' }) || ''
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/run_ai_audit.ts'));
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
     expect(source).not.toContain('process.exitCode =');
     expect(source).toContain('setProcessExitCode(exitCode)');
     expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).toContain('getRegisteredEnvText, nowIso, readTextFile');
   });
 });
