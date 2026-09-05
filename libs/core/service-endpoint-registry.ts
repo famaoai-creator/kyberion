@@ -4,9 +4,6 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
-import { createLogger } from './logger.js';
-
-const logger = createLogger('service-endpoint-registry');
 
 export interface ServiceEndpointRecord {
   base_url?: string;
@@ -39,11 +36,6 @@ const DEFAULT_SERVICE_ENDPOINTS_PATH = pathResolver.knowledge(
 const DEFAULT_SERVICE_ENDPOINTS_DIR = pathResolver.knowledge(
   'product/orchestration/service-endpoints'
 );
-const FALLBACK_SERVICE_ENDPOINTS: ServiceEndpointsCatalog = {
-  version: 'fallback',
-  default_pattern: 'https://api.{service_id}.com/v1',
-  services: {},
-};
 const SERVICE_ENDPOINTS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/service-endpoints.schema.json'
 );
@@ -72,13 +64,6 @@ const serviceEndpointsCatalog = defineCatalog<ServiceEndpointsCatalog>({
       allowMissingLeaf: true,
     }),
   schema: SERVICE_ENDPOINTS_SCHEMA_PATH,
-  fallback: FALLBACK_SERVICE_ENDPOINTS,
-  fallbackOnInvalid: true,
-  onFallback: (error) => {
-    if (!String(error).includes('missing')) {
-      logger.warn(`failed to load service endpoints catalog: ${String(error)}`);
-    }
-  },
 });
 
 function loadServiceEndpointsCatalogFromPath(catalogPath: string): ServiceEndpointsCatalog {
@@ -190,16 +175,11 @@ export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
     const dirEntries = safeReaddir(resolvedCatalogDir);
     const hasJsonFiles = dirEntries.some((entry) => entry.endsWith('.json'));
     if (hasJsonFiles) {
-      try {
-        const parsed = loadServiceEndpointsDirectory(catalogDir);
-        cachedServiceEndpointsPath = catalogPath;
-        cachedServiceEndpointsDir = catalogDir;
-        cachedServiceEndpoints = parsed;
-        return parsed;
-      } catch (_) {
-        // Fall back to the compatibility snapshot silently. The directory may
-        // be partially migrated or intentionally empty during staged rollout.
-      }
+      const parsed = loadServiceEndpointsDirectory(catalogDir);
+      cachedServiceEndpointsPath = catalogPath;
+      cachedServiceEndpointsDir = catalogDir;
+      cachedServiceEndpoints = parsed;
+      return parsed;
     }
   }
 
