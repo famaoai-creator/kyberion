@@ -186,9 +186,9 @@ function resolveSttAvailability(): VoiceSttAvailability {
   );
   return {
     server: Boolean(
-      process.env.VOICE_HUB_STT_BASE_URL?.trim() ||
-      process.env.WHISPERKIT_BASE_URL?.trim() ||
-      process.env.MLX_AUDIO_BASE_URL?.trim()
+      getRegisteredEnvText('VOICE_HUB_STT_BASE_URL')?.trim() ||
+      getRegisteredEnvText('WHISPERKIT_BASE_URL')?.trim() ||
+      getRegisteredEnvText('MLX_AUDIO_BASE_URL')?.trim()
     ),
     fluidAudio,
     fasterWhisper,
