@@ -73,4 +73,21 @@ describe('KnowledgeProvider scope boundary', () => {
       safeRmSync(target, { force: true });
     }
   });
+
+  it('rejects a knowledge resource replaced by a directory', () => {
+    const name = `.knowledge-provider-directory-${process.pid}`;
+    const directory = pathResolver.knowledge(`public/${name}`);
+    try {
+      try {
+        fs.rmSync(directory, { recursive: true, force: true });
+      } catch {
+        // The fixture may not exist yet.
+      }
+      fs.mkdirSync(directory, { recursive: true });
+
+      expect(() => KnowledgeProvider.getText(`public/${name}`)).toThrow('[KNOWLEDGE_SCOPE_DENIED]');
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
 });

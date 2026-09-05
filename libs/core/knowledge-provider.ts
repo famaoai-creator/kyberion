@@ -135,6 +135,11 @@ export class KnowledgeProvider {
           throw error;
         }
       }
+      if (!safeLstat(absolute).isFile()) {
+        throw new Error(
+          `[KNOWLEDGE_SCOPE_DENIED] knowledge resource must be a regular file: ${relative}`
+        );
+      }
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('[KNOWLEDGE_SCOPE_DENIED]')) {
         throw error;
