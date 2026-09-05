@@ -27,6 +27,7 @@ const SOURCES = [
   ['libs/core/operator-notifications.ts', /process\.env\.VITEST/u],
   ['scripts/run_baseline_check.ts', /process\.env\.VITEST/u],
   ['scripts/peer_network_register.ts', /process\.env\[secretEnv\]/u],
+  ['scripts/backup.ts', /process\.env\[(?:envName|options\.passphraseEnv)\]/u],
   ['libs/core/mission-work-reconciliation.ts', /process\.env\.GITHUB_(?:HEAD_REF|REF_NAME|SHA)/u],
   ['scripts/lib/harness.ts', /process\.env\.LOG_LEVEL/u],
   ['scripts/demos/demo_telegram_flow.ts', /process\.env\.MISSION_ROLE/u],
