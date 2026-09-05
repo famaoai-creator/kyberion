@@ -1264,3 +1264,9 @@ Chronos cost routeのbudget fallbackとOperator SurfaceのMOS監査警告に残�
 environment capabilityのenv probeに残っていたraw環境参照を、空文字を保持できる `getRegisteredEnvText(..., { preserveEmpty: true })` へ移行した。未設定／空文字の判定、`require_non_empty`、manifest署名鍵のfail-closed検証は変更していない。foundationにpresence-sensitive readの回帰テストと共通environment boundary testを追加した。
 
 検証: foundation／environment capability／environment boundary **3 files / 49 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 142
+
+secret-guardのupstream／personal vault fallbackに残っていた環境secretの動的raw参照を、登録済み `getRegisteredEnvText` へ統一した。upstream KMS、scope／temporal grant検証、personal vault fallback、secret maskingとsecret非出力の既存semanticsは変更していない。共通environment boundary testに対象を追加した。
+
+検証: secret-guard／environment boundary **3 files / 19 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
