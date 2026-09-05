@@ -5,7 +5,6 @@ import {
 } from './surface-query.js';
 import { resolveIntentResolutionPacket, type IntentResolutionPacket } from './intent-resolution.js';
 import { pathResolver } from './path-resolver.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
 import { recordUnhandledIntent } from './unhandled-intent-registry.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 
@@ -47,23 +46,10 @@ export interface IntentRoutingMap {
   >;
 }
 
-const DEFAULT_INTENT_ROUTING_MAP: IntentRoutingMap = {
-  pipeline_intent_map: {},
-  mission_intent_action_map: {},
-  direct_intent_commands: {},
-};
-
 const intentRoutingCatalog = defineCatalog<IntentRoutingMap>({
   id: 'intent-routing-map',
   path: () => pathResolver.knowledge('product/governance/intent-routing-map.json'),
   schema: 'knowledge/product/schemas/intent-routing-map.schema.json',
-  fallback: DEFAULT_INTENT_ROUTING_MAP,
-  onFallback: (error, defaults) =>
-    recordConfigFallback({
-      knowledgePath: 'product/governance/intent-routing-map.json',
-      error,
-      defaults,
-    }),
 });
 
 export function loadIntentRoutingMap(): IntentRoutingMap {
