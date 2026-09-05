@@ -383,32 +383,25 @@ describe('tool runtime registry', () => {
     expect(agyLinux.selected_backend?.command).toBe('any-installer');
   });
 
-  it('keeps WinGet fallbacks available when the governed registry is missing', () => {
+  it('fails closed when the governed registry is missing', () => {
     vi.stubEnv('KYBERION_TOOL_RUNTIME_REGISTRY_PATH', path.join(tmpRoot, 'missing-registry.json'));
     _resetToolRuntimeRegistryCacheForTests();
 
-    const ollama = probeToolRuntime('ollama', 'approved_install', 'win32');
-    expect(ollama.selected_backend?.command).toBe('winget');
-    expect(ollama.selected_backend?.args).toContain('Ollama.Ollama');
-
-    const llamaCpp = probeToolRuntime('llamacpp', 'approved_install', 'win32');
-    expect(llamaCpp.selected_backend?.command).toBe('winget');
-    expect(llamaCpp.selected_backend?.args).toContain('ggml.llamacpp');
+    expect(() => getToolRuntimeRegistry()).toThrow(/Catalog tool-runtime-registry is missing/);
   });
 
-  it('uses the fallback when the governed registry fails schema validation', () => {
+  it('fails closed when the governed registry fails schema validation', () => {
     safeWriteFile(registryPath, JSON.stringify({ version: 'invalid' }), { encoding: 'utf8' });
     _resetToolRuntimeRegistryCacheForTests();
 
-    expect(getToolRuntimeRegistry().default_tool_id).toBe('mflux');
-    expect(getToolRuntimeRecord('llamacpp').installed_backend?.command).toBe('llama-server');
+    expect(() => getToolRuntimeRegistry()).toThrow(/Invalid catalog tool-runtime-registry/);
   });
 
-  it('uses the fallback when the registry override is outside the repository', () => {
+  it('rejects a registry override outside the repository', () => {
     vi.stubEnv('KYBERION_TOOL_RUNTIME_REGISTRY_PATH', '/tmp/tool-runtime-registry-external.json');
     _resetToolRuntimeRegistryCacheForTests();
 
-    expect(getToolRuntimeRegistry().version).toBe('fallback');
+    expect(() => getToolRuntimeRegistry()).toThrow(/outside the repository root/);
   });
 
   it('loads a valid tool runtime state through the canonical schema and path binding', () => {
