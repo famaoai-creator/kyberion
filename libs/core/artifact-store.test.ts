@@ -238,6 +238,26 @@ describe('writeScopedArtifact (AL-02)', () => {
     }
   });
 
+  it('rejects governed artifact operations when the file path is a directory', () => {
+    const logicalPath = `active/shared/coordination/artifact-store-directory-${randomUUID()}.jsonl`;
+    const absolutePath = path.join(tmpRoot, logicalPath);
+    fs.mkdirSync(absolutePath, { recursive: true });
+
+    try {
+      expect(() =>
+        store.appendGovernedArtifactJsonl('mission_controller', logicalPath, { value: true })
+      ).toThrow('governed artifact must be a regular file');
+      expect(() =>
+        store.writeGovernedArtifactJson('mission_controller', logicalPath, { value: true })
+      ).toThrow('governed artifact must be a regular file');
+      expect(() => store.readGovernedArtifactJson(logicalPath)).toThrow(
+        'governed artifact must be a regular file'
+      );
+    } finally {
+      fs.rmSync(absolutePath, { recursive: true, force: true });
+    }
+  });
+
   it('isScopedArtifactPath accepts only the scoped artifact roots', () => {
     expect(store.isScopedArtifactPath('active/missions/M-1/artifacts/report/a.json')).toBe(true);
     expect(store.isScopedArtifactPath('active/projects/confidential/t/p/artifacts/cache/a')).toBe(

@@ -52,6 +52,12 @@ export function resolveGovernedArtifactPath(logicalPath: string): string {
   });
 }
 
+function ensureRegularGovernedArtifactFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`governed artifact must be a regular file: ${filePath}`);
+  }
+}
+
 export function ensureGovernedArtifactDir(role: GovernedArtifactRole, logicalDir: string): string {
   return withRole(role, () => {
     const resolved = resolveGovernedArtifactPath(logicalDir);
@@ -69,6 +75,7 @@ export function writeGovernedArtifactJson(
     const resolved = resolveGovernedArtifactPath(logicalPath);
     const dir = path.dirname(resolved);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    ensureRegularGovernedArtifactFile(resolved);
     safeWriteFile(logicalPath, JSON.stringify(value, null, 2));
     return resolved;
   });
@@ -83,6 +90,7 @@ export function appendGovernedArtifactJsonl(
     const resolved = resolveGovernedArtifactPath(logicalPath);
     const dir = path.dirname(resolved);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    ensureRegularGovernedArtifactFile(resolved);
     appendJsonLine(logicalPath, value);
     return resolved;
   });
@@ -91,6 +99,7 @@ export function appendGovernedArtifactJsonl(
 export function readGovernedArtifactJson<T>(logicalPath: string): T | null {
   const resolved = resolveGovernedArtifactPath(logicalPath);
   if (!safeExistsSync(resolved)) return null;
+  ensureRegularGovernedArtifactFile(resolved);
   return readJson<T>(resolved);
 }
 
