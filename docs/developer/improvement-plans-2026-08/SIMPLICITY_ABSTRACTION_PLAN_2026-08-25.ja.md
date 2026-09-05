@@ -22143,3 +22143,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_improvement_plan_metadata.ts`
 - **変更**: improvement plan metadata checker の本文読込を foundation の `readTextFile` へ移行した。既存の frontmatter 追加・status 正規化・secure write semanticsは変更せず、計画走査CLIに残っていた旧 `safeReadFile` 直読を削減した。
 - **検証**: improvement-plan-metadata **3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1491
+
+- **対象**: `scripts/find_dead_code.ts`、`scripts/find_dead_code.entrypoint.test.ts`
+- **変更**: dead-code finder の source／workspace scan 本文読込を foundation の `readTextFile` へ移行した。候補抽出、workspace scope、advisory report生成、共有printerのsemanticsは変更せず、analysis CLIに残っていた旧 `safeReadFile` 直読を削減した。
+- **検証**: find-dead-code entrypoint **1 test passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
