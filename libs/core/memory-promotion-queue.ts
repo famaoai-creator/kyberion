@@ -10,6 +10,7 @@ import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeStat,
@@ -215,6 +216,15 @@ function ensureQueueDir(queuePath: string): void {
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
 }
 
+function readQueueRows(queuePath: string): MemoryCandidate[] {
+  const safePath = assertSafeRepositoryPath(queuePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[MEMORY_PROMOTION] queue must be a regular file: ${safePath}`);
+  }
+  return readJsonLines<MemoryCandidate>(safePath);
+}
+
 export function createMemoryPromotionCandidate(input: {
   candidateId?: string;
   sourceType: MemoryCandidateSourceType;
@@ -368,8 +378,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
 export function listMemoryPromotionCandidates(scope?: MemoryScopeEnvelope): MemoryCandidate[] {
   return (scope ? [resolveQueuePath(scope)] : queuePathsForAllScopes())
     .filter((queuePath, index, all) => all.indexOf(queuePath) === index)
-    .filter((queuePath) => safeExistsSync(queuePath))
-    .flatMap((queuePath) => readJsonLines<MemoryCandidate>(queuePath));
+    .flatMap((queuePath) => readQueueRows(queuePath));
 }
 
 export function loadMemoryPromotionCandidate(
@@ -400,8 +409,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
       ? [candidateQueuePath]
       : queuePathsForAllScopes();
   const matchingQueuePaths = candidatePaths.filter((candidatePath) => {
-    if (!safeExistsSync(candidatePath)) return false;
-    const rows = readJsonLines<MemoryCandidate>(candidatePath);
+    const rows = readQueueRows(candidatePath);
     return rows.some(
       (row) =>
         row.candidate_id === input.candidateId &&
@@ -415,9 +423,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
   }
   if (input.allMatching && !requestedScopeKey) {
     const matched = matchingQueuePaths.flatMap((queuePath) =>
-      readJsonLines<MemoryCandidate>(queuePath).filter(
-        (row) => row.candidate_id === input.candidateId
-      )
+      readQueueRows(queuePath).filter((row) => row.candidate_id === input.candidateId)
     );
     const scopeKeys = new Set(matched.map((row) => resolveScopeKey(row.scope)));
     if (scopeKeys.size > 1) {
@@ -431,7 +437,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
   let firstUpdated: MemoryCandidate | null = null;
   const ratifiedAt = nowIso();
   for (const queuePath of matchingQueuePaths) {
-    const rows = readJsonLines<MemoryCandidate>(queuePath);
+    const rows = readQueueRows(queuePath);
     let changed = false;
     for (let index = 0; index < rows.length; index += 1) {
       const current = rows[index] as MemoryCandidate;
