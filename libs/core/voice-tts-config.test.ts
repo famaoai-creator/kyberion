@@ -62,10 +62,10 @@ describe('voice tts config registry', () => {
     expect(config.urlToken).toBe('リンク');
   });
 
-  it('uses the fallback when a configured registry path is outside the repository', () => {
+  it('rejects a configured registry path outside the repository', () => {
     process.env.KYBERION_VOICE_HUB_TTS_CONFIG_PATH = '/tmp/voice-tts-external.json';
     _resetVoiceTtsConfigCacheForTests();
 
-    expect(getVoiceTtsLanguageConfig('en')).toEqual({ voice: 'default', rate: 180 });
+    expect(() => getVoiceTtsLanguageConfig('en')).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });
