@@ -1,6 +1,5 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
 
 export type ProviderConfigRuntimeRole =
   | 'anthropic-default'
@@ -30,51 +29,10 @@ const PROVIDER_CONFIG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/provider-config.schema.json'
 );
 
-const FALLBACK: ProviderConfigFile = {
-  default_priority: ['agy', 'claude', 'codex', 'grok', 'copilot'],
-  obsolete_agent_runtime_providers: ['gemini'],
-  default_models: {
-    gemini: 'gemini-3.6-flash',
-    claude: 'claude-opus-5',
-    agy: 'Gemini 3.7 Flash (Medium)',
-    codex: 'gpt-5.6-sol',
-    grok: 'grok-4.6',
-    copilot: 'auto',
-  },
-  runtime_defaults: {
-    'anthropic-default': 'claude-opus-5',
-    'anthropic-fast': 'claude-haiku-4-5-20251001',
-    'gemini-default': 'gemini-3.6-flash',
-    'gemini-fast': 'gemini-3.1-flash-lite',
-    'openai-vision': 'gpt-5.5',
-    'codex-default': 'gpt-5.6-sol',
-    'copilot-default': 'auto',
-  },
-  lifecycle: {
-    gemini: {
-      boot_command: 'gemini',
-      boot_args: ['--acp', '-y'],
-      default_model: 'gemini-3.6-flash',
-    },
-    copilot: {
-      boot_command: 'gh',
-      boot_args: ['copilot', '--', '--acp', '--allow-all'],
-      default_model: 'auto',
-    },
-  },
-};
-
 const providerConfigCatalog: GovernedCatalog<ProviderConfigFile> = defineCatalog({
   id: 'provider-config',
   path: PROVIDER_CONFIG_PATH,
   schema: PROVIDER_CONFIG_SCHEMA_PATH,
-  fallback: FALLBACK,
-  onFallback: (error, fallback) =>
-    recordConfigFallback({
-      knowledgePath: 'product/governance/provider-config.json',
-      error,
-      defaults: fallback,
-    }),
 });
 
 export function loadProviderConfig(): ProviderConfigFile {
@@ -104,7 +62,6 @@ export function resolveRuntimeDefaultModelId(role: ProviderConfigRuntimeRole): s
   return (
     config.runtime_defaults[role] ||
     config.default_models[RUNTIME_ROLE_PROVIDER_FALLBACK[role]] ||
-    FALLBACK.runtime_defaults[role] ||
     role
   );
 }
