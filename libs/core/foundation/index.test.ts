@@ -106,4 +106,17 @@ describe('foundation helpers', () => {
       })
     ).toBe(2500);
   });
+
+  it('can preserve empty environment values for presence-sensitive probes', () => {
+    const environment = { KYBERION_EMPTY_FOUNDATION_TEST: '' };
+    expect(getRegisteredEnvText('KYBERION_EMPTY_FOUNDATION_TEST', { env: environment })).toBe(
+      undefined
+    );
+    expect(
+      getRegisteredEnvText('KYBERION_EMPTY_FOUNDATION_TEST', {
+        env: environment,
+        preserveEmpty: true,
+      })
+    ).toBe('');
+  });
 });

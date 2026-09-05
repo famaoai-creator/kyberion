@@ -293,7 +293,7 @@ async function runProbe(
       }
     }
     case 'env': {
-      const value = process.env[probe.name];
+      const value = getRegisteredEnvText(probe.name, { preserveEmpty: true });
       if (value === undefined) {
         return { available: false, reason: `env var ${probe.name} is unset` };
       }

@@ -42,10 +42,15 @@ function entries(): FoundationEnvEntry[] {
 
 export function getRegisteredEnv<T = string>(
   name: string,
-  options: { env?: Record<string, string | undefined>; defaultValue?: T; strict?: boolean } = {}
+  options: {
+    env?: Record<string, string | undefined>;
+    defaultValue?: T;
+    strict?: boolean;
+    preserveEmpty?: boolean;
+  } = {}
 ): string | number | boolean | T | undefined {
   const raw = (options.env ?? process.env)[name];
-  if (raw === undefined || raw === '') return options.defaultValue;
+  if (raw === undefined || (raw === '' && !options.preserveEmpty)) return options.defaultValue;
   const entry = entries().find((candidate) => candidate.name === name);
   if (!entry || entry.type === 'string' || entry.type === 'path') return raw;
   if (entry.type === 'boolean') {
@@ -68,7 +73,11 @@ export function getRegisteredEnv<T = string>(
  */
 export function getRegisteredEnvText(
   name: string,
-  options: { env?: Record<string, string | undefined>; strict?: boolean } = {}
+  options: {
+    env?: Record<string, string | undefined>;
+    strict?: boolean;
+    preserveEmpty?: boolean;
+  } = {}
 ): string | undefined {
   const value = getRegisteredEnv(name, options);
   if (value === undefined) return undefined;
