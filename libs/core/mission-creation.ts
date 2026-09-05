@@ -282,7 +282,7 @@ export async function createMission(args: {
   const gitBranch = getCurrentBranch(rootDir);
   const gitHash = getGitHash(rootDir);
   const now = nowIso();
-  const owner = process.env.USER || 'famao';
+  const owner = getRegisteredEnvText('USER') || 'famao';
   const resolvedVision = normalizeMissionVisionRef(visionRef, tenantSlug, rootDir);
 
   for (const file of template.files) {
