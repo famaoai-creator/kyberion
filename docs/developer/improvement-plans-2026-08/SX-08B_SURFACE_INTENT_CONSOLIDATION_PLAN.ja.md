@@ -946,3 +946,9 @@ reasoning-backendのambient prompt visibilityが参照する `MISSION_ID` の環
 pipeline-run-journalの再開候補探索に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。mission journalの候補発見、path boundary、JSONL event復元、approval resumeの既存 semanticsは変更していない。
 
 検証: journal／mission graph／approval resume **3 files / 17 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 89
+
+nerve-bridgeのstimulus metadataとCLI usage meteringのmission telemetryに残っていた `MISSION_ID` 直読を、登録済み `getRegisteredEnvText` へ統一した。message routing、TTL／rotation、推定token cost、usage causeと既存のbest-effort semanticsは変更していない。
+
+検証: CLI metering／stimuli TTL **2 files / 7 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。

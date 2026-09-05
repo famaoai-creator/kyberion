@@ -1,4 +1,5 @@
 import { metrics } from './metrics.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 /**
  * OP-01 Task 1.2: CLI reasoning backends (gemini/codex) do not report token
@@ -18,7 +19,7 @@ export function recordEstimatedCliUsage(
     metrics.record(component, Date.now() - started, status, {
       model,
       agent: component,
-      mission_id: process.env.MISSION_ID || undefined,
+      mission_id: getRegisteredEnvText('MISSION_ID') || undefined,
       estimated: true,
       usage: {
         prompt_tokens: Math.ceil(promptChars / 4),

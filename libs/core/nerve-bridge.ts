@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 /**
  * libs/core/nerve-bridge.ts
@@ -62,7 +63,7 @@ export function sendNerveMessage(input: {
     payload: input.payload,
     metadata: {
       reply_to: input.replyTo,
-      mission_id: process.env.MISSION_ID,
+      mission_id: getRegisteredEnvText('MISSION_ID'),
       ttl: 60,
     },
   };
