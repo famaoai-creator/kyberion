@@ -928,3 +928,9 @@ spend-guardのmission spend集計に残っていた `MISSION_ID` の環境直読
 secret-guardのTIBA scope判定と接続文書監査記録に残っていた `MISSION_ID`／`AUTHORIZED_SCOPE` の環境直読を、登録済み `getRegisteredEnvText` へ統一した。temporal grant、scope prefix、secret resolver、暗号化接続文書、監査ledgerの既存 semanticsは変更していない。
 
 検証: secret guard／branch／bridge **3 files / 24 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 86
+
+metricsのresource usage／execution metrics記録に残っていた `MISSION_ID` の環境直読2箇所を、登録済み `getRegisteredEnvText` へ統一した。明示mission_id優先、日次／mission cost集計、usage cause／scopeの正規化、JSONL persistenceの既存 semanticsは変更していない。
+
+検証: metrics／cost関連 **4 files / 32 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。

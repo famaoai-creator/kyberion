@@ -7,6 +7,7 @@ import { createLogger } from './logger.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { clamp } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 const logger = createLogger('metrics');
@@ -287,7 +288,7 @@ export class MetricsCollector {
     if (!Number.isFinite(cost) || cost < 0) {
       throw new Error('resource usage cost_usd must be a finite non-negative number');
     }
-    const missionId = input.mission_id || process.env.MISSION_ID || undefined;
+    const missionId = input.mission_id || getRegisteredEnvText('MISSION_ID') || undefined;
     const scope = input.scope ? normalizeEventScope(input.scope) : undefined;
     const record: ResourceUsageRecord = {
       type: 'resource_usage',
@@ -412,7 +413,7 @@ export class MetricsCollector {
       agg.cacheIntegrityFailures += extra.cacheStats.integrityFailures || 0;
     }
 
-    const missionId = extra.mission_id || process.env.MISSION_ID || undefined;
+    const missionId = extra.mission_id || getRegisteredEnvText('MISSION_ID') || undefined;
     const persistedExtra = {
       ...extra,
       cause: normalizeUsageCause(extra.cause),
