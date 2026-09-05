@@ -45,14 +45,14 @@ describe('video composition template registry', () => {
     expect(listVideoCompositionTemplates('active')).toHaveLength(1);
   });
 
-  it('falls back when an override fails schema validation', () => {
+  it('fails closed when an override fails schema validation', () => {
     safeMkdir(tmpDir, { recursive: true });
     safeWriteFile(overridePath, JSON.stringify({ version: 'invalid' }));
     process.env.KYBERION_VIDEO_COMPOSITION_TEMPLATE_REGISTRY_PATH = overridePath;
 
-    const registry = getVideoCompositionTemplateRegistry();
-    expect(registry.version).toBe('fallback');
-    expect(registry.default_template_id).toBe('basic-title-card');
+    expect(() => getVideoCompositionTemplateRegistry()).toThrow(
+      /Invalid catalog video-composition-template-registry/
+    );
   });
 
   it('rejects a registry override outside the repository', () => {
