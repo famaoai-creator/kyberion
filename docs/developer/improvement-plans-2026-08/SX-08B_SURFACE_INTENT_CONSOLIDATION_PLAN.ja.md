@@ -1030,3 +1030,9 @@ pipeline executionのapproval escalation／output artifact mission attribution�
 pipeline resultsのexecute／resume／context mission解決に残っていた `MISSION_ID` の環境直読3箇所を、登録済み `getRegisteredEnvText` へ統一した。明示context優先、resume journalのmission binding、未指定時の環境設定、副作用、pipeline result／trace semanticsは変更していない。
 
 検証: pipeline results **2 files / 72 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 103
+
+mission memory commandのrubric override監査記録に残っていた `MISSION_ID` の環境直読を、既存の `registeredEnv` helper へ移行した。環境値優先、明示 `--mission-id` fallback、audit metadataとoverride policyの既存 semanticsは変更していない。
+
+検証: mission memory command **1 file / 3 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。

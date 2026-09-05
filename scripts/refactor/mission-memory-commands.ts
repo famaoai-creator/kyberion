@@ -217,7 +217,7 @@ export function acceptRubricOverride(
         'has documented the exception.'
     );
   }
-  const missionId = process.env.MISSION_ID || getOptionValue('--mission-id') || '';
+  const missionId = registeredEnv('MISSION_ID') || getOptionValue('--mission-id') || '';
   const entry = auditChain.record({
     agentId: registeredEnv('KYBERION_PERSONA') || 'mission_controller',
     action: 'rubric.override_accepted',
