@@ -117,6 +117,18 @@ describe('agent-manifest selection hint loading', () => {
     });
   });
 
+  it('skips a manifest entry replaced with a directory', () => {
+    const root = pathResolver.sharedTmp('agent-manifest-directory-test');
+    const agentsDir = `${root}/knowledge/product/agents`;
+
+    try {
+      safeMkdir(`${agentsDir}/directory-agent.agent.md`, { recursive: true });
+      expect(loadAgentManifests(root)).toEqual([]);
+    } finally {
+      safeRmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects a manifest file reached through a symbolic link', () => {
     const root = pathResolver.sharedTmp('agent-manifest-symlink-test');
     const agentsDir = `${root}/knowledge/product/agents`;
