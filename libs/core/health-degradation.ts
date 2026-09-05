@@ -84,8 +84,6 @@ const thresholdsCatalog = defineCatalog<HealthThresholds>({
   id: 'health-thresholds',
   path: THRESHOLDS_PATH,
   schema: pathResolver.knowledge('product/schemas/health-thresholds.schema.json'),
-  fallback: DEFAULT_THRESHOLDS,
-  fallbackOnInvalid: true,
 });
 
 function positiveOr(value: unknown, fallback: number, min = 0): number {
