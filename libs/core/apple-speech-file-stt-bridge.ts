@@ -15,6 +15,7 @@
 import * as path from 'node:path';
 
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
@@ -170,7 +171,10 @@ export function installAppleSpeechFileToTextBridgeIfAvailable(
   if (getSpeechToTextBridges().some((bridge) => bridge.name === APPLE_SPEECH_FILE_BRIDGE_NAME)) {
     return true;
   }
-  if (env.KYBERION_STT_COMMAND?.trim() || env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()) {
+  if (
+    getRegisteredEnvText('KYBERION_STT_COMMAND', { env })?.trim() ||
+    getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND', { env })?.trim()
+  ) {
     return false;
   }
   if (!isAppleSpeechFileTranscriptionSupported()) return false;

@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 
 const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(() => ({ stdout: '{"ok":true,"text":"hello"}', stderr: '', status: 0 })),
@@ -17,6 +19,16 @@ vi.mock('./secure-io.js', async () => {
 });
 
 describe('apple speech file stt bridge', () => {
+  it('routes Apple Speech environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/apple-speech-file-stt-bridge.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('normalizes the native JSON envelope and rejects malformed shapes', async () => {
     const { normalizeAppleSpeechFilePayload } = await import('./apple-speech-file-stt-bridge.js');
 
