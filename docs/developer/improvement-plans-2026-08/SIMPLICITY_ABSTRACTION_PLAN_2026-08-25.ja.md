@@ -22389,3 +22389,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_lockfile_commit_gate.ts`、`scripts/check_lockfile_commit_gate.test.ts`
 - **変更**: lockfile commit gate の review evidence 本文読込を foundation の `readTextFile` へ移行した。lockfile のSHA-256計算に必要なバイナリ読込、CI環境値、明示的override＋hash-bound evidence判定は変更せず、既存テストに reader contract を追加した。
 - **検証**: lockfile-commit-gate **既存テスト＋reader contract passed**（7 tests）、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1532
+
+- **対象**: `scripts/context_ranker.ts`、`scripts/context_ranker.test.ts`
+- **変更**: knowledge scope 通過後の Markdown 本文読込を foundation の `readTextFile` へ移行した。scope containment、frontmatter parsing、tier／authority／phase inference、ranking semanticsは変更せず、既存テストに reader contract を追加した。
+- **検証**: context-ranker **既存テスト＋reader contract passed**（3 tests）、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
