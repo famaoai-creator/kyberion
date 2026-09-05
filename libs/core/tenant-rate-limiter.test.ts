@@ -132,7 +132,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
     }
   });
 
-  it('discards schema-invalid persisted state before enforcing a budget', () => {
+  it('rejects schema-invalid persisted state instead of resetting quota history', () => {
     safeWriteFile(
       pathResolver.rootResolve('active/shared/runtime/tenant-rate-limit-state.json'),
       JSON.stringify({ tenants: { 'acme-corp': { tokens: 'not-a-number', updated_at: 'bad' } } })
@@ -140,9 +140,9 @@ describe('tenant-rate-limiter (IP-29)', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
     process.env.KYBERION_PERSONA = 'worker';
 
-    expect(consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toMatchObject({
-      allowed: true,
-    });
+    expect(() => consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toThrow(
+      'Invalid catalog tenant-rate-limit-state'
+    );
   });
 
   it('persists a canonical state payload after quota enforcement', () => {
