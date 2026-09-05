@@ -51,6 +51,21 @@ describe('service-runtime-registry', () => {
     });
   });
 
+  it('fails closed when a registry override fails schema validation', () => {
+    safeWriteFile(STATE_TEST_REGISTRY_PATH, JSON.stringify({ version: 'invalid' }));
+    process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH = STATE_TEST_REGISTRY_PATH;
+    _resetServiceRuntimeRegistryCacheForTests();
+
+    expect(() => getServiceRuntimeRegistry()).toThrow(/Invalid catalog service-runtime-registry/);
+  });
+
+  it('fails closed when a registry override is outside the repository', () => {
+    process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH = '/tmp/service-runtime-registry.json';
+    _resetServiceRuntimeRegistryCacheForTests();
+
+    expect(() => getServiceRuntimeRegistry()).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('probes comfyui through the service runtime layer', async () => {
     const resolution = await probeServiceRuntime('comfyui', 'trial', 'darwin');
     expect(resolution.available).toBe(true);
