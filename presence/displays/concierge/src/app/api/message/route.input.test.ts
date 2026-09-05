@@ -48,4 +48,40 @@ describe('concierge message input contract', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
+
+  it('projects a voice-hub approval-required contract as an execution preview', async () => {
+    const intentResolution = {
+      request_id: 'request-approval-1',
+      normalized_intent: 'send the approved report',
+      missing_inputs: [],
+      resolution_shape: 'mission' as const,
+      outcome_kind: 'approval_ready_plan' as const,
+      authority_level: 'approval_required' as const,
+      next_action: {
+        kind: 'request_approval' as const,
+        label: 'Approve and start',
+        consequence: 'The mission will start after approval.',
+      },
+      rationale: 'The requested operation changes external state.',
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ reply: 'Ready for approval.', intentResolution }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    const response = await POST(request({ text: 'send the approved report' }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({
+      mode: 'voice-hub',
+      shape: 'execution_preview',
+      nextActions: [{ id: 'approve', label: 'Approve and start' }],
+      intentResolution,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore();
+  });
 });

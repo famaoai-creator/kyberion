@@ -856,3 +856,9 @@ Chronosの共有 `json-record` parser に残っていた独自 `JSON.parse` と�
 `libs/core/detectors.ts` の形式判定に残っていた直接 `JSON.parse` を `foundation/safe-json` の共通parserへ移行した。判定用途でもmalformed JSONと危険キーをJSONとして受理しない境界を揃え、正常なJSON判定は維持した。
 
 検証: detector test 3 tests、対象lint、Prettier、`git diff --check`。外部文字列の直接JSON parser残差を一つ閉じた。
+
+## 2026-09-05 再レビュー修正 74
+
+Concierge `/api/message` の実routeを通る `approval_required` 回帰を追加した。voice-hub応答のcontractを検証後、`execution_preview`、approve next action、intent resolutionが実際のレスポンスへ投影されることを固定した。入力拒否テストと同じroute境界で、承認が必要な返答が通常replyへ崩れないことを確認する。
+
+検証: Concierge message route **4 tests passed**、対象lint、Prettier、`git diff --check`。production-like approval testの残差を一つ閉じた。
