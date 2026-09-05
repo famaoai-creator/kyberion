@@ -1790,3 +1790,7 @@ mission dispatch event appendの共通I/O helperへoperation-timeのregular-file
 ## 2026-09-06 再レビュー修正 232
 
 provider capability schemaのprovider内`provenance`参照を`#/definitions/provenance`へ修正し、baselineで発生していた未定義 `$defs/provenance` のschema compilation errorを解消した。baseline pipeline正常完了、catalog gate **1/1 passed**、全体 typecheck、対象Prettierで確認した。
+
+## 2026-09-06 再レビュー修正 233
+
+共通 `defineGenerator` の declared／dynamic output pathを `assertSafeRepositoryPath` で検査してから比較・read・writeする境界を追加し、symlink経由の生成先を拒否する回帰を追加した。dynamic output、normalization、check mode、undeclared output semanticsを維持し、**1 file / 10 tests passed**、typecheck、対象lint、Prettier、`git diff --check`で確認した。
