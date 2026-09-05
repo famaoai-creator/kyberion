@@ -156,6 +156,7 @@ describe('ingest-sync-cursors (DA-03 watermark store)', () => {
     expect(message).not.toMatch(/not valid JSON/);
     expect(message).not.toMatch(/resetSyncCursor/);
     expect(message).toMatch(/watermark is intact/);
+    expect(message).toMatch(/regular file/);
   });
 
   it('fails closed on a shape-invalid state file', () => {
