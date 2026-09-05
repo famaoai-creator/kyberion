@@ -14,6 +14,7 @@ describe('android catalog resource boundary', () => {
     expect(source).toContain('defineCatalog<AndroidUiDefaults>({');
     expect(source).toContain("id: 'android-ui-defaults'");
     expect(source).toContain('schema: ANDROID_UI_DEFAULTS_SCHEMA_PATH');
+    expect(source).not.toContain('fallbackOnInvalid: true');
     expect(source).toContain('androidUiDefaultsCatalog.load()');
   });
 });
