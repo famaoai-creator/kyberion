@@ -48,18 +48,16 @@ afterAll(() => {
 });
 
 describe('policy loading (spend-policy.json override pattern)', () => {
-  it('falls back to the defaults when no policy file exists', () => {
+  it('fails closed when no policy file exists', () => {
     const missingRoot = path.join(fixtureRoot, 'no-policy-here');
-    expect(loadIngestQuotaPolicy({ rootDir: missingRoot })).toEqual({
-      ...DEFAULT_INGEST_QUOTA_POLICY,
-    });
+    expect(() => loadIngestQuotaPolicy({ rootDir: missingRoot })).toThrowError(/missing/iu);
   });
 
-  it('falls back to the defaults on a corrupt policy file (guard never silently disabled)', () => {
+  it('fails closed on a corrupt policy file', () => {
     writePolicy('{not json!!');
-    expect(loadIngestQuotaPolicy({ rootDir: fixtureRoot })).toEqual({
-      ...DEFAULT_INGEST_QUOTA_POLICY,
-    });
+    expect(() => loadIngestQuotaPolicy({ rootDir: fixtureRoot })).toThrowError(
+      /Expected property name|JSON/iu
+    );
   });
 
   it('loads governed limits and per-tenant overrides keyed by tenant slug', () => {

@@ -21299,6 +21299,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: media generation quota policyの欠損・schema不正時に組み込みquota policyへ戻るcatalog fallbackを削除し、正本policyの読み込み障害をfail-closedで返す境界へ統一した。tenant override、quota counterのtenant／date検証、atomic reservation／release、未知operationの既存default解決は変更していない。
 - **検証**: generation-quota **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1351
+
+- **対象**: `libs/core/ingest-quota.ts`、`libs/core/ingest-quota.test.ts`、`knowledge/product/schemas/ingest-quota-policy.schema.json`
+- **変更**: ingest quota policyの欠損・破損時に組み込みquota policyへ戻るcatalog fallbackを削除し、base limit／warn ratioの正数・範囲制約をschemaへ移して正本policyの読み込み障害をfail-closedで返す境界へ統一した。tenant overrideの不正entry局所除外、quota counterのtenant／date検証、warn→block stagingとrecord後のcounter運用は変更していない。
+- **検証**: ingest-quota **1 file / 13 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
