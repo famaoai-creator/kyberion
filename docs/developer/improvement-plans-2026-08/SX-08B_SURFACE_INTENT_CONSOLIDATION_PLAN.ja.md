@@ -1718,3 +1718,9 @@ Cursor CLIを明示指定だけでなく、既定のreasoning provider failover 
 Cursor CLIのprovider discoveryが`KYBERION_CURSOR_CLI_BIN`を無視して`cursor-agent`を固定実行していた残存を修正し、backend probeと同じ登録済みbinary overrideを使うようにした。未指定時のPATH discovery、version health判定、capability cacheとfailover routingは維持している。
 
 検証: provider-discovery **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
+## 2026-09-06 再レビュー修正 217
+
+provider capability probeがprovider discovery／実行backendと異なりCLI binary overrideを無視していた残存を修正し、登録済みのClaude／Codex／AGY／Grok／Cursor／Gemini／Copilot binaryをversion・auth・helpの全probeへ伝播するようにした。明示Claude binaryのplaceholder fallbackへの勝手な置換も抑止した。
+
+検証: provider-capability-registry **1 file / 16 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。

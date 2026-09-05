@@ -215,6 +215,53 @@ describe('provider-capability-registry', () => {
     });
   });
 
+  it('uses the registered CLI binary override for Cursor capability probes', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const calls: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`);
+      return { ok: true, stdout: '--sandbox --mode', stderr: '' };
+    };
+
+    const results = probeProviderCapabilities({
+      providerIds: ['cursor'],
+      env: { KYBERION_CURSOR_CLI_BIN: '/custom/cursor-agent' },
+      exec,
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'cursor',
+      binary_found: true,
+      sandbox_probe: { command: '/custom/cursor-agent' },
+    });
+    expect(calls).toEqual([
+      '/custom/cursor-agent --version',
+      '/custom/cursor-agent status',
+      '/custom/cursor-agent --help',
+    ]);
+  });
+
+  it('does not replace an explicitly configured Claude binary with a fallback candidate', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const calls: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`);
+      return { ok: false, stdout: '', stderr: 'placeholder failure' };
+    };
+
+    const results = probeProviderCapabilities({
+      providerIds: ['claude'],
+      env: { KYBERION_CLAUDE_CLI_BIN: '/configured/claude' },
+      exec,
+      resolveClaudeCliFallbackCandidates: () => ['/fallback/claude'],
+    });
+
+    expect(results[0]).toMatchObject({ binary_found: false, authenticated: false });
+    expect(calls).toEqual(['/configured/claude --version']);
+  });
+
   it('records help-flag sandbox evidence without claiming OS-level enforcement', async () => {
     resetMocks();
     const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
