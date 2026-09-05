@@ -1,6 +1,11 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { defineCatalog, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import {
+  defineCatalog,
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
 import { type VocabularyKey } from '@agent/core/t';
 import { CloudflareOsSurface } from '@agent/core/cloudflare-os-surface';
 import {
@@ -410,15 +415,17 @@ export const staticDir = path.join(
   'presence/displays/presence-studio/static'
 );
 export const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-export const PORT = Number(process.env.PRESENCE_STUDIO_PORT || 3031);
-export const HOST = process.env.PRESENCE_STUDIO_HOST || '127.0.0.1';
+export const PORT = Number(getRegisteredEnvText('PRESENCE_STUDIO_PORT') || 3031);
+export const HOST = getRegisteredEnvText('PRESENCE_STUDIO_HOST') || '127.0.0.1';
 export const VOICE_HUB_URL = validateLocalServiceUrl(
-  process.env.VOICE_HUB_URL || 'http://127.0.0.1:3032',
+  getRegisteredEnvText('VOICE_HUB_URL') || 'http://127.0.0.1:3032',
   'VOICE_HUB_URL'
 );
 export const sseClients = new Set<Client>();
 export const activeTimelineTimers = new Map<string, NodeJS.Timeout[]>();
-export const SPEECH_STATE_POLL_MS = Number(process.env.PRESENCE_STUDIO_SPEECH_STATE_POLL_MS || 400);
+export const SPEECH_STATE_POLL_MS = Number(
+  getRegisteredEnvText('PRESENCE_STUDIO_SPEECH_STATE_POLL_MS') || 400
+);
 export let latestSpeechSseState = 'idle';
 export let speechStatePollInFlight = false;
 
