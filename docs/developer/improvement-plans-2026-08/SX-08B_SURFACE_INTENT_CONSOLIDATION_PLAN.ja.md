@@ -838,3 +838,9 @@ field shape を検証せず、任意値の候補から返信を選択してい�
 
 検証: Concierge conversation／voice parser **2 files / 4 tests passed**、変更対象 Prettier、root typecheck、
 `git diff --check` が green。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-05 再レビュー修正 71
+
+Concierge のsummary event parserに残っていた直接 `JSON.parse` を shared `parseSafeJsonInput`へ移行した。既存の `parseConciergeSummaryValue` によるdomain shape検証は維持し、malformed JSON／危険キーの拒否を共通parserの境界へ統一した。
+
+検証: 既存のsummary event／summary response test、対象lint、Prettier、`git diff --check`。これは本計画の「全 direct JSONL／外部応答 inventory」残差を一つ閉じる実装sliceである。
