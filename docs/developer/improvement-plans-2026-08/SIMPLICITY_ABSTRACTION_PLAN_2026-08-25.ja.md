@@ -22576,6 +22576,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: production consumerがなく、canonical foundation readerへの互換shimだけが残っていた `cli-input` の実装・専用テスト・package exportを削除した。既存の `foundation/{json,text}`、secure path、CLI boundary semanticsは変更せず、未参照のcompatibility surfaceをadopt-or-delete方針で除去した。
 - **検証**: 対象テスト **3 files／29 tests passed**、`pnpm run typecheck`、foundation-adoption **passed**、improvement-plan metadata **passed**。残るdomain loader／CLI／catalog統合は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1570
+
+- **対象**: `libs/core/policy-engine.ts`
+- **変更**: domain 層に残っていた `getFoundationIo().readFile` の直接利用を foundation の `readTextFile` へ移行した。policy file の存在確認、YAML parse、policy normalization、fail-closed evaluation semanticsは変更していない。
+- **検証**: 対象テスト **2 files／13 tests passed**、`pnpm run typecheck`、`git diff --check`。残る foundation 内部 reader と domain loader／catalog統合は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
