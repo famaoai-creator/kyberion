@@ -155,12 +155,54 @@ Wave ごとに orchestrator(Fable)が diff をレビューし、typecheck + 該�
 
 ## 5. スコープ外(別起票)
 
+> 2026-09-06 追記: 利用者の指示により、下記のうち **secure-io の tail read / 日本語ハードコードの撤去 / supervisor ログのローテーション / peer transcript 表示** の 4 件は本計画の第 2 期(§7 AC-08〜11)として同ブランチで実装する。残りは引き続き別起票。
+
 - 投影 `attention` / activity-board の日本語ハードコード撤去(reason_code への完全移行)。
 - `secure-io` への tail/range read primitive の追加(現状は全量読み後に末尾を切る)。
 - HUD / Chronos が空になる条件の明示: 既定窓(HUD/Chronos 7 日、投影既定 2 日)内に dispatch 経由の活動が無いと「待ちはありません」だけになる。窓を UI から切り替える手段は未提供。
 - `agent-runtime-supervisor-events.jsonl` のローテーション(29MB 放置の根治)。
 - peer-conversations を投影のエッジ源に加えること。AC-05 の detail での transcript 表示も、`agent_id → peer_id` の対応表が無いため未実装(対応表の導入とセットで別起票)。
 - 月次計画ディレクトリ `improvement-plans-2026-09` の新設(checker 4 本に 2026-08 が固定されているため、本計画は 2026-08 索引に置く)。
+
+## 7. 第 2 期: follow-up(AC-08〜11)
+
+### AC-08: secure-io の tail read primitive(G3 の根治)
+
+- `libs/core/secure-io.ts` に `safeReadFileTail(filePath, maxBytes): { buffer: Buffer; truncated: boolean; size: number }` を追加。`fs.openSync` + `fs.readSync`(position 指定)で末尾 `maxBytes` だけ読む。既存の `safeReadFile` と同じ path 検証・authority 検査を通す。`secure-io` の公開面を列挙する契約テストがあれば登録する。
+- `agent-collaboration-projection.ts` の `readJsonlBounded` と terminal-hud `store/tail.ts` の `tailLines` をこれに置き換える(HUD 側の 2MB cap の「skip sentinel」は不要になるので、末尾 cap 読みに変更)。
+- 受入: 29MB の fixture を与えても読み取り byte 数が `maxBytes` + 1 行分に収まること(`fs.readSync` 呼び出しの引数をスパイして検証)。
+
+### AC-09: 注意項目・blocker の日本語ハードコード撤去
+
+- 投影 `CollaborationAttentionItem` に `code: 'blocked' | 'waiting_human' | 'review_pending' | 'failure'` を追加。`title` / `next_action` は開発者向け英語の固定文に置き換え(core は user-facing 文言を持たない)、`reason` は従来どおり event summary。
+- `agent-activity-board.ts` の blocker `reason` を英語の固定文 + 構造化フィールド(`dependency_ids?: string[]`)に置き換え、`'(未割当)'` は定数 `UNASSIGNED_AGENT_ID = 'unassigned'` に。
+- surface: terminal-hud(`store/coordination.ts` の attention 行、`store/agent-graph.ts` の detail)と Chronos(`AgentCollaborationBoard.tsx` の attention、`api/agent-activity` の消費者)は `code` / `kind` から vocabulary(`tui_attention_<code>`、`chronos_ac_attention_<code>_title` / `_next`、`*_blocker_<kind>`、`*_unassigned`)で翻訳する。
+- 受入: `grep -n "[ぁ-んァ-ン一-龥]" libs/core/agent-collaboration-projection.ts libs/core/agent-activity-board.ts` が 0 件(コメント除く)。`L` でロケールを切り替えると attention 行が英語になる。
+
+### AC-10: supervisor イベントのローテーション
+
+- `agent-runtime-events.ts` の `appendSupervisorEvent` を日付付きファイル `agent-runtime-supervisor-events-YYYY-MM-DD.jsonl` に書き換え(worker-events と同じ規約)。読み手向けに `listSupervisorEventFiles({ recentDays?, includeLegacy? })` を同ファイルに追加し、旧単一ファイルは最古として含める。
+- 読み手 3 箇所(`agent-collaboration-projection.ts` の `JSONL_SOURCES`、`report-ops.ts`、`mission-retrospective.ts`)を helper 経由に移行。
+- `storage-janitor.ts` に保持日数(既定 14 日、`retention` 設定に登録)を追加。
+- 30 秒ごとの `a2a_inflight_metric` は値が変わったときと 10 分に 1 回だけ書く(emit 側でスロットル)。
+- 受入: 1 日分の metric が 2,880 → ≤ 144 件。日付跨ぎで新ファイルが作られ、`recentDays: 2` で 2 ファイルだけ読まれる。
+
+### AC-11: peer transcript の表示と peer エッジ
+
+- `peer-conversation.ts` に `listPeerConversationPeers(tenantId)`(runtime root の `peers/` を列挙)、`collectPeerTranscriptTails(tenantId, { maxPerPeer })`(peer ごとに最新セッションの transcript 末尾)、`readPeerConversationEdges(tenantId, { since })`(observability `events.jsonl` の `peer_id → remote_peer_id`)を追加。
+- 投影の `readSourceEvents` に peer-conversations を source `a2a` として加え、`sender = peer_id`、`receiver = remote_peer_id`(direction が inbound なら逆)、kind `handoff`。
+- terminal-hud `agent-graph` の detail: ノード label が peer id(local または remote)と一致するとき、その peer の transcript 末尾 5 件を表示。tenant は `currentScope()` から取り、取れなければ黙って省略。
+- 受入: fixture の 2 peer 会話から handoff エッジが 1 本出る。HUD の detail に transcript 行が出る(view-model テスト)。
+
+### 第 2 期 Wave
+
+| Wave | 項目                                                                                                    | 担当   | 所有ファイル                                                                                                                                                          |
+| ---- | ------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A    | AC-08(primitive のみ)                                                                                   | sonnet | `libs/core/secure-io.ts`, その test, `presence/displays/terminal-hud/src/store/tail.ts` + test                                                                        |
+| A    | AC-10(writer・janitor・report-ops/retrospective の読み手・metric スロットル)                            | sonnet | `libs/core/agent-runtime-events.ts`, `storage-janitor.ts`, `report-ops.ts`, `mission-retrospective.ts`, `a2a-bridge.ts`(metric 発行箇所のみ), 各 test, retention 設定 |
+| A    | AC-11(core helper のみ)                                                                                 | sonnet | `libs/core/peer-conversation.ts` + test                                                                                                                               |
+| B    | 投影統合(AC-08 の `readJsonlBounded` 置換、AC-10 の dated 読み、AC-11 の peer source)+ AC-09 の core 側 | opus   | `agent-collaboration-projection.ts`, `agent-activity-board.ts`, 各 test, schema                                                                                       |
+| B    | AC-09 / AC-11 の surface 側                                                                             | sonnet | terminal-hud `store/coordination.ts` `store/agent-graph.ts` + tests、Chronos board / agent-activity route、vocabulary(tui / chronos)                                  |
 
 ## 6. 実装状況
 
