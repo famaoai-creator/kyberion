@@ -606,7 +606,11 @@ function resolveDelegationTier(options?: ReasoningCallOptions): DelegationCapabi
  */
 function resolveBestEffortDelegationActor(): string {
   const role =
-    String(process.env.SYSTEM_ROLE || process.env.MISSION_ROLE || 'delegating-agent')
+    String(
+      getRegisteredEnvText('SYSTEM_ROLE') ||
+        getRegisteredEnvText('MISSION_ROLE') ||
+        'delegating-agent'
+    )
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
