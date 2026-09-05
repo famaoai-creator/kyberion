@@ -162,7 +162,7 @@ export class ShellAuditForwarder implements AuditForwarder {
   publish(entry: AuditEntry): void {
     const json = JSON.stringify(redactSensitiveObject(entry));
     const cmd = this.options.command.replace(/\{\{entry\}\}/gu, shellEscape(json));
-    const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
+    const shell = this.options.shell ?? getRegisteredEnvText('SHELL') ?? '/bin/sh';
     try {
       execFileSync(shell, ['-c', cmd], {
         input: `${json}\n`,
