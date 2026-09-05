@@ -632,6 +632,8 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 
 - 2026-09-01: PI-03 の Chronos trace-log API reader 再レビューとして、allowed trace root の字句検査だけでなく実体ファイルを `assertSafeRepositoryPath`／`safeLstat` で read 前に再検査するようにした。symlink／非 regular file を trace projection へ到達させない **2 test files / 5 tests passed** 回帰を追加した。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+- 2026-09-06: PI-03 の direct-loader 再レビューとして、process-improvement queueのJSONL reader／writerへoperation-timeの`assertSafeRepositoryPath`／`safeLstat` regular-file境界を追加し、symlink queueをempty stateへ隠蔽しない回帰を関連 **1 file / 13 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査direct loader全件inventory、全script harness／generator移行、provider CLIの実OS-level enforcement probeは継続課題である。
+
 ## 7. 検証コマンド(実装時)
 
 - 2026-08-31: PI-03 の plugin-pack registry 再レビューとして、registry／import log directory と JSONL／JSON leaf の repository path／symlink 境界を `assertSafeRepositoryPath` へ統一した。symlink directory／registry file は読み書きへ到達せず、既存の managed install／import lifecycle は維持した。plugin-pack **14 tests**、対象 lint、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、tenant-aware discovery は継続課題である。
