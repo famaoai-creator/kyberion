@@ -3,13 +3,17 @@ import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
 import { validateService } from '@agent/core/service-validator';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { getRegisteredEnvText, isVitestProcess, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  isVitestProcess,
+  parseSafeJsonInput,
+  readTextFile,
+} from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeReaddir,
-  safeReadFile,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
 import { withExecutionContext } from '@agent/core/authority';
@@ -121,7 +125,7 @@ export function readAuditLedgerFreshness(
         continue;
       }
       if (!safeExistsSync(safeFile) || !safeLstat(safeFile).isFile()) continue;
-      const raw = String(safeReadFile(safeFile, { encoding: 'utf8' }) || '');
+      const raw = readTextFile(safeFile);
       for (const line of raw.split(/\r?\n/u).reverse()) {
         if (!line.trim()) continue;
         try {

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import {
   pathResolver,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
@@ -51,25 +51,18 @@ function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCa
 
 describe('run_baseline_check', () => {
   it('uses the canonical readiness loader for the runtime config', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/run_baseline_check.ts'), {
-        encoding: 'utf8',
-      })
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/run_baseline_check.ts'));
     expect(source).toContain('loadServiceConnectionReadinessConfig()');
     expect(source).not.toContain('const raw = safeReadFile(configPath');
   });
 
   it('keeps the baseline CLI exit boundary inside the shared harness', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/run_baseline_check.ts'), {
-        encoding: 'utf8',
-      })
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/run_baseline_check.ts'));
 
     expect(source).not.toContain('process.exitCode');
     expect(source).toContain("new ScriptExitError(1, '', true, report)");
     expect(source).toContain('runBaselineCheckCli = defineScript');
+    expect(source).toContain('readTextFile');
   });
 
   it('marks readiness config as degraded when parse fails', () => {

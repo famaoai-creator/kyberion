@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeAppendFileSync,
@@ -18,15 +19,14 @@ import {
 
 describe('soak_endurance', () => {
   it('uses the canonical evidence manifest loader and writer', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/soak_endurance.ts'), { encoding: 'utf8' })
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/soak_endurance.ts'));
     expect(source).toContain('loadSoakEvidenceManifestAtPath');
     expect(source).toContain('writeSoakEvidenceManifestAtPath');
     expect(source).not.toContain('readJsonIfPresent<SoakEvidenceManifest>');
     expect(source).not.toContain('JSON.stringify(manifest, null, 2)');
     expect(source).not.toContain('console.log');
     expect(source).toContain('const code = await main(argv, print)');
+    expect(source).toContain('appendJsonLine, nowIso, readTextFile');
   });
   it('captures a time series with sampled file sizes', async () => {
     const sampleRoot = pathResolver.sharedTmp('soak-endurance-tests/series');

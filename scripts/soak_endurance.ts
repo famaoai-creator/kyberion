@@ -8,10 +8,9 @@ import {
   safeLstat,
   safeMkdir,
   safeStat,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine, nowIso } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, readTextFile } from '@agent/core/foundation';
 import {
   loadSoakEvidenceManifestAtPath,
   writeSoakEvidenceManifestAtPath,
@@ -476,7 +475,7 @@ function applyEvidenceRollover(filePath: string, retentionCount: number): void {
   if (!Number.isFinite(retentionCount) || retentionCount <= 0) return;
   const safeFilePath = assertSoakResourcePath(filePath, 'run log');
   if (!safeExistsSync(safeFilePath) || !safeLstat(safeFilePath).isFile()) return;
-  const raw = String(safeReadFile(safeFilePath, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(safeFilePath);
   const lines = raw
     .split('\n')
     .map((line) => line.trim())
