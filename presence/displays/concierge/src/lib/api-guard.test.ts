@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+type GuardResponse = { status: number };
+
 const mocks = vi.hoisted(() => ({
   authorizeSurfaceMutation: vi.fn(),
-  guardConciergeRequest: vi.fn(() => null),
+  guardConciergeRequest: vi.fn<() => GuardResponse | null>(() => null),
   resolveConciergeViewer: vi.fn(),
 }));
 
