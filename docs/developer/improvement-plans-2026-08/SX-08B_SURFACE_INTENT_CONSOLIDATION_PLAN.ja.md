@@ -1749,4 +1749,8 @@ Discord／Telegram bridgeのthread history loader／writerをoperation-timeの`a
 
 mission queueのqueuePathをoperation-timeの`assertSafeRepositoryPath`／`safeLstat`へ接続し、symlink／非regular fileをmission dispatchのJSONL read／append／rewriteへ到達させない境界を追加した。symlink queue regressionを含む**2 files / 3 tests passed**、typecheck、対象lint、Prettier、`git diff --check`で確認した。
 
+## 2026-09-06 再レビュー修正 223
+
+stimuli journalのappend／subscribeを共通の`resolveStimuliJournalPath`へ接続し、nerve／sensor／journal writerのsymlink traversalを拒否する operation-time 境界を追加した。malformed／TTL／rotation semanticsを維持し、**4 files / 10 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
+
 検証: backend-conformance **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と全provider adapterの実測は継続課題とする。
