@@ -47,21 +47,6 @@ const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge(
   'personal/voice/profile-registry.json'
 );
 
-const FALLBACK_REGISTRY: VoiceProfileRegistry = {
-  version: 'fallback',
-  default_profile_id: 'operator-en-default',
-  profiles: [
-    {
-      profile_id: 'operator-en-default',
-      display_name: 'Operator English Default',
-      tier: 'public',
-      languages: ['en'],
-      default_engine_id: 'local_say',
-      status: 'active',
-    },
-  ],
-};
-
 let cachedRegistryPath: string | null = null;
 let cachedRegistry: VoiceProfileRegistry | null = null;
 
@@ -288,21 +273,14 @@ function loadBaseVoiceProfileRegistry(): VoiceProfileRegistry {
   const registryDir = useCanonicalDirectory ? getRegistryDir() : null;
 
   if (!safeExistsSync(safeRegistryPath)) {
-    return (
-      (useCanonicalDirectory ? loadRegistryDirectory(registryDir || getRegistryDir()) : null) ||
-      FALLBACK_REGISTRY
-    );
+    const directoryRegistry = useCanonicalDirectory
+      ? loadRegistryDirectory(registryDir || getRegistryDir())
+      : null;
+    if (directoryRegistry) return directoryRegistry;
+    throw new Error(`Voice profile registry not found: ${registryPath}`);
   }
 
-  let parsed: VoiceProfileRegistry;
-  try {
-    parsed = readRegistryFile(safeRegistryPath, 'voice profile registry');
-  } catch (error: any) {
-    logger.warn(
-      `[VOICE_PROFILE_REGISTRY] Failed to load base registry at ${registryPath}: ${error.message}`
-    );
-    return FALLBACK_REGISTRY;
-  }
+  const parsed = readRegistryFile(safeRegistryPath, 'voice profile registry');
 
   return (
     (useCanonicalDirectory
@@ -408,22 +386,15 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
     const directoryRegistry = useCanonicalDirectory
       ? loadRegistryDirectory(registryDir || getRegistryDir())
       : null;
+    if (!directoryRegistry) {
+      throw new Error(`Voice profile registry not found: ${registryPath}`);
+    }
     cachedRegistryPath = cacheKey;
-    cachedRegistry = directoryRegistry || FALLBACK_REGISTRY;
+    cachedRegistry = directoryRegistry;
     return cachedRegistry;
   }
 
-  let parsed: VoiceProfileRegistry;
-  try {
-    parsed = readRegistryFile(safeRegistryPath, 'voice profile registry');
-  } catch (error: any) {
-    logger.warn(
-      `[VOICE_PROFILE_REGISTRY] Failed to load base registry at ${registryPath}: ${error.message}`
-    );
-    cachedRegistryPath = cacheKey;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
+  const parsed = readRegistryFile(safeRegistryPath, 'voice profile registry');
 
   const directoryRegistry = useCanonicalDirectory
     ? loadRegistryDirectory(registryDir || getRegistryDir(), parsed.default_profile_id)
@@ -494,7 +465,7 @@ export function getVoiceProfileRecord(profileId?: string): VoiceProfileRecord {
   return (
     registry.profiles.find((profile) => profile.profile_id === resolvedProfileId) ||
     registry.profiles.find((profile) => profile.profile_id === registry.default_profile_id) ||
-    FALLBACK_REGISTRY.profiles[0]
+    registry.profiles[0]
   );
 }
 
