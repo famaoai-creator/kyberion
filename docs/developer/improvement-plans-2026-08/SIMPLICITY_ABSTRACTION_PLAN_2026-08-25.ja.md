@@ -20645,6 +20645,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Conciergeのsummary event parserに残っていた直接 `JSON.parse` を、Node依存を含まない `foundation/safe-json` の公開subpath経由の `parseSafeJsonInput` に移行した。既存のsummary domain shape検証は維持し、Client Componentへfoundation barrelのNode依存を取り込まない構成にした。
 - **検証**: Concierge summary event 11 tests、summary response 4 tests、フル `pnpm run validate`（69 gates / 0 failures）を実行した。
 
+## 2026-09-05 再レビュー修正 1242
+
+- **対象**: `presence/displays/chronos-mirror-v2/src/lib/json-record.ts`
+- **変更**: Chronosの共有JSON record／value parserに残っていた独自 `JSON.parse` と危険キー走査を、browser-safeな `@agent/core/foundation/safe-json` の `parseSafeJsonInput` に統一した。既存の戻り値契約と入力拒否 semanticsは維持した。
+- **検証**: Chronos json-record test、対象lint、Prettier、`git diff --check`。フルvalidateはこのslice反映後に実行する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -844,3 +844,9 @@ field shape を検証せず、任意値の候補から返信を選択してい�
 Concierge のsummary event parserに残っていた直接 `JSON.parse` を shared `parseSafeJsonInput`へ移行した。既存の `parseConciergeSummaryValue` によるdomain shape検証は維持し、malformed JSON／危険キーの拒否を共通parserの境界へ統一した。
 
 検証: 既存のsummary event／summary response test、対象lint、Prettier、`git diff --check`。これは本計画の「全 direct JSONL／外部応答 inventory」残差を一つ閉じる実装sliceである。
+
+## 2026-09-05 再レビュー修正 72
+
+Chronosの共有 `json-record` parser に残っていた独自 `JSON.parse` と危険キー走査を、Node依存を含まない `@agent/core/foundation/safe-json` の `parseSafeJsonInput` に統一した。record／valueの既存の戻り値契約と、malformed JSON・primitive・array・危険キーを拒否する挙動は維持した。
+
+検証: Chronos `json-record` test、対象lint、Prettier、`git diff --check`。surface内の直接JSON parser重複を一つ閉じ、残るframework-specific parsing／provider実機受入は継続課題である。
