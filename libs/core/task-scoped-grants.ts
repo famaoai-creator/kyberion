@@ -149,7 +149,7 @@ export const TASK_GRANTS_STORE_PATH = pathResolver.shared(
 );
 
 export function resolveTaskGrantsStorePath(): string {
-  const override = process.env[TASK_GRANTS_PATH_ENV]?.trim();
+  const override = getRegisteredEnvText(TASK_GRANTS_PATH_ENV)?.trim();
   const configured = override ? pathResolver.rootResolve(override) : TASK_GRANTS_STORE_PATH;
   return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
@@ -232,7 +232,7 @@ function recordGrantAudit(event: TaskGrantAuditEvent): void {
       auditSinkOverride(event);
       return;
     }
-    if (process.env.VITEST) return; // hermetic guard — see setTaskGrantAuditSinkForTests
+    if (getRegisteredEnvText('VITEST')) return; // hermetic guard — see setTaskGrantAuditSinkForTests
     auditChain.record({
       agentId: event.grantee_nhi_id,
       action: event.action,
@@ -279,7 +279,7 @@ function readGrantRecords(): Map<string, TaskScopedGrant> {
 }
 
 function appendGrantRecord(record: TaskScopedGrant): void {
-  if (process.env.VITEST && !process.env[TASK_GRANTS_PATH_ENV]?.trim()) {
+  if (getRegisteredEnvText('VITEST') && !getRegisteredEnvText(TASK_GRANTS_PATH_ENV)?.trim()) {
     throw new Error(
       '[task-scoped-grants] refusing to write the governed default store under vitest — ' +
         `set process.env.${TASK_GRANTS_PATH_ENV} to an active/shared/tmp/... path in your ` +

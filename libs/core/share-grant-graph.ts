@@ -16,6 +16,7 @@ import {
   assertSafeRepositoryPath,
 } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   assertProvenanceShareAllowed,
   combineProvenanceTaint,
@@ -349,14 +350,15 @@ function isRoleAtLeast(actual: ShareGrantRole, required: ShareGrantRole): boolea
 }
 
 function resolveStorePath(): string {
-  const configured = process.env[SHARE_GRANTS_PATH_ENV]?.trim()
-    ? pathResolver.rootResolve(process.env[SHARE_GRANTS_PATH_ENV]!.trim())
+  const configuredPath = getRegisteredEnvText(SHARE_GRANTS_PATH_ENV)?.trim();
+  const configured = configuredPath
+    ? pathResolver.rootResolve(configuredPath)
     : SHARE_GRANTS_STORE_PATH;
   return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 function resolveDefaultHmacKey(): string {
-  const fromEnv = process.env[SHARE_GRANTS_HMAC_KEY_ENV]?.trim();
+  const fromEnv = getRegisteredEnvText(SHARE_GRANTS_HMAC_KEY_ENV)?.trim();
   if (fromEnv) {
     if (fromEnv.length < 32) {
       throw new ShareGrantValidationError(
@@ -960,7 +962,7 @@ export class ShareGrantGraph {
     try {
       if (this.#auditSink) {
         this.#auditSink(event);
-      } else if (!process.env.VITEST) {
+      } else if (!getRegisteredEnvText('VITEST')) {
         auditChain.record({
           agentId: event.actor,
           action: `share_grant_${event.action}`,
