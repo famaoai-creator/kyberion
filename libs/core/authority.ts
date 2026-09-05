@@ -264,9 +264,9 @@ export function withExecutionContext<T>(
   persona?: Persona,
   tenantSlug?: string
 ): T {
-  const previousRole = process.env.MISSION_ROLE;
+  const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  process.env.MISSION_ROLE = role;
+  setRegisteredEnv('MISSION_ROLE', role);
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
     setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
@@ -279,8 +279,7 @@ export function withExecutionContext<T>(
       fn
     );
   } finally {
-    if (previousRole === undefined) delete process.env.MISSION_ROLE;
-    else process.env.MISSION_ROLE = previousRole;
+    setRegisteredEnv('MISSION_ROLE', previousRole);
     setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }
@@ -296,9 +295,9 @@ export async function withExecutionContextAsync<T>(
   persona?: Persona,
   tenantSlug?: string
 ): Promise<T> {
-  const previousRole = process.env.MISSION_ROLE;
+  const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  process.env.MISSION_ROLE = role;
+  setRegisteredEnv('MISSION_ROLE', role);
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
     setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
@@ -311,8 +310,7 @@ export async function withExecutionContextAsync<T>(
       fn
     );
   } finally {
-    if (previousRole === undefined) delete process.env.MISSION_ROLE;
-    else process.env.MISSION_ROLE = previousRole;
+    setRegisteredEnv('MISSION_ROLE', previousRole);
     setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }
