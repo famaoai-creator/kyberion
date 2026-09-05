@@ -26,22 +26,6 @@ const DEFAULT_POLICY_PATH = pathResolver.knowledge(
   'product/governance/service-runtime-policy.json'
 );
 
-const FALLBACK_POLICY: ServiceRuntimePolicy = {
-  version: 'fallback',
-  managed_roots: {
-    service_runtime_root: 'active/shared/runtime',
-    cache_root: 'active/shared/tmp/service-runtime-cache',
-  },
-  mode_preference: {
-    local_service: 'trial_first',
-    remote_service: 'installed_first',
-  },
-  approval: {
-    provision_requires_approval: true,
-    pin_requires_approval: true,
-  },
-};
-
 function getPolicyPath(): string {
   return assertSafeRepositoryPath(
     getRegisteredEnvText('KYBERION_SERVICE_RUNTIME_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH,
@@ -53,7 +37,6 @@ const policyCatalog = defineCatalog<ServiceRuntimePolicy>({
   id: 'service-runtime-policy',
   path: getPolicyPath,
   schema: pathResolver.knowledge('product/schemas/service-runtime-policy.schema.json'),
-  fallback: FALLBACK_POLICY,
 });
 
 export function _resetServiceRuntimePolicyCacheForTests(): void {
@@ -61,11 +44,7 @@ export function _resetServiceRuntimePolicyCacheForTests(): void {
 }
 
 export function getServiceRuntimePolicy(): ServiceRuntimePolicy {
-  try {
-    return policyCatalog.load();
-  } catch {
-    return FALLBACK_POLICY;
-  }
+  return policyCatalog.load();
 }
 
 export function resolveServiceRuntimeRoot(
