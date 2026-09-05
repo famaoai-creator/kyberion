@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   safeExistsSync,
+  safeMkdir,
   safeReadFile,
   safeRmSync,
   safeSymlinkSync,
@@ -192,6 +193,28 @@ describe('artifact-registry', () => {
     } finally {
       safeRmSync(registryPath, { force: true });
       safeRmSync(target, { force: true });
+    }
+  });
+
+  it('rejects a registry path that is a directory', () => {
+    safeMkdir(registryPath, { recursive: true });
+
+    try {
+      expect(() => listArtifactOwnershipRecords()).toThrow(
+        '[ARTIFACT_REGISTRY] registry must be a regular file'
+      );
+      expect(() =>
+        appendArtifactOwnershipRecord(
+          createArtifactOwnershipRecord({
+            artifact_id: 'ART-DIRECTORY-REGISTRY',
+            project_id: 'PRJ-TEST',
+            kind: 'report',
+            storage_class: 'artifact_store',
+          })
+        )
+      ).toThrow('[ARTIFACT_REGISTRY] registry must be a regular file');
+    } finally {
+      safeRmSync(registryPath, { recursive: true, force: true });
     }
   });
 });
