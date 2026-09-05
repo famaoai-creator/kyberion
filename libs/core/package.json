@@ -67,6 +67,18 @@
       "types": "./dist/knowledge-index.d.ts",
       "default": "./dist/knowledge-index.js"
     },
+    "./pipeline-engine": {
+      "types": "./dist/pipeline-engine.d.ts",
+      "default": "./dist/pipeline-engine.js"
+    },
+    "./intent-compiler": {
+      "types": "./dist/intent-compiler.d.ts",
+      "default": "./dist/intent-compiler.js"
+    },
+    "./knowledge-curation-report": {
+      "types": "./dist/knowledge-curation-report.d.ts",
+      "default": "./dist/knowledge-curation-report.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
