@@ -1,6 +1,7 @@
 import { appendJsonLine } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 /**
  * NI-04: task-scoped short-lived grants — audience-bound authority.
  *
@@ -59,13 +60,7 @@ import { z } from 'zod';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isVitestProcess } from './foundation/env.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeReadFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
@@ -274,7 +269,7 @@ function readGrantRecords(): Map<string, TaskScopedGrant> {
   if (!safeLstat(storePath).isFile()) {
     throw new Error(`[TASK_GRANTS_RESOURCE] store must be a regular file: ${storePath}`);
   }
-  const raw = String(safeReadFile(storePath, { encoding: 'utf-8' }));
+  const raw = readTextFile(storePath);
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;

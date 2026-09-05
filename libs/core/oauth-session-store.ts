@@ -4,13 +4,13 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeCreateExclusiveFileSync,
   safeFsyncFile,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeLstat,
   safeUnlinkSync,
@@ -365,7 +365,7 @@ export function acquirePendingOAuthCallback(
   } catch (error) {
     if (!safeExistsSync(lockPath)) throw error;
     try {
-      const lockContents = String(safeReadFile(lockPath, { encoding: 'utf8' }));
+      const lockContents = readTextFile(lockPath);
       const lockCreatedAt = Number(lockContents.trim().split(':').at(-1));
       if (!Number.isFinite(lockCreatedAt) || now - lockCreatedAt <= OAUTH_CALLBACK_TTL_MS) {
         return null;

@@ -24,9 +24,9 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeCreateExclusiveFileSync,
@@ -151,7 +151,7 @@ function isStaleLock(lockPath: string): boolean {
   try {
     const safeLockPath = assertSafeRepositoryPath(lockPath, { allowMissingLeaf: true });
     if (!safeExistsSync(safeLockPath) || !safeLstat(safeLockPath).isFile()) return true;
-    const raw = safeReadFile(safeLockPath, { encoding: 'utf8' }) as string;
+    const raw = readTextFile(safeLockPath);
     const parsed = normalizeTenantRateLimitLockRecord(
       parseSafeJsonInput(raw || '{}', 'tenant rate limit lock')
     );
