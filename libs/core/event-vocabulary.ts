@@ -175,7 +175,7 @@ const INFERENCE_RULES: ReadonlyArray<{ pattern: RegExp; kind: CollaborationKind 
   { pattern: /dispatch|issue|request|kickoff/u, kind: 'dispatch' },
   { pattern: /block/u, kind: 'blocked' },
   { pattern: /wait|pending/u, kind: 'waiting' },
-  { pattern: /step|progress|turn|update|resolved/u, kind: 'progress' },
+  { pattern: /step|progress|turn|update|resolved|notif/u, kind: 'progress' },
 ]);
 
 /**

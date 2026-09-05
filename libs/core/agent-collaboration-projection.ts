@@ -101,8 +101,8 @@ export interface CollaborationBoundedReadOptions {
   /** Worker-event dated files (`worker-events-YYYY-MM-DD.jsonl`) older than
    * this many days (relative to `options.now`) are skipped entirely. Default 2. */
   recentDays?: number;
-  /** step_begin/step_end are ~95% of worker-event volume and irrelevant to
-   * the collaboration graph; excluded by default. */
+  /** step_begin/step_end/turn_begin/turn_end are ~95% of worker-event
+   * volume and carry no collaboration semantics; excluded by default. */
   includeStepEvents?: boolean;
 }
 
@@ -136,6 +136,26 @@ export interface ComposeCollaborationProjectionOptions {
    * `buildAgentCollaborationProjection` consults this.
    */
   roots?: { observabilityDir?: string; workerEventsDir?: string };
+  /**
+   * Exclude events whose `ts` is older than this ISO instant. Set by
+   * `buildAgentCollaborationProjection` from `bounded.recentDays` so the recent
+   * window applies to single unrotated files (orchestration-events.jsonl holds
+   * months of history) and not only to dated worker-event files.
+   */
+  since?: string;
+}
+
+/**
+ * Lifecycle / telemetry records that carry no collaboration semantics and, in
+ * a real repository, dominate the newest slice of every source: worker
+ * step/turn heartbeats and the 30-second `a2a_inflight_metric` samples of the
+ * runtime supervisor. Dropped before composition unless `includeStepEvents`.
+ */
+const NOISE_EVENT_NAMES = new Set(['step_begin', 'step_end', 'turn_begin', 'turn_end']);
+function isCollaborationNoise(record: JsonRecord): boolean {
+  const name = stringValue(record, 'type', 'decision', 'event_type', 'event');
+  if (!name) return false;
+  return NOISE_EVENT_NAMES.has(name) || /_metric$|_heartbeat$/u.test(name);
 }
 
 const DEFAULT_BOUNDED_READ: Required<CollaborationBoundedReadOptions> = {
@@ -493,14 +513,7 @@ function readWorkerEvents(
       : { records: readJsonl(file), truncated: false };
     if (truncated) truncatedSources.add(path.basename(file));
     return records.flatMap((record, index) => {
-      const eventTypeValue = typeof record.type === 'string' ? record.type : undefined;
-      if (
-        bound &&
-        !bound.includeStepEvents &&
-        (eventTypeValue === 'step_begin' || eventTypeValue === 'step_end')
-      ) {
-        return [];
-      }
+      if (bound && !bound.includeStepEvents && isCollaborationNoise(record)) return [];
       const source = toRecordOrNull(record.source) || {};
       const payload = toRecordOrNull(record.payload) || {};
       const event = eventFromRecord(
@@ -543,6 +556,7 @@ function readSourceEvents(
       : { records: readJsonl(filePath), truncated: false };
     if (truncated) truncatedSources.add(file);
     return records.flatMap((record, index) => {
+      if (bound && !bound.includeStepEvents && isCollaborationNoise(record)) return [];
       const event = eventFromRecord(record, source, index);
       return event ? [event] : [];
     });
@@ -560,6 +574,11 @@ function eventMatches(
   options: ComposeCollaborationProjectionOptions
 ): boolean {
   if (options.missionId && event.mission_id !== options.missionId.toUpperCase()) return false;
+  if (options.since) {
+    // Only a parseable timestamp can be judged old; undated records stay.
+    const at = Date.parse(event.ts);
+    if (Number.isFinite(at) && at < Date.parse(options.since)) return false;
+  }
   if (options.tenant || (options.tenantSlugs && options.tenantSlugs !== 'all')) {
     const eventTenant = event.scope?.tenant_slug || event.tenant_slug;
     // Tenant-scoped views must fail closed: an event without an explicit or
@@ -724,14 +743,17 @@ export function composeAgentCollaborationProjection(
   for (const event of input.filter((event) => eventMatches(event, options))) {
     deduped.set(`${event.source}:${event.source_event_id}`, event);
   }
-  const events = [...deduped.values()]
-    .sort(
-      (left, right) =>
-        left.ts.localeCompare(right.ts) || left.event_id.localeCompare(right.event_id)
-    )
-    .slice(-limit);
+  // `limit` caps only the returned `events` feed (newest-last). The graph,
+  // attention list and overview are composed over every event that survived
+  // filtering: in a real repository the newest N events are routinely
+  // unattributed worker heartbeats, and slicing before composition made the
+  // graph empty while older mission-control events were silently dropped.
+  const ordered = [...deduped.values()].sort(
+    (left, right) => left.ts.localeCompare(right.ts) || left.event_id.localeCompare(right.event_id)
+  );
+  const events = ordered.slice(-limit);
   const generatedAt = options.now ?? nowIso();
-  const status = statusFromEvents(events, options, generatedAt);
+  const status = statusFromEvents(ordered, options, generatedAt);
   const nodes = new Map<string, CollaborationGraphNode>();
   const edges: CollaborationGraphEdge[] = [];
   const attention: CollaborationAttentionItem[] = [];
@@ -749,14 +771,14 @@ export function composeAgentCollaborationProjection(
   // kind 'completion' / 'failure') by delegation_id so a spawn edge's child
   // node can show the outcome instead of staying 'running' forever.
   const delegationEndState = new Map<string, string>();
-  for (const event of events) {
+  for (const event of ordered) {
     if (!event.delegation_id || event.kind === 'spawn') continue;
     delegationEndState.set(
       event.delegation_id,
       event.state_after || (event.kind === 'failure' ? 'failed' : 'success')
     );
   }
-  for (const event of events) {
+  for (const event of ordered) {
     if (event.mission_id) {
       missions.add(event.mission_id);
       addNode(nodes, `mission:${event.mission_id}`, 'mission', event.mission_id, event.state_after);
@@ -886,13 +908,13 @@ export function composeAgentCollaborationProjection(
     partial: status.flags.length > 0,
     status_flags: status.flags,
     sequence_gaps: status.gaps,
-    sources: [...new Set(events.map((event) => event.source))].sort(),
+    sources: [...new Set(ordered.map((event) => event.source))].sort(),
     // Never set by compose itself — it never touches the filesystem. Populated
     // additively by buildAgentCollaborationProjection when a bounded read (AC-03)
     // truncated a source file.
     truncated_sources: [],
     overview: {
-      events: events.length,
+      events: ordered.length,
       missions: missions.size,
       tasks: tasks.size,
       agents: agents.size,
@@ -925,7 +947,17 @@ export function buildAgentCollaborationProjection(
     workerEventsDir,
     options.missionId
   );
-  const projection = composeAgentCollaborationProjection(events, { ...options, now: nowValue });
+  // A mission-scoped lookup keeps that mission's full history (its worker
+  // partition is already exempt from the file date window above).
+  const sinceValue =
+    bound && !options.missionId && Number.isFinite(Date.parse(nowValue))
+      ? new Date(Date.parse(nowValue) - bound.recentDays * 24 * 60 * 60 * 1000).toISOString()
+      : undefined;
+  const projection = composeAgentCollaborationProjection(events, {
+    ...options,
+    now: nowValue,
+    ...(options.since ? {} : sinceValue ? { since: sinceValue } : {}),
+  });
   if (truncatedSources.length === 0) return projection;
   return {
     ...projection,
