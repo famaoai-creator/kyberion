@@ -1558,3 +1558,9 @@ service endpointの分割directory loaderで、schema上任意のversionが各JS
 visual review rubricの大規模な組み込みrubricと、正本rubricの欠損・schema不正をbuilt-inへ収束させるfallback／catchを削除し、正本rubricの読み込み障害を明示エラーとして返す境界へ統一した。tenant rubric→public rubricの選択、egress／tier guard、レビュー不能時の`skipped` semanticsは変更していない。
 
 検証: visual-review **1 file / 25 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 191
+
+video motion patternの大規模な組み込みcatalogと、正本catalogの欠損・schema不正をbuilt-inへ収束させるfallback／catchを削除し、必須のmotion catalogを正本からのみ解決する境界へ統一した。LLM draftの未知patternをrole defaultへ補正する既存semantics、`_meta`除去、duration／easeの決定的補正は維持している。
+
+検証: video-motion-direction **1 file / 18 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
