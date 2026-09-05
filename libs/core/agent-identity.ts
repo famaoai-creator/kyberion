@@ -48,7 +48,7 @@ import { parseSafeJsonInput } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { isVitestProcess } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -448,6 +448,11 @@ export class AgentIdentityJournal {
 
   private readJournal(): AgentIdentityReadResult {
     if (!safeExistsSync(this.journalPath)) return { events: [], maxSeq: -1 };
+    if (!safeLstat(this.journalPath).isFile()) {
+      throw new Error(
+        `[AGENT_IDENTITY_RESOURCE] journal must be a regular file: ${this.journalPath}`
+      );
+    }
     const raw = String(safeReadFile(this.journalPath, { encoding: 'utf-8' }));
     const events: JournalEventEnvelope[] = [];
     let maxSeq = -1;
