@@ -41,6 +41,29 @@ describe('customer conversation requirements paths', () => {
     expect(() => loadSupportGrounding('../other-tenant')).toThrow(/CUSTOMER_SCOPE|tenant/i);
   });
 
+  it('does not fall back to public grounding when tenant notes are a directory', () => {
+    const groundingRoot = pathResolver.sharedTmp('customer-grounding-' + process.pid);
+    const knowledgeSpy = vi
+      .spyOn(pathResolver, 'knowledge')
+      .mockImplementation((subPath = '') => path.join(groundingRoot, subPath));
+    const groundingPath = path.join(
+      groundingRoot,
+      'confidential',
+      testTenant,
+      'support',
+      'known-issues.md'
+    );
+    safeMkdir(groundingPath, { recursive: true });
+    try {
+      expect(() => loadSupportGrounding(testTenant)).toThrow(
+        '[CUSTOMER_GROUNDING] known-issues resource must be a regular file'
+      );
+    } finally {
+      safeRmSync(groundingRoot, { recursive: true, force: true });
+      knowledgeSpy.mockRestore();
+    }
+  });
+
   it('round-trips a validated requirements capture and fails closed for invalid files', () => {
     const requirements = {
       functional_requirements: [],
