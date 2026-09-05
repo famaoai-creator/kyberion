@@ -175,6 +175,18 @@ describe('scope-context', () => {
     ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
+  it('rejects a scope.env directory instead of falling back to public scope', () => {
+    const scopePath = pathResolver.sharedTmp('scope-context-test-directory.env');
+    safeMkdir(scopePath, { recursive: true });
+    try {
+      expect(() => resolveScopeResolution({}, { KYBERION_SCOPE_ENV_PATH: scopePath })).toThrow(
+        '[SCOPE_ENV_INVALID]'
+      );
+    } finally {
+      safeRmSync(scopePath, { recursive: true, force: true });
+    }
+  });
+
   it('memoizes and resets the process scope', () => {
     resetCurrentScope();
     const original = {
