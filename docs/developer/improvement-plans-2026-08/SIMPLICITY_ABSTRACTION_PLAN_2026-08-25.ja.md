@@ -21435,3 +21435,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/actuators/media-actuator/src/media-catalog-loaders.ts`、`libs/actuators/media-actuator/src/media-catalog-loaders.test.ts`
 - **変更**: media design systemsの大規模な組み込みfallbackと、正本catalogの欠損・schema不正をfallbackへ収束させる設定を削除した。分割catalogを集約するための最小envelope seedは維持し、正本ファイルを読む経路と分割JSONをschema検証する境界は変更していない。
 - **検証**: media-catalog-loaders **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 1373
+
+- **対象**: `libs/actuators/android-actuator/src/android-runtime-helpers.ts`、`libs/actuators/android-actuator/src/catalog.resource-boundary.test.ts`
+- **変更**: android UI defaultsの組み込みselectorとschema不正時のfallbackを削除し、ログイン／passkey操作のselectorを正本JSONからのみ解決する必須catalog境界へ統一した。android actuatorの実機操作、retry policy、ADF input contractは変更していない。
+- **検証**: android catalog resource boundary **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
