@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
   createDistillCandidateRecord,
   listDistillCandidateRecords,
@@ -207,8 +207,6 @@ const executionFeedbackCatalog: GovernedCatalog<ExecutionFeedbackStore> = define
   id: 'execution-feedback',
   path: FEEDBACK_STORE_PATH,
   schema: FEEDBACK_SCHEMA_PATH,
-  fallback: defaultStore,
-  fallbackOnInvalid: true,
 });
 
 function validateStore(store: unknown): ExecutionFeedbackStore {
@@ -222,6 +220,7 @@ function validateStore(store: unknown): ExecutionFeedbackStore {
 }
 
 function loadStoreFromDisk(): ExecutionFeedbackStore {
+  if (!safeExistsSync(FEEDBACK_STORE_PATH)) return defaultStore();
   return executionFeedbackCatalog.load();
 }
 

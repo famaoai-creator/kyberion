@@ -1528,3 +1528,9 @@ health degradationの正本閾値ファイルが欠損・schema不正のとき�
 service bootstrapとwork coordination importの任意overlayについて、未作成時の空overlayをcatalog fallbackへ依存せず呼び出し側で明示する形へ整理した。public catalogの必須読み込み、personal overlayの任意性、id単位のoverlay優先順位とutterance／command解決は変更していない。
 
 検証: service-bootstrap-catalog **1 file / 5 tests passed**、work-coordination-import-catalog **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 186
+
+contextual intent learning storeとexecution feedback storeについて、未作成時は明示的に空storeから開始し、既存ファイルのschema不正を空storeへ戻すcatalog fallbackを削除した。学習・feedbackの記録、上限件数、候補昇格、既存storeのschema検証は変更していない。
+
+検証: contextual-intent-learning **1 file / 4 tests passed**、execution-feedback **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。

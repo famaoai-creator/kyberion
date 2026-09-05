@@ -57,19 +57,13 @@ function contextualIntentLearningCatalogAtPath(
     id: 'contextual-intent-learning',
     path: filePath,
     schema: LEARNING_SCHEMA_PATH,
-    fallback: defaultStore,
-    fallbackOnInvalid: true,
   });
 }
 
-function contextualIntentLearningCatalog(
-  scope?: ScopeContext
-): GovernedCatalog<ContextualIntentLearningStore> {
-  return contextualIntentLearningCatalogAtPath(learningStorePath(scope));
-}
-
 function readStore(scope?: ScopeContext): ContextualIntentLearningStore {
-  return contextualIntentLearningCatalog(scope).load();
+  const safePath = learningStorePath(scope);
+  if (!safeExistsSync(safePath)) return defaultStore();
+  return contextualIntentLearningCatalogAtPath(safePath).load();
 }
 
 function writeStore(store: ContextualIntentLearningStore, scope?: ScopeContext): void {
