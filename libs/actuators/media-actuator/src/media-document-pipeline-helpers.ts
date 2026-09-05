@@ -9,9 +9,9 @@ import {
   generateNativePptx,
   generateNativeXlsx,
 } from '@agent/core/media-contracts';
-import type { PdfDesignProtocol } from '@agent/core/src/types/pdf-protocol';
-import type { PptxDesignProtocol, PptxSlide } from '@agent/core/src/types/pptx-protocol';
-import type { XlsxDesignProtocol } from '@agent/core/src/types/xlsx-protocol';
+import type { PdfDesignProtocol } from '@agent/core/types/pdf-protocol';
+import type { PptxDesignProtocol, PptxSlide } from '@agent/core/types/pptx-protocol';
+import type { XlsxDesignProtocol } from '@agent/core/types/xlsx-protocol';
 import * as path from 'node:path';
 import {
   buildMediaGenerationBoundary,

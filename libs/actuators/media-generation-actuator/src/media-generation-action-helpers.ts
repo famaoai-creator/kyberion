@@ -9,7 +9,7 @@ import { normalizeEventScope } from '@agent/core/event-scope';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
-import type { GenerationJob } from '@agent/core/src/types/generation-job';
+import type { GenerationJob } from '@agent/core/types/generation-job';
 import { handleCaptureAction } from './capture-actions.js';
 import { transitionGenerationJob } from './generation-job-state.js';
 import { MEDIA_GENERATION_ACTIONS } from './op-catalog.js';

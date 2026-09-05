@@ -99,6 +99,26 @@
       "types": "./dist/docx-utils.d.ts",
       "default": "./dist/docx-utils.js"
     },
+    "./types/generation-job": {
+      "types": "./dist/types/generation-job.d.ts",
+      "default": "./dist/types/generation-job.js"
+    },
+    "./types/pdf-protocol": {
+      "types": "./dist/types/pdf-protocol.d.ts",
+      "default": "./dist/types/pdf-protocol.js"
+    },
+    "./types/pptx-protocol": {
+      "types": "./dist/types/pptx-protocol.d.ts",
+      "default": "./dist/types/pptx-protocol.js"
+    },
+    "./types/xlsx-protocol": {
+      "types": "./dist/types/xlsx-protocol.d.ts",
+      "default": "./dist/types/xlsx-protocol.js"
+    },
+    "./types/docx-protocol": {
+      "types": "./dist/types/docx-protocol.d.ts",
+      "default": "./dist/types/docx-protocol.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"

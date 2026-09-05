@@ -12,7 +12,7 @@ import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy'
 import { resolveSpreadsheetStyleIndex } from '@agent/core/spreadsheet-style-policy';
 import { resolveMediaToneStyle } from '@agent/core/media-tone-style-map';
 import { nowIso } from '@agent/core/foundation';
-import type { XlsxDesignProtocol } from '@agent/core/src/types/xlsx-protocol';
+import type { XlsxDesignProtocol } from '@agent/core/types/xlsx-protocol';
 
 export interface MediaSpreadsheetPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => MediaTheme | null;

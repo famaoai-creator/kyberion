@@ -3,8 +3,8 @@ import { resolveDocumentContentsLabel } from '@agent/core/document-contents-poli
 import { resolveReportSectionTitle } from '@agent/core/document-outline-label-policy';
 import { resolveThemeColorRole as resolveThemeColorRolePolicy } from '@agent/core/media-theme-role-policy';
 import { nowIso } from '@agent/core/foundation';
-import type { DocxDesignProtocol } from '@agent/core/src/types/docx-protocol';
-import type { PdfDesignProtocol } from '@agent/core/src/types/pdf-protocol';
+import type { DocxDesignProtocol } from '@agent/core/types/docx-protocol';
+import type { PdfDesignProtocol } from '@agent/core/types/pdf-protocol';
 import {
   buildMediaGenerationBoundary,
   buildReportNarrativeOutline,
