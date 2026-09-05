@@ -9297,7 +9297,7 @@
     {
       "path": "product/schemas/provider-capabilities.schema.json",
       "tier": "public",
-      "size": 1414,
+      "size": 1420,
       "type": "json"
     },
     {
