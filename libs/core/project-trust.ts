@@ -12,7 +12,8 @@ import {
   type ApprovalRequestRecord,
 } from './approval-store.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import { isBuiltinPipelineResource } from './trust-requiring-resources.js';
 
 export const PROJECT_TRUST_APPROVAL_CHANNEL = 'project-trust';
@@ -51,7 +52,7 @@ function contentHash(absolutePath: string): string {
       `[PROJECT_TRUST_SCOPE] pipeline resource must be a regular file: ${absolutePath}`
     );
   }
-  const raw = safeReadFile(absolutePath, { encoding: 'utf8' });
+  const raw = readTextFile(absolutePath);
   return createHash('sha256').update(String(raw)).digest('hex');
 }
 
