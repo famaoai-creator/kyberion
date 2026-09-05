@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   checkTriggerSourceWiring,
   checkWorkerEventTypeEmitters,
@@ -20,6 +21,16 @@ import {
  * red is worse than no rule, because it certifies the thing it never checked.
  */
 describe('check_event_wiring', () => {
+  it('uses the foundation text reader for wiring source files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_event_wiring.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain('parseSafeJsonObjectInput, readTextFile');
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   const sources = (files: Record<string, string>): EventWiringSources => ({ files });
 
   describe('parsers', () => {
