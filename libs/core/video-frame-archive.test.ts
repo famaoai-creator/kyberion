@@ -104,4 +104,19 @@ describe('video-frame-archive', () => {
     }).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
     expect(mocks.safeExec).not.toHaveBeenCalled();
   });
+
+  it('rejects an input video path replaced by a directory', async () => {
+    const { readVideoFramesFromMp4 } = await import('./video-frame-archive.js');
+    const inputPath = pathResolver.sharedTmp('video-frame-archive-tests/directory.mp4');
+    mocks.safeLstat.mockImplementation((candidate: string) => ({
+      isFile: () => !candidate.endsWith('/directory.mp4'),
+    }));
+
+    await expect(async () => {
+      for await (const _frame of readVideoFramesFromMp4(inputPath)) {
+        // The directory input must fail before ffmpeg is invoked.
+      }
+    }).rejects.toThrow('[VIDEO_FRAME_ARCHIVE_RESOURCE] input must be a regular file');
+    expect(mocks.safeExec).not.toHaveBeenCalled();
+  });
 });
