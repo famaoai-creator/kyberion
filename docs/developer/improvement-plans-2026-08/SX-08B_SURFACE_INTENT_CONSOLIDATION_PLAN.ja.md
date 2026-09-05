@@ -1066,3 +1066,15 @@ platform command adapterのPOSIX shellをmodule load時に固定していた `SH
 secret resolver／audit forwarderのshell実行に残っていた `SHELL` の環境直読を、登録済み `getRegisteredEnvText` へ統一した。明示shell option優先、`/bin/sh` fallback、secret／auditのredaction、resolver／forwarder failure semanticsは変更していない。
 
 検証: secret resolver／audit forwarder **2 files / 24 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 109
+
+locale解決のOS fallbackに残っていた `LANG` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示locale、surface preference、identity、`KYBERION_LOCALE`／deprecated alias、navigator、catalog defaultの優先順位は変更していない。
+
+検証: locale **1 file / 19 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 110
+
+機密パス判定のホームルート解決に残っていた `HOME` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。SSH／AWS／Kubernetes／GnuPG／provider credential、Kyberion connections／vaultのdeny判定と、secure-io初期化時の再帰防止は変更していない。
+
+検証: sensitive path／secure-io **2 files / 42 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
