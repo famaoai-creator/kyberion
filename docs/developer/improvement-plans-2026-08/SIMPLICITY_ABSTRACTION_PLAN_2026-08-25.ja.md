@@ -21501,3 +21501,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Cursor CLI reasoning backendとprovider governance／runtime integration、`libs/core/provider-capability-registry.test.ts`、`libs/actuators/media-actuator/src/media-design-protocol.ts`
 - **変更**: Cursor Agent CLIをprovider permission、route policy、provider discovery、capability probe、runtime model、sandbox／egress境界へ接続し、構造化応答のenvelope検証、timeout、abort、credential分離、permission profileの型境界を追加した。Cursor CLIの利用可能性と実行引数を実際のspawn seamで検証し、provider capability cacheのgoverned catalog mockを正規ファイル境界へ揃えた。未作成のoptional theme scopeは明示的な型付き空catalogへ固定した。
 - **検証**: Cursor／egress／provider config／permission／route／capability registry **8 files / 78 tests passed**、core／actuator build、typecheck、対象ESLint、Prettier、`git diff --check`、canonical check **68/69 gates passed**。残る1 gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandboxで`EPERM`となる実行環境制約。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1384
+
+- **対象**: `libs/core/cursor-cli-reasoning-backend.ts`、`libs/core/cursor-cli-reasoning-backend.test.ts`
+- **変更**: Cursor CLIの追加引数が`--force`／`--mode`／`--sandbox`などのpolicy引数を後勝ちで上書きできる残存を修正し、governed execution flagを`extraArgs`から拒否するようにした。通常の追加引数、permission profile、timeout、egress、credential分離は維持している。
+- **検証**: Cursor CLI **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは直前sliceで69/69 gates passed。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。

@@ -171,6 +171,31 @@ describe('cursor-cli-reasoning-backend', () => {
     expect(args).not.toContain('--mode');
   });
 
+  it('rejects extra args that could override governed permission flags', () => {
+    expect(() => new CursorCliReasoningBackend({ extraArgs: ['--force'] })).toThrow(
+      /governed flag: --force/
+    );
+    expect(() => new CursorCliReasoningBackend({ extraArgs: ['--mode=ask'] })).toThrow(
+      /governed flag: --mode/
+    );
+  });
+
+  it('preserves non-governed extra args', async () => {
+    const envelope = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: 'ok',
+    });
+    spawnMock.mockReturnValueOnce(createChild(envelope));
+
+    const backend = new CursorCliReasoningBackend({ extraArgs: ['--verbose'] });
+    await backend.prompt('hello');
+
+    const [, args] = spawnMock.mock.calls[0];
+    expect(args).toContain('--verbose');
+  });
+
   it('rejects error envelopes', async () => {
     const envelope = JSON.stringify({
       type: 'result',
