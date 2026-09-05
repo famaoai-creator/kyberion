@@ -20939,6 +20939,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: app preflightのAndroid SDK存在確認に残っていた `ANDROID_HOME`／`ANDROID_SDK_ROOT` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。`ANDROID_HOME` 優先、SDK未設定時のfail、診断メッセージと他のAndroid／iOS probeは変更していない。
 - **検証**: app preflight **2 files / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
+## 2026-09-05 再レビュー修正 1291
+
+- **対象**: `libs/core/agent-adapter.ts`、`libs/core/grok-adapter.test.ts`
+- **変更**: Grok adapterのnative subagent有効／無効判定に残っていた `GROK_SUBAGENTS` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。`GROK_SUBAGENTS=0` のfail-closed、runtime capability表示、ACPの観測・完了証跡とpermission modeは変更していない。
+- **検証**: Grok adapter **1 file / 7 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -1138,3 +1138,9 @@ authorityのtask-scoped grant audience判定に残っていた `TASK_ID` の環�
 app preflightのAndroid SDK存在確認に残っていた `ANDROID_HOME`／`ANDROID_SDK_ROOT` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。`ANDROID_HOME` 優先、SDK未設定時のfail、診断メッセージと他のAndroid／iOS probeは変更していない。
 
 検証: app preflight **2 files / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 121
+
+Grok adapterのnative subagent有効／無効判定に残っていた `GROK_SUBAGENTS` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。`GROK_SUBAGENTS=0` のfail-closed、runtime capability表示、ACPの観測・完了証跡とpermission modeは変更していない。
+
+検証: Grok adapter **1 file / 7 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
