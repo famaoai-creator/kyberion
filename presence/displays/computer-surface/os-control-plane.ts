@@ -7,13 +7,15 @@ import {
 } from '@agent/core/cloudflare-os-surface';
 import { auditChain } from '@agent/core/audit-chain';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export function getComputerSurfaceAccess(
   env: NodeJS.ProcessEnv = process.env
 ): CloudflareOsSurfaceAccess {
-  const rawTenant = String(env.KYBERION_TENANT || '').trim();
+  const rawTenant = getRegisteredEnvText('KYBERION_TENANT', { env })?.trim() || '';
   const tenant = isValidTenantSlug(rawTenant) ? rawTenant : undefined;
-  const configuredPrincipal = String(env.KYBERION_COMPUTER_SURFACE_PRINCIPAL || '').trim();
+  const configuredPrincipal =
+    getRegisteredEnvText('KYBERION_COMPUTER_SURFACE_PRINCIPAL', { env })?.trim() || '';
   if (tenant && !configuredPrincipal) {
     throw new Error(
       '[POLICY_VIOLATION] KYBERION_COMPUTER_SURFACE_PRINCIPAL is required for tenant-scoped OS projection'
@@ -34,14 +36,14 @@ export function getComputerSurfaceAccess(
 export function getComputerSurfaceTenantScope(
   env: NodeJS.ProcessEnv = process.env
 ): string | undefined {
-  const rawTenant = String(env.KYBERION_TENANT || '').trim();
+  const rawTenant = getRegisteredEnvText('KYBERION_TENANT', { env })?.trim() || '';
   return isValidTenantSlug(rawTenant) ? rawTenant : undefined;
 }
 
 export function getComputerSurfaceGuardedSurfaceUrl(
   env: NodeJS.ProcessEnv = process.env
 ): string | undefined {
-  const configured = String(env.KYBERION_OS_GUARDED_SURFACE_URL || '').trim();
+  const configured = getRegisteredEnvText('KYBERION_OS_GUARDED_SURFACE_URL', { env })?.trim() || '';
   if (!configured) return undefined;
   try {
     const url = new URL(configured);

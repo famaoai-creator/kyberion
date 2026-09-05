@@ -4,6 +4,7 @@ import {
   SurfaceViewerScopeError,
 } from '@agent/core/surface-mutation-guard';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 type ComputerSurfaceRequest = Pick<Request, 'headers' | 'socket'>;
 
@@ -32,7 +33,7 @@ export function isComputerSurfaceLoopbackRequest(req: ComputerSurfaceRequest): b
 }
 
 function serverTenant(env: NodeJS.ProcessEnv): string | undefined {
-  const raw = String(env.KYBERION_TENANT || '').trim();
+  const raw = getRegisteredEnvText('KYBERION_TENANT', { env })?.trim() || '';
   if (!raw) return undefined;
   return raw;
 }
@@ -48,11 +49,11 @@ export function resolveComputerSurfaceViewerContext(
   env: NodeJS.ProcessEnv = process.env
 ): SurfaceAuthorizationContext {
   const token = bearerToken(req);
-  const localadminToken = env.KYBERION_LOCALADMIN_TOKEN;
-  const apiToken = env.KYBERION_API_TOKEN;
+  const localadminToken = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN', { env });
+  const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN', { env });
   const local = isComputerSurfaceLoopbackRequest(req);
   const tenant = serverTenant(env);
-  const principalId = String(env.KYBERION_COMPUTER_SURFACE_PRINCIPAL || '');
+  const principalId = getRegisteredEnvText('KYBERION_COMPUTER_SURFACE_PRINCIPAL', { env }) || '';
 
   try {
     const scope = resolveSurfaceViewerScope({
@@ -61,7 +62,7 @@ export function resolveComputerSurfaceViewerContext(
       serverTenant: tenant,
       apiToken,
       localadminToken,
-      allowLoopback: env.KYBERION_LOCALHOST_AUTOADMIN !== 'false',
+      allowLoopback: getRegisteredEnvText('KYBERION_LOCALHOST_AUTOADMIN', { env }) !== 'false',
       loopbackRole: 'localadmin',
       loopbackUsesServerTenant: true,
       principalIds: {

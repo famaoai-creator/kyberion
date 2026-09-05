@@ -38,6 +38,19 @@ async function withHttpApp<T>(run: (baseUrl: string) => Promise<T>): Promise<T> 
 }
 
 describe('Computer Surface Cloudflare OS projection', () => {
+  it('routes OS projection environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(
+        pathResolver.rootResolve('presence/displays/computer-surface/os-control-plane.ts'),
+        {
+          encoding: 'utf8',
+        }
+      )
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('derives human tenant-scoped access from server environment', () => {
     vi.stubEnv('KYBERION_TENANT', 'tenant-a');
     vi.stubEnv('KYBERION_COMPUTER_SURFACE_PRINCIPAL', 'human:computer-a');

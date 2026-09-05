@@ -4,6 +4,8 @@ import {
   isComputerSurfaceLoopbackRequest,
   resolveComputerSurfaceViewerContext,
 } from '../auth.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 function request(input: {
   remoteAddress: string;
@@ -20,6 +22,16 @@ function request(input: {
 }
 
 describe('Computer Surface viewer context', () => {
+  it('routes viewer environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('presence/displays/computer-surface/auth.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   afterEach(() => vi.unstubAllEnvs());
 
   it('resolves loopback as localadmin while preserving server tenant scope', () => {
