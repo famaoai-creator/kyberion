@@ -82,6 +82,15 @@ describe('event-vocabulary', () => {
     expect(resolveCollaborationKind('mission_owner_notified')).toBe('progress');
   });
 
+  it('peer-conversation のメッセージを handoff に分類する(AC-11)', () => {
+    // The collaboration projection maps peer-conversation observability rows
+    // to this name; without an anchored rule every peer handoff would resolve
+    // to 'unknown' and raise the projection's unknown_event status flag.
+    expect(resolveCollaborationKind('peer_conversation_message')).toBe('handoff');
+    // It is inference, not a closed vocabulary member.
+    expect(isKnownEventType('peer_conversation_message')).toBe(false);
+  });
+
   it('空・未知の入力は unknown を返す', () => {
     expect(resolveCollaborationKind('')).toBe('unknown');
     expect(resolveCollaborationKind(undefined)).toBe('unknown');

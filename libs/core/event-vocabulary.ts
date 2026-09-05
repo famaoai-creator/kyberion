@@ -156,6 +156,12 @@ const INFERENCE_RULES: ReadonlyArray<{ pattern: RegExp; kind: CollaborationKind 
   // nothing), so without this anchor every a2a event reads as 'unknown' and
   // needlessly raises the projection's unknown_event status flag.
   { pattern: /^a2a_message_routed$/u, kind: 'handoff' },
+  // AC-11: peer-conversation observability rows the collaboration projection
+  // maps to `peer_conversation_message`. Anchored for the same reason as
+  // `a2a_message_routed`: 'message' matches no generic rule below, so without
+  // this the whole peer source would read as 'unknown' and raise the
+  // projection's unknown_event flag on every peer handoff.
+  { pattern: /^peer_conversation_message$/u, kind: 'handoff' },
   // Outcome words before subject words. Decision names are built as
   // <subject>_<verb>_<outcome> (`agent_runtime_prewarm_timeout`), so testing the
   // subject first misclassifies every terminal event about that subject — this
