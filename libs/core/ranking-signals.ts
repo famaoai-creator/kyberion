@@ -13,6 +13,7 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { clamp } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 
 /** Cross-scope affinity: how relevant an entry of scope X is when ranking for scope Y. */
@@ -117,24 +118,26 @@ const knowledgeWeightsCatalog = defineCatalog<KnowledgeRankingWeightConfig>({
   id: 'knowledge-weights',
   path: KNOWLEDGE_WEIGHTS_PATH,
   schema: KNOWLEDGE_WEIGHTS_SCHEMA_PATH,
-  fallback: DEFAULT_KNOWLEDGE_WEIGHTS_CONFIG,
-  fallbackOnInvalid: true,
 });
 
 export function loadKnowledgeRankingWeightConfig(
   rootPath = KNOWLEDGE_WEIGHTS_PATH,
   fallbackOnInvalid = true
 ): KnowledgeRankingWeightConfig {
-  if (rootPath === KNOWLEDGE_WEIGHTS_PATH && fallbackOnInvalid) {
-    return knowledgeWeightsCatalog.load();
+  void fallbackOnInvalid;
+  const safeRootPath = assertSafeRepositoryPath(rootPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeRootPath)) {
+    return { ...DEFAULT_KNOWLEDGE_WEIGHTS_CONFIG };
   }
-  return defineCatalog<KnowledgeRankingWeightConfig>({
-    id: 'knowledge-weights',
-    path: rootPath,
-    schema: KNOWLEDGE_WEIGHTS_SCHEMA_PATH,
-    fallback: DEFAULT_KNOWLEDGE_WEIGHTS_CONFIG,
-    fallbackOnInvalid,
-  }).load();
+  const catalog =
+    safeRootPath === KNOWLEDGE_WEIGHTS_PATH
+      ? knowledgeWeightsCatalog
+      : defineCatalog<KnowledgeRankingWeightConfig>({
+          id: 'knowledge-weights',
+          path: safeRootPath,
+          schema: KNOWLEDGE_WEIGHTS_SCHEMA_PATH,
+        });
+  return catalog.load();
 }
 
 /** Load governed ranking knobs after the caller has resolved its scope. */
@@ -143,16 +146,12 @@ export function loadKnowledgeRankingWeights(
   rootPath = KNOWLEDGE_WEIGHTS_PATH
 ): KnowledgeRankingWeights {
   const defaults: KnowledgeRankingWeights = { proximity: 1, usage_yield: 4 };
-  try {
-    const config = loadKnowledgeRankingWeightConfig(rootPath);
-    return {
-      ...defaults,
-      ...(config.defaults || {}),
-      ...(scope?.tenant_slug ? config.tenant_overrides?.[scope.tenant_slug] || {} : {}),
-    };
-  } catch {
-    return defaults;
-  }
+  const config = loadKnowledgeRankingWeightConfig(rootPath);
+  return {
+    ...defaults,
+    ...(config.defaults || {}),
+    ...(scope?.tenant_slug ? config.tenant_overrides?.[scope.tenant_slug] || {} : {}),
+  };
 }
 
 /**
