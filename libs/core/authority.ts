@@ -555,7 +555,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
       if (taskGrantsPath && rawExistsSync(taskGrantsPath)) {
         const actorNhiId = resolveGrantActorNhiId(envRole);
         if (actorNhiId) {
-          const taskId = process.env.TASK_ID?.trim() || undefined;
+          const taskId = getRegisteredEnvText('TASK_ID')?.trim() || undefined;
           const latestGrants = new Map<string, JsonRecord>();
           for (const line of rawReadTextFile(taskGrantsPath).split('\n')) {
             const trimmed = line.trim();
