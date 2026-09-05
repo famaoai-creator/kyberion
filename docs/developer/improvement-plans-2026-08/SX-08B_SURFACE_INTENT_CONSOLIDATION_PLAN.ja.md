@@ -1042,3 +1042,9 @@ mission memory commandのrubric override監査記録に残っていた `MISSION_
 meeting preflightのmission fallbackに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `missionId` 優先、preflight内の既存環境設定、doctor／consent／runtime probe semanticsは変更していない。
 
 検証: meeting preflight **2 files / 5 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 105
+
+deployment adapterのshell実行に残っていた `SHELL` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示shell option優先、`/bin/sh` fallback、command／timeout／cwd／env merge、deployment resultと既存のapproval境界は変更していない。
+
+検証: deployment adapter **2 files / 11 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
