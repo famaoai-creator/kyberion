@@ -9,7 +9,9 @@ export const simulateTelegram = defineScript({
     if (!getRegisteredEnvText('KYBERION_PERSONA')) {
       setRegisteredEnv('KYBERION_PERSONA', 'ecosystem_architect');
     }
-    process.env.MISSION_ROLE ||= 'mission_controller';
+    if (!getRegisteredEnvText('MISSION_ROLE')) {
+      setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+    }
 
     logger.info('🚀 Starting Telegram Flow Simulation...');
     logger.info('📥 Inbound Message: "Telegram連携を試して"');

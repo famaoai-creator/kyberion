@@ -1186,3 +1186,9 @@ pipeline実行入口に残っていた `NODE_OPTIONS` の環境直読と、ident
 mission contextを設定する13個のCLI／daemon入口に残っていた `MISSION_ID`／`MISSION_ROLE` の直接環境アクセスを、登録済み `getRegisteredEnvText`／`setRegisteredEnv` へ統一した。既存の既定role、明示mission優先、scoped restore、onboarding／meeting／supervisorの実行 semanticsは変更していない。対象全入口を走査する `mission-context-env-boundary.test.ts` を追加し、直接アクセスの再混入を検出可能にした。
 
 検証: mission context boundaryを含む **6 files / 100 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck、foundation adoption check。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 129
+
+共通 `authority` の同期／非同期 execution context、logger、script harness、Telegram demo に残っていた `MISSION_ROLE`／`LOG_LEVEL`／`NODE_ENV`／`DEBUG` の直接環境アクセスを、登録済み `getRegisteredEnvText`／`setRegisteredEnv` へ統一した。role／personaの scoped restore、quiet／json output、test guard、debug loggingの既存 semanticsは変更していない。共通層とdemoの直接アクセスを走査する境界テストを追加した。
+
+検証: authority／environment boundary／harness **4 files / 21 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck、foundation adoption check。残る provider／test-only guard と外部provider実機確認は継続課題とする。

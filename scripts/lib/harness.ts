@@ -1,6 +1,7 @@
 import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { isDirectEntry } from '@agent/core/direct-entry';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 
 export interface ScriptFlags {
   json: boolean;
@@ -102,9 +103,9 @@ export function defineScript<T>(options: {
 }): (argv?: string[]) => Promise<T | undefined> {
   return async (argv = process.argv.slice(2)): Promise<T | undefined> => {
     const flags = parseScriptFlags(argv, options.flags ?? DEFAULT_SCRIPT_FLAGS);
-    const previousLogLevel = process.env.LOG_LEVEL;
+    const previousLogLevel = getRegisteredEnvText('LOG_LEVEL');
     const suppressLogs = flags.quiet || flags.json;
-    if (suppressLogs) process.env.LOG_LEVEL = 'silent';
+    if (suppressLogs) setRegisteredEnv('LOG_LEVEL', 'silent');
     const output = (value: unknown): void => {
       if (!flags.quiet) {
         const rendered =
@@ -139,8 +140,7 @@ export function defineScript<T>(options: {
         return undefined;
       }
     } finally {
-      if (previousLogLevel === undefined) delete process.env.LOG_LEVEL;
-      else process.env.LOG_LEVEL = previousLogLevel;
+      setRegisteredEnv('LOG_LEVEL', previousLogLevel);
     }
   };
 }

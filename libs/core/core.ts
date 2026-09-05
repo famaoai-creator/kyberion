@@ -49,7 +49,7 @@ function missionLogPrefix(): string {
 
 function isQuietProcess(): boolean {
   return (
-    process.env.LOG_LEVEL === 'silent' ||
+    getRegisteredEnvText('LOG_LEVEL') === 'silent' ||
     process.argv.includes('--quiet') ||
     process.argv.includes('--json')
   );
@@ -58,7 +58,7 @@ function isQuietProcess(): boolean {
 export const logger = {
   _log: (level: string, msg: string) => {
     if (isQuietProcess() && level !== 'error') return;
-    if (process.env.NODE_ENV === 'test' && level !== 'error') return;
+    if (getRegisteredEnvText('NODE_ENV') === 'test' && level !== 'error') return;
     const ts = color('dim', nowIso());
     const mid = missionLogPrefix();
     const prefix =
@@ -88,7 +88,7 @@ export const logger = {
 
 export const ui = {
   spinner: (msg: string) => {
-    if (process.env.NODE_ENV === 'test') return { stop: () => {} };
+    if (getRegisteredEnvText('NODE_ENV') === 'test') return { stop: () => {} };
     const chars = ['\u25dc', '\u25dd', '\u25de', '\u25df'];
     let i = 0;
     const interval = setInterval(() => {
@@ -336,7 +336,7 @@ export class Cache {
     const ttl = customTtlMs || this._ttlMs;
     const timestamp = Date.now();
 
-    if (process.env.NODE_ENV !== 'test') {
+    if (getRegisteredEnvText('NODE_ENV') !== 'test') {
       const mem = process.memoryUsage();
       const usageRatio = mem.heapUsed / mem.heapTotal;
       if (usageRatio > 0.8) {
@@ -414,7 +414,7 @@ export const _fileCache = new Cache(200, 3600000);
 // the caller's decision — CLI entry guards exit, daemons recover.
 export const errorHandler = (err: any, context = '') => {
   logger.error(context + ': ' + (err.message || err));
-  if (process.env.DEBUG) logger.error(String(err.stack));
+  if (getRegisteredEnvText('DEBUG')) logger.error(String(err.stack));
   throw err instanceof Error ? err : new Error(String(err));
 };
 
