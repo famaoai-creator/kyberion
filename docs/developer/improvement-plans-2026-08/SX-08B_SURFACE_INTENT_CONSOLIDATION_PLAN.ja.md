@@ -1408,3 +1408,9 @@ egress policyのunsafe path時にwarn／enforce設定を合成した `unsafe-pat
 dynamic permission policyのschema不正時にcatalog fallbackを生成する経路を削除した。未配置時は動的grantなし、読み込み障害時は警告とgrantなしを維持し、時間制限・role／path scope検証を含む既存のpermission semanticsは変更していない。
 
 検証: dynamic-permission-guard **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 166
+
+service endpoint registryのcanonical directory読み込み障害を互換snapshotへ黙って戻す経路と、空services fallbackを削除した。正本snapshot／directoryのschema・service ID・version／default pattern整合、path scope、endpoint／credential metadataの既存semanticsは変更していない。
+
+検証: service-endpoint-registry／sync **2 files / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。

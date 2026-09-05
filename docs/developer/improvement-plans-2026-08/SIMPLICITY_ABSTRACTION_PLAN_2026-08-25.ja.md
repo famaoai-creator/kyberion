@@ -21209,6 +21209,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: dynamic permission policyのschema不正時にcatalog fallbackを生成する経路を削除した。未配置時は動的grantなし、読み込み障害時は警告とgrantなしを維持し、時間制限・role／path scope検証を含む既存のpermission semanticsは変更していない。
 - **検証**: dynamic-permission-guard **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1336
+
+- **対象**: `libs/core/service-endpoint-registry.ts`、`libs/core/service-endpoint-registry.test.ts`
+- **変更**: service endpoint registryのcanonical directory読み込み障害を互換snapshotへ黙って戻す経路と、空services fallbackを削除した。正本snapshot／directoryのschema・service ID・version／default pattern整合、path scope、endpoint／credential metadataの既存semanticsは変更していない。
+- **検証**: service-endpoint-registry／sync **2 files / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
