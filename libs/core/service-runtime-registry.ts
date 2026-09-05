@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
@@ -139,44 +138,6 @@ const serviceRuntimeStateCatalog = defineCatalog<ServiceRuntimeState>({
   schema: SERVICE_RUNTIME_STATE_SCHEMA_PATH,
 });
 
-const FALLBACK_REGISTRY: ServiceRuntimeRegistry = {
-  version: 'fallback',
-  default_service_id: 'comfyui',
-  services: [
-    {
-      service_id: 'comfyui',
-      display_name: 'ComfyUI Local Service Runtime',
-      kind: 'local_service',
-      status: 'active',
-      platforms: ['darwin', 'linux', 'win32'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      default_base_url: 'http://127.0.0.1:8188',
-      trial_probe: {
-        kind: 'http',
-        method: 'GET',
-        path: 'system_stats',
-        description: 'Probe the local ComfyUI service statistics endpoint.',
-      },
-      install_plan: {
-        kind: 'service_preset',
-        preset_path: 'knowledge/product/orchestration/service-presets/comfyui.json',
-        description: 'Use the ComfyUI service preset to provision or connect the local runtime.',
-      },
-      installed_probe: {
-        kind: 'http',
-        method: 'GET',
-        path: 'system_stats',
-        description: 'Re-check the ComfyUI service after provisioning.',
-      },
-      managed_service_subpath: 'service-runtimes/comfyui',
-      service_endpoint_path: 'knowledge/product/orchestration/service-endpoints/comfyui.json',
-      service_preset_path: 'knowledge/product/orchestration/service-presets/comfyui.json',
-      notes:
-        'ComfyUI is managed as a service runtime so availability, provisioning intent, and managed location can be tracked separately from media-generation routing.',
-    },
-  ],
-};
-
 let cachedRegistryPath: string | null = null;
 let cachedRegistry: ServiceRuntimeRegistry | null = null;
 
@@ -191,32 +152,16 @@ const serviceRuntimeRegistryCatalog = defineCatalog<ServiceRuntimeRegistry>({
   id: 'service-runtime-registry',
   path: getRegistryPath,
   schema: pathResolver.knowledge('product/schemas/service-runtime-registry.schema.json'),
-  fallback: FALLBACK_REGISTRY,
-  fallbackOnInvalid: true,
-  onFallback(error) {
-    if (!/missing:/u.test(String(error))) {
-      logger.warn(`[SERVICE_RUNTIME_REGISTRY] Invalid registry; using fallback: ${error}`);
-    }
-  },
 });
 
 function getRegistry(): ServiceRuntimeRegistry {
   const registryPath = getRegistryPath();
   if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
 
-  try {
-    const parsed = serviceRuntimeRegistryCatalog.load();
-    cachedRegistryPath = registryPath;
-    cachedRegistry = parsed;
-    return parsed;
-  } catch (error: any) {
-    logger.warn(
-      `[SERVICE_RUNTIME_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
-    );
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
+  const parsed = serviceRuntimeRegistryCatalog.load();
+  cachedRegistryPath = registryPath;
+  cachedRegistry = parsed;
+  return parsed;
 }
 
 function isSupportedPlatform(record: ServiceRuntimeRecord, platform: NodeJS.Platform): boolean {
