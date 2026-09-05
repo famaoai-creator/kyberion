@@ -862,3 +862,9 @@ Chronosの共有 `json-record` parser に残っていた独自 `JSON.parse` と�
 Concierge `/api/message` の実routeを通る `approval_required` 回帰を追加した。voice-hub応答のcontractを検証後、`execution_preview`、approve next action、intent resolutionが実際のレスポンスへ投影されることを固定した。入力拒否テストと同じroute境界で、承認が必要な返答が通常replyへ崩れないことを確認する。
 
 検証: Concierge message route **4 tests passed**、対象lint、Prettier、`git diff --check`。production-like approval testの残差を一つ閉じた。
+
+## 2026-09-05 再レビュー修正 75
+
+Windows local-assist bridgeの外部status応答を再監査し、endpoint discoveryがJSON objectを型アサーションだけで参照していた残存を修正した。共通 `parseSafeJsonObjectValue` を通してからendpoint候補を読むようにし、危険キーを含むstatus応答は既定endpointへ閉じる。既存のendpoint候補、Windows capability fallback、chat responseのshape検証は維持した。
+
+検証: Windows local-assist bridge **4 tests passed**、core typecheck、対象ESLint、Prettier、`git diff --check`。外部応答の直接利用残差を一つ閉じ、provider実機依存と未監査inventoryは継続課題とする。
