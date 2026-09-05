@@ -65,6 +65,8 @@ describe('slack bridge channel turn', () => {
     );
     expect(source).toContain('renderIntentAuthorityLabel(');
     expect(source).not.toContain('Authority: ${params.intentResolution.authority_level}');
+    expect(source).toContain('appendJsonLine(stimuliJournalPath(), artifact.stimulus);');
+    expect(source).not.toContain('const STIMULI_PATH =');
   });
 
   it('excludes the current event from the collected thread context', async () => {
