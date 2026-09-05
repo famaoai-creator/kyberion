@@ -1,6 +1,6 @@
 /** PI-12: reject dependency declarations that bypass the lockfile policy. */
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
@@ -29,9 +29,7 @@ export function checkPinnedDependencies(): string[] {
   }
 
   try {
-    const lockfile = String(
-      safeReadFile(pathResolver.rootResolve('pnpm-lock.yaml'), { encoding: 'utf8' })
-    );
+    const lockfile = readTextFile(pathResolver.rootResolve('pnpm-lock.yaml'));
     if (!/^lockfileVersion:\s*['"]?9(?:\.0)?['"]?/mu.test(lockfile)) {
       findings.push('pnpm-lock.yaml must use the governed lockfileVersion 9');
     }
