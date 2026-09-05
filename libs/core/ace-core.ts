@@ -4,8 +4,8 @@ import {
   safeAppendFileSync,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
 } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 
 function safeMinutesPath(minutesPath: string): string {
@@ -35,7 +35,7 @@ export const aceCore = {
     const safePath = safeMinutesPath(minutesPath);
     let content = '';
     if (safeExistsSync(safePath)) {
-      content = safeReadFile(safePath, { encoding: 'utf8' }) as string;
+      content = readTextFile(safePath);
     }
 
     const prevHash = aceCore.calculateHash(content);
@@ -54,7 +54,7 @@ export const aceCore = {
   validateIntegrity: (minutesPath: string) => {
     const safePath = safeMinutesPath(minutesPath);
     if (!safeExistsSync(safePath)) return true;
-    const content = safeReadFile(safePath, { encoding: 'utf8' }) as string;
+    const content = readTextFile(safePath);
     const entries = content.split(/\n(?=### \[)/).filter(Boolean);
     let prefixContent = '';
 
