@@ -220,13 +220,20 @@ function resolveTelegramThreadTs(message: TelegramMessage): string {
   return typeof threadId === 'number' ? `${chatId}:${threadId}` : chatId;
 }
 
-function resolveTelegramThreadHistoryPath(threadTs: string): string {
+export function resolveTelegramThreadHistoryPath(threadTs: string): string {
   const safeThreadTs = sanitizePathSegment(threadTs);
-  return pathResolver.resolve(`${TELEGRAM_THREAD_HISTORY_ROOT}/${safeThreadTs}.jsonl`);
+  return assertSafeRepositoryPath(
+    pathResolver.resolve(`${TELEGRAM_THREAD_HISTORY_ROOT}/${safeThreadTs}.jsonl`),
+    { allowMissingLeaf: true }
+  );
 }
 
 function readTelegramThreadHistory(threadTs: string): TelegramThreadHistoryEntry[] {
   const resolved = resolveTelegramThreadHistoryPath(threadTs);
+  if (!safeExistsSync(resolved)) return [];
+  if (!safeLstat(resolved).isFile()) {
+    throw new Error(`Telegram thread history must be an existing regular file: ${threadTs}`);
+  }
   return readJsonLines<TelegramThreadHistoryEntry>(resolved, {
     onMalformed: 'skip',
     map: (value) => {

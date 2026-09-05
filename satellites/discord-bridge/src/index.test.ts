@@ -8,7 +8,7 @@ import type {
 } from '@agent/core/channel-surface-types';
 import { withExecutionContext } from '@agent/core/authority';
 import * as pathResolver from '@agent/core/path-resolver';
-import { safeReadFile, safeRmSync } from '@agent/core/secure-io';
+import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 
 vi.mock('discord.js', () => ({
   Client: class MockClient {},
@@ -45,6 +45,7 @@ import {
   handleDiscordInteraction,
   handleDiscordMessage,
   parseDiscordThreadHistoryEntry,
+  resolveDiscordThreadHistoryPath,
   type DiscordThreadHistoryEntry,
 } from './index.js';
 
@@ -93,6 +94,24 @@ describe('discord bridge thread context', () => {
         receivedAt: '2026-05-15T00:01:00.000Z',
       })
     ).toMatchObject({ role: 'assistant', text: '了解しました' });
+  });
+
+  it('rejects a symlinked persisted thread history path before reading it', () => {
+    const threadTs = `symlink-${RUN_ID}`;
+    const linkedPath = resolveDiscordThreadHistoryPath(threadTs);
+    const targetPath = pathResolver.resolve(
+      `active/shared/tmp/discord-thread-history-target-${RUN_ID}.jsonl`
+    );
+    withExecutionContext('surface_runtime', () => {
+      safeWriteFile(targetPath, '{"role":"assistant"}\n');
+      safeSymlinkSync(targetPath, linkedPath);
+      try {
+        expect(() => resolveDiscordThreadHistoryPath(threadTs)).toThrow('[RESOURCE_PATH_SYMLINK]');
+      } finally {
+        safeRmSync(linkedPath, { force: true });
+        safeRmSync(targetPath, { force: true });
+      }
+    });
   });
 
   it('formats recent user and assistant entries', () => {

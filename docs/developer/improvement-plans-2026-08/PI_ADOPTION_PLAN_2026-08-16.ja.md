@@ -792,6 +792,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03／SX-04 の provider capability catalog 再レビューとして、未参照のfallback catalogを削除し、primary catalogの欠損時だけ明示的空viewを使うようにした。配置済みcatalogのJSON／schema不正と、probe書込み時の既存catalog不正を黙って空catalogへ置換せず fail-closed とした。関連 **3 test files / 22 tests passed**、typecheck、対象 lint、`git diff --check` で確認した。provider CLIの実OS-level enforcement probeと未監査direct loader全件inventoryは継続課題である。
 
 - 2026-09-06: PI-13／DH-11 の provider sandbox probe 再レビューとして、Cursor CLIを実際の非対話JSON invocationへ接続し、`--mode plan` とwrite-sentinel／明示denial markerを検査するlive probeを追加した。provider-specific permission projection、CLI binary override、sentinel cleanupを維持し、help広告だけではverifiedにしない契約を固定した。関連 **1 test file / 7 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。実CLI実機でのenforcement結果と全provider adapterの実測は継続課題である。
+- 2026-09-06: PI-03 の direct-loader 再レビューとして、Discord／Telegram bridgeのthread history JSONL read／append前へ`assertSafeRepositoryPath`／`safeLstat`のoperation-time regular-file境界を追加した。symlink経由の外部scope read／writeを拒否する回帰を関連 **4 files / 19 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査direct loader全件inventory、全script harness／generator移行、provider CLIの実OS-level enforcement probeは継続課題である。
 
 ## 7. 検証コマンド(実装時)
 

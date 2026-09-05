@@ -21538,6 +21538,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Cursor CLIを実際の非対話JSON invocationへ接続し、`--mode plan` とwrite-sentinel／明示denial markerを検査するlive probeを追加した。provider-specific permission projection、CLI binary override、sentinel cleanupを維持し、help広告だけではverifiedにしない契約を固定した。
 - **検証**: backend-conformance **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と全provider adapterの実測は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1391
+
+- **対象**: `satellites/discord-bridge/src/index.ts`、`satellites/discord-bridge/src/index.test.ts`、`satellites/telegram-bridge/src/index.ts`、`satellites/telegram-bridge/src/index.test.ts`
+- **変更**: Discord／Telegram bridgeの永続thread historyについて、JSONLのread／append前にrepository pathのsymlink traversalとleafのregular file性をoperation-timeで再検査するようにした。履歴未作成時の空配列、thread keyのsanitize、malformed entryのskip semanticsは維持し、symlink経由の外部scope read／writeを拒否する回帰テストを追加した。
+- **検証**: Discord／Telegram bridge **4 files / 19 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全provider adapterの実測は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`
