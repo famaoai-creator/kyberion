@@ -2,7 +2,8 @@ import * as path from 'node:path';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 
 export type VisionSectionKey = 'soul' | 'steering' | 'destination';
 
@@ -167,7 +168,7 @@ function readResolvedVision(filePath: string): string | null {
     if (!safeLstat(filePath).isFile()) {
       throw new Error(`[VISION_RESOURCE] vision must be a regular file: ${filePath}`);
     }
-    return safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    return readTextFile(filePath);
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('[VISION_RESOURCE]')) {
       throw error;
