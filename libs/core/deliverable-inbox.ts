@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { readJsonLines } from './foundation/json.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
@@ -13,7 +13,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -129,7 +128,7 @@ export function normalizeInboxLockRecord(value: unknown): { pid: number } | unde
 
 function isStaleLock(lockPath: string): boolean {
   try {
-    const raw = String(safeReadFile(lockPath, { encoding: 'utf8' }) || '');
+    const raw = readTextFile(lockPath);
     const parsed = normalizeInboxLockRecord(parseSafeJsonInput(raw, 'deliverable inbox lock'));
     if (!parsed) return true;
     process.kill(parsed.pid, 0);
