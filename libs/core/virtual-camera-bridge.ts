@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeExec,
   safeWriteFile,
@@ -406,16 +407,30 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
         camera_intent: input.camera_intent,
         subject_hint: input.subject_hint,
       });
-      const payload = safeReadFile(result.save_path, { encoding: null });
-      const framePayload = Buffer.isBuffer(payload)
-        ? new Uint8Array(payload)
-        : new Uint8Array(Buffer.from(payload));
-      yield {
-        format: { mime_type: /\.png$/i.test(result.save_path) ? 'image/png' : 'image/jpeg' },
-        payload: framePayload,
-        ts_ms: index * intervalMs,
-      };
-      safeRmSync(result.save_path, { force: true });
+      try {
+        if (!safeLstat(result.save_path).isFile()) {
+          throw new Error(
+            `[VIRTUAL_CAMERA_RESOURCE] captured frame must be a regular file: ${result.save_path}`
+          );
+        }
+        const payload = safeReadFile(result.save_path, { encoding: null });
+        const framePayload = Buffer.isBuffer(payload)
+          ? new Uint8Array(payload)
+          : new Uint8Array(Buffer.from(payload));
+        yield {
+          format: { mime_type: /\.png$/i.test(result.save_path) ? 'image/png' : 'image/jpeg' },
+          payload: framePayload,
+          ts_ms: index * intervalMs,
+        };
+      } finally {
+        try {
+          if (!safeLstat(result.save_path).isDirectory()) {
+            safeRmSync(result.save_path, { force: true });
+          }
+        } catch {
+          // A missing or non-removable frame must not mask the capture result.
+        }
+      }
       if (index < frameCount - 1 && intervalMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
       }
