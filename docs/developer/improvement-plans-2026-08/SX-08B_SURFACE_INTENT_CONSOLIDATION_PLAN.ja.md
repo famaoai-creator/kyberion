@@ -1372,3 +1372,9 @@ service bootstrapのpublic正本とservice onboarding catalogに残っていた�
 tool runtime registryに残っていた大規模なコード内registry fallbackとinvalid／path errorのfallback復旧を削除し、正本governance registryの欠損・不正・unsafe overrideをそのまま返すfail-closed境界へ統一した。platform別install backend、runtime stateの検証・保存、probe／inventoryの既存semanticsは変更していない。
 
 検証: tool-runtime-registry **1 file / 16 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 160
+
+approval policyの欠損・schema不正時に「承認不要」の空policyへ落ちる復旧経路を削除し、customer／governance正本のload errorをfail-closedで返す境界へ統一した。strict posture、injection suspected override、危険操作のhard-coded safety ruleと通常のpolicy rule解決は変更していない。
+
+検証: approval-policy **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。

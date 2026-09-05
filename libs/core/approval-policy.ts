@@ -44,7 +44,6 @@ const approvalPolicyCatalog = defineCatalog<ApprovalPolicyFile>({
     return safeExistsSync(safeCustomerPath) ? safeCustomerPath : fallbackPath;
   },
   schema: pathResolver.knowledge('product/schemas/approval-policy.schema.json'),
-  fallback: { version: '1.0.0', rules: [], defaults: { requires_approval: false } },
 });
 
 const HARD_CODED_DANGEROUS_RULES: Array<{
@@ -89,11 +88,7 @@ const HARD_CODED_DANGEROUS_RULES: Array<{
 ];
 
 export function loadApprovalPolicy(): ApprovalPolicyFile {
-  try {
-    return approvalPolicyCatalog.load();
-  } catch {
-    return { version: '1.0.0', rules: [], defaults: { requires_approval: false } };
-  }
+  return approvalPolicyCatalog.load();
 }
 
 export function resolveApprovalPolicy(input: {
