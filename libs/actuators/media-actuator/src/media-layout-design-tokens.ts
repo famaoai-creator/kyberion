@@ -30,7 +30,7 @@ export interface MediaPptxPalette {
 }
 
 export function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderTokenCatalog {
-  const fallback = {
+  const aggregationSeed: SemanticRenderTokenCatalog = {
     version: '1.0.0',
     defaults: { content: {} },
     semantics: {},
@@ -43,8 +43,6 @@ export function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderT
       'knowledge/public/design-patterns/media-templates/semantic-render-tokens.json'
     ),
     schema: path.resolve(rootDir, 'knowledge/product/schemas/semantic-render-tokens.schema.json'),
-    fallback,
-    fallbackOnInvalid: true,
   });
   const directoryPath = path.resolve(
     rootDir,
@@ -52,7 +50,10 @@ export function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderT
   );
   const docs = readJsonFilesRecursively(directoryPath);
   if (docs.length === 0) return catalog.load();
-  const merged = docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback));
+  const merged = docs.reduce(
+    (acc, doc) => deepMergeCatalog(acc, doc),
+    cloneJsonValue(aggregationSeed)
+  );
   return catalog.validate(merged, directoryPath);
 }
 
