@@ -89,9 +89,9 @@ vi.mock('@agent/core/managed-process', async () => {
   };
 });
 
-vi.mock('@agent/core/src/knowledge-index', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/src/knowledge-index')>(
-    '@agent/core/src/knowledge-index'
+vi.mock('@agent/core/knowledge-index', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/knowledge-index')>(
+    '@agent/core/knowledge-index'
   );
   return {
     ...actual,

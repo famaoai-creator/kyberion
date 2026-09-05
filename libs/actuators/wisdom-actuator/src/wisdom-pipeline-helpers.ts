@@ -459,7 +459,7 @@ async function opCapture(
     }
     case 'knowledge_search': {
       const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } =
-        await import('@agent/core/src/knowledge-index');
+        await import('@agent/core/knowledge-index');
       const securityScope =
         ctx.security_scope && typeof ctx.security_scope === 'object'
           ? (ctx.security_scope as Record<string, unknown>)
@@ -616,7 +616,7 @@ async function opCapture(
     }
     case 'query': {
       const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } =
-        await import('@agent/core/src/knowledge-index');
+        await import('@agent/core/knowledge-index');
       const scope = ctx._knowledge_scope ?? DEFAULT_SCOPE;
       const scopeKey = JSON.stringify(scope);
       if (!ctx._knowledgeIndex || ctx._knowledgeIndexScopeKey !== scopeKey) {

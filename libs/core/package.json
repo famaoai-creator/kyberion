@@ -63,6 +63,10 @@
       "types": "./dist/logic-utils.d.ts",
       "default": "./dist/logic-utils.js"
     },
+    "./knowledge-index": {
+      "types": "./dist/knowledge-index.d.ts",
+      "default": "./dist/knowledge-index.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
