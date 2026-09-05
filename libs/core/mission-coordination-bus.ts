@@ -7,6 +7,7 @@ import { withExecutionContext } from './authority.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeMoveSync,
   safeReadFile,
@@ -202,6 +203,11 @@ export class MissionCoordinationBus {
       filePaths.push(this.busPath(normalizedMissionId));
       for (const filePath of filePaths) {
         if (!safeExistsSync(filePath)) continue;
+        if (!safeLstat(filePath).isFile()) {
+          throw new Error(
+            `[MISSION_COORDINATION_RESOURCE] stream must be a regular file: ${filePath}`
+          );
+        }
         const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
         for (const line of raw.split(/\r?\n/u)) {
           const trimmed = line.trim();
@@ -236,6 +242,9 @@ export class MissionCoordinationBus {
 
   private countBusLines(filePath: string): number {
     if (!safeExistsSync(filePath)) return 0;
+    if (!safeLstat(filePath).isFile()) {
+      throw new Error(`[MISSION_COORDINATION_RESOURCE] stream must be a regular file: ${filePath}`);
+    }
     const raw = String(
       withExecutionContext('mission_controller', () =>
         safeReadFile(filePath, { encoding: 'utf8' })

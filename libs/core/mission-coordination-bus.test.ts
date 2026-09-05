@@ -241,6 +241,25 @@ describe('mission-coordination-bus', () => {
     }
   });
 
+  it('fails closed when the current bus stream is replaced by a directory', () => {
+    const missionId = 'MSN-BUS-DIRECTORY';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const busPath = `${missionPath}/coordination/bus.jsonl`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      safeMkdir(busPath, { recursive: true });
+    });
+    try {
+      expect(() => new MissionCoordinationBus().listMissionMessages(missionId)).toThrow(
+        'stream must be a regular file'
+      );
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
+  });
+
   it('rejects a symlinked archived bus segment before loading history', () => {
     const missionId = 'MSN-BUS-ARCHIVE-SYMLINK';
     const missionPath = withExecutionContext('mission_controller', () =>
