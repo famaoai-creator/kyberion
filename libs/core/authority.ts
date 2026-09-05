@@ -424,7 +424,7 @@ function resolveGrantActorNhiId(role: string | undefined): string | undefined {
 }
 
 export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   const envPersona = getRegisteredEnvText('KYBERION_PERSONA');
   const envRole = resolveRole();
 

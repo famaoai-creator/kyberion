@@ -970,3 +970,9 @@ history-search-indexのprivate mission access checkに残っていた `MISSION_I
 Anthropic SDK usage meteringのmission attributionに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。provider usage／cache statsの記録、best-effort metering、既存のreasoning semanticsは変更していない。
 
 検証: Anthropic backend **1 file / 9 tests passed（1 skipped）**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 93
+
+authorityのmission identity／grant audience解決に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。mission state探索、authority grant照合、tenant override、fail-closed semanticsは変更していない。
+
+検証: authority **2 files / 21 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
