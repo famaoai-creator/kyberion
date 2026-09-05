@@ -21675,3 +21675,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/src/knowledge-feedback-loop.ts`、`libs/core/src/knowledge-feedback-loop.test.ts`
 - **変更**: knowledge feedback の human／gap／delivery JSONL append と gap read 前に operation-time の regular-file 検査を追加した。scope partition、feedback policy、usage aggregate、memory promotion、telemetry の best-effort semantics は維持し、feedback log leaf のディレクトリ置換を拒否する回帰テストを追加した。
 - **検証**: knowledge-feedback-loop **1 file / 13 tests passed**、全体 typecheck、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1413
+
+- **対象**: `libs/core/agent-runtime-manual-drive-bridge.ts`、`libs/core/agent-runtime-manual-drive-bridge.test.ts`
+- **変更**: manual-drive bridge の descriptor／commands／results／cancellations JSON／JSONL read／append／write 前に operation-time の regular-file 検査を追加した。lock、descriptor TTL、approval resume、executor output redaction、command lifecycle semantics は維持し、bridge record leaf のディレクトリ置換を拒否する回帰テストを追加した。
+- **検証**: manual-drive bridge **1 file / 6 tests passed**、全体 typecheck、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
