@@ -17,6 +17,11 @@ describe('imported DESIGN.md catalog', () => {
     expect(source).toContain("id: 'imported-design-md-index'");
     expect(source).toContain('imported-design-md-index.schema.json');
     expect(source).toContain('return catalog.validate(merged, directoryPath);');
+    const loaderSource = source.slice(
+      source.indexOf('function loadImportedDesignMdIndex'),
+      source.indexOf('function normalizeDesignLookupKey')
+    );
+    expect(loaderSource).not.toContain('fallbackOnInvalid: true');
 
     const catalog = loadImportedDesignMdIndex(pathResolver.rootDir());
     expect(catalog.count).toBe(catalog.systems.length);

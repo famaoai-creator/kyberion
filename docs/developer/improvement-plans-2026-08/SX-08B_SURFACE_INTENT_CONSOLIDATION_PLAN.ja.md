@@ -1664,3 +1664,9 @@ artifact libraryとdocument composition presetの組み込み空catalogおよび
 media theme catalogをscope別に整理し、public themeは正本必須、runtime／personal themeは未配置時のみ明示的な空scopeを許容する境界へ変更した。配置済みscopeのschema不正をfallbackへ収束させる設定を削除し、3 scopeのmergeとtheme role解決は維持している。
 
 検証: media-theme-catalog **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 208
+
+imported DESIGN.md indexの組み込み空indexとschema不正時のfallbackを削除し、public生成indexを正本schemaからのみ解決する必須catalog境界へ統一した。design systemの検索・推薦と外部参照の既存merge semanticsは変更していない。
+
+検証: media-design-md-catalog **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
