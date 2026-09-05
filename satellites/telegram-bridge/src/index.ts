@@ -3,6 +3,7 @@ import { installProcessGuards } from '@agent/core/process-guards';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import {
   appendJsonLine,
+  getRegisteredEnvText,
   nowIso,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
@@ -329,7 +330,7 @@ function sendJson(res: ServerResponse, statusCode: number, payload: unknown): vo
 }
 
 function resolveToken(input?: string): string | undefined {
-  return input || process.env.TELEGRAM_BOT_TOKEN || undefined;
+  return input || getRegisteredEnvText('TELEGRAM_BOT_TOKEN') || undefined;
 }
 
 async function sendTelegramMessageSingle(
@@ -344,8 +345,8 @@ async function sendTelegramMessageSingle(
   const token = resolveToken(options.token);
   const dryRun =
     typeof options.dryRun === 'boolean'
-      ? options.dryRun || !token || process.env.TELEGRAM_DRY_RUN === '1'
-      : !token || process.env.TELEGRAM_DRY_RUN === '1';
+      ? options.dryRun || !token || getRegisteredEnvText('TELEGRAM_DRY_RUN') === '1'
+      : !token || getRegisteredEnvText('TELEGRAM_DRY_RUN') === '1';
   const chatId = String(input.chatId);
 
   if (dryRun) {
@@ -846,23 +847,28 @@ async function main(): Promise<void> {
       type: 'string',
       description: 'Read a Telegram bridge payload from a JSON file',
     })
-    .option('port', { type: 'number', default: Number(process.env.TELEGRAM_BRIDGE_PORT || '3035') })
+    .option('port', {
+      type: 'number',
+      default: Number(getRegisteredEnvText('TELEGRAM_BRIDGE_PORT') || '3035'),
+    })
     .option('token', { type: 'string', description: 'Telegram Bot API token' })
     .option('api-base-url', {
       type: 'string',
-      default: process.env.TELEGRAM_API_BASE_URL || 'https://api.telegram.org',
+      default: getRegisteredEnvText('TELEGRAM_API_BASE_URL') || 'https://api.telegram.org',
     })
     .option('parse-mode', {
       type: 'string',
-      default: process.env.TELEGRAM_PARSE_MODE || 'Markdown',
+      default: getRegisteredEnvText('TELEGRAM_PARSE_MODE') || 'Markdown',
     })
     .option('dry-run', {
       type: 'boolean',
-      default: process.env.TELEGRAM_DRY_RUN === '1' || !process.env.TELEGRAM_BOT_TOKEN,
+      default:
+        getRegisteredEnvText('TELEGRAM_DRY_RUN') === '1' ||
+        !getRegisteredEnvText('TELEGRAM_BOT_TOKEN'),
     })
     .option('webhook-path', {
       type: 'string',
-      default: process.env.TELEGRAM_WEBHOOK_PATH || '/webhook',
+      default: getRegisteredEnvText('TELEGRAM_WEBHOOK_PATH') || '/webhook',
     })
     .parseSync();
 
@@ -919,7 +925,7 @@ async function main(): Promise<void> {
     }
   });
 
-  const port = Number(argv.port || process.env.TELEGRAM_BRIDGE_PORT || 3035);
+  const port = Number(argv.port || getRegisteredEnvText('TELEGRAM_BRIDGE_PORT') || 3035);
   server.listen(port, '127.0.0.1', () => {
     logger.success(`📨 [TelegramBridge] listening on http://127.0.0.1:${port}`);
   });
@@ -941,7 +947,7 @@ async function main(): Promise<void> {
 }
 
 const directEntry = isDirectEntry(import.meta.url, 'satellites/telegram-bridge/src/index.ts');
-if (directEntry && !process.env.VITEST) {
+if (directEntry && !getRegisteredEnvText('VITEST')) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
