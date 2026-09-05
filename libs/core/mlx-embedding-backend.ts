@@ -145,7 +145,7 @@ export function probeMlxEmbeddingBackend(env: NodeJS.ProcessEnv = process.env): 
   const scriptPath = rootResolve('scripts/mlx_embed.py');
   return {
     available: process.platform === 'darwin' && safeExistsSync(scriptPath),
-    model: env.KYBERION_MLX_EMBED_MODEL ?? DEFAULT_MODEL,
+    model: getRegisteredEnvText('KYBERION_MLX_EMBED_MODEL', { env }) ?? DEFAULT_MODEL,
     scriptPath,
   };
 }
