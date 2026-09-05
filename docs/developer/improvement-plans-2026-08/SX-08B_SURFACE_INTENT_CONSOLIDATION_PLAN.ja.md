@@ -1054,3 +1054,9 @@ deployment adapterのshell実行に残っていた `SHELL` の環境直読を、
 PTY engineの非Windows shell fallbackに残っていた `SHELL` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示shell引数優先、WindowsのPowerShell fallback、PTY／child processのsession・環境引き渡しは変更していない。
 
 検証: PTY engine **1 file / 3 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 107
+
+platform command adapterのPOSIX shellをmodule load時に固定していた `SHELL` 直読を、実行時の登録済み `getRegisteredEnvText` へ移行した。Windows shell、POSIX args、current environmentの変更反映、terminal actuatorのadapter契約は変更していない。
+
+検証: platform command adapter／terminal actuator **2 files / 30 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
