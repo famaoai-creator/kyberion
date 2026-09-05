@@ -2,7 +2,7 @@ import * as crypto from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
@@ -19,13 +19,7 @@ import {
   buildWorkCoordinationPeerCommandEnvelope,
   type WorkCoordinationPeerCommandEnvelope,
 } from './work-coordination-peer.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-  safeRmSync,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeRmSync } from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { signA2AMessage } from './a2a-bridge.js';
@@ -243,7 +237,7 @@ function readJsonl<T>(logicalPath: string, parse: (value: unknown) => T): T[] {
   if (!safeLstat(safePath).isFile()) {
     throw new Error(`mesh-hub persisted JSONL must be a regular file: ${safePath}`);
   }
-  const raw = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(safePath);
   return raw
     .split(/\r?\n/u)
     .map((line) => line.trim())
