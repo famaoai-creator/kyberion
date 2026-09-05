@@ -197,4 +197,23 @@ describe('artifact review contract', () => {
       safeRmSync(boundaryRoot, { recursive: true, force: true });
     }
   });
+
+  it('rejects directory artifact and receipt paths before reading them', () => {
+    const boundaryRoot = pathResolver.sharedTmp('artifact-review-directory-boundary');
+    const artifactDir = nodePath.join(boundaryRoot, 'artifact');
+    const receiptDir = nodePath.join(boundaryRoot, 'receipt.json');
+    fs.mkdirSync(artifactDir, { recursive: true });
+    fs.mkdirSync(receiptDir, { recursive: true });
+
+    try {
+      expect(() => hashArtifactForReview(artifactDir)).toThrow(
+        '[ARTIFACT_REVIEW_RESOURCE] artifact must be a regular file'
+      );
+      expect(() => loadArtifactReviewReceipt(receiptDir)).toThrow(
+        '[ARTIFACT_REVIEW_RESOURCE] receipt must be a regular file'
+      );
+    } finally {
+      safeRmSync(boundaryRoot, { recursive: true, force: true });
+    }
+  });
 });
