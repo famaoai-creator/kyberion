@@ -7,7 +7,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { logger } from './core.js';
@@ -16,7 +15,7 @@ import { notifyOperator } from './operator-notifications.js';
 import { recordAgentRoleOutcomes } from './agent-performance-index.js';
 import { recordModelRoleOutcomes } from './model-performance-index.js';
 import { MetricsCollector, resolveCostRates } from './metrics.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
@@ -304,7 +303,7 @@ function readJsonl(filePath: string): JsonRecord[] {
   const safePath = regularProcessImprovementQueuePath(filePath);
   if (!safeExistsSync(safePath)) return [];
   try {
-    return String(safeReadFile(safePath, { encoding: 'utf8' }))
+    return readTextFile(safePath)
       .split('\n')
       .filter((line) => line.trim())
       .flatMap((line) => {

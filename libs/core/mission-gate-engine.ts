@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 
 import {
   type StructuredOutputSchemaName,
@@ -12,7 +13,6 @@ import {
   safeExistsSync,
   safeExec,
   safeLstat,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
 } from './secure-io.js';
@@ -365,7 +365,7 @@ async function evaluateGateCheck(
       if (!isRegularGateFile(safeArtifactPath)) {
         return { passed: false, reason: `Deliverable must be a regular file: ${artifactPath}` };
       }
-      const raw = safeReadFile(safeArtifactPath, { encoding: 'utf8' }) as string;
+      const raw = readTextFile(safeArtifactPath);
       let artifact: unknown = raw;
       try {
         artifact = parseSafeJsonInput(raw, 'mission gate deliverable');
@@ -426,7 +426,7 @@ async function evaluateGateCheck(
           reason: 'llm_review requires a real reasoning backend (stub active).',
         };
       }
-      const content = String(safeReadFile(safeArtifactPath, { encoding: 'utf8' })).slice(0, 24_000);
+      const content = readTextFile(safeArtifactPath).slice(0, 24_000);
       const prompt = [
         'あなたは品質ゲートの審査員です。以下の成果物を判定基準に照らして審査してください。',
         '出力は次のJSONのみ(コードフェンス可): {"pass": true|false, "reasons": ["..."], "improvements": ["..."]}',

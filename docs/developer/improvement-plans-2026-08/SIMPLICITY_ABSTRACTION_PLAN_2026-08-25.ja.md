@@ -22503,3 +22503,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
 - **変更**: runtime health、surface log、report JSONL、mesh delivery、ingest cursor、customer known-issues の本文読込を foundation の `readTextFile` へ移行した。health／surface／tenant scope、report／mesh／cursor append semantics、customer approval・tier semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **7 files／48 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1551
+
+- **対象**: `libs/core/mission-orchestration-journal.ts`、`libs/core/mission-orchestration-progress.ts`、`libs/core/mission-creation.ts`、`libs/core/mission-gate-engine.ts`、`libs/core/mission-retrospective.ts`
+- **変更**: mission orchestration journal／task board／events、mission creation board、gate artifact、retrospective queue の本文読込を foundation の `readTextFile` へ移行した。mission scope、journal／ledger append、gate validation、creation／retrospective lifecycle semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
+- **検証**: 対象テスト **4 files／41 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

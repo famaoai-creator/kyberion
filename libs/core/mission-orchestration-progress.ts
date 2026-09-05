@@ -9,7 +9,8 @@ import {
 import { ledger } from './ledger.js';
 import { findMissionPath, missionDir } from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import {
   provisionMissionEntry,
   writeProvisionedJson,
@@ -147,7 +148,7 @@ export function createMissionProgressController(
       return;
     }
 
-    const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+    const currentTaskBoard = readTextFile(taskBoardPath);
     const gateSummary = dependencies.summarizeMissionGateState(missionId);
     const gateSection =
       gateSummary.lines.length > 0
@@ -320,7 +321,7 @@ export function createMissionProgressController(
       allowMissingLeaf: true,
     });
     if (!safeExistsSync(taskEventsPath)) return new Set();
-    const raw = safeReadFile(taskEventsPath, { encoding: 'utf8' }) as string;
+    const raw = readTextFile(taskEventsPath);
     return new Set(
       raw
         .split('\n')
@@ -381,7 +382,7 @@ export function createMissionProgressController(
 
     reconcileTaskOutcomeEvents(missionId);
 
-    const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+    const currentTaskBoard = readTextFile(taskBoardPath);
     const gateSummary = dependencies.summarizeMissionGateState(missionId);
     const gateSection =
       gateSummary.lines.length > 0
@@ -443,7 +444,7 @@ export function createMissionProgressController(
   function markTaskBoardInProgress(missionId: string): void {
     const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
     if (!safeExistsSync(taskBoardPath)) return;
-    const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+    const currentTaskBoard = readTextFile(taskBoardPath);
     const updatedTaskBoard = currentTaskBoard
       .replace('## Status: Planning Ready', '## Status: Execution Ready')
       .replace('- [ ] Step 2: Implementation', '- [~] Step 2: Implementation');
