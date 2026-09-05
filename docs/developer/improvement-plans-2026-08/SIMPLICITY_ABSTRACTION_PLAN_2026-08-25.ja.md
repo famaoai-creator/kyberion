@@ -22527,3 +22527,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/analysis-corpus.ts`、`libs/core/agent-identity.ts`、`libs/core/distill-knowledge-injector.ts`、`libs/core/intent-reconciliation.ts`、`libs/core/cognitive-routing.ts`、`libs/core/cli-input.ts`
 - **変更**: analysis corpus、agent identity journal、distill markdown、intent reconciliation、cognitive routing schema、CLI text／JSON input の本文読込を foundation の `readTextFile` へ移行した。path／tenant scope、identity journal、distill ranking、reconciliation／routing validation、CLI input boundary semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **6 files／60 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1555
+
+- **対象**: `libs/core/knowledge-weight-recalculation.ts`、`libs/core/protocol-service-lifecycle.ts`、`libs/core/worker-state-journal.ts`、`libs/core/sdlc-gate-readiness.ts`
+- **変更**: knowledge ranking governance、protocol lifecycle log、worker state journal、SDLC template の本文読込を foundation の `readTextFile` へ移行した。ranking／protocol audit、journal resume、SDLC gate／template validation semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
+- **検証**: 対象テスト **4 files／36 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
