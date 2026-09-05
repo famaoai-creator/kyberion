@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 
 export type VisionSectionKey = 'soul' | 'steering' | 'destination';
 
@@ -164,8 +164,14 @@ function extractTitleAndSections(raw: string): {
 function readResolvedVision(filePath: string): string | null {
   if (!safeExistsSync(filePath)) return null;
   try {
+    if (!safeLstat(filePath).isFile()) {
+      throw new Error(`[VISION_RESOURCE] vision must be a regular file: ${filePath}`);
+    }
     return safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[VISION_RESOURCE]')) {
+      throw error;
+    }
     return null;
   }
 }

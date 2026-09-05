@@ -21801,3 +21801,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - 対象: libs/core/adf-repair-agent.ts、libs/core/adf-repair-agent.test.ts
 - 変更: ADF repair の初回read、軽量修復write、delegated repair 前後のread/write、最後のJSON recovery writeに operation-time の regular-file 検査を追加した。既存の repository／symlink path boundary、project-trust、schema／guardrail、delegation／repair output semanticsは維持し、repair target が directoryへ置換された場合に修復処理へ進まない回帰テストを追加した。
 - 検証: adf-repair-agent 2 files / 18 tests passed、対象 ESLint、Prettier、git diff --check。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1434
+
+- **対象**: `libs/core/vision-resolver.ts`、`libs/core/vision-resolver.test.ts`
+- **変更**: vision candidate が存在する場合の read 前に operation-time の regular-file 検査を追加し、directory 等の resource boundary failure を `null` として global vision へフォールバックしないようにした。既存の tenant slug、symlink boundary、customer overlay／confidential tenant／global fallback の優先順位は維持し、tenant vision の directory replacement を拒否する回帰テストを追加した。
+- **検証**: vision-resolver **2 files / 8 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
