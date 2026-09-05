@@ -10,7 +10,7 @@ import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
 import { isRecord, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { PipelineAdfStep } from '@agent/core/pipeline-contract';
-import { resolveRef } from '@agent/core/src/pipeline-engine';
+import { resolveRef } from '@agent/core/pipeline-engine';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';

@@ -239,7 +239,7 @@ export async function opControl(
       });
     }
     case 'ref': {
-      const { resolveRef } = await import('@agent/core/src/pipeline-engine');
+      const { resolveRef } = await import('@agent/core/pipeline-engine');
       const resolvedPath = resolve(params.path);
       if (typeof resolvedPath !== 'string' || !resolvedPath.trim()) {
         throw new Error('Browser-Actuator ref control requires a non-empty path');

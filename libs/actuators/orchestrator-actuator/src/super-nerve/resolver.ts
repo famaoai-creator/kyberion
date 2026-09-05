@@ -1,4 +1,4 @@
-import { compileIntent } from '@agent/core/src/intent-compiler';
+import { compileIntent } from '@agent/core/intent-compiler';
 import { logger } from '@agent/core/core';
 import { executeRegisteredSuperPipeline } from '@agent/core/super-nerve-execution-port';
 import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
