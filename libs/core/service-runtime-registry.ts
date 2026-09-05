@@ -350,7 +350,7 @@ function resolveBaseUrl(record: ServiceRuntimeRecord, state: ServiceRuntimeState
     `KYBERION_${record.service_id.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_BASE_URL`,
   ];
   for (const envKey of envCandidates) {
-    const value = process.env[envKey]?.trim();
+    const value = getRegisteredEnvText(envKey)?.trim();
     if (value) return value;
   }
   const endpointBase = getServiceEndpointRecord(record.service_id)?.base_url?.trim();
