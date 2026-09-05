@@ -259,7 +259,7 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
   readonly id = 'gemini_service';
 
   async isAvailable(): Promise<boolean> {
-    if (!process.env.GEMINI_API_KEY) return false;
+    if (!getRegisteredEnvText('GEMINI_API_KEY')) return false;
     try {
       resolveServiceBinding('gemini', 'secret-guard');
       return true;
@@ -313,13 +313,15 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'llm_api';
 
   async isAvailable(): Promise<boolean> {
-    return Boolean(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY);
+    return Boolean(
+      getRegisteredEnvText('GEMINI_API_KEY') || getRegisteredEnvText('OPENAI_API_KEY')
+    );
   }
 
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
     const startedAt = Date.now();
-    const apiKeyGemini = process.env.GEMINI_API_KEY;
-    const apiKeyOpenAI = process.env.OPENAI_API_KEY;
+    const apiKeyGemini = getRegisteredEnvText('GEMINI_API_KEY');
+    const apiKeyOpenAI = getRegisteredEnvText('OPENAI_API_KEY');
 
     const order = request.providerPreference || ['gemini', 'openai'];
 
@@ -623,15 +625,15 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
 }
 
 function envFlagEnabled(name: string): boolean {
-  return process.env[name] === 'true';
+  return getRegisteredEnvText(name) === 'true';
 }
 
 function envAnyEnabled(names: string[]): boolean {
-  return names.some((name) => Boolean(process.env[name]));
+  return names.some((name) => Boolean(getRegisteredEnvText(name)));
 }
 
 function envEquals(name: string, expected: string): boolean {
-  return process.env[name] === expected;
+  return getRegisteredEnvText(name) === expected;
 }
 
 export class HostAgentImageGenerationProvider extends BaseHostBridgeImageGenerationProvider {
