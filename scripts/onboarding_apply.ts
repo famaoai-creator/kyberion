@@ -15,7 +15,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { withLock } from '@agent/core/src/lock-utils';
+import { withLock } from '@agent/core/lock-utils';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import {

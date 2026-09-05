@@ -5,11 +5,11 @@ import {
   setRegisteredEnv,
 } from '@agent/core/foundation';
 import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
-import { TraceContext, finalizeAndPersist } from '@agent/core/src/trace';
+import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
 import { logger } from '@agent/core/core';
 import { findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
 import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
-import { runFeedbackLoop } from '@agent/core/src/feedback-loop';
+import { runFeedbackLoop } from '@agent/core/feedback-loop';
 import { getSemanticDecideDegradations } from '@agent/core/semantic-decide';
 import { appendSemanticDegradationRun } from '@agent/core/semantic-degradation-log';
 import {

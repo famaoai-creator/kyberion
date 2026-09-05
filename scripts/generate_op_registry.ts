@@ -1,5 +1,5 @@
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
+import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
 import type { ActuatorOpDescription } from '@agent/core/actuator-sdk';
 import { loadActuatorOpRegistry, type PipelineStepType } from '@agent/core/actuator-op-registry';
 import { pathResolver } from '@agent/core/path-resolver';

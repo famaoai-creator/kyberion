@@ -1,5 +1,5 @@
 import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
-import { TraceContext, finalizeAndPersist, persistTrace } from '@agent/core/src/trace';
+import { TraceContext, finalizeAndPersist, persistTrace } from '@agent/core/trace';
 import { logger } from '@agent/core/core';
 import {
   safeExec,
@@ -26,7 +26,7 @@ import {
   resolveActuatorOperation,
 } from '@agent/core/actuator-op-registry';
 import { runJanitor } from '@agent/core/storage-janitor';
-import { checkActuatorCapabilities } from '@agent/core/src/actuator-capability';
+import { checkActuatorCapabilities } from '@agent/core/actuator-capability';
 import { validateOpInput } from '@agent/core/op-input-contracts';
 import { getRegisteredEnv, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { resolveIdentityContext } from '@agent/core/authority';

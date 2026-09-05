@@ -2,7 +2,7 @@ import path from 'node:path';
 import { isRecord } from '@agent/core/foundation';
 import { metrics } from '@agent/core/metrics';
 import { pathResolver } from '@agent/core/path-resolver';
-import { traceLogDir } from '@agent/core/src/trace';
+import { traceLogDir } from '@agent/core/trace';
 import { validateTraceReplay } from '@agent/core/trace-schema';
 import { tailJsonl } from './tail.js';
 import { theme, statusColor } from '../theme.js';

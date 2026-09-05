@@ -36,7 +36,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { TraceContext, finalizeAndPersist } from '@agent/core/src/trace';
+import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 
 type Print = (value: unknown) => void;

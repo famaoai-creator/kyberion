@@ -55,7 +55,7 @@ import { formatWireError } from '@agent/core/wire-error';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { buildKnowledgeIndex, queryKnowledge } from '@agent/core/src/knowledge-index';
-import { recordHumanKnowledgeFeedback } from '@agent/core/src/knowledge-feedback-loop';
+import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loop';
 import { executeServicePreset } from '@agent/core/service-engine';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
 import {

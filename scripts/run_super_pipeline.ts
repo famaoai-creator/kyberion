@@ -3,7 +3,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
-import { finalizeAndPersist, TraceContext } from '@agent/core/src/trace';
+import { finalizeAndPersist, TraceContext } from '@agent/core/trace';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { SuperPipelineStep } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';

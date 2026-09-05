@@ -23,7 +23,7 @@ import { validateTraceReplay } from '@agent/core/trace-schema';
 import type { AuditEntry } from '@agent/core/audit-chain';
 import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
 import type { IntentDelta, IntentSnapshot } from '@agent/core/intent-delta';
-import type { Trace } from '@agent/core/src/trace';
+import type { Trace } from '@agent/core/trace';
 import { listMissionsInSearchDirs, loadState, loadStateAtPath } from './refactor/mission-state.js';
 import type { MissionState } from './refactor/mission-types.js';
 

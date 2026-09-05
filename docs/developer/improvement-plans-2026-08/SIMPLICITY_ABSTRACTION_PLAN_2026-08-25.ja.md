@@ -20000,6 +20000,24 @@ SX-03／SX-09のcomputer-surface設定境界を再監査し、viewer contextとO
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1199
+
+SX-03／SX-06の公開モジュール境界を再監査し、production source に残っていた9領域の
+`@agent/core/src/*` 参照を、公開サブパスへ移行した。対象は cron、trace、feedback loop、
+lock、actuator manifest／example／capability、pipeline preview、knowledge feedback である。
+core package に公開 facade と export を追加し、実装本体の責務・実行順序・結果契約は変更していない。
+今回対象9領域の `@agent/core/src/*` 参照は **0 occurrences** となり、repository-wide に残る
+internal path **49 occurrences** は今回対象外の domain facade として次 wave へ引き継ぐ。
+
+検証:
+
+- `@agent/core` core typecheck／build passed。
+- 関連 **12 files / 122 tests passed**。
+- packaging／ESM／module boundary／script integrity／catalog integrity **6 files / 30 tests passed**。
+- 対象ESLint、`git diff --check` passed。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

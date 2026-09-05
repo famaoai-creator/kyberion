@@ -31,6 +31,34 @@
       "types": "./dist/foundation/primitives.d.ts",
       "default": "./dist/foundation/primitives.js"
     },
+    "./cron-utils": {
+      "types": "./dist/cron-utils.d.ts",
+      "default": "./dist/cron-utils.js"
+    },
+    "./feedback-loop": {
+      "types": "./dist/feedback-loop.d.ts",
+      "default": "./dist/feedback-loop.js"
+    },
+    "./trace": {
+      "types": "./dist/trace.d.ts",
+      "default": "./dist/trace.js"
+    },
+    "./lock-utils": {
+      "types": "./dist/lock-utils.d.ts",
+      "default": "./dist/lock-utils.js"
+    },
+    "./actuator-manifest-index": {
+      "types": "./dist/actuator-manifest-index.d.ts",
+      "default": "./dist/actuator-manifest-index.js"
+    },
+    "./actuator-example-catalog": {
+      "types": "./dist/actuator-example-catalog.d.ts",
+      "default": "./dist/actuator-example-catalog.js"
+    },
+    "./pipeline-preview": {
+      "types": "./dist/pipeline-preview.d.ts",
+      "default": "./dist/pipeline-preview.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
@@ -1396,8 +1424,8 @@
       "default": "./dist/actuator-forwarding-port.js"
     },
     "./actuator-capability": {
-      "types": "./dist/src/actuator-capability.d.ts",
-      "default": "./dist/src/actuator-capability.js"
+      "types": "./dist/actuator-capability.d.ts",
+      "default": "./dist/actuator-capability.js"
     },
     "./audit-forwarder": {
       "types": "./dist/audit-forwarder.d.ts",

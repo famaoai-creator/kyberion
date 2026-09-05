@@ -3,7 +3,7 @@ import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery
 import {
   loadActuatorManifest,
   type ActuatorManifestFile,
-} from '@agent/core/src/actuator-manifest-index';
+} from '@agent/core/actuator-manifest-index';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { nowIso, parseSafeJsonObjectInput } from '@agent/core/foundation';

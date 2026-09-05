@@ -1,6 +1,6 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReaddir } from '@agent/core/secure-io';
-import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
+import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
 import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
 import { loadIntentDomainOntologyCatalog } from '@agent/core/intent-resolution';
 import { loadMissionClassificationPolicy } from '@agent/core/mission-classification';

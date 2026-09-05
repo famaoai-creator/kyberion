@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { recordHumanKnowledgeFeedback } from '@agent/core/src/knowledge-feedback-loop';
+import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loop';
 import { currentScope } from '@agent/core/scope-context';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
