@@ -51,13 +51,16 @@ async function requestJson(url: string, init: RequestInit, timeoutMs: number): P
 }
 
 function discoverEndpoint(payload: unknown, fallback: string): string {
-  if (!payload || typeof payload !== 'object') return fallback;
-  const record = payload as Record<string, unknown>;
-  const candidates = [record.endpoint, record.Endpoint, record.url, record.Url];
-  const endpoints = record.endpoints ?? record.Endpoints;
-  if (Array.isArray(endpoints)) candidates.push(...endpoints);
-  const found = candidates.find((value) => typeof value === 'string' && value.length > 0);
-  return (typeof found === 'string' ? found : fallback).replace(/\/$/, '');
+  try {
+    const record = parseSafeJsonObjectValue(payload, 'Windows local assist availability response');
+    const candidates = [record.endpoint, record.Endpoint, record.url, record.Url];
+    const endpoints = record.endpoints ?? record.Endpoints;
+    if (Array.isArray(endpoints)) candidates.push(...endpoints);
+    const found = candidates.find((value) => typeof value === 'string' && value.length > 0);
+    return (typeof found === 'string' ? found : fallback).replace(/\/$/, '');
+  } catch {
+    return fallback;
+  }
 }
 
 function parseChatCompletionText(payload: unknown): string | null {
