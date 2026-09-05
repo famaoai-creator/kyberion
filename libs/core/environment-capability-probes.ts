@@ -117,7 +117,9 @@ export async function probeExplicitReasoningBackend(
         : unavailable(probe.reason ?? 'claude CLI probe failed');
     }
     case 'claude-agent': {
-      if (env.CLAUDE_API_KEY?.trim()) return { available: true };
+      if (getRegisteredEnvText('CLAUDE_API_KEY', { env })?.trim()) {
+        return { available: true };
+      }
       const probe = claudeProbe();
       return probe.available
         ? { available: true }
@@ -241,25 +243,25 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   if (binaryAvailable('grok', ['--version'])) {
     return { available: true };
   }
-  if (process.env.CLAUDE_API_KEY !== undefined || probeShellClaudeCliAvailability().available) {
+  if (kyberionEnv('CLAUDE_API_KEY') || probeShellClaudeCliAvailability().available) {
     return { available: true };
   }
-  if (Boolean(process.env.ANTHROPIC_API_KEY)) {
+  if (Boolean(kyberionEnv('ANTHROPIC_API_KEY'))) {
     return { available: true };
   }
-  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+  if (kyberionEnv('GEMINI_API_KEY') || kyberionEnv('GOOGLE_API_KEY')) {
     const geminiProbe = await probeGeminiApiBackendAvailability(process.env);
     if (geminiProbe.available) return { available: true };
   }
-  if (process.env.XAI_API_KEY || kyberionEnv('KYBERION_GROK_API_KEY')) {
+  if (kyberionEnv('XAI_API_KEY') || kyberionEnv('KYBERION_GROK_API_KEY')) {
     const grokApiProbe = await probeGrokApiBackendAvailability(process.env);
     if (grokApiProbe.available) return { available: true };
   }
-  if (process.env.OPENROUTER_API_KEY || kyberionEnv('KYBERION_OPENROUTER_KEY')) {
+  if (kyberionEnv('OPENROUTER_API_KEY') || kyberionEnv('KYBERION_OPENROUTER_KEY')) {
     const openrouterProbe = await probeOpenRouterBackendAvailability(process.env);
     if (openrouterProbe.available) return { available: true };
   }
-  if (Boolean(kyberionEnv('KYBERION_OLLAMA_URL')) || Boolean(process.env.OLLAMA_HOST)) {
+  if (Boolean(kyberionEnv('KYBERION_OLLAMA_URL')) || Boolean(kyberionEnv('OLLAMA_HOST'))) {
     const ollamaProbe = await probeOllamaBackendAvailability(process.env);
     if (ollamaProbe.available) return { available: true };
   }
