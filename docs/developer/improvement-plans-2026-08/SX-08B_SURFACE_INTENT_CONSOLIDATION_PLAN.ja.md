@@ -1753,4 +1753,8 @@ mission queueのqueuePathをoperation-timeの`assertSafeRepositoryPath`／`safeL
 
 stimuli journalのappend／subscribeを共通の`resolveStimuliJournalPath`へ接続し、nerve／sensor／journal writerのsymlink traversalを拒否する operation-time 境界を追加した。malformed／TTL／rotation semanticsを維持し、**4 files / 10 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
 
+## 2026-09-06 再レビュー修正 224
+
+process-improvement queueのreader／writerを`assertSafeRepositoryPath`／`safeLstat`へ接続し、symlink／非regular fileをempty queueへ隠蔽せず、operator ratification queueのread／append／rewrite対象から除外する境界を追加した。**1 file / 13 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
+
 検証: backend-conformance **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と全provider adapterの実測は継続課題とする。
