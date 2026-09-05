@@ -22395,3 +22395,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/context_ranker.ts`、`scripts/context_ranker.test.ts`
 - **変更**: knowledge scope 通過後の Markdown 本文読込を foundation の `readTextFile` へ移行した。scope containment、frontmatter parsing、tier／authority／phase inference、ranking semanticsは変更せず、既存テストに reader contract を追加した。
 - **検証**: context-ranker **既存テスト＋reader contract passed**（3 tests）、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1533
+
+- **対象**: `scripts/reasoning_config.ts`、`scripts/reasoning_config.entrypoint.test.ts`
+- **変更**: reasoning route config の previous snapshot 本文読込を foundation の `readTextFile` へ移行した。route validation、backup/history write、dry-run／governance action semanticsは変更せず、entrypoint contract に reader assertion を追加した。
+- **検証**: reasoning-config **entrypoint contract passed**（1 test）、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

@@ -11,10 +11,10 @@ import {
 } from '@agent/core/reasoning-route-resolver';
 import { inspectReasoningRoutes } from '@agent/core/reasoning-route-doctor';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { nowIso } from '@agent/core/foundation';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
-import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 
 const HELP = `Usage:
   pnpm reasoning:config list [--json]
@@ -62,7 +62,7 @@ function saveWithBackup(
     return;
   }
   if (safeExistsSync(path)) {
-    const previous = safeReadFile(path, { encoding: 'utf8' }) as string;
+    const previous = readTextFile(path);
     safeWriteFile(backup, previous, { mkdir: true, encoding: 'utf8' });
     safeWriteFile(historyPath, previous, { mkdir: true, encoding: 'utf8' });
   }
