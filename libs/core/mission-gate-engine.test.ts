@@ -75,6 +75,27 @@ describe('mission-gate-engine', () => {
     expect(gate.reasons.join(' ')).toContain('override denied');
   });
 
+  it('does not treat a directory as evidence or a deliverable', async () => {
+    const directoryPath = `${missionPath}/evidence/replaced.md`;
+    safeMkdir(directoryPath, { recursive: true });
+
+    const gate = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'regular-file-gate',
+        checks: [
+          { kind: 'evidence_exists', params: { path: directoryPath } },
+          { kind: 'deliverable_quality', params: { path: directoryPath, kind: 'deck' } },
+        ],
+      },
+      evidenceDir: `${missionPath}/gates`,
+    });
+
+    expect(gate.verdict).toBe('fail');
+    expect(gate.reasons.join(' ')).toContain('Missing evidence');
+    expect(gate.reasons.join(' ')).toContain('must be a regular file');
+  });
+
   it('passes deliverable_quality when the deck brief meets the rubric threshold', async () => {
     safeMkdir(`${missionPath}/evidence`, { recursive: true });
     safeWriteFile(

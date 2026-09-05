@@ -11,6 +11,7 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeExec,
+  safeLstat,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
@@ -155,6 +156,14 @@ function safeOptionalGatePath(filePath: string): string | undefined {
   }
 }
 
+function isRegularGateFile(filePath: string): boolean {
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 export function writeMissionGateRecord(input: MissionGateRecordInput): string {
   const recordPath = input.recordPath
     ? assertSafeRepositoryPath(input.recordPath, { allowMissingLeaf: true })
@@ -233,7 +242,7 @@ async function evaluateGateCheck(
       }
       const missing = evidencePaths.filter((entry) => {
         const safePath = safeOptionalGatePath(entry);
-        return !safePath || !safeExistsSync(safePath);
+        return !safePath || !safeExistsSync(safePath) || !isRegularGateFile(safePath);
       });
       return missing.length === 0
         ? { passed: true }
@@ -353,6 +362,9 @@ async function evaluateGateCheck(
       if (!safeArtifactPath || !safeExistsSync(safeArtifactPath)) {
         return { passed: false, reason: `Deliverable not found: ${artifactPath}` };
       }
+      if (!isRegularGateFile(safeArtifactPath)) {
+        return { passed: false, reason: `Deliverable must be a regular file: ${artifactPath}` };
+      }
       const raw = safeReadFile(safeArtifactPath, { encoding: 'utf8' }) as string;
       let artifact: unknown = raw;
       try {
@@ -395,6 +407,12 @@ async function evaluateGateCheck(
       const safeArtifactPath = safeOptionalGatePath(artifactPath);
       if (!safeArtifactPath || !safeExistsSync(safeArtifactPath)) {
         return { passed: false, reason: `llm_review: deliverable not found: ${artifactPath}` };
+      }
+      if (!isRegularGateFile(safeArtifactPath)) {
+        return {
+          passed: false,
+          reason: `llm_review: deliverable must be a regular file: ${artifactPath}`,
+        };
       }
       const criteria = toStringList(params.criteria);
       const { getReasoningBackend } = await import('./reasoning-backend.js');
