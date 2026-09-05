@@ -67,7 +67,9 @@ function assertMissionControllerContext(verb: string): void {
 
 function resolveActor(): string {
   return (
-    getRegisteredEnvText('KYBERION_PERSONA') || process.env.MISSION_ROLE || 'mission_controller'
+    getRegisteredEnvText('KYBERION_PERSONA') ||
+    getRegisteredEnvText('MISSION_ROLE') ||
+    'mission_controller'
   );
 }
 
