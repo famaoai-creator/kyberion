@@ -13,6 +13,17 @@ describe('generate_project_os', () => {
     process.exitCode = undefined;
   });
 
+  it('uses the foundation text reader for blueprint source files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/generate_project_os.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).toContain("readTextFile, slugify } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(sourcePath');
+  });
+
   it('renders deterministic files without writing during planning', () => {
     const files = renderProjectOs([
       '--',
