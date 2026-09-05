@@ -15,6 +15,10 @@ const CONVERSATION_FILE = pathResolver.shared(`runtime/a2a-conversations/${CONVE
 const CONCURRENT_CONVERSATION_FILE = pathResolver.shared(
   `runtime/a2a-conversations/${CONVERSATION_ID}-CONCURRENT.jsonl`
 );
+const DIRECTORY_CONVERSATION_ID = `${CONVERSATION_ID}-DIRECTORY`;
+const DIRECTORY_CONVERSATION_FILE = pathResolver.shared(
+  `runtime/a2a-conversations/${DIRECTORY_CONVERSATION_ID}.jsonl`
+);
 
 afterEach(() => {
   withExecutionContext('mission_controller', () => {
@@ -55,6 +59,24 @@ describe('a2a conversation store', () => {
     } finally {
       safeRmSync(CONVERSATION_FILE, { force: true });
       safeRmSync(target, { force: true });
+    }
+  });
+
+  it('rejects a conversation path replaced by a directory', async () => {
+    safeMkdir(DIRECTORY_CONVERSATION_FILE, { recursive: true });
+    try {
+      expect(() => readConversationHistory(DIRECTORY_CONVERSATION_ID)).toThrow(
+        '[A2A_CONVERSATION_STORE] conversation file must be a regular file'
+      );
+      await expect(
+        appendConversationTurn(DIRECTORY_CONVERSATION_ID, {
+          sender: 'sender-x',
+          receiver: 'agent-y',
+          performative: 'request',
+        })
+      ).rejects.toThrow('[A2A_CONVERSATION_STORE] conversation file must be a regular file');
+    } finally {
+      safeRmSync(DIRECTORY_CONVERSATION_FILE, { recursive: true, force: true });
     }
   });
 
