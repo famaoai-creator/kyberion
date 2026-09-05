@@ -581,6 +581,71 @@
         "ja": "不明",
         "qps-ploc": "⟦ůñķñőẇñ ŀőř⟧"
       },
+      "chronos_ac_tree": {
+        "en": "Collaboration tree",
+        "ja": "連携ツリー",
+        "qps-ploc": "⟦Ƈőŀŀȧƀőřȧŧïőñ ŧřėė ŀőřėɱ⟧"
+      },
+      "chronos_ac_tree_empty": {
+        "en": "No missions, tasks, or agents are collaborating right now.",
+        "ja": "現在連携中のミッション・タスク・エージェントはありません。",
+        "qps-ploc": "⟦Ñő ɱïşşïőñş, ŧȧşķş, őř ȧɠėñŧş ȧřė ƈőŀŀȧƀőřȧŧïñɠ řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "chronos_ac_wait_approval_pending": {
+        "en": "Approval pending",
+        "ja": "承認待ち",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ṗėñḓïñɠ ŀőřėɱ⟧"
+      },
+      "chronos_ac_wait_child_running": {
+        "en": "Waiting for child",
+        "ja": "子の完了待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ƈħïŀḓ ŀőřėɱ⟧"
+      },
+      "chronos_ac_wait_claim_pending": {
+        "en": "Claim pending",
+        "ja": "クレーム待ち",
+        "qps-ploc": "⟦Ƈŀȧïɱ ṗėñḓïñɠ ŀőřė⟧"
+      },
+      "chronos_ac_wait_blocked": {
+        "en": "Blocked",
+        "ja": "ブロック",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "chronos_ac_wait_review_pending": {
+        "en": "Review pending",
+        "ja": "レビュー待ち",
+        "qps-ploc": "⟦Řėṽïėẇ ṗėñḓïñɠ ŀőřė⟧"
+      },
+      "chronos_ac_wait_stale": {
+        "en": "Stale",
+        "ja": "停滞",
+        "qps-ploc": "⟦Şŧȧŀė ŀőř⟧"
+      },
+      "chronos_ac_tree_col_node": {
+        "en": "Node",
+        "ja": "ノード",
+        "qps-ploc": "⟦Ñőḓė ŀőř⟧"
+      },
+      "chronos_ac_tree_col_state": {
+        "en": "State",
+        "ja": "状態",
+        "qps-ploc": "⟦Şŧȧŧė ŀőř⟧"
+      },
+      "chronos_ac_tree_col_waiting": {
+        "en": "Waiting",
+        "ja": "待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ŀőř⟧"
+      },
+      "chronos_ac_tree_col_elapsed": {
+        "en": "Elapsed",
+        "ja": "経過",
+        "qps-ploc": "⟦Ėŀȧṗşėḓ ŀőř⟧"
+      },
+      "chronos_ac_tree_col_provider": {
+        "en": "Provider / role",
+        "ja": "プロバイダ/役割",
+        "qps-ploc": "⟦Ṗřőṽïḓėř / řőŀė ŀőřė⟧"
+      },
       "chronos_channel": {
         "en": "channel",
         "ja": "channel",

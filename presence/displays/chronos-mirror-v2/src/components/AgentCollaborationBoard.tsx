@@ -6,10 +6,60 @@ import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
 import {
   parseCollaborationResponse,
   type ClientCollaborationProjection,
+  type ClientCollaborationTree,
+  type ClientCollaborationTreeNode,
+  type ClientCollaborationWaitReason,
 } from '../lib/collaboration-response';
+import { formatElapsedDuration, shortNodeLabel } from '../lib/collaboration-tree-format';
 import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 
 type CollaborationProjection = ClientCollaborationProjection;
+
+const TREE_NODE_GLYPH: Record<ClientCollaborationTreeNode['type'], string> = {
+  mission: '◆',
+  task: '▸',
+  agent: '●',
+};
+
+const TREE_WAIT_LABEL_KEY: Record<ClientCollaborationWaitReason, string> = {
+  approval_pending: 'chronos_ac_wait_approval_pending',
+  child_running: 'chronos_ac_wait_child_running',
+  claim_pending: 'chronos_ac_wait_claim_pending',
+  blocked: 'chronos_ac_wait_blocked',
+  review_pending: 'chronos_ac_wait_review_pending',
+  stale: 'chronos_ac_wait_stale',
+};
+
+interface CollaborationTreeRow {
+  node: ClientCollaborationTreeNode;
+  depth: number;
+}
+
+/** Pre-order walk over roots then orphans, mirroring the terminal-hud row order. */
+function flattenCollaborationTreeRows(tree: ClientCollaborationTree): CollaborationTreeRow[] {
+  const rows: CollaborationTreeRow[] = [];
+  const walk = (node: ClientCollaborationTreeNode, depth: number): void => {
+    rows.push({ node, depth });
+    for (const child of node.children) walk(child, depth + 1);
+  };
+  for (const node of [...tree.roots, ...tree.orphans]) walk(node, 0);
+  return rows;
+}
+
+/** Newest activity first; ties (and undated roots) fall back to id order. */
+function byRecentActivity(
+  left: ClientCollaborationTreeNode,
+  right: ClientCollaborationTreeNode
+): number {
+  const l = left.last_event_at ?? '';
+  const r = right.last_event_at ?? '';
+  return r.localeCompare(l) || left.id.localeCompare(right.id);
+}
+
+function providerRoleCell(node: ClientCollaborationTreeNode): string {
+  if (node.provider && node.team_role) return `${node.provider}/${node.team_role}`;
+  return node.provider || node.team_role || '-';
+}
 
 const KIND_LABEL_KEY: Record<string, string> = {
   dispatch: 'chronos_ac_kind_dispatch',
@@ -131,6 +181,7 @@ export function AgentCollaborationBoard({
   const [error, setError] = React.useState<string | null>(null);
   const [missionId, setMissionId] = React.useState('');
   const [refreshing, setRefreshing] = React.useState(false);
+  const [expandedTreeNodeId, setExpandedTreeNodeId] = React.useState<string | null>(null);
   const schedulerRef = React.useRef<LiveSyncScheduler<CollaborationProjection> | null>(null);
 
   const refresh = React.useCallback(() => {
@@ -207,6 +258,17 @@ export function AgentCollaborationBoard({
       ).sort(),
     [projection?.events]
   );
+  const tree = projection?.tree;
+  const treeRows = React.useMemo(() => {
+    if (!tree) return [];
+    const sorted: ClientCollaborationTree = {
+      ...tree,
+      roots: [...tree.roots].sort(byRecentActivity),
+      orphans: [...tree.orphans].sort(byRecentActivity),
+    };
+    return flattenCollaborationTreeRows(sorted);
+  }, [tree]);
+  const hasTreeNodes = treeRows.length > 0;
   return (
     <section className="rounded-2xl border kb-border-accent kb-surface-accent p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -356,6 +418,87 @@ export function AgentCollaborationBoard({
       ) : (
         <div className="mt-4 text-[11px] kb-text-muted">{uxText('chronos_ac_loading', locale)}</div>
       )}
+
+      {tree ? (
+        hasTreeNodes ? (
+          <details className="mt-4 rounded-2xl border kb-border-subtle kb-surface-sunken p-4" open>
+            <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-[0.16em] kb-text-muted">
+              {uxText('chronos_ac_tree', locale)}
+            </summary>
+            <div className="mt-3 grid gap-1">
+              <div className="grid grid-cols-[1fr_72px_150px_64px_150px] gap-2 px-3 text-[9px] uppercase tracking-[0.12em] kb-text-muted">
+                <span>{uxText('chronos_ac_tree_col_node', locale)}</span>
+                <span>{uxText('chronos_ac_tree_col_state', locale)}</span>
+                <span>{uxText('chronos_ac_tree_col_waiting', locale)}</span>
+                <span>{uxText('chronos_ac_tree_col_elapsed', locale)}</span>
+                <span>{uxText('chronos_ac_tree_col_provider', locale)}</span>
+              </div>
+              {treeRows.map(({ node, depth }) => {
+                const isWaiting = node.waiting_on.length > 0;
+                const isExpanded = expandedTreeNodeId === node.id;
+                return (
+                  <React.Fragment key={node.id}>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedTreeNodeId(isExpanded ? null : node.id)}
+                      aria-expanded={isExpanded}
+                      className={`grid grid-cols-[1fr_72px_150px_64px_150px] items-center gap-2 rounded-lg border px-3 py-2 text-left text-[10px] ${
+                        isWaiting
+                          ? 'kb-status-warning-border kb-status-warning-surface kb-status-warning'
+                          : 'kb-border-subtle kb-surface-sunken kb-text-secondary'
+                      }`}
+                    >
+                      <span className="min-w-0 truncate" style={{ paddingLeft: `${depth * 14}px` }}>
+                        <span className="mr-1 kb-text-muted">{TREE_NODE_GLYPH[node.type]}</span>
+                        {node.label}
+                      </span>
+                      <span className="truncate kb-text-muted">{node.state || '-'}</span>
+                      <span className="truncate">
+                        {node.waiting_on
+                          .map((wait) => uxText(TREE_WAIT_LABEL_KEY[wait.reason], locale))
+                          .join(', ')}
+                      </span>
+                      <span className="truncate kb-text-muted">
+                        {formatElapsedDuration(node.elapsed_ms)}
+                      </span>
+                      <span className="truncate kb-text-muted">{providerRoleCell(node)}</span>
+                    </button>
+                    {isExpanded ? (
+                      <div className="ml-4 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[10px] kb-text-muted">
+                        {node.waiting_on.length === 0 && node.handoffs.length === 0 ? (
+                          <div>{node.id}</div>
+                        ) : null}
+                        {node.waiting_on.map((wait, index) => (
+                          <div key={`wait-${index}`}>
+                            {uxText(TREE_WAIT_LABEL_KEY[wait.reason], locale)}
+                            {wait.target_id ? ` → ${shortNodeLabel(wait.target_id)}` : ''}
+                            {` (${wait.since})`}
+                          </div>
+                        ))}
+                        {node.handoffs.map((handoff, index) => (
+                          <div key={`handoff-${index}`}>
+                            {'→ '}
+                            {shortNodeLabel(handoff.to_agent_id)}
+                            {handoff.performative ? ` (${handoff.performative})` : ''}
+                            {` ${handoff.at}`}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </details>
+        ) : (
+          <div className="mt-4 text-[11px] kb-text-muted">
+            <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.16em]">
+              {uxText('chronos_ac_tree', locale)}
+            </span>
+            {uxText('chronos_ac_tree_empty', locale)}
+          </div>
+        )
+      ) : null}
 
       {projection && projection.attention.length > 0 ? (
         <div className="mt-4">

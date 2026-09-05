@@ -43,6 +43,52 @@ const projection = {
       mission_id: 'MSN-1',
     },
   ],
+  tree: {
+    generated_at: '2026-09-04T00:00:00.000Z',
+    roots: [
+      {
+        id: 'mission:MSN-1',
+        type: 'mission',
+        label: 'MSN-1',
+        last_event_at: '2026-09-04T00:00:00.000Z',
+        waiting_on: [],
+        handoffs: [],
+        children: [
+          {
+            id: 'agent:agent-a',
+            type: 'agent',
+            label: 'agent-a',
+            state: 'running',
+            provider: 'claude-cli',
+            team_role: 'implementer',
+            elapsed_ms: 4200,
+            waiting_on: [{ reason: 'approval_pending', since: '2026-09-04T00:00:00.000Z' }],
+            handoffs: [
+              {
+                to_agent_id: 'agent:agent-b',
+                performative: 'inform',
+                at: '2026-09-04T00:00:00.000Z',
+              },
+            ],
+            children: [],
+          },
+        ],
+      },
+    ],
+    orphans: [],
+    waiting: [
+      { node_id: 'agent:agent-a', reason: 'approval_pending', since: '2026-09-04T00:00:00.000Z' },
+    ],
+    stats: {
+      missions: 1,
+      tasks: 0,
+      agents_total: 1,
+      agents_running: 1,
+      agents_waiting: 1,
+      agents_done: 0,
+      humans_waited_on: 1,
+    },
+  },
 };
 
 describe('collaboration response boundary', () => {
@@ -77,6 +123,33 @@ describe('collaboration response boundary', () => {
       parseCollaborationResponse({
         ok: true,
         projection: { ...projection, events: [{ ...projection.events[0], effort: 'extreme' }] },
+      })
+    ).toBeUndefined();
+  });
+
+  it('rejects a missing tree and an invalid wait reason nested inside it (AC-06)', () => {
+    const { tree: _omitted, ...projectionWithoutTree } = projection;
+    expect(
+      parseCollaborationResponse({ ok: true, projection: projectionWithoutTree })
+    ).toBeUndefined();
+    const invalidWaitReason = {
+      ...projection.tree,
+      roots: [
+        {
+          ...projection.tree.roots[0],
+          children: [
+            {
+              ...projection.tree.roots[0].children[0],
+              waiting_on: [{ reason: 'unexpected', since: '2026-09-04T00:00:00.000Z' }],
+            },
+          ],
+        },
+      ],
+    };
+    expect(
+      parseCollaborationResponse({
+        ok: true,
+        projection: { ...projection, tree: invalidWaitReason },
       })
     ).toBeUndefined();
   });
