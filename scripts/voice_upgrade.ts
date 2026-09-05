@@ -121,8 +121,8 @@ async function checkTier0(): Promise<{ name: string; ok: boolean; detail?: strin
 
 function checkTier1(): { name: string; ok: boolean; detail?: string }[] {
   const checks: { name: string; ok: boolean; detail?: string }[] = [];
-  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  const hasAnthropic = Boolean(getRegisteredEnv<string>('ANTHROPIC_API_KEY'));
+  const hasOpenAI = Boolean(getRegisteredEnv<string>('OPENAI_API_KEY'));
   checks.push({
     name: 'ANTHROPIC_API_KEY',
     ok: hasAnthropic,

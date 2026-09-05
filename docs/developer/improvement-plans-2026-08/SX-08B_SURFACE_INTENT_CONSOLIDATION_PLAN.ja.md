@@ -1114,3 +1114,9 @@ ingest CLIの実行者 fallbackに残っていた `MISSION_ROLE` の環境直読
 Control Plane CLIのPresence／Chronos health check URL fallbackに残っていた環境直読を、登録済み `getRegisteredEnvText` へ統一した。既定URL、surface filter、client retry、health resultの既存 semanticsは変更していない。
 
 検証: Control Plane CLI **2 files / 13 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 117
+
+voice upgradeのcloud provider availability判定に残っていた API key の環境直読を、既存の `getRegisteredEnv` へ移行した。secret valueは出力せず、Anthropic／OpenAIいずれかの存在判定、tier prerequisite、profile書込の既存 semanticsは変更していない。
+
+検証: voice upgrade **2 files / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。

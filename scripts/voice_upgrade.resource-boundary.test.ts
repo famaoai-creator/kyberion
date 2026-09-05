@@ -23,6 +23,10 @@ describe('voice_upgrade resource boundary', () => {
     );
     expect(source).toContain('readSafeJsonFile');
     expect(source).not.toContain('readJson<Record<string, unknown>>(out)');
+    expect(source).not.toContain('process.env.ANTHROPIC_API_KEY');
+    expect(source).not.toContain('process.env.OPENAI_API_KEY');
+    expect(source).toContain("getRegisteredEnv<string>('ANTHROPIC_API_KEY')");
+    expect(source).toContain("getRegisteredEnv<string>('OPENAI_API_KEY')");
   });
 
   it('rejects repository-external profile resources', () => {
