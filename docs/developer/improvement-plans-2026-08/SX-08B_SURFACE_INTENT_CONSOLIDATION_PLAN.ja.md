@@ -1590,3 +1590,9 @@ tenant rate-limit policyを必須catalogへ変更し、quota stateは未作成�
 knowledge curation SLOのcatalog fallbackを削除し、SLO config未作成時は呼び出し側の明示的な保守的既定値から開始し、存在するconfigのschema不正はそのまま拒否する境界へ整理した。freshness／low-yield判定、tenant ingest advisory、archive historyの既存semanticsは変更していない。
 
 検証: knowledge-curation-report **1 file / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 196
+
+video visual patternの組み込みcatalogと、正本catalogの欠損・schema不正を組み込み値へ戻すfallbackを削除し、正本pattern packの読み込み障害をfail-closedで返す境界へ統一した。LLM出力の未知patternをcatalog先頭へ補正するrender継続／degraded表示、visual directionの無効入力に対する決定的補正は維持している。
+
+検証: video-visual-direction **1 file / 9 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。

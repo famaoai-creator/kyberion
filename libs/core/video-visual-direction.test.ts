@@ -116,7 +116,7 @@ describe('video visual direction (agy short-video quality)', () => {
     expect(direction.palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
   });
 
-  it('uses the deterministic fallback when the pattern catalog is schema-invalid', () => {
+  it('rejects a pattern catalog that is schema-invalid', () => {
     const rootDir = pathResolver.sharedTmp('video-visual-pattern-catalog-tests');
     const catalogDir = path.join(rootDir, 'knowledge/public/design-patterns/media-templates');
     try {
@@ -126,10 +126,9 @@ describe('video visual direction (agy short-video quality)', () => {
         JSON.stringify({ version: '1.0.0', description: 'invalid', patterns: {} })
       );
 
-      const catalog = loadVideoVisualPatternCatalog(rootDir);
-
-      expect(Object.keys(catalog)).toEqual(['calm-tech']);
-      expect(catalog['calm-tech'].palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
+      expect(() => loadVideoVisualPatternCatalog(rootDir)).toThrow(
+        'Invalid catalog video-visual-patterns'
+      );
     } finally {
       safeRmSync(rootDir, { recursive: true, force: true });
     }

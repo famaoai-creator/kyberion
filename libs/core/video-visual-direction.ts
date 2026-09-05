@@ -157,22 +157,6 @@ const VIDEO_VISUAL_PATTERN_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/video-visual-patterns.schema.json'
 );
 
-const DEFAULT_PATTERN_CATALOG: VideoVisualPatternCatalog = {
-  version: '1.0.0',
-  description: 'Deterministic fallback visual pattern catalog.',
-  patterns: {
-    'calm-tech': {
-      name: 'Calm Tech',
-      mood: DEFAULT_VISUAL_DIRECTION.mood,
-      palette: DEFAULT_VISUAL_DIRECTION.palette,
-      typography: {
-        portrait: { headline_px: 96, body_px: 34 },
-        landscape: { headline_px: 68, body_px: 23 },
-      },
-    },
-  },
-};
-
 const videoVisualPatternCatalogs = new Map<string, GovernedCatalog<VideoVisualPatternCatalog>>();
 
 function getVideoVisualPatternCatalog(
@@ -194,13 +178,6 @@ function getVideoVisualPatternCatalog(
       id: 'video-visual-patterns',
       path: catalogPath,
       schema: VIDEO_VISUAL_PATTERN_SCHEMA_PATH,
-      fallback: DEFAULT_PATTERN_CATALOG,
-      fallbackOnInvalid: true,
-      onFallback: (error) => {
-        logger.warn(
-          `pattern catalog unreadable, using built-in default: ${error instanceof Error ? error.message : String(error)}`
-        );
-      },
     });
     videoVisualPatternCatalogs.set(catalogPath, catalog);
   }
