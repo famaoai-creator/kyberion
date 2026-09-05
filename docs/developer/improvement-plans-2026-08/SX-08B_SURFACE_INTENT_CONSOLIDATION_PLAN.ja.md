@@ -1354,3 +1354,9 @@ voice engine registryに残っていたコード内registry fallbackを削除し
 voice task profile catalogに残っていた空配列fallbackを削除し、必須のgovernance catalogが欠損・不正な場合は `defineCatalog` のmissing／validation errorを返すfail-closed境界へ統一した。profileのtask type／operation scoringとdistill target解決は変更していない。
 
 検証: voice-task-profile-catalog **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 157
+
+actuator op registryに残っていた空registry fallbackとconfig fallback記録経路を削除し、必須のgovernance registryが欠損・不正な場合は `defineCatalog` のmissing／validation errorを実行解決へ伝播するfail-closed境界へ統一した。plugin operation登録、built-in control op、manifest／capability検証、未知opのsuggestionは変更していない。
+
+検証: actuator-op-registry **1 file / 13 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
