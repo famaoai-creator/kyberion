@@ -124,7 +124,7 @@ presenceStudioData.app.get('/api/identity', (_req, res) => {
     });
     res.json(summarizePresenceStudioIdentity(result));
   } catch (err: any) {
-    res.status(500).json({ ok: false, error: err?.message || String(err) });
+    res.status(500).json(presenceStudioData.presenceStudioWireError(err, 500));
   }
 });
 
@@ -133,8 +133,7 @@ presenceStudioData.app.get('/api/onboarding/browser-state', (_req, res) => {
     const mic = probeMicCapture();
     res.json({ ...getBrowserOnboardingState(), readiness: { microphone: mic } });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ ok: false, error: message });
+    res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
   }
 });
 
@@ -142,7 +141,7 @@ presenceStudioData.app.post('/api/onboarding/preview', (req, res) => {
   try {
     res.json(previewBrowserOnboarding(req.body));
   } catch (error: any) {
-    res.status(400).json({ ok: false, error: error?.message || String(error) });
+    res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
   }
 });
 
@@ -163,7 +162,7 @@ presenceStudioData.app.post('/api/onboarding/apply', async (req, res) => {
         error: error?.message || String(error),
       })
     );
-    res.status(400).json({ ok: false, error: error?.message || String(error) });
+    res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
   }
 });
 
@@ -264,7 +263,7 @@ presenceStudioData.app.get('/api/standard-intents', (_req, res) => {
       });
     res.json({ ok: true, items });
   } catch (error: any) {
-    res.status(500).json({ ok: false, error: error?.message || String(error) });
+    res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
   }
 });
 
@@ -295,7 +294,7 @@ presenceStudioData.app.get('/api/project-management', (_req, res) => {
       })),
     });
   } catch (error: any) {
-    res.status(500).json({ ok: false, error: error?.message || String(error) });
+    res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
   }
 });
 
@@ -354,7 +353,7 @@ presenceStudioData.app.get('/api/surface-launcher', async (_req, res) => {
   try {
     res.json(await presenceStudioData.loadSurfaceLauncherPayload());
   } catch (error: any) {
-    res.status(500).json({ ok: false, error: error?.message || String(error) });
+    res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
   }
 });
 
@@ -385,7 +384,7 @@ presenceStudioData.app.get('/api/os/control-plane', (req, res) => {
         error: message,
       })
     );
-    return res.status(status).json({ ok: false, error: message });
+    return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
   }
 });
 
@@ -430,7 +429,7 @@ presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res
         error: message,
       })
     );
-    return res.status(status).json({ ok: false, error: message });
+    return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
   }
 });
 
@@ -476,7 +475,7 @@ presenceStudioData.app.post('/api/os/held-actions/:actionId/apply', async (req, 
         error: message,
       })
     );
-    return res.status(status).json({ ok: false, error: message });
+    return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
   }
 });
 
@@ -557,7 +556,7 @@ presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => 
     );
     return res.json({ ok: true, item: updated });
   } catch (error: any) {
-    return res.status(500).json({ ok: false, error: error?.message || String(error) });
+    return res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
   }
 });
 
@@ -769,7 +768,7 @@ presenceStudioData.app.post('/api/browser-conversation-sessions/bootstrap', (req
         error: error?.message || String(error),
       })
     );
-    return res.status(500).json({ ok: false, error: error?.message || String(error) });
+    return res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
   }
 });
 
@@ -809,10 +808,7 @@ presenceStudioData.app.post('/a2ui/dispatch', (req, res) => {
         error: presenceStudioData.safeErrorMessage(error),
       })
     );
-    return res.status(400).json({
-      ok: false,
-      error: presenceStudioData.safeErrorMessage(error) || 'Invalid A2UI message.',
-    });
+    return res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
   }
   presenceStudioData.emitState();
   logger.info(
@@ -1133,7 +1129,7 @@ presenceStudioData.app.post('/api/email-draft', async (req, res) => {
         error: error?.message || String(error),
       })
     );
-    return res.status(500).json({ error: error?.message || String(error) });
+    return res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
   }
 });
 
@@ -1206,7 +1202,7 @@ presenceStudioData.app.post('/api/email-deliver', async (req, res) => {
         error: error?.message || String(error),
       })
     );
-    return res.status(500).json({ error: error?.message || String(error) });
+    return res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
   }
 });
 
@@ -1278,10 +1274,7 @@ presenceStudioData.app.post('/api/voice/native-listen', async (req, res) => {
         error: error?.message || String(error),
       })
     );
-    res.status(503).json({
-      ok: false,
-      error: `Voice hub connection failed: ${error?.message || String(error)}`,
-    });
+    res.status(503).json(presenceStudioData.presenceStudioWireError(error, 503));
   }
 });
 
@@ -1293,7 +1286,7 @@ presenceStudioData.app.get('/api/voice/selection', (_req, res) => {
     const { storage_path: _storagePath, ...publicSnapshot } = snapshot;
     res.json({ ok: true, ...publicSnapshot });
   } catch (error: any) {
-    res.status(500).json({ ok: false, error: error?.message || String(error) });
+    res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
   }
 });
 
@@ -1345,10 +1338,7 @@ presenceStudioData.app.get('/api/voice/input-devices', async (req, res) => {
     }
     res.status(response.status).type('application/json').send(payload);
   } catch (error: any) {
-    res.status(503).json({
-      ok: false,
-      error: `Voice hub connection failed: ${error?.message || String(error)}`,
-    });
+    res.status(503).json(presenceStudioData.presenceStudioWireError(error, 503));
   }
 });
 
@@ -1364,10 +1354,7 @@ presenceStudioData.app.get('/api/voice/stt-backends', async (req, res) => {
     }
     res.status(response.status).type('application/json').send(payload);
   } catch (error: any) {
-    res.status(503).json({
-      ok: false,
-      error: `Voice hub connection failed: ${error?.message || String(error)}`,
-    });
+    res.status(503).json(presenceStudioData.presenceStudioWireError(error, 503));
   }
 });
 
@@ -1383,10 +1370,7 @@ presenceStudioData.app.get('/api/voice/speech-state', async (req, res) => {
     }
     res.status(response.status).type('application/json').send(payload);
   } catch (error: any) {
-    res.status(503).json({
-      ok: false,
-      error: `Voice hub connection failed: ${error?.message || String(error)}`,
-    });
+    res.status(503).json(presenceStudioData.presenceStudioWireError(error, 503));
   }
 });
 

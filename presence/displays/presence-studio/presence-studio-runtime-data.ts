@@ -36,6 +36,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
+import { toWireError } from '@agent/core/wire-error';
 import { saveBrowserOnboardingVoiceSample } from '@agent/core/browser-onboarding';
 import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
 import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
@@ -77,6 +78,19 @@ export type Client = express.Response;
 
 export function safeErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** Project internal exceptions into the stable Presence Studio JSON boundary. */
+export function presenceStudioWireError(error: unknown, status?: number) {
+  const safe = toWireError(
+    status === undefined ? error : { status, message: safeErrorMessage(error) }
+  );
+  return {
+    ok: false,
+    error: safe.message,
+    error_code: safe.code,
+    correlation_id: safe.correlation_id,
+  };
 }
 
 export interface SurfaceSnapshot {
@@ -1076,7 +1090,7 @@ app.post(
           error: error?.message || String(error),
         })
       );
-      res.status(400).json({ ok: false, error: error?.message || String(error) });
+      res.status(400).json(presenceStudioWireError(error, 400));
     }
   }
 );
@@ -1098,7 +1112,7 @@ app.get('/api/headless/manifest', (req, res) => {
     });
   } catch (error) {
     const status = error instanceof PresenceStudioViewerError ? error.status : 500;
-    res.status(status).json({ ok: false, error: safeErrorMessage(error) });
+    res.status(status).json(presenceStudioWireError(error, status));
   }
 });
 
@@ -1116,7 +1130,7 @@ app.get('/api/headless/overview', (req, res) => {
     );
   } catch (error) {
     const status = error instanceof PresenceStudioViewerError ? error.status : 500;
-    res.status(status).json({ ok: false, error: safeErrorMessage(error) });
+    res.status(status).json(presenceStudioWireError(error, status));
   }
 });
 
@@ -1139,7 +1153,7 @@ app.get('/api/headless/a2ui/overview', (req, res) => {
     );
   } catch (error) {
     const status = error instanceof PresenceStudioViewerError ? error.status : 500;
-    res.status(status).json({ ok: false, error: safeErrorMessage(error) });
+    res.status(status).json(presenceStudioWireError(error, status));
   }
 });
 
@@ -1229,7 +1243,7 @@ app.post('/api/minutes/session/start', async (req, res) => {
   } catch (err: any) {
     inRoomMinutesSession = null;
     inRoomMinutesMissionId = null;
-    res.status(500).json({ ok: false, error: err?.message || String(err) });
+    res.status(500).json(presenceStudioWireError(err, 500));
   }
 });
 
@@ -1253,7 +1267,7 @@ app.post('/api/minutes/session/stop', async (_req, res) => {
     });
     res.json({ ok: true, ...result });
   } catch (err: any) {
-    res.status(500).json({ ok: false, error: err?.message || String(err) });
+    res.status(500).json(presenceStudioWireError(err, 500));
   }
 });
 
