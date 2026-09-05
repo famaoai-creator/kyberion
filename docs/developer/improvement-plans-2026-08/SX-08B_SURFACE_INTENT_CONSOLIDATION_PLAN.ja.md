@@ -1168,3 +1168,9 @@ lockfile commit gateのGitHub base ref、レビュー証跡パス、lockfile ove
 Google Workspace Meet CLIの`CLOUDSDK_PYTHON` child command fallbackに残っていた環境直読を、登録済み `getRegisteredEnvText` へ移行した。`--cloudsdk-python` の明示引数優先、gws command、payload境界、safe child envは変更していない。
 
 検証: Google Workspace Meet CLI **1 file / 3 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 126
+
+PR title checkerのGitHub event path fallbackに残っていた `GITHUB_EVENT_PATH` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。`--event-path`／`--title` の明示引数優先、イベントJSONの安全な読込、Conventional Commit判定とfail-closed fallbackは変更していない。
+
+検証: PR title checker **1 file / 5 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。

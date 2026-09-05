@@ -10,6 +10,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExec } from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
@@ -104,7 +105,8 @@ export const runCheckPullRequestTitle = defineScript({
     }
     const result = checkPullRequestTitle({
       title: optionValue(context.argv, '--title'),
-      eventPath: optionValue(context.argv, '--event-path') || process.env.GITHUB_EVENT_PATH,
+      eventPath:
+        optionValue(context.argv, '--event-path') || getRegisteredEnvText('GITHUB_EVENT_PATH'),
     });
     if (!result.ok) {
       throw new ScriptExitError(1, `${result.source}: ${result.value} (${result.reason})`);
