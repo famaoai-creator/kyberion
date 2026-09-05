@@ -20621,6 +20621,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Chronos agent route専用の `withMissionRole` が独自にprocess環境を退避・復元していたため、共通authorityの `withExecutionContext` に委譲した。既存の同期呼び出し契約を維持しつつ、authorityの実行scope/ペルソナ処理と同じ経路へ統一した。
 - **検証**: `agent-route-helpers.boundary.test.ts` でhelper内の直接setter不在と共通authorityへの委譲を固定する。
 
+## 2026-09-05 再レビュー修正 1238
+
+- **対象**: `presence/displays/presence-studio/presence-studio-runtime-data.ts`、`satellites/voice-hub/server.ts`
+- **変更**: 長寿命surface初期化に残っていた `process.env.MISSION_ROLE ||= 'surface_runtime'` を、登録済み環境の読み取りと `setRegisteredEnv` に置き換えた。既存の明示的なroleを維持し、未設定時だけsurface既定値を設定する挙動は保つ。
+- **検証**: 各 `*.boundary.test.ts` で直接process setterの不在と登録済みsetter利用を固定する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

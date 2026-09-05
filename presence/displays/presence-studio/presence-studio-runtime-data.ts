@@ -5,6 +5,7 @@ import {
   getRegisteredEnvText,
   nowIso,
   parseSafeJsonObjectValue,
+  setRegisteredEnv,
 } from '@agent/core/foundation';
 import { type VocabularyKey } from '@agent/core/t';
 import { CloudflareOsSurface } from '@agent/core/cloudflare-os-surface';
@@ -487,7 +488,9 @@ export function parseStimuliTailContent(content: string, limit = 20): GuspStimul
     .filter((stimulus): stimulus is GuspStimulus => stimulus !== undefined);
 }
 
-process.env.MISSION_ROLE ||= 'surface_runtime';
+if (!getRegisteredEnvText('MISSION_ROLE')) {
+  setRegisteredEnv('MISSION_ROLE', 'surface_runtime');
+}
 export const cloudflareOsSurface = new CloudflareOsSurface();
 
 export const state: PresenceStudioState = {
