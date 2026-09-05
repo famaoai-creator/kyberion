@@ -1,6 +1,5 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
 
 export interface MediaBorderKeySideEntry {
   key_char: 'T' | 'B' | 'L' | 'R';
@@ -20,15 +19,6 @@ const catalog = defineCatalog<MediaStylePolicyCatalog>({
   id: 'media-style-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: () => ({
-    version: '1.0.0',
-    // A missing policy must not silently recreate the governed catalog in code.
-    // Keep only conservative behavior until the catalog is restored.
-    signal_tone_ranks: {},
-    border_key_sides: [],
-  }),
-  onFallback: (error, fallback) =>
-    recordConfigFallback({ knowledgePath: CATALOG_PATH, error, defaults: fallback }),
 });
 
 export function loadMediaStylePolicyCatalog(): MediaStylePolicyCatalog {
