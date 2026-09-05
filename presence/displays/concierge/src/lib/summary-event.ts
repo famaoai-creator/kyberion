@@ -1,3 +1,5 @@
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+
 export type ConciergeSummary = {
   generated_at: string;
   briefing: {
@@ -149,7 +151,7 @@ export function parseConciergeSummaryResponse(value: unknown): ConciergeSummary 
 
 export function parseConciergeSummaryEvent(raw: string): ConciergeSummary | null {
   try {
-    return parseConciergeSummaryValue(JSON.parse(raw));
+    return parseConciergeSummaryValue(parseSafeJsonInput(raw, 'Concierge summary event'));
   } catch {
     return null;
   }
