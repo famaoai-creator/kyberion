@@ -9,6 +9,7 @@ export const PANELS = [
   'stats',
   'profile',
   'settings',
+  'agents',
 ] as const;
 
 export type PanelId = (typeof PANELS)[number];
@@ -22,6 +23,7 @@ export const PANEL_LABEL_KEYS: Record<PanelId, VocabularyKey> = {
   stats: 'tui:tui_tab_stats',
   profile: 'tui:tui_tab_profile',
   settings: 'tui:tui_tab_settings',
+  agents: 'tui:tui_tab_agents',
 };
 
 export interface HelpRow {
@@ -30,7 +32,7 @@ export interface HelpRow {
 }
 
 export const GLOBAL_HELP: HelpRow[] = [
-  { keys: '1-8', labelKey: 'tui:tui_key_switch_panel' },
+  { keys: '1-9', labelKey: 'tui:tui_key_switch_panel' },
   { keys: '[ / ]', labelKey: 'tui:tui_key_cycle' },
   { keys: 'j / k', labelKey: 'tui:tui_key_move' },
   { keys: 'Enter', labelKey: 'tui:tui_key_detail' },

@@ -9,18 +9,20 @@ import {
 } from './keymap.js';
 
 describe('keymap', () => {
-  it('maps digits 1..8 to panels in order', () => {
+  it('maps digits 1..9 to panels in order', () => {
     expect(panelForDigit('1')).toBe('missions');
     expect(panelForDigit('8')).toBe('settings');
-    expect(panelForDigit('9')).toBeUndefined();
+    expect(panelForDigit('9')).toBe('agents');
+    expect(panelForDigit('10')).toBeUndefined();
     expect(panelForDigit('0')).toBeUndefined();
     expect(panelForDigit('x')).toBeUndefined();
   });
 
   it('cycles panels in both directions with wrap-around', () => {
     expect(nextPanel('missions', 1)).toBe('tasks');
-    expect(nextPanel('settings', 1)).toBe('missions');
-    expect(nextPanel('missions', -1)).toBe('settings');
+    expect(nextPanel('settings', 1)).toBe('agents');
+    expect(nextPanel('agents', 1)).toBe('missions');
+    expect(nextPanel('missions', -1)).toBe('agents');
   });
 
   it('recognizes valid panel ids', () => {
