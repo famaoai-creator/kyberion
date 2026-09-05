@@ -81,7 +81,7 @@ function actorId(): string {
  * atomically with the mission); otherwise a shared runtime file keyed by mission id.
  */
 function pinFilePath(): string {
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   if (missionId) {
     for (const tier of ['personal', 'confidential', 'public']) {
       const missionDir = pathResolver.rootResolve(path.join('active/missions', tier, missionId));
@@ -147,7 +147,7 @@ export function pinProviderDecision(decisionKey: string, decision: ProviderDecis
     by: actorId(),
   };
   file.version = PIN_FILE_VERSION;
-  file.missionId = process.env.MISSION_ID;
+  file.missionId = getRegisteredEnvText('MISSION_ID');
   file.pins[decisionKey] = entry;
   writePinFile(file);
   return entry;
