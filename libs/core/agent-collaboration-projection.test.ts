@@ -408,6 +408,7 @@ describe('agent collaboration projection', () => {
     const droppedLines = Array.from({ length: 40 }, (_, index) =>
       JSON.stringify({
         event_id: `dropped-${suffix}-${index}`,
+        ts: '2026-09-05T23:00:00.000Z',
         decision: 'agent_runtime_prewarm_requested',
         mission_id: droppedMissionId,
         seq: index,
@@ -417,6 +418,7 @@ describe('agent collaboration projection', () => {
     const keptLines = Array.from({ length: 5 }, (_, index) =>
       JSON.stringify({
         event_id: `kept-${suffix}-${index}`,
+        ts: '2026-09-05T23:30:00.000Z',
         decision: 'agent_runtime_prewarm_requested',
         mission_id: keptMissionId,
         seq: index,
@@ -431,7 +433,10 @@ describe('agent collaboration projection', () => {
       const projection = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:00.000Z',
         bounded: { maxBytesPerFile },
-        roots: { observabilityDir },
+        roots: {
+          observabilityDir,
+          workerEventsDir: path.join(fixtureDir, 'logs', 'worker-events'),
+        },
       });
       expect(projection.partial).toBe(true);
       expect(projection.status_flags).toContain('bounded_read');
@@ -442,7 +447,10 @@ describe('agent collaboration projection', () => {
       const unboundedProjection = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:00.000Z',
         bounded: false,
-        roots: { observabilityDir },
+        roots: {
+          observabilityDir,
+          workerEventsDir: path.join(fixtureDir, 'logs', 'worker-events'),
+        },
       });
       expect(unboundedProjection.status_flags).not.toContain('bounded_read');
       expect(
@@ -481,7 +489,7 @@ describe('agent collaboration projection', () => {
     try {
       const projection = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:00.000Z',
-        roots: { workerEventsDir },
+        roots: { workerEventsDir, observabilityDir: path.join(fixtureDir, 'observability') },
       });
       expect(projection.events.some((entry) => entry.mission_id === recentMissionId)).toBe(true);
       expect(projection.events.some((entry) => entry.mission_id === oldMissionId)).toBe(false);
@@ -489,7 +497,7 @@ describe('agent collaboration projection', () => {
       const unboundedProjection = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:00.000Z',
         bounded: false,
-        roots: { workerEventsDir },
+        roots: { workerEventsDir, observabilityDir: path.join(fixtureDir, 'observability') },
       });
       expect(unboundedProjection.events.some((entry) => entry.mission_id === oldMissionId)).toBe(
         true
@@ -532,7 +540,7 @@ describe('agent collaboration projection', () => {
       const scopedToTarget = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:00.000Z',
         missionId: targetMissionId,
-        roots: { workerEventsDir },
+        roots: { workerEventsDir, observabilityDir: path.join(fixtureDir, 'observability') },
       });
       expect(scopedToTarget.events.some((entry) => entry.mission_id === targetMissionId)).toBe(
         true
@@ -546,7 +554,7 @@ describe('agent collaboration projection', () => {
       const scopedToOther = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:00.000Z',
         missionId: otherMissionId,
-        roots: { workerEventsDir },
+        roots: { workerEventsDir, observabilityDir: path.join(fixtureDir, 'observability') },
       });
       expect(scopedToOther.events.some((entry) => entry.mission_id === otherMissionId)).toBe(true);
       expect(scopedToOther.events.some((entry) => entry.mission_id === targetMissionId)).toBe(
@@ -556,7 +564,7 @@ describe('agent collaboration projection', () => {
       // Unscoped: recentDays applies to both mission partitions equally.
       const unscoped = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:00.000Z',
-        roots: { workerEventsDir },
+        roots: { workerEventsDir, observabilityDir: path.join(fixtureDir, 'observability') },
       });
       expect(unscoped.events.some((entry) => entry.mission_id === targetMissionId)).toBe(false);
       expect(unscoped.events.some((entry) => entry.mission_id === otherMissionId)).toBe(false);
@@ -605,7 +613,7 @@ describe('agent collaboration projection', () => {
       const projection = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:10.000Z',
         missionId,
-        roots: { workerEventsDir },
+        roots: { workerEventsDir, observabilityDir: path.join(fixtureDir, 'observability') },
       });
       expect(projection.edges).toEqual(
         expect.arrayContaining([
@@ -653,7 +661,7 @@ describe('agent collaboration projection', () => {
       const projection = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:10.000Z',
         missionId,
-        roots: { workerEventsDir },
+        roots: { workerEventsDir, observabilityDir: path.join(fixtureDir, 'observability') },
       });
       expect(projection.events[0]).toMatchObject({
         kind: 'approval',
@@ -666,7 +674,82 @@ describe('agent collaboration projection', () => {
     }
   });
 
-  it('drops step_begin/step_end worker events by default and keeps them with includeStepEvents (AC-03)', () => {
+  it('applies the recent-days window to event timestamps and drops telemetry noise from unrotated sources (AC-03)', () => {
+    const suffix = randomUUID();
+    const fixtureDir = collabFixtureDir(suffix);
+    const observabilityDir = path.join(fixtureDir, 'observability', 'mission-control');
+    const workerEventsDir = path.join(fixtureDir, 'logs', 'worker-events');
+    const oldMissionId = `MSN-OLD-${suffix}`.toUpperCase();
+    const freshMissionId = `MSN-FRESH-${suffix}`.toUpperCase();
+    fs.mkdirSync(observabilityDir, { recursive: true });
+    fs.mkdirSync(workerEventsDir, { recursive: true });
+    const orchestration = [
+      {
+        ts: '2026-07-01T00:00:00.000Z',
+        decision: 'mission_owner_notified',
+        mission_id: oldMissionId,
+      },
+      {
+        ts: '2026-09-05T12:00:00.000Z',
+        decision: 'mission_owner_notified',
+        mission_id: freshMissionId,
+      },
+    ];
+    const supervisor = Array.from({ length: 50 }, (_, index) => ({
+      ts: '2026-09-05T13:00:00.000Z',
+      decision: 'a2a_inflight_metric',
+      inflight_total: index,
+    }));
+    fs.writeFileSync(
+      path.join(observabilityDir, 'orchestration-events.jsonl'),
+      `${orchestration.map((line) => JSON.stringify(line)).join('\n')}\n`
+    );
+    fs.writeFileSync(
+      path.join(observabilityDir, 'agent-runtime-supervisor-events.jsonl'),
+      `${supervisor.map((line) => JSON.stringify(line)).join('\n')}\n`
+    );
+    try {
+      const projection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        roots: { observabilityDir, workerEventsDir },
+      });
+      const missionIds = projection.nodes
+        .filter((node) => node.type === 'mission')
+        .map((n) => n.id);
+      expect(missionIds).toContain(`mission:${freshMissionId}`);
+      expect(missionIds).not.toContain(`mission:${oldMissionId}`);
+      expect(projection.overview.events).toBe(1);
+      expect(projection.status_flags).not.toContain('unknown_event');
+
+      const unbounded = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        bounded: false,
+        roots: { observabilityDir, workerEventsDir },
+      });
+      expect(unbounded.nodes.map((node) => node.id)).toContain(`mission:${oldMissionId}`);
+      expect(unbounded.overview.events).toBe(52);
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps limit as a cap on the returned feed only, not on the composed graph (AC-05 follow-up)', () => {
+    const events = Array.from({ length: 30 }, (_, index) =>
+      event({
+        source: 'orchestration',
+        source_event_id: `evt-${index}`,
+        kind: 'progress',
+        mission_id: `MSN-LIMIT-${index}`,
+        ts: `2026-09-05T00:00:${String(index).padStart(2, '0')}.000Z`,
+      })
+    );
+    const projection = composeAgentCollaborationProjection(events, { limit: 5 });
+    expect(projection.events).toHaveLength(5);
+    expect(projection.overview.events).toBe(30);
+    expect(projection.nodes.filter((node) => node.type === 'mission')).toHaveLength(30);
+  });
+
+  it('drops step/turn lifecycle worker events by default and keeps them with includeStepEvents (AC-03)', () => {
     const suffix = randomUUID();
     const fixtureDir = collabFixtureDir(suffix);
     const workerEventsDir = path.join(fixtureDir, 'logs', 'worker-events');
@@ -676,13 +759,13 @@ describe('agent collaboration projection', () => {
     fs.mkdirSync(workerEventsDir, { recursive: true });
     const lines = [
       { type: 'step_begin', mission_id: stepMissionId, ts: '2026-09-06T00:00:00.000Z', seq: 1 },
-      { type: 'turn_begin', mission_id: turnMissionId, ts: '2026-09-06T00:00:01.000Z', seq: 2 },
+      { type: 'mission_event', mission_id: turnMissionId, ts: '2026-09-06T00:00:01.000Z', seq: 2 },
     ];
     fs.writeFileSync(filePath, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`);
     try {
       const defaultProjection = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:00.000Z',
-        roots: { workerEventsDir },
+        roots: { workerEventsDir, observabilityDir: path.join(fixtureDir, 'observability') },
       });
       expect(defaultProjection.events.some((entry) => entry.mission_id === stepMissionId)).toBe(
         false
@@ -694,7 +777,7 @@ describe('agent collaboration projection', () => {
       const includedProjection = buildAgentCollaborationProjection({
         now: '2026-09-06T00:00:00.000Z',
         bounded: { includeStepEvents: true },
-        roots: { workerEventsDir },
+        roots: { workerEventsDir, observabilityDir: path.join(fixtureDir, 'observability') },
       });
       expect(includedProjection.events.some((entry) => entry.mission_id === stepMissionId)).toBe(
         true

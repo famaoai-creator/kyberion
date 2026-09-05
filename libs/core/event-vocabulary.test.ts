@@ -78,6 +78,8 @@ describe('event-vocabulary', () => {
     expect(resolveCollaborationKind('MISSION_FINISH_REFRESH_RECOMMENDED')).toBe('review');
     // Case-insensitive: the projection lowercases before matching inference.
     expect(resolveCollaborationKind('mission_paused')).toBe('waiting');
+    // mission-orchestration `mission_owner_notified` is a progress signal, not unknown.
+    expect(resolveCollaborationKind('mission_owner_notified')).toBe('progress');
   });
 
   it('空・未知の入力は unknown を返す', () => {
