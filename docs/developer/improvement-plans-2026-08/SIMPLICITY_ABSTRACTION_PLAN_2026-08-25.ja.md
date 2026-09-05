@@ -21999,3 +21999,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/distill-knowledge-injector.ts`、`libs/core/distill-knowledge-injector.test.ts`
 - **変更**: distill catalog の markdown entry read 前に operation-time の regular-file 検査を追加した。ファイル名だけが `distill_*.md` に一致する directory 等を knowledge injection 対象へ含めず、既存の tenant scope／symlink／placeholder quarantine と ranking semantics は維持した。
 - **検証**: distill-knowledge-injector **2 files / 12 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1467
+
+- **対象**: `libs/core/a2a-conversation-store.ts`、`libs/core/a2a-conversation-store.test.ts`
+- **変更**: A2A conversation JSONL の read／append 前に operation-time の regular-file 検査を追加した。履歴ファイルが directory 等へ置換された場合に空履歴や新規 append の fallback として扱わず拒否し、既存の symlink 境界、行単位 validation、lock／MAX_TURNS／confidential mission semantics は維持した。
+- **検証**: a2a-conversation-store **2 files / 6 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
