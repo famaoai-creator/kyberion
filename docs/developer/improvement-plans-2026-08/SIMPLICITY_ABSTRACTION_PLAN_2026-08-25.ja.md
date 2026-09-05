@@ -21729,3 +21729,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/ace-core.ts`、`libs/core/ace-core.test.ts`
 - **変更**: ACE minutes の append／integrity read を operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。併せて verifier が header-body 間の改行を hash から落として正常な chain を false にする既存不整合を修正した。symlink／repository 外／非 regular file の minutes を read／append へ到達させず、hash chain semanticsを維持した。
 - **検証**: ace-core minutes boundary **2 files / 2 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1422
+
+- **対象**: `libs/core/report-contract.ts`、`libs/core/report-contract.test.ts`
+- **変更**: pipeline report の product schema_ref leaf を operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。schema compiler／prompt read が symlink・repository 外・非 regular file を読むことを防ぎ、builtin contract、schema traversal、judge retry semanticsは維持した。
+- **検証**: report-contract **2 files / 3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
