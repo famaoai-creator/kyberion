@@ -2,7 +2,7 @@ import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { clamp } from './foundation/text.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import { resolveIdentityContext } from './authority.js';
 
 export type AutonomousOpsDecision = 'auto' | 'notify' | 'approve';
@@ -55,63 +55,11 @@ export interface AutonomousOpsGateResult {
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/autonomous-ops-policy.json');
 
-const FALLBACK_POLICY: AutonomousOpsPolicy = {
-  version: 'fallback',
-  decision_thresholds: {
-    auto_max_score: 3,
-    notify_max_score: 6,
-  },
-  axis_weights: {
-    scope: 1,
-    reversibility: 1,
-    sensitivity: 1,
-    confidence: 1,
-  },
-  actions: {
-    storage_janitor: {
-      title: 'Storage janitor',
-      description: 'Remove stale runtime and temporary artifacts after safe verification.',
-      axis_scores: { scope: 2, reversibility: 2, sensitivity: 1, confidence: 2 },
-      budget_cap_tokens: 2000,
-    },
-    baseline_health_scan: {
-      title: 'Baseline health scan',
-      description: 'Run the baseline health and maintenance readiness scan.',
-      axis_scores: { scope: 0, reversibility: 0, sensitivity: 0, confidence: 1 },
-      budget_cap_tokens: 1000,
-    },
-    tenant_drift_watch: {
-      title: 'Tenant drift watch',
-      description: 'Observe tenant drift and surface drift signals.',
-      axis_scores: { scope: 1, reversibility: 0, sensitivity: 1, confidence: 2 },
-      budget_cap_tokens: 1500,
-    },
-    dependency_vuln_scan: {
-      title: 'Dependency vulnerability scan',
-      description: 'Scan dependency vulnerabilities and append to the ledger.',
-      axis_scores: { scope: 1, reversibility: 0, sensitivity: 1, confidence: 1 },
-      budget_cap_tokens: 4000,
-    },
-    auto_checkpoint: {
-      title: 'Automatic checkpoint',
-      description: 'Persist a durable checkpoint for long-running maintenance.',
-      axis_scores: { scope: 0, reversibility: 0, sensitivity: 0, confidence: 1 },
-      budget_cap_tokens: 1000,
-    },
-  },
-};
-
-let cachedPolicySourceHealthy = false;
-
 function getPolicyPath(): string {
   return assertSafeRepositoryPath(
     getRegisteredEnvText('KYBERION_AUTONOMOUS_OPS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH,
     { allowMissingLeaf: true }
   );
-}
-
-function cloneFallbackPolicy(): AutonomousOpsPolicy {
-  return JSON.parse(JSON.stringify(FALLBACK_POLICY)) as AutonomousOpsPolicy;
 }
 
 const autonomousOpsPolicyCatalog = defineCatalog<AutonomousOpsPolicy>({
@@ -121,30 +69,11 @@ const autonomousOpsPolicyCatalog = defineCatalog<AutonomousOpsPolicy>({
 });
 
 export function _resetAutonomousOpsPolicyCacheForTests(): void {
-  cachedPolicySourceHealthy = false;
   autonomousOpsPolicyCatalog.reset();
 }
 
 export function getAutonomousOpsPolicy(): AutonomousOpsPolicy {
-  let policyPath: string;
-  try {
-    policyPath = getPolicyPath();
-  } catch {
-    cachedPolicySourceHealthy = false;
-    return cloneFallbackPolicy();
-  }
-  if (!safeExistsSync(policyPath)) {
-    cachedPolicySourceHealthy = false;
-    return cloneFallbackPolicy();
-  }
-  try {
-    const policy = autonomousOpsPolicyCatalog.load();
-    cachedPolicySourceHealthy = true;
-    return policy;
-  } catch {
-    cachedPolicySourceHealthy = false;
-    return cloneFallbackPolicy();
-  }
+  return autonomousOpsPolicyCatalog.load();
 }
 
 function clampAxisScore(score: number | undefined): number {
@@ -207,16 +136,17 @@ export function evaluateAutonomousOpsAction(
   const identity = resolveIdentityContext();
   const tenantSlug = input.tenantSlug ?? identity.tenantSlug;
   const executionMode = input.executionMode ?? 'apply';
-  const policy = getAutonomousOpsPolicy();
-
-  if (!cachedPolicySourceHealthy) {
+  let policy: AutonomousOpsPolicy;
+  try {
+    policy = getAutonomousOpsPolicy();
+  } catch {
     return {
       actionId: input.actionId,
       decision: 'approve',
       allowed: false,
       score: Number.POSITIVE_INFINITY,
-      maxScore: policy.decision_thresholds.notify_max_score,
-      policyVersion: policy.version,
+      maxScore: 0,
+      policyVersion: 'unavailable',
       tenantSlug,
       executionMode,
       reason: `Autonomous ops policy unavailable or invalid; refusing ${input.actionId}`,

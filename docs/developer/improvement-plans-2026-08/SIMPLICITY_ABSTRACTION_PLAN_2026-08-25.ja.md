@@ -21137,6 +21137,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: media backend registryに残っていたコード内catalog fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorを返すfail-closed境界へ統一した。voice engineの動的backend統合、modality alias、availability probe、backend固有の実行fallbackは変更していない。
 - **検証**: media-backend-registry **1 file / 12 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1324
+
+- **対象**: `libs/core/autonomous-ops-gate.ts`、`libs/core/src/autonomous-ops-gate.test.ts`
+- **変更**: autonomous ops gateに残っていたコード内policy fallbackを削除し、正本policyの欠損・不正・unsafe overrideを評価境界で構造化されたapprove／deny結果へ変換するfail-closed経路へ統一した。action score、tenant override、budget cap、dry-run判定と、人手承認を要求する既存semanticsは変更していない。
+- **検証**: autonomous-ops-gate **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
