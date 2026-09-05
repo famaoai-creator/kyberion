@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
 import { main, resolveDecisionResourcePath } from './read-decision.js';
 
 const tempRoot = pathResolver.sharedTmp(`read-decision-output-${process.pid}`);
@@ -43,14 +44,13 @@ describe('mission alignment decision resource boundary', () => {
     expect(output).toHaveLength(2);
     expect(String(output[0])).toContain('"decision": "pending"');
     expect(String(output[1])).toContain('pending');
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/mission-alignment-gate/read-decision.ts'), {
-        encoding: 'utf8',
-      }) || ''
+    const source = readTextFile(
+      pathResolver.rootResolve('scripts/mission-alignment-gate/read-decision.ts')
     );
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
     expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
   });
 
   it('preserves approved exit semantics after printing the report', () => {

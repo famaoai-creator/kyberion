@@ -10,12 +10,8 @@
  * 使い方:
  *   node_modules/.bin/tsx scripts/mission-alignment-gate/read-decision.ts <reviewed.html> <mission-brief.json>
  */
-import {
-  assertSafeRepositoryPath,
-  safeReadFile,
-  safeExistsSync,
-  safeLstat,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { loadMissionBriefAtPath } from './mission-brief.js';
@@ -36,7 +32,7 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
   if (!safeLstat(safeHtmlPath).isFile())
     throw new ScriptExitError(1, `html is not a regular file: ${htmlPath}`);
 
-  const html = safeReadFile(safeHtmlPath, { encoding: 'utf8' }) as string;
+  const html = readTextFile(safeHtmlPath);
   // mg-gate 要素の開始タグに限定して属性を読む（CSSセレクタ data-decision="approved" への誤マッチ防止）
   const gateTag = (html.match(/<div\s+id="mg-gate"[^>]*>/) || [''])[0];
   const decision = (gateTag.match(/data-decision="([^"]*)"/) || [])[1] || 'pending';

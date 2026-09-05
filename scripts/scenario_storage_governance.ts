@@ -14,8 +14,8 @@ import {
 import { createProcessLogger } from '@agent/core/process-logger';
 import { runJanitor } from '@agent/core/storage-janitor';
 import { sharedLogsAudit, sharedLogsProcess } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
-import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -97,7 +97,7 @@ export async function main(print: Print = () => undefined): Promise<void> {
     if (safeExistsSync(sbissMirror)) {
       const files = safeReaddir(sbissMirror);
       ok(`tenant mirror sbiss: ${files.join(', ')}`);
-      const lines = (safeReadFile(path.join(sbissMirror, files[0]), { encoding: 'utf8' }) as string)
+      const lines = readTextFile(path.join(sbissMirror, files[0]))
         .trim()
         .split('\n')
         .filter(Boolean);
@@ -199,9 +199,7 @@ export async function main(print: Print = () => undefined): Promise<void> {
     procLog.error('connection reset', { host: 'api.example.com', attempt: 3 });
 
     if (safeExistsSync(sharedLogsProcess('scenario-daemon.log'))) {
-      const raw = safeReadFile(sharedLogsProcess('scenario-daemon.log'), {
-        encoding: 'utf8',
-      }) as string;
+      const raw = readTextFile(sharedLogsProcess('scenario-daemon.log'));
       const lines = raw.trim().split('\n').filter(Boolean);
       ok(
         `process log written: ${lines.length} entries at active/shared/logs/process/scenario-daemon.log`
