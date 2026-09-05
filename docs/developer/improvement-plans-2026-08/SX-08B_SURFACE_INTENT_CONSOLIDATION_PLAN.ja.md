@@ -1492,3 +1492,9 @@ analysis configに残っていた正本JSONと重複する大規模な組み込�
 spend policyに残っていた正本JSONと重複するdefault policyと例外時の復帰を削除し、schema検証済みの支出上限・postureをそのまま利用する境界へ統一した。tenant override、warn／block posture、daily／mission cap判定とalert dedupeの既存semanticsは変更していない。
 
 検証: spend-guard **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 180
+
+media generation quota policyの欠損・schema不正時に組み込みquota policyへ戻るcatalog fallbackを削除し、正本policyの読み込み障害をfail-closedで返す境界へ統一した。tenant override、quota counterのtenant／date検証、atomic reservation／release、未知operationの既存default解決は変更していない。
+
+検証: generation-quota **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。

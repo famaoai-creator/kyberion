@@ -64,8 +64,6 @@ function createGenerationQuotaPolicyCatalog(root: string) {
       { allowMissingLeaf: true, rootDir: root }
     ),
     schema: GENERATION_QUOTA_POLICY_SCHEMA_PATH,
-    fallback: DEFAULT_GENERATION_QUOTA_POLICY,
-    fallbackOnInvalid: true,
   });
 }
 
