@@ -6,7 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { auditChain } from './audit-chain.js';
 import { resolveTenant } from './tenant-registry.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
@@ -159,7 +159,7 @@ export function assertRecordIdentity(
   recordTenant(record);
   if (
     record.tenant_slug &&
-    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST)
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
   ) {
     resolveTenant(record.tenant_slug, { rootDir });
   }

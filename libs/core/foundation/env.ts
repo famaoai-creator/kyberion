@@ -75,6 +75,17 @@ export function getRegisteredEnvText(
   return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
 }
 
+/**
+ * Detect the Vitest runtime without loading the repository environment
+ * registry. Test workers deliberately repoint the repository root to fixture
+ * directories, while the registry reader is backed by secure-io and expects
+ * the real catalog tree. The marker is test infrastructure rather than an
+ * operator setting, so it must remain a raw, side-effect-free process check.
+ */
+export function isVitestProcess(env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean(env.VITEST);
+}
+
 /** Read a registered boolean without converting it to the legacy text form. */
 export function getRegisteredEnvBool(
   name: string,

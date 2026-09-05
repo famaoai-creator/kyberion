@@ -41,6 +41,7 @@ import { readTenantProfile } from './tenant-registry.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import { nowIso } from './foundation/time.js';
+import { isVitestProcess } from './foundation/env.js';
 import {
   listAgentIdentities,
   retireAgentIdentity,
@@ -76,7 +77,7 @@ function recordGovernanceAudit(event: NhiGovernanceAuditEvent): void {
       auditSinkOverride(event);
       return;
     }
-    if (process.env.VITEST) return; // hermetic guard — see setNhiGovernanceAuditSinkForTests
+    if (isVitestProcess()) return; // hermetic guard — see setNhiGovernanceAuditSinkForTests
     auditChain.record({
       agentId: event.nhi_id,
       action: event.action,

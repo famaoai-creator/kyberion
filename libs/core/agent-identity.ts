@@ -46,6 +46,7 @@
 import { z } from 'zod';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { isVitestProcess } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
@@ -603,7 +604,7 @@ export function resetAgentIdentityServiceForTests(
 }
 
 function appendGoverned(opName: string, payload: unknown): void {
-  if (process.env.VITEST && !journalExplicitlyScoped) {
+  if (isVitestProcess() && !journalExplicitlyScoped) {
     throw new Error(
       '[agent-identity] refusing to write the governed default journal under vitest — ' +
         'call resetAgentIdentityServiceForTests(<active/shared/tmp/... path>) in your suite ' +

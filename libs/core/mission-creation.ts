@@ -16,7 +16,7 @@ import {
 import { initializeMissionTeamBindings } from './mission-team-binding.js';
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { inferMissionOutcomeContract } from './outcome-contract.js';
 import { ensureDefaultTenantProfile, resolveTenant } from './tenant-registry.js';
 import { loadOrganizationProfile } from './organization-profile.js';
@@ -232,7 +232,7 @@ export async function createMission(args: {
   }
   if (
     tenantSlug &&
-    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST)
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
   ) {
     resolveTenant(tenantSlug, { rootDir });
   }

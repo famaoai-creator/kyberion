@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import {
   buildProjectBootstrapWorkItems,
   listProjectRecords,
@@ -620,7 +620,7 @@ export function buildManagedProjectRecord(input: ManagedProjectCreateInput): Pro
   if (
     input.tier === 'confidential' &&
     input.tenant_slug &&
-    (kyberionEnv('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST)
+    (kyberionEnv('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
   ) {
     resolveTenant(input.tenant_slug, { rootDir: input.rootDir });
   }
@@ -662,7 +662,7 @@ function createManagedProjectInternal(
     throw new Error(`Project already exists: ${projectId}`);
   const record = buildManagedProjectRecord(input);
   const enforceEntityGovernance =
-    kyberionEnv('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST;
+    kyberionEnv('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess();
   const organizationState =
     enforceEntityGovernance && input.organization_id
       ? loadOrganizationOperationalState(input.organization_id, {
