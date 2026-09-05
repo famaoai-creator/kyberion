@@ -1,7 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// AC-08: `node:fs` is a native ESM namespace whose exports are
+// non-configurable, so `vi.spyOn(fs, 'readFileSync')` cannot redefine them.
+// Mocking the module with a `vi.fn` wrapper around the real implementation
+// gives the bounded-reader test below a spyable reference (shared by this
+// file's default import and secure-io's namespace import) while every other
+// export stays real.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const readFileSync = vi.fn(actual.readFileSync);
+  return { ...actual, readFileSync, default: { ...actual, readFileSync } };
+});
 import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -9,6 +21,10 @@ import {
   composeAgentCollaborationProjection,
 } from './agent-collaboration-projection.js';
 import { createAgentCollaborationEvent } from './agent-collaboration-events.js';
+import {
+  appendPeerConversationTranscript,
+  clearPeerConversationRuntime,
+} from './peer-conversation.js';
 
 function event(partial: Partial<Parameters<typeof createAgentCollaborationEvent>[0]>) {
   return createAgentCollaborationEvent({
@@ -251,6 +267,68 @@ describe('agent collaboration projection', () => {
     expect(projection.attention.map((item) => item.kind)).toEqual(
       expect.arrayContaining(['failure', 'approval'])
     );
+    // AC-09: surfaces translate from `code`; core's title/next_action stay
+    // developer-facing English and carry no localized text.
+    expect(projection.attention.map((item) => item.code)).toEqual(
+      expect.arrayContaining(['failure', 'waiting_human'])
+    );
+    expect(projection.attention.find((item) => item.code === 'waiting_human')).toMatchObject({
+      title: 'Waiting for human approval',
+      next_action: 'Review the request in the approval queue',
+    });
+  });
+
+  it('labels every attention item with a closed reason code (AC-09)', () => {
+    const projection = composeAgentCollaborationProjection([
+      // Distinct timestamps: `event()` leaves event_id random, which is the
+      // ordering tiebreaker, so equal ts would make the order unstable.
+      event({
+        source_event_id: 'blocked-1',
+        kind: 'blocked',
+        summary: 'no input',
+        ts: '2026-07-26T00:00:01.000Z',
+      }),
+      event({
+        source_event_id: 'approval-1',
+        kind: 'approval',
+        summary: 'sign-off',
+        ts: '2026-07-26T00:00:02.000Z',
+      }),
+      event({
+        source_event_id: 'review-1',
+        kind: 'review',
+        summary: 'check it',
+        ts: '2026-07-26T00:00:03.000Z',
+      }),
+      event({
+        source_event_id: 'failure-1',
+        kind: 'failure',
+        summary: 'crashed',
+        ts: '2026-07-26T00:00:04.000Z',
+      }),
+      event({
+        source_event_id: 'progress-1',
+        kind: 'progress',
+        summary: 'still going',
+        ts: '2026-07-26T00:00:05.000Z',
+      }),
+    ]);
+    expect(
+      projection.attention.map((item) => ({ kind: item.kind, code: item.code, title: item.title }))
+    ).toEqual([
+      // newest first; the progress event raises no attention item at all.
+      { kind: 'failure', code: 'failure', title: 'Failed' },
+      { kind: 'review', code: 'review_pending', title: 'Review pending' },
+      { kind: 'approval', code: 'waiting_human', title: 'Waiting for human approval' },
+      { kind: 'blocked', code: 'blocked', title: 'Blocked' },
+    ]);
+    // `reason` stays the event summary, unchanged by AC-09.
+    expect(projection.attention.map((item) => item.reason)).toEqual([
+      'crashed',
+      'check it',
+      'sign-off',
+      'no input',
+    ]);
   });
 
   it('replays the 3-to-10 agent golden scenario deterministically', () => {
@@ -831,6 +909,187 @@ describe('agent collaboration projection', () => {
       expect(projection.events).toEqual([]);
     } finally {
       fs.rmSync(directoryPath, { recursive: true, force: true });
+    }
+  });
+
+  it('reads an oversized source through the tail primitive and drops the torn leading line (AC-08)', () => {
+    const suffix = randomUUID();
+    const fixtureDir = collabFixtureDir(suffix);
+    const observabilityDir = path.join(fixtureDir, 'observability', 'mission-control');
+    const filePath = path.join(observabilityDir, 'agent-runtime-supervisor-events.jsonl');
+    const padding = 'x'.repeat(120);
+    // Every mission id has the same width, so all six lines are the same
+    // length and the byte cut below can be placed inside a chosen one.
+    const missionIds = Array.from({ length: 6 }, (_, index) =>
+      `MSN-TAIL-${index}-${suffix}`.toUpperCase()
+    );
+    const lines = missionIds.map((missionId) =>
+      JSON.stringify({
+        ts: '2026-09-05T23:30:00.000Z',
+        decision: 'mission_owner_notified',
+        mission_id: missionId,
+        padding,
+      })
+    );
+    const lineLength = lines[0].length + 1;
+    expect(new Set(lines.map((line) => line.length)).size).toBe(1);
+    const content = `${lines.join('\n')}\n`;
+    fs.mkdirSync(observabilityDir, { recursive: true });
+    fs.writeFileSync(filePath, content);
+    // Cut in the middle of line index 2: it becomes a torn fragment that must
+    // be discarded, while lines 3..5 are complete and must survive.
+    const tailStart = 2 * lineLength + Math.floor(lineLength / 2);
+    const maxBytesPerFile = content.length - tailStart;
+    try {
+      const readFileSyncMock = fs.readFileSync as unknown as ReturnType<typeof vi.fn>;
+      readFileSyncMock.mockClear();
+      const projection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        bounded: { maxBytesPerFile },
+        roots: {
+          observabilityDir,
+          workerEventsDir: path.join(fixtureDir, 'logs', 'worker-events'),
+        },
+      });
+      const projected = projection.nodes.filter((node) => node.type === 'mission').map((n) => n.id);
+      expect(projected).toEqual(
+        expect.arrayContaining(missionIds.slice(3).map((id) => `mission:${id}`))
+      );
+      for (const missionId of missionIds.slice(0, 3)) {
+        expect(projected).not.toContain(`mission:${missionId}`);
+      }
+      expect(projection.truncated_sources).toContain('agent-runtime-supervisor-events.jsonl');
+      // The tail primitive seeks; the file is never loaded whole.
+      const wholeFileReads = readFileSyncMock.mock.calls.filter((call: unknown[]) =>
+        String(call[0]).endsWith('agent-runtime-supervisor-events.jsonl')
+      );
+      expect(wholeFileReads).toEqual([]);
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it('merges dated supervisor partitions inside the window with the legacy file (AC-10)', () => {
+    const suffix = randomUUID();
+    const fixtureDir = collabFixtureDir(suffix);
+    const observabilityDir = path.join(fixtureDir, 'observability', 'mission-control');
+    const legacyMissionId = `MSN-LEGACY-${suffix}`.toUpperCase();
+    const recentMissionId = `MSN-RECENT-${suffix}`.toUpperCase();
+    const oldMissionId = `MSN-OLD-${suffix}`.toUpperCase();
+    fs.mkdirSync(observabilityDir, { recursive: true });
+    const line = (missionId: string, ts: string) =>
+      `${JSON.stringify({ ts, decision: 'mission_owner_notified', mission_id: missionId })}\n`;
+    fs.writeFileSync(
+      path.join(observabilityDir, 'agent-runtime-supervisor-events.jsonl'),
+      line(legacyMissionId, '2026-09-05T10:00:00.000Z')
+    );
+    fs.writeFileSync(
+      path.join(observabilityDir, 'agent-runtime-supervisor-events-2026-09-05.jsonl'),
+      line(recentMissionId, '2026-09-05T11:00:00.000Z')
+    );
+    fs.writeFileSync(
+      path.join(observabilityDir, 'agent-runtime-supervisor-events-2026-09-01.jsonl'),
+      line(oldMissionId, '2026-09-01T11:00:00.000Z')
+    );
+    try {
+      const projection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        roots: {
+          observabilityDir,
+          workerEventsDir: path.join(fixtureDir, 'logs', 'worker-events'),
+        },
+      });
+      const missionIds = projection.nodes.filter((n) => n.type === 'mission').map((n) => n.id);
+      expect(missionIds).toContain(`mission:${recentMissionId}`);
+      // The legacy partition stays in the read; only the `since` window hides
+      // its genuinely old rows, and this one is inside the window.
+      expect(missionIds).toContain(`mission:${legacyMissionId}`);
+      expect(missionIds).not.toContain(`mission:${oldMissionId}`);
+      expect(projection.sources).toContain('runtime');
+      expect(projection.status_flags).not.toContain('unknown_event');
+
+      const unbounded = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        bounded: false,
+        roots: {
+          observabilityDir,
+          workerEventsDir: path.join(fixtureDir, 'logs', 'worker-events'),
+        },
+      });
+      expect(unbounded.nodes.map((node) => node.id)).toContain(`mission:${oldMissionId}`);
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it('projects peer conversations as oriented a2a handoff edges, scoped by tenant (AC-11)', () => {
+    const suffix = randomUUID().replace(/-/gu, '').slice(0, 12);
+    const tenantId = `tenant-collab-${suffix}`;
+    const otherTenantId = `tenant-other-${suffix}`;
+    const localPeer = `peer-a-${suffix}`;
+    const remotePeer = `peer-b-${suffix}`;
+    const fixtureDir = collabFixtureDir(suffix);
+    const roots = {
+      observabilityDir: path.join(fixtureDir, 'observability', 'mission-control'),
+      workerEventsDir: path.join(fixtureDir, 'logs', 'worker-events'),
+    };
+    appendPeerConversationTranscript({
+      tenantId,
+      sessionId: 'PCS-collab-1',
+      localPeerId: localPeer,
+      remotePeerId: remotePeer,
+      kind: 'handoff',
+      direction: 'outbound',
+      text: 'take this over',
+    });
+    appendPeerConversationTranscript({
+      tenantId,
+      sessionId: 'PCS-collab-1',
+      localPeerId: localPeer,
+      remotePeerId: remotePeer,
+      kind: 'reply',
+      direction: 'inbound',
+      text: 'acknowledged',
+    });
+    try {
+      const projection = buildAgentCollaborationProjection({
+        now: new Date(Date.now() + 60_000).toISOString(),
+        tenant: tenantId,
+        roots,
+      });
+      const handoffs = projection.edges.filter((edge) => edge.kind === 'handoff');
+      // outbound: local → remote; inbound is flipped by readPeerConversationEdges.
+      expect(handoffs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ from: `agent:${localPeer}`, to: `agent:${remotePeer}` }),
+          expect.objectContaining({ from: `agent:${remotePeer}`, to: `agent:${localPeer}` }),
+        ])
+      );
+      expect(projection.sources).toContain('a2a');
+      expect(projection.status_flags).not.toContain('unknown_event');
+      const peerEvents = projection.events.filter((entry) => entry.source === 'a2a');
+      expect(peerEvents).toHaveLength(2);
+      const inbound = peerEvents.find((entry) => entry.sender === remotePeer);
+      expect(inbound).toMatchObject({
+        kind: 'handoff',
+        agent_id: localPeer,
+        receiver: localPeer,
+        summary: 'reply',
+        correlation_id: 'PCS-collab-1',
+      });
+      expect(inbound?.scope?.tenant_slug).toBe(tenantId);
+      expect(inbound?.source_event_id).toMatch(/^PCM-/u);
+
+      const otherTenantProjection = buildAgentCollaborationProjection({
+        now: new Date(Date.now() + 60_000).toISOString(),
+        tenant: otherTenantId,
+        roots,
+      });
+      expect(otherTenantProjection.sources).not.toContain('a2a');
+      expect(otherTenantProjection.edges).toEqual([]);
+    } finally {
+      clearPeerConversationRuntime(tenantId, localPeer);
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
     }
   });
 });

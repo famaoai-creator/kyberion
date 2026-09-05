@@ -16,9 +16,24 @@ import {
 import { loadState } from './mission-state.js';
 import { nowIso } from './foundation/time.js';
 
+/**
+ * AC-09: the agent id used for a work item nobody has claimed. A stable
+ * sentinel, not display text — surfaces translate it through their own
+ * vocabulary.
+ */
+export const UNASSIGNED_AGENT_ID = 'unassigned';
+
 export interface AgentActivityBlocker {
   kind: 'blocked' | 'dependency' | 'review_wait' | 'unassigned';
+  /**
+   * AC-09: developer-facing English, one fixed sentence per `kind`. Surfaces
+   * render from `kind` plus the structured fields below, never from this text.
+   */
   reason: string;
+  /** `dependency` only: the unmet task ids this item is waiting on. */
+  dependency_ids?: string[];
+  /** `blocked` only: the reason the work item itself recorded, when it has one. */
+  blocked_reason?: string;
 }
 
 export interface AgentActivityEntry {
@@ -60,14 +75,14 @@ function deriveBlockers(
   const metadata = (item.metadata || {}) as Record<string, unknown>;
   if (item.status === 'blocked') {
     const lastAttempt = item.attempts?.[item.attempts.length - 1];
+    // The item's own wording is data, not display text: it is carried as a
+    // separate field so `reason` can stay one fixed, translatable sentence.
+    const recorded =
+      lastAttempt?.blocked_reason || lastAttempt?.failure_reason || lastAttempt?.summary;
     blockers.push({
       kind: 'blocked',
-      reason: String(
-        lastAttempt?.blocked_reason ||
-          lastAttempt?.failure_reason ||
-          lastAttempt?.summary ||
-          'タスクがブロック状態です(needs_input の可能性)'
-      ),
+      reason: 'Work item is blocked and may be waiting on input',
+      ...(recorded ? { blocked_reason: String(recorded) } : {}),
     });
   }
   const dependencies = Array.isArray(metadata.dependencies)
@@ -78,13 +93,17 @@ function deriveBlockers(
     return status !== undefined && !['done', 'archived'].includes(status);
   });
   if (unmet.length > 0 && ['backlog', 'ready'].includes(item.status)) {
-    blockers.push({ kind: 'dependency', reason: `依存タスク待ち: ${unmet.join(', ')}` });
+    blockers.push({
+      kind: 'dependency',
+      reason: 'Waiting on unfinished dependency tasks',
+      dependency_ids: unmet,
+    });
   }
   if (item.status === 'review') {
-    blockers.push({ kind: 'review_wait', reason: 'レビュー/ゲート承認待ち' });
+    blockers.push({ kind: 'review_wait', reason: 'Waiting for review or gate approval' });
   }
   if (!item.assignee_peer_id && !['done', 'archived'].includes(item.status)) {
-    blockers.push({ kind: 'unassigned', reason: '担当エージェント未割当' });
+    blockers.push({ kind: 'unassigned', reason: 'No agent is assigned to this work item' });
   }
   return blockers;
 }
@@ -118,7 +137,7 @@ export function composeAgentActivityBoard(input: {
     if (['done', 'archived'].includes(item.status)) continue;
     const metadata = (item.metadata || {}) as Record<string, unknown>;
     entries.push({
-      agent_id: item.assignee_peer_id || '(未割当)',
+      agent_id: item.assignee_peer_id || UNASSIGNED_AGENT_ID,
       team_role: metadata.team_role ? String(metadata.team_role) : undefined,
       mission_id: missionId,
       tenant_slug: tenant,

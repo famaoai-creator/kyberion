@@ -212,6 +212,10 @@ function safeConversationPath(logicalPath: string): string {
   });
 }
 
+function tenantsRoot(): string {
+  return path.dirname(safeConversationPath(`${RUNTIME_ROOT}/tenants/.path-check`));
+}
+
 function tenantPeersRoot(tenantId: string): string {
   const normalizedTenantId = normalizeTenantId(tenantId);
   return path.dirname(
@@ -471,6 +475,31 @@ function truncateTranscriptTailText(text: string): string {
   return text.length > TRANSCRIPT_TAIL_TEXT_MAX_LENGTH
     ? text.slice(0, TRANSCRIPT_TAIL_TEXT_MAX_LENGTH)
     : text;
+}
+
+/**
+ * AC-11: tenants that have a peer-conversation runtime directory, sorted.
+ *
+ * Used by the collaboration projection when no tenant scope was supplied, so
+ * an unscoped operator view still sees peer handoffs. Entries that are not
+ * valid tenant slugs (stray files, `.DS_Store`) are ignored rather than
+ * passed on to `normalizeTenantId`, which would throw.
+ */
+export function listPeerConversationTenants(): string[] {
+  return withExecutionContext(GOVERNED_ROLE, () => {
+    try {
+      const root = pathResolver.resolve(tenantsRoot());
+      if (!safeExistsSync(root)) return [];
+      return safeReaddir(root)
+        .filter((entry) => isValidTenantSlug(entry))
+        .sort();
+    } catch (error) {
+      logger.warn(
+        `[peer-conversation] failed to list conversation tenants: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return [];
+    }
+  });
 }
 
 /** List peers with a runtime conversation directory for a tenant, sorted. */

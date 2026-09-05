@@ -8,8 +8,7 @@ import {
   safeExistsSync,
   safeLstat,
   safeReaddir,
-  safeReadFile,
-  safeStat,
+  safeReadFileTail,
 } from './secure-io.js';
 import { splitCompleteLines } from './jsonl-tail.js';
 import {
@@ -20,6 +19,8 @@ import {
   type CollaborationKind,
   type CollaborationSource,
 } from './agent-collaboration-events.js';
+import { listSupervisorEventFiles } from './agent-runtime-events.js';
+import { listPeerConversationTenants, readPeerConversationEdges } from './peer-conversation.js';
 import { eventScopeMatches, type EventScopeFilter } from './event-scope.js';
 import { resolveScopeForRecord } from './scope-migration.js';
 import type { GraphRunArtifact } from './graph-run-artifact.js';
@@ -40,12 +41,21 @@ export interface CollaborationGraphEdge {
   event_id: string;
 }
 
+/**
+ * AC-09: closed enumeration of why an event needs attention. `title` and
+ * `next_action` below are developer-facing English; every user-facing surface
+ * translates from this code through its own vocabulary instead of rendering
+ * core's strings.
+ */
+export type CollaborationAttentionCode = 'blocked' | 'waiting_human' | 'review_pending' | 'failure';
+
 export interface CollaborationAttentionItem {
   event_id: string;
   mission_id?: string;
   task_id?: string;
   agent_id?: string;
   kind: CollaborationKind;
+  code: CollaborationAttentionCode;
   title: string;
   reason: string;
   next_action: string;
@@ -186,10 +196,14 @@ function resolveRootDir(overridePath: string | undefined, defaultDir: string): s
 const OBSERVABILITY_DIR = pathResolver.shared('observability/mission-control');
 const WORKER_EVENTS_DIR = pathResolver.shared('logs/worker-events');
 const WORKER_DATED_FILE_PATTERN = /^worker-events-(\d{4}-\d{2}-\d{2})\.jsonl$/u;
+/**
+ * Single-file mission-control sources. The supervisor stream is *not* here:
+ * AC-10 rotates it daily, so its partitions are enumerated through
+ * `listSupervisorEventFiles` in `readSourceEvents` instead of a fixed name.
+ */
 const JSONL_SOURCES: Array<{ file: string; source: CollaborationSource }> = [
   { file: 'task-events.jsonl', source: 'task' },
   { file: 'orchestration-events.jsonl', source: 'orchestration' },
-  { file: 'agent-runtime-supervisor-events.jsonl', source: 'runtime' },
   { file: 'agent-runtime-events.jsonl', source: 'runtime' },
 ];
 
@@ -220,19 +234,15 @@ function readJsonl(filePath: string): JsonRecord[] {
 }
 
 /**
- * AC-03: read at most `maxBytesPerFile` from the end of `filePath`.
+ * AC-03/AC-08: read at most `maxBytesPerFile` from the end of `filePath`.
  *
- * `secure-io` has no partial/range read primitive, so this still loads the
- * whole file into memory (bounded by `safeReadFile`'s own maxSizeMB guard,
- * raised here to the file's actual size) and slices to the tail in-process.
- * That keeps the *parsed record volume* bounded — which is what makes the
- * 29MB supervisor log expensive to compose — even though the disk read
- * itself is not partial. The first line after the byte cut is always a torn
- * fragment of whatever preceded it, so it is dropped; a trailing fragment
- * (no closing newline) is dropped the same way via `splitCompleteLines`.
- * Follow-up: a true range/tail read needs a secure-io primitive that can
- * open+seek without loading the whole file — this is a known gap, not an
- * oversight, tracked for whoever adds that primitive next.
+ * `safeReadFileTail` opens the file and seeks to `size - maxBytes`, so a 29MB
+ * supervisor log costs one `maxBytes` read instead of loading the whole file
+ * to slice its tail in memory. When the read was truncated, the first line in
+ * the window is a fragment of whatever preceded the byte cut and is dropped;
+ * a trailing fragment (no closing newline) is dropped the same way via
+ * `splitCompleteLines`. An untruncated read starts at byte 0, so its first
+ * line is whole and is kept.
  */
 function readJsonlBounded(
   filePath: string,
@@ -241,19 +251,11 @@ function readJsonlBounded(
   const safePath = safeOptionalRepositoryPath(filePath);
   if (!safePath || !safeExistsSync(safePath)) return { records: [], truncated: false };
   try {
-    const size = safeStat(safePath).size;
-    if (size <= maxBytesPerFile) {
-      return { records: readJsonl(filePath), truncated: false };
-    }
-    const buffer = safeReadFile(safePath, {
-      encoding: null,
-      maxSizeMB: Math.ceil(size / (1024 * 1024)) + 1,
-    }) as Buffer;
-    const tailStart = Math.max(0, buffer.length - maxBytesPerFile);
-    const tailText = buffer.subarray(tailStart).toString('utf8');
-    const firstNewline = tailText.indexOf('\n');
-    const withoutLeadingFragment = firstNewline >= 0 ? tailText.slice(firstNewline + 1) : '';
-    const { lines } = splitCompleteLines(withoutLeadingFragment);
+    const { buffer, truncated } = safeReadFileTail(safePath, maxBytesPerFile);
+    const text = buffer.toString('utf8');
+    const firstNewline = truncated ? text.indexOf('\n') : -1;
+    const body = truncated ? (firstNewline >= 0 ? text.slice(firstNewline + 1) : '') : text;
+    const { lines } = splitCompleteLines(body);
     const records: JsonRecord[] = [];
     for (const line of lines) {
       if (!line.trim()) continue;
@@ -264,7 +266,7 @@ function readJsonlBounded(
         /* a torn or malformed tail line must not stop the rest of the batch */
       }
     }
-    return { records, truncated: true };
+    return { records, truncated };
   } catch {
     return { records: [], truncated: false };
   }
@@ -541,12 +543,122 @@ function readWorkerEvents(
   return { events, truncatedSources: [...truncatedSources] };
 }
 
+/**
+ * AC-10: the runtime supervisor stream, now written as one
+ * `agent-runtime-supervisor-events-YYYY-MM-DD.jsonl` per UTC day. Partitions
+ * are enumerated through the writer's own helper (oldest first, legacy
+ * unrotated file included) and each is read under the same per-file byte cap.
+ *
+ * The legacy file stays in the list even in bounded mode: it is history, and
+ * the `since` window applied in `eventMatches` already hides its old events,
+ * so including it costs one capped tail read and never resurrects stale rows.
+ *
+ * `seq` continues across partitions instead of restarting per file, because
+ * `statusFromEvents` derives `sequence_gap` for the `runtime` source from it —
+ * a per-file offset would manufacture a gap at every partition boundary.
+ */
+function readSupervisorSourceEvents(
+  bound: Required<CollaborationBoundedReadOptions> | null,
+  nowIsoValue: string,
+  observabilityDir: string
+): ReadResult {
+  const truncatedSources = new Set<string>();
+  const events: AgentCollaborationEvent[] = [];
+  let seq = 0;
+  const files = listSupervisorEventFiles({
+    ...(bound ? { recentDays: bound.recentDays } : {}),
+    now: nowIsoValue,
+    includeLegacy: true,
+    dir: observabilityDir,
+  });
+  for (const file of files) {
+    const { records, truncated } = bound
+      ? readJsonlBounded(file.path, bound.maxBytesPerFile)
+      : { records: readJsonl(file.path), truncated: false };
+    if (truncated) truncatedSources.add(path.basename(file.path));
+    for (const record of records) {
+      if (bound && !bound.includeStepEvents && isCollaborationNoise(record)) continue;
+      const event = eventFromRecord(record, 'runtime', seq);
+      seq += 1;
+      if (event) events.push(event);
+    }
+  }
+  return { events, truncatedSources: [...truncatedSources] };
+}
+
+/**
+ * AC-11: peer conversations as a fifth source (`a2a`).
+ *
+ * Each observability edge becomes one `peer_conversation_message` event whose
+ * sender/receiver are already oriented by `readPeerConversationEdges`
+ * (inbound rows are flipped), so the generic sender/receiver edge builder in
+ * `composeAgentCollaborationProjection` emits `agent:<sender> →
+ * agent:<receiver>` handoffs without a peer-specific branch.
+ *
+ * Tenant selection mirrors the viewer scope: an explicit `tenant`, else an
+ * explicit `tenantSlugs` list, else — for an unscoped or `'all'` view — every
+ * tenant with a peer-conversation runtime directory. That last fallback is
+ * suppressed under a `roots` override: peer-conversation storage has no root
+ * of its own to redirect, and a read the caller explicitly isolated to fixture
+ * directories must not silently mix in the real shared peer logs (which other
+ * suites write to concurrently). An explicitly named tenant is still read, so
+ * an isolated test can pin a throwaway tenant and still exercise this source.
+ *
+ * The session id travels as `correlation_id` rather than `session_id`: a scope
+ * carrying a session without a mission/task is not a valid event scope, and the
+ * tenant is the only containment a peer conversation actually has.
+ */
+function readPeerEvents(
+  options: ComposeCollaborationProjectionOptions,
+  since?: string
+): AgentCollaborationEvent[] {
+  const tenants = options.tenant
+    ? [options.tenant]
+    : Array.isArray(options.tenantSlugs)
+      ? options.tenantSlugs
+      : options.roots
+        ? []
+        : listPeerConversationTenants();
+  const events: AgentCollaborationEvent[] = [];
+  let seq = 0;
+  for (const tenant of tenants) {
+    let edges: ReturnType<typeof readPeerConversationEdges>;
+    try {
+      edges = readPeerConversationEdges(tenant, since ? { since } : {});
+    } catch {
+      // An unreadable or invalid tenant must not empty the whole projection.
+      continue;
+    }
+    for (const edge of edges) {
+      const event = eventFromRecord(
+        {
+          event_id: edge.message_id,
+          ts: edge.ts,
+          event_type: 'peer_conversation_message',
+          agent_id: edge.receiver_peer_id,
+          sender: edge.sender_peer_id,
+          receiver: edge.receiver_peer_id,
+          correlation_id: edge.session_id,
+          summary: edge.kind,
+          scope: { tenant_slug: edge.tenant_id },
+        },
+        'a2a',
+        seq
+      );
+      seq += 1;
+      if (event) events.push(event);
+    }
+  }
+  return events;
+}
+
 function readSourceEvents(
   bound: Required<CollaborationBoundedReadOptions> | null,
   nowIsoValue: string,
   observabilityDir: string,
   workerEventsDir: string,
-  missionScopeId?: string
+  options: ComposeCollaborationProjectionOptions,
+  since?: string
 ): ReadResult {
   const truncatedSources = new Set<string>();
   const events = JSONL_SOURCES.flatMap(({ file, source }) => {
@@ -561,10 +673,17 @@ function readSourceEvents(
       return event ? [event] : [];
     });
   });
-  const workerResult = readWorkerEvents(bound, nowIsoValue, workerEventsDir, missionScopeId);
+  const supervisorResult = readSupervisorSourceEvents(bound, nowIsoValue, observabilityDir);
+  for (const name of supervisorResult.truncatedSources) truncatedSources.add(name);
+  const workerResult = readWorkerEvents(bound, nowIsoValue, workerEventsDir, options.missionId);
   for (const name of workerResult.truncatedSources) truncatedSources.add(name);
   return {
-    events: [...events, ...workerResult.events],
+    events: [
+      ...events,
+      ...supervisorResult.events,
+      ...workerResult.events,
+      ...readPeerEvents(options, since),
+    ],
     truncatedSources: [...truncatedSources],
   };
 }
@@ -632,56 +751,53 @@ function addNode(
   nodes.set(id, { id, type, label: existing?.label || label, state: state || existing?.state });
 }
 
+/**
+ * AC-09: which collaboration kinds raise attention, and the developer-facing
+ * text that goes with each. A table, not a chain of `if`s, so adding a kind is
+ * one line and the closed `code` set stays visible in one place.
+ */
+const ATTENTION_BY_KIND: Partial<
+  Record<
+    CollaborationKind,
+    { code: CollaborationAttentionCode; title: string; next_action: string }
+  >
+> = {
+  blocked: {
+    code: 'blocked',
+    title: 'Blocked',
+    next_action: 'Resolve the blocking input, dependency or assignment',
+  },
+  approval: {
+    code: 'waiting_human',
+    title: 'Waiting for human approval',
+    next_action: 'Review the request in the approval queue',
+  },
+  review: {
+    code: 'review_pending',
+    title: 'Review pending',
+    next_action: 'Review the deliverable and evidence refs',
+  },
+  failure: {
+    code: 'failure',
+    title: 'Failed',
+    next_action: 'Classify the failure and decide on re-run conditions',
+  },
+};
+
 function attentionForEvent(event: AgentCollaborationEvent): CollaborationAttentionItem | null {
-  if (event.kind === 'blocked') {
-    return {
-      event_id: event.event_id,
-      mission_id: event.mission_id,
-      task_id: event.task_id,
-      agent_id: event.agent_id,
-      kind: event.kind,
-      title: 'ブロック中',
-      reason: event.summary,
-      next_action: '原因を確認して入力・依存タスク・担当を解消',
-    };
-  }
-  if (event.kind === 'approval') {
-    return {
-      event_id: event.event_id,
-      mission_id: event.mission_id,
-      task_id: event.task_id,
-      agent_id: event.agent_id,
-      kind: event.kind,
-      title: '人間の承認待ち',
-      reason: event.summary,
-      next_action: '承認キューで対象と影響範囲を確認',
-    };
-  }
-  if (event.kind === 'review') {
-    return {
-      event_id: event.event_id,
-      mission_id: event.mission_id,
-      task_id: event.task_id,
-      agent_id: event.agent_id,
-      kind: event.kind,
-      title: 'レビュー待ち',
-      reason: event.summary,
-      next_action: '成果物と evidence ref をレビュー',
-    };
-  }
-  if (event.kind === 'failure') {
-    return {
-      event_id: event.event_id,
-      mission_id: event.mission_id,
-      task_id: event.task_id,
-      agent_id: event.agent_id,
-      kind: event.kind,
-      title: '失敗',
-      reason: event.summary,
-      next_action: '失敗分類と再実行条件を確認',
-    };
-  }
-  return null;
+  const template = ATTENTION_BY_KIND[event.kind];
+  if (!template) return null;
+  return {
+    event_id: event.event_id,
+    mission_id: event.mission_id,
+    task_id: event.task_id,
+    agent_id: event.agent_id,
+    kind: event.kind,
+    code: template.code,
+    title: template.title,
+    reason: event.summary,
+    next_action: template.next_action,
+  };
 }
 
 function statusFromEvents(
@@ -940,19 +1056,23 @@ export function buildAgentCollaborationProjection(
   const bound = resolveBoundedReadOptions(options.bounded);
   const observabilityDir = resolveRootDir(options.roots?.observabilityDir, OBSERVABILITY_DIR);
   const workerEventsDir = resolveRootDir(options.roots?.workerEventsDir, WORKER_EVENTS_DIR);
+  // A mission-scoped lookup keeps that mission's full history (its worker
+  // partition is already exempt from the file date window above). Resolved
+  // before the read so the peer-conversation source (AC-11), whose single
+  // per-peer log is never rotated, can bound its own scan by the same window
+  // instead of loading every message ever exchanged.
+  const sinceValue =
+    bound && !options.missionId && Number.isFinite(Date.parse(nowValue))
+      ? new Date(Date.parse(nowValue) - bound.recentDays * 24 * 60 * 60 * 1000).toISOString()
+      : undefined;
   const { events, truncatedSources } = readSourceEvents(
     bound,
     nowValue,
     observabilityDir,
     workerEventsDir,
-    options.missionId
+    options,
+    options.since ?? sinceValue
   );
-  // A mission-scoped lookup keeps that mission's full history (its worker
-  // partition is already exempt from the file date window above).
-  const sinceValue =
-    bound && !options.missionId && Number.isFinite(Date.parse(nowValue))
-      ? new Date(Date.parse(nowValue) - bound.recentDays * 24 * 60 * 60 * 1000).toISOString()
-      : undefined;
   const projection = composeAgentCollaborationProjection(events, {
     ...options,
     now: nowValue,

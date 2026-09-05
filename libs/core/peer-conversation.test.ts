@@ -13,6 +13,7 @@ import {
   createPeerConversationSession,
   listPeerConversationPeers,
   listPeerConversationSessions,
+  listPeerConversationTenants,
   loadPeerConversationSession,
   parsePeerConversationTranscriptEntry,
   readPeerConversationEdges,
@@ -202,6 +203,26 @@ describe('peer conversation peer listing, transcript tails, and edges', () => {
   afterEach(() => {
     clearPeerConversationRuntime(TENANT_ID, 'peer-a-test');
     clearPeerConversationRuntime(TENANT_ID, 'peer-b-test');
+  });
+
+  it('lists tenants that have a peer-conversation runtime directory (AC-11)', () => {
+    appendPeerConversationTranscript({
+      tenantId: TENANT_ID,
+      sessionId: 'PCS-tenants-1',
+      localPeerId: 'peer-a-test',
+      remotePeerId: 'peer-b-test',
+      kind: 'message',
+      direction: 'outbound',
+      text: 'hello',
+    });
+    const tenants = listPeerConversationTenants();
+    expect(tenants).toContain(TENANT_ID);
+    // Sorted and free of non-tenant entries, so callers can hand each value
+    // straight to `readPeerConversationEdges` without it throwing.
+    expect([...tenants].sort()).toEqual(tenants);
+    for (const tenant of tenants) {
+      expect(() => readPeerConversationEdges(tenant)).not.toThrow();
+    }
   });
 
   it('lists peers and returns the newest session tail per peer, truncated at 240 chars', async () => {
