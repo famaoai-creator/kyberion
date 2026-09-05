@@ -22065,3 +22065,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/screen-capture-bridge.ts`、`libs/core/screen-capture-bridge.test.ts`
 - **変更**: screen capture stream の結果 path を payload read 前に operation-time の regular-file として検査するようにした。capture result が directory 等へ置換された場合に frame を生成せず、異常時の cleanup が入力エラーを覆い隠さないよう保護した。通常の stub capture／stream／VideoFrameBus semantics は維持した。
 - **検証**: screen-capture-bridge **2 files / 6 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1478
+
+- **対象**: `libs/core/virtual-camera-bridge.ts`、`libs/core/virtual-camera-bridge.test.ts`
+- **変更**: virtual camera stream の結果 path を payload read 前に operation-time の regular-file として検査するようにした。capture result が directory 等へ置換された場合に frame を生成せず、read／yield 中断時の cleanup が入力エラーを覆い隠さないよう `finally` で保護した。通常の stub capture／stream／VideoFrameBus semantics は維持した。
+- **検証**: virtual-camera-bridge **2 files / 5 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 import { createVirtualCameraBridge, VIRTUAL_CAMERA_BRIDGE_ID } from './virtual-camera-bridge.js';
 import { StubVideoFrameBus } from './video-frame-bus.js';
-import { safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from './secure-io.js';
 
 describe('createVirtualCameraBridge', () => {
   it('exposes a stable bridge identity', async () => {
@@ -39,12 +40,43 @@ describe('createVirtualCameraBridge', () => {
     }
 
     expect(frames).toHaveLength(2);
-    expect(frames[0]).toEqual(expect.objectContaining({
-      format: expect.objectContaining({
-        mime_type: 'image/jpeg',
-      }),
-    }));
+    expect(frames[0]).toEqual(
+      expect.objectContaining({
+        format: expect.objectContaining({
+          mime_type: 'image/jpeg',
+        }),
+      })
+    );
     expect(frames[0].payload.byteLength).toBeGreaterThan(0);
+  });
+
+  it('rejects a captured frame path replaced by a directory', async () => {
+    const bridge = createVirtualCameraBridge({ preferred_backend: 'stub' });
+    const resultPath = pathResolver.sharedTmp('camera-stream-tests/directory-result');
+    safeRmSync(resultPath, { recursive: true, force: true });
+    safeMkdir(resultPath, { recursive: true });
+    vi.spyOn(bridge, 'capturePhoto').mockResolvedValue({
+      bridge_id: VIRTUAL_CAMERA_BRIDGE_ID,
+      platform: process.platform,
+      backend: 'stub',
+      save_path: resultPath,
+    });
+
+    try {
+      await expect(
+        (async () => {
+          for await (const _frame of bridge.captureStream({
+            max_frames: 1,
+            frame_interval_ms: 0,
+          })) {
+            // The directory result must fail before a frame is yielded.
+          }
+        })()
+      ).rejects.toThrow('[VIRTUAL_CAMERA_RESOURCE] captured frame must be a regular file');
+      expect(safeExistsSync(resultPath)).toBe(true);
+    } finally {
+      safeRmSync(resultPath, { recursive: true, force: true });
+    }
   });
 
   it('pipes camera frames into a video frame bus', async () => {
