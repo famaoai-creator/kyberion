@@ -20152,6 +20152,20 @@ local flux policyへ実行環境を渡す既存の明示的なboundaryは維持�
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1209
+
+SX-03のenvironment capability probeを再監査し、明示backendのcredential確認と自動provider検出の
+可用性signalを`getRegisteredEnvText`経由へ統一した。probeへ注入envを渡すテスト／provider境界と
+Playwrightの環境overrideは維持し、backend probeの選択順序・fail-closed理由・検出契約は変更していない。
+
+検証:
+
+- environment capability **2 files / 63 tests passed**。
+- core typecheck、対象ESLint、`git diff --check` passed。
+- 対象provider credential／availability signalの直接 `process.env` 参照 **0 occurrences**。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
