@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import {
   pathResolver,
   safeExistsSync,
@@ -14,6 +15,11 @@ const rootDir = pathResolver.sharedTmp('company-onboarding-test');
 afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
 
 describe('AI company onboarding', () => {
+  it('uses the foundation reader for onboarding snapshots', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/company_onboarding.ts'));
+    expect(source).toContain('readTextFile');
+  });
+
   it('emits help through the supplied harness printer', () => {
     const print = vi.fn();
 
