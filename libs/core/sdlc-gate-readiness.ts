@@ -1,7 +1,14 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { SPECIALIST_IDS } from './specialist-ids.js';
 import type { ArtifactRecord } from './artifact-record.js';
 import type { ProjectRecord } from './project-registry.js';
@@ -102,8 +109,14 @@ function buildArtifactEvidenceSet(input: {
 
 function resolveTemplateRef(artifactId: string): string | undefined {
   const logicalPath = `knowledge/public/templates/blueprints/${artifactId}.md`;
-  const resolvedPath = pathResolver.resolve(logicalPath);
-  return safeExistsSync(resolvedPath) ? logicalPath : undefined;
+  const resolvedPath = assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(resolvedPath)) return undefined;
+  if (!safeLstat(resolvedPath).isFile()) {
+    throw new Error(`[SDLC_TEMPLATE] template must be a regular file: ${logicalPath}`);
+  }
+  return logicalPath;
 }
 
 function sanitizeSeedFragment(value: string): string {
@@ -361,11 +374,22 @@ export function materializeTrackArtifactSkeleton(input: {
   proposal: TrackNextWorkProposal;
 }): string | null {
   if (!input.proposal.template_ref) return null;
-  const templatePath = pathResolver.resolve(input.proposal.template_ref);
+  const templatePath = assertSafeRepositoryPath(pathResolver.resolve(input.proposal.template_ref), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(templatePath)) return null;
-  const projectRoot = pathResolver.resolve(input.projectRootPath);
+  if (!safeLstat(templatePath).isFile()) {
+    throw new Error(
+      `[SDLC_TEMPLATE] template must be a regular file: ${input.proposal.template_ref}`
+    );
+  }
+  const projectRoot = assertSafeRepositoryPath(pathResolver.resolve(input.projectRootPath), {
+    allowMissingLeaf: true,
+  });
   const logicalTarget = input.proposal.target_path;
-  const targetPath = path.join(projectRoot, logicalTarget);
+  const targetPath = assertSafeRepositoryPath(path.join(projectRoot, logicalTarget), {
+    allowMissingLeaf: true,
+  });
   const targetDir = path.dirname(targetPath);
   if (!safeExistsSync(targetDir)) {
     safeMkdir(targetDir, { recursive: true });
