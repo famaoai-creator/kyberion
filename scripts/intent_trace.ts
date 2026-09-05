@@ -11,7 +11,6 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
 import { traceLogDir } from '@agent/core/trace';
@@ -19,7 +18,7 @@ import { validateTraceReplay } from '@agent/core/trace-schema';
 import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
 import { loadMissionOrchestrationJournal } from '@agent/core/mission-orchestration-journal';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
 
@@ -188,7 +187,7 @@ function normalizeTraceRecord(value: unknown): TraceRecord | null {
 function readJsonlRecords<T>(filePath: string, normalize: (value: unknown) => T | null): T[] {
   const safeFile = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (!safeExistsSync(safeFile) || !safeLstat(safeFile).isFile()) return [];
-  const raw = String(safeReadFile(safeFile, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(safeFile);
   return raw
     .split(/\r?\n/u)
     .map((line) => line.trim())
