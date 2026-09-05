@@ -4,11 +4,15 @@ import {
   buildPresenceSurfaceFrame,
   type PresenceSurfaceFrameInput,
 } from './presence-surface.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { redactSensitiveObject } from './network.js';
 
-const PRESENCE_STUDIO_URL = process.env.PRESENCE_STUDIO_URL || 'http://127.0.0.1:3031';
+const PRESENCE_STUDIO_URL = getRegisteredEnvText('PRESENCE_STUDIO_URL') || 'http://127.0.0.1:3031';
 
-export async function dispatchPresenceMessages(messages: A2UIMessage[], baseUrl = PRESENCE_STUDIO_URL): Promise<void> {
+export async function dispatchPresenceMessages(
+  messages: A2UIMessage[],
+  baseUrl = PRESENCE_STUDIO_URL
+): Promise<void> {
   const response = await fetch(`${baseUrl}/a2ui/dispatch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -19,18 +23,24 @@ export async function dispatchPresenceMessages(messages: A2UIMessage[], baseUrl 
   }
 }
 
-export async function dispatchPresenceFrame(input: PresenceSurfaceFrameInput, baseUrl = PRESENCE_STUDIO_URL): Promise<void> {
+export async function dispatchPresenceFrame(
+  input: PresenceSurfaceFrameInput,
+  baseUrl = PRESENCE_STUDIO_URL
+): Promise<void> {
   await dispatchPresenceMessages(buildPresenceSurfaceFrame(input), baseUrl);
 }
 
-export async function reflectPresenceAgentReply(input: {
-  agentId: string;
-  text: string;
-  speaker?: string;
-  surfaceId?: string;
-  thinkingMs?: number;
-  speakingMs?: number;
-}, baseUrl = PRESENCE_STUDIO_URL): Promise<void> {
+export async function reflectPresenceAgentReply(
+  input: {
+    agentId: string;
+    text: string;
+    speaker?: string;
+    surfaceId?: string;
+    thinkingMs?: number;
+    speakingMs?: number;
+  },
+  baseUrl = PRESENCE_STUDIO_URL
+): Promise<void> {
   const timeline = buildPresenceAssistantReplyTimeline({
     agentId: input.agentId,
     surfaceId: input.surfaceId,
