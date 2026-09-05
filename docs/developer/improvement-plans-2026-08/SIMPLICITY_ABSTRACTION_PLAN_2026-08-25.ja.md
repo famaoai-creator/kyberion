@@ -21717,3 +21717,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/sdlc-gate-readiness.ts`、`libs/core/sdlc-gate-readiness.test.ts`
 - **変更**: SDLC gate の template read と artifact skeleton materialization を operation-time の `assertSafeRepositoryPath`／`safeLstat` 境界へ接続した。template／project root／生成先の symlink・repository 外・非 regular file を read／write へ到達させず、既存の readiness proposal と governed project artifact semanticsは維持した。
 - **検証**: sdlc-gate-readiness **1 file / 4 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1420
+
+- **対象**: `libs/core/tenant-rate-limiter.ts`、`libs/core/tenant-rate-limiter.test.ts`
+- **変更**: tenant rate limiter の lock reader に operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界を追加した。symlink／非 regular file の lock 内容を外部 scope から読まず、stale lock reclaim と quota state の read-modify-write semanticsは維持した。
+- **検証**: tenant-rate-limiter **1 file / 10 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
