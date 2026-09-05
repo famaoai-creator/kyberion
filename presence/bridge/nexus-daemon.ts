@@ -7,7 +7,7 @@
 import { installProcessGuards } from '@agent/core/process-guards';
 import { logger } from '@agent/core/core';
 import { loadChannelRegistry, type ChannelRegistryChannel } from '@agent/core/channel-registry';
-import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { terminalBridge } from '@agent/core/terminal-bridge';
 import {
   assertSafeRepositoryPath,
@@ -111,7 +111,7 @@ function ensureSystemMission() {
   logger.info(`🛡️ [Nexus] System Mission physical state established.`);
 }
 
-const CHECK_INTERVAL_MS = Number(process.env.NEXUS_INTERVAL) || 3000;
+const CHECK_INTERVAL_MS = Number(getRegisteredEnvText('NEXUS_INTERVAL')) || 3000;
 
 async function loadNexusChannelRegistry(): Promise<ChannelRegistryChannel[]> {
   try {
