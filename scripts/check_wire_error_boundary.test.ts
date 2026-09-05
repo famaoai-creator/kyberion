@@ -37,4 +37,19 @@ describe('wire error boundary checker', () => {
       expect.stringContaining('raw debug error fields'),
     ]);
   });
+
+  it('rejects raw exception messages in Presence Studio JSON responses', () => {
+    expect(
+      findWireErrorBoundaryViolations(
+        'return res.status(500).json({ ok: false, error: error?.message || String(error) });',
+        'presence/displays/presence-studio/server.ts'
+      )
+    ).toEqual([expect.stringContaining('raw exception message')]);
+    expect(
+      findWireErrorBoundaryViolations(
+        'return res.status(503).json({ ok: false, error: `Voice hub failed: ${error?.message}` });',
+        'presence/displays/presence-studio/server.ts'
+      )
+    ).toEqual([expect.stringContaining('raw exception message')]);
+  });
 });
