@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import {
   pathResolver,
   safeExistsSync,
@@ -125,14 +126,11 @@ describe('applyDependencyPatch', () => {
   });
 
   it('keeps command output behind the shared printer boundary', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/apply_dependency_patch.ts'), {
-        encoding: 'utf8',
-      })
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/apply_dependency_patch.ts'));
 
     expect(source).toContain('print: Print');
     expect(source).not.toContain('console.log');
+    expect(source).toContain('nowIso, readTextFile');
   });
 
   it('propose mode records the plan without touching files', () => {

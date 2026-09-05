@@ -53,7 +53,7 @@ import {
   safeLstat,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
-import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { normalizePersistedAuditEntry, type AuditEntry } from '@agent/core/audit-chain';
 
@@ -131,7 +131,7 @@ function filterAuditChainByMission(
   for (const entry of safeReaddir(auditDir)) {
     if (!entry.endsWith('.jsonl')) continue;
     const abs = path.join(auditDir, entry);
-    const txt = safeReadFile(abs, { encoding: 'utf8' }) as string;
+    const txt = readTextFile(abs);
     for (const line of txt.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
