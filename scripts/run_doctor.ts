@@ -361,7 +361,9 @@ export async function collectDoctorReport(argv: {
   platform?: 'ios' | 'android' | 'all';
   full?: boolean;
 }): Promise<DoctorRunReport> {
-  const missionId = argv.mission ? String(argv.mission) : process.env.MISSION_ID || undefined;
+  const missionId = argv.mission
+    ? String(argv.mission)
+    : getRegisteredEnvText('MISSION_ID') || undefined;
   if (missionId) process.env.MISSION_ID = missionId;
 
   const appPreflight =
@@ -546,7 +548,9 @@ export function formatDoctorReport(report: DoctorRunReport, argv: DoctorArgument
     return lines.join('\n');
   }
 
-  const missionId = argv.mission ? String(argv.mission) : process.env.MISSION_ID || undefined;
+  const missionId = argv.mission
+    ? String(argv.mission)
+    : getRegisteredEnvText('MISSION_ID') || undefined;
   if (!missionId && !argv.manifest && !argv.runtime && !argv.all) {
     lines.push(
       'Tip: pass `--runtime meeting --mission <id>` to include browser, voice, audio, and mission-scoped consent checks.'
