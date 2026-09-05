@@ -21957,3 +21957,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-orchestration-journal.ts`、`libs/core/mission-orchestration-journal.test.ts`
 - **変更**: mission orchestration journal の replay read 前に operation-time の regular-file 検査を追加した。`orchestration-journal.jsonl` が directory 等へ置換された場合に空のjournalとして扱わず `MISSION_LOG_CORRUPT` で拒否し、既存のjournal validation／replay／provisioned-entry recovery semantics は維持した。
 - **検証**: mission-orchestration-journal の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1460
+
+- **対象**: `libs/core/agent-identity.ts`、`libs/core/agent-identity.test.ts`
+- **変更**: NHI identity journal の restore read 前に operation-time の regular-file 検査を追加した。identity journal が directory 等へ置換された場合に空の identity state として復元せず拒否し、既存のNHI lifecycle／replay／governed write semantics は維持した。
+- **検証**: agent-identity の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
