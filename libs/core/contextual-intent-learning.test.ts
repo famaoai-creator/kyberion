@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeRmSync } from './secure-io.js';
+import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import {
   loadContextualIntentLearningStore,
@@ -44,6 +44,14 @@ describe('contextual-intent-learning', () => {
       '/tmp/kyberion-contextual-intent-learning.json';
 
     expect(() => loadContextualIntentLearningStore()).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects an invalid existing learning store instead of resetting it', () => {
+    safeWriteFile(learningPath, '{"version":"1.0.0","entries":[{}]}\n');
+
+    expect(() => loadContextualIntentLearningStore()).toThrow(
+      'Invalid catalog contextual-intent-learning'
+    );
   });
 
   it('persists the catalog-normalized store payload', () => {
