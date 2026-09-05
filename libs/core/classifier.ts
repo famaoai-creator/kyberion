@@ -9,7 +9,7 @@
  *   const result = classify(text, rules, { resultKey: 'domain' });
  */
 
-import { safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
 import type { ClassifyRules, ClassifyOptions, ClassifyResult } from './types.js';
 
 /**
@@ -66,6 +66,6 @@ export function classifyFile(
   rules: ClassifyRules,
   options: ClassifyOptions = {}
 ): ClassifyResult {
-  const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+  const content = readTextFile(filePath);
   return classify(content, rules, options);
 }

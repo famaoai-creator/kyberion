@@ -1,11 +1,11 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -51,7 +51,7 @@ export const entropyGate = {
     const currentHash = createHash('md5').update(currentData).digest('hex');
 
     if (safeExistsSync(hashPath)) {
-      const lastHash = safeReadFile(hashPath, { encoding: 'utf8' }) as string;
+      const lastHash = readTextFile(hashPath);
       if (lastHash === currentHash) {
         return false; // No change, stay in sleep
       }
