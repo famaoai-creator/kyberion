@@ -1,5 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
@@ -13,7 +13,6 @@ import {
   safeLstat,
   safeFsyncFile,
   safeMkdir,
-  safeReadFile,
   assertSafeRepositoryPath,
 } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
@@ -378,7 +377,7 @@ function resolveDefaultHmacKey(): string {
 
   if (safeExistsSync(SHARE_GRANTS_HMAC_KEY_PATH)) {
     assertRegularShareGrantResource(SHARE_GRANTS_HMAC_KEY_PATH, 'persisted share-link HMAC key');
-    const persisted = String(safeReadFile(SHARE_GRANTS_HMAC_KEY_PATH, { encoding: 'utf8' })).trim();
+    const persisted = readTextFile(SHARE_GRANTS_HMAC_KEY_PATH).trim();
     if (persisted) {
       if (persisted.length < 32) {
         throw new ShareGrantValidationError('persisted share-link HMAC key is too short');
@@ -397,9 +396,7 @@ function resolveDefaultHmacKey(): string {
   } catch {
     if (safeExistsSync(SHARE_GRANTS_HMAC_KEY_PATH)) {
       assertRegularShareGrantResource(SHARE_GRANTS_HMAC_KEY_PATH, 'persisted share-link HMAC key');
-      const persisted = String(
-        safeReadFile(SHARE_GRANTS_HMAC_KEY_PATH, { encoding: 'utf8' })
-      ).trim();
+      const persisted = String(readTextFile(SHARE_GRANTS_HMAC_KEY_PATH)).trim();
       if (persisted) {
         if (persisted.length < 32) {
           throw new ShareGrantValidationError('persisted share-link HMAC key is too short');
@@ -1019,7 +1016,7 @@ export class ShareGrantGraph {
   #load(): void {
     if (!safeExistsSync(this.#storePath)) return;
     assertRegularShareGrantResource(this.#storePath, 'share-grant ledger');
-    const raw = String(safeReadFile(this.#storePath, { encoding: 'utf8' }));
+    const raw = readTextFile(this.#storePath);
     let previousHash = GENESIS_HASH;
     for (const line of raw.split('\n')) {
       const trimmed = line.trim();
@@ -1045,7 +1042,7 @@ export class ShareGrantGraph {
   #readVerifiedTailHash(): string {
     if (!safeExistsSync(this.#storePath)) return GENESIS_HASH;
     assertRegularShareGrantResource(this.#storePath, 'share-grant ledger');
-    const raw = String(safeReadFile(this.#storePath, { encoding: 'utf8' }));
+    const raw = readTextFile(this.#storePath);
     let previousHash = GENESIS_HASH;
     for (const line of raw.split('\n')) {
       const trimmed = line.trim();

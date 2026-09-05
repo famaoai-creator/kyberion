@@ -22504,6 +22504,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: STT sidecar、browser onboarding vision、A2A persisted secret、background review の承認対象本文を foundation の `readTextFile` へ移行した。音声／画像などのバイナリ読込、secret／approval／patch hash、既存のscope・provenance・validation semanticsは変更せず、secure-io はバイナリ・属性検証・書込用途に限定した。
 - **検証**: 対象テスト **4 files／53 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1558
+
+- **対象**: `libs/core/share-grant-graph.ts` と対象テスト
+- **変更**: 共有リンクの persisted HMAC key と share-grant ledger の本文読込を foundation の `readTextFile` へ移行した。key／ledger の検証、ハッシュチェーン、lock／scope／grant authorization semanticsは変更せず、バイナリ用途の `safeReadFile` は引き続き用途限定で保持する。
+- **検証**: 対象テスト **1 file／18 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
