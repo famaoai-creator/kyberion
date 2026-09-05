@@ -16,6 +16,11 @@ describe('media artifact library catalog', () => {
 
     expect(source).toContain("id: 'artifact-library'");
     expect(source).toContain('artifact-library.schema.json');
+    const loaderSource = source.slice(
+      source.indexOf('function loadArtifactLibraryCatalog'),
+      source.indexOf('function loadDocumentCompositionCatalog')
+    );
+    expect(loaderSource).not.toContain('fallbackOnInvalid: true');
     expect(source).toContain('return catalog.validate(merged, dirPath);');
 
     const catalog = loadArtifactLibraryCatalog(pathResolver.rootDir());
