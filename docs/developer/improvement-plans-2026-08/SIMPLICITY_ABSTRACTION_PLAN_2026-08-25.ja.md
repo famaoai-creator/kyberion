@@ -21753,3 +21753,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/validate.ts`、`libs/core/validate.test.ts`
 - **変更**: lightweight schema loader の schema name を単一 filename segment に制限し、schema path を operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。prototype key を schema と誤認する `Record` cache も `Map` へ変更し、既存の capability validation semanticsは維持した。
 - **検証**: validate loader **2 files / 3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1426
+
+- **対象**: `libs/core/knowledge-provider.ts`、`libs/core/knowledge-provider.test.ts`
+- **変更**: KnowledgeProvider の knowledge-root resource read に operation-time の regular-file 検査を追加した。既存の tenant／tier scope、repository root、symlink traversal、missing resource の default semanticsは維持し、knowledge leaf がディレクトリへ置換された場合に read しない回帰テストを追加した。
+- **検証**: knowledge-provider **2 files / 5 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
