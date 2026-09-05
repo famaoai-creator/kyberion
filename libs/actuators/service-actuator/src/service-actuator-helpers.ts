@@ -28,7 +28,7 @@ import {
   exchangeServiceOAuthCode,
   refreshServiceOAuthToken,
 } from '@agent/core/oauth-broker';
-import { validateServiceAuth } from '@agent/core/src/pfc/ServiceValidator';
+import { validateServiceAuth } from '@agent/core/service-validator';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
 import { getServicePresetRecord } from '@agent/core/service-preset-registry';
