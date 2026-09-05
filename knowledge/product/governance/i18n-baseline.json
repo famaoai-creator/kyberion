@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-04T17:21:52.583Z",
+  "generated_at": "2026-09-05T15:01:25.845Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -86,7 +86,6 @@
     "libs/core/mission-orchestration-worker-part-results.ts": 2,
     "libs/core/mission-retrospective.ts": 9,
     "libs/core/operator-notifications.ts": 4,
-    "libs/core/presentation-preference-registry.ts": 2,
     "libs/core/procedure-dispatcher.ts": 1,
     "libs/core/project-registry.ts": 9,
     "libs/core/question-resolver.ts": 6,
