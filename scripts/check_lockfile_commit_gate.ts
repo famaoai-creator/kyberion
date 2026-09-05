@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { safeExec } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -55,7 +55,7 @@ export function checkLockfileCommitGate(): LockfileCommitGateResult {
       : pathResolver.rootResolve(evidenceRef)
     : undefined;
   const lockfileHash = createHash('sha256')
-    .update(safeReadFile(pathResolver.rootResolve('pnpm-lock.yaml')))
+    .update(readTextFile(pathResolver.rootResolve('pnpm-lock.yaml')))
     .digest('hex');
   const evidenceText =
     evidencePath && safeExistsSync(evidencePath) ? readTextFile(evidencePath) : '';
