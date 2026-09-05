@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { loadMediaAwsIconRuleCatalog, resolveMediaAwsIconCandidates } from './media-aws-icon-rules.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
+import {
+  loadMediaAwsIconRuleCatalog,
+  resolveMediaAwsIconCandidates,
+} from './media-aws-icon-rules.js';
 
 describe('media-aws-icon-rules', () => {
+  it('uses the canonical catalog without a duplicated fallback definition', () => {
+    const source = safeReadFile(pathResolver.rootResolve('libs/core/media-aws-icon-rules.ts'), {
+      encoding: 'utf8',
+    }) as string;
+    expect(source).not.toContain('FALLBACK_');
+    expect(source).not.toContain('fallback:');
+  });
+
   it('resolves rule-based aws icon candidates', () => {
     const catalog = loadMediaAwsIconRuleCatalog();
 

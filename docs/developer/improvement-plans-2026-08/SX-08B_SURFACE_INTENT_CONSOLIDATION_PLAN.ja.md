@@ -1426,3 +1426,9 @@ voice TTS registryのunsafe path／invalid catalog時の組み込み英語fallba
 voice profile registryの基底registry欠損・schema不正時に組み込み英語profileへ戻る経路を削除し、正本snapshot／canonical directoryの読み込み障害をfail-closedで返す境界へ統一した。personal／customer overlayの任意性、profile ID・tier・sample refs検証、directory優先順位は変更していない。
 
 検証: voice-profile-registry **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 169
+
+AWS icon rule catalogに残っていた正本JSONと重複する大規模な組み込みrules／exact resource fallbackを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。resource typeのexact優先、starts_with／contains rule解決、未知resourceの空候補という表示側の既存semanticsは変更していない。
+
+検証: media-aws-icon-rules **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
