@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { escapeXml } from './text-escaping.js';
 import { withLock } from './src/lock-utils.js';
 
@@ -291,8 +291,15 @@ function reduceDurableRecords(records: AgentInputQueueRecord[]): {
 }
 
 function appendDurableRecord(filePath: string, record: AgentInputQueueRecord): void {
+  ensureDurableQueueFile(filePath);
   const validated = queueRecordCatalog(filePath).validate(record, filePath);
   appendJsonLine(filePath, validated);
+}
+
+function ensureDurableQueueFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[AGENT_INPUT_QUEUE] durable queue must be a regular file: ${filePath}`);
+  }
 }
 
 export class AgentInputQueue {
@@ -452,6 +459,7 @@ export class AgentInputQueue {
     if (!safeExistsSync(this.queuePath)) {
       return { active: new Map(), consumed: new Set(), cleared: new Set() };
     }
+    ensureDurableQueueFile(this.queuePath);
     const catalog = queueRecordCatalog(this.queuePath);
     return reduceDurableRecords(
       readJsonLines<AgentInputQueueRecord>(this.queuePath, {
