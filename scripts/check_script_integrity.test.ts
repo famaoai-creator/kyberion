@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import {
   checkScriptIntegrity,
   findDirectScriptGuardViolations,
@@ -25,6 +31,17 @@ describe('check_script_integrity', () => {
     if (safeExistsSync(FIXTURE_DIR)) {
       safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
     }
+  });
+
+  it('uses the foundation text reader for production source scans', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_script_integrity.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
   });
 
   it('requires compiled direct-script guards alongside TypeScript guards', () => {
