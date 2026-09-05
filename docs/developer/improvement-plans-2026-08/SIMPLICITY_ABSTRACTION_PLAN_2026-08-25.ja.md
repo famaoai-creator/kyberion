@@ -22509,3 +22509,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-orchestration-journal.ts`、`libs/core/mission-orchestration-progress.ts`、`libs/core/mission-creation.ts`、`libs/core/mission-gate-engine.ts`、`libs/core/mission-retrospective.ts`
 - **変更**: mission orchestration journal／task board／events、mission creation board、gate artifact、retrospective queue の本文読込を foundation の `readTextFile` へ移行した。mission scope、journal／ledger append、gate validation、creation／retrospective lifecycle semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **4 files／41 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1552
+
+- **対象**: `libs/core/mission-orchestration-worker-part-results.ts`、`libs/core/mission-orchestration-worker-part-context.ts`、`libs/core/mission-coordination-bus.ts`、`libs/core/mission-lifecycle-completion.ts`、`libs/core/mission-lifecycle.ts`
+- **変更**: worker deliverable／diff／procedure、coordination message、completion evidence／minutes、mission memory の本文読込を foundation の `readTextFile` へ移行した。worker／coordination／completion／lifecycleのscope、audit、reconciliation、memory promotion semanticsは変更していない。
+- **検証**: worker結果・coordination・lifecycle service **3 files／33 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。`mission-lifecycle.test.ts` 全体には今回のreader行と無関係な完了summary期待値差分1件とtimeout 3件が残るため、CIでの再確認課題として明記する。残るchecker／production loaderの全件codemodは継続課題とする。
