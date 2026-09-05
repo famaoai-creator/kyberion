@@ -21789,3 +21789,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/trigger-runner.ts`、`libs/core/trigger-runner.test.ts`
 - **変更**: trigger delivery store の record read／append 前に operation-time の regular-file 検査を追加した。既存の idempotency、delivery claim、retry、compaction、malformed record skip semanticsは維持し、store leaf がディレクトリへ置換された場合に read を拒否する回帰テストを追加した。
 - **検証**: trigger-runner **2 files / 11 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1432
+
+- **対象**: `libs/core/tenant-registry.ts`、`libs/core/tenant-registry.test.ts`
+- **変更**: tenant profile の state read 前に operation-time の regular-file 検査を追加した。既存の tenant path／symlink 境界、personal-tier access failure と corrupt JSON の分類、profile schema／tenant identity 検証は維持し、directory replacement の診断に regular-file 原因を含める回帰検証を追加した。
+- **検証**: tenant-registry **2 files / 18 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
