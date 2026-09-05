@@ -1,4 +1,3 @@
-import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
@@ -18,30 +17,10 @@ interface VoiceTtsConfigRegistry {
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/presence/voice-hub-tts.json');
 
-const FALLBACK_REGISTRY: {
-  defaultLanguage: string;
-  languages: Record<string, VoiceTtsLanguageConfig>;
-} = {
-  defaultLanguage: 'en',
-  languages: {
-    en: {
-      voice: 'default',
-      rate: 180,
-    },
-  },
-};
-
 const voiceTtsConfigCatalog = defineCatalog<VoiceTtsConfigRegistry>({
   id: 'voice-tts-config',
   path: getRegistryPath,
   schema: pathResolver.knowledge('product/schemas/voice-tts-config.schema.json'),
-  fallback: () => FALLBACK_REGISTRY,
-  fallbackOnInvalid: true,
-  onFallback: (error) => {
-    if (!String(error).includes('missing')) {
-      logger.warn(`[VOICE_TTS_CONFIG] Failed to load registry: ${String(error)}`);
-    }
-  },
 });
 
 let cachedRegistryPath: string | null = null;
@@ -59,17 +38,7 @@ function loadRegistry(): {
   defaultLanguage: string;
   languages: Record<string, VoiceTtsLanguageConfig>;
 } {
-  let registryPath: string;
-  try {
-    registryPath = getRegistryPath();
-  } catch (error) {
-    logger.warn(
-      `[VOICE_TTS_CONFIG] Unsafe registry path; using fallback: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-    return FALLBACK_REGISTRY;
-  }
+  const registryPath = getRegistryPath();
   if (cachedRegistryPath === registryPath && cachedDefaultLanguage && cachedLanguages) {
     return {
       defaultLanguage: cachedDefaultLanguage,
@@ -78,15 +47,15 @@ function loadRegistry(): {
   }
 
   const parsed = voiceTtsConfigCatalog.load();
-  const languages = {
-    ...FALLBACK_REGISTRY.languages,
-    ...(parsed.languages || {}),
-  };
+  const languages = parsed.languages || {};
   const firstLanguage = Object.keys(languages)[0];
+  if (!firstLanguage) {
+    throw new Error(`Voice TTS registry has no language entries: ${registryPath}`);
+  }
   const defaultLanguage =
     typeof parsed.defaultLanguage === 'string' && parsed.defaultLanguage in languages
       ? parsed.defaultLanguage
-      : firstLanguage || FALLBACK_REGISTRY.defaultLanguage;
+      : firstLanguage;
   cachedRegistryPath = registryPath;
   cachedDefaultLanguage = defaultLanguage;
   cachedLanguages = languages;
