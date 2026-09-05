@@ -6,6 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
@@ -54,6 +55,11 @@ export function resolveA2ASecret(): string {
   });
   try {
     if (safeExistsSync(secretPath)) {
+      if (!safeLstat(secretPath).isFile()) {
+        throw new Error(
+          `[A2A_SECRET_RESOURCE] persisted secret must be a regular file: ${secretPath}`
+        );
+      }
       const persisted = String(safeReadFile(secretPath, { encoding: 'utf8' }) || '').trim();
       if (persisted) {
         cachedSecret = persisted;
@@ -61,6 +67,7 @@ export function resolveA2ASecret(): string {
       }
     }
   } catch (err: unknown) {
+    if (err instanceof Error && err.message.startsWith('[A2A_SECRET_RESOURCE]')) throw err;
     logger.warn(`[a2a-signature] could not read persisted secret: ${errorMessage(err)}`);
   }
 
