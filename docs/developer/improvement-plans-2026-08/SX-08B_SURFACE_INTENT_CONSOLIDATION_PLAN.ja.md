@@ -1576,3 +1576,11 @@ trust engineの組み込みdefault trust policyと、正本policyの欠損・sch
 external service registryのpublic seed／provider catalogを必須化し、personal overlayとruntime storeは未作成時のみ明示的な空catalogを使う構造へ整理した。既存registryのschema不正は空registryへ戻さず拒否し、runtime登録・統計更新とprovider URL解決の既存優先順位は維持している。
 
 検証: external-service-registry **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 194
+
+presentation preference registryの組み込みfallbackと、正本registryの欠損・schema不正をfallbackへ収束させるcatchを削除し、表示設定の正本読み込み障害をfail-closedで返す境界へ統一した。personal overlayの任意性、profile merge、default profile選択と、書き込み時のschema検証は維持・明示化している。
+
+tenant rate-limit policyを必須catalogへ変更し、quota stateは未作成時だけ明示的な空stateから開始し、既存stateのschema不正をリセットしないようにした。推論provider registryは欠損fallbackを削除し、未知・不正なprovider entryを無視せず明示エラーにした。
+
+検証: presentation-preference-registry／tenant-rate-limiter／reasoning-provider-registry **3 files / 17 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateはこの変更群反映後に再実行する。

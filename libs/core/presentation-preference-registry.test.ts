@@ -193,4 +193,20 @@ describe('presentation preference registry', () => {
       'presentation-preference-registry.json'
     );
   });
+
+  it('fails closed when the governed registry is missing or invalid', () => {
+    const missingPath = `${tmpDir}/presentation-preference-registry.missing.json`;
+    process.env.KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH = missingPath;
+    expect(() => getPresentationPreferenceRegistry()).toThrow(
+      'Catalog presentation-preference-registry is missing'
+    );
+
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(overridePath, JSON.stringify({ profiles: [] }));
+    process.env.KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH = overridePath;
+    resetPresentationPreferenceRegistryCache();
+    expect(() => getPresentationPreferenceRegistry()).toThrow(
+      'Invalid catalog presentation-preference-registry'
+    );
+  });
 });

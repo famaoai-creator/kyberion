@@ -30,6 +30,7 @@ import {
   safeMkdir,
   safeCreateExclusiveFileSync,
   safeUnlinkSync,
+  safeExistsSync,
 } from './secure-io.js';
 import { resolveIdentityContext } from './authority.js';
 
@@ -109,20 +110,12 @@ const policyCatalog = defineCatalog<RateLimitPolicy>({
   id: 'tenant-rate-limit-policy',
   path: () => pathResolver.rootResolve(POLICY_PATH),
   schema: POLICY_SCHEMA_PATH,
-  fallback: {
-    default: { tokens_per_minute: 60, burst_capacity: 60, denial_grace_ms: 30000 },
-    tenants: {},
-    operation_costs: {},
-    exempt_personas: ['sovereign', 'ecosystem_architect'],
-  },
 });
 
 const stateCatalog = defineCatalog<RateLimitState>({
   id: 'tenant-rate-limit-state',
   path: () => pathResolver.rootResolve(STATE_PATH),
   schema: STATE_SCHEMA_PATH,
-  fallback: { tenants: {} },
-  fallbackOnInvalid: true,
 });
 
 function loadPolicy(): RateLimitPolicy {
@@ -137,7 +130,8 @@ export function _resetTenantRateLimitPolicyCacheForTests(): void {
 }
 
 function loadState(): RateLimitState {
-  return stateCatalog.load();
+  const statePath = pathResolver.rootResolve(STATE_PATH);
+  return safeExistsSync(statePath) ? stateCatalog.load() : { tenants: {} };
 }
 
 function saveState(state: RateLimitState): void {

@@ -1,4 +1,3 @@
-import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
@@ -23,45 +22,6 @@ const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
 const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge(
   'personal/orchestration/presentation-preference-registry.json'
 );
-
-const FALLBACK_REGISTRY: PresentationPreferenceRegistry = {
-  version: 'fallback',
-  default_profile_id: 'business-deck-default',
-  profiles: [
-    {
-      kind: 'presentation-preference-profile',
-      profile_id: 'business-deck-default',
-      scope: 'default',
-      theme_selection_policy: {
-        decision_mode: 'ask_when_uncertain',
-        ask_user_when: [
-          'audience_unclear',
-          'brand_alignment_unclear',
-          'chart_density_unclear',
-          'executive_tone_unclear',
-          'new_deck_category',
-          'user_requested_precheck',
-        ],
-        default_theme_hint: 'executive_clean',
-      },
-      brief_question_sets: [
-        {
-          label: 'Proposal deck',
-          deck_purposes: ['proposal'],
-          questions: ['誰に見せる資料ですか?', '最終的に何を決めたいですか?'],
-        },
-      ],
-      theme_sets: [
-        {
-          label: 'Executive clean',
-          deck_purposes: ['proposal', 'briefing'],
-          theme_hint: 'executive_clean',
-          design_traits: ['executive', 'minimal', 'brand_aligned'],
-        },
-      ],
-    },
-  ],
-};
 
 let registryCacheKey: string | null = null;
 let registryCache: PresentationPreferenceRegistry | null = null;
@@ -148,34 +108,18 @@ export function getPresentationPreferenceRegistry(): PresentationPreferenceRegis
   const cacheKey = overlayPath ? `${registryPath}::${overlayPath}` : registryPath;
   if (registryCacheKey === cacheKey && registryCache) return registryCache;
 
-  if (!safeExistsSync(registryPath)) {
+  const base = loadRegistryFromPath(registryPath);
+  if (!overlayPath || !safeExistsSync(overlayPath)) {
     registryCacheKey = cacheKey;
-    registryCache = FALLBACK_REGISTRY;
-    return registryCache;
+    registryCache = base;
+    return base;
   }
 
-  try {
-    const base = loadRegistryFromPath(registryPath);
-    if (!overlayPath || !safeExistsSync(overlayPath)) {
-      registryCacheKey = cacheKey;
-      registryCache = base;
-      return base;
-    }
-
-    const overlay = loadRegistryFromPath(overlayPath);
-    const merged = mergeRegistries(base, overlay);
-    registryCacheKey = cacheKey;
-    registryCache = merged;
-    return merged;
-  } catch (error: any) {
-    const target = overlayPath ? `${registryPath} or overlay ${overlayPath}` : registryPath;
-    logger.warn(
-      `[PRESENTATION_PREFERENCE_REGISTRY] Failed to load registry at ${target}: ${error.message}`
-    );
-    registryCacheKey = cacheKey;
-    registryCache = FALLBACK_REGISTRY;
-    return registryCache;
-  }
+  const overlay = loadRegistryFromPath(overlayPath);
+  const merged = mergeRegistries(base, overlay);
+  registryCacheKey = cacheKey;
+  registryCache = merged;
+  return merged;
 }
 
 export function getPresentationPreferenceProfile(
@@ -186,7 +130,7 @@ export function getPresentationPreferenceProfile(
   return (
     registry.profiles.find((profile) => profile.profile_id === resolvedProfileId) ||
     registry.profiles.find((profile) => profile.profile_id === registry.default_profile_id) ||
-    FALLBACK_REGISTRY.profiles[0]
+    registry.profiles[0]
   );
 }
 
@@ -194,7 +138,12 @@ export function writePresentationPreferenceRegistry(
   registry: PresentationPreferenceRegistry,
   registryPath = getRegistryPath()
 ): string {
-  safeWriteFile(registryPath, JSON.stringify(registry, null, 2), { mkdir: true });
+  const validated = defineCatalog<PresentationPreferenceRegistry>({
+    id: 'presentation-preference-registry',
+    path: registryPath,
+    schema: REGISTRY_SCHEMA_PATH,
+  }).validate(registry, registryPath);
+  safeWriteFile(registryPath, JSON.stringify(validated, null, 2), { mkdir: true });
   resetPresentationPreferenceRegistryCache();
   return registryPath;
 }

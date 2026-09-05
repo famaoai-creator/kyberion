@@ -135,7 +135,6 @@ const reasoningProviderCatalog = defineCatalog<RegistryFile>({
   id: 'reasoning-provider-registry',
   path: REGISTRY_PATH,
   schema: REGISTRY_SCHEMA_PATH,
-  fallback: { version: 'missing', providers: [] },
 });
 
 let cachedDescriptors: readonly ReasoningProviderDescriptor[] | null = null;
@@ -266,9 +265,15 @@ function assertConformanceEvidence(
 
 function loadDescriptors(): readonly ReasoningProviderDescriptor[] {
   const parsed = reasoningProviderCatalog.load();
-  const descriptors = parsed.providers
-    .map(parseDescriptor)
-    .filter((entry): entry is ReasoningProviderDescriptor => entry !== null);
+  const descriptors = parsed.providers.map((entry, index) => {
+    const descriptor = parseDescriptor(entry);
+    if (!descriptor) {
+      throw new Error(
+        `[REASONING_PROVIDER_REGISTRY_INVALID] provider entry ${index} is not a valid governed descriptor`
+      );
+    }
+    return descriptor;
+  });
   const seen = new Set<ReasoningBackendMode>();
   for (const descriptor of descriptors) {
     if (seen.has(descriptor.mode)) {
