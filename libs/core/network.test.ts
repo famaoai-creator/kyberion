@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetEgressPolicyCacheForTests, withEgressPayloadContext } from './egress-policy.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const mocks = vi.hoisted(() => ({
   axios: vi.fn(),
@@ -37,6 +37,14 @@ describe('secureFetch', () => {
     if (safeExistsSync(tmpRoot)) safeRmSync(tmpRoot, { recursive: true, force: true });
     delete process.env.KYBERION_EGRESS_POLICY_PATH;
     _resetEgressPolicyCacheForTests();
+  });
+
+  it('uses the canonical security policy without a fallback catalog', async () => {
+    const source = safeReadFile(pathResolver.rootResolve('libs/core/network.ts'), {
+      encoding: 'utf8',
+    }) as string;
+    expect(source).not.toContain('fallback: {}');
+    expect(source).not.toContain('fallbackOnInvalid');
   });
 
   it('blocks non-allowlisted hosts when egress policy is enforce', async () => {

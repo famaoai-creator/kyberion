@@ -26,8 +26,6 @@ const securityPolicyCatalog = defineCatalog<{
   id: 'security-policy-network-guardrails',
   path: pathResolver.knowledge('product/governance/security-policy.json'),
   schema: pathResolver.knowledge('product/schemas/security-policy.schema.json'),
-  fallback: {},
-  fallbackOnInvalid: true,
 });
 
 function loadNetworkGuardrails(): { maxRequestSizeKb: number } {
