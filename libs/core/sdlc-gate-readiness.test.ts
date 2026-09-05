@@ -1,14 +1,37 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
-import { buildTrackGateReadinessSummary, buildTrackNextWorkProposal, materializeTrackArtifactSkeleton } from './sdlc-gate-readiness.js';
+import {
+  safeExistsSync,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeMkdir,
+} from './secure-io.js';
+import {
+  buildTrackGateReadinessSummary,
+  buildTrackNextWorkProposal,
+  materializeTrackArtifactSkeleton,
+} from './sdlc-gate-readiness.js';
 
 describe('sdlc-gate-readiness', () => {
+  const symlinkRoot = pathResolver.active('projects/test-sdlc-skeleton-link');
+  const externalRoot = pathResolver.sharedTmp('sdlc-skeleton-external');
+
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.KYBERION_SUDO = 'true';
-    safeRmSync(pathResolver.active('projects/test-sdlc-skeleton'), { recursive: true, force: true });
+    safeRmSync(pathResolver.active('projects/test-sdlc-skeleton'), {
+      recursive: true,
+      force: true,
+    });
+    safeRmSync(symlinkRoot, { recursive: true, force: true });
+    safeRmSync(externalRoot, { recursive: true, force: true });
+  });
+
+  afterEach(() => {
+    safeRmSync(symlinkRoot, { recursive: true, force: true });
+    safeRmSync(externalRoot, { recursive: true, force: true });
   });
 
   it('marks the current gate from missing required artifacts', () => {
@@ -44,9 +67,14 @@ describe('sdlc-gate-readiness', () => {
     expect(summary.total_gate_count).toBeGreaterThan(0);
     expect(summary.current_gate_id).toBe('gate-requirements-baseline');
     expect(summary.current_phase).toBe('define');
-    expect(summary.gates[0]?.present_artifacts).toEqual(['requirements-definition', 'requirements-traceability-matrix']);
+    expect(summary.gates[0]?.present_artifacts).toEqual([
+      'requirements-definition',
+      'requirements-traceability-matrix',
+    ]);
     expect(summary.next_required_artifacts[0]?.artifact_id).toBe('slo-sli-definition');
-    expect(summary.next_required_artifacts[0]?.template_ref).toBe('knowledge/public/templates/blueprints/slo-sli-definition.md');
+    expect(summary.next_required_artifacts[0]?.template_ref).toBe(
+      'knowledge/public/templates/blueprints/slo-sli-definition.md'
+    );
   });
 
   it('creates a deterministic next-work proposal from missing artifacts', () => {
@@ -134,6 +162,53 @@ describe('sdlc-gate-readiness', () => {
     const resolvedPath = pathResolver.resolve(`active/projects/test-sdlc-skeleton/${logicalPath}`);
     expect(logicalPath).toBe('tracks/TRK-SDLC-3/02_define/requirements-definition.md');
     expect(safeExistsSync(resolvedPath)).toBe(true);
-    expect(String(safeReadFile(resolvedPath, { encoding: 'utf8' }) || '')).toContain('Instantiated from knowledge/public/templates/blueprints/requirements-definition.md');
+    expect(String(safeReadFile(resolvedPath, { encoding: 'utf8' }) || '')).toContain(
+      'Instantiated from knowledge/public/templates/blueprints/requirements-definition.md'
+    );
+  });
+
+  it('rejects a project root that is replaced by a symlink', () => {
+    const readiness = buildTrackGateReadinessSummary({
+      track: {
+        track_id: 'TRK-SDLC-4',
+        project_id: 'PRJ-SDLC-4',
+        name: 'Release 4',
+        summary: 'Release lane',
+        status: 'active',
+        track_type: 'release',
+        lifecycle_model: 'sdlc',
+        tier: 'public',
+      },
+      artifacts: [],
+    });
+    const proposal = buildTrackNextWorkProposal({
+      project: {
+        project_id: 'PRJ-SDLC-4',
+        name: 'Payments Modernization',
+        summary: 'Project',
+        status: 'active',
+        tier: 'public',
+      },
+      track: {
+        track_id: 'TRK-SDLC-4',
+        project_id: 'PRJ-SDLC-4',
+        name: 'Release 4',
+        summary: 'Release lane',
+        status: 'active',
+        track_type: 'release',
+        lifecycle_model: 'sdlc',
+        tier: 'public',
+      },
+      readiness,
+    });
+    safeMkdir(externalRoot, { recursive: true });
+    safeSymlinkSync(externalRoot, symlinkRoot, 'dir');
+
+    expect(() =>
+      materializeTrackArtifactSkeleton({
+        projectRootPath: symlinkRoot,
+        proposal: proposal!,
+      })
+    ).toThrow(/RESOURCE_PATH_SYMLINK/);
   });
 });
