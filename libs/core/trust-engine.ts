@@ -4,7 +4,6 @@ import { clamp } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
 
 /**
  * Trust Engine v1.0
@@ -59,46 +58,10 @@ export interface TrustPolicyAnomalyDetection {
   trust_degradation: { min_drop_percent: number; window_ms: number };
 }
 
-const DEFAULT_TRUST_POLICY: TrustPolicyFile = {
-  scoring: {
-    weights: {
-      policyCompliance: 0.25,
-      securityPosture: 0.25,
-      outputQuality: 0.2,
-      resourceEfficiency: 0.15,
-      collaborationHealth: 0.15,
-    },
-    dimension_max: 200,
-  },
-  tier_thresholds: [
-    { min_score: 900, tier: 'verified' },
-    { min_score: 700, tier: 'trusted' },
-    { min_score: 500, tier: 'standard' },
-    { min_score: 300, tier: 'probationary' },
-    { min_score: 0, tier: 'untrusted' },
-  ],
-  decay: { rate_per_hour: 2, floor: 100 },
-  propagation: { factor: 0.3, max_depth: 2 },
-  regime_shift: { threshold: 0.5 },
-  anomaly_detection: {
-    rapid_fire: { max_actions: 10, window_ms: 5000 },
-    policy_violations: { max_violations: 3, window_ms: 600000 },
-    trust_degradation: { min_drop_percent: 15, window_ms: 3600000 },
-  },
-};
-
 const trustPolicyCatalog = defineCatalog<TrustPolicyFile>({
   id: 'trust-policy',
   path: pathResolver.knowledge('product/governance/trust-policy.json'),
   schema: pathResolver.knowledge('product/schemas/trust-policy.schema.json'),
-  fallback: DEFAULT_TRUST_POLICY,
-  fallbackOnInvalid: true,
-  onFallback: (error, defaults) =>
-    recordConfigFallback({
-      knowledgePath: 'product/governance/trust-policy.json',
-      error,
-      defaults,
-    }),
 });
 
 const TRUST_LEDGER_SCHEMA_PATH = pathResolver.knowledge(

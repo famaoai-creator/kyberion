@@ -1564,3 +1564,9 @@ visual review rubricの大規模な組み込みrubricと、正本rubricの欠損
 video motion patternの大規模な組み込みcatalogと、正本catalogの欠損・schema不正をbuilt-inへ収束させるfallback／catchを削除し、必須のmotion catalogを正本からのみ解決する境界へ統一した。LLM draftの未知patternをrole defaultへ補正する既存semantics、`_meta`除去、duration／easeの決定的補正は維持している。
 
 検証: video-motion-direction **1 file / 18 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 192
+
+trust engineの組み込みdefault trust policyと、正本policyの欠損・schema不正をdefaultへ収束させるfallback／telemetryを削除し、信頼スコア計算・decay・propagation・tier判定を正本policyからのみ解決する境界へ統一した。trust ledger未作成時の初期状態、score更新、history保存と外部root拒否は変更していない。
+
+検証: trust-engine **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
