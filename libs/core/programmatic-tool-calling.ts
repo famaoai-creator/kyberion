@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeUnlinkSync, safeExistsSync } from './secure-io.js';
 import { ToolRepeatAdvisor, type ToolRepeatObservation } from './tool-repeat-advisor.js';
@@ -370,10 +371,10 @@ export async function executeProgrammaticToolCall(
     const runner = options.runner || defaultRunner();
     const childEnv: NodeJS.ProcessEnv = {
       KYBERION_PTC_CHILD: '1',
-      PATH: process.env.PATH,
-      NODE_ENV: process.env.NODE_ENV,
-      LANG: process.env.LANG,
-      LC_ALL: process.env.LC_ALL,
+      PATH: getRegisteredEnvText('PATH'),
+      NODE_ENV: getRegisteredEnvText('NODE_ENV'),
+      LANG: getRegisteredEnvText('LANG'),
+      LC_ALL: getRegisteredEnvText('LC_ALL'),
     };
     child = spawn(runner.command, runner.args, {
       cwd: runner.cwd || pathResolver.rootDir(),

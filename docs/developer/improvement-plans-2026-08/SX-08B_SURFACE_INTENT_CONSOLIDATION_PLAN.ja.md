@@ -1084,3 +1084,9 @@ locale解決のOS fallbackに残っていた `LANG` の環境直読を、登録�
 external hook discoveryのglobal config fallbackに残っていた `HOME` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `globalHomeDir` の優先、global opt-in／別trust、project／globalのpath containmentとsymlink拒否は変更していない。
 
 検証: external hook discovery **1 file / 8 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 112
+
+orchestratorのADF初期コンテキスト、secure-ioの安全な実行環境、programmatic tool childの最小環境に残っていた `HOME`／`TERM`／`PATH`／`NODE_ENV`／`LANG`／`LC_ALL` の環境直読を、登録済み `getRegisteredEnvText` へ統一した。ADF実行、最小child env、TTY fallback、既存の安全境界とfailure semanticsは変更していない。
+
+検証: orchestrator／secure-io／programmatic tool calling **3 files / 71 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
