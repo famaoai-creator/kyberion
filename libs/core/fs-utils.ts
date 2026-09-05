@@ -14,11 +14,6 @@ const projectStandardsCatalog = defineCatalog<ProjectStandards>({
   id: 'project-standards',
   path: pathResolver.knowledge('public/common/project_standards.json'),
   schema: pathResolver.knowledge('product/schemas/project-standards.schema.json'),
-  fallback: {
-    ignore_dirs: ['.git', 'node_modules', '.DS_Store'],
-    ignore_extensions: ['.lock', '.bin'],
-  },
-  fallbackOnInvalid: true,
 });
 
 const standards = projectStandardsCatalog.load();
