@@ -19,14 +19,8 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  safeExistsSync,
-  safeReadFile,
-  safeReaddir,
-  safeStat,
-  safeWriteFile,
-} from '@agent/core/secure-io';
-import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { safeExistsSync, safeReaddir, safeStat, safeWriteFile } from '@agent/core/secure-io';
+import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
@@ -98,7 +92,7 @@ function fingerprint(manifest: Manifest): ActuatorFingerprint {
   if (manifest.contract_schema) {
     const schemaPath = pathResolver.rootResolve(manifest.contract_schema);
     if (safeExistsSync(schemaPath)) {
-      const raw = safeReadFile(schemaPath, { encoding: 'utf8' }) as string;
+      const raw = readTextFile(schemaPath);
       let parsed: unknown;
       try {
         parsed = parseSafeJsonInput(raw, `contract schema ${manifest.contract_schema}`);

@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { validateFacetPurity } from '@agent/core/facet-registry';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const roots = [
@@ -21,7 +22,7 @@ export function checkFacetPurity(): string[] {
       const filePath = path.join(root, file);
       const errors = validateFacetPurity({
         kind,
-        content: safeReadFile(filePath, { encoding: 'utf8' }) as string,
+        content: readTextFile(filePath),
       });
       for (const error of errors) violations.push(`${filePath}: ${error}`);
     }

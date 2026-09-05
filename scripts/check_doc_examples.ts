@@ -29,8 +29,9 @@
 
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
@@ -66,7 +67,7 @@ function listMarkdownFiles(roots: string[]): string[] {
 }
 
 function parseCodeBlocks(file: string): CodeBlock[] {
-  const text = safeReadFile(file, { encoding: 'utf8' }) as string;
+  const text = readTextFile(file);
   const lines = text.split('\n');
   const blocks: CodeBlock[] = [];
   let inFence = false;

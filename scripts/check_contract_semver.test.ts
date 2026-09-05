@@ -69,6 +69,8 @@ describe('classifyBump', () => {
       })
     );
     expect(source).toContain('parseSafeJsonInput(raw,');
+    expect(source).toContain('nowIso, parseSafeJsonInput, readTextFile');
+    expect(source).not.toContain('safeReadFile(schemaPath');
     expect(source).toContain('readSafeJsonFile');
     expect(source).not.toContain('readJson<Manifest>');
     expect(source).not.toContain('readJson<BaselineFile>');
