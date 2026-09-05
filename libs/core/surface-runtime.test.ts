@@ -1,14 +1,21 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync, safeWriteFile } from './secure-io.js';
-import { loadSurfaceManifest, loadSurfaceState, saveSurfaceState } from './surface-runtime.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  loadSurfaceManifest,
+  loadSurfaceState,
+  readSurfaceLogTail,
+  saveSurfaceState,
+} from './surface-runtime.js';
 
 const manifestPath = pathResolver.sharedTmp('surface-runtime-manifest-test.json');
 const statePath = pathResolver.sharedTmp('surface-runtime-state-test.json');
+const logPath = pathResolver.sharedTmp('surface-runtime-log-test.log');
 
 afterEach(() => {
   safeRmSync(manifestPath, { force: true });
   safeRmSync(statePath, { force: true });
+  safeRmSync(logPath, { recursive: true, force: true });
 });
 
 describe('surface runtime manifest loader', () => {
@@ -84,5 +91,11 @@ describe('surface runtime state catalog', () => {
     safeWriteFile(statePath, '{');
 
     expect(() => loadSurfaceState(statePath)).toThrow(SyntaxError);
+  });
+
+  it('rejects a runtime log path replaced by a directory', () => {
+    safeMkdir(logPath, { recursive: true });
+
+    expect(() => readSurfaceLogTail(logPath)).toThrow('log must be a regular file');
   });
 });

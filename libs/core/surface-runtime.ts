@@ -11,6 +11,7 @@ const logger = createLogger('surface-runtime');
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeReaddir,
@@ -83,6 +84,9 @@ export interface SurfacePortStatus {
 export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
   const safeLogPath = assertSafeRepositoryPath(logPath, { allowMissingLeaf: true });
   if (!safeExistsSync(safeLogPath)) return [];
+  if (!safeLstat(safeLogPath).isFile()) {
+    throw new Error(`[SURFACE_RUNTIME_RESOURCE] log must be a regular file: ${safeLogPath}`);
+  }
   const content = safeReadFile(safeLogPath, { encoding: 'utf8' }) as string;
   return content
     .split('\n')
