@@ -11,6 +11,7 @@ import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import { createActuatorTrace, finalizeActuatorTrace } from './actuator-trace.js';
 import { buildCompletionNextAction, type CompletionReconciliation } from './next-action.js';
 import {
@@ -28,7 +29,6 @@ import {
   safeExec,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
 } from './secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
@@ -972,7 +972,7 @@ export async function finishMission(
     );
     const safeMemoryPath = assertSafeRepositoryPath(memoryPath, { allowMissingLeaf: true });
     const memorySummary = safeExistsSync(safeMemoryPath)
-      ? extractPromotableMissionMemory(safeReadFile(safeMemoryPath, { encoding: 'utf8' }) as string)
+      ? extractPromotableMissionMemory(readTextFile(safeMemoryPath))
       : null;
     const memoryEvidenceRefs = memorySummary
       ? [...evidence.map((item) => item.ref), safeMemoryPath]

@@ -1,5 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -10,7 +10,6 @@ import {
   safeLstat,
   safeMkdir,
   safeMoveSync,
-  safeReadFile,
   safeRmSync,
 } from './secure-io.js';
 import { findMissionPath, missionDir } from './path-resolver.js';
@@ -208,7 +207,7 @@ export class MissionCoordinationBus {
             `[MISSION_COORDINATION_RESOURCE] stream must be a regular file: ${filePath}`
           );
         }
-        const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+        const raw = readTextFile(filePath);
         for (const line of raw.split(/\r?\n/u)) {
           const trimmed = line.trim();
           if (!trimmed) continue;
@@ -246,9 +245,7 @@ export class MissionCoordinationBus {
       throw new Error(`[MISSION_COORDINATION_RESOURCE] stream must be a regular file: ${filePath}`);
     }
     const raw = String(
-      withExecutionContext('mission_controller', () =>
-        safeReadFile(filePath, { encoding: 'utf8' })
-      ) || ''
+      withExecutionContext('mission_controller', () => readTextFile(filePath)) || ''
     );
     return raw.split(/\r?\n/u).filter((line) => line.trim()).length;
   }

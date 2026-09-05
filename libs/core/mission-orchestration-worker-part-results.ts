@@ -10,7 +10,7 @@ import { TraceContext, persistTrace } from './src/trace.js';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
@@ -18,7 +18,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
 } from './secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import {
@@ -213,7 +212,7 @@ export async function applyDraftRefineToDeliverable(input: {
         `[DRAFT_REFINE_RESOURCE] deliverable must be a regular file: ${deliverablePath}`
       );
     }
-    const original = String(safeReadFile(deliverablePath, { encoding: 'utf8' }) || '');
+    const original = readTextFile(deliverablePath);
     if (!original.trim()) return;
     const outcome = await draftRefine({
       kind: 'doc',
