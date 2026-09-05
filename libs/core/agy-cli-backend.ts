@@ -685,14 +685,16 @@ export class AgyCliBackend implements ReasoningBackend {
 export function buildAgyCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): AgyCliBackend | null {
-  const bin = env.KYBERION_ANTIGRAVITY_CLI_BIN?.trim() || env.KYBERION_AGY_CLI_BIN?.trim();
-  const model = env.KYBERION_AGY_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_AGY_CLI_TIMEOUT_MS?.trim();
+  const bin =
+    getRegisteredEnvText('KYBERION_ANTIGRAVITY_CLI_BIN', { env })?.trim() ||
+    getRegisteredEnvText('KYBERION_AGY_CLI_BIN', { env })?.trim();
+  const model = getRegisteredEnvText('KYBERION_AGY_CLI_MODEL', { env })?.trim();
+  const timeoutRaw = getRegisteredEnvText('KYBERION_AGY_CLI_TIMEOUT_MS', { env })?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const sandbox = env.KYBERION_AGY_SANDBOX?.trim();
+  const sandbox = getRegisteredEnvText('KYBERION_AGY_SANDBOX', { env })?.trim();
   const sandboxEnabled = sandbox === undefined ? undefined : sandbox !== '0';
-  const logFile = env.KYBERION_AGY_CLI_LOG_FILE?.trim();
-  const agent = env.KYBERION_AGY_AGENT?.trim();
+  const logFile = getRegisteredEnvText('KYBERION_AGY_CLI_LOG_FILE', { env })?.trim();
+  const agent = getRegisteredEnvText('KYBERION_AGY_AGENT', { env })?.trim();
   const backend = new AgyCliBackend({
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),

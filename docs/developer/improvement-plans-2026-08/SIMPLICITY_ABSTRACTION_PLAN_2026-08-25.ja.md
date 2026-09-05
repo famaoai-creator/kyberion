@@ -19791,6 +19791,17 @@ SX-03のShell Claude CLI backend境界を再監査し、probe／builder／availa
 
 SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
 
+## 2026-09-05 再レビュー修正 1180
+
+SX-03のAGY CLI backend境界を再監査し、binary alias、model、timeout、sandbox、log file、agent設定における環境直読を`getRegisteredEnvText(name, { env })`へ移行した。AGYの既存argv、workspace agent、permission profile、provider child env、wall-clock制御は変更していない。
+
+検証:
+
+- `agy-cli-backend.test.ts` **27 tests passed**。option／agent／model、structured output、spawn env allowlist、permission profile、wall-clock、env accessor境界を確認した。
+- 対象ESLint、`git diff --check` passed。対象AGY CLI moduleの`env.KYBERION_*`直接参照は0件。
+
+SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 の残存項目は引き続き未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
