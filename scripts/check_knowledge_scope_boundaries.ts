@@ -1,8 +1,8 @@
 /** KS-16: semantic static checks for knowledge scope choke points. */
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge-scope-check-policy';
-import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface KnowledgeScopeCheckConfig {
@@ -140,7 +140,7 @@ function collectSources(): Array<{ file: string; source: string }> {
       if (relativeFile === 'scripts/check_knowledge_scope_boundaries.ts') continue;
       files.push({
         file: relativeFile,
-        source: String(safeReadFile(file, { encoding: 'utf8' }) || ''),
+        source: readTextFile(file),
       });
     }
   }

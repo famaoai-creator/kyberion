@@ -22323,3 +22323,21 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_module_boundaries.ts`、`scripts/check_module_boundaries.test.ts`
 - **変更**: module boundary checker の module source本文読込を foundation の `readTextFile` へ移行した。comment masking、runtime／type-only／dynamic import edge判定、cycle／direction ratchet semanticsは変更せず、既存テストにreader contractを追加した。
 - **検証**: module-boundaries **reader contract＋既存テスト passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1521
+
+- **対象**: `scripts/check_knowledge_scope_boundaries.ts`、`scripts/check_knowledge_scope_boundaries.test.ts`
+- **変更**: knowledge scope checker のsource inventory本文読込を foundation の `readTextFile` へ移行した。tenant/tier scope判定、direct env ratchet、physical namespace writer検査、policy loader semanticsは変更せず、既存テストにreader contractを追加した。
+- **検証**: knowledge-scope-boundaries **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。共有worktree由来のscope driftと残るchecker移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1522
+
+- **対象**: `scripts/check_ux_contract_docs.ts`、`scripts/check_ux_contract_docs.test.ts`
+- **変更**: UX contract checker のfront-door文書本文読込を foundation の `readTextFile` へ移行した。internal／external vocabulary検査、surface-role／vocabulary governed loader、failure semanticsは変更せず、既存テストにreader contractを追加した。
+- **検証**: UX-contract-docs **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1523
+
+- **対象**: `scripts/check_packaging_contract.ts`、`scripts/check_packaging_contract.test.ts`
+- **変更**: packaging contract checker の`.dockerignore`／package manifest／env example本文読込を foundation の `readTextFile` へ統一した。tier isolation、duplicate export key、secret-shaped value検査とfailure semanticsは変更せず、既存テストにreader contractを追加した。
+- **検証**: packaging-contract **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

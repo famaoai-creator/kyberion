@@ -1,5 +1,5 @@
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
 import { loadSurfaceRoleCatalog } from '@agent/core/surface-role-catalog';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -14,7 +14,7 @@ const INTERNAL_TERMS = /\b(?:mission|actuator|ADF|packet|ledger|capability bundl
 const EXTERNAL_TERMS = [/\brequest\b/iu, /\bplan\b/iu, /\bresult\b/iu, /\bnext action\b/iu];
 
 function read(relativePath: string): string {
-  return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) || '');
+  return readTextFile(pathResolver.rootResolve(relativePath));
 }
 
 function frontDoor(markdown: string): string {

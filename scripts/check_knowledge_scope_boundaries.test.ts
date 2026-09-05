@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   countDirectTenantEnvReads,
   findKnowledgeScopeViolations,
@@ -7,6 +8,16 @@ import {
 } from './check_knowledge_scope_boundaries.js';
 
 describe('knowledge scope semantic checker', () => {
+  it('uses the foundation text reader for scope source files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_knowledge_scope_boundaries.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   it('detects an unscoped index and confidential literal', () => {
     const findings = findKnowledgeScopeViolations(
       "buildScopedIndex(); const input = { scope: { tier: 'confidential' } };",
