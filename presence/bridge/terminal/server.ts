@@ -361,7 +361,7 @@ function attachRuntime(session: Session, cols = 80, rows = 30) {
   if (session.rt) return;
 
   const rt = new ReflexTerminal({
-    shell: process.env.SHELL || '/bin/zsh',
+    shell: getRegisteredEnvText('SHELL') || '/bin/zsh',
     cols,
     rows,
     cwd: ROOT_DIR,
@@ -604,7 +604,7 @@ app.post('/sessions', (req, res) => {
   });
 });
 
-const PORT = Number(process.env.TERMINAL_PORT || 4000);
+const PORT = Number(getRegisteredEnvText('TERMINAL_PORT') || 4000);
 const HOST = getRegisteredEnvText('KYBERION_TERMINAL_HOST') || '127.0.0.1';
 server.listen(PORT, HOST, () => {
   logger.info(`🌌 Terminal Hub v6.2 standardized on port ${PORT}`);
