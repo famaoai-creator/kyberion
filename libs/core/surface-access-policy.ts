@@ -69,7 +69,7 @@ function resolveAllowlist(surface: string): ParsedAllowlist | null {
   if (common) return parseCommonAllowlist(common, surface);
 
   for (const key of legacyEnvironmentKeys(surface)) {
-    const raw = process.env[key]?.trim();
+    const raw = getRegisteredEnvText(key)?.trim();
     if (!raw) continue;
     return {
       ids: raw
