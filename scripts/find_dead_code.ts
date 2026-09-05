@@ -27,11 +27,10 @@
 
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { nowIso } from '@agent/core/foundation';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import {
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
@@ -121,7 +120,7 @@ const EXPORT_PATTERNS: { regex: RegExp; kind: ExportedSymbol['kind'] }[] = [
 ];
 
 function extractExports(file: string): ExportedSymbol[] {
-  const text = safeReadFile(file, { encoding: 'utf8' }) as string;
+  const text = readTextFile(file);
   const symbols: ExportedSymbol[] = [];
   for (const { regex, kind } of EXPORT_PATTERNS) {
     let m: RegExpExecArray | null;
@@ -149,7 +148,7 @@ function countOccurrences(
   for (const f of files) {
     let text: string;
     try {
-      text = safeReadFile(f, { encoding: 'utf8' }) as string;
+      text = readTextFile(f);
     } catch {
       continue;
     }
