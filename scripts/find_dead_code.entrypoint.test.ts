@@ -11,6 +11,8 @@ describe('find dead code script boundary', () => {
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(file');
     expect(source).toContain('run({ print })');
     expect(source).toContain('main(print)');
   });
