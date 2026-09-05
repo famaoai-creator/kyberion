@@ -1,6 +1,7 @@
 import * as yaml from 'js-yaml';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
 import { loadMissionClassificationPolicy } from '@agent/core/mission-classification';
 import { loadMissionReviewGateRegistry } from '@agent/core/mission-review-gates';
@@ -30,7 +31,7 @@ function addValuesAtKey(value: unknown, key: string, out: Set<string>): void {
 }
 
 function parseFrontmatter(path: string): JsonRecord {
-  const raw = String(safeReadFile(rel(path), { encoding: 'utf8' }));
+  const raw = readTextFile(rel(path));
   if (!raw.startsWith('---\n')) return {};
   const end = raw.indexOf('\n---', 4);
   if (end < 0) return {};

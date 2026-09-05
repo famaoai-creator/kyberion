@@ -1,6 +1,6 @@
 /** DH-01: fail if a public operation boundary drops the standard waterfall. */
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const boundaries = [
@@ -137,13 +137,13 @@ export function collectOpPreflightCoverageSources(): OpPreflightCoverageSources 
   const boundarySources = Object.fromEntries(
     boundaries.map((relativePath) => [
       relativePath,
-      String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' })),
+      readTextFile(pathResolver.rootResolve(relativePath)),
     ])
   );
   const sharedSources = Object.fromEntries(
     Object.entries(sharedPreflightHelpers).map(([key, relativePath]) => [
       key,
-      String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' })),
+      readTextFile(pathResolver.rootResolve(relativePath)),
     ])
   ) as Record<keyof typeof sharedPreflightHelpers, string>;
   return { boundaries: boundarySources, shared: sharedSources };

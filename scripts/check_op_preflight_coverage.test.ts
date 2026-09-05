@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   findMissingOpPreflightCoverage,
   maskNonCode,
@@ -7,6 +8,16 @@ import {
 } from './check_op_preflight_coverage.js';
 
 describe('check_op_preflight_coverage', () => {
+  it('uses the foundation text reader for boundary source files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_op_preflight_coverage.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   const sources = (
     overrides: Record<string, string> = {},
     shared: Partial<OpPreflightCoverageSources['shared']> = {}
