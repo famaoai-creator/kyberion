@@ -42,7 +42,7 @@ describe('external-service-registry', () => {
     });
   });
 
-  it('ignores schema-invalid runtime registry data', () => {
+  it('rejects schema-invalid runtime registry data', () => {
     safeWriteFile(
       runtimePath,
       JSON.stringify({
@@ -52,7 +52,7 @@ describe('external-service-registry', () => {
       { mkdir: true }
     );
 
-    expect(listServices()).toEqual([]);
+    expect(() => listServices()).toThrow('Invalid catalog external-service-registry');
   });
 
   it('loads the schema-valid provider catalog for URL resolution', () => {

@@ -13,7 +13,7 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
-import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -78,13 +78,12 @@ const EMPTY_PROVIDER_CATALOG: ServiceProviderCatalog = { version: '1.0.0', provi
 
 // ─── Internal Helpers ───────────────────────────────────────────────────────
 
-function parseRegistry(filePath: string): ExternalServiceRegistry | null {
+function parseRegistry(filePath: string, optional = false): ExternalServiceRegistry {
+  if (optional && !safeExistsSync(filePath)) return EMPTY_REGISTRY;
   return defineCatalog<ExternalServiceRegistry>({
     id: 'external-service-registry',
     path: filePath,
     schema: REGISTRY_SCHEMA_PATH,
-    fallback: EMPTY_REGISTRY,
-    fallbackOnInvalid: true,
   }).load();
 }
 
@@ -93,10 +92,9 @@ function parseRegistry(filePath: string): ExternalServiceRegistry | null {
  * Later tiers win on same service_id. Priority: runtime > personal > public.
  */
 function loadMerged(): ExternalServiceRegistry {
-  const fallback: ExternalServiceRegistry = { version: '1.0.0', services: [] };
-  const publicSeed = parseRegistry(PUBLIC_SEED_PATH) ?? fallback;
-  const personalSeed = parseRegistry(PERSONAL_SEED_PATH) ?? fallback;
-  const runtime = parseRegistry(RUNTIME_PATH) ?? fallback;
+  const publicSeed = parseRegistry(PUBLIC_SEED_PATH);
+  const personalSeed = parseRegistry(PERSONAL_SEED_PATH, true);
+  const runtime = parseRegistry(RUNTIME_PATH, true);
 
   const byId = new Map<string, ExternalServiceEntry>();
   // Apply in ascending priority order (later writes win)
@@ -164,7 +162,7 @@ export function registerService(params: {
   topic: string;
   url: string;
 }): ExternalServiceEntry {
-  const runtime = parseRegistry(RUNTIME_PATH) ?? { version: '1.0.0', services: [] };
+  const runtime = parseRegistry(RUNTIME_PATH, true);
   const now = nowIso();
 
   const entry: ExternalServiceEntry = {
@@ -191,7 +189,7 @@ export function registerService(params: {
  * Update success/failure stats for a registered service.
  */
 export function updateServiceStats(serviceId: string, success: boolean): void {
-  const runtime = parseRegistry(RUNTIME_PATH) ?? { version: '1.0.0', services: [] };
+  const runtime = parseRegistry(RUNTIME_PATH, true);
   const updatedAt = nowIso();
   const idx = runtime.services.findIndex((e) => e.service_id === serviceId);
 
@@ -266,18 +264,17 @@ const PERSONAL_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
 );
 
 function loadProviderCatalog(): ServiceProvider[] {
-  const load = (p: string): ServiceProvider[] => {
+  const load = (p: string, optional = false): ServiceProvider[] => {
+    if (optional && !safeExistsSync(p)) return EMPTY_PROVIDER_CATALOG.providers;
     return defineCatalog<ServiceProviderCatalog>({
       id: 'service-provider-catalog',
       path: p,
       schema: PROVIDER_SCHEMA_PATH,
-      fallback: EMPTY_PROVIDER_CATALOG,
-      fallbackOnInvalid: true,
     }).load().providers;
   };
 
   const publicProviders = load(PUBLIC_PROVIDER_CATALOG_PATH);
-  const personalProviders = load(PERSONAL_PROVIDER_CATALOG_PATH);
+  const personalProviders = load(PERSONAL_PROVIDER_CATALOG_PATH, true);
 
   // Personal overrides public by id
   const byId = new Map<string, ServiceProvider>();
