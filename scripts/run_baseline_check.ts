@@ -38,7 +38,7 @@ import {
 } from '@agent/core/provider-capability-registry';
 import { readDaemonHeartbeat, type DaemonHeartbeatStatus } from '@agent/core/daemon-heartbeat';
 import { loadScheduleRegistry, type ScheduledPipeline } from '@agent/core/pipeline-scheduler';
-import { matchesCron } from '@agent/core/src/cron-utils';
+import { matchesCron } from '@agent/core/cron-utils';
 import {
   sendOpsAlert,
   resolveOpsAlertChannelStatus,
@@ -48,7 +48,7 @@ import {
   collectFailedSchedules,
   sweepFailedSchedules,
   type FailedScheduleFinding,
-} from '@agent/core/src/feedback-loop';
+} from '@agent/core/feedback-loop';
 import { enqueueOperationalLearningSignal } from '@agent/core/operational-learning';
 import {
   loadNotificationPreferences,

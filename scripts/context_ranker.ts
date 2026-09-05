@@ -31,7 +31,7 @@ import {
   loadKnowledgeRankingWeights,
 } from '@agent/core/ranking-signals';
 import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from '@agent/core/knowledge-scope';
-import { loadKnowledgeUsageAggregate } from '@agent/core/src/knowledge-feedback-loop';
+import { loadKnowledgeUsageAggregate } from '@agent/core/knowledge-feedback-loop';
 import { loadAnalysisConfigAtPath } from '@agent/core/analysis-config';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import type { ScopeContext } from '@agent/core/scope-context';

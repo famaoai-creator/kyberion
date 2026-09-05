@@ -14,7 +14,7 @@ import { resolveRef } from '@agent/core/src/pipeline-engine';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
-import type { TraceContext } from '@agent/core/src/trace';
+import type { TraceContext } from '@agent/core/trace';
 import * as path from 'node:path';
 
 export interface MediaPipelineStep {

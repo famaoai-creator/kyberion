@@ -4,7 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   loadActuatorManifest,
   type ActuatorManifestCapability,
-} from '@agent/core/src/actuator-manifest-index';
+} from '@agent/core/actuator-manifest-index';
 import {
   assertSafeRepositoryPath,
   safeExec,

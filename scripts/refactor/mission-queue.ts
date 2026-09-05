@@ -5,7 +5,7 @@
 
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
-import { withLock } from '@agent/core/src/lock-utils';
+import { withLock } from '@agent/core/lock-utils';
 import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
 
 export interface MissionQueueEntry {

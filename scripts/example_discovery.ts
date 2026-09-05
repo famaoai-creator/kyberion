@@ -11,7 +11,7 @@ import { isRecord } from '@agent/core/foundation';
 import {
   loadActuatorExampleCatalog,
   type ActuatorExampleCatalog,
-} from '@agent/core/src/actuator-example-catalog';
+} from '@agent/core/actuator-example-catalog';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export function isActuatorExampleCatalog(value: unknown): value is ActuatorExampleCatalog {

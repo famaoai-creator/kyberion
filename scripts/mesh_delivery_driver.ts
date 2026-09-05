@@ -11,7 +11,7 @@ import {
   formatMeshDeliveryPassReport,
   type MeshDeliveryPassReport,
 } from '@agent/core/mesh-delivery-driver';
-import { acquireLock, releaseLock } from '@agent/core/src/lock-utils';
+import { acquireLock, releaseLock } from '@agent/core/lock-utils';
 import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation';

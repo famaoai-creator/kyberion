@@ -9,7 +9,7 @@ import {
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/adf-engine';
 import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
-import { TraceContext, persistTrace } from '@agent/core/src/trace';
+import { TraceContext, persistTrace } from '@agent/core/trace';
 import { pathResolver } from '@agent/core/path-resolver';
 import { getPathValue } from '@agent/core/src/logic-utils';
 import { retry } from '@agent/core/async-utils';
