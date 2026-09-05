@@ -49,14 +49,14 @@ describe('video render runtime policy', () => {
     expect(policy.render.backend).toBe('hyperframes_cli');
   });
 
-  it('falls back when an override fails schema validation', () => {
+  it('fails closed when an override fails schema validation', () => {
     safeMkdir(tmpDir, { recursive: true });
     safeWriteFile(overridePath, JSON.stringify({ version: 'invalid' }));
     process.env.KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH = overridePath;
 
-    const policy = getVideoRenderRuntimePolicy();
-    expect(policy.version).toBe('fallback');
-    expect(policy.queue.concurrency).toBe(1);
+    expect(() => getVideoRenderRuntimePolicy()).toThrow(
+      /Invalid catalog video-render-runtime-policy/
+    );
   });
 
   it('rejects a policy override outside the repository', () => {
