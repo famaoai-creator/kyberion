@@ -14,7 +14,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
-import { getRegisteredEnv } from './foundation/env.js';
+import { getRegisteredEnv, getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { listDemotedProviders, registerHealthyInstancesResolver } from './provider-health-view.js';
 
@@ -69,7 +69,7 @@ let loadedFromPath: string | null = null;
 // leak demotions across unrelated test files (same pattern as
 // operator-notifications' VITEST guard).
 function persistenceEnabled(): boolean {
-  return !process.env.VITEST || Boolean(getRegisteredEnv(STATE_PATH_ENV));
+  return !getRegisteredEnvText('VITEST') || Boolean(getRegisteredEnv(STATE_PATH_ENV));
 }
 
 function stateFilePath(): string {
@@ -151,7 +151,7 @@ function keyFor(provider: string, instance: string): string {
  */
 export function instancesForProvider(provider: string): string[] {
   const envKey = `KYBERION_${provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_INSTANCES`;
-  const configured = (process.env[envKey] || '')
+  const configured = (getRegisteredEnvText(envKey) || '')
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);
