@@ -190,7 +190,7 @@ describe('voice engine registry', () => {
     expect(registry.engines.map((engine) => engine.engine_id)).toEqual(['snapshot_engine']);
   });
 
-  it('uses the governed fallback when a configured snapshot violates its schema', () => {
+  it('fails closed when a configured snapshot violates its schema', () => {
     safeMkdir(tmpDir, { recursive: true });
     const snapshotPath = path.join(tmpDir, 'invalid-snapshot.json');
     safeWriteFile(
@@ -199,27 +199,18 @@ describe('voice engine registry', () => {
     );
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = snapshotPath;
 
-    const registry = getVoiceEngineRegistry();
-    expect(registry.version).toBe('fallback');
-    expect(registry.default_engine_id).toBe('local_say');
-    expect(registry.engines).toHaveLength(1);
+    expect(() => getVoiceEngineRegistry()).toThrow(/Invalid catalog voice-engine-registry/);
   });
 
-  it('uses the governed fallback when a configured snapshot is outside the repository', () => {
+  it('rejects a configured snapshot outside the repository', () => {
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = '/tmp/voice-engine-external.json';
 
-    const registry = getVoiceEngineRegistry();
-
-    expect(registry.version).toBe('fallback');
-    expect(registry.default_engine_id).toBe('local_say');
+    expect(() => getVoiceEngineRegistry()).toThrow(/outside the repository root/);
   });
 
-  it('uses the governed fallback when a configured registry directory is outside the repository', () => {
+  it('rejects a configured registry directory outside the repository', () => {
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR = '/tmp/voice-engines-external';
 
-    const registry = getVoiceEngineRegistry();
-
-    expect(registry.version).toBe('fallback');
-    expect(registry.default_engine_id).toBe('local_say');
+    expect(() => getVoiceEngineRegistry()).toThrow(/outside the repository root/);
   });
 });

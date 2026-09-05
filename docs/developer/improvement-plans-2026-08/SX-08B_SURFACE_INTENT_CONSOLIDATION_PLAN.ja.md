@@ -1342,3 +1342,9 @@ media backend registryに残っていたコード内catalog fallbackを削除し
 autonomous ops gateに残っていたコード内policy fallbackを削除し、正本policyの欠損・不正・unsafe overrideを評価境界で構造化されたapprove／deny結果へ変換するfail-closed経路へ統一した。action score、tenant override、budget cap、dry-run判定と、人手承認を要求する既存semanticsは変更していない。
 
 検証: autonomous-ops-gate **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 155
+
+voice engine registryに残っていたコード内registry fallbackを削除し、正本snapshotの欠損・不正・unsafe overrideと、canonical directoryの読み込み障害をfail-closedで返す経路へ統一した。未知engine IDのregistry内default／先頭engine解決、platform fallback、directory／snapshotの既存優先順位は変更していない。
+
+検証: voice-engine-registry **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
