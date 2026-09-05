@@ -1,7 +1,12 @@
 import * as path from 'node:path';
 import { installProcessGuards } from '@agent/core/process-guards';
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { appendJsonLine, nowIso, readJsonLines } from '@agent/core/foundation';
+import {
+  appendJsonLine,
+  getRegisteredEnvText,
+  nowIso,
+  readJsonLines,
+} from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -469,7 +474,7 @@ async function main() {
     .option('token', { type: 'string', description: 'Discord Bot Token' })
     .parseSync();
 
-  const token = argv.token || process.env.DISCORD_TOKEN;
+  const token = argv.token || getRegisteredEnvText('DISCORD_TOKEN');
 
   if (!token) {
     logger.error('❌ [DiscordBridge] DISCORD_TOKEN is required.');
@@ -517,7 +522,7 @@ async function main() {
 // a gateway connection — and a leaked VITEST env cannot silently no-op a real
 // start.
 const directEntry = isDirectEntry(import.meta.url, 'satellites/discord-bridge/src/index.ts');
-if (directEntry && !process.env.VITEST) {
+if (directEntry && !getRegisteredEnvText('VITEST')) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
