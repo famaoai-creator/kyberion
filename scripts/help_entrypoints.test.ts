@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 function runHelp(
   script: string,
@@ -54,6 +55,14 @@ describe('CLI help entrypoints', () => {
     ]);
     expect(quiet.status).toBe(0);
     expect(quiet.stdout).toBe('');
+  });
+
+  it('uses the foundation text reader for email file inputs', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/email-workflow.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain('readTextFile');
+    expect(source).not.toContain('safeReadFile(filePath');
   });
 
   it('honors shared output flags for calendar workflow results', () => {
