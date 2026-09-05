@@ -32,6 +32,9 @@ describe('foundation helpers', () => {
     const filePath = pathResolver.sharedTmp('foundation-text-test.txt');
     safeWriteFile(filePath, 'foundation text');
     expect(readTextFile(filePath)).toBe('foundation text');
+    expect(() => readTextFile(filePath, { maxSizeMB: 0.000001, label: 'foundation text' })).toThrow(
+      /too large/i
+    );
     safeRmSync(filePath, { force: true });
   });
 

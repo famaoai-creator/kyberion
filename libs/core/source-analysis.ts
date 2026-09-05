@@ -5,7 +5,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -13,7 +12,7 @@ import * as pathResolver from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
 import { isRecord } from './foundation/primitives.js';
-import { clamp } from './foundation/text.js';
+import { clamp, readTextFile } from './foundation/text.js';
 import { parseTestInventory } from './software-quality.js';
 
 const SOURCE_EXTENSIONS = new Set([
@@ -419,7 +418,7 @@ export function analyzeSourceTree(options: AnalyzeSourceTreeOptions = {}): Sourc
     const kind = classifyFile(relative);
     let text = '';
     try {
-      text = String(safeReadFile(absolute, { encoding: 'utf8', maxSizeMB: 4 }));
+      text = readTextFile(absolute, { maxSizeMB: 4 });
     } catch {
       continue;
     }
@@ -478,12 +477,7 @@ export function analyzeSourceTree(options: AnalyzeSourceTreeOptions = {}): Sourc
     try {
       const packageJson = parseSafeJsonObjectValue(
         parseSafeJsonInput(
-          String(
-            safeReadFile(assertSafeRepositoryPath(packagePath), {
-              encoding: 'utf8',
-              maxSizeMB: 4,
-            })
-          ),
+          String(readTextFile(assertSafeRepositoryPath(packagePath), { maxSizeMB: 4 })),
           'source package manifest'
         ),
         'source package manifest'

@@ -10,9 +10,14 @@ export interface FoundationIo {
   loadJsonIfPresent<T>(filePath: string): T | null;
   appendFile(filePath: string, content: string): void;
   exists(filePath: string): boolean;
-  readFile(filePath: string): string;
+  readFile(filePath: string, options?: FoundationReadOptions): string;
   stat(filePath: string): { mtimeMs: number; size: number };
   writeFile(filePath: string, content: string): void;
+}
+
+export interface FoundationReadOptions {
+  maxSizeMB?: number;
+  label?: string;
 }
 
 // Keep the registration stable across test module resets. This is a registry

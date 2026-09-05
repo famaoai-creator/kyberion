@@ -12,14 +12,13 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { clamp, isRecord } from './foundation/text.js';
+import { clamp, isRecord, readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeLstat,
-  safeReadFile,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -323,7 +322,7 @@ export function normalizeTriggerRecord(value: unknown): TriggerRecord | null {
 function readRecords(storePath: string): TriggerRecord[] {
   if (!safeExistsSync(storePath)) return [];
   assertTriggerStoreFile(storePath);
-  const raw = safeReadFile(storePath, { encoding: 'utf8', maxSizeMB: 5 }) as string;
+  const raw = readTextFile(storePath, { maxSizeMB: 5 });
   const records: TriggerRecord[] = [];
   for (const line of raw.split(/\r?\n/u)) {
     if (!line.trim()) continue;
