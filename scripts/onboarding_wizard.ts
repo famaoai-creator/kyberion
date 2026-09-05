@@ -18,7 +18,7 @@ import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import type { SupportedLocale } from '@agent/core/locale';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { withLock } from '@agent/core/src/lock-utils';
+import { withLock } from '@agent/core/lock-utils';
 import {
   compileSchema,
   getRegisteredEnvText,

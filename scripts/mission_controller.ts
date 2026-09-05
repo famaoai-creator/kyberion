@@ -31,7 +31,7 @@ import { pathResolver, missionEvidenceDir } from '@agent/core/path-resolver';
 import { resolveMissionClassification } from '@agent/core/mission-classification';
 import { resolveMissionWorkflowDesign } from '@agent/core/mission-workflow-catalog';
 import { safeExec, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
-import { TraceContext, persistTrace } from '@agent/core/src/trace';
+import { TraceContext, persistTrace } from '@agent/core/trace';
 import { killSwitch } from '@agent/core/kill-switch';
 import { renderStatus } from '@agent/core/ux-vocabulary';
 import { buildHandoffPacket } from '@agent/core/handoff-packet';

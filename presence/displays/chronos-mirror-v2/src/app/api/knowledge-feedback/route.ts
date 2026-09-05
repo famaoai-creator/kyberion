@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { recordHumanKnowledgeFeedback } from '@agent/core/src/knowledge-feedback-loop';
+import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loop';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { readChronosJsonObject } from '../../../lib/request-input';
 import { parseKnowledgeFeedbackInput } from './knowledge-feedback-input';

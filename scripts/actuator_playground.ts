@@ -9,7 +9,7 @@ import {
 import {
   loadActuatorManifest,
   type ActuatorManifestFile,
-} from '@agent/core/src/actuator-manifest-index';
+} from '@agent/core/actuator-manifest-index';
 import { pathResolver } from '@agent/core/path-resolver';
 import * as readline from 'node:readline';
 import chalk from 'chalk';

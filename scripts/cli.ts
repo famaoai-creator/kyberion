@@ -11,16 +11,13 @@ import {
   safeStat,
   safeLstat,
 } from '@agent/core/secure-io';
-import { loadActuatorExampleCatalog } from '@agent/core/src/actuator-example-catalog';
-import type { ActuatorExampleRecord } from '@agent/core/src/actuator-example-catalog';
-import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
+import { loadActuatorExampleCatalog } from '@agent/core/actuator-example-catalog';
+import type { ActuatorExampleRecord } from '@agent/core/actuator-example-catalog';
+import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
 import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
 import { renderStatus } from '@agent/core/ux-vocabulary';
-import { checkAllActuatorCapabilities } from '@agent/core/src/actuator-capability';
-import {
-  assertPipelinePreviewResourcePath,
-  previewPipeline,
-} from '@agent/core/src/pipeline-preview';
+import { checkAllActuatorCapabilities } from '@agent/core/actuator-capability';
+import { assertPipelinePreviewResourcePath, previewPipeline } from '@agent/core/pipeline-preview';
 import {
   listScheduledPipelines,
   registerScheduledPipeline,

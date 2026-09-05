@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
-import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
+import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
 import {
   loadServiceEndpointsDirectoryCatalog,
   type ServiceEndpointsCatalog,
