@@ -291,7 +291,7 @@ describe('computeCurationReport — SLO thresholds come from config', () => {
     });
   });
 
-  it('falls back to the complete default config when a persisted config violates its schema', () => {
+  it('rejects a persisted config that violates its schema', () => {
     writeSloConfigFixture({
       version: '1.0.0',
       low_yield_delivery_threshold: 0,
@@ -299,11 +299,7 @@ describe('computeCurationReport — SLO thresholds come from config', () => {
       default_freshness_days: 180,
     });
 
-    expect(loadCurationSloConfig()).toEqual({
-      low_yield_delivery_threshold: 5,
-      freshness_days_by_kind: { governance: 90, playbook: 60, knowledge_hint: 30 },
-      default_freshness_days: 180,
-    });
+    expect(() => loadCurationSloConfig()).toThrow(/Invalid catalog knowledge-curation-slo/u);
   });
 });
 
