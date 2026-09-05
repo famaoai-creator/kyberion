@@ -354,13 +354,16 @@ describe('agent collaboration projection', () => {
       missions: 1,
       tasks: 10,
       agents: 10,
-      waiting_human: 1,
+      // The golden approval (ACE-GOLDEN-014) is already `approved`, so it is
+      // neither a human wait nor an attention item.
+      waiting_human: 0,
       review_pending: 1,
       failures: 1,
     });
     expect(first.attention.map((item) => item.kind)).toEqual(
-      expect.arrayContaining(['approval', 'review', 'failure'])
+      expect.arrayContaining(['review', 'failure'])
     );
+    expect(first.attention.map((item) => item.kind)).not.toContain('approval');
     expect(first.edges.length).toBeGreaterThanOrEqual(10);
     expect(first.status_flags).toEqual([]);
   });
@@ -809,6 +812,42 @@ describe('agent collaboration projection', () => {
     } finally {
       fs.rmSync(fixtureDir, { recursive: true, force: true });
     }
+  });
+
+  it('drops an approval from attention once its response arrives (AC-09 follow-up)', () => {
+    const projection = composeAgentCollaborationProjection([
+      event({
+        source: 'worker',
+        source_event_id: 'req-1',
+        kind: 'approval',
+        request_id: 'REQ-1',
+        agent_id: 'implementer-1',
+        summary: 'pending',
+        ts: '2026-09-05T00:00:00.000Z',
+      }),
+      event({
+        source: 'worker',
+        source_event_id: 'req-2',
+        kind: 'approval',
+        request_id: 'REQ-2',
+        agent_id: 'implementer-2',
+        summary: 'pending',
+        ts: '2026-09-05T00:00:01.000Z',
+      }),
+      event({
+        source: 'worker',
+        source_event_id: 'res-1',
+        kind: 'approval',
+        request_id: 'REQ-1',
+        agent_id: 'sovereign-user',
+        state_after: 'approved',
+        summary: 'approved',
+        ts: '2026-09-05T00:01:00.000Z',
+      }),
+    ]);
+    expect(projection.attention.map((item) => item.agent_id)).toEqual(['implementer-2']);
+    expect(projection.attention[0]).toMatchObject({ code: 'waiting_human' });
+    expect(projection.overview.waiting_human).toBe(1);
   });
 
   it('keeps limit as a cap on the returned feed only, not on the composed graph (AC-05 follow-up)', () => {
