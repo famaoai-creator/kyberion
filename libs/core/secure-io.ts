@@ -172,7 +172,7 @@ export function buildSafeExecEnv(
   // boundary instead of polluting every assignment with NODE_ENV.
   const safeEnv: Record<string, string | undefined> = {
     FORCE_COLOR: '0',
-    TERM: process.env.TERM || 'dumb',
+    TERM: getRegisteredEnvText('TERM') || 'dumb',
   };
 
   for (const key of SAFE_EXEC_ENV_ALLOWLIST) {
