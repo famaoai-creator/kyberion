@@ -116,6 +116,8 @@ describe('check_first_win_smoke', () => {
       safeReadFile(path.join(ROOT, 'scripts/check_first_win_smoke.ts'), { encoding: 'utf8' })
     );
     expect(source).toContain("import { readValidatedPipelineAdf } from './refactor/adf-input.js'");
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
     expect(source).toContain('return readValidatedPipelineAdf(file)');
     expect(source).not.toContain('readFoundationJson');
     expect(source).not.toContain('function readJson(');
