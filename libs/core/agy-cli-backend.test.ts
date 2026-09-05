@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { z } from 'zod';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import { AgyCliBackend, buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 import { AgySdkAdapter } from './agy-sdk-adapter.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
@@ -53,6 +54,16 @@ function createChild(stdoutText: string, stderrText = '', exitCode = 0): any {
 }
 
 describe('agy-cli-backend', () => {
+  it('routes AGY CLI environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/agy-cli-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
     delete process.env.KYBERION_AGY_CLI_BIN;
