@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeNerveMessage, parseNerveMessageLine } from './stimuli-journal.js';
+import * as pathResolver from './path-resolver.js';
+import {
+  normalizeNerveMessage,
+  parseNerveMessageLine,
+  resolveStimuliJournalPath,
+} from './stimuli-journal.js';
+import { safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 
 const validMessage = {
   id: 'msg-1',
@@ -42,5 +48,18 @@ describe('NerveMessage JSONL boundary', () => {
       metadata: { ...validMessage.metadata, ['__proto__']: { polluted: true } },
     });
     expect(parseNerveMessageLine(unsafe)).toBeUndefined();
+  });
+
+  it('rejects a symlinked stimuli journal path before a writer can use it', () => {
+    const targetPath = pathResolver.sharedTmp(`stimuli-journal-target-${process.pid}.jsonl`);
+    const linkPath = pathResolver.sharedTmp(`stimuli-journal-link-${process.pid}.jsonl`);
+    safeWriteFile(targetPath, '');
+    safeSymlinkSync(targetPath, linkPath);
+    try {
+      expect(() => resolveStimuliJournalPath(linkPath)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(linkPath, { force: true });
+      safeRmSync(targetPath, { force: true });
+    }
   });
 });

@@ -21550,6 +21550,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: mission queueのJSONL read／append／rewrite前に、`queuePath`をrepository内のsymlinkなし regular fileとしてoperation-timeで再検査するようにした。未作成queueの初期化、malformed entryのskip、priority／dependency dispatch semanticsは維持し、symlink queueをread／writeしない回帰テストを追加した。
 - **検証**: mission-queue **2 files / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全provider adapterの実測は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1393
+
+- **対象**: `libs/core/stimuli-journal.ts`、`libs/core/nerve-bridge.ts`、`libs/core/sensor-engine.ts`、`libs/core/stimuli-journal.test.ts`
+- **変更**: stimuli journalのappend／subscribe経路を共通のrepository path resolverへ接続し、symlink経由の外部scopeへnerve／sensor recordを書き込まず、listenerも同じ operation-time 境界を使うようにした。journal rotation、TTL、malformed record処理とsensor／nerveの既存payload semanticsは維持した。
+- **検証**: stimuli-journal **4 files / 10 tests passed**、対象ESLint、Prettier、`git diff --check`。全体typecheckは別作業の未追跡OpenCode実装にあるZod型エラーで未完了。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`
