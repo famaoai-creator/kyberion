@@ -1,6 +1,7 @@
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 import {
@@ -40,19 +41,19 @@ const THEMES_JSON_NESTED_PATH = path.join(
 
 function renderUpdatedFile(filePath: string, content: string): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
-  const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  const source = readTextFile(filePath);
   return content === source ? undefined : { path: filePath, content };
 }
 
 function renderTokenSurface(filePath: string, tokenBlock: string): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
-  const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  const source = readTextFile(filePath);
   return renderUpdatedFile(filePath, replaceTokenBlock(source, tokenBlock));
 }
 
 function renderTailwindConfig(filePath: string): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
-  const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  const source = readTextFile(filePath);
   const next = source.replace(
     /        kyberion: \{[\s\S]*?\n        \}/m,
     renderKyberionTailwindColorsBlock()
@@ -66,7 +67,7 @@ function renderThemesCatalog(
   includeDefaultTheme: boolean
 ): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
-  const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  const source = readTextFile(filePath);
   const next = updateThemesJson(source, tokens, { includeDefaultTheme });
   return renderUpdatedFile(filePath, next);
 }
