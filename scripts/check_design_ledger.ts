@@ -1,6 +1,7 @@
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type DesignNoteStatus = 'proposed' | 'implemented' | 'rejected';
@@ -76,7 +77,7 @@ export function validateDesignLedger(root = pathResolver.rootDir()): DesignLedge
     const statusRoot = path.join(notesRoot, status);
     for (const filePath of collectMarkdownFiles(statusRoot)) {
       const file = relative(filePath);
-      const fields = parseFrontmatter(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''));
+      const fields = parseFrontmatter(readTextFile(filePath));
       if (!fields) {
         violations.push({ file, message: 'missing or malformed YAML frontmatter' });
         continue;
@@ -97,7 +98,7 @@ export function validateDesignLedger(root = pathResolver.rootDir()): DesignLedge
   const postmortemRoot = path.join(root, 'docs/developer/postmortem');
   for (const filePath of collectMarkdownFiles(postmortemRoot)) {
     const file = relative(filePath);
-    const fields = parseFrontmatter(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''));
+    const fields = parseFrontmatter(readTextFile(filePath));
     if (!fields) {
       violations.push({ file, message: 'missing or malformed YAML frontmatter' });
       continue;

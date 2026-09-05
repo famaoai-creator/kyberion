@@ -1,5 +1,5 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const BRIDGES = [
@@ -22,9 +22,7 @@ export function hasSharedThreadFormatterImport(source: string): boolean {
 export function checkChannelAdapterAdoption(): string[] {
   const failures: string[] = [];
   for (const relative of BRIDGES) {
-    const source = stripComments(
-      String(safeReadFile(pathResolver.rootResolve(relative), { encoding: 'utf8' }) || '')
-    );
+    const source = stripComments(readTextFile(pathResolver.rootResolve(relative)));
     if (!/\brunChannelTurn\s*\(/u.test(source)) {
       failures.push(`${relative}: missing executable runChannelTurn call`);
     }
