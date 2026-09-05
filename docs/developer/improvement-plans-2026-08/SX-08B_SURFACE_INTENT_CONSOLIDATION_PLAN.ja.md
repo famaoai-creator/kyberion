@@ -1604,3 +1604,9 @@ recovery policyのactuator manifestを必須catalogへ変更し、manifestの欠
 SDLC gate profile registryも必須化し、sdlc profile欠損時に空gateへ進む経路を削除した。track readinessのartifact照合、next-work proposal、skeleton materializationは変更していない。
 
 検証: recovery-policy／sdlc-gate-readiness **2 files / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 198
+
+knowledge ranking weightsの正本catalogについて、未配置時は呼び出し側の明示的な初期重みから開始し、配置済みcatalogのschema不正を既定値へ戻すfallbackと外側のcatchを削除した。scope proximityのtenant境界、authority／recency／usage-yieldの計算、tenant overrideの既存semanticsは変更していない。
+
+検証: ranking-signals **1 file / 13 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。

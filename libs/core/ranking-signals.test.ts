@@ -100,7 +100,7 @@ describe('ranking-signals (KM-02)', () => {
     });
   });
 
-  it('loads a custom ranking catalog through schema validation and falls back when invalid', () => {
+  it('loads a custom ranking catalog through schema validation and rejects invalid data', () => {
     const catalogPath = pathResolver.sharedTmp(
       `ranking-signals-invalid/${process.pid}/knowledge-weights.json`
     );
@@ -112,10 +112,9 @@ describe('ranking-signals (KM-02)', () => {
       }
     );
     try {
-      expect(loadKnowledgeRankingWeights(undefined, catalogPath)).toEqual({
-        proximity: 1,
-        usage_yield: 4,
-      });
+      expect(() => loadKnowledgeRankingWeights(undefined, catalogPath)).toThrow(
+        'Invalid catalog knowledge-weights'
+      );
     } finally {
       safeRmSync(pathResolver.sharedTmp(`ranking-signals-invalid/${process.pid}`), {
         recursive: true,

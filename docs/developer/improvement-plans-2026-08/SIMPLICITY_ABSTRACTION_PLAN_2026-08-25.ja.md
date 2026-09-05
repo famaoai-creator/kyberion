@@ -21405,3 +21405,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/recovery-policy.ts`、`libs/core/recovery-policy.test.ts`、`libs/core/sdlc-gate-readiness.ts`、`libs/core/sdlc-gate-readiness.test.ts`
 - **変更**: recovery policyのactuator manifestを必須catalogへ変更し、manifestの欠損・schema不正を空policyへ収束させるfallbackを削除した。manifest内のrecovery_policy省略時にactuator側のretry default／fallback categoryを使う既存semanticsは維持し、不正manifestだけを明示拒否する。SDLC gate profile registryも必須化し、sdlc profile欠損時に空gateへ進む経路を削除した。track readinessのartifact照合、next-work proposal、skeleton materializationは変更していない。
 - **検証**: recovery-policy／sdlc-gate-readiness **2 files / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 1368
+
+- **対象**: `libs/core/ranking-signals.ts`、`libs/core/ranking-signals.test.ts`
+- **変更**: knowledge ranking weightsの正本catalogについて、未配置時は呼び出し側の明示的な初期重みから開始し、配置済みcatalogのschema不正を既定値へ戻すfallbackと外側のcatchを削除した。scope proximityのtenant境界、authority／recency／usage-yieldの計算、tenant overrideの既存semanticsは変更していない。
+- **検証**: ranking-signals **1 file / 13 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
