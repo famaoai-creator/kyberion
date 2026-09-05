@@ -25,10 +25,12 @@ import { nowIso } from './foundation/time.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import {
+  assertSafeRepositoryPath,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeCreateExclusiveFileSync,
+  safeLstat,
   safeUnlinkSync,
   safeExistsSync,
 } from './secure-io.js';
@@ -147,7 +149,9 @@ function sleepSync(ms: number): void {
 
 function isStaleLock(lockPath: string): boolean {
   try {
-    const raw = safeReadFile(lockPath, { encoding: 'utf8' }) as string;
+    const safeLockPath = assertSafeRepositoryPath(lockPath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeLockPath) || !safeLstat(safeLockPath).isFile()) return true;
+    const raw = safeReadFile(safeLockPath, { encoding: 'utf8' }) as string;
     const parsed = normalizeTenantRateLimitLockRecord(
       parseSafeJsonInput(raw || '{}', 'tenant rate limit lock')
     );

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 import {
   consumeTenantBudget,
   inspectTenantBudget,
@@ -12,12 +12,18 @@ import {
 } from './tenant-rate-limiter.js';
 
 describe('tenant-rate-limiter (IP-29)', () => {
+  const lockPath = pathResolver.rootResolve(
+    'active/shared/runtime/tenant-rate-limit-state.json.lock'
+  );
+  const externalLockPath = pathResolver.sharedTmp('tenant-rate-limit-external.lock');
   let savedTenant: string | undefined;
   let savedPersona: string | undefined;
 
   beforeEach(() => {
     savedTenant = process.env.KYBERION_TENANT;
     savedPersona = process.env.KYBERION_PERSONA;
+    safeRmSync(lockPath, { recursive: true, force: true });
+    safeRmSync(externalLockPath, { recursive: true, force: true });
     _resetTenantRateLimitStateForTests();
     _resetTenantRateLimitPolicyCacheForTests();
   });
@@ -27,6 +33,8 @@ describe('tenant-rate-limiter (IP-29)', () => {
     else process.env.KYBERION_TENANT = savedTenant;
     if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = savedPersona;
+    safeRmSync(lockPath, { recursive: true, force: true });
+    safeRmSync(externalLockPath, { recursive: true, force: true });
     _resetTenantRateLimitStateForTests();
     _resetTenantRateLimitPolicyCacheForTests();
   });
@@ -43,6 +51,24 @@ describe('tenant-rate-limiter (IP-29)', () => {
     expect(normalizeTenantRateLimitLockRecord({ pid: Number.NaN })).toBeNull();
     expect(normalizeTenantRateLimitLockRecord({ pid: '42' })).toBeNull();
     expect(normalizeTenantRateLimitLockRecord([])).toBeNull();
+  });
+
+  it('does not read through a symlinked lock file before reclaiming it', () => {
+    safeWriteFile(
+      externalLockPath,
+      JSON.stringify({ pid: process.pid, created_at: '2026-09-06T00:00:00.000Z' })
+    );
+    safeSymlinkSync(externalLockPath, lockPath, 'file');
+
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'worker';
+    expect(consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toMatchObject({
+      allowed: true,
+    });
+    expect(safeReadFile(externalLockPath, { encoding: 'utf8' })).toContain(String(process.pid));
+    expect(() => safeReadFile(lockPath, { encoding: 'utf8' })).toThrow();
+
+    safeRmSync(externalLockPath, { recursive: true, force: true });
   });
 
   it('passes through when no tenant slug is bound (tenant-agnostic)', () => {
