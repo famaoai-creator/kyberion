@@ -14,7 +14,6 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
   safeMkdir,
   safeUnlinkSync,
@@ -22,7 +21,12 @@ import {
 } from '@agent/core/secure-io';
 import { applyOnboardingContextBinding } from '@agent/core/onboarding-context';
 import { loadOrganizationProfileAtPath } from '@agent/core/organization-profile';
-import { getRegisteredEnvText, nowIso, setRegisteredEnv } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  nowIso,
+  readTextFile,
+  setRegisteredEnv,
+} from '@agent/core/foundation';
 import { bootstrapCompany, listCompanyVerticals } from './company_bootstrap.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -83,9 +87,7 @@ function snapshotFiles(filePaths: string[], rootDir: string): Map<string, string
     filePaths.map((filePath) => [
       assertSafeRepositoryPath(filePath, { allowMissingLeaf: true, rootDir }),
       safeExistsSync(assertSafeRepositoryPath(filePath, { allowMissingLeaf: true, rootDir }))
-        ? (safeReadFile(assertSafeRepositoryPath(filePath, { rootDir }), {
-            encoding: 'utf8',
-          }) as string)
+        ? readTextFile(assertSafeRepositoryPath(filePath, { rootDir }))
         : undefined,
     ])
   );
@@ -266,9 +268,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
         rootDir,
       });
       const previousTenantProfile = safeExistsSync(safeTenantPath)
-        ? (safeReadFile(assertSafeRepositoryPath(safeTenantPath, { rootDir }), {
-            encoding: 'utf8',
-          }) as string)
+        ? readTextFile(assertSafeRepositoryPath(safeTenantPath, { rootDir }))
         : undefined;
       try {
         const existingTenant = readTenantProfile(normalized.tenantSlug, {

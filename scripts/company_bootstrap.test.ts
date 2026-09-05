@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 
 import {
   pathResolver,
@@ -16,6 +17,11 @@ afterEach(() => {
 });
 
 describe('company bootstrap', () => {
+  it('uses the foundation reader for template materialization', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/company_bootstrap.ts'));
+    expect(source).toContain('getRegisteredEnvText, readTextFile, setRegisteredEnv');
+  });
+
   it('emits the vertical list through the supplied harness printer', () => {
     const print = vi.fn();
 

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { readTextFile } from '@agent/core/foundation';
 import {
   isEncryptedConnectionEnvelope,
   overrideSecretEncryptionKeyForTests,
@@ -30,6 +31,13 @@ afterEach(() => {
 });
 
 describe('migrateConnectionDocuments (AC-05)', () => {
+  it('uses the foundation reader for plaintext connection documents', () => {
+    const source = readTextFile(
+      pathResolver.rootResolve('scripts/encrypt_connection_documents.ts')
+    );
+    expect(source).toContain('parseSafeJsonInput, readTextFile');
+  });
+
   it('encrypts plaintext documents with a raw .bak, then round-trips via --decrypt', () => {
     const first = migrateConnectionDocuments({ decrypt: false, connectionsDir: dir });
     expect(first).toEqual({ encrypted: 1, decrypted: 0, skipped: 0 });
