@@ -46,6 +46,7 @@ import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
 import { pathResolver } from '@agent/core/path-resolver';
 import { logger } from '@agent/core/core';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { setRegisteredEnv } from '@agent/core/foundation';
 import type {
   AudioFormat,
   MeetingTarget,
@@ -385,7 +386,7 @@ async function main(args: string[] = []): Promise<void> {
     .parseSync();
 
   const missionId = String(argv.mission);
-  process.env.MISSION_ID = missionId;
+  setRegisteredEnv('MISSION_ID', missionId);
   const trace = new TraceContext(`meeting_participate:${missionId}`, {
     missionId,
     actuator: 'meeting-participate',
