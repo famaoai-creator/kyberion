@@ -21651,3 +21651,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/agent-input-queue.ts`、`libs/core/agent-input-queue.test.ts`
 - **変更**: durable `next_run` queueのread／append前にoperation-timeのregular-file検査を追加した。既存のrepository path検証、append-only reducer、lock、scope filtering、volatile laneのsemanticsは維持し、queue pathがディレクトリへ置換された場合に読み書きを拒否する回帰テストを追加した。
 - **検証**: AgentInputQueue **1 file / 15 tests passed**、全体typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1409
+
+- **対象**: `libs/core/artifact-registry.ts`、`libs/core/artifact-registry.test.ts`
+- **変更**: 共有 artifact ownership registry の append／read 前に operation-time の regular-file 検査を追加した。既存の repository path／symlink 検証、catalog validation、ownership query、tmp delivery 制約は維持し、registry leaf がディレクトリへ置換された場合に fail-closed となる回帰テストを追加した。
+- **検証**: artifact-registry **1 file / 9 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

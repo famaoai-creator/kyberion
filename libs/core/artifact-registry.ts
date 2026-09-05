@@ -3,7 +3,7 @@ import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 
 export interface ArtifactOwnershipRecord {
   artifact_id: string;
@@ -37,6 +37,12 @@ function artifactRegistryPath(): string {
   return assertSafeRepositoryPath(pathResolver.shared('runtime/artifacts/registry.jsonl'), {
     allowMissingLeaf: true,
   });
+}
+
+function ensureArtifactRegistryFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[ARTIFACT_REGISTRY] registry must be a regular file: ${filePath}`);
+  }
 }
 
 function artifactOwnershipCatalog(filePath: string) {
@@ -144,6 +150,7 @@ export function appendArtifactOwnershipRecord(
     allowMissingLeaf: true,
   });
   if (!safeExistsSync(registryDir)) safeMkdir(registryDir, { recursive: true });
+  ensureArtifactRegistryFile(registryPath);
   appendJsonLine(registryPath, validated);
   return registryPath;
 }
@@ -151,6 +158,7 @@ export function appendArtifactOwnershipRecord(
 export function listArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
   const registryPath = artifactRegistryPath();
   if (!safeExistsSync(registryPath)) return [];
+  ensureArtifactRegistryFile(registryPath);
   try {
     return readJsonLines<ArtifactOwnershipRecord>(registryPath, {
       map: (value) => artifactOwnershipCatalog(registryPath).validate(value, registryPath),
