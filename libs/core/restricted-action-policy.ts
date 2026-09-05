@@ -51,11 +51,6 @@ const restrictedActionCatalog = defineCatalog<RestrictedActionPolicyFile>({
       allowMissingLeaf: true,
     }),
   schema: POLICY_SCHEMA_PATH,
-  fallback: { rules: [] },
-  fallbackOnInvalid: true,
-  onFallback: (error) => {
-    logger.warn(`[restricted-actions] policy load failed: ${String(error)}`);
-  },
 });
 
 export function loadRestrictedActionRules(opts?: { path?: string }): RestrictedActionRule[] {
@@ -64,24 +59,14 @@ export function loadRestrictedActionRules(opts?: { path?: string }): RestrictedA
   const safePath = assertSafeRepositoryPath(pathResolver.rootResolve(rel), {
     allowMissingLeaf: true,
   });
-  try {
-    if (safePath === pathResolver.rootResolve(DEFAULT_POLICY_PATH)) {
-      return restrictedActionCatalog.load().rules;
-    }
-    return defineCatalog<RestrictedActionPolicyFile>({
-      id: 'restricted-action-kinds-policy',
-      path: safePath,
-      schema: POLICY_SCHEMA_PATH,
-      fallback: { rules: [] },
-      fallbackOnInvalid: true,
-      onFallback: (error) => {
-        logger.warn(`[restricted-actions] policy load failed: ${String(error)}`);
-      },
-    }).load().rules;
-  } catch (err: any) {
-    logger.warn(`[restricted-actions] policy load failed: ${err?.message ?? err}`);
-    return [];
+  if (safePath === pathResolver.rootResolve(DEFAULT_POLICY_PATH)) {
+    return restrictedActionCatalog.load().rules;
   }
+  return defineCatalog<RestrictedActionPolicyFile>({
+    id: 'restricted-action-kinds-policy',
+    path: safePath,
+    schema: POLICY_SCHEMA_PATH,
+  }).load().rules;
 }
 
 /**
