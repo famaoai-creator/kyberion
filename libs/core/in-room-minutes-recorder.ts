@@ -16,6 +16,7 @@ import { checkMeetingParticipationConsent } from './meeting-participation-coordi
 import { startMicCapture, type MicCaptureOptions, type MicCaptureSession } from './mic-capture.js';
 import { missionEvidenceDir, rootResolve } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import { wavHeader } from './pcm-wav.js';
 import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import {
@@ -23,7 +24,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { EnergyVad, type EnergyVadOptions } from './voice-activity-detector.js';
@@ -152,7 +152,7 @@ export async function startInRoomMinutesSession(
         `[IN_ROOM_MINUTES_RESOURCE] transcript must be a regular file: ${transcriptPath}`
       );
     }
-    const existing = safeReadFile(transcriptPath, { encoding: 'utf8' }) as string;
+    const existing = readTextFile(transcriptPath);
     safeWriteFile(transcriptPath, `${existing}${text}`);
   };
 

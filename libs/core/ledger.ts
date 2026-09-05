@@ -1,11 +1,6 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import {
-  assertSafeRepositoryPath,
-  safeReadFile,
-  safeMkdir,
-  safeExistsSync,
-  safeLstat,
-} from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeMkdir, safeExistsSync, safeLstat } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -170,7 +165,7 @@ function _getLastHash(ledgerPath: string) {
   if (!safeExistsSync(ledgerPath)) return GENESIS_HASH;
   ensureRegularLedgerFile(ledgerPath);
   try {
-    const content = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
+    const content = readTextFile(ledgerPath);
     const trimmed = content.trim();
     if (!trimmed) return GENESIS_HASH;
     const lines = trimmed.split('\n');
@@ -206,7 +201,7 @@ export const verifyLedgerIntegrityDetailed = (
   }
   ensureRegularLedgerFile(safePath);
 
-  const content = safeReadFile(safePath, { encoding: 'utf8' }) as string;
+  const content = readTextFile(safePath);
   const lines = content.trim().split('\n');
   let expectedParentHash = GENESIS_HASH;
   const corrupted: string[] = [];
@@ -256,7 +251,7 @@ export const loadForScope = (
   const safePath = safeLedgerPath(ledgerPath);
   if (!safeExistsSync(safePath)) return [];
   ensureRegularLedgerFile(safePath);
-  const content = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
+  const content = readTextFile(safePath);
   return content
     .split(/\r?\n/u)
     .map((line) => line.trim())

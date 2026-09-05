@@ -16,7 +16,6 @@ import {
   safeExec,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { transitionStatus } from './mission-status.js';
@@ -26,6 +25,7 @@ import { loadState, saveState } from './mission-state.js';
 import { syncProjectLedgerIfLinked } from './mission-project-ledger.js';
 import { runAdaptiveStructuredLlmProfile, type LlmPolicyConfig } from './mission-llm.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 
 const WISDOM_POLICY_PATH = pathResolver.knowledge('product/governance/wisdom-policy.json');
@@ -106,7 +106,7 @@ export function gatherDistillContext(
         `[MISSION_DISTILL_RESOURCE] evidence ledger must be a regular file: ${ledgerPath}`
       );
     }
-    const ledgerContent = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
+    const ledgerContent = readTextFile(ledgerPath);
     const lines = ledgerContent.trim().split('\n');
     parts.push('');
     parts.push(`### Evidence Ledger (${lines.length} events)`);
@@ -248,9 +248,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   const context = gatherDistillContext(upperId, state, missionPath);
 
   const promptTemplatePath = pathResolver.knowledge('product/governance/distill-prompt.md');
-  const promptTemplate = safeExistsSync(promptTemplatePath)
-    ? (safeReadFile(promptTemplatePath, { encoding: 'utf8' }) as string)
-    : '';
+  const promptTemplate = safeExistsSync(promptTemplatePath) ? readTextFile(promptTemplatePath) : '';
 
   const fullPrompt = [
     promptTemplate,
