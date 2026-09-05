@@ -29,7 +29,7 @@ import * as path from 'node:path';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -268,6 +268,14 @@ function scopedFeedbackPath(kind: 'human' | 'gaps', scope?: ScopeContext): strin
   });
 }
 
+function ensureRegularFeedbackFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(
+      `[KNOWLEDGE_FEEDBACK_INVALID] feedback log must be a regular file: ${filePath}`
+    );
+  }
+}
+
 export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): string {
   const documentPath = input.document_path.trim();
   if (!documentPath) throw new Error('[KNOWLEDGE_FEEDBACK_INVALID] document_path is required');
@@ -302,6 +310,7 @@ export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): str
   const target = scopedFeedbackPath('human', input.scope);
   const dir = path.dirname(target);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  ensureRegularFeedbackFile(target);
   appendJsonLine(target, record);
   bumpUsageAggregate(
     documentPath,
@@ -330,6 +339,7 @@ export function recordKnowledgeGap(input: {
   const target = scopedFeedbackPath('gaps', input.scope);
   const dir = path.dirname(target);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  ensureRegularFeedbackFile(target);
   let priorCount = 0;
   if (safeExistsSync(target)) {
     try {
@@ -518,6 +528,7 @@ export function recordKnowledgeDelivery(input: {
   };
 
   try {
+    ensureRegularFeedbackFile(filePath);
     appendJsonLine(filePath, record);
     for (const ref of refs) {
       bumpUsageAggregate(ref.path, { delivered_count: 1 }, now, input.scope);
