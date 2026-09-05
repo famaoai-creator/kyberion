@@ -233,7 +233,8 @@ class PtyRegistry {
     const id = crypto.randomUUID();
     if (threadId) this.threadToSession.set(threadId, id);
     const targetShell =
-      shell || (os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash');
+      shell ||
+      (os.platform() === 'win32' ? 'powershell.exe' : getRegisteredEnvText('SHELL') || '/bin/bash');
     const targetCwd = cwd || pathResolver.rootDir();
     const targetEnv = { ...process.env, ...env, TERM: 'xterm-256color', PAGER: 'cat' };
 
