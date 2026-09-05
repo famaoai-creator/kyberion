@@ -1,5 +1,6 @@
 import { secureFetch } from './network.js';
 import { isRecord } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import type { EmbeddingBackend } from './embedding-backend.js';
 
 /**
@@ -15,7 +16,11 @@ const DEFAULT_DIMENSIONS = 768;
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 export function resolveGeminiEmbeddingKey(): string | undefined {
-  return process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim() || undefined;
+  return (
+    getRegisteredEnvText('GEMINI_API_KEY')?.trim() ||
+    getRegisteredEnvText('GOOGLE_API_KEY')?.trim() ||
+    undefined
+  );
 }
 
 export function isGeminiEmbeddingAvailable(): boolean {
