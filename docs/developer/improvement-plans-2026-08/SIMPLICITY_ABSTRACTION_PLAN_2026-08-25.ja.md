@@ -21723,3 +21723,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/tenant-rate-limiter.ts`、`libs/core/tenant-rate-limiter.test.ts`
 - **変更**: tenant rate limiter の lock reader に operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界を追加した。symlink／非 regular file の lock 内容を外部 scope から読まず、stale lock reclaim と quota state の read-modify-write semanticsは維持した。
 - **検証**: tenant-rate-limiter **1 file / 10 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1421
+
+- **対象**: `libs/core/ace-core.ts`、`libs/core/ace-core.test.ts`
+- **変更**: ACE minutes の append／integrity read を operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。併せて verifier が header-body 間の改行を hash から落として正常な chain を false にする既存不整合を修正した。symlink／repository 外／非 regular file の minutes を read／append へ到達させず、hash chain semanticsを維持した。
+- **検証**: ace-core minutes boundary **2 files / 2 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
