@@ -21,6 +21,7 @@ import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
@@ -121,7 +122,13 @@ export async function startInRoomMinutesSession(
   const transcriptPath = assertSafeRepositoryPath(path.join(evidenceDir, 'transcript.md'), {
     allowMissingLeaf: true,
   });
-  if (!safeExistsSync(transcriptPath)) {
+  if (safeExistsSync(transcriptPath)) {
+    if (!safeLstat(transcriptPath).isFile()) {
+      throw new Error(
+        `[IN_ROOM_MINUTES_RESOURCE] transcript must be a regular file: ${transcriptPath}`
+      );
+    }
+  } else {
     safeWriteFile(
       transcriptPath,
       `# Transcript — ${options.meetingTitle || missionId}\n\n` + `録音開始: ${nowIso()}\n\n`
@@ -140,6 +147,11 @@ export async function startInRoomMinutesSession(
   let stopping = false;
 
   const appendTranscript = (text: string) => {
+    if (!safeLstat(transcriptPath).isFile()) {
+      throw new Error(
+        `[IN_ROOM_MINUTES_RESOURCE] transcript must be a regular file: ${transcriptPath}`
+      );
+    }
     const existing = safeReadFile(transcriptPath, { encoding: 'utf8' }) as string;
     safeWriteFile(transcriptPath, `${existing}${text}`);
   };
