@@ -12,8 +12,8 @@
  * to report on a tree that does not compile.
  */
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
-import { parseSafeJsonObjectInput } from '@agent/core/foundation';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -331,14 +331,14 @@ export function collectEventWiringSources(): EventWiringSources {
       return;
     }
     if (!/\.tsx?$/u.test(relativePath)) return;
-    files[relativePath] = String(safeReadFile(absolutePath, { encoding: 'utf8' }) || '');
+    files[relativePath] = readTextFile(absolutePath);
   };
 
   for (const root of CODE_ROOTS) visit(root);
   for (const extra of EXTRA_FILES) {
     const absolutePath = pathResolver.rootResolve(extra);
     if (!safeExistsSync(absolutePath)) continue;
-    files[extra] = String(safeReadFile(absolutePath, { encoding: 'utf8' }) || '');
+    files[extra] = readTextFile(absolutePath);
   }
 
   return { files };

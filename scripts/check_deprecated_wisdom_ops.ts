@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
+import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEPRECATED = new Map(
@@ -33,7 +34,7 @@ function collectFindings(): Finding[] {
   for (const root of ROOTS) {
     if (!safeExistsSync(root)) continue;
     for (const file of getAllFiles(root).filter((entry) => entry.endsWith('.json'))) {
-      const content = String(safeReadFile(file, { encoding: 'utf8' }));
+      const content = readTextFile(file);
       for (const [alias, canonical] of DEPRECATED) {
         if (content.includes(`wisdom:${alias}`)) {
           findings.push({
