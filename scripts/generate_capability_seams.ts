@@ -1,7 +1,8 @@
 /** DH-07: generate the declaration/provider/consumer seam graph. */
 import { loadCoreSeamBindings } from './bindings.js';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 interface SeamRoleEntry {
@@ -127,7 +128,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
 const OUTPUT_PATH = pathResolver.rootResolve('docs/developer/CAPABILITY_SEAMS.md');
 
 function source(relativePath: string): string {
-  return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }));
+  return readTextFile(pathResolver.rootResolve(relativePath));
 }
 
 function validateRoles(bindings: ReturnType<typeof loadCoreSeamBindings>): string[] {
