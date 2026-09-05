@@ -82,8 +82,6 @@ function registryCatalog(
     id: 'pipeline-schedule-registry',
     path: filePath,
     schema: REGISTRY_SCHEMA_PATH,
-    fallback: { version: '1.0', schedules: [] },
-    fallbackOnInvalid: true,
   });
   registryCatalogs.set(filePath, catalog);
   return catalog;
@@ -128,20 +126,12 @@ export function loadScheduleRegistry(
   if (!safeExistsSync(filePath)) {
     return { version: '1.0', schedules: [] };
   }
-  try {
-    const parsed = registryCatalog(options).load();
-    const schedules = (parsed.schedules || []).map((schedule) => ({
-      ...schedule,
-      pipelinePath: normalizeScheduledPipelinePath(schedule.pipelinePath, options.rootDir),
-    }));
-    return { ...parsed, schedules };
-  } catch (err) {
-    if (err instanceof Error && /pipelinePath must be/u.test(err.message)) {
-      throw err;
-    }
-    logger.warn(`[PIPELINE-SCHEDULER] Failed to load registry, returning empty: ${err}`);
-    return { version: '1.0', schedules: [] };
-  }
+  const parsed = registryCatalog(options).load();
+  const schedules = (parsed.schedules || []).map((schedule) => ({
+    ...schedule,
+    pipelinePath: normalizeScheduledPipelinePath(schedule.pipelinePath, options.rootDir),
+  }));
+  return { ...parsed, schedules };
 }
 
 export function saveScheduleRegistry(
