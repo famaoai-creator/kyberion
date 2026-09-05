@@ -11,7 +11,7 @@ import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/adf-engine';
 import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
 import { TraceContext, persistTrace } from '@agent/core/trace';
 import { pathResolver } from '@agent/core/path-resolver';
-import { getPathValue } from '@agent/core/src/logic-utils';
+import { getPathValue } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { processUntrustedContent } from '@agent/core/untrusted-content';

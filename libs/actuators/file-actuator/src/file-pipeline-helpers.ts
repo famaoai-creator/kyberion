@@ -22,7 +22,7 @@ import {
   evaluateCondition,
   resolveWriteArtifactSpec,
   resolveRequiredStringParam,
-} from '@agent/core/src/logic-utils';
+} from '@agent/core/logic-utils';
 import { validateOpInput } from '@agent/core/op-input-contracts';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { skipAdfStep } from '@agent/core/adf-engine';

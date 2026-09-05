@@ -42,7 +42,7 @@ import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator
 import { resolveIdentityContext } from '@agent/core/authority';
 import { loadVoiceConsentAtPath, validateVoiceConsentRecord } from '@agent/core/voice-consent';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
-import { resolveVars } from '@agent/core/src/logic-utils';
+import { resolveVars } from '@agent/core/logic-utils';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';

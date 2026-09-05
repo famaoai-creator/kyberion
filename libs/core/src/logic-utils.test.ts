@@ -110,6 +110,17 @@ describe('logic-utils', () => {
     expect(getPathValue({ report: {} }, 'report.metrics.count')).toBeUndefined();
   });
 
+  it('resolves env paths through the governed environment accessor', () => {
+    const previous = process.env.KYBERION_LOCALE;
+    process.env.KYBERION_LOCALE = 'ja';
+    try {
+      expect(getPathValue({}, 'env.KYBERION_LOCALE')).toBe('ja');
+    } finally {
+      if (previous === undefined) delete process.env.KYBERION_LOCALE;
+      else process.env.KYBERION_LOCALE = previous;
+    }
+  });
+
   it('evaluates supported condition operators', () => {
     expect(evaluateCondition(undefined, ctx)).toBe(true);
     expect(evaluateCondition({ from: 'mission.id', operator: 'exists' }, ctx)).toBe(true);

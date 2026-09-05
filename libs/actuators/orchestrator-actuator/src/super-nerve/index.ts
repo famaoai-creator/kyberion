@@ -2,7 +2,7 @@ import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { classifyError } from '@agent/core/error-classifier';
 import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
 import { determineActuatorStepType } from '@agent/core/actuator-op-registry';
-import { evaluateCondition, resolveVars } from '@agent/core/src/logic-utils';
+import { evaluateCondition, resolveVars } from '@agent/core/logic-utils';
 import { skipAdfStep } from '@agent/core/adf-engine';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import {

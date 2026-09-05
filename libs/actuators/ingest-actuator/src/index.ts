@@ -18,7 +18,7 @@
  */
 
 import { logger } from '@agent/core/core';
-import { resolvePipelineContextValues } from '@agent/core/src/logic-utils';
+import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { stalenessReport, type IngestSourceObservation } from '@agent/core/ingest-asset-ledger';
 import { defineCatalogBackedActuator, runActuatorPipeline } from '../../../core/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

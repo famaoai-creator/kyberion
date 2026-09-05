@@ -59,6 +59,10 @@
       "types": "./dist/pipeline-preview.d.ts",
       "default": "./dist/pipeline-preview.js"
     },
+    "./logic-utils": {
+      "types": "./dist/logic-utils.d.ts",
+      "default": "./dist/logic-utils.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"

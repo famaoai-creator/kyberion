@@ -9,7 +9,7 @@ import {
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePipelineContextValues } from '@agent/core/src/logic-utils';
+import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, sleep } from '@agent/core/async-utils';

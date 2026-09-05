@@ -2,7 +2,7 @@ import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { classifyError } from '@agent/core/error-classifier';
 import { logger } from '@agent/core/core';
 import { safeReadFile, safeExistsSync } from '@agent/core/secure-io';
-import { resolveVars, evaluateCondition } from '@agent/core/src/logic-utils';
+import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning-backend';
 import {

@@ -7,7 +7,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveVars } from '@agent/core/src/logic-utils';
+import { resolveVars } from '@agent/core/logic-utils';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
 import { getVoiceBridge } from '@agent/core/voice-bridge';
 import { consumeTenantBudget, TenantRateLimitExceededError } from '@agent/core/tenant-rate-limiter';

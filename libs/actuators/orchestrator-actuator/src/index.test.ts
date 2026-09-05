@@ -47,8 +47,8 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeSymlinkSync: mocks.safeSymlinkSync,
 }));
 
-vi.mock('@agent/core/src/logic-utils', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/src/logic-utils')>()),
+vi.mock('@agent/core/logic-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/logic-utils')>()),
   resolveVars: mocks.resolveVars,
   evaluateCondition: mocks.evaluateCondition,
 }));
