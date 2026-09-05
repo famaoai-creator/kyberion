@@ -29,15 +29,9 @@ import {
 } from '@agent/core/reasoning-bootstrap';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-  safeReaddir,
-  safeWriteFile,
-} from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
 import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
-import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readTextFile } from '@agent/core/foundation';
 
 type Print = (value: unknown) => void;
 
@@ -196,7 +190,7 @@ export function enumerateInvariants(
     .sort()
     .map((entry) => {
       const absolute = path.join(absoluteDir, entry);
-      const content = safeReadFile(absolute, { encoding: 'utf8' }) as string;
+      const content = readTextFile(absolute);
       return parseInvariantMarkdown(repoRelative(absolute), content);
     });
 }
@@ -216,7 +210,7 @@ export function resolveScopeFiles(scope: string[]): {
 
   const readScoped = (absolute: string): void => {
     assertNoSymlinkPath(absolute);
-    const raw = safeReadFile(absolute, { encoding: 'utf8' }) as string;
+    const raw = readTextFile(absolute);
     const truncated = raw.length > MAX_SCOPE_FILE_CHARS;
     files.push({
       path: repoRelative(absolute),

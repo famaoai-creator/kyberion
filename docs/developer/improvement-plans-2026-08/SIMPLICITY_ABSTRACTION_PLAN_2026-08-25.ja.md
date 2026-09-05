@@ -22407,3 +22407,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/license_audit.ts`、`scripts/vital_check.ts`、`scripts/google_workspace_meet.ts` と対象テスト
 - **変更**: license file、active mission state、Google Workspace Meet payload の本文読込を foundation の `readTextFile` へ統一した。license classification、vital health／mission count、payload scope／JSON validation／gws execution semanticsは変更せず、各既存テストに reader contract を追加した。
 - **検証**: 対象テスト **4 files／10 tests passed**、license／vital／Google Workspace Meet の `--help` プローブ passed、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1535
+
+- **対象**: `scripts/scan_dependency_vulns.ts`、`scripts/run_ai_audit.ts`、`scripts/pipeline_promote.ts` と対象テスト
+- **変更**: dependency manifest、AI audit invariant/scope、pipeline catalog README の本文読込を foundation の `readTextFile` へ移行した。dependency parsing／vulnerability decision、AI audit scope boundary、pipeline ADF validation／promotion semanticsは変更せず、各境界テストに reader contract を追加した。
+- **検証**: 対象テスト **4 files／22 tests passed**、dependency scan は `0 package(s)`、AI audit の help 出力 passed、pipeline promote は不正な既存入力を governed ADF validation で拒否、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
