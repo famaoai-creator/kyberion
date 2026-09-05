@@ -8,7 +8,7 @@
  * every other surface uses.
  */
 import { resolveOperatorDisplayName } from '@agent/core/operator-identity';
-import { nowIso, parseSafeJsonObjectInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonObjectInput } from '@agent/core/foundation';
 import {
   acceptInboxEntryWithHumanReceipt,
   listInboxEntries,
@@ -969,7 +969,8 @@ async function handleProcedureRun(
       throw new ScriptExitError(1, '', true);
     }
   }
-  const missionId = argv.missionId || process.env.MISSION_ID || `MSN-CLI-${procedureId}`;
+  const missionId =
+    argv.missionId || getRegisteredEnvText('MISSION_ID') || `MSN-CLI-${procedureId}`;
   const correlationId = (argv.correlationId || `cli:${procedureId}:${randomUUID()}`)
     .trim()
     .slice(0, 240);
