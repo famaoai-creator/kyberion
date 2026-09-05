@@ -41,7 +41,6 @@ function getManifestCatalog(manifestPath: string): GovernedCatalog<RecoveryManif
     id: 'actuator-manifest-recovery-policy',
     path: manifestPath,
     schema: ACTUATOR_MANIFEST_SCHEMA_PATH,
-    fallback: {},
   });
   manifestCatalogs.set(manifestPath, catalog);
   return catalog;
@@ -53,12 +52,8 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 
 /** Load only the recovery_policy envelope from an actuator manifest. */
 export function loadRecoveryPolicy(manifestPath: string): RecoveryPolicy {
-  try {
-    const manifest = getManifestCatalog(manifestPath).load();
-    return isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-  } catch {
-    return {};
-  }
+  const manifest = getManifestCatalog(manifestPath).load();
+  return isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
 }
 
 /**
