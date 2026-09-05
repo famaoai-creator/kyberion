@@ -91,53 +91,6 @@ const MIDSCENE_DURATION_RANGE: [number, number] = [0.4, 8];
 export const MIN_MIDSCENE_LAYERS = 2;
 export const MIN_DISTINCT_EASES = 3;
 
-const BUILT_IN_CATALOG: VideoMotionCatalog = {
-  eases: {
-    'smooth-out': 'cubic-bezier(0.16, 1, 0.3, 1)',
-    overshoot: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-    gentle: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
-    'sine-io': 'ease-in-out',
-    decelerate: 'cubic-bezier(0.0, 0.0, 0.2, 1)',
-    snap: 'cubic-bezier(0.22, 1, 0.36, 1)',
-    linear: 'linear',
-  },
-  entrance: {
-    'fade-rise': {
-      name: 'Fade rise',
-      keyframes:
-        'from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); }',
-      duration_sec: 0.8,
-      offset_sec: 0.15,
-      default_ease: 'smooth-out',
-    },
-  },
-  midscene: {
-    breathe: {
-      name: 'Breathe',
-      keyframes: 'from { transform: translateY(0); } to { transform: translateY(-8px); }',
-      duration_sec: 4,
-      default_ease: 'sine-io',
-      alternate: true,
-    },
-    'pulse-accent': {
-      name: 'Accent pulse',
-      keyframes: 'from { opacity: 0.55; } to { opacity: 1; }',
-      duration_sec: 2.4,
-      default_ease: 'sine-io',
-      alternate: true,
-    },
-  },
-  role_defaults: {
-    generic: { entrance: 'fade-rise', midscene: ['breathe', 'pulse-accent'] },
-  },
-  transitions: {
-    default: 'cut',
-    max_non_cut_per_video: 3,
-    min_duration_sec: 0.3,
-    preferred_duration_sec: 0.5,
-  },
-};
-
 let cachedCatalog: VideoMotionCatalog | null = null;
 const MOTION_CATALOG_PATH = pathResolver.knowledge(
   'public/design-patterns/media-templates/video-motion-patterns.json'
@@ -149,30 +102,19 @@ const motionCatalog: GovernedCatalog<VideoMotionCatalog> = defineCatalog<VideoMo
   id: 'video-motion-patterns',
   path: MOTION_CATALOG_PATH,
   schema: MOTION_SCHEMA_PATH,
-  fallback: BUILT_IN_CATALOG,
-  fallbackOnInvalid: true,
-  onFallback: (error) => {
-    logger.warn(
-      `motion catalog unreadable, using built-in default: ${error instanceof Error ? error.message : String(error)}`
-    );
-  },
 });
 
-/** Load the curated motion catalog; a missing/broken file degrades to built-ins. */
+/** Load the curated motion catalog from the governed source file. */
 export function loadVideoMotionCatalog(): VideoMotionCatalog {
   if (cachedCatalog) return cachedCatalog;
-  try {
-    if (safeExistsSync(MOTION_CATALOG_PATH)) {
-      const catalog = coerceCatalog(motionCatalog.load());
-      if (catalog) {
-        cachedCatalog = catalog;
-        return cachedCatalog;
-      }
-    }
-  } catch (error: any) {
-    logger.warn(`motion catalog unreadable, using built-in default: ${error?.message || error}`);
+  if (!safeExistsSync(MOTION_CATALOG_PATH)) {
+    throw new Error(`[VIDEO_MOTION_CATALOG_MISSING] ${MOTION_CATALOG_PATH}`);
   }
-  cachedCatalog = BUILT_IN_CATALOG;
+  const catalog = coerceCatalog(motionCatalog.load());
+  if (!catalog) {
+    throw new Error(`[VIDEO_MOTION_CATALOG_INVALID] ${MOTION_CATALOG_PATH}`);
+  }
+  cachedCatalog = catalog;
   return cachedCatalog;
 }
 
@@ -191,16 +133,22 @@ function coerceCatalog(parsed: any): VideoMotionCatalog | null {
   const entrance = strip<MotionEntrancePattern>(parsed.entrance);
   const midscene = strip<MotionMidscenePattern>(parsed.midscene);
   const roleDefaults = strip<{ entrance: string; midscene: string[] }>(parsed.role_defaults);
-  if (Object.keys(entrance).length === 0 || Object.keys(midscene).length < MIN_MIDSCENE_LAYERS) {
+  if (
+    Object.keys(eases).length === 0 ||
+    Object.keys(entrance).length === 0 ||
+    Object.keys(midscene).length < MIN_MIDSCENE_LAYERS ||
+    Object.keys(roleDefaults).length === 0 ||
+    !parsed.transitions ||
+    typeof parsed.transitions !== 'object'
+  ) {
     return null;
   }
   return {
-    eases: Object.keys(eases).length > 0 ? eases : BUILT_IN_CATALOG.eases,
+    eases,
     entrance,
     midscene,
-    role_defaults:
-      Object.keys(roleDefaults).length > 0 ? roleDefaults : BUILT_IN_CATALOG.role_defaults,
-    transitions: { ...BUILT_IN_CATALOG.transitions, ...(parsed.transitions || {}) },
+    role_defaults: roleDefaults,
+    transitions: parsed.transitions,
   };
 }
 

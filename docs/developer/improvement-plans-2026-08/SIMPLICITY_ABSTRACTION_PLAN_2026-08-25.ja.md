@@ -21359,6 +21359,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: visual review rubricの大規模な組み込みrubricと、正本rubricの欠損・schema不正をbuilt-inへ収束させるfallback／catchを削除し、正本rubricの読み込み障害を明示エラーとして返す境界へ統一した。tenant rubric→public rubricの選択、egress／tier guard、レビュー不能時の`skipped` semanticsは変更していない。
 - **検証**: visual-review **1 file / 25 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1361
+
+- **対象**: `libs/core/video-motion-direction.ts`、`libs/core/video-motion-direction.test.ts`
+- **変更**: video motion patternの大規模な組み込みcatalogと、正本catalogの欠損・schema不正をbuilt-inへ収束させるfallback／catchを削除し、必須のmotion catalogを正本からのみ解決する境界へ統一した。LLM draftの未知patternをrole defaultへ補正する既存semantics、`_meta`除去、duration／easeの決定的補正は維持している。
+- **検証**: video-motion-direction **1 file / 18 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
