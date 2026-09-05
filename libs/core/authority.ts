@@ -219,7 +219,7 @@ function isAuthority(value: string): value is Authority {
 }
 
 export function resolveRole(): string | undefined {
-  const envRole = process.env.SYSTEM_ROLE || process.env.MISSION_ROLE;
+  const envRole = getRegisteredEnvText('SYSTEM_ROLE') || getRegisteredEnvText('MISSION_ROLE');
   if (envRole) return envRole.toLowerCase().replace(/\s+/g, '_');
 
   const argv1 = process.argv[1] || '';

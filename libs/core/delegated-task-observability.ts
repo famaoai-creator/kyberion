@@ -726,7 +726,7 @@ export function createDelegationHandle(input: {
   const trace = startDelegatedTaskTrace({
     owner:
       input.owner ||
-      process.env.MISSION_ROLE ||
+      getRegisteredEnvText('MISSION_ROLE') ||
       getRegisteredEnvText('KYBERION_PERSONA') ||
       'reasoning-backend',
     instruction: input.instruction,
