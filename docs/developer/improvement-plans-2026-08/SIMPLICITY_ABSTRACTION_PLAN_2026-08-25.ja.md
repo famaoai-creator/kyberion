@@ -22035,3 +22035,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/facet-registry.ts`、`libs/core/facet-registry.test.ts`
 - **変更**: managed／tenant／product facet の content read 前に operation-time の regular-file 検査を追加した。facet resource が directory 等へ置換された場合に内容 reader へ渡さず明示拒否し、既存の tier／tenant precedence、managed-pack provenance、symlink boundary semantics は維持した。
 - **検証**: facet-registry **2 files / 7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1473
+
+- **対象**: `libs/core/in-room-minutes-recorder.ts`、`libs/core/in-room-minutes-recorder.test.ts`
+- **変更**: in-room minutes の transcript read／append 前に operation-time の regular-file 検査を追加した。transcript が directory 等へ置換された場合は mic capture を開始せず拒否し、通常の VAD／STT／minutes pipeline と recording consent semantics は維持した。
+- **検証**: in-room-minutes-recorder **2 files / 3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
