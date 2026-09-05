@@ -21411,3 +21411,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/ranking-signals.ts`、`libs/core/ranking-signals.test.ts`
 - **変更**: knowledge ranking weightsの正本catalogについて、未配置時は呼び出し側の明示的な初期重みから開始し、配置済みcatalogのschema不正を既定値へ戻すfallbackと外側のcatchを削除した。scope proximityのtenant境界、authority／recency／usage-yieldの計算、tenant overrideの既存semanticsは変更していない。
 - **検証**: ranking-signals **1 file / 13 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 1369
+
+- **対象**: `libs/core/media-style-policy.ts`、`libs/core/media-style-policy.test.ts`
+- **変更**: media style policyの空policy fallbackとconfig fallback telemetryを削除し、正本style catalogの欠損・schema不正をfail-closedで返す境界へ統一した。未指定toneの数値既定値、tone rank／border key sideの正本解決と既存のCSS設計入力は変更していない。
+- **検証**: media-style-policy **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
