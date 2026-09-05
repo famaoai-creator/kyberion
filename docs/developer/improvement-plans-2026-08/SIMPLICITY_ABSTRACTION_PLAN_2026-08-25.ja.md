@@ -22533,3 +22533,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/knowledge-weight-recalculation.ts`、`libs/core/protocol-service-lifecycle.ts`、`libs/core/worker-state-journal.ts`、`libs/core/sdlc-gate-readiness.ts`
 - **変更**: knowledge ranking governance、protocol lifecycle log、worker state journal、SDLC template の本文読込を foundation の `readTextFile` へ移行した。ranking／protocol audit、journal resume、SDLC gate／template validation semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **4 files／36 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1556
+
+- **対象**: `libs/core/worker-context-compaction.ts`、`libs/core/email-workflow.ts`、`libs/core/promoted-memory.ts`、`libs/core/codex-cli-query.ts`、`libs/core/mission-artifact-closure.ts` と対象テスト
+- **変更**: worker compaction prompt、email draft、promoted-memory hints、Codex CLI output、mission artifact index の本文読込を foundation の `readTextFile` へ移行した。既存のpath／scope、provider output parsing、memory promotion、email safety、artifact closure semanticsは変更せず、codex-cli test seamを新readerへ適応した。
+- **検証**: 対象テスト **7 files／67 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
