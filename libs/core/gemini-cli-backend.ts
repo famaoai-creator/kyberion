@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { recordEstimatedCliUsage } from './cli-usage-metering.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   buildProviderChildEnv,
@@ -425,12 +426,12 @@ export function buildGeminiCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
   modelOverride?: string
 ): GeminiCliBackend | null {
-  const bin = env.KYBERION_GEMINI_CLI_BIN?.trim();
+  const bin = getRegisteredEnvText('KYBERION_GEMINI_CLI_BIN', { env })?.trim();
   const model =
     modelOverride ||
-    env.KYBERION_GEMINI_CLI_MODEL?.trim() ||
+    getRegisteredEnvText('KYBERION_GEMINI_CLI_MODEL', { env })?.trim() ||
     resolveRuntimeModelId('gemini-default', env);
-  const timeoutRaw = env.KYBERION_GEMINI_CLI_TIMEOUT?.trim();
+  const timeoutRaw = getRegisteredEnvText('KYBERION_GEMINI_CLI_TIMEOUT', { env })?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
   const backend = new GeminiCliBackend({
     ...(bin ? { bin } : {}),
