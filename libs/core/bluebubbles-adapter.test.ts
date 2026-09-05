@@ -15,6 +15,16 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 describe('bluebubbles-adapter', () => {
+  it('routes BlueBubbles environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/bluebubbles-adapter.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('evaluates missing and invalid configuration without exposing secrets', () => {
     expect(evaluateBlueBubblesConfiguration()).toMatchObject({
       configured: false,
