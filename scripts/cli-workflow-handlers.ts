@@ -1,13 +1,9 @@
 import * as path from 'node:path';
 import chalk from 'chalk';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
-import {
-  assertSafeRepositoryPath,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { t as coreT } from '@agent/core/t';
 import type { VocabularyKey } from '@agent/core/t';
 import { offboardScope } from '@agent/core/scope-offboarding';
@@ -507,9 +503,7 @@ export async function handleEmailWorkflowCommand(
       typeof options['--triage-file'] === 'string'
         ? options['--triage-file']
         : resolveEmailTriagePath();
-    const triageText = String(
-      safeReadFile(resolveWorkflowPath(triageFile, 'triage file'), { encoding: 'utf8' }) || ''
-    ).trim();
+    const triageText = readTextFile(resolveWorkflowPath(triageFile, 'triage file')).trim();
     if (!triageText) {
       throw new Error(`triage text not found at ${triageFile}`);
     }
@@ -534,9 +528,7 @@ export async function handleEmailWorkflowCommand(
       typeof options['--body-markdown'] === 'string'
         ? options['--body-markdown']
         : bodyFile
-          ? String(
-              safeReadFile(resolveWorkflowPath(bodyFile, 'body file'), { encoding: 'utf8' }) || ''
-            )
+          ? readTextFile(resolveWorkflowPath(bodyFile, 'body file'))
           : '';
     if (!bodyMarkdown.trim()) {
       throw new Error('body_markdown is required; provide --body-markdown or --body-file');

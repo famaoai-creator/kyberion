@@ -12,6 +12,8 @@ describe('CLI workflow handler output boundary', () => {
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
     expect(source).not.toContain('process.exitCode');
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(resolveWorkflowPath');
     expect(source).toContain('activePrint: Print = () => undefined');
     expect(source).toContain('withWorkflowOutputPrinter');
   });
