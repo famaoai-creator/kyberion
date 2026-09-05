@@ -1,4 +1,5 @@
 import { safeReadFile } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import * as jschardet from 'jschardet';
 import LanguageDetect from 'languagedetect';
 
@@ -43,7 +44,7 @@ export function detectFormat(text: string) {
 
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
-      JSON.parse(trimmed);
+      parseSafeJsonInput(trimmed, 'detected JSON');
       return { format: 'json', confidence: 1.0 };
     } catch (_) {
       /* best-effort cleanup */
