@@ -3,6 +3,7 @@
 // bootstrap is intentionally one-way and does not create an import cycle.
 import '../secure-io.js';
 import { getFoundationIo } from './io.js';
+import { readTextFile } from './text.js';
 export {
   parseSafeJsonInput,
   parseSafeJsonEntriesInput,
@@ -50,7 +51,7 @@ export interface ReadJsonLinesOptions<T> {
 
 export function readJsonLines<T>(filePath: string, options: ReadJsonLinesOptions<T> = {}): T[] {
   if (!getFoundationIo().exists(filePath)) return [];
-  const raw = getFoundationIo().readFile(filePath);
+  const raw = readTextFile(filePath);
   const records: T[] = [];
   for (const [index, line] of raw.split(/\r?\n/).entries()) {
     if (!line.trim()) continue;
