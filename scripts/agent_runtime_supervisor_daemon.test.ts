@@ -103,7 +103,11 @@ vi.mock('@agent/core/core', async () => {
   };
 });
 
-import { startAgentRuntimeSupervisorDaemon } from './agent_runtime_supervisor_daemon.js';
+import {
+  startAgentRuntimeSupervisorDaemon,
+  recordInflightMetricSample,
+  resetInflightMetricThrottleForTests,
+} from './agent_runtime_supervisor_daemon.js';
 
 async function sendRequest(
   socketPath: string,
@@ -192,6 +196,10 @@ describe('agent_runtime_supervisor_daemon', () => {
       resourceId: 'delegated-task-worker:child-1',
       child,
     });
+    // AC-10: the inflight-metric throttle is process-local module state;
+    // reset it so tests don't see stale "unchanged" suppression left over
+    // from a previous test's samples.
+    resetInflightMetricThrottleForTests();
   });
 
   afterEach(async () => {
@@ -204,6 +212,60 @@ describe('agent_runtime_supervisor_daemon', () => {
       fs.rmSync(rootDir, { recursive: true, force: true });
     }
     vi.clearAllMocks();
+  });
+
+  describe('recordInflightMetricSample (AC-10 throttle)', () => {
+    it('emits the first sample unconditionally', () => {
+      recordInflightMetricSample(2, { 'agent-1': 2 }, 1_000);
+      expect(mocks.appendSupervisorEvent).toHaveBeenCalledTimes(1);
+      expect(mocks.appendSupervisorEvent).toHaveBeenCalledWith({
+        decision: 'a2a_inflight_metric',
+        inflight_total: 2,
+        inflight_by_agent: { 'agent-1': 2 },
+      });
+    });
+
+    it('suppresses an unchanged sample before the minimum interval elapses', () => {
+      recordInflightMetricSample(2, { 'agent-1': 2 }, 1_000);
+      recordInflightMetricSample(2, { 'agent-1': 2 }, 1_000 + 60_000);
+      expect(mocks.appendSupervisorEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('emits immediately when the total changes, even before the minimum interval', () => {
+      recordInflightMetricSample(2, { 'agent-1': 2 }, 1_000);
+      recordInflightMetricSample(3, { 'agent-1': 2, 'agent-2': 1 }, 1_000 + 1_000);
+      expect(mocks.appendSupervisorEvent).toHaveBeenCalledTimes(2);
+      expect(mocks.appendSupervisorEvent).toHaveBeenLastCalledWith({
+        decision: 'a2a_inflight_metric',
+        inflight_total: 3,
+        inflight_by_agent: { 'agent-1': 2, 'agent-2': 1 },
+      });
+    });
+
+    it('emits an unchanged sample again once the minimum interval elapses', () => {
+      recordInflightMetricSample(2, { 'agent-1': 2 }, 1_000);
+      recordInflightMetricSample(2, { 'agent-1': 2 }, 1_000 + 10 * 60_000);
+      expect(mocks.appendSupervisorEvent).toHaveBeenCalledTimes(2);
+    });
+
+    it('treats agent-map key order as the same sample (no spurious emission)', () => {
+      recordInflightMetricSample(2, { a: 1, b: 1 }, 1_000);
+      recordInflightMetricSample(2, { b: 1, a: 1 }, 1_000 + 1_000);
+      expect(mocks.appendSupervisorEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('caps steady-state emissions at <= 144/day for a 30s sweep tick with no change', () => {
+      const dayMs = 24 * 60 * 60 * 1000;
+      const tickMs = 30_000;
+      // A tick at exactly `dayMs` belongs to the *next* day's window as much
+      // as this one's, so use a half-open [0, dayMs) window — 144 emission
+      // points (every 10 minutes) is the correct steady-state bound within
+      // any single 24h span.
+      for (let t = 0; t < dayMs; t += tickMs) {
+        recordInflightMetricSample(1, { 'agent-1': 1 }, t);
+      }
+      expect(mocks.appendSupervisorEvent.mock.calls.length).toBeLessThanOrEqual(144);
+    });
   });
 
   it('serves health/ensure/ask over the IPC socket', async () => {
