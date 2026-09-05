@@ -59,7 +59,9 @@ function isPrivateIpv6(hostname: string): boolean {
 
 export function getPresenceStudioAuthToken(): string {
   return String(
-    process.env.PRESENCE_STUDIO_TOKEN || getRegisteredEnvText('KYBERION_API_TOKEN') || ''
+    getRegisteredEnvText('PRESENCE_STUDIO_TOKEN') ||
+      getRegisteredEnvText('KYBERION_API_TOKEN') ||
+      ''
   );
 }
 
@@ -91,7 +93,7 @@ export function extractPresenceStudioToken(req: Pick<Request, 'headers'>): strin
 function resolvePresenceStudioCredential(presented: string) {
   const configured = getPresenceStudioAuthToken();
   return resolveSurfaceViewerToken(presented, {
-    apiToken: process.env.PRESENCE_STUDIO_TOKEN ? undefined : configured,
+    apiToken: getRegisteredEnvText('PRESENCE_STUDIO_TOKEN') ? undefined : configured,
     configuredCredentials: configured ? [{ token: configured, role: 'readonly' as const }] : [],
   });
 }
@@ -107,13 +109,17 @@ export function checkPresenceStudioRateLimit(
 
   const windowMs =
     options?.windowMs ??
-    Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS || RATE_LIMIT_DEFAULT_WINDOW_MS);
+    Number(
+      getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS') || RATE_LIMIT_DEFAULT_WINDOW_MS
+    );
   const method = String(req.method || 'UNKNOWN').toUpperCase();
   const limit =
     options?.limit ??
     (method === 'GET' || method === 'HEAD'
-      ? Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_GET || RATE_LIMIT_DEFAULT_GET)
-      : Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_MUTATION || RATE_LIMIT_DEFAULT_MUTATION));
+      ? Number(getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_GET') || RATE_LIMIT_DEFAULT_GET)
+      : Number(
+          getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_MUTATION') || RATE_LIMIT_DEFAULT_MUTATION
+        ));
   const key = getPresenceStudioRateLimitKey(req);
   const now = Date.now();
   const current = rateLimitStore.get(key);
@@ -145,7 +151,7 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
     return { ok: true, status: 200, reason: 'local' };
   }
 
-  if (process.env.PRESENCE_STUDIO_ALLOW_REMOTE === 'true') {
+  if (getRegisteredEnvText('PRESENCE_STUDIO_ALLOW_REMOTE') === 'true') {
     const token = getPresenceStudioAuthToken();
     if (!token) {
       return {
