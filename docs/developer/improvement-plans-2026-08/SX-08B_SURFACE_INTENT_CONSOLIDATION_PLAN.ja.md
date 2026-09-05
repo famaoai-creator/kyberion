@@ -1552,3 +1552,9 @@ voice profile promotionの未作成registry初期化をcatalog fallbackから呼
 service endpointの分割directory loaderで、schema上任意のversionが各JSONにない場合をserviceなしと誤判定していたため、実際のservice件数を空判定に使い、directory versionは`1.0.0`へ収束する修正を追加した。分割fileのservice id／filename一致、default pattern整合性、schema検証とfail-closed境界は維持している。
 
 検証: service-endpoint-registry **1 file / 4 tests passed**、operator-surface surface-directory **1 file / 4 tests passed**、core build、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 190
+
+visual review rubricの大規模な組み込みrubricと、正本rubricの欠損・schema不正をbuilt-inへ収束させるfallback／catchを削除し、正本rubricの読み込み障害を明示エラーとして返す境界へ統一した。tenant rubric→public rubricの選択、egress／tier guard、レビュー不能時の`skipped` semanticsは変更していない。
+
+検証: visual-review **1 file / 25 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。

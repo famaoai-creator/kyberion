@@ -57,27 +57,6 @@ export interface VisualReviewRubric {
   iteration: { max_rounds: number; stop_when_no_errors: boolean };
 }
 
-const BUILT_IN_RUBRIC: VisualReviewRubric = {
-  criteria: [
-    {
-      id: 'overflow',
-      title: 'Text fits its frame',
-      severity: 'error',
-      weight: 10,
-      prompt: 'Does any text run past its box or collide with another element?',
-    },
-    {
-      id: 'alignment',
-      title: 'Alignment and margins',
-      severity: 'error',
-      weight: 9,
-      prompt: 'Are elements aligned to a consistent grid with even margins?',
-    },
-  ],
-  banned_patterns: [],
-  iteration: { max_rounds: 3, stop_when_no_errors: true },
-};
-
 const cachedRubrics = new Map<string, VisualReviewRubric>();
 const rubricCatalogs = new Map<string, GovernedCatalog<VisualReviewRubric>>();
 const RUBRIC_SCHEMA_PATH = pathResolver.knowledge(
@@ -91,13 +70,6 @@ function rubricCatalog(filePath: string): GovernedCatalog<VisualReviewRubric> {
     id: `visual-review-rubric:${filePath}`,
     path: filePath,
     schema: RUBRIC_SCHEMA_PATH,
-    fallback: BUILT_IN_RUBRIC,
-    fallbackOnInvalid: true,
-    onFallback: (error) => {
-      logger.warn(
-        `rubric unreadable, using built-in: ${error instanceof Error ? error.message : String(error)}`
-      );
-    },
   });
   rubricCatalogs.set(filePath, catalog);
   return catalog;
@@ -111,32 +83,21 @@ export function loadVisualReviewRubric(options: { tenantSlug?: string } = {}): V
   const cacheKey = tenantSlug || 'public';
   const cached = cachedRubrics.get(cacheKey);
   if (cached) return cached;
-  try {
-    const candidatePaths = tenantSlug
-      ? [
-          pathResolver.knowledge(
-            'confidential/' + tenantSlug + '/design/visual-review-rubric.json'
-          ),
-          pathResolver.knowledge(
-            'public/design-patterns/media-templates/visual-review-rubric.json'
-          ),
-        ]
-      : [
-          pathResolver.knowledge(
-            'public/design-patterns/media-templates/visual-review-rubric.json'
-          ),
-        ];
-    const rubricPath = candidatePaths.find((candidate) => safeExistsSync(candidate));
-    if (rubricPath) {
-      const rubric = rubricCatalog(rubricPath).load();
-      cachedRubrics.set(cacheKey, rubric);
-      return rubric;
-    }
-  } catch (error: any) {
-    logger.warn(`rubric unavailable, using built-in: ${error?.message || error}`);
+  const candidatePaths = tenantSlug
+    ? [
+        pathResolver.knowledge('confidential/' + tenantSlug + '/design/visual-review-rubric.json'),
+        pathResolver.knowledge('public/design-patterns/media-templates/visual-review-rubric.json'),
+      ]
+    : [pathResolver.knowledge('public/design-patterns/media-templates/visual-review-rubric.json')];
+  const rubricPath = candidatePaths.find((candidate) => safeExistsSync(candidate));
+  if (!rubricPath) {
+    throw new Error(
+      `[VISUAL_REVIEW_RUBRIC_MISSING] no governed rubric found for ${tenantSlug || 'public'}`
+    );
   }
-  cachedRubrics.set(cacheKey, BUILT_IN_RUBRIC);
-  return BUILT_IN_RUBRIC;
+  const rubric = rubricCatalog(rubricPath).load();
+  cachedRubrics.set(cacheKey, rubric);
+  return rubric;
 }
 
 /** One actionable defect seen in the render. */
