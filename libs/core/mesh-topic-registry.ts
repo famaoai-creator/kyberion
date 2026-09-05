@@ -5,7 +5,7 @@ import { normalizeIso, nowIso } from './foundation/time.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeRmSync } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { listEligibleMeshPeers } from './mesh-peer-directory.js';
 import type {
@@ -125,7 +125,12 @@ function randomId(prefix: string): string {
 }
 
 function readJsonl<T>(logicalPath: string): T[] {
-  return readJsonLines<T>(logicalPath);
+  const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`mesh topic registry JSONL must be a regular file: ${safePath}`);
+  }
+  return readJsonLines<T>(safePath);
 }
 
 function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: unknown): string {

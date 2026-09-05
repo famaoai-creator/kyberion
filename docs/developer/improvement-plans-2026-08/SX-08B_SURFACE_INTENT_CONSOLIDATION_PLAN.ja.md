@@ -1758,3 +1758,7 @@ stimuli journalのappend／subscribeを共通の`resolveStimuliJournalPath`へ�
 process-improvement queueのreader／writerを`assertSafeRepositoryPath`／`safeLstat`へ接続し、symlink／非regular fileをempty queueへ隠蔽せず、operator ratification queueのread／append／rewrite対象から除外する境界を追加した。**1 file / 13 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
 
 検証: backend-conformance **1 file / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と全provider adapterの実測は継続課題とする。
+
+## 2026-09-06 再レビュー修正 225
+
+mesh topic registryのsubscriptions JSONL readerを`assertSafeRepositoryPath`／`safeLstat`へ接続し、symlink／非regular fileをsubscription discoveryへ読み込まないoperation-time境界を追加した。governed artifact writer、tenant／namespace検証と未作成subscriptionsの空配列を維持し、**1 file / 5 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
