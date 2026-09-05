@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import {
   createApprovalRequest,
   computeApprovalPayloadHash,
@@ -44,7 +45,6 @@ import {
   safeMkdir,
   safeMoveSync,
   safeReaddir,
-  safeReadFile,
   safeRmSync,
   safeStat,
   safeWriteFile,
@@ -148,11 +148,9 @@ function readPluginManifestSafely(pluginRoot: string): {
       throw new Error(`plugin manifest must be a regular file: ${candidatePath}`);
     }
     parsed = parseSafeJsonObjectValue(
-      parseSafeJsonInput(
-        String(safeReadFile(candidatePath, { encoding: 'utf8' }) || ''),
-        `plugin manifest ${candidatePath}`,
-        { preserveParseError: true }
-      ),
+      parseSafeJsonInput(readTextFile(candidatePath), `plugin manifest ${candidatePath}`, {
+        preserveParseError: true,
+      }),
       `plugin manifest ${candidatePath}`
     );
   } catch (err: unknown) {

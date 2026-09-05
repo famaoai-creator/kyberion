@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from './knowledge-scope.js';
 
@@ -89,7 +90,7 @@ export class KnowledgeProvider {
       if (defaultValue !== undefined) return defaultValue;
       throw new Error(`Knowledge file not found: ${fullPath}`);
     }
-    return safeReadFile(fullPath, { encoding: 'utf8' }) as string;
+    return readTextFile(fullPath);
   }
 
   private static assertReadable(
