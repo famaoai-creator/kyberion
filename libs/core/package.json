@@ -2223,10 +2223,6 @@
       "types": "./dist/project-state-sync.d.ts",
       "default": "./dist/project-state-sync.js"
     },
-    "./cli-input": {
-      "types": "./dist/cli-input.d.ts",
-      "default": "./dist/cli-input.js"
-    },
     "./locale-normalize": {
       "types": "./dist/locale-normalize.d.ts",
       "default": "./dist/locale-normalize.js"
