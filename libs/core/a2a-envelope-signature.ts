@@ -2,13 +2,13 @@ import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 
@@ -60,7 +60,7 @@ export function resolveA2ASecret(): string {
           `[A2A_SECRET_RESOURCE] persisted secret must be a regular file: ${secretPath}`
         );
       }
-      const persisted = String(safeReadFile(secretPath, { encoding: 'utf8' }) || '').trim();
+      const persisted = readTextFile(secretPath).trim();
       if (persisted) {
         cachedSecret = persisted;
         return cachedSecret;
