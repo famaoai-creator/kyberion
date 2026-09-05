@@ -282,6 +282,9 @@ export function readTenantProfile(
   // callers looking for a corrupt file instead of a missing execution context.
   let source: string;
   try {
+    if (!safeLstat(safeFile).isFile()) {
+      throw new Error('tenant profile must be a regular file');
+    }
     source = safeReadFile(safeFile, { encoding: 'utf8' }) as string;
   } catch (error) {
     throw new Error(
