@@ -1730,3 +1730,9 @@ provider capability probeがprovider discovery／実行backendと異なりCLI bi
 reasoning provider descriptorのcapability／input modality／env keyを必須メタデータへ変更した。欠損・型不正・text modalityなしのdescriptorを保守的既定値へ補正せず拒否し、schemaとruntime parserを一致させた。
 
 検証: reasoning-provider-registry **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`、knowledge index更新後のcanonical full gate **69/69 passed**。provider CLIの実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
+## 2026-09-06 再レビュー修正 219
+
+未参照のprovider capability fallback catalogを削除し、primary catalogの欠損時だけ明示的空viewを使うようにした。配置済みcatalogのJSON／schema不正と、probe書込み時の既存catalog不正を黙って空catalogへ置換せず fail-closed とした。
+
+検証: provider-capability-catalog／provider-discovery／provider-capability-registry **3 files / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
