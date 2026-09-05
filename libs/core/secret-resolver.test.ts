@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   ChainSecretResolver,
   describeSecretResolver,
   getSecretResolver,
+  installSecretResolverIfAvailable,
   registerSecretResolver,
   resetSecretResolver,
   resolveSecretAsync,
@@ -14,6 +17,27 @@ import {
 
 describe('secret-resolver', () => {
   afterEach(() => resetSecretResolver());
+
+  it('routes resolver environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/secret-resolver.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  it('installs from an injected environment without consulting ambient state', () => {
+    expect(
+      installSecretResolverIfAvailable({
+        KYBERION_SECRET_RESOLVER_COMMAND: 'printf injected-secret',
+        KYBERION_SECRET_RESOLVER_TIMEOUT_MS: '2500',
+      })
+    ).toBe(true);
+    expect(getSecretResolver()?.name).toBe('shell');
+    expect(describeSecretResolver()).toEqual({ configured: true, writable: false });
+  });
 
   it('returns null when no resolver is registered', () => {
     expect(resolveSecretSync({ key: 'X' })).toBeNull();
