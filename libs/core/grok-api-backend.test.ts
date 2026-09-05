@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   GROK_API_DEFAULT_BASE_URL,
   GROK_API_DEFAULT_MODEL,
@@ -17,6 +19,16 @@ describe('grok-api-backend', () => {
     delete process.env.KYBERION_GROK_API_URL;
     delete process.env.KYBERION_GROK_API_MODEL;
     delete process.env.KYBERION_REASONING_MODEL;
+  });
+
+  it('routes Grok API environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/grok-api-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 
   it('does not build without an xAI API key', () => {
@@ -71,9 +83,12 @@ describe('grok-api-backend', () => {
 
   it('inlines validated image attachments using the OpenAI vision message shape', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ choices: [{ message: { content: 'A Kyberion mark.' } }] }), {
-        status: 200,
-      })
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { role: 'assistant', content: 'A Kyberion mark.' } }],
+        }),
+        { status: 200 }
+      )
     );
     vi.stubGlobal('fetch', fetchMock);
     const backend = buildGrokApiBackendFromEnv({ XAI_API_KEY: 'xai-test-key' });
