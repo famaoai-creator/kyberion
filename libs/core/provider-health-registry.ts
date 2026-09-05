@@ -14,7 +14,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
-import { getRegisteredEnv, getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnv, getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { listDemotedProviders, registerHealthyInstancesResolver } from './provider-health-view.js';
 
@@ -69,7 +69,7 @@ let loadedFromPath: string | null = null;
 // leak demotions across unrelated test files (same pattern as
 // operator-notifications' VITEST guard).
 function persistenceEnabled(): boolean {
-  return !getRegisteredEnvText('VITEST') || Boolean(getRegisteredEnv(STATE_PATH_ENV));
+  return !isVitestProcess() || Boolean(getRegisteredEnv(STATE_PATH_ENV));
 }
 
 function stateFilePath(): string {

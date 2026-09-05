@@ -1204,3 +1204,9 @@ AGY CLI backend と memory promotion queue に残っていた `NODE_ENV` の直�
 AGY／memory に続く実運用環境境界として、mission-work reconciliation の GitHub branch／commit metadata と avatar generator の provider detection に残っていた直接環境参照を、登録済み `getRegisteredEnvText` へ移行した。GitHub metadataの優先順位、local git fallback、Codex／AGY bridgeの自動選択、既存の安全なartifact path境界は変更していない。共通 environment boundary test に対象を追加した。
 
 検証: avatar／mission reconciliation／environment boundary **4 files / 30 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck、foundation adoption check。残る test-only guard、未移行の個別設定、外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 132
+
+Vitestの実行ガードに残っていた `VITEST` の直接環境参照を、テスト用マーカーとして副作用なく判定する共通 `isVitestProcess` へ統一した。テストfixtureがrepository rootを差し替える場合に環境registryを再帰的に読まない境界を明示し、NHI lifecycle fixtureには既存schemaをseedして実行条件を再現した。プロダクションの認証・権限・監査semanticsは変更していない。
+
+検証: 対象 **14 files / 179 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`、foundation adoption check。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。

@@ -15,10 +15,11 @@
  * suites create their own mission fixtures deliberately.
  */
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 
 export function resolveSharedObservabilityDir(realDir: string): string | null {
   const override = getRegisteredEnvText('KYBERION_TEST_OBSERVABILITY_DIR');
   if (override && override.trim()) return override.trim();
-  if (process.env.VITEST) return null;
+  if (isVitestProcess()) return null;
   return realDir;
 }

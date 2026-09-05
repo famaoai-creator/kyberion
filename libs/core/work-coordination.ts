@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { slugify } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 
 import { withExecutionContext } from './authority.js';
 import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
@@ -658,7 +658,7 @@ function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
   const context = normalizeWorkItemContext(input.context || {}, input.projectId);
   if (
     context.tenant_slug &&
-    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST)
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
   ) {
     resolveTenant(context.tenant_slug, {
       rootDir: coordinationRootOverride || undefined,

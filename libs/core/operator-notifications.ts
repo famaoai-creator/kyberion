@@ -3,6 +3,7 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
@@ -302,7 +303,7 @@ export function notifyOperatorSync(
   // Tests exercising real mission flows must not pollute the operator's
   // real inbox/channels (81 phantom entries taught us this). Suites that
   // genuinely test delivery mock this module or set the override.
-  if (process.env.VITEST && getRegisteredEnvText('KYBERION_ALLOW_TEST_NOTIFICATIONS') !== '1') {
+  if (isVitestProcess() && getRegisteredEnvText('KYBERION_ALLOW_TEST_NOTIFICATIONS') !== '1') {
     return false;
   }
   try {

@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createLogger } from '../logger.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
+import { isVitestProcess } from '../foundation/env.js';
 
 const logger = createLogger('lock-utils');
 
@@ -16,7 +17,7 @@ export interface LockIo {
 let lockIo: LockIo | undefined;
 
 function testLockIo(): LockIo | undefined {
-  if (!process.env.VITEST) return undefined;
+  if (!isVitestProcess()) return undefined;
   return (
     globalThis as typeof globalThis & {
       __kyberionVitestIo?: { lockIo?: LockIo };

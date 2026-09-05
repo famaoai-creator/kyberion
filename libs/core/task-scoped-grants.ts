@@ -58,6 +58,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { auditChain } from './audit-chain.js';
@@ -232,7 +233,7 @@ function recordGrantAudit(event: TaskGrantAuditEvent): void {
       auditSinkOverride(event);
       return;
     }
-    if (getRegisteredEnvText('VITEST')) return; // hermetic guard — see setTaskGrantAuditSinkForTests
+    if (isVitestProcess()) return; // hermetic guard — see setTaskGrantAuditSinkForTests
     auditChain.record({
       agentId: event.grantee_nhi_id,
       action: event.action,
@@ -279,7 +280,7 @@ function readGrantRecords(): Map<string, TaskScopedGrant> {
 }
 
 function appendGrantRecord(record: TaskScopedGrant): void {
-  if (getRegisteredEnvText('VITEST') && !getRegisteredEnvText(TASK_GRANTS_PATH_ENV)?.trim()) {
+  if (isVitestProcess() && !getRegisteredEnvText(TASK_GRANTS_PATH_ENV)?.trim()) {
     throw new Error(
       '[task-scoped-grants] refusing to write the governed default store under vitest — ' +
         `set process.env.${TASK_GRANTS_PATH_ENV} to an active/shared/tmp/... path in your ` +

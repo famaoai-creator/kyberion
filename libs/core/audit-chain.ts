@@ -3,6 +3,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
@@ -206,7 +207,7 @@ export function registerAuditForwarderPublisher(publisher: AuditForwarderPublish
 }
 
 function testAuditChainIo(): AuditChainIo | undefined {
-  if (!process.env.VITEST) return undefined;
+  if (!isVitestProcess()) return undefined;
   return (
     globalThis as typeof globalThis & {
       __kyberionVitestIo?: { auditIo?: AuditChainIo };

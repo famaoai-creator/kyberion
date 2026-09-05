@@ -14,6 +14,7 @@
 import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 import { metrics } from './metrics.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
@@ -223,7 +224,7 @@ export function checkSpendGuard(
 export function enforceSpendGuardForReasoning(missionId?: string): void {
   // Same VITEST pattern as provider-health persistence: unit tests must not
   // read the real metrics history / policy unless they opt in.
-  if (process.env.VITEST && getRegisteredEnvText('KYBERION_SPEND_GUARD_TEST') !== '1') return;
+  if (isVitestProcess() && getRegisteredEnvText('KYBERION_SPEND_GUARD_TEST') !== '1') return;
   const result = checkSpendGuard({ missionId });
   if (!result.allowed) {
     throw new SpendCapExceededError(result);

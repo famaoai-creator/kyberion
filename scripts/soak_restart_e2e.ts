@@ -14,7 +14,12 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine, nowIso } from '@agent/core/foundation';
+import {
+  appendJsonLine,
+  getRegisteredEnvText,
+  isVitestProcess,
+  nowIso,
+} from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -184,7 +189,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
   safeRmSync(safeRoot, { recursive: true, force: true });
   safeMkdir(safeRoot, { recursive: true });
 
-  if (process.env.VITEST === '1' || process.env.NODE_ENV === 'test') {
+  if (isVitestProcess() || getRegisteredEnvText('NODE_ENV') === 'test') {
     const bootstrap = writeBootstrapState(safeRoot);
     safeWriteFile(
       bootstrap.journal_path,

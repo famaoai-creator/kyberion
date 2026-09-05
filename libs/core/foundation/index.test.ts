@@ -9,6 +9,7 @@ import {
   clamp,
   getRegisteredEnv,
   getRegisteredEnvText,
+  isVitestProcess,
   normalizeText,
   parseIso,
   readTextFile,
@@ -85,6 +86,11 @@ describe('foundation helpers', () => {
     expect(environment.KYBERION_FOUNDATION_TEST).toBe('enabled');
     setRegisteredEnv('KYBERION_FOUNDATION_TEST', undefined, environment);
     expect(environment.KYBERION_FOUNDATION_TEST).toBeUndefined();
+  });
+
+  it('detects the test runtime without consulting the repository registry', () => {
+    expect(isVitestProcess({ VITEST: '1' })).toBe(true);
+    expect(isVitestProcess({ VITEST: undefined })).toBe(false);
   });
 
   it('builds a least-privilege child environment from the shared allowlist', () => {
