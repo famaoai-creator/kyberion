@@ -1584,3 +1584,9 @@ presentation preference registryの組み込みfallbackと、正本registryの�
 tenant rate-limit policyを必須catalogへ変更し、quota stateは未作成時だけ明示的な空stateから開始し、既存stateのschema不正をリセットしないようにした。推論provider registryは欠損fallbackを削除し、未知・不正なprovider entryを無視せず明示エラーにした。
 
 検証: presentation-preference-registry／tenant-rate-limiter／reasoning-provider-registry **3 files / 17 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateはこの変更群反映後に再実行する。
+
+## 2026-09-06 再レビュー修正 195
+
+knowledge curation SLOのcatalog fallbackを削除し、SLO config未作成時は呼び出し側の明示的な保守的既定値から開始し、存在するconfigのschema不正はそのまま拒否する境界へ整理した。freshness／low-yield判定、tenant ingest advisory、archive historyの既存semanticsは変更していない。
+
+検証: knowledge-curation-report **1 file / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。

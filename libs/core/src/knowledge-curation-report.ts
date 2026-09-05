@@ -179,8 +179,6 @@ function curationSloCatalog(
     id: 'knowledge-curation-slo',
     path: filePath,
     schema: CURATION_SLO_SCHEMA_PATH,
-    fallback: { version: '1.0.0', ...DEFAULT_SLO_CONFIG },
-    fallbackOnInvalid: true,
   });
   curationSloCatalogs.set(filePath, catalog);
   return catalog;
@@ -377,22 +375,21 @@ function usageScopeForTenant(tenantSlug: string): ScopeContext {
 
 /**
  * SLO thresholds are config, not code: this is the only place defaults are
- * declared, and they are used only when the config file is absent/invalid
- * (fail-open — a missing/malformed config must not crash the weekly
- * pipeline, it should just fall back to conservative defaults).
+ * declared. A missing config starts an unconfigured report with conservative
+ * defaults; a present but malformed config is rejected instead of being
+ * silently replaced.
  */
 export function loadCurationSloConfig(): CurationSloConfig {
   const filePath = sloConfigPath();
-  try {
-    const parsed = curationSloCatalog(filePath).load();
-    return {
-      low_yield_delivery_threshold: parsed.low_yield_delivery_threshold,
-      freshness_days_by_kind: { ...parsed.freshness_days_by_kind },
-      default_freshness_days: parsed.default_freshness_days,
-    };
-  } catch {
+  if (!safeExistsSync(filePath)) {
     return { ...DEFAULT_SLO_CONFIG };
   }
+  const parsed = curationSloCatalog(filePath).load();
+  return {
+    low_yield_delivery_threshold: parsed.low_yield_delivery_threshold,
+    freshness_days_by_kind: { ...parsed.freshness_days_by_kind },
+    default_freshness_days: parsed.default_freshness_days,
+  };
 }
 
 function loadTaxonomyDirectoryDefaults(): KnowledgeTaxonomyDirectoryDefault[] {
