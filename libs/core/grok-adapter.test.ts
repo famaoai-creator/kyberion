@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import { GrokAdapter } from './agent-adapter.js';
 
 const grokParent = Object.getPrototypeOf(GrokAdapter.prototype) as {
@@ -19,6 +21,14 @@ describe('GrokAdapter native spawn_subagent observation', () => {
     if (previous === undefined) delete process.env.GROK_SUBAGENTS;
     else process.env.GROK_SUBAGENTS = previous;
     vi.restoreAllMocks();
+  });
+
+  it('reads the native-subagent feature flag through the environment registry', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/agent-adapter.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain('process.env.GROK_SUBAGENTS');
+    expect(source).toContain("getRegisteredEnvText('GROK_SUBAGENTS')");
   });
 
   it('fails closed when the parent turn never invoked spawn_subagent', async () => {
