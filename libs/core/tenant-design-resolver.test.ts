@@ -42,6 +42,16 @@ describe('tenant-design-resolver', () => {
     });
   });
 
+  it('rejects a present but schema-invalid confidential design index', () => {
+    const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
+    safeMkdir(path.dirname(indexPath), { recursive: true });
+    safeWriteFile(indexPath, JSON.stringify({ tenants: [{ id: 'tenant-a' }] }));
+
+    expect(() => loadTenantDesignOverrideIndex(rootDir)).toThrow(
+      'Invalid catalog tenant-design-override-index'
+    );
+  });
+
   it('resolves tenant branding from confidential override files', () => {
     const designDir = path.join(rootDir, 'knowledge/confidential/client-a/design');
     safeMkdir(path.join(designDir, 'assets'), { recursive: true });
@@ -227,7 +237,7 @@ describe('tenant-design-resolver', () => {
     expect(result.tenantOverride).toBeNull();
   });
 
-  it('does not follow a registry override into a lower tier', () => {
+  it('rejects a registry override that points into a lower tier', () => {
     const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
     const personalDesignDir = path.join(rootDir, 'knowledge/personal/secret/design');
     safeMkdir(path.dirname(indexPath), { recursive: true });
@@ -248,10 +258,9 @@ describe('tenant-design-resolver', () => {
       JSON.stringify({ brand_name: 'Personal Leak', matchers: ['personal leak'] })
     );
 
-    const result = resolveTenantDesign({ rootDir, brandName: 'Personal Leak' });
-
-    expect(result.source).toBe('default');
-    expect(result.tenantOverride).toBeNull();
+    expect(() => resolveTenantDesign({ rootDir, brandName: 'Personal Leak' })).toThrow(
+      'Invalid catalog tenant-design-override-index'
+    );
   });
 });
 
