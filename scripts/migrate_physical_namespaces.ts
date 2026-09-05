@@ -23,13 +23,12 @@ import {
   assertSafeRepositoryPath,
   safeMkdir,
   safeMoveSync,
-  safeReadFile,
   safeReaddir,
   safeLstat,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { isRecord, nowIso } from '@agent/core/foundation';
+import { isRecord, nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 
@@ -238,7 +237,7 @@ function safeRecordName(source: string): string {
 
 function hashFile(source: string): string {
   return createHash('sha256')
-    .update(String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' })))
+    .update(readTextFile(requireRegularMigrationFile(source)))
     .digest('hex');
 }
 
@@ -281,7 +280,7 @@ function feedbackScopes(source: string): {
   scope?: EventScope;
   reason?: string;
 } {
-  const lines = String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' }))
+  const lines = readTextFile(requireRegularMigrationFile(source))
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -342,7 +341,7 @@ function intentScopes(source: string): {
   let parsed: Record<string, unknown>;
   try {
     parsed = parseMigrationJsonObject(
-      String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' })),
+      readTextFile(requireRegularMigrationFile(source)),
       'intent memory'
     );
   } catch (error) {
@@ -397,7 +396,7 @@ function ledgerScopes(source: string): {
   scope?: EventScope;
   reason?: string;
 } {
-  const lines = String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' }))
+  const lines = readTextFile(requireRegularMigrationFile(source))
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -453,7 +452,7 @@ function promotionScopes(source: string): {
   scope?: EventScope;
   reason?: string;
 } {
-  const lines = String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' }))
+  const lines = readTextFile(requireRegularMigrationFile(source))
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -569,7 +568,7 @@ function buildPlan(kind: MigrationKind, apply: boolean): MigrationPlan {
     let record: Record<string, unknown>;
     try {
       record = parseMigrationJsonObject(
-        String(safeReadFile(requireRegularMigrationFile(candidate.source), { encoding: 'utf8' })),
+        readTextFile(requireRegularMigrationFile(candidate.source)),
         `${candidate.kind} record`
       );
     } catch (error) {

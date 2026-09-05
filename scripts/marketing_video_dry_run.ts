@@ -20,7 +20,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { parseSafeJsonObjectInput } from '@agent/core/foundation';
+import { parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ProbeResult {
@@ -89,8 +89,8 @@ export function runMarketingVideoDryRun(input: {
     throw new Error(`brand profile path must be a regular file: ${input.brandProfilePath}`);
   }
   const outputRoot = resolveMarketingVideoPath(input.outputRoot, 'output root', true);
-  const brief = safeReadFile(briefPath, { encoding: 'utf8' }) as string;
-  const brand = safeReadFile(brandPath, { encoding: 'utf8' }) as string;
+  const brief = readTextFile(briefPath);
+  const brand = readTextFile(brandPath);
   const parsedBrief = parseSafeJsonObjectInput(brief, 'campaign brief JSON') as {
     intake: Parameters<typeof validateMarketingIntake>[0];
   };
@@ -317,15 +317,15 @@ export function runMarketingVideoDryRun(input: {
   const sensitiveDataScan = scanMarketingTextForSensitiveData([
     {
       location: 'campaign-brief.md',
-      content: safeReadFile(campaignBriefOutputPath, { encoding: 'utf8' }) as string,
+      content: readTextFile(campaignBriefOutputPath),
     },
     {
       location: 'script.md',
-      content: safeReadFile(scriptOutputPath, { encoding: 'utf8' }) as string,
+      content: readTextFile(scriptOutputPath),
     },
     {
       location: 'captions.vtt',
-      content: safeReadFile(captionsPath, { encoding: 'utf8' }) as string,
+      content: readTextFile(captionsPath),
     },
   ]);
   const classificationGate = validatePublicationClassification({

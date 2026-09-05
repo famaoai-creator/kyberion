@@ -22443,3 +22443,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/run_baseline_check.ts`、`scripts/soak_endurance.ts`、`scripts/pipeline-execution-part-execution.ts` と対象テスト
 - **変更**: baseline config、soak evidence、pipeline fragment の本文読込を foundation の `readTextFile` へ移行した。baseline／soak／pipelineの既存実行・環境境界・evidence semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／40 tests passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1541
+
+- **対象**: `scripts/migrate_peer_tenant_runtime.ts`、`scripts/migrate_physical_namespaces.ts`、`scripts/marketing_video_dry_run.ts` と対象テスト
+- **変更**: peer tenant／physical namespace migration の入力・ハッシュ対象本文、marketing video の brief／brand／生成テキスト本文を foundation の `readTextFile` へ移行した。移行のtenant scope／quarantine、SHA-256・バイナリアーティファクト、marketing approval／media semanticsは変更せず、reader contract を追加した。
+- **検証**: 対象テスト **3 files／18 tests passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
