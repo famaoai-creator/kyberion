@@ -1806,3 +1806,7 @@ Browser Native Messaging hostの内部例外応答を`formatWireError`へ統一�
 ## 2026-09-06 再レビュー修正 236
 
 Computer Surfaceの認証・OS projection・A2UI・identity read境界を共通wire-safe projectionへ統一し、内部例外のmessage／stackをJSON応答へ返さないようにした。statusと既存の明示的な拒否 semanticsを維持し、wire checkerへ実ファイル監査を追加した。関連 **3 files / 21 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 237
+
+Conciergeのviewer／主要API境界を共通wire-safe projectionへ統一し、内部例外のmessage／stackを外部JSONへ返さないようにした。rate limit、validation、not-found、既存の認証拒否 semanticsを維持し、wire checkerの実ファイル監査対象へConciergeを追加した。関連 **12 files / 33 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。

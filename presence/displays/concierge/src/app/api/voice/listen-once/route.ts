@@ -7,6 +7,7 @@ import {
 } from '../../../../lib/request-input';
 import { voiceHubUrl } from '../../../../lib/voice-hub';
 import { parseVoiceListenOnceResponse } from '../../../../lib/voice-types';
+import { conciergeErrorResponse } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,9 +74,6 @@ export async function POST(req: NextRequest) {
     }
     // Daemon down or capture timed out — a clear machine-readable failure the
     // hook maps to a polite notice (never an unhandled exception).
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 503 }
-    );
+    return conciergeErrorResponse(error, 503);
   }
 }

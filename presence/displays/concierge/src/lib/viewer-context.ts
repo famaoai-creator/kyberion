@@ -18,6 +18,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+import { toWireError } from '@agent/core/wire-error';
 
 const CONCIERGE_RATE_LIMIT_WINDOW_MS = 60_000;
 const CONCIERGE_RATE_LIMIT_GET = 180;
@@ -227,9 +228,9 @@ export function resolveConciergeViewer(
     return { context: resolveConciergeViewerContext(req) };
   } catch (error) {
     return {
-      response: NextResponse.json(
-        { ok: false, error: error instanceof Error ? error.message : 'Unauthorized' },
-        { status: error instanceof ConciergeViewerError ? error.status : 401 }
+      response: conciergeErrorResponse(
+        error,
+        error instanceof ConciergeViewerError ? error.status : 401
       ),
     };
   }
@@ -309,8 +310,18 @@ export function withConciergeViewerContext<T>(viewer: ConciergeViewerContext, fn
 }
 
 export function conciergeErrorResponse(error: unknown, statusOverride?: number): NextResponse {
+  const status = statusOverride || (error instanceof ConciergeViewerError ? error.status : 500);
+  const safe = toWireError({
+    status,
+    message: error instanceof Error ? error.message : String(error),
+  });
   return NextResponse.json(
-    { ok: false, error: error instanceof Error ? error.message : 'Request failed' },
-    { status: statusOverride || (error instanceof ConciergeViewerError ? error.status : 500) }
+    {
+      ok: false,
+      error: safe.message,
+      error_code: safe.code,
+      correlation_id: safe.correlation_id,
+    },
+    { status }
   );
 }

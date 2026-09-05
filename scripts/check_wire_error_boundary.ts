@@ -28,6 +28,16 @@ export const WIRE_ERROR_BOUNDARY_FILES = [
   'presence/displays/presence-studio/presence-studio-runtime-data.ts',
   'scripts/browser_bridge_host.ts',
   'presence/displays/computer-surface/server.ts',
+  'presence/displays/concierge/src/lib/viewer-context.ts',
+  'presence/displays/concierge/src/app/api/approvals/[id]/route.ts',
+  'presence/displays/concierge/src/app/api/config-missions/route.ts',
+  'presence/displays/concierge/src/app/api/notification-preferences/route.ts',
+  'presence/displays/concierge/src/app/api/outcomes/[id]/route.ts',
+  'presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts',
+  'presence/displays/concierge/src/app/api/plugins/route.ts',
+  'presence/displays/concierge/src/app/api/response-status/route.ts',
+  'presence/displays/concierge/src/app/api/setup/route.ts',
+  'presence/displays/concierge/src/app/api/voice/listen-once/route.ts',
 ];
 const DEFAULT_WIRE_ERROR_FILE = WIRE_ERROR_BOUNDARY_FILES[0];
 

@@ -809,6 +809,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-02／PI-03 の Presence Studio wire境界を再レビューし、Express／runtime-dataの内部例外JSON responseを共通`presenceStudioWireError`へ統一した。固定message／`error_code`／`correlation_id`以外をwireへ返さず、監査ログと明示的なvalidation／not-found文言は維持した。wire boundary checkerをPresence Studioの実ファイルへ拡張し、関連 **4 files / 13 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettierで確認した。
 - 2026-09-06: PI-02／PI-03 の Browser Native Messaging host wire境界を再レビューし、recording／delta／analysis／report保存とdispatch外側catchの内部例外を`formatWireError`へ統一した。validation／approval拒否 semanticsを維持し、wire boundary checkerをhostへ拡張した。関連 **3 files / 16 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-02／PI-03 の Computer Surface wire境界を再レビューし、認証・OS projection・A2UI・identity readの内部例外JSON responseを`computerSurfaceWireError`へ統一した。statusと明示的なoperation／入力拒否 semanticsを維持し、wire boundary checkerをComputer Surfaceへ拡張した。関連 **3 files / 21 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
+- 2026-09-06: PI-02／PI-03 の Concierge wire境界を再レビューし、viewer解決・approval・config mission・notification・outcome・plugin・response status・setup・voice listenの内部例外JSON responseを`conciergeErrorResponse`へ統一した。rate limit／validation／not-found semanticsを維持し、wire boundary checkerをConciergeへ拡張した。関連 **12 files / 33 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 
