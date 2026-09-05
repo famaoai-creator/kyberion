@@ -15,6 +15,7 @@ import {
 import { platform } from './platform.js';
 import { pathResolver } from './path-resolver.js';
 import { createLogger } from './logger.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveVideoBackend, type MediaBackendRecord } from './media-backend-registry.js';
 
 const logger = createLogger('video-render-backend');
@@ -146,7 +147,7 @@ async function renderVideoCompositionBundleImpl(
     });
     const outputPath = resolveOutputPath(plan);
     const execEnv = buildSafeExecEnv({
-      NODE_OPTIONS: `${process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ` : ''}--require=${resolveRepositoryScript('scripts/hyperframes-localhost-preload.cjs')}`,
+      NODE_OPTIONS: `${getRegisteredEnvText('NODE_OPTIONS') ? `${getRegisteredEnvText('NODE_OPTIONS')} ` : ''}--require=${resolveRepositoryScript('scripts/hyperframes-localhost-preload.cjs')}`,
     });
     const command = [
       'hyperframes',

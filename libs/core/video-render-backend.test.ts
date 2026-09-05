@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import { platform as corePlatform } from './platform.js';
 
 const mocks = vi.hoisted(() => ({
@@ -35,6 +36,16 @@ describe('video render backend', () => {
       if (command === 'ffprobe') return '0\n';
       return '';
     });
+  });
+
+  it('reads inherited Node options through the environment registry', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/video-render-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toContain('process.env.NODE_OPTIONS');
+    expect(source).toContain("getRegisteredEnvText('NODE_OPTIONS')");
   });
 
   it('returns non-executed when backend rendering is disabled', async () => {
