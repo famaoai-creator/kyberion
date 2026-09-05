@@ -1,7 +1,7 @@
 import { logger } from '@agent/core/core';
 import { clamp } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
-import { splitLinesBalanced } from '@agent/core/src/native-pptx-engine/text-metrics';
+import { splitLinesBalanced } from '@agent/core/native-pptx-engine/text-metrics';
 import { ensureReadableOn, validateThemeContrast } from '@agent/core/design-qa';
 import { classifyRenderSemantic } from './media-document-helpers.js';
 import * as path from 'node:path';

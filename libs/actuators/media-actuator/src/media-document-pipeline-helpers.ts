@@ -2,7 +2,7 @@ import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/
 import { defineCatalog, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { retry } from '@agent/core/async-utils';
-import { designDefaultsFromMediaTheme } from '@agent/core/src/native-pptx-engine/design-cascade';
+import { designDefaultsFromMediaTheme } from '@agent/core/native-pptx-engine/design-cascade';
 import {
   generateNativeDocx,
   generateNativePdf,

@@ -79,6 +79,14 @@
       "types": "./dist/knowledge-curation-report.d.ts",
       "default": "./dist/knowledge-curation-report.js"
     },
+    "./native-pptx-engine/text-metrics": {
+      "types": "./dist/native-pptx-engine/text-metrics.d.ts",
+      "default": "./dist/native-pptx-engine/text-metrics.js"
+    },
+    "./native-pptx-engine/design-cascade": {
+      "types": "./dist/native-pptx-engine/design-cascade.d.ts",
+      "default": "./dist/native-pptx-engine/design-cascade.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
