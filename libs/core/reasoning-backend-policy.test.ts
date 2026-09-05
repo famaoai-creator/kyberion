@@ -19,6 +19,7 @@ describe('reasoning-backend-policy', () => {
     expect(policy.allowed_modes).toContain('openrouter');
     expect(policy.allowed_modes).toContain('nemotron-api');
     expect(policy.allowed_modes).toContain('copilot');
+    expect(policy.allowed_modes).toContain('cursor-cli');
     expect(policy.allowed_modes).toContain('grok-cli');
     expect(policy.allowed_modes).toContain('grok-api');
     expect(policy.mode_aliases['gemini-api']).toBeUndefined();

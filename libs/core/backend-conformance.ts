@@ -26,6 +26,7 @@ const CLI_MODES = [
   'gemini-cli',
   'agy-cli',
   'grok-cli',
+  'cursor-cli',
   'copilot',
 ] as const satisfies readonly ReasoningBackendMode[];
 
@@ -35,6 +36,7 @@ const CLI_BINARIES: Record<(typeof CLI_MODES)[number], string> = {
   'gemini-cli': 'gemini',
   'agy-cli': 'agy',
   'grok-cli': 'grok',
+  'cursor-cli': 'cursor-agent',
   copilot: 'copilot',
 };
 
@@ -128,6 +130,7 @@ const SANDBOX_PROBE_PROVIDERS = [
   { mode: 'codex-cli', provider: 'codex', binary: 'codex' },
   { mode: 'gemini-cli', provider: 'gemini', binary: 'gemini' },
   { mode: 'grok-cli', provider: 'grok', binary: 'grok' },
+  { mode: 'cursor-cli', provider: 'cursor', binary: 'cursor-agent' },
   { mode: 'agy-cli', provider: 'agy', binary: 'agy' },
   { mode: 'copilot', provider: undefined, binary: 'copilot' },
 ] as const satisfies readonly {

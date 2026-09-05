@@ -151,6 +151,13 @@ export async function probeExplicitReasoningBackend(
       return binaryProbe('gh', ['copilot', '--', '--help'])
         ? { available: true }
         : unavailable('`gh copilot -- --help` failed');
+    case 'cursor-cli':
+      return binaryProbe(
+        getRegisteredEnvText('KYBERION_CURSOR_CLI_BIN', { env })?.trim() || 'cursor-agent',
+        ['--version']
+      )
+        ? { available: true }
+        : unavailable('`cursor-agent --version` failed');
     case 'anthropic': {
       const probe = await anthropicProbe(env);
       return probe.available

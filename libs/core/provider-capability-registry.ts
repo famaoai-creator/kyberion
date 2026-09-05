@@ -157,6 +157,19 @@ export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> =
       expectedFlags: ['--allow', '--deny'],
     },
   },
+  cursor: {
+    binaryCommand: 'cursor-agent',
+    binaryArgs: ['--version'],
+    authCommand: 'cursor-agent',
+    authArgs: ['status'],
+    headless: true,
+    structuredOutput: true,
+    sandboxProbe: {
+      command: 'cursor-agent',
+      args: ['--help'],
+      expectedFlags: ['--sandbox', '--mode'],
+    },
+  },
   gemini: {
     binaryCommand: 'gemini',
     binaryArgs: ['--version'],

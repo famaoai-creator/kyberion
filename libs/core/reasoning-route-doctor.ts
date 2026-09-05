@@ -51,6 +51,7 @@ function cliProviderForMode(mode: string): string | undefined {
       'claude-agent': 'claude',
       'gemini-cli': 'gemini',
       'grok-cli': 'grok',
+      'cursor-cli': 'cursor',
       copilot: 'copilot',
     } as Record<string, string>
   )[mode];

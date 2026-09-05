@@ -37,7 +37,7 @@ import {
  * given — see each backend's `resolvePermissionArgs` helper).
  */
 
-export type ProviderId = 'claude' | 'codex' | 'agy' | 'grok' | 'gemini';
+export type ProviderId = 'claude' | 'codex' | 'agy' | 'grok' | 'gemini' | 'cursor';
 
 export const PROVIDER_IDS: readonly ProviderId[] = [
   'claude',
@@ -45,6 +45,7 @@ export const PROVIDER_IDS: readonly ProviderId[] = [
   'agy',
   'grok',
   'gemini',
+  'cursor',
 ] as const;
 
 /**
@@ -165,6 +166,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       ['--sandbox', '--approval-mode', 'yolo'],
       'Gemini CLI yolo mode remains inside its provider sandbox for workspace-write work.'
     ),
+    cursor: ok(
+      ['--force', '--sandbox', 'enabled'],
+      'Cursor Agent CLI force-allows tools inside its sandbox for implementer-tier write/exec work.'
+    ),
   },
   explorer: {
     claude: ok(
@@ -199,6 +204,7 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       ['--sandbox', '--approval-mode', 'plan'],
       'Gemini CLI plan mode is the provider read-only projection.'
     ),
+    cursor: ok(['--mode', 'plan'], 'Cursor Agent plan mode is read-only planning without edits.'),
   },
   planner: {
     claude: ok(
@@ -221,6 +227,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
     gemini: ok(
       ['--sandbox', '--approval-mode', 'plan'],
       'Gemini CLI plan mode is the provider no-write projection.'
+    ),
+    cursor: ok(
+      ['--mode', 'ask'],
+      'Cursor Agent ask mode is Q&A-only and does not execute mutating tools.'
     ),
   },
 } as const;
@@ -322,6 +332,7 @@ const PROVIDER_REQUIRED_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>
   // home override is required for headless -p invocations.
   grok: [],
   gemini: [],
+  cursor: [],
 };
 
 /**
@@ -336,6 +347,7 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
   // still allowed through when present.
   grok: ['XAI_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+  cursor: ['CURSOR_API_KEY'],
 };
 
 /**
