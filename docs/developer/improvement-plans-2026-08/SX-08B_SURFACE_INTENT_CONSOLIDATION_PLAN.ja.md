@@ -1150,3 +1150,9 @@ Grok adapterのnative subagent有効／無効判定に残っていた `GROK_SUBA
 reasoning route doctorのAnthropic availability判定に残っていた `ANTHROPIC_API_KEY` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。未設定時のnot_configured、secret valueを出さないreason、他provider probeとroute fallbackは変更していない。
 
 検証: reasoning route doctor boundary **1 file / 1 test passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 123
+
+video render backendのHyperframes child process用 `NODE_OPTIONS` fallbackに残っていた環境直読を、登録済み `getRegisteredEnvText` へ移行した。既存のNode preload付与、明示的なcommand／timeout／cwd／safe exec環境、render fallbackは変更していない。
+
+検証: video render backend **1 file / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
