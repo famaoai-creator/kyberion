@@ -1,6 +1,6 @@
 import { appendJsonLine as appendFoundationJsonLine } from './foundation/json.js';
 import * as nodePath from 'node:path';
-import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 
 export function countWords(value: string): number {
@@ -23,6 +23,9 @@ export function ensureDirectory(dirPath: string): void {
 
 export function appendJsonLine(filePath: string, payload: Record<string, unknown>): void {
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (safeExistsSync(safeFilePath) && !safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[MISSION_DISPATCH] event log must be a regular file: ${safeFilePath}`);
+  }
   const dir = nodePath.dirname(safeFilePath);
   ensureDirectory(dir);
   withExecutionContext(
