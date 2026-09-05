@@ -5,7 +5,7 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import {
   safeChmodSync,
   safeExistsSync,
@@ -332,18 +332,18 @@ export class EnvSecretProvider implements SecretProvider {
 
   async get(service: string, account: string): Promise<string | null> {
     const key = this.envKey(service, account);
-    return process.env[key] || null;
+    return getRegisteredEnvText(key) || null;
   }
 
   async set(service: string, account: string, value: string): Promise<void> {
     const key = this.envKey(service, account);
-    process.env[key] = value;
+    setRegisteredEnv(key, value);
     registryAdd(service, account);
   }
 
   async delete(service: string, account: string): Promise<void> {
     const key = this.envKey(service, account);
-    delete process.env[key];
+    setRegisteredEnv(key, undefined);
     registryRemove(service, account);
   }
 }
