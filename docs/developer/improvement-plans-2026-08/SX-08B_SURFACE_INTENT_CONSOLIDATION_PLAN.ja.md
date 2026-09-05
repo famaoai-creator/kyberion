@@ -1504,3 +1504,9 @@ media generation quota policyの欠損・schema不正時に組み込みquota pol
 ingest quota policyの欠損・破損時に組み込みquota policyへ戻るcatalog fallbackを削除し、base limit／warn ratioの正数・範囲制約をschemaへ移して正本policyの読み込み障害をfail-closedで返す境界へ統一した。tenant overrideの不正entry局所除外、quota counterのtenant／date検証、warn→block stagingとrecord後のcounter運用は変更していない。
 
 検証: ingest-quota **1 file / 13 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 182
+
+operator learning dispatch registryに残っていた正本ルールの組み込みfallbackと、欠損・schema不正をfallbackへ収束させる外側のcatchを削除し、正本base／存在するoverlayの読み込み障害をfail-closedで返す境界へ統一した。個人・confidential overlayの任意性、confidential→personalの優先順位、dispatch ruleのマッチングと学習昇格semanticsは変更していない。
+
+検証: operator-learning-dispatch-registry **1 file / 6 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
