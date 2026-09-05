@@ -71,6 +71,23 @@ describe('voice profile registry', () => {
     expect(listVoiceProfiles('shadow')).toHaveLength(1);
   });
 
+  it('fails closed when the configured base registry is invalid', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = overridePath;
+
+    expect(() => getVoiceProfileRegistry()).toThrow(/Invalid catalog voice-profile-registry/);
+  });
+
+  it('rejects configured base registries outside the repository', () => {
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = '/tmp/kyberion-voice-profile-registry.json';
+
+    expect(() => getVoiceProfileRegistry()).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('rejects registry overrides that traverse a symbolic link', () => {
     safeMkdir(tmpDir, { recursive: true });
     safeWriteFile(
