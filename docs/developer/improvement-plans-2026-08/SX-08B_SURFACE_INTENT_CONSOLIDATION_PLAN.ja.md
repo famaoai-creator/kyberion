@@ -1474,3 +1474,9 @@ network security policyの欠損・schema不正時に空objectへ落ちるcatalo
 surface query provider configのschema不正・unsafe path・overlay読み込み障害を空objectへ収束させるfallback／catchを削除し、正本base／overlayの読み込み障害をfail-closedで返す境界へ統一した。base config未配置時のquery機能無効化、tenant／entity／phase／role／personal overlayの任意性、intent分類とquery抽出は変更していない。
 
 検証: surface-query **1 file / 10 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 177
+
+ADF execution policyの欠損・schema不正時に空objectへ落ちるcatalog fallbackを削除し、実行guardrail policyの読み込み障害をfail-closedで返す境界へ統一した。policyで未指定の個別値に対する既存の安全な上限補完、shell／egress／sandbox検査、script wrapper・git co-execution mutation検出は変更していない。
+
+検証: adf-guardrails **1 file / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。

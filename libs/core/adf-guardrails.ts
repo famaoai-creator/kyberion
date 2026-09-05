@@ -109,8 +109,6 @@ const adfExecutionPolicyCatalog = defineCatalog<Partial<AdfExecutionPolicy>>({
   id: 'adf-execution-policy',
   path: POLICY_PATH,
   schema: POLICY_SCHEMA_PATH,
-  fallback: {},
-  fallbackOnInvalid: true,
 });
 
 function loadAdfExecutionPolicy(): AdfExecutionPolicy {
