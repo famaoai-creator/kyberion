@@ -1,4 +1,9 @@
-import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeReadFile,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
@@ -168,15 +173,24 @@ export function defineGenerator(options: {
       const normalize = options.normalize ?? ((content: string) => content);
       const declaredOutputs =
         typeof options.outputs === 'function' ? options.outputs(context, files) : options.outputs;
+      const safeFiles = files.map((file) => ({
+        ...file,
+        safePath: assertSafeRepositoryPath(file.path, { allowMissingLeaf: true }),
+      }));
+      const safeDeclaredOutputs = declaredOutputs.map((filePath) =>
+        assertSafeRepositoryPath(filePath, { allowMissingLeaf: true })
+      );
       const changed = files
-        .filter((file) => {
-          if (!safeExistsSync(file.path)) return true;
-          return normalize(String(safeReadFile(file.path))) !== normalize(file.content);
+        .filter((file, index) => {
+          const safePath = safeFiles[index]?.safePath as string;
+          if (!safeExistsSync(safePath)) return true;
+          return normalize(String(safeReadFile(safePath))) !== normalize(file.content);
         })
         .map((file) => file.path);
       const unexpected = files
-        .map((file) => file.path)
-        .filter((file) => !declaredOutputs.includes(file));
+        .map((file, index) => ({ path: file.path, safePath: safeFiles[index]?.safePath as string }))
+        .filter((file) => !safeDeclaredOutputs.includes(file.safePath))
+        .map((file) => file.path);
       if (unexpected.length > 0)
         throw new ScriptExitError(
           1,
@@ -184,7 +198,7 @@ export function defineGenerator(options: {
         );
       if (!context.check && !context.dryRun) {
         withExecutionContext(options.executionContext ?? 'ecosystem_architect', () => {
-          for (const file of files) safeWriteFile(file.path, file.content);
+          for (const file of safeFiles) safeWriteFile(file.safePath, file.content);
         });
       }
       const result = { changed, files };

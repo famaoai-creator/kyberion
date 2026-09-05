@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   defineGenerator,
   defineScript,
@@ -131,6 +131,30 @@ describe('script harness', () => {
     expect(result).toBeUndefined();
     expect(process.exitCode).toBe(1);
     process.exitCode = undefined;
+  });
+
+  it('rejects generator output paths that traverse a symbolic link', async () => {
+    const targetPath = pathResolver.sharedTmp('harness-test/generator-target.txt');
+    const linkedPath = pathResolver.sharedTmp('harness-test/generator-link.txt');
+    safeWriteFile(targetPath, 'existing value');
+    safeSymlinkSync(targetPath, linkedPath);
+    try {
+      process.exitCode = undefined;
+      const main = defineGenerator({
+        id: 'harness-symlink-output-test',
+        outputs: [linkedPath],
+        render: () => [{ path: linkedPath, content: 'new value' }],
+      });
+
+      const result = await main([]);
+
+      expect(result).toBeUndefined();
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = undefined;
+      safeRmSync(linkedPath, { recursive: true, force: true });
+      safeRmSync(targetPath, { recursive: true, force: true });
+    }
   });
 
   it('preserves governed non-zero exit codes without forcing process termination', async () => {
