@@ -15,6 +15,8 @@ describe('mission memory command output boundary', () => {
     expect(source).not.toContain('console.error');
     expect(source).not.toContain('process.exitCode');
     expect(source).toContain('print: Print');
+    expect(source).not.toContain('process.env.MISSION_ID');
+    expect(source).toContain("registeredEnv('MISSION_ID')");
   });
 
   it('routes the queue table through the supplied printer', () => {
