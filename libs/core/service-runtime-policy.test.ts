@@ -12,7 +12,7 @@ describe('service-runtime-policy', () => {
     _resetServiceRuntimePolicyCacheForTests();
   });
 
-  it('loads the governed fallback policy and resolves managed roots', () => {
+  it('loads the governed policy and resolves managed roots', () => {
     const policy = getServiceRuntimePolicy();
     expect(policy.managed_roots.service_runtime_root).toBe('active/shared/runtime');
     expect(policy.managed_roots.cache_root).toBe('active/shared/tmp/service-runtime-cache');
@@ -38,11 +38,11 @@ describe('service-runtime-policy', () => {
     ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
-  it('falls back when the policy override is outside the repository', () => {
+  it('fails closed when the policy override is outside the repository', () => {
     process.env.KYBERION_SERVICE_RUNTIME_POLICY_PATH =
       '/tmp/kyberion-service-runtime-policy-external.json';
     _resetServiceRuntimePolicyCacheForTests();
 
-    expect(getServiceRuntimePolicy().version).toBe('fallback');
+    expect(() => getServiceRuntimePolicy()).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });
