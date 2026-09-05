@@ -447,7 +447,7 @@ function sameDeviceWarning(targetPath: string): string | null {
 }
 
 function requirePassphrase(envName: string): string {
-  const passphrase = process.env[envName];
+  const passphrase = getRegisteredEnvText(envName);
   if (!passphrase) {
     throw new Error(
       `Missing ${envName}; encrypted backups require a passphrase in that environment variable.`
@@ -686,7 +686,7 @@ export function createBackup(options: BackupCliOptions): {
   );
 
   if (options.encrypt) {
-    requirePassphrase(options.passphraseEnv);
+    const passphrase = requirePassphrase(options.passphraseEnv);
     runRequired(
       'openssl',
       [
@@ -702,7 +702,7 @@ export function createBackup(options: BackupCliOptions): {
         `env:${options.passphraseEnv}`,
       ],
       'backup encryption failed',
-      { [options.passphraseEnv]: process.env[options.passphraseEnv] || '' }
+      { [options.passphraseEnv]: passphrase }
     );
     safeRmSync(plainArchivePath, { force: true });
   }
@@ -1124,7 +1124,7 @@ export function restoreBackup(options: BackupCliOptions): {
   safeMkdir(tempDir);
   const plainArchive = archive.endsWith('.enc') ? path.join(tempDir, 'payload.tar.gz') : archive;
   if (archive.endsWith('.enc')) {
-    requirePassphrase(options.passphraseEnv);
+    const passphrase = requirePassphrase(options.passphraseEnv);
     runRequired(
       'openssl',
       [
@@ -1140,7 +1140,7 @@ export function restoreBackup(options: BackupCliOptions): {
         `env:${options.passphraseEnv}`,
       ],
       'backup decryption failed',
-      { [options.passphraseEnv]: process.env[options.passphraseEnv] || '' }
+      { [options.passphraseEnv]: passphrase }
     );
   }
 
