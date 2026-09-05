@@ -20609,6 +20609,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: mission asset API から request-wide な `process.env.MISSION_ROLE` の書き換えを削除し、artifact 読み込み、mission root/tier/tenant 解決、repository path 検証を `withViewerExecutionContext` の短いスコープで実行するよう統一した。これにより、同時リクエスト間でviewer roleが共有環境へ残留せず、実データに触れる判定もviewer実行コンテキスト下で行われる。
 - **検証**: `route.boundary.test.ts` で process-wide role assignment の不在と viewer context wrapper の存在を固定し、既存の tier/tenant 解決テストと合わせて実行する。
 
+## 2026-09-05 再レビュー修正 1236
+
+- **対象**: `presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts`
+- **変更**: agents API の GET/POST/DELETE をそれぞれ `withViewerExecutionContextAsync` のリクエストスコープで実行し、request-wide な `process.env.MISSION_ROLE` setterを削除した。GETの応答roleは既に解決済みのviewer contextから返し、認証済みviewerと実行時のrole解決を一つの境界に揃えた。
+- **検証**: `route.boundary.test.ts` でprocess-wide role assignmentの不在とasync viewer context境界を固定し、既存の入力境界テストを再実行する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
