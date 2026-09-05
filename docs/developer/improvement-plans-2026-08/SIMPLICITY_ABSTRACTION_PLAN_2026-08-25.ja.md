@@ -21317,6 +21317,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: error classifierとsurface intent routerに残っていた正本JSON欠損時の空設定fallbackを削除し、分類ルール／ポリシー違反説明とintent route mapの読み込み障害をfail-closedで返す境界へ統一した。unknown errorへの分類結果、共有intent resolverによる直接分岐、正本JSONのschema検証は維持している。
 - **検証**: error-classifier **1 file / 40 tests passed**、router-contract **1 file / 10 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1354
+
+- **対象**: `libs/core/health-degradation.ts`、`libs/core/health-degradation.test.ts`
+- **変更**: health degradationの正本閾値ファイルが欠損・schema不正のときに組み込み閾値へ戻るcatalog fallbackを削除し、監視設定の読み込み障害をfail-closedで返す境界へ統一した。純粋なdegradation評価で入力が省略された場合のテスト向け既定閾値、schema-validな値に対する既存の個別補正、warning／critical alert判定は変更していない。
+- **検証**: health-degradation **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
