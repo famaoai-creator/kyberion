@@ -21568,6 +21568,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: mesh topic registryのsubscriptions JSONL readerにoperation-timeの`assertSafeRepositoryPath`／`safeLstat` regular-file境界を追加した。未作成subscriptionsの空配列、governed artifact writer、tenant／namespaceの既存検証は維持し、symlink経由の外部scope readを拒否する回帰テストを追加した。
 - **検証**: mesh-topic-registry **1 file / 5 tests passed**、対象ESLint、Prettier、`git diff --check`。全体typecheckは別作業の未追跡OpenCode実装にあるZod型エラーで未完了。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1396
+
+- **対象**: `libs/core/memory-promotion-queue.ts`、`libs/core/memory-promotion-queue.test.ts`
+- **変更**: memory promotion queueのcandidate discovery／status updateに共通のoperation-time readerを導入し、queue pathのsymlink traversalと非regular fileをJSONL read前に拒否するようにした。scopeごとのqueue列挙、legacy queue、重複統合、ratification semanticsは維持している。
+- **検証**: memory-promotion-queue **1 file / 13 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`

@@ -1762,3 +1762,7 @@ process-improvement queueのreader／writerを`assertSafeRepositoryPath`／`safe
 ## 2026-09-06 再レビュー修正 225
 
 mesh topic registryのsubscriptions JSONL readerを`assertSafeRepositoryPath`／`safeLstat`へ接続し、symlink／非regular fileをsubscription discoveryへ読み込まないoperation-time境界を追加した。governed artifact writer、tenant／namespace検証と未作成subscriptionsの空配列を維持し、**1 file / 5 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 226
+
+memory promotion queueのcandidate discovery／status updateを共通のoperation-time readerへ統一し、scope queueのsymlink／非regular fileをJSONL read前に拒否する境界を追加した。scope列挙、legacy queue、重複統合、ratification semanticsを維持し、**1 file / 13 tests passed**、対象lint、Prettier、`git diff --check`で確認した。
