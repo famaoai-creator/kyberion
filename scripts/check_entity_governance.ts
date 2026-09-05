@@ -3,14 +3,8 @@ import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { listProjectRecords } from '@agent/core/project-registry';
-import {
-  safeExistsSync,
-  safeReadFile,
-  safeReaddir,
-  safeExecResult,
-  safeStat,
-} from '@agent/core/secure-io';
-import { getRegisteredEnvBool } from '@agent/core/foundation';
+import { safeExistsSync, safeReaddir, safeExecResult, safeStat } from '@agent/core/secure-io';
+import { getRegisteredEnvBool, readTextFile } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
@@ -116,7 +110,7 @@ function collectPlanLedgerGaps(rootDir: string): string[] {
   const planDir = path.join(rootDir, 'docs/developer/improvement-plans-2026-07');
   const statusPath = path.join(planDir, 'STATUS.ja.md');
   if (!safeExistsSync(statusPath)) return ['STATUS.ja.md'];
-  const status = String(safeReadFile(statusPath, { encoding: 'utf8' }));
+  const status = readTextFile(statusPath);
   return safeReaddir(planDir)
     .filter((entry) => entry.endsWith('.ja.md'))
     .filter((entry) => !['README.ja.md', 'STATUS.ja.md'].includes(entry))
@@ -235,7 +229,7 @@ export function collectEntityGovernanceReport(
   const planLedgerMissing = collectPlanLedgerGaps(rootDir);
   const gitIgnorePath = path.join(rootDir, '.gitignore');
   if (safeExistsSync(gitIgnorePath)) {
-    const gitIgnore = String(safeReadFile(gitIgnorePath, { encoding: 'utf8' }));
+    const gitIgnore = readTextFile(gitIgnorePath);
     if (/^\*\.jsonl$/m.test(gitIgnore))
       gitBoundaryViolations.push('global *.jsonl ignore rule remains');
     if ((gitIgnore.match(/^active\/$/gm) || []).length > 1)

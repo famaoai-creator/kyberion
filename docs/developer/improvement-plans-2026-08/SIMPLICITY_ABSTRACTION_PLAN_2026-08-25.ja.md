@@ -22245,3 +22245,21 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_facet_purity.ts`、`scripts/check_facet_purity.test.ts`
 - **変更**: facet purity checker の facet本文読込を foundation の `readTextFile` へ移行した。facet kind／directory scan／purity validationと報告 semanticsは変更せず、既存テストにcanonical readerの採用と旧 `safeReadFile` 直読の不在を固定した。
 - **検証**: facet-purity **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1508
+
+- **対象**: `scripts/check_event_wiring.ts`、`scripts/check_event_wiring.test.ts`
+- **変更**: event wiring checker の production／extra source 本文読込を foundation の `readTextFile` へ統一した。source collection、AST／文字列 wiring rule、event documentation／retention判定は変更せず、既存テストにreader contractを追加した。
+- **検証**: event-wiring **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1509
+
+- **対象**: `scripts/check_deprecated_wisdom_ops.ts`、`scripts/check_deprecated_wisdom_ops.test.ts`
+- **変更**: deprecated Wisdom op checker の pipeline／template本文読込を foundation の `readTextFile` へ移行した。deprecated／forwarded op catalog判定、finding shape、shared printer semanticsは変更せず、既存entrypoint testにreader contractを追加した。
+- **検証**: deprecated-wisdom-ops **reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1510
+
+- **対象**: `scripts/check_entity_governance.ts`、`scripts/check_entity_governance.entrypoint.test.ts`
+- **変更**: entity governance checker の improvement-plan STATUS／`.gitignore` 本文読込を foundation の `readTextFile` へ移行した。tenant／organization／project／mission scope、git boundary、plan ledger、strict warning semanticsは変更せず、entrypoint contract testで旧 `safeReadFile` 直読の不在を固定した。
+- **検証**: entity-governance **reader contract passed**、対象ESLint、Prettier、`git diff --check`。共有worktreeに依存するdrift報告と残るchecker／production loaderの全件codemodは継続課題とする。

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 describe('deprecated Wisdom op checker output boundary', () => {
   it('keeps findings behind the shared printer', () => {
@@ -10,5 +10,7 @@ describe('deprecated Wisdom op checker output boundary', () => {
 
     expect(source).toContain('context.print');
     expect(source).not.toContain('console.warn');
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
   });
 });
