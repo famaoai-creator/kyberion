@@ -15,6 +15,7 @@ const SOURCES = [
     /process\.env\[(?:MANIFEST_SIGNING_KEY_ENV|probe\.name)\]/u,
   ],
   ['libs/core/secret-guard.ts', /process\.env\[key\]/u],
+  ['libs/core/secret-bridge.ts', /(?:process\.env\[key\]|delete process\.env\[key\])/u],
   ['libs/core/organization-operating-model-persistence.ts', /process\.env\.VITEST/u],
   ['libs/core/project-management.ts', /process\.env\.VITEST/u],
   ['libs/core/work-coordination.ts', /process\.env\.VITEST/u],
