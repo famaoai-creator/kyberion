@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { findWireErrorBoundaryViolations } from './check_wire_error_boundary.js';
 
 describe('wire error boundary checker', () => {
+  it('uses the foundation text reader for wire-facing source files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_wire_error_boundary.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   it('rejects raw exception interpolation in a wire text response', () => {
     expect(
       findWireErrorBoundaryViolations('return { text: `failed: ${err}` };', 'fixture.ts')

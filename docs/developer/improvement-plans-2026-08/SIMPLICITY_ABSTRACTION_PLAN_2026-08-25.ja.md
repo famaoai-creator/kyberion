@@ -22359,3 +22359,21 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_extension_order.ts`、`scripts/check_extension_order.test.ts`
 - **変更**: extension order checker の lifecycle document本文読込を foundation の `readTextFile` へ移行した。runtime hook vocabulary、document section、lifecycle order mismatch判定は変更せず、既存テストにreader contractを追加した。
 - **検証**: extension-order **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1527
+
+- **対象**: `scripts/check_wire_error_boundary.ts`、`scripts/check_wire_error_boundary.test.ts`
+- **変更**: wire error boundary checker の network-facing source本文読込を foundation の `readTextFile` へ移行した。raw exception interpolation／message／debug field detectionとwire boundary report semanticsは変更せず、既存テストにreader contractを追加した。
+- **検証**: wire-error-boundary **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1528
+
+- **対象**: `scripts/check_tier_hygiene.ts`、`scripts/check_tier_hygiene.test.ts`
+- **変更**: tier hygiene checker のpublic／persistent fixture本文読込を foundation の `readTextFile` へ移行した。tier policy catalog、allowlist／denied pattern、fail-open unreadable path、violation semanticsは変更せず、既存テストにreader contractを追加した。
+- **検証**: tier-hygiene **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。共有worktreeのtier driftと残るchecker移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1529
+
+- **対象**: `scripts/check_module_invariants.ts`、`scripts/check_module_invariants.test.ts`
+- **変更**: module invariant checker の対象module本文読込を foundation の `readTextFile` へ移行した。invariant catalog、runtime／documented enforcement、source assertion判定は変更せず、既存テストにreader contractを追加した。
+- **検証**: module-invariants **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
