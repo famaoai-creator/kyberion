@@ -36,20 +36,10 @@ export interface ResolvedToolActuatorRoute {
   source: 'policy_match' | 'fallback';
 }
 
-const FALLBACK_POLICY: ToolActuatorRoutingPolicy = {
-  version: 'fallback',
-  defaults: {
-    fallback_actuator: 'orchestrator-actuator',
-    require_approval_on_mismatch: true,
-  },
-  tool_routes: [],
-};
-
 const toolActuatorRoutingCatalog = defineCatalog<ToolActuatorRoutingPolicy>({
   id: 'tool-actuator-routing-policy',
   path: getPolicyPath,
   schema: pathResolver.knowledge('product/schemas/tool-actuator-routing-policy.schema.json'),
-  fallback: FALLBACK_POLICY,
 });
 
 let cachedPolicyPath: string | null = null;
@@ -64,16 +54,12 @@ function getPolicyPath(): string {
 }
 
 export function getToolActuatorRoutingPolicy(): ToolActuatorRoutingPolicy {
-  try {
-    const policyPath = toolActuatorRoutingCatalog.path();
-    if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
-    const parsed = toolActuatorRoutingCatalog.load();
-    cachedPolicyPath = policyPath;
-    cachedPolicy = parsed;
-    return parsed;
-  } catch {
-    return FALLBACK_POLICY;
-  }
+  const policyPath = toolActuatorRoutingCatalog.path();
+  if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
+  const parsed = toolActuatorRoutingCatalog.load();
+  cachedPolicyPath = policyPath;
+  cachedPolicy = parsed;
+  return parsed;
 }
 
 export function resolveToolActuatorRoute(input: {

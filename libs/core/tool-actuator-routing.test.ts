@@ -29,15 +29,12 @@ describe('tool-actuator-routing', () => {
     );
   });
 
-  it('uses the conservative fallback for an external policy override', () => {
+  it('fails closed for an external policy override', () => {
     const original = process.env.KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH;
     process.env.KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH =
       '/tmp/kyberion-tool-routing-policy-external.json';
     try {
-      expect(getToolActuatorRoutingPolicy()).toMatchObject({
-        version: 'fallback',
-        defaults: { require_approval_on_mismatch: true },
-      });
+      expect(() => getToolActuatorRoutingPolicy()).toThrow('[RESOURCE_PATH_SCOPE]');
     } finally {
       if (original === undefined) delete process.env.KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH;
       else process.env.KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH = original;
