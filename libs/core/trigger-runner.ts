@@ -18,6 +18,7 @@ import {
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
+  safeLstat,
   safeReadFile,
   safeStat,
   safeWriteFile,
@@ -321,6 +322,7 @@ export function normalizeTriggerRecord(value: unknown): TriggerRecord | null {
 
 function readRecords(storePath: string): TriggerRecord[] {
   if (!safeExistsSync(storePath)) return [];
+  assertTriggerStoreFile(storePath);
   const raw = safeReadFile(storePath, { encoding: 'utf8', maxSizeMB: 5 }) as string;
   const records: TriggerRecord[] = [];
   for (const line of raw.split(/\r?\n/u)) {
@@ -334,6 +336,12 @@ function readRecords(storePath: string): TriggerRecord[] {
     }
   }
   return records;
+}
+
+function assertTriggerStoreFile(storePath: string): void {
+  if (safeExistsSync(storePath) && !safeLstat(storePath).isFile()) {
+    throw new Error('[TRIGGER_STORE_INVALID] delivery store must be a regular file: ' + storePath);
+  }
 }
 
 function isProcessAlive(pid: number | undefined): boolean {
@@ -355,6 +363,7 @@ function compactRecords(storePath: string, records: TriggerRecord[]): void {
 
 function appendRecord(storePath: string, record: TriggerRecord, maxStoreBytes: number): void {
   safeMkdir(path.dirname(pathResolver.rootResolve(storePath)));
+  assertTriggerStoreFile(storePath);
   const serialized = `${JSON.stringify(record)}\n`;
   let size = 0;
   if (safeExistsSync(storePath)) {
