@@ -93,12 +93,12 @@ describe('media backend registry', () => {
     ).toBe(true);
   });
 
-  it('uses the conservative fallback for an external registry override', () => {
+  it('fails closed for an external registry override', () => {
     process.env.KYBERION_MEDIA_BACKEND_REGISTRY_PATH =
       '/tmp/kyberion-media-backend-registry-external.json';
     resetMediaBackendRegistryCache();
 
-    expect(getMediaBackendRegistry().version).toBe('fallback');
+    expect(() => getMediaBackendRegistry()).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('resolves image, voice, and video backends through the same abstraction', () => {
