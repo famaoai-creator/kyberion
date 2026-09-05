@@ -21059,6 +21059,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Chronos cost routeのbudget fallbackとOperator SurfaceのMOS監査警告に残っていた環境直読を、登録済み `getRegisteredEnvText` へ統一した。server-side budgetの明示query優先、viewer／tenant scope、MOSのread-only監査記録と非production時の診断出力は変更していない。両surfaceの環境境界テストを追加した。
 - **検証**: surface環境境界 **2 files / 9 tests passed**、Operator Surface typecheck／両surface ESLint、root typecheck、Prettier、`git diff --check`。Chronos package単体tscは既存のNext生成型および既存surface型エラーで未完了（今回変更箇所に起因するエラーは確認されず）。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1311
+
+- **対象**: `libs/core/foundation/env.ts`、`libs/core/environment-capability.ts`、関連境界テスト
+- **変更**: environment capabilityのenv probeに残っていたraw環境参照を、空文字を保持できる `getRegisteredEnvText(..., { preserveEmpty: true })` へ移行した。未設定／空文字の判定、`require_non_empty`、manifest署名鍵のfail-closed検証は変更していない。foundationにpresence-sensitive readの回帰テストと共通environment boundary testを追加した。
+- **検証**: foundation／environment capability／environment boundary **3 files / 49 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
