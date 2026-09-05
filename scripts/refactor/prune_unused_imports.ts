@@ -20,7 +20,8 @@
  */
 import * as path from 'node:path';
 import ts from 'typescript';
-import { safeReadFile, safeWriteFile, safeReaddir, safeLstat } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import { safeWriteFile, safeReaddir, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 
@@ -471,7 +472,7 @@ export function run(argv: string[]): void {
 
   const results: PruneFileResult[] = [];
   for (const file of selected) {
-    const text = String(safeReadFile(file, { encoding: 'utf8' }));
+    const text = readTextFile(file);
     if (!text.includes('import')) continue;
     const result = pruneFile(file, text);
     results.push(result);

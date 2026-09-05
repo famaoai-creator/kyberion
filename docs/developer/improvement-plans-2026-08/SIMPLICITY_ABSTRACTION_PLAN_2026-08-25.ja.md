@@ -22449,3 +22449,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/migrate_peer_tenant_runtime.ts`、`scripts/migrate_physical_namespaces.ts`、`scripts/marketing_video_dry_run.ts` と対象テスト
 - **変更**: peer tenant／physical namespace migration の入力・ハッシュ対象本文、marketing video の brief／brand／生成テキスト本文を foundation の `readTextFile` へ移行した。移行のtenant scope／quarantine、SHA-256・バイナリアーティファクト、marketing approval／media semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／18 tests passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1542
+
+- **対象**: `scripts/agent_runtime_supervisor_daemon.ts`、`scripts/refactor/prune_unused_imports.ts` と reader contract tests
+- **変更**: supervisor daemon のロックPID本文と import-pruning refactor の対象ソース本文を foundation の `readTextFile` へ移行した。バイナリ用途の secure-io 読取、daemon の stale-lock 判定／cleanup、import pruning の AST解析・write semanticsは変更せず、両エントリポイントに reader contract を追加した。
+- **検証**: supervisor daemon **既存テスト＋reader contract passed**（11 tests）、prune refactor の dry-run probe passed、foundation-adoption **passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
