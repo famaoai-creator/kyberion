@@ -25,7 +25,7 @@ import { validateContextOutputTier } from '@agent/core/context-security-scope';
 import type { GovernedContextFragment } from '@agent/core/context-security-scope';
 import type { ReasoningCallOptions, ToolDefinition } from '@agent/core/reasoning-backend-contracts';
 import { curateBackgroundReviewProposals } from '@agent/core/background-review-curator';
-import { generateKnowledgeCurationReport } from '@agent/core/src/knowledge-curation-report';
+import { generateKnowledgeCurationReport } from '@agent/core/knowledge-curation-report';
 import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
 import { deriveExecutionGraph, executeGraph } from '@agent/core/graph-scheduler';
 import * as path from 'node:path';
