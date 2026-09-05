@@ -8,6 +8,7 @@ import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
@@ -406,14 +407,25 @@ function buildLiveHintsDocument(existing: string, retainedBlocks: string[]): str
   return `${baseDocument.trimEnd()}\n\n${retainedBlocks.join('\n\n')}\n`;
 }
 
+function existingRegularPromotedMemoryFile(filePath: string, label: string): string | null {
+  if (!safeExistsSync(filePath)) return null;
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[PROMOTED_MEMORY_RESOURCE] ${label} must be a regular file: ${filePath}`);
+  }
+  return filePath;
+}
+
 function appendGovernanceHintRecord(
   record: PromotedKnowledgeHintRecord,
   scope?: MemoryScopeEnvelope
 ): void {
   const block = buildHintsBlock(record);
   const hintsPath = resolveHintsPath(scope);
-  const existing = safeExistsSync(hintsPath)
-    ? (safeReadFile(hintsPath, { encoding: 'utf8' }) as string)
+  const existingHintsPath = existingRegularPromotedMemoryFile(hintsPath, 'hints')
+    ? hintsPath
+    : null;
+  const existing = existingHintsPath
+    ? (safeReadFile(existingHintsPath, { encoding: 'utf8' }) as string)
     : [
         '# Operational Hints',
         '',
@@ -451,7 +463,7 @@ function resolvePromotedRecordPath(ref: string): string | null {
     } catch {
       return null;
     }
-    return safeExistsSync(abs) ? abs : null;
+    return existingRegularPromotedMemoryFile(abs, 'promoted record');
   }
   const kinds = ['pattern', 'sop_candidate', 'knowledge_hint', 'report_template'] as const;
   const tiers = ['personal', 'confidential', 'public'] as const;
@@ -466,15 +478,17 @@ function resolvePromotedRecordPath(ref: string): string | null {
               ? `knowledge/${tier}/common/wisdom/generated`
               : `knowledge/${tier}/common/templates/generated`;
       const abs = pathResolver.resolve(`${dir}/${normalized}.md`);
-      if (safeExistsSync(abs)) return abs;
+      const existing = existingRegularPromotedMemoryFile(abs, 'promoted record');
+      if (existing) return existing;
     }
   }
   return null;
 }
 
 function updateFrontmatterField(absPath: string, key: string, value: string): void {
-  if (!safeExistsSync(absPath)) return;
-  const raw = safeReadFile(absPath, { encoding: 'utf8' }) as string;
+  const existingPath = existingRegularPromotedMemoryFile(absPath, 'promoted record');
+  if (!existingPath) return;
+  const raw = safeReadFile(existingPath, { encoding: 'utf8' }) as string;
   const lines = raw.split(/\r?\n/);
   const start = lines.indexOf('---');
   if (start < 0) return;
@@ -490,7 +504,7 @@ function updateFrontmatterField(absPath: string, key: string, value: string): vo
     }
   }
   if (!updated) lines.splice(end, 0, nextValue);
-  safeWriteFile(absPath, `${lines.join('\n').replace(/\n?$/, '\n')}`);
+  safeWriteFile(existingPath, `${lines.join('\n').replace(/\n?$/, '\n')}`);
 }
 
 function backlinkSupersededRecord(record: PromotedMemoryRecord): void {

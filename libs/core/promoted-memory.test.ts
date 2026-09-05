@@ -273,6 +273,40 @@ describe('promoted-memory', () => {
     expect(hints).toContain('active/shared/tmp/hints-source.md');
   });
 
+  it('rejects a governance HINTS path replaced by a directory', () => {
+    const candidate = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'personal',
+      track_id: 'TRK-DEMO-HINTS-DIRECTORY',
+      title: 'Directory replacement boundary',
+      summary: 'A replaced governance hints path must fail closed.',
+      status: 'promoted',
+      target_kind: 'knowledge_hint',
+      evidence_refs: ['active/shared/tmp/hints-source.md'],
+      metadata: {
+        hint_scope: 'boundary review',
+        hint_triggers: ['directory replacement'],
+        recommended_refs: ['knowledge/public/procedures/browser/navigate-web.md'],
+      },
+    });
+    rememberWrite(
+      pathResolver.resolve(
+        `knowledge/personal/common/wisdom/generated/${candidate.candidate_id}.md`
+      )
+    );
+
+    fs.rmSync(scratchHintsPath, { force: true });
+    fs.mkdirSync(scratchHintsPath, { recursive: true });
+    try {
+      expect(() => savePromotedMemoryRecord(candidate)).toThrow(
+        '[PROMOTED_MEMORY_RESOURCE] hints must be a regular file'
+      );
+    } finally {
+      fs.rmSync(scratchHintsPath, { recursive: true, force: true });
+      fs.writeFileSync(scratchHintsPath, originalHintsRaw ?? '');
+    }
+  });
+
   it('falls back from external hints overrides without writing outside the repository', () => {
     const previousHints = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
     const previousHintsPath = process.env.KYBERION_HINTS_PATH;
