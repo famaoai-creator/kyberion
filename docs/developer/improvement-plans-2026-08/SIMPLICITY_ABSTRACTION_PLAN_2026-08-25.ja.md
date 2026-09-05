@@ -21963,3 +21963,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/agent-identity.ts`、`libs/core/agent-identity.test.ts`
 - **変更**: NHI identity journal の restore read 前に operation-time の regular-file 検査を追加した。identity journal が directory 等へ置換された場合に空の identity state として復元せず拒否し、既存のNHI lifecycle／replay／governed write semantics は維持した。
 - **検証**: agent-identity の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1461
+
+- **対象**: `libs/core/surface-runtime.ts`、`libs/core/surface-runtime.test.ts`
+- **変更**: surface runtime log tail の read 前に operation-time の regular-file 検査を追加した。runtime log が directory 等へ置換された場合に空のログとして扱わず拒否し、既存の surface manifest／state catalog と log tail semantics は維持した。
+- **検証**: surface-runtime **7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
