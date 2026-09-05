@@ -151,7 +151,7 @@ describe('provider-permission-profiles', () => {
   });
 
   describe('buildProviderChildEnv', () => {
-    const providers: ProviderId[] = ['claude', 'codex', 'agy', 'grok', 'gemini'];
+    const providers: ProviderId[] = ['claude', 'codex', 'agy', 'grok', 'gemini', 'cursor'];
     const fakeBaseEnv = (): NodeJS.ProcessEnv =>
       ({
         PATH: '/usr/bin:/bin',
@@ -163,6 +163,7 @@ describe('provider-permission-profiles', () => {
         GEMINI_API_KEY: 'fake-gemini-key',
         GH_TOKEN: 'fake-github-token',
         XAI_API_KEY: 'fake-xai-key',
+        CURSOR_API_KEY: 'fake-cursor-key',
         CUSTOM_SECRET_TOKEN: 'fake-custom-token',
         CODEX_HOME: '/home/test/.codex',
         KYBERION_PERSONA: 'implementer',
@@ -218,6 +219,16 @@ describe('provider-permission-profiles', () => {
       expect(env.ANTHROPIC_API_KEY).toBeUndefined();
       expect(env.GEMINI_API_KEY).toBeUndefined();
       expect(env.GH_TOKEN).toBeUndefined();
+      expect(env.CURSOR_API_KEY).toBeUndefined();
+    });
+
+    it('excludes other providers credentials for cursor, and carries CURSOR_API_KEY', () => {
+      const env = buildProviderChildEnv({ provider: 'cursor', baseEnv: fakeBaseEnv() });
+      expect(env.CURSOR_API_KEY).toBe('fake-cursor-key');
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.XAI_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
     });
 
     it('carries KYBERION_*/MISSION_* vars for every provider, but not unrelated vars', () => {

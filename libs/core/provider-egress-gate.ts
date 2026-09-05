@@ -323,6 +323,8 @@ const REASONING_IDENTIFIER_TO_PROVIDER_ID: Readonly<Record<string, string>> = {
   'shell-grok-cli': 'grok',
   'grok-api': 'grok',
   grok: 'grok',
+  'cursor-cli': 'cursor',
+  cursor: 'cursor',
 };
 
 /** Map a reasoning mode or backend name to a provider id known to the egress policy, when possible. */

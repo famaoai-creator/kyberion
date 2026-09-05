@@ -203,7 +203,7 @@ function loadThemeCatalog(rootDir: string): MediaThemeCatalog {
     true
   );
   const merged = deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
-  return defineCatalog({
+  return defineCatalog<MediaThemeCatalog>({
     id: 'media-themes',
     path: path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/themes.json'),
     schema: schemaPath,
