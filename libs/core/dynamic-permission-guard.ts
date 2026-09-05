@@ -39,11 +39,6 @@ const dynamicPolicyCatalog = defineCatalog<DynamicPolicyFile>({
   id: 'dynamic-permission-policy',
   path: POLICY_PATH,
   schema: POLICY_SCHEMA_PATH,
-  fallback: { version: '1.0.0', policies: [] },
-  fallbackOnInvalid: true,
-  onFallback: (error) => {
-    logger.warn(`dynamic-policies.json unreadable — no dynamic grants active: ${String(error)}`);
-  },
 });
 
 class DynamicPermissionGuard {
