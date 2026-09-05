@@ -1,6 +1,6 @@
 # @presence/terminal-hud — Kyberion Terminal HUD
 
-Kyberion のフルスクリーン対話型 TUI（Ink / React）。起動直後は `Operator Cockpit` が Mission・承認・成果物・次アクションを要約し、入力欄を会話の主入口にします。8 パネルは詳細確認・操作用のドリルダウンです。
+Kyberion のフルスクリーン対話型 TUI（Ink / React）。起動直後は `Operator Cockpit` が Mission・承認・成果物・次アクション・エージェント待ちを要約し、入力欄を会話の主入口にします。9 パネルは詳細確認・操作用のドリルダウンです。
 
 ## 起動
 
@@ -18,16 +18,17 @@ pnpm tui:dev    # ソース実行 (@agent/core の dist は事前ビルドが必
 
 ## パネル
 
-| キー | パネル                         | 主な操作                                                                                                              |
-| ---- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| 1    | ミッション                     | s 開始 / p 一時停止 / u 再開 / c チェックポイント / V 検証 / F 完了 / X 中止（mission_controller を subprocess 実行） |
-| 2    | タスク（work items）           | c 引き受け / x 解放 / s 状態変更（work-coordination API 直呼び。解放は HUD 保持リースのみ）                           |
-| 3    | スケジュール                   | e on/off / R 今すぐ実行 / x 削除（実行は run_pipeline.js を managed process で分離起動）                              |
-| 4    | プロセス（surfaces + daemons） | s 起動 / x 停止 / R repair（surface_runtime.js を worker persona で実行）                                             |
-| 5    | エージェント連携               | R ランタイム再起動 / X 停止 / E supervisor daemon 起動（daemon は heartbeat が healthy の時のみ IPC、自動起動しない） |
-| 6    | 統計                           | metrics 履歴・trace tail・リソース使用・退行検出（表示のみ）                                                          |
-| 7    | プロフィール                   | operator / onboarding / NHI identities / 組織（read-only）                                                            |
-| 8    | 設定                           | 推論バックエンド・顧客・ロケール（L でセッション内切替。永続変更は CLI 誘導）                                         |
+| キー | パネル                         | 主な操作                                                                                                                                                                 |
+| ---- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | ミッション                     | s 開始 / p 一時停止 / u 再開 / c チェックポイント / V 検証 / F 完了 / X 中止（mission_controller を subprocess 実行）                                                    |
+| 2    | タスク（work items）           | c 引き受け / x 解放 / s 状態変更（work-coordination API 直呼び。解放は HUD 保持リースのみ）                                                                              |
+| 3    | スケジュール                   | e on/off / R 今すぐ実行 / x 削除（実行は run_pipeline.js を managed process で分離起動）                                                                                 |
+| 4    | プロセス（surfaces + daemons） | s 起動 / x 停止 / R repair（surface_runtime.js を worker persona で実行）                                                                                                |
+| 5    | エージェント連携               | R ランタイム再起動 / X 停止 / E supervisor daemon 起動（daemon は heartbeat が healthy の時のみ IPC、自動起動しない）                                                    |
+| 6    | 統計                           | metrics 履歴・trace tail・リソース使用・退行検出（表示のみ）                                                                                                             |
+| 7    | プロフィール                   | operator / onboarding / NHI identities / 組織（read-only）                                                                                                               |
+| 8    | 設定                           | 推論バックエンド・顧客・ロケール（L でセッション内切替。永続変更は CLI 誘導）                                                                                            |
+| 9    | 連携                           | mission → task → agent → child の木、`waiting_on`（承認待ち/子の完了待ち/クレーム待ち/ブロック/レビュー待ち/停滞）。Enter で直近イベント・handoff の詳細（読み取り専用） |
 
 グローバル: `[` `]` / Tab 巡回, `Enter` 詳細, `j/k` 移動, `r` 再読込, `?` ヘルプ, `q` 終了。
 
