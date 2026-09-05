@@ -21,7 +21,7 @@ import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { currentScope } from '@agent/core/scope-context';
-import { safeExistsSync, safeReaddir, safeReadFile, safeStat } from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { loadKnowledgeTaxonomy, type KnowledgeTaxonomy } from '@agent/core/knowledge-taxonomy';
 import {
   scopeAffinityScore,
@@ -35,7 +35,7 @@ import { loadKnowledgeUsageAggregate } from '@agent/core/knowledge-feedback-loop
 import { loadAnalysisConfigAtPath } from '@agent/core/analysis-config';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import type { ScopeContext } from '@agent/core/scope-context';
-import { isRecord } from '@agent/core/foundation';
+import { isRecord, readTextFile } from '@agent/core/foundation';
 
 type Print = (value: unknown) => void;
 
@@ -254,7 +254,7 @@ export function scanKnowledgeFiles(
             continue;
           }
           if (stats) stats.in_scope_files += 1;
-          const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
+          const content = readTextFile(fullPath);
           const fm = parseFrontmatter(content);
           const tier = relativePath.startsWith('personal/')
             ? 'personal'
