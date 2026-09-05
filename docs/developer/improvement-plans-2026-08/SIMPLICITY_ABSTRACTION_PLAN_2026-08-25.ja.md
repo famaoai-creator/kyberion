@@ -21023,6 +21023,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: ops alertのwebhook URL取得に残っていた環境直読を、登録済み `getRegisteredEnvText` へ統一した。明示webhook URL優先、未設定時のoperator route fallback、redeliveryのfail-closedとsecret非出力の既存semanticsは変更していない。共通environment boundary testに対象を追加した。
 - **検証**: ops-alert／environment boundary **2 files / 14 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1305
+
+- **対象**: `scripts/peer_network_register.ts`、`libs/core/environment-access-boundary.test.ts`
+- **変更**: peer network登録CLIの共有secret取得に残っていた動的環境直読を、登録済み `getRegisteredEnvText` へ統一した。`--shared-secret-env` の動的な変数名、missing-secret時のfail-closed、peer catalogへの登録内容とsecret非出力の既存semanticsは変更していない。共通environment boundary testに対象を追加した。
+- **検証**: peer network登録／environment boundary **2 files / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
