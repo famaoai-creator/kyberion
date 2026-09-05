@@ -21,13 +21,12 @@ import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeExecResult,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
@@ -278,7 +277,7 @@ export const stubSpeechToTextBridge: SpeechToTextBridge = {
     });
     if (safeExistsSync(sidecar)) {
       assertRegularFile(sidecar, 'transcript sidecar');
-      const text = safeReadFile(sidecar, { encoding: 'utf8' }) as string;
+      const text = readTextFile(sidecar);
       logger.warn(
         `[stt-bridge:stub] using pre-baked sidecar ${sidecar} — register a real SpeechToTextBridge to decode audio.`
       );

@@ -22498,6 +22498,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: tenant curation card、knowledge indexのhint／Markdown、Cowork knowledge、deal document、mission context、locale catalog の本文読込を foundation の `readTextFile` へ移行した。tier／tenant／path scope、ranking／embedding、Cowork promotion、document／locale semanticsは変更せず、knowledge-indexテストのreader mockを新APIへ適応した。
 - **検証**: 対象テスト **7 files／67 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1557
+
+- **対象**: `libs/core/speech-to-text-bridge.ts`、`libs/core/browser-onboarding.ts`、`libs/core/a2a-envelope-signature.ts`、`libs/core/background-review-patch.ts` と対象テスト
+- **変更**: STT sidecar、browser onboarding vision、A2A persisted secret、background review の承認対象本文を foundation の `readTextFile` へ移行した。音声／画像などのバイナリ読込、secret／approval／patch hash、既存のscope・provenance・validation semanticsは変更せず、secure-io はバイナリ・属性検証・書込用途に限定した。
+- **検証**: 対象テスト **4 files／53 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
