@@ -9,7 +9,7 @@ import {
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/src/logic-utils';
+import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { classifyError } from '@agent/core/error-classifier';

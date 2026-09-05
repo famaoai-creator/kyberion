@@ -24,7 +24,7 @@ import {
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
-} from '@agent/core/src/logic-utils';
+} from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';

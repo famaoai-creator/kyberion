@@ -1,4 +1,5 @@
 import { resolveRepositoryPathToken } from '../path-token-resolver.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 
 /**
  * Logic Utilities for ADF and Pipeline Processing.
@@ -31,7 +32,7 @@ export function tokenizePath(input: string): string[] {
 export function getPathValue(ctx: any, pathLike?: string): any {
   if (!pathLike) return undefined;
   if (String(pathLike).startsWith('env.')) {
-    return process.env[String(pathLike).slice(4)];
+    return getRegisteredEnvText(String(pathLike).slice(4));
   }
   const parts = tokenizePath(pathLike);
   let current = ctx;

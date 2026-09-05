@@ -9,7 +9,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { resolveVars } from '@agent/core/src/logic-utils';
+import { resolveVars } from '@agent/core/logic-utils';
 import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
 import { getReasoningBackend, type ReasoningCallOptions } from '@agent/core/reasoning-backend';
 import {

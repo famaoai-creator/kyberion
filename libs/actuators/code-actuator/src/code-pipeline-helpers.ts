@@ -21,7 +21,7 @@ import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
-import { evaluateCondition, resolveWriteArtifactSpec } from '@agent/core/src/logic-utils';
+import { evaluateCondition, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
   loadCapabilityRegistry,

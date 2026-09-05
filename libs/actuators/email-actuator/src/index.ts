@@ -14,7 +14,7 @@
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { retry } from '@agent/core/async-utils';
-import { resolveVars } from '@agent/core/src/logic-utils';
+import { resolveVars } from '@agent/core/logic-utils';
 import { sendEmail, createDraft } from '@agent/core/email-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
