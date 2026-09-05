@@ -22017,3 +22017,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/screen-frame-redaction.ts`、`libs/core/screen-frame-redaction.test.ts`
 - **変更**: raw screen capture の read 前に operation-time の regular-file 検査を追加し、directory 等の異常入力を明示拒否するようにした。拒否対象を cleanup で再帰削除せず、入力エラーが cleanup error に置き換わらないよう raw capture cleanup を保護した。通常の redacted output、OCR failure、raw capture cleanup semantics は維持した。
 - **検証**: screen-frame-redaction **2 files / 3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1470
+
+- **対象**: `libs/core/mission-seal.ts`、`libs/core/mission-seal.test.ts`
+- **変更**: mission seal の暗号化 archive／encrypted key 出力後、hash／anchor 処理へ進む前に operation-time の regular-file 検査を追加した。暗号化出力が directory 等へ置換された場合に seal を有効 artifact として扱わず、既存の re-seal／intermediate cleanup／best-effort anchor semantics は維持した。
+- **検証**: mission-seal **2 files / 7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
