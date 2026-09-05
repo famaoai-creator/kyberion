@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   buildShellClaudeCliBackendFromEnv,
   isClaudeCliPlaceholderFailure,
@@ -57,6 +59,16 @@ function createChild(stdoutText: string, exitCode = 0): any {
 }
 
 describe('shell-claude-cli-backend', () => {
+  it('routes Claude CLI environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/shell-claude-cli-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('returns null when the availability probe fails', () => {
     const backend = buildShellClaudeCliBackendFromEnv(
       { KYBERION_CLAUDE_CLI_BIN: 'claude' } as NodeJS.ProcessEnv,
