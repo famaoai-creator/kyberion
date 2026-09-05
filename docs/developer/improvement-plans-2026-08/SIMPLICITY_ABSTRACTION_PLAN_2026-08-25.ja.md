@@ -22149,3 +22149,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/find_dead_code.ts`、`scripts/find_dead_code.entrypoint.test.ts`
 - **変更**: dead-code finder の source／workspace scan 本文読込を foundation の `readTextFile` へ移行した。候補抽出、workspace scope、advisory report生成、共有printerのsemanticsは変更せず、analysis CLIに残っていた旧 `safeReadFile` 直読を削減した。
 - **検証**: find-dead-code entrypoint **1 test passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1492
+
+- **対象**: `scripts/check_script_integrity.ts`、`scripts/check_script_integrity.test.ts`
+- **変更**: script integrity checker の production source／package entrypoint／docs scan 本文読込を foundation の `readTextFile` へ統一した。direct-script guard、harness判定、package／pipeline／documentation path検査のsemanticsは変更せず、SX-07 gate自身に残っていた旧 `safeReadFile` 直読4箇所を削減し、source contract testで再導入を検出する。
+- **検証**: check-script-integrity **7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。

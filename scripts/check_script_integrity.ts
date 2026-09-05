@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import { safeExistsSync, safeStat } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile, readSafeJsonValueFile } from './lib/json-input.js';
@@ -270,7 +271,7 @@ function checkProductionScriptBoundaries(): string[] {
     ) {
       continue;
     }
-    const source = String(safeReadFile(file, { encoding: 'utf8' }));
+    const source = readTextFile(file);
     if (argvPattern.test(source)) {
       violations.push(
         `${relative}: direct ${processArgvLabel} access; use the script harness boundary`
@@ -303,7 +304,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
       ...findScriptHarnessViolations(packageJson.scripts || {}, (repoRelativePath) => {
         const sourcePath = pathResolver.rootResolve(repoRelativePath);
         if (!safeExistsSync(sourcePath)) return undefined;
-        return String(safeReadFile(sourcePath, { encoding: 'utf8' }));
+        return readTextFile(sourcePath);
       })
     );
   }
@@ -344,7 +345,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
       )
         continue;
       validatePackageScriptReferences(
-        String(safeReadFile(file, { encoding: 'utf8' })),
+        readTextFile(file),
         toRepoRelative(file),
         packageScripts,
         violations
@@ -355,7 +356,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
   if (scanRepositoryDocs) {
     for (const file of listPipelineDocumentationFiles()) {
       validatePackageScriptReferences(
-        String(safeReadFile(file, { encoding: 'utf8' })),
+        readTextFile(file),
         toRepoRelative(file),
         packageScripts,
         violations
