@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => ''),
@@ -42,8 +43,19 @@ vi.mock('./virtual-audio-input-recording-bridge.js', () => ({
 }));
 
 import { recordVoiceSample } from './voice-sample-recorder.js';
+import { safeReadFile } from './secure-io.js';
 
 describe('voice-sample-recorder', () => {
+  it('routes recording command environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/voice-sample-recorder.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   const originalPlatform = process.platform;
 
   afterEach(() => {

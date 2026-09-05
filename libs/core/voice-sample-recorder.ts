@@ -7,6 +7,7 @@ import { createVirtualDeviceInventoryBridge } from './virtual-device-inventory-b
 import { assertSafeRepositoryPath, safeExec, safeMkdir, safeWriteFile } from './secure-io.js';
 import { resolveVoicePath } from './voice-path-policy.js';
 import { clamp } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export interface RecordVoiceSampleRequest {
   action: 'record_voice_sample';
@@ -44,7 +45,7 @@ interface AudioCaptureMetrics {
 }
 
 function getRecordingCommand(env: NodeJS.ProcessEnv = process.env): string {
-  return String(env.KYBERION_AUDIO_RECORD_COMMAND || '').trim();
+  return getRegisteredEnvText('KYBERION_AUDIO_RECORD_COMMAND', { env })?.trim() || '';
 }
 
 function resolveOutputPath(input: RecordVoiceSampleRequest): string {
