@@ -7,6 +7,7 @@ import {
   validateProcedureCatalog,
 } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
+import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -286,13 +287,9 @@ function promoteDesktopProcedureFromRecording(
       { allowMissingLeaf: true }
     );
     if (safeExistsSync(pipelinePath)) assertRegularDesktopResource(pipelinePath, 'pipeline');
-    const previousPipeline = safeExistsSync(pipelinePath)
-      ? (safeReadFile(pipelinePath, { encoding: 'utf8' }) as string)
-      : null;
+    const previousPipeline = safeExistsSync(pipelinePath) ? readTextFile(pipelinePath) : null;
     if (safeExistsSync(catalogPath)) assertRegularDesktopResource(catalogPath, 'procedure catalog');
-    const previousCatalog = safeExistsSync(catalogPath)
-      ? (safeReadFile(catalogPath, { encoding: 'utf8' }) as string)
-      : null;
+    const previousCatalog = safeExistsSync(catalogPath) ? readTextFile(catalogPath) : null;
     catalog.procedures.push(compiled.procedureEntry);
     validateProcedureCatalog(catalog, catalogPath);
     const nextPipelineText = `${JSON.stringify(compiled.pipeline, null, 2)}\n`;

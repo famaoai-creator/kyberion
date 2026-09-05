@@ -1,11 +1,11 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExec,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
   validateUrl,
@@ -407,7 +407,7 @@ export class OpenRouterBackend implements ReasoningBackend {
     try {
       switch (name) {
         case 'read_file':
-          return String(safeReadFile(assertSafeRepositoryPath(String(args.path ?? ''))));
+          return readTextFile(assertSafeRepositoryPath(String(args.path ?? '')));
         case 'write_file': {
           const filePath = assertSafeRepositoryPath(String(args.path ?? ''), {
             allowMissingLeaf: true,

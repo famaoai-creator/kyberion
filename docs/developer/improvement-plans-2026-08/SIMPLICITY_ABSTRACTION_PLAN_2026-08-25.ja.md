@@ -22528,6 +22528,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: customer notes、CLI input、mesh JSONL、orchestrator journal、classifier input、entropy hash の本文読込を foundation の `readTextFile` へ移行した。customer tenant scope、mesh／journal replay、classifier result、entropy cache semanticsは変更せず、バイナリ・個別サイズ上限付きreaderは対象外として保持した。
 - **検証**: 対象既存テスト **6 files／52 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。classifier は専用テストファイルが存在しないため静的検査と既存利用経路で確認した。残るchecker／production loaderの全件codemodは継続課題とする。
 
+## 2026-09-06 再レビュー修正 1562
+
+- **対象**: `libs/core/desktop-recording-compiler.ts`、`libs/core/openai-compatible-backend.ts`、`libs/core/openrouter-backend.ts` と対象テスト
+- **変更**: desktop recording の pipeline／procedure catalog、OpenAI／OpenRouter tool `read_file` の本文読込を foundation の `readTextFile` へ移行した。recording／vision image bytes、resource path validation、tool-loop・provider semanticsは変更せず、バイナリ用途の `safeReadFile` は保持した。
+- **検証**: 対象テスト **3 files／46 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
