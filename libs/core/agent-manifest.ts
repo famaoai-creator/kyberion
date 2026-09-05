@@ -9,6 +9,7 @@ import {
   safeStat,
 } from './secure-io.js';
 import { isRecord } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import * as path from 'node:path';
 import type { AgentProvider } from './agent-registry.js';
 
@@ -316,7 +317,7 @@ export function validateRequirements(
 
   // Check environment variables
   for (const envVar of req.env || []) {
-    if (!process.env[envVar]) {
+    if (!getRegisteredEnvText(envVar)) {
       reasons.push(`Missing env: ${envVar}`);
     }
   }
@@ -346,7 +347,7 @@ export function validateRequirements(
   for (const service of req.services || []) {
     const requiredEnvs = SERVICE_ENV_MAP[service] || [];
     for (const envVar of requiredEnvs) {
-      if (!process.env[envVar]) {
+      if (!getRegisteredEnvText(envVar)) {
         reasons.push(`Service "${service}" requires env: ${envVar}`);
       }
     }
