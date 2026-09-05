@@ -3,6 +3,7 @@ import {
   buildRegisteredReasoningProvider,
   getReasoningProviderDescriptor,
   listReasoningProviderDescriptors,
+  parseReasoningProviderDescriptor,
   registerReasoningProvider,
   resetReasoningProviderRegistryForTests,
 } from './reasoning-provider-registry.js';
@@ -30,6 +31,32 @@ describe('reasoning provider registry', () => {
     );
     dispose();
     expect(() => registerReasoningProvider(descriptor, factory)).not.toThrow();
+  });
+
+  it('rejects descriptors with incomplete capability metadata instead of inventing support', () => {
+    expect(
+      parseReasoningProviderDescriptor({
+        mode: 'stub',
+        provider: 'stub',
+        module: './reasoning-backend',
+        env_keys: [],
+      })
+    ).toBeNull();
+    expect(
+      parseReasoningProviderDescriptor({
+        mode: 'stub',
+        provider: 'stub',
+        module: './reasoning-backend',
+        capabilities: {
+          reasoning: true,
+          structured_output: true,
+          abort: false,
+          session_continuity: false,
+          input_modalities: ['image'],
+        },
+        env_keys: [],
+      })
+    ).toBeNull();
   });
 
   it('passes an opaque bootstrap context to a registered factory', () => {

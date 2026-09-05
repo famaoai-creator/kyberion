@@ -1724,3 +1724,9 @@ Cursor CLIのprovider discoveryが`KYBERION_CURSOR_CLI_BIN`を無視して`curso
 provider capability probeがprovider discovery／実行backendと異なりCLI binary overrideを無視していた残存を修正し、登録済みのClaude／Codex／AGY／Grok／Cursor／Gemini／Copilot binaryをversion・auth・helpの全probeへ伝播するようにした。明示Claude binaryのplaceholder fallbackへの勝手な置換も抑止した。
 
 検証: provider-capability-registry **1 file / 16 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
+## 2026-09-06 再レビュー修正 218
+
+reasoning provider descriptorのcapability／input modality／env keyを必須メタデータへ変更した。欠損・型不正・text modalityなしのdescriptorを保守的既定値へ補正せず拒否し、schemaとruntime parserを一致させた。
+
+検証: reasoning-provider-registry **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`、knowledge index更新後のcanonical full gate **69/69 passed**。provider CLIの実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
