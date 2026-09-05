@@ -17,5 +17,7 @@ describe('modeling preset resource boundary', () => {
     expect(source).toContain("id: 'browser-execution-presets'");
     expect(source).toContain('schema: BROWSER_EXECUTION_PRESETS_SCHEMA_PATH');
     expect(source).toContain('browserExecutionPresetCatalog.load()');
+    expect(source).not.toContain('FALLBACK_BROWSER_EXECUTION_PRESETS');
+    expect(source).not.toContain('fallbackOnInvalid: true');
   });
 });

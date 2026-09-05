@@ -92,23 +92,10 @@ interface BrowserExecutionPresetCatalog {
   presets: Record<string, Record<string, unknown>>;
 }
 
-const FALLBACK_BROWSER_EXECUTION_PRESETS: BrowserExecutionPresetCatalog = {
-  default_preset: 'standard-web-auth',
-  presets: {
-    'standard-web-auth': {
-      default_email: 'tester@example.com',
-      default_password: 'debug-password',
-      handoff_output_path: 'active/shared/tmp/browser/generated-web-session-handoff.json',
-    },
-  },
-};
-
 const browserExecutionPresetCatalog = defineCatalog<BrowserExecutionPresetCatalog>({
   id: 'browser-execution-presets',
   path: BROWSER_EXECUTION_PRESETS_PATH,
   schema: BROWSER_EXECUTION_PRESETS_SCHEMA_PATH,
-  fallback: FALLBACK_BROWSER_EXECUTION_PRESETS,
-  fallbackOnInvalid: true,
 });
 
 export interface PipelineStep {
@@ -598,12 +585,12 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       }
       const presetCatalog = await loadBrowserExecutionPresetCatalog();
       const presetName = String(
-        profile.execution_preset ||
-          params.preset ||
-          presetCatalog.default_preset ||
-          'standard-web-auth'
-      );
-      const executionPreset = presetCatalog.presets?.[presetName] || {};
+        profile.execution_preset || params.preset || presetCatalog.default_preset
+      ).trim();
+      const executionPreset = presetCatalog.presets[presetName];
+      if (!executionPreset) {
+        throw new Error(`Unknown browser execution preset: ${presetName}`);
+      }
 
       const baseUrl = String(profile.base_url || '');
       const loginRoute = String(profile.login_route || '/login');
@@ -628,13 +615,21 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       ];
 
       if (loginSelectors.email && loginSelectors.password && loginSelectors.submit) {
+        const email = params.default_email || executionPreset.default_email;
+        const password = params.default_password || executionPreset.default_password;
+        if (typeof email !== 'string' || !email.trim()) {
+          throw new Error(`Browser execution preset ${presetName} requires default_email`);
+        }
+        if (typeof password !== 'string' || !password.trim()) {
+          throw new Error(`Browser execution preset ${presetName} requires default_password`);
+        }
         steps.push(
           {
             type: 'apply',
             op: 'fill',
             params: {
               selector: String(loginSelectors.email),
-              text: params.default_email || executionPreset.default_email || 'tester@example.com',
+              text: email,
             },
           },
           {
@@ -642,7 +637,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
             op: 'fill',
             params: {
               selector: String(loginSelectors.password),
-              text: params.default_password || executionPreset.default_password || 'debug-password',
+              text: password,
             },
           },
           {
@@ -813,14 +808,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
 }
 
 async function loadBrowserExecutionPresetCatalog(): Promise<BrowserExecutionPresetCatalog> {
-  try {
-    return await retry(async () => browserExecutionPresetCatalog.load(), buildRetryOptions());
-  } catch (err) {
-    logger.warn(
-      `[modeling-pipeline-helpers] suppressed error in loadBrowserExecutionPresetCatalog: ${err}`
-    );
-    return structuredClone(FALLBACK_BROWSER_EXECUTION_PRESETS);
-  }
+  return browserExecutionPresetCatalog.load();
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
