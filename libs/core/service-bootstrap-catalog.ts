@@ -32,7 +32,6 @@ const publicCatalog = defineCatalog<ServiceBootstrapCatalog>({
   id: 'service-bootstrap-catalog.public',
   path: PUBLIC_CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: { version: '1.0.0', entries: [] },
 });
 
 const personalCatalog = defineCatalog<ServiceBootstrapCatalog>({
