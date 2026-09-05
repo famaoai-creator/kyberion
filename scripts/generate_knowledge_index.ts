@@ -3,13 +3,12 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { loadFrontmatterExclusions } from '@agent/core/frontmatter-exclusions';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
@@ -74,7 +73,7 @@ function getTier(relPath: string): string {
 
 function parseMarkdownMetadata(filePath: string): { title: string; author: string } {
   try {
-    const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    const content = readTextFile(filePath);
     let title = path.basename(filePath, '.md');
     let author = 'Unknown';
 
@@ -273,12 +272,8 @@ function normalizeIndex(content: string): string {
 
 function generatedFilesAreCurrent(files: readonly GeneratedFile[]): boolean {
   const expected = new Map(files.map((file) => [file.path, file.content]));
-  const existingManifest = safeReadFile(KNOWLEDGE_MANIFEST_PATH, {
-    encoding: 'utf8',
-  }) as string;
-  const existingIndex = safeReadFile(KNOWLEDGE_INDEX_PATH, {
-    encoding: 'utf8',
-  }) as string;
+  const existingManifest = readTextFile(KNOWLEDGE_MANIFEST_PATH);
+  const existingIndex = readTextFile(KNOWLEDGE_INDEX_PATH);
   const expectedManifest = expected.get(KNOWLEDGE_MANIFEST_PATH);
   const expectedIndex = expected.get(KNOWLEDGE_INDEX_PATH);
   return (
