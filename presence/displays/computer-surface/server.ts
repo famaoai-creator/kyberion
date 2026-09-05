@@ -3,7 +3,6 @@ import { createServer } from 'node:http';
 import * as path from 'node:path';
 import {
   assertSurfaceOperation,
-  SurfaceAuthorizationError,
   type SurfaceAuthorizationContext,
 } from '@agent/core/surface-authorization';
 import {
@@ -28,6 +27,7 @@ import {
   safeReadFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
+import { toWireError } from '@agent/core/wire-error';
 import {
   assertComputerSurfacePayloadInScope,
   computerSurfaceServerTenantResource,
@@ -74,6 +74,19 @@ const HOST = getRegisteredEnvText('COMPUTER_SURFACE_HOST') || '127.0.0.1';
 const sseClients = new Set<Client>();
 const computerSurfaceManifest = buildComputerSurfaceManifest();
 
+function computerSurfaceWireError(error: unknown, status: number) {
+  const safe = toWireError({
+    status,
+    message: error instanceof Error ? error.message : String(error),
+  });
+  return {
+    ok: false,
+    error: safe.message,
+    error_code: safe.code,
+    correlation_id: safe.correlation_id,
+  };
+}
+
 export function resolveExistingIdentityFile(filePath: string): string | null {
   try {
     const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
@@ -94,9 +107,7 @@ function authorizeSurface(
     context = resolveComputerSurfaceViewerContext(req);
   } catch (error) {
     const status = error instanceof ComputerSurfaceViewerError ? error.status : 403;
-    res
-      .status(status)
-      .json({ ok: false, error: error instanceof Error ? error.message : 'Unauthorized.' });
+    res.status(status).json(computerSurfaceWireError(error, status));
     return null;
   }
 
@@ -123,13 +134,7 @@ function authorizeSurface(
     });
     return context;
   } catch (error) {
-    const message =
-      error instanceof SurfaceAuthorizationError
-        ? error.decision.reason
-        : error instanceof Error
-          ? error.message
-          : 'Forbidden.';
-    res.status(403).json({ ok: false, error: message });
+    res.status(403).json(computerSurfaceWireError(error, 403));
     return null;
   }
 }
@@ -266,7 +271,7 @@ app.get('/api/identity', (req, res) => {
       vision: result.vision,
     });
   } catch (err: any) {
-    res.status(500).json({ ok: false, error: err?.message || String(err) });
+    res.status(500).json(computerSurfaceWireError(err, 500));
   }
 });
 
@@ -306,14 +311,9 @@ app.get('/api/os/control-plane', (req, res) => {
       ...snapshot,
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message.startsWith('[POLICY_VIOLATION]')
-        ? error.message
-        : 'Unable to load the OS control-plane projection.';
-    res.status(message.startsWith('[POLICY_VIOLATION]') ? 403 : 400).json({
-      ok: false,
-      error: message,
-    });
+    const status =
+      error instanceof Error && error.message.startsWith('[POLICY_VIOLATION]') ? 403 : 400;
+    res.status(status).json(computerSurfaceWireError(error, status));
   }
 });
 
@@ -336,18 +336,14 @@ app.post('/a2ui/dispatch', (req, res) => {
     assertComputerSurfacePayloadInScope(context, body);
   } catch (error) {
     const status = error instanceof ComputerSurfaceViewerError ? error.status : 403;
-    res
-      .status(status)
-      .json({ ok: false, error: error instanceof Error ? error.message : 'Forbidden.' });
+    res.status(status).json(computerSurfaceWireError(error, status));
     return;
   }
   const messages = Array.isArray(body) ? body : [body];
   try {
     for (const message of messages) applyA2UIMessage(validateA2UIMessage(message));
   } catch (error) {
-    res
-      .status(400)
-      .json({ ok: false, error: error instanceof Error ? error.message : 'Invalid A2UI message.' });
+    res.status(400).json(computerSurfaceWireError(error, 400));
     return;
   }
   emitState();

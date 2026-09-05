@@ -1802,3 +1802,7 @@ Presence StudioのExpress／runtime-data境界に残っていた内部例外のr
 ## 2026-09-06 再レビュー修正 235
 
 Browser Native Messaging hostの内部例外応答を`formatWireError`へ統一し、recording／delta／analysis／report／dispatch境界からprovider・filesystemのraw messageを返さないようにした。既存のvalidation／approval拒否 semanticsを維持し、wire checkerの実ファイル対象とtemplate interpolation検査を追加した。関連 **3 files / 16 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー修正 236
+
+Computer Surfaceの認証・OS projection・A2UI・identity read境界を共通wire-safe projectionへ統一し、内部例外のmessage／stackをJSON応答へ返さないようにした。statusと既存の明示的な拒否 semanticsを維持し、wire checkerへ実ファイル監査を追加した。関連 **3 files / 21 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。

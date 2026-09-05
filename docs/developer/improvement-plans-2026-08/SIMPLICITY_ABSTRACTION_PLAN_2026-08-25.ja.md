@@ -21628,6 +21628,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Browser Native Messaging hostのrecording／delta／analysis／report保存とdispatch外側catchに残っていた内部例外のraw messageを`formatWireError`へ統一した。既存の入力検証・承認拒否・not-foundなどの利用者向けエラーは維持し、wire checkerをhostへ拡張して例外message／template interpolationの再発を検出するようにした。
 - **検証**: Browser Bridge／wire boundary **3 files / 16 tests passed**、実ファイルwire checker `OK`、typecheck、対象ESLint、Prettier、`git diff --check`。全 script harness／generator 移行、provider CLIの実機enforcement結果は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1406
+
+- **対象**: `presence/displays/computer-surface/server.ts`、`scripts/check_wire_error_boundary.ts`、`scripts/check_wire_error_boundary.test.ts`
+- **変更**: Computer Surfaceの認証・OS projection・A2UI・identity readに残っていた内部例外のraw JSON responseを`computerSurfaceWireError`へ統一した。HTTP statusと明示的なoperation／入力エラー semanticsは維持し、wire checkerの実ファイル対象へComputer Surfaceを追加した。
+- **検証**: Computer Surface／wire boundary **3 files / 21 tests passed**、実ファイルwire checker `OK`、typecheck、対象ESLint、Prettier、`git diff --check`。全 script harness／generator 移行、provider CLIの実機enforcement結果は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1387
 
 - **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`
