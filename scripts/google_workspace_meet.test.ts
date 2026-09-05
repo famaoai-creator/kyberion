@@ -30,6 +30,8 @@ describe('google workspace meet payload boundaries', () => {
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
+    expect(source).not.toContain('process.env.CLOUDSDK_PYTHON');
+    expect(source).toContain("getRegisteredEnvText('CLOUDSDK_PYTHON')");
     expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 });

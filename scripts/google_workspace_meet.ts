@@ -8,6 +8,7 @@ import {
   safeReadFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
 
@@ -85,7 +86,8 @@ async function main(argv: string[], print: Print = () => undefined): Promise<voi
 
   const payload = readPayload(args);
   const env = buildSafeExecEnv({
-    CLOUDSDK_PYTHON: getString(args, '--cloudsdk-python') || process.env.CLOUDSDK_PYTHON,
+    CLOUDSDK_PYTHON:
+      getString(args, '--cloudsdk-python') || getRegisteredEnvText('CLOUDSDK_PYTHON'),
   });
   const output = safeExec('gws', ['meet', 'spaces', 'create', '--json', JSON.stringify(payload)], {
     env,
