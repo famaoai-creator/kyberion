@@ -20615,6 +20615,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: agents API の GET/POST/DELETE をそれぞれ `withViewerExecutionContextAsync` のリクエストスコープで実行し、request-wide な `process.env.MISSION_ROLE` setterを削除した。GETの応答roleは既に解決済みのviewer contextから返し、認証済みviewerと実行時のrole解決を一つの境界に揃えた。
 - **検証**: `route.boundary.test.ts` でprocess-wide role assignmentの不在とasync viewer context境界を固定し、既存の入力境界テストを再実行する。
 
+## 2026-09-05 再レビュー修正 1237
+
+- **対象**: `presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.ts`
+- **変更**: Chronos agent route専用の `withMissionRole` が独自にprocess環境を退避・復元していたため、共通authorityの `withExecutionContext` に委譲した。既存の同期呼び出し契約を維持しつつ、authorityの実行scope/ペルソナ処理と同じ経路へ統一した。
+- **検証**: `agent-route-helpers.boundary.test.ts` でhelper内の直接setter不在と共通authorityへの委譲を固定する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
