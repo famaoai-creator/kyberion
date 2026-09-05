@@ -4,6 +4,7 @@ import path from 'node:path';
 import { safeExec } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function collectChangedFiles(args: string[], changed: Set<string>): void {
@@ -34,7 +35,7 @@ export function isLockfileChangePermitted(input: {
 }
 
 export function checkLockfileCommitGate(): LockfileCommitGateResult {
-  const baseRef = process.env.GITHUB_BASE_REF?.trim();
+  const baseRef = getRegisteredEnvText('GITHUB_BASE_REF')?.trim();
   const safeBase = baseRef && /^[A-Za-z0-9._/-]+$/u.test(baseRef) ? baseRef : undefined;
   const changed = new Set<string>();
 
@@ -46,7 +47,7 @@ export function checkLockfileCommitGate(): LockfileCommitGateResult {
     );
   }
 
-  const evidenceRef = process.env.PI_LOCKFILE_REVIEW_EVIDENCE?.trim() || undefined;
+  const evidenceRef = getRegisteredEnvText('PI_LOCKFILE_REVIEW_EVIDENCE')?.trim() || undefined;
   const evidencePath = evidenceRef
     ? path.isAbsolute(evidenceRef)
       ? evidenceRef
@@ -66,7 +67,7 @@ export function checkLockfileCommitGate(): LockfileCommitGateResult {
   const lockfileChanged = changed.has('pnpm-lock.yaml');
   const permitted = isLockfileChangePermitted({
     lockfileChanged,
-    allowOverride: process.env.PI_ALLOW_LOCKFILE_CHANGE === '1',
+    allowOverride: getRegisteredEnvText('PI_ALLOW_LOCKFILE_CHANGE') === '1',
     hasReviewEvidence,
   });
 
