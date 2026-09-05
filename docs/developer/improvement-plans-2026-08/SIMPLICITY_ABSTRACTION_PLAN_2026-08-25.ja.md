@@ -20256,6 +20256,25 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 - SX-03〜SX-14は引き続き部分完了であり、他のdomain reader、catalog、CLI、ADF、UX、知識整理の残存課題は別sliceとして継続する。
 
+## 2026-09-05 再レビュー修正 1216
+
+### 対象
+
+- SX-03/SX-09: `mission-work-reconciliation` の承認申請、scaffold生成、reconcile実行にある承認者identityのOSユーザー名フォールバックを共通env accessorへ統一。
+- `requestedBy`の明示値、`KYBERION_PERSONA`優先、`mission_controller`既定値、manifest actor一致検証は変更しない。
+
+### 検証
+
+- `pnpm exec vitest run libs/core/mission-work-reconciliation.test.ts`
+- `pnpm --filter @agent/core run typecheck`
+- `pnpm exec eslint --max-warnings 0 libs/core/mission-work-reconciliation.ts`
+- `git diff --check`
+- フル `pnpm run validate` は変更反映後に実行。
+
+### 残存
+
+- SX-03〜SX-14は引き続き部分完了であり、GITHUB CI環境値、domain reader、catalog、CLI、ADF、UX、知識整理の残存課題は別sliceとして継続する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

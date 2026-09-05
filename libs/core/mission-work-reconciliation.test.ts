@@ -49,6 +49,7 @@ const artifactPath = 'libs/core/entity-scope.ts';
 const verificationPath = 'libs/core/mission-status.ts';
 let previousMissionRole: string | undefined;
 let previousPersona: string | undefined;
+let previousUser: string | undefined;
 const reconciliationApprovalIds: string[] = [];
 
 function fileHash(repoRelativePath: string): string {
@@ -354,6 +355,7 @@ function prepareReviewReconciliationFixture(input?: {
 beforeEach(() => {
   previousMissionRole = process.env.MISSION_ROLE;
   previousPersona = process.env.KYBERION_PERSONA;
+  previousUser = process.env.USER;
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_PERSONA = actorId;
   setWorkCoordinationNamespace(namespace);
@@ -384,9 +386,23 @@ afterEach(() => {
   else process.env.MISSION_ROLE = previousMissionRole;
   if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
   else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousUser === undefined) delete process.env.USER;
+  else process.env.USER = previousUser;
 });
 
 describe('mission existing work reconciliation', () => {
+  it('uses the governed USER accessor when no persona is configured', () => {
+    prepareMission();
+    writeManifest(buildManifest());
+    delete process.env.KYBERION_PERSONA;
+    process.env.USER = actorId;
+
+    const request = createMissionWorkReconciliationApprovalRequest({ missionId, manifestPath });
+    reconciliationApprovalIds.push(request.id);
+
+    expect(request.requestedBy).toBe(actorId);
+  });
+
   it('requires mission-controller authority and a governed output location', () => {
     prepareMission();
     const previousRole = process.env.MISSION_ROLE;

@@ -301,7 +301,7 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
   const requestedBy =
     input.requestedBy?.trim() ||
     getRegisteredEnvText('KYBERION_PERSONA') ||
-    process.env.USER ||
+    getRegisteredEnvText('USER') ||
     'mission_controller';
   return createApprovalRequest('mission_controller', {
     channel: MISSION_RECONCILIATION_APPROVAL_CHANNEL,
@@ -811,7 +811,9 @@ export function generateMissionWorkReconciliationScaffold(input: {
     generated_at: nowIso(),
     source: { repository: '.', branch, commit },
     adopted_by:
-      getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller',
+      getRegisteredEnvText('KYBERION_PERSONA') ||
+      getRegisteredEnvText('USER') ||
+      'mission_controller',
     reason: input.reason || `Adopt verified existing work for ${missionId}.`,
     tasks: tasks.map((task) => ({
       task_id: String(task.task_id || ''),
@@ -857,7 +859,9 @@ export async function reconcileMissionExistingWork(input: {
     );
   }
   const actorId =
-    getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller';
+    getRegisteredEnvText('KYBERION_PERSONA') ||
+    getRegisteredEnvText('USER') ||
+    'mission_controller';
   if (manifest.adopted_by !== actorId) {
     throw new Error(
       `Manifest adopted_by ${manifest.adopted_by} does not match execution actor ${actorId}`
