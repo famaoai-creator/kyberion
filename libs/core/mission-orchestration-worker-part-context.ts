@@ -1,5 +1,5 @@
 import { a2aBridge } from './a2a-bridge.js';
-import { clamp } from './foundation/text.js';
+import { clamp, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { readHintsByCategory } from './src/feedback-loop.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
@@ -22,7 +22,7 @@ import {
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
-import { assertSafeRepositoryPath, safeExec, safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExec, safeExistsSync } from './secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { createMissionProgressController } from './mission-orchestration-progress.js';
 import {
@@ -124,7 +124,7 @@ export function buildReviewDiffLines(missionId: string, task: PlannedNextTask): 
     'diff.patch'
   );
   if (!safeExistsSync(diffPath)) return [];
-  const diff = String(safeReadFile(diffPath, { encoding: 'utf8' }) || '');
+  const diff = readTextFile(diffPath);
   if (!diff.trim()) return [];
   const lines = diff.split('\n');
   const changedFiles = lines
@@ -767,7 +767,7 @@ export function buildAuthorityRoleProcedureInjectionProvider(
     collect: () => {
       const procedurePath = pathResolver.knowledge(`product/roles/${authorityRole}/PROCEDURE.md`);
       if (!safeExistsSync(procedurePath)) return null;
-      const content = String(safeReadFile(procedurePath, { encoding: 'utf8' }) || '').trim();
+      const content = readTextFile(procedurePath).trim();
       if (!content) return null;
       return [`## Role procedure (${authorityRole})`, content].join('\n\n');
     },

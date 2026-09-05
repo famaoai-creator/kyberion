@@ -18,7 +18,6 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -35,6 +34,7 @@ import {
 } from './artifact-review.js';
 import { loadState } from './mission-state.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import type { IntentReconciliationInput } from './intent-reconciliation.js';
 import {
   loadMissionNextTaskObjectsAtPath,
@@ -98,7 +98,7 @@ export function collectMissionEvidence(missionDir: string): Array<{ ref: string;
     .map((ref) => {
       let text: string | undefined;
       try {
-        text = String(safeReadFile(ref, { encoding: 'utf8' })).slice(0, 2000);
+        text = readTextFile(ref).slice(0, 2000);
       } catch (err) {
         logger.warn(`[mission-lifecycle] suppressed error in collectMissionEvidence: ${err}`);
       }
@@ -260,7 +260,7 @@ export function publishMeetingDeliverablesIfNeeded(input: {
     if (!safeLstat(minutesPath).isFile()) {
       throw new Error(`[DELIVERY_RESOURCE] minutes must be a regular file: ${minutesPath}`);
     }
-    const minutes = String(safeReadFile(minutesPath, { encoding: 'utf8' }));
+    const minutes = readTextFile(minutesPath);
     minutesExcerpt = minutes.split(/\r?\n/u).slice(0, 8).join('\n').trim();
   }
 
