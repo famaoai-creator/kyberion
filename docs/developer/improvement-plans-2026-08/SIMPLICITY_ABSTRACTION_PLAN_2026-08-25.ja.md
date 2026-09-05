@@ -22383,3 +22383,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_ui_ux_governance.ts`、`scripts/check-governance-path-scanners.ts`、`scripts/check_foundation_adoption.ts` と対象テスト
 - **変更**: UI/UX、governance path、foundation adoption checker の本文読込を foundation の `readTextFile` へ統一した。semantic token／raw color、machine-absolute path／product placement、foundation adoption の各検査と既存の例外・失敗 semanticsは変更せず、UI/UX／foundation adoption に reader contract test を追加した。
 - **検証**: UI/UX・foundation-adoption・governance-rules **既存テスト＋reader contract passed**（11 tests）、実チェッカー `check:ui-ux`／`check:foundation-adoption`／`check:governance-rules` **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1531
+
+- **対象**: `scripts/check_lockfile_commit_gate.ts`、`scripts/check_lockfile_commit_gate.test.ts`
+- **変更**: lockfile commit gate の review evidence 本文読込を foundation の `readTextFile` へ移行した。lockfile のSHA-256計算に必要なバイナリ読込、CI環境値、明示的override＋hash-bound evidence判定は変更せず、既存テストに reader contract を追加した。
+- **検証**: lockfile-commit-gate **既存テスト＋reader contract passed**（7 tests）、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

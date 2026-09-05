@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
 import {
   checkLockfileCommitGate,
   isLockfileChangePermitted,
@@ -8,14 +8,11 @@ import {
 
 describe('lockfile commit gate', () => {
   it('reads CI metadata and review overrides through the environment registry', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/check_lockfile_commit_gate.ts'), {
-        encoding: 'utf8',
-      })
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/check_lockfile_commit_gate.ts'));
     expect(source).not.toContain('process.env.GITHUB_BASE_REF');
     expect(source).not.toContain('process.env.PI_LOCKFILE_REVIEW_EVIDENCE');
     expect(source).not.toContain('process.env.PI_ALLOW_LOCKFILE_CHANGE');
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
     expect(source).toContain("getRegisteredEnvText('GITHUB_BASE_REF')");
     expect(source).toContain("getRegisteredEnvText('PI_LOCKFILE_REVIEW_EVIDENCE')");
     expect(source).toContain("getRegisteredEnvText('PI_ALLOW_LOCKFILE_CHANGE')");
