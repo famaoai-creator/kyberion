@@ -26,10 +26,15 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { isRecord, nowIso, parseSafeJsonInput, slugify } from '@agent/core/foundation';
+import {
+  isRecord,
+  nowIso,
+  parseSafeJsonInput,
+  readTextFile,
+  slugify,
+} from '@agent/core/foundation';
 import { tryRepairJson } from '@agent/core/json-repair';
 import {
   loadPipelineAdfAtPath,
@@ -172,7 +177,7 @@ async function requestPromotionAdvice(pipeline: PipelineAdf): Promise<PromotionA
 function appendCatalogRow(slug: string, description: string, dryRun: boolean): void {
   const readmePath = pathResolver.rootResolve('pipelines/README.md');
   if (!safeExistsSync(readmePath)) return;
-  let content = String(safeReadFile(readmePath, { encoding: 'utf8' }));
+  let content = readTextFile(readmePath);
   const row = `| \`${slug}\` | \`pnpm pipeline --input pipelines/${slug}.json\` | ${description} |`;
   if (content.includes(`| \`${slug}\``)) return;
   const sectionHeader = '### Promoted (pipeline:promote)';

@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core';
 import { normalizePromotionAdvice, resolvePromotionInputPath } from './pipeline_promote.js';
 
 describe('pipeline promotion resource boundaries', () => {
   it('uses the governed parser for model promotion advice', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/pipeline_promote.ts'), {
-        encoding: 'utf8',
-      })
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/pipeline_promote.ts'));
     expect(source).toContain("parseSafeJsonInput(jsonText, 'pipeline promotion advice')");
     expect(source).toContain('loadPipelineAdfAtPath(resolvedInput)');
     expect(source).not.toContain('readJson<unknown>(resolvedInput)');
     expect(source).not.toContain('JSON.parse(jsonText)');
+    expect(source).toContain('readTextFile');
   });
 
   it('rejects external and non-file sources before promotion', () => {

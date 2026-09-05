@@ -1,12 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  safeExistsSync,
-  safeExecResult,
-  safeReadFile,
-  safeReaddir,
-  safeLstat,
-} from '@agent/core/secure-io';
+import { safeExistsSync, safeExecResult, safeReaddir, safeLstat } from '@agent/core/secure-io';
 import { decidePatchAction, type PatchDecision } from '@agent/core/patch-decision';
 import {
   appendDependencyVulnerabilityLedgerRecord,
@@ -17,6 +11,7 @@ import {
   nowIso,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
+  readTextFile,
 } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -159,10 +154,7 @@ function collectWorkspaceDependencyNames(rootDir = pathResolver.rootDir()): Set<
   const names = new Set<string>();
   for (const file of listWorkspacePackageJsonFiles(rootDir)) {
     try {
-      const pkg = readJsonObject(
-        safeReadFile(file, { encoding: 'utf8' }) as string,
-        `package.json at ${file}`
-      );
+      const pkg = readJsonObject(readTextFile(file), `package.json at ${file}`);
       for (const section of [pkg.dependencies, pkg.devDependencies, pkg.peerDependencies]) {
         for (const dep of Object.keys(section || {})) names.add(dep);
       }
