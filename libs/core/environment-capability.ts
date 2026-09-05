@@ -25,6 +25,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
@@ -787,7 +788,7 @@ export function verifyManifestSignature(
 }
 
 function enforceManifestSignature(manifest: EnvironmentManifest): void {
-  const signingKey = process.env[MANIFEST_SIGNING_KEY_ENV];
+  const signingKey = getRegisteredEnvText(MANIFEST_SIGNING_KEY_ENV);
   if (signingKey) {
     if (!verifyManifestSignature(manifest, signingKey)) {
       throw new Error(
