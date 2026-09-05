@@ -811,6 +811,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-02／PI-03 の Computer Surface wire境界を再レビューし、認証・OS projection・A2UI・identity readの内部例外JSON responseを`computerSurfaceWireError`へ統一した。statusと明示的なoperation／入力拒否 semanticsを維持し、wire boundary checkerをComputer Surfaceへ拡張した。関連 **3 files / 21 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-02／PI-03 の Concierge wire境界を再レビューし、viewer解決・approval・config mission・notification・outcome・plugin・response status・setup・voice listenの内部例外JSON responseを`conciergeErrorResponse`へ統一した。rate limit／validation／not-found semanticsを維持し、wire boundary checkerをConciergeへ拡張した。関連 **12 files / 33 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 の direct-loader 再レビューとして、AgentInputQueueのdurable `next_run` queue read／append前へoperation-timeのregular-file検査を追加し、queue pathのディレクトリ置換を拒否する回帰を関連 **1 file / 15 tests passed**、全体typecheck、対象lint、Prettier、`git diff --check`で確認した。未監査direct loader全件inventory、全script harness／generator移行、provider CLIの実OS-level enforcement probeは継続課題である。
+- 2026-09-06: PI-03 の direct-loader 再レビューとして、共有 artifact ownership registry の append／read 前へ operation-time の regular-file 検査を追加し、registry leaf のディレクトリ置換を拒否する回帰を関連 **1 file / 9 tests passed**、対象 lint、Prettier、`git diff --check`で確認した。未監査direct loader全件inventory、全script harness／generator移行、provider CLIの実OS-level enforcement probeは継続課題である。
 
 ## 7. 検証コマンド(実装時)
 
