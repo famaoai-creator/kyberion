@@ -181,6 +181,6 @@ export function buildCopilotAcpBackendFromEnv(
   model?: string
 ): CopilotAcpReasoningBackend {
   return new CopilotAcpReasoningBackend({
-    model: model || env.KYBERION_COPILOT_MODEL,
+    model: model || getRegisteredEnvText('KYBERION_COPILOT_MODEL', { env }),
   });
 }
