@@ -16,6 +16,7 @@ import {
   recordKnowledgeDelivery,
   recordKnowledgeGap,
   recordKnowledgeUsageFeedback,
+  recordHumanKnowledgeFeedback,
 } from './knowledge-feedback-loop.js';
 import {
   listMemoryPromotionCandidates,
@@ -165,6 +166,31 @@ describe('recordKnowledgeDelivery', () => {
     expect(result).toBeUndefined();
     expect(safeExistsSync(knowledgeDeliveryLogDir())).toBe(false);
     expect(safeExistsSync(knowledgeUsageAggregatePath())).toBe(false);
+  });
+
+  it('rejects feedback log paths that are directories', () => {
+    const humanPath = path.join(suiteRoot, 'feedback', 'knowledge-human.jsonl');
+    const gapsPath = path.join(suiteRoot, 'feedback', 'knowledge-gaps.jsonl');
+    safeMkdir(humanPath, { recursive: true });
+    safeMkdir(gapsPath, { recursive: true });
+
+    try {
+      expect(() =>
+        recordHumanKnowledgeFeedback({
+          document_path: 'knowledge/product/architecture/example.md',
+          verdict: 'useful',
+        })
+      ).toThrow('[KNOWLEDGE_FEEDBACK_INVALID] feedback log must be a regular file');
+      expect(() =>
+        recordKnowledgeGap({
+          topic: 'directory boundary',
+          sourceRef: 'task:directory-boundary',
+        })
+      ).toThrow('[KNOWLEDGE_FEEDBACK_INVALID] feedback log must be a regular file');
+    } finally {
+      safeRmSync(humanPath, { recursive: true, force: true });
+      safeRmSync(gapsPath, { recursive: true, force: true });
+    }
   });
 
   it('deduplicates refs by path within one delivery call', () => {
