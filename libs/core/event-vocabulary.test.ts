@@ -68,6 +68,18 @@ describe('event-vocabulary', () => {
     expect(resolveCollaborationKind('agent_runtime_refreshed')).toBe('retry');
   });
 
+  it('agent-runtime-events.jsonl の MISSION_* イベント名を分類する(AC-02)', () => {
+    // These come from libs/core/agent-runtime-events.jsonl (`event` key) and
+    // were an orphaned, unclassified source before AC-02 wired readSourceEvents
+    // to read them.
+    expect(resolveCollaborationKind('MISSION_PAUSED')).toBe('waiting');
+    expect(resolveCollaborationKind('MISSION_CANCELLED')).toBe('failure');
+    expect(resolveCollaborationKind('MISSION_WORK_REMAINS')).toBe('progress');
+    expect(resolveCollaborationKind('MISSION_FINISH_REFRESH_RECOMMENDED')).toBe('review');
+    // Case-insensitive: the projection lowercases before matching inference.
+    expect(resolveCollaborationKind('mission_paused')).toBe('waiting');
+  });
+
   it('空・未知の入力は unknown を返す', () => {
     expect(resolveCollaborationKind('')).toBe('unknown');
     expect(resolveCollaborationKind(undefined)).toBe('unknown');

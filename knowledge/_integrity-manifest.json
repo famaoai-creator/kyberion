@@ -6375,7 +6375,7 @@
     {
       "path": "product/schemas/agent-collaboration-event.schema.json",
       "tier": "public",
-      "size": 3934,
+      "size": 4333,
       "type": "json"
     },
     {

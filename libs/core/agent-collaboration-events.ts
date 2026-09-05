@@ -40,6 +40,18 @@ export interface AgentCollaborationEvent {
   task_id?: string;
   agent_id?: string;
   parent_agent_id?: string;
+  /**
+   * a2a envelope sender/receiver actor ids (AC-02). Distinct from agent_id,
+   * which for a routed a2a message already holds the receiving agent id.
+   */
+  sender?: string;
+  receiver?: string;
+  performative?: string;
+  /** Correlates a subagent_begin with its matching subagent_end/unavailable. */
+  delegation_id?: string;
+  team_role?: string;
+  instruction_summary?: string;
+  elapsed_ms?: number;
   session_id?: string;
   provider?: string;
   adopter_id?: string;
@@ -93,9 +105,13 @@ const SHARED_METADATA_KEYS = new Set([
   'channel',
   'correlation_id',
   'decision',
+  'delegation_id',
+  'elapsed_ms',
   'event_id',
   'event_type',
   'expires_at',
+  'instruction_summary',
+  'intent',
   'kind',
   'mission_id',
   'mission_type',
@@ -106,6 +122,8 @@ const SHARED_METADATA_KEYS = new Set([
   'operation',
   'orchestration_status',
   'outcome',
+  'parent_agent_id',
+  'performative',
   'phase',
   'pipeline_id',
   'planned_task_count',
@@ -114,11 +132,13 @@ const SHARED_METADATA_KEYS = new Set([
   'provider',
   'reason_code',
   'reason_category',
+  'receiver',
   'requested_by',
   'request_id',
   'resource_id',
   'runtime_status',
   'scope_kind',
+  'sender',
   'session_id',
   'source',
   'scope',
@@ -219,6 +239,15 @@ export function createAgentCollaborationEvent(
     ...(input.task_id ? { task_id: input.task_id } : {}),
     ...(input.agent_id ? { agent_id: input.agent_id } : {}),
     ...(input.parent_agent_id ? { parent_agent_id: input.parent_agent_id } : {}),
+    ...(input.sender ? { sender: input.sender } : {}),
+    ...(input.receiver ? { receiver: input.receiver } : {}),
+    ...(input.performative ? { performative: input.performative } : {}),
+    ...(input.delegation_id ? { delegation_id: input.delegation_id } : {}),
+    ...(input.team_role ? { team_role: input.team_role } : {}),
+    ...(input.instruction_summary
+      ? { instruction_summary: redactCollaborationSummary(input.instruction_summary, '') }
+      : {}),
+    ...(input.elapsed_ms !== undefined ? { elapsed_ms: input.elapsed_ms } : {}),
     ...(input.session_id ? { session_id: input.session_id } : {}),
     ...(input.provider ? { provider: input.provider } : {}),
     ...(input.adopter_id ? { adopter_id: input.adopter_id } : {}),

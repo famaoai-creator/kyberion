@@ -287,6 +287,381 @@ describe('agent collaboration projection', () => {
     expect(first.status_flags).toEqual([]);
   });
 
+  it('builds an agent-to-agent handoff edge from a routed a2a message (AC-02a)', () => {
+    const projection = composeAgentCollaborationProjection([
+      event({
+        source: 'orchestration',
+        source_event_id: 'a2a-1',
+        kind: 'handoff',
+        sender: 'planner',
+        receiver: 'worker-1',
+        performative: 'request',
+      }),
+    ]);
+
+    expect(projection.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'agent:planner', type: 'agent' }),
+        expect.objectContaining({ id: 'agent:worker-1', type: 'agent' }),
+      ])
+    );
+    expect(projection.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: 'agent:planner', to: 'agent:worker-1', kind: 'handoff' }),
+      ])
+    );
+  });
+
+  it('routes a human sender to a human: node for a handoff edge (AC-02a)', () => {
+    const projection = composeAgentCollaborationProjection([
+      event({
+        source: 'surface',
+        actor_type: 'human',
+        source_event_id: 'a2a-human-1',
+        kind: 'handoff',
+        sender: 'operator',
+        receiver: 'worker-1',
+      }),
+    ]);
+
+    expect(projection.nodes).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'human:operator', type: 'human' })])
+    );
+    expect(projection.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: 'human:operator', to: 'agent:worker-1', kind: 'handoff' }),
+      ])
+    );
+  });
+
+  it('builds a spawn edge whose child state reflects the matching subagent_end (AC-02b)', () => {
+    const projection = composeAgentCollaborationProjection([
+      event({
+        source: 'worker',
+        source_event_id: 'begin-1',
+        kind: 'spawn',
+        parent_agent_id: 'planner',
+        agent_id: 'child-1',
+        delegation_id: 'DEL-1',
+        ts: '2026-07-26T00:00:00.000Z',
+      }),
+      event({
+        source: 'worker',
+        source_event_id: 'end-1',
+        kind: 'completion',
+        agent_id: 'child-1',
+        delegation_id: 'DEL-1',
+        state_after: 'success',
+        ts: '2026-07-26T00:01:00.000Z',
+      }),
+    ]);
+
+    expect(projection.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: 'agent:planner', to: 'agent:child-1', kind: 'spawn' }),
+      ])
+    );
+    expect(projection.nodes.find((node) => node.id === 'agent:child-1')).toMatchObject({
+      state: 'success',
+    });
+  });
+
+  it('leaves the spawned child state as running when no subagent_end has arrived yet (AC-02b)', () => {
+    const projection = composeAgentCollaborationProjection([
+      event({
+        source: 'worker',
+        source_event_id: 'begin-2',
+        kind: 'spawn',
+        parent_agent_id: 'planner',
+        agent_id: 'child-2',
+        delegation_id: 'DEL-2',
+      }),
+    ]);
+
+    expect(projection.nodes.find((node) => node.id === 'agent:child-2')).toMatchObject({
+      state: 'running',
+    });
+  });
+
+  // AC-03 fixtures below build under an isolated `roots` override
+  // (active/shared/tmp/collab-<uuid>/...) instead of the real, shared
+  // observability files. Those real files can be tens of megabytes in the
+  // main checkout and are read concurrently by other suites (vital_check,
+  // Chronos, headless-projections) and processes; writing/truncating/deleting
+  // them from a test is the exact class of shared-file race that has already
+  // caused a CI flake here. Only the pre-existing symlink-boundary test below
+  // still exercises the real paths, because it is specifically asserting
+  // symlink-escape behaviour against the real worker-events directory.
+  function collabFixtureDir(suffix: string): string {
+    return path.join(pathResolver.shared('tmp'), `collab-${suffix}`);
+  }
+
+  it('truncates a large source file to its byte tail and flags bounded_read (AC-03)', () => {
+    const suffix = randomUUID();
+    const fixtureDir = collabFixtureDir(suffix);
+    const observabilityDir = path.join(fixtureDir, 'observability', 'mission-control');
+    const filePath = path.join(observabilityDir, 'agent-runtime-supervisor-events.jsonl');
+    const keptMissionId = `MSN-KEPT-${suffix}`.toUpperCase();
+    const droppedMissionId = `MSN-DROPPED-${suffix}`.toUpperCase();
+    const maxBytesPerFile = 2000;
+    const padding = 'x'.repeat(200);
+    const droppedLines = Array.from({ length: 40 }, (_, index) =>
+      JSON.stringify({
+        event_id: `dropped-${suffix}-${index}`,
+        decision: 'agent_runtime_prewarm_requested',
+        mission_id: droppedMissionId,
+        seq: index,
+        padding,
+      })
+    );
+    const keptLines = Array.from({ length: 5 }, (_, index) =>
+      JSON.stringify({
+        event_id: `kept-${suffix}-${index}`,
+        decision: 'agent_runtime_prewarm_requested',
+        mission_id: keptMissionId,
+        seq: index,
+        padding,
+      })
+    );
+    const content = `${[...droppedLines, ...keptLines].join('\n')}\n`;
+    fs.mkdirSync(observabilityDir, { recursive: true });
+    fs.writeFileSync(filePath, content);
+    try {
+      expect(fs.statSync(filePath).size).toBeGreaterThan(maxBytesPerFile);
+      const projection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        bounded: { maxBytesPerFile },
+        roots: { observabilityDir },
+      });
+      expect(projection.partial).toBe(true);
+      expect(projection.status_flags).toContain('bounded_read');
+      expect(projection.truncated_sources).toContain('agent-runtime-supervisor-events.jsonl');
+      expect(projection.events.some((entry) => entry.mission_id === keptMissionId)).toBe(true);
+      expect(projection.events.some((entry) => entry.mission_id === droppedMissionId)).toBe(false);
+
+      const unboundedProjection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        bounded: false,
+        roots: { observabilityDir },
+      });
+      expect(unboundedProjection.status_flags).not.toContain('bounded_read');
+      expect(
+        unboundedProjection.events.some((entry) => entry.mission_id === droppedMissionId)
+      ).toBe(true);
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores worker-events-<date>.jsonl files outside the recent-days window by default (AC-03)', () => {
+    const suffix = randomUUID();
+    const fixtureDir = collabFixtureDir(suffix);
+    const workerEventsDir = path.join(fixtureDir, 'logs', 'worker-events');
+    const recentMissionId = `MSN-RECENT-${suffix}`.toUpperCase();
+    const oldMissionId = `MSN-OLD-${suffix}`.toUpperCase();
+    const recentPath = path.join(workerEventsDir, 'worker-events-2026-09-05.jsonl');
+    const oldPath = path.join(workerEventsDir, 'worker-events-2026-09-01.jsonl');
+    fs.mkdirSync(workerEventsDir, { recursive: true });
+    fs.writeFileSync(
+      recentPath,
+      `${JSON.stringify({
+        type: 'progress',
+        mission_id: recentMissionId,
+        ts: '2026-09-05T00:00:00.000Z',
+      })}\n`
+    );
+    fs.writeFileSync(
+      oldPath,
+      `${JSON.stringify({
+        type: 'progress',
+        mission_id: oldMissionId,
+        ts: '2026-09-01T00:00:00.000Z',
+      })}\n`
+    );
+    try {
+      const projection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        roots: { workerEventsDir },
+      });
+      expect(projection.events.some((entry) => entry.mission_id === recentMissionId)).toBe(true);
+      expect(projection.events.some((entry) => entry.mission_id === oldMissionId)).toBe(false);
+
+      const unboundedProjection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        bounded: false,
+        roots: { workerEventsDir },
+      });
+      expect(unboundedProjection.events.some((entry) => entry.mission_id === oldMissionId)).toBe(
+        true
+      );
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it('always includes a mission-scoped worker-event partition regardless of recentDays, but not other missions (AC-03 follow-up)', () => {
+    const suffix = randomUUID();
+    const fixtureDir = collabFixtureDir(suffix);
+    const workerEventsDir = path.join(fixtureDir, 'logs', 'worker-events');
+    const targetMissionId = `MSN-TARGET-${suffix}`.toUpperCase();
+    const otherMissionId = `MSN-OTHER-${suffix}`.toUpperCase();
+    const targetMissionDir = path.join(workerEventsDir, 'missions', targetMissionId);
+    const otherMissionDir = path.join(workerEventsDir, 'missions', otherMissionId);
+    fs.mkdirSync(targetMissionDir, { recursive: true });
+    fs.mkdirSync(otherMissionDir, { recursive: true });
+    const oldDate = '2026-09-01';
+    fs.writeFileSync(
+      path.join(targetMissionDir, `worker-events-${oldDate}.jsonl`),
+      `${JSON.stringify({
+        type: 'progress',
+        mission_id: targetMissionId,
+        ts: `${oldDate}T00:00:00.000Z`,
+      })}\n`
+    );
+    fs.writeFileSync(
+      path.join(otherMissionDir, `worker-events-${oldDate}.jsonl`),
+      `${JSON.stringify({
+        type: 'progress',
+        mission_id: otherMissionId,
+        ts: `${oldDate}T00:00:00.000Z`,
+      })}\n`
+    );
+    try {
+      // Scoped to the target mission: its own old partition is read despite
+      // being outside recentDays; the other mission's old partition is not.
+      const scopedToTarget = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        missionId: targetMissionId,
+        roots: { workerEventsDir },
+      });
+      expect(scopedToTarget.events.some((entry) => entry.mission_id === targetMissionId)).toBe(
+        true
+      );
+      expect(scopedToTarget.events.some((entry) => entry.mission_id === otherMissionId)).toBe(
+        false
+      );
+
+      // Scoped the other way around, to prove this is genuinely a per-scope
+      // read-layer decision and not an artifact of one mission's fixture data.
+      const scopedToOther = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        missionId: otherMissionId,
+        roots: { workerEventsDir },
+      });
+      expect(scopedToOther.events.some((entry) => entry.mission_id === otherMissionId)).toBe(true);
+      expect(scopedToOther.events.some((entry) => entry.mission_id === targetMissionId)).toBe(
+        false
+      );
+
+      // Unscoped: recentDays applies to both mission partitions equally.
+      const unscoped = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        roots: { workerEventsDir },
+      });
+      expect(unscoped.events.some((entry) => entry.mission_id === targetMissionId)).toBe(false);
+      expect(unscoped.events.some((entry) => entry.mission_id === otherMissionId)).toBe(false);
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it('lifts payload.status of recorded subagent_end envelopes into the spawned child state (AC-02b)', () => {
+    const suffix = randomUUID();
+    const fixtureDir = collabFixtureDir(suffix);
+    const workerEventsDir = path.join(fixtureDir, 'logs', 'worker-events');
+    const missionId = `MSN-SPAWN-${suffix}`.toUpperCase();
+    const delegationId = `DEL-${suffix}`;
+    const childId = `implementer:${suffix.slice(0, 8)}`;
+    fs.mkdirSync(workerEventsDir, { recursive: true });
+    const shared = {
+      delegation_id: delegationId,
+      agent_id: childId,
+      parent_agent_id: 'kyberion://agent/orchestrator',
+      team_role: 'implementer',
+      dispatcher: 'harness-subagent',
+      profile: 'implementer',
+    };
+    const lines = [
+      {
+        type: 'subagent_begin',
+        ts: '2026-09-06T00:00:00.000Z',
+        seq: 0,
+        source: { mission_id: missionId },
+        payload: shared,
+      },
+      {
+        type: 'subagent_end',
+        ts: '2026-09-06T00:00:05.000Z',
+        seq: 1,
+        source: { mission_id: missionId },
+        payload: { ...shared, status: 'fallback', fallback_to: 'process-spawn', elapsed_ms: 5000 },
+      },
+    ];
+    fs.writeFileSync(
+      path.join(workerEventsDir, 'worker-events-2026-09-06.jsonl'),
+      `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`
+    );
+    try {
+      const projection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:10.000Z',
+        missionId,
+        roots: { workerEventsDir },
+      });
+      expect(projection.edges).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            from: 'agent:kyberion://agent/orchestrator',
+            to: `agent:${childId}`,
+            kind: 'spawn',
+          }),
+        ])
+      );
+      expect(projection.nodes.find((node) => node.id === `agent:${childId}`)).toMatchObject({
+        state: 'fallback',
+      });
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it('drops step_begin/step_end worker events by default and keeps them with includeStepEvents (AC-03)', () => {
+    const suffix = randomUUID();
+    const fixtureDir = collabFixtureDir(suffix);
+    const workerEventsDir = path.join(fixtureDir, 'logs', 'worker-events');
+    const stepMissionId = `MSN-STEP-${suffix}`.toUpperCase();
+    const turnMissionId = `MSN-TURN-${suffix}`.toUpperCase();
+    const filePath = path.join(workerEventsDir, 'worker-events-2026-09-06.jsonl');
+    fs.mkdirSync(workerEventsDir, { recursive: true });
+    const lines = [
+      { type: 'step_begin', mission_id: stepMissionId, ts: '2026-09-06T00:00:00.000Z', seq: 1 },
+      { type: 'turn_begin', mission_id: turnMissionId, ts: '2026-09-06T00:00:01.000Z', seq: 2 },
+    ];
+    fs.writeFileSync(filePath, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`);
+    try {
+      const defaultProjection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        roots: { workerEventsDir },
+      });
+      expect(defaultProjection.events.some((entry) => entry.mission_id === stepMissionId)).toBe(
+        false
+      );
+      expect(defaultProjection.events.some((entry) => entry.mission_id === turnMissionId)).toBe(
+        true
+      );
+
+      const includedProjection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:00.000Z',
+        bounded: { includeStepEvents: true },
+        roots: { workerEventsDir },
+      });
+      expect(includedProjection.events.some((entry) => entry.mission_id === stepMissionId)).toBe(
+        true
+      );
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
   it('skips worker event symlinks that escape the repository boundary', () => {
     const suffix = `agent-collaboration-${randomUUID()}`;
     const workerEventsDir = pathResolver.shared('logs/worker-events');
