@@ -11,7 +11,8 @@ import {
 import { queryTenantKnowledge } from './tenant-knowledge-retrieval.js';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import type { ProjectOperationalState } from './project-operational-state-registry.js';
 import type { WorkItem } from './work-coordination.js';
 import type {
@@ -92,7 +93,7 @@ function loadPinnedKnowledgeHint(repoRelativePath: string): MissionContextPackKn
     if (!abs) return null;
     if (!safeExistsSync(abs)) return null;
     if (!safeLstat(abs).isFile()) return null;
-    const raw = safeReadFile(abs, { encoding: 'utf8' }) as string;
+    const raw = readTextFile(abs);
     const { title: frontmatterTitle, body } = pinnedFrontmatterTitle(raw);
     const bodyWithoutHeading = body.replace(/^#\s+.+\n/, '');
     const title = frontmatterTitle || firstMarkdownHeading(body) || path.basename(repoRelativePath);

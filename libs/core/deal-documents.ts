@@ -1,13 +1,13 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -236,7 +236,7 @@ export function draftContractForDeal(input: {
   if (!safeLstat(templateFile).isFile()) {
     throw new Error(`contract_template_must_be_a_regular_file:${templateFile}`);
   }
-  const template = String(safeReadFile(templateFile, { encoding: 'utf8' }));
+  const template = readTextFile(templateFile);
   const rendered = template
     .split('{{DATE}}')
     .join(nowIso().slice(0, 10))
@@ -366,7 +366,7 @@ export async function sendDealDocumentToCustomer(input: {
     );
     return { sent: false, status: 'blocked', reason: 'contract_review_required' };
   }
-  const body = String(safeReadFile(docPath, { encoding: 'utf8' }));
+  const body = readTextFile(docPath);
   const result = await sendToCustomer({
     binding: input.binding,
     title: `${input.kind === 'quote' ? 'お見積書' : '契約書ドラフト'} (${input.dealId} v${input.version})`,

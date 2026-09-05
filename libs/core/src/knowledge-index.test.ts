@@ -36,6 +36,14 @@ vi.mock('../foundation/json.js', () => ({
   parseSafeJsonInput: (raw: string) => JSON.parse(raw),
 }));
 
+vi.mock('../foundation/text.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../foundation/text.js')>();
+  return {
+    ...actual,
+    readTextFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+  };
+});
+
 import {
   buildKnowledgeIndex,
   queryKnowledge,
