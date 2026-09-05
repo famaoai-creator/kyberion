@@ -20669,6 +20669,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Windows local-assistの外部status応答をendpoint discoveryへ投影する前に、共通 `parseSafeJsonObjectValue` でrootと危険キーを検証するようにした。malformed／危険キーを含むstatus応答は既定endpointへfail-closedとし、既存のendpoint候補とchat response parserの境界は維持した。
 - **検証**: Windows local-assist bridge 4 tests、`pnpm --filter @agent/core run typecheck`、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
 
+## 2026-09-05 再レビュー修正 1246
+
+- **対象**: `presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.ts`
+- **変更**: Chronos intent contractのA2UI helperが受け取る構造型を共有 `IntentResolutionContract` へ統一し、authority／outcomeのenum型アサーションを削除した。parser後のcontractを表示境界まで型付きで保持し、既存のlocale labelとA2UI投影項目は変更していない。
+- **検証**: Chronos agent route helper 2 tests、`pnpm --filter @agent/core run typecheck`、対象ESLint、Prettier、`git diff --check`。フル `pnpm run validate` はこのslice反映後に実行する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

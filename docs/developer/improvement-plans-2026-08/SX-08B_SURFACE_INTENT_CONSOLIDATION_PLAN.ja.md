@@ -868,3 +868,9 @@ Concierge `/api/message` の実routeを通る `approval_required` 回帰を追�
 Windows local-assist bridgeの外部status応答を再監査し、endpoint discoveryがJSON objectを型アサーションだけで参照していた残存を修正した。共通 `parseSafeJsonObjectValue` を通してからendpoint候補を読むようにし、危険キーを含むstatus応答は既定endpointへ閉じる。既存のendpoint候補、Windows capability fallback、chat responseのshape検証は維持した。
 
 検証: Windows local-assist bridge **4 tests passed**、core typecheck、対象ESLint、Prettier、`git diff --check`。外部応答の直接利用残差を一つ閉じ、provider実機依存と未監査inventoryは継続課題とする。
+
+## 2026-09-05 再レビュー修正 76
+
+Chronosのintent contract A2UI helperに残っていた `string` 型とenum型アサーションを、共有 `IntentResolutionContract` 型へ統一した。contract parser後のauthority／outcome／next actionを表示投影で再び未検証型に戻さず、既存のlocale labelと6項目のA2UI表示を維持する。
+
+検証: Chronos agent route helper **2 tests passed**、core typecheck、対象ESLint、Prettier、`git diff --check`。surface contractの表示境界を一つ狭め、残る全surfaceの実ブラウザ受入は継続課題とする。

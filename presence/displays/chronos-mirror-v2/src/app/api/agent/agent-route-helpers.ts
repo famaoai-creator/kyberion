@@ -4,6 +4,7 @@ import { isRecord } from '@agent/core/foundation';
 import { t } from '@agent/core/t';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import type { MissionProposal } from '@agent/core/channel-surface-types';
+import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract';
 import {
   renderIntentAuthorityLabel,
   renderIntentOutcomeLabel,
@@ -300,23 +301,11 @@ export function parseChronosAgentsBody(
 }
 
 export function intentResolutionA2ui(
-  contract: {
-    normalized_intent: string;
-    missing_inputs: string[];
-    authority_level: string;
-    outcome_kind: string;
-    next_action: { kind: string; label: string; consequence: string };
-  },
+  contract: IntentResolutionContract,
   locale: SupportedLocale = 'en'
 ) {
-  const authorityValue = renderIntentAuthorityLabel(
-    contract.authority_level as Parameters<typeof renderIntentAuthorityLabel>[0],
-    locale
-  );
-  const outcomeValue = renderIntentOutcomeLabel(
-    contract.outcome_kind as Parameters<typeof renderIntentOutcomeLabel>[0],
-    locale
-  );
+  const authorityValue = renderIntentAuthorityLabel(contract.authority_level, locale);
+  const outcomeValue = renderIntentOutcomeLabel(contract.outcome_kind, locale);
   const labels = {
     title: t('dock.intent_resolution.title', undefined, locale),
     understanding: t('bridge:contract_understanding', undefined, locale),
