@@ -12,5 +12,10 @@ describe('pipeline context resource boundary', () => {
       "parseSafeJsonObjectInput(argv.context as string, 'pipeline --context')"
     );
     expect(source).not.toContain('JSON.parse(argv.context as string)');
+    expect(source).not.toContain('process.env.MISSION_ID ||');
+    expect(source).not.toContain(
+      'loadPipelineRunJournal(String(argv.resume), process.env.MISSION_ID)'
+    );
+    expect(source).toContain("getRegisteredEnvText('MISSION_ID')");
   });
 });

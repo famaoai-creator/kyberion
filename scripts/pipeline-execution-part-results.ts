@@ -170,8 +170,12 @@ export async function executePipelineFile(
   const effectiveTrustResolved =
     options.trustResolved === true || Boolean(options.projectTrustApprovalId);
   const missionId =
-    String(options.context?.mission_id || baseContext.mission_id || process.env.MISSION_ID || '') ||
-    undefined;
+    String(
+      options.context?.mission_id ||
+        baseContext.mission_id ||
+        getRegisteredEnvText('MISSION_ID') ||
+        ''
+    ) || undefined;
   const autoContext: Record<string, unknown> = {
     repo_root: pathResolver.rootDir(),
     platform_name: process.platform,
@@ -348,7 +352,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
 
   let resumeState: PipelineRunJournalState | undefined;
   if (argv.resume) {
-    resumeState = loadPipelineRunJournal(String(argv.resume), process.env.MISSION_ID);
+    resumeState = loadPipelineRunJournal(String(argv.resume), getRegisteredEnvText('MISSION_ID'));
     if (!argv.input) argv.input = resumeState.started?.input_path;
   }
   if (!argv.input) throw new Error('Either --input or --resume is required.');
@@ -443,7 +447,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
   const missionId = firstNonEmpty(
     overrideContext.mission_id as string | undefined,
     baseContext.mission_id as string | undefined,
-    process.env.MISSION_ID
+    getRegisteredEnvText('MISSION_ID')
   );
   const autoContext: Record<string, unknown> = {};
   // Propagate missionId to env so tier-guard can resolve ${MISSION_ID} in default_allow paths.
