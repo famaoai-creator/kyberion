@@ -21,6 +21,7 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
 import { applyConsolidationActions, type ConsolidationAction } from './memory-notebook.js';
@@ -29,7 +30,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import {
@@ -350,7 +350,7 @@ export function inspectBackgroundReviewProposal(
       : action === 'skill_patch'
         ? resolveManagedSkillTarget(proposal.target_ref)
         : resolveMemoryTarget(proposal.target_ref);
-  const before = String(safeReadFile(target.absolute, { encoding: 'utf8' }));
+  const before = readTextFile(target.absolute);
   const patch =
     action === 'pipeline_proposal'
       ? parsePipelinePatch(proposal.patch)
@@ -467,7 +467,7 @@ export function applyBackgroundReviewPipelinePatch(
   const patch = parsePipelinePatch(metadata.patch);
   if (!safeExistsSync(target.absolute)) throw new Error(`Pipeline target not found: ${target.ref}`);
 
-  const before = String(safeReadFile(target.absolute, { encoding: 'utf8' }));
+  const before = readTextFile(target.absolute);
   const beforeSha256 = sha256(before);
   if (beforeSha256 !== expectedSha256) {
     throw new Error(
@@ -702,7 +702,7 @@ export function applyBackgroundReviewMemoryConsolidationPatch(
   const metadata = assertBackgroundProposal(record, 'memory_consolidation');
   const target = resolveMemoryTarget(metadata.target_ref);
   const patch = parseMemoryPatch(metadata.patch);
-  const before = String(safeReadFile(target.absolute, { encoding: 'utf8' }));
+  const before = readTextFile(target.absolute);
   const beforeSha256 = sha256(before);
   if (beforeSha256 !== expectedSha256) {
     throw new Error(
@@ -797,7 +797,7 @@ export function applyBackgroundReviewSkillPatch(
   const metadata = assertBackgroundProposal(record, 'skill_patch');
   const target = resolveManagedSkillTarget(metadata.target_ref);
   const patch = parseSkillPatch(metadata.patch);
-  const before = String(safeReadFile(target.absolute, { encoding: 'utf8' }));
+  const before = readTextFile(target.absolute);
   const beforeSha256 = sha256(before);
   if (beforeSha256 !== expectedSha256) {
     throw new Error(

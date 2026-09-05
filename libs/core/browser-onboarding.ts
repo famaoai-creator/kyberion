@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { withExecutionContext } from './authority.js';
 import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import {
   getAdapterDefaultSelectionSnapshot,
   saveAdapterDefaultPreferences,
@@ -36,7 +37,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
@@ -477,7 +477,7 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
       const vision = String(
         identity?.vision ||
           (safeExistsSync(visionPath)
-            ? String(safeReadFile(visionPath, { encoding: 'utf8' }) || '')
+            ? readTextFile(visionPath)
                 .replace(/^#\s+Sovereign Vision\s*/i, '')
                 .trim()
             : '')
