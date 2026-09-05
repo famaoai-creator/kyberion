@@ -189,7 +189,7 @@ export class ShellDeploymentAdapter implements DeploymentAdapter {
       .replace(/\{\{projectName\}\}/gu, input.projectName)
       .replace(/\{\{version\}\}/gu, input.version)
       .replace(/\{\{releaseNotesPath\}\}/gu, input.releaseNotesPath ?? '');
-    const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
+    const shell = this.options.shell ?? getRegisteredEnvText('SHELL') ?? '/bin/sh';
     const startedAt = nowIso();
     try {
       const stdout = execFileSync(shell, ['-c', cmd], {
