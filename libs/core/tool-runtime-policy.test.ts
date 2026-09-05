@@ -7,7 +7,7 @@ import {
   writeToolRuntimePolicyAtPath,
 } from './tool-runtime-policy.js';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync } from './secure-io.js';
+import { safeRmSync, safeWriteFile } from './secure-io.js';
 import { withExecutionContext } from './index.js';
 
 const fixtureRoot = pathResolver.sharedTmp(`tool-runtime-policy-${process.pid}`);
@@ -28,23 +28,31 @@ describe('tool runtime policy', () => {
   });
 
   it('respects env overrides', () => {
-    vi.stubEnv('KYBERION_TOOL_RUNTIME_POLICY_PATH', '/tmp/tool-runtime-policy.json');
+    vi.stubEnv(
+      'KYBERION_TOOL_RUNTIME_POLICY_PATH',
+      pathResolver.knowledge('product/governance/tool-runtime-policy.json')
+    );
     _resetToolRuntimePolicyCacheForTests();
     const policy = getToolRuntimePolicy();
-    expect(policy.version).toBe('fallback');
+    expect(policy.version).toBe('1.0.0');
   });
 
-  it('falls back when an override fails schema validation', () => {
-    vi.stubEnv('KYBERION_TOOL_RUNTIME_POLICY_PATH', '/tmp/tool-runtime-policy.json');
+  it('fails closed when an override fails schema validation', () => {
+    const invalidPath = pathResolver.sharedTmp(`tool-runtime-policy-${process.pid}/invalid.json`);
+    safeWriteFile(invalidPath, JSON.stringify({ version: 'invalid' }), {
+      mkdir: true,
+      encoding: 'utf8',
+    });
+    vi.stubEnv('KYBERION_TOOL_RUNTIME_POLICY_PATH', invalidPath);
     _resetToolRuntimePolicyCacheForTests();
-    expect(getToolRuntimePolicy().version).toBe('fallback');
+    expect(() => getToolRuntimePolicy()).toThrow(/Invalid catalog tool-runtime-policy/);
   });
 
-  it('falls back when an override is outside the repository', () => {
+  it('fails closed when an override is outside the repository', () => {
     vi.stubEnv('KYBERION_TOOL_RUNTIME_POLICY_PATH', '/tmp/tool-runtime-external.json');
     _resetToolRuntimePolicyCacheForTests();
 
-    expect(getToolRuntimePolicy().version).toBe('fallback');
+    expect(() => getToolRuntimePolicy()).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('rejects an invalid policy before persisting it', () => {

@@ -27,23 +27,6 @@ const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/tool-runtime-policy.schema.json'
 );
 
-const FALLBACK_POLICY: ToolRuntimePolicy = {
-  version: 'fallback',
-  managed_roots: {
-    tool_runtime_root: 'active/shared/runtime',
-    cache_root: 'active/shared/tmp/tool-runtime-cache',
-  },
-  mode_preference: {
-    python: 'trial_first',
-    node: 'installed_first',
-    system: 'installed_first',
-  },
-  approval: {
-    install_requires_approval: true,
-    pin_requires_approval: true,
-  },
-};
-
 let cachedPolicyPath: string | null = null;
 let cachedPolicy: ToolRuntimePolicy | null = null;
 
@@ -59,8 +42,6 @@ const policyCatalog = defineCatalog<ToolRuntimePolicy>({
   id: 'tool-runtime-policy',
   path: getPolicyPath,
   schema: POLICY_SCHEMA_PATH,
-  fallback: FALLBACK_POLICY,
-  fallbackOnInvalid: true,
 });
 
 export function _resetToolRuntimePolicyCacheForTests(): void {
@@ -70,14 +51,7 @@ export function _resetToolRuntimePolicyCacheForTests(): void {
 }
 
 export function getToolRuntimePolicy(): ToolRuntimePolicy {
-  let policyPath: string;
-  try {
-    policyPath = getPolicyPath();
-  } catch {
-    cachedPolicyPath = null;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
-  }
+  const policyPath = getPolicyPath();
   if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
 
   cachedPolicy = withExecutionContext(
@@ -85,6 +59,7 @@ export function getToolRuntimePolicy(): ToolRuntimePolicy {
     () => policyCatalog.load(),
     'ecosystem_architect'
   );
+  cachedPolicyPath = policyPath;
   return cachedPolicy;
 }
 

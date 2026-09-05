@@ -21095,6 +21095,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: voice runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorをそのまま返すfail-closed境界へ統一した。queue、chunking、progress、delivery、personal-tier routingの既存設定は変更していない。
 - **検証**: voice-runtime-policy **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1317
+
+- **対象**: `libs/core/tool-runtime-policy.ts`、`libs/core/tool-runtime-policy.test.ts`
+- **変更**: tool runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorをそのまま返すfail-closed境界へ統一した。profile overlayの選択、managed root、runtime mode、install／pin approvalの既存設定は変更していない。policy path cacheも読み込み成功後に明示的に固定した。
+- **検証**: tool-runtime-policy **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
