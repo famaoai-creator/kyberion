@@ -40,6 +40,7 @@ import { createDelegationHandle, type DelegationHandle } from './delegated-task-
 import { runOpPreflight } from './op-preflight.js';
 import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 /** Default tier for an in-session delegation that does not name one (backward compatible). */
 const DEFAULT_SUBAGENT_PROFILE = 'implementer';
@@ -807,8 +808,12 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
  * the more capable / more governed of the two opt-ins.
  */
 export function selectAgentDispatcher(env: NodeJS.ProcessEnv = process.env): AgentDispatcher {
-  if (env.KYBERION_HARNESS_SUBAGENT === '1') return new HarnessSubagentDispatcher();
-  if (env.KYBERION_IN_SESSION_SUBAGENT === '1') return new InSessionDispatcher();
+  if (getRegisteredEnvText('KYBERION_HARNESS_SUBAGENT', { env }) === '1') {
+    return new HarnessSubagentDispatcher();
+  }
+  if (getRegisteredEnvText('KYBERION_IN_SESSION_SUBAGENT', { env }) === '1') {
+    return new InSessionDispatcher();
+  }
   return new ProcessSpawnDispatcher();
 }
 
@@ -821,11 +826,11 @@ export function maybeWrapWithDispatcher(
   backend: ReasoningBackend,
   env: NodeJS.ProcessEnv = process.env
 ): ReasoningBackend {
-  if (env.KYBERION_HARNESS_SUBAGENT === '1') {
+  if (getRegisteredEnvText('KYBERION_HARNESS_SUBAGENT', { env }) === '1') {
     logger.success('[agent-dispatch] ⚡ Harness sub-agent dispatch enabled (CT-02)');
     return new DispatchingReasoningBackend(backend, new HarnessSubagentDispatcher());
   }
-  if (env.KYBERION_IN_SESSION_SUBAGENT === '1') {
+  if (getRegisteredEnvText('KYBERION_IN_SESSION_SUBAGENT', { env }) === '1') {
     logger.success('[agent-dispatch] ⚡ In-Session sub-agent dispatch enabled');
     return new DispatchingReasoningBackend(backend, new InSessionDispatcher());
   }
