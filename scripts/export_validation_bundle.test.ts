@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { readTextFile } from '@agent/core/foundation';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { filterAuditChainByMission } from './export_validation_bundle.js';
@@ -12,6 +13,11 @@ afterEach(() => {
 });
 
 describe('validation bundle audit projection', () => {
+  it('uses the foundation text reader for audit JSONL projection', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/export_validation_bundle.ts'));
+    expect(source).toContain('nowIso, parseSafeJsonInput, readTextFile');
+  });
+
   it('projects only shape-valid audit entries for the requested mission', () => {
     safeMkdir(AUDIT_FIXTURE_DIR, { recursive: true });
     const valid = {

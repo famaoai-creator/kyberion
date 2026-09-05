@@ -22413,3 +22413,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/scan_dependency_vulns.ts`、`scripts/run_ai_audit.ts`、`scripts/pipeline_promote.ts` と対象テスト
 - **変更**: dependency manifest、AI audit invariant/scope、pipeline catalog README の本文読込を foundation の `readTextFile` へ移行した。dependency parsing／vulnerability decision、AI audit scope boundary、pipeline ADF validation／promotion semanticsは変更せず、各境界テストに reader contract を追加した。
 - **検証**: 対象テスト **4 files／22 tests passed**、dependency scan は `0 package(s)`、AI audit の help 出力 passed、pipeline promote は不正な既存入力を governed ADF validation で拒否、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1536
+
+- **対象**: `scripts/marketing_publish_dry_run.ts`、`scripts/export_validation_bundle.ts`、`scripts/apply_dependency_patch.ts` と対象テスト
+- **変更**: marketing text artifact、validation bundle audit JSONL、dependency patch package manifest の本文読込を foundation の `readTextFile` へ移行した。artifact SHA-256／bundle binary copy、approval／audit projection、dependency patch proposal/apply semanticsは変更せず、reader contract を追加した。
+- **検証**: 対象テスト **3 files／24 tests passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

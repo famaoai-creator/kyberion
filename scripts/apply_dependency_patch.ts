@@ -25,7 +25,7 @@ import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExecResult, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeExecResult, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { safeJsonParse } from '@agent/core/validators';
 import {
   currentProcessArgv,
@@ -33,7 +33,7 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
-import { nowIso } from '@agent/core/foundation';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import { appendDependencyVulnerabilityLedgerRecord } from '@agent/core/dependency-vulnerability-ledger';
 import { runDegradationWatch, type DegradationReport } from '@agent/core/health-degradation';
 import { withExecutionContext } from '@agent/core/governance';
@@ -242,7 +242,7 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
     timestamp.replace(/[:.]/g, '-')
   );
   safeMkdir(backupDir, { recursive: true });
-  const packageJsonRaw = safeReadFile(packageJsonPath, { encoding: 'utf8' }) as string;
+  const packageJsonRaw = readTextFile(packageJsonPath);
   safeWriteFile(path.join(backupDir, 'package.json'), packageJsonRaw);
 
   // 2. Apply the version bump (direct section or pnpm.overrides).

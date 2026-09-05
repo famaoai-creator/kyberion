@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import {
   pathResolver,
   buildPublicationEffectPayload,
@@ -122,6 +123,11 @@ afterEach(() => {
 });
 
 describe('marketing publication dry-run', () => {
+  it('uses the foundation text reader for approved text artifacts', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/marketing_publish_dry_run.ts'));
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
+  });
+
   it('re-hashes approved artifacts and writes local preview verification', () => {
     const { root, approvalPath, sharedApprovalRequest } = fixture();
     const result = runMarketingPublishDryRun({

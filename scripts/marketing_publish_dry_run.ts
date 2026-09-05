@@ -21,6 +21,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
 import { loadApprovalRequest, type ApprovalRequestRecord } from '@agent/core/approval-store';
 import { escapeHtml } from '@agent/core/text-escaping';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -85,13 +86,12 @@ export function runMarketingPublishDryRun(input: {
     .filter(([, artifact]) => /\.(?:md|txt|vtt|html?|json)$/i.test(artifact.path))
     .map(([name, artifact]) => ({
       location: name,
-      content: safeReadFile(
+      content: readTextFile(
         requireRegularMarketingInput(
           resolveMarketingPath(artifact.path, `approved artifact ${name}`),
           `approved artifact ${name}`
-        ),
-        { encoding: 'utf8' }
-      ) as string,
+        )
+      ),
     }));
   const sensitiveDataScan = scanMarketingTextForSensitiveData([
     { location: 'publication.title', content: approval.title },
