@@ -3,8 +3,8 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
-import { nowIso } from '@agent/core/foundation';
+import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface CheckResult {
@@ -53,7 +53,7 @@ export function activeMissionCount(): number {
               stack.push(full);
             } else if (stat.isFile() && entryName === 'mission-state.json') {
               try {
-                const txt = safeReadFile(full, { encoding: 'utf8' }) as string;
+                const txt = readTextFile(full);
                 if (/"status"\s*:\s*"active"/.test(txt)) count += 1;
               } catch {
                 // skip unreadable state files
