@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 /**
  * Event-sourced worker state restore contract (KD-03).
@@ -51,7 +52,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -818,7 +818,7 @@ export class WorkerStateJournal {
         `[WORKER_STATE_JOURNAL_RESOURCE] journal must be a regular file: ${journalPath}`
       );
     }
-    const raw = String(safeReadFile(journalPath, { encoding: 'utf-8' }));
+    const raw = readTextFile(journalPath);
     const events: JournalEventEnvelope[] = [];
     let maxSeq = -1;
     for (const line of raw.split('\n')) {

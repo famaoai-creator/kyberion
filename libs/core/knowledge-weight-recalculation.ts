@@ -1,16 +1,10 @@
 import { createHash } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import { clamp } from './foundation/text.js';
+import { clamp, readTextFile } from './foundation/text.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { auditChain } from './audit-chain.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 import {
   loadKnowledgeUsageAggregate,
   type KnowledgeUsageAggregateEntry,
@@ -265,9 +259,7 @@ export function applyKnowledgeRankingWeightProposal(input: {
       },
     },
   };
-  const previous = safeExistsSync(governancePath)
-    ? (safeReadFile(governancePath, { encoding: 'utf8' }) as string)
-    : '';
+  const previous = safeExistsSync(governancePath) ? readTextFile(governancePath) : '';
   if (previous) {
     safeWriteFile(`${governancePath}.previous`, previous, { mkdir: true, encoding: 'utf8' });
     safeWriteFile(`${governancePath}.history/knowledge-weights-${Date.now()}.json`, previous, {

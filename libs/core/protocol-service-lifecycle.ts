@@ -4,10 +4,10 @@ import * as path from 'node:path';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 import { parseSafeJsonInput } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import { getProtocolServiceRegistryEntry } from './protocol-service-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 
 export type ProtocolServiceLifecycleAction =
   'start' | 'stop' | 'reconnect' | 'restore' | 'restore_quarantine' | 'health_check';
@@ -280,7 +280,7 @@ export function readProtocolServiceLifecycleReceipts(
       `[PROTOCOL_LIFECYCLE_RECEIPT_INVALID] receipt stream must be a regular file: ${absolutePath}`
     );
   }
-  const lines = String(safeReadFile(absolutePath, { encoding: 'utf8' }) || '')
+  const lines = readTextFile(absolutePath)
     .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter(Boolean);
