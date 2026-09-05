@@ -22377,3 +22377,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_module_invariants.ts`、`scripts/check_module_invariants.test.ts`
 - **変更**: module invariant checker の対象module本文読込を foundation の `readTextFile` へ移行した。invariant catalog、runtime／documented enforcement、source assertion判定は変更せず、既存テストにreader contractを追加した。
 - **検証**: module-invariants **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1530
+
+- **対象**: `scripts/check_ui_ux_governance.ts`、`scripts/check-governance-path-scanners.ts`、`scripts/check_foundation_adoption.ts` と対象テスト
+- **変更**: UI/UX、governance path、foundation adoption checker の本文読込を foundation の `readTextFile` へ統一した。semantic token／raw color、machine-absolute path／product placement、foundation adoption の各検査と既存の例外・失敗 semanticsは変更せず、UI/UX／foundation adoption に reader contract test を追加した。
+- **検証**: UI/UX・foundation-adoption・governance-rules **既存テスト＋reader contract passed**（11 tests）、実チェッカー `check:ui-ux`／`check:foundation-adoption`／`check:governance-rules` **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。

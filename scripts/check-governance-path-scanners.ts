@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir, safeReadFile, safeStat } from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
 
 const MACHINE_ABS_PATH_RE =
   /(?:\/Users\/|\/home\/[A-Za-z0-9._-]+\/|\/private\/(?:var\/folders|tmp)\/|[A-Za-z]:\\Users\\)/; // governance-allow-abs-path
@@ -58,7 +59,7 @@ function scanFileForAbsolutePaths(absPath: string, relPath: string, violations: 
   if (/\.(test|spec)\.[tj]s$/.test(relPath)) return;
   let content: string;
   try {
-    content = safeReadFile(absPath, { encoding: 'utf8' }) as string;
+    content = readTextFile(absPath);
   } catch {
     return;
   }
@@ -136,7 +137,7 @@ export function scanProductJsonForPlacementDrift(violations: string[]) {
       const relPath = path.relative(pathResolver.rootDir(), absEntry);
       let content: string;
       try {
-        content = safeReadFile(absEntry, { encoding: 'utf8' }) as string;
+        content = readTextFile(absEntry);
       } catch {
         continue;
       }
