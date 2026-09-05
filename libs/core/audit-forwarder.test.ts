@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   ChainAuditForwarder,
   HttpAuditForwarder,
   TenantFilteringAuditForwarder,
   getAuditForwarder,
+  installAuditForwarderIfAvailable,
   registerAuditForwarder,
   resetAuditForwarder,
   stubAuditForwarder,
@@ -45,6 +48,28 @@ describe('audit-forwarder', () => {
   });
 
   afterEach(() => resetAuditForwarder());
+
+  it('routes audit forwarder environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/audit-forwarder.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  it('installs shell and HTTP forwarders from an injected environment', () => {
+    expect(
+      installAuditForwarderIfAvailable({
+        KYBERION_AUDIT_FORWARDER_COMMAND: 'logger {{entry}}',
+        KYBERION_AUDIT_FORWARDER_URL: 'https://example.com/audit',
+        KYBERION_AUDIT_FORWARDER_HEADERS: '{"x-tenant":"acme"}',
+        KYBERION_AUDIT_FORWARDER_TIMEOUT_MS: '2500',
+      })
+    ).toBe(true);
+    expect(getAuditForwarder().name).toContain('shell→http');
+  });
 
   it('defaults to the stub (no-op) forwarder', () => {
     expect(getAuditForwarder().name).toBe('stub');
