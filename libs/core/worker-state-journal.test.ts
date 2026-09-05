@@ -136,6 +136,16 @@ describe('KD-03 AC1: restore from journal replay after a simulated process kill'
 
     expect(() => journal.restore()).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
+
+  it('fails closed when the journal leaf is replaced by a directory', () => {
+    const journalPath = nextJournalPath();
+    const resolvedJournalPath = pathResolver.rootResolve(journalPath);
+    safeMkdir(resolvedJournalPath, { recursive: true });
+
+    expect(() => new WorkerStateJournal({ journalPath }).restore()).toThrow(
+      'journal must be a regular file'
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

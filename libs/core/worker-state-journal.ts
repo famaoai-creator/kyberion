@@ -49,6 +49,7 @@ import { readJson } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -772,6 +773,11 @@ export class WorkerStateJournal {
     try {
       const indexPath = assertSafeRepositoryPath(this.indexPath, { allowMissingLeaf: true });
       if (!safeExistsSync(indexPath)) return null;
+      if (!safeLstat(indexPath).isFile()) {
+        throw new Error(
+          `[WORKER_STATE_JOURNAL_RESOURCE] derived index must be a regular file: ${indexPath}`
+        );
+      }
       // Reconstruct explicitly: zod v4 infers `.nullable()` keys as optional,
       // so round-trip through the hand-written contract shape instead of the
       // schema's looser inferred type.
@@ -807,6 +813,11 @@ export class WorkerStateJournal {
   private readJournal(): ReadResult {
     const journalPath = assertSafeRepositoryPath(this.journalPath, { allowMissingLeaf: true });
     if (!safeExistsSync(journalPath)) return { events: [], maxSeq: -1 };
+    if (!safeLstat(journalPath).isFile()) {
+      throw new Error(
+        `[WORKER_STATE_JOURNAL_RESOURCE] journal must be a regular file: ${journalPath}`
+      );
+    }
     const raw = String(safeReadFile(journalPath, { encoding: 'utf-8' }));
     const events: JournalEventEnvelope[] = [];
     let maxSeq = -1;

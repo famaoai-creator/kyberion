@@ -21933,3 +21933,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-coordination-bus.ts`、`libs/core/mission-coordination-bus.test.ts`
 - **変更**: mission coordination bus の current／archive JSONL read と current stream の line count 前に operation-time の regular-file 検査を追加した。stream が directory 等へ置換された場合に空の coordination state として扱わず拒否し、既存の append／archive rotation／ack reconstruction semantics は維持した。
 - **検証**: mission-coordination-bus **10 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1456
+
+- **対象**: `libs/core/worker-state-journal.ts`、`libs/core/worker-state-journal.test.ts`
+- **変更**: worker state journal／derived index の read 前に operation-time の regular-file 検査を追加した。journal leaf が directory 等へ置換された場合に空のrestore stateとして扱わず拒否し、通常のjournal replay、corrupt derived index の再投影、restore silence semantics は維持した。
+- **検証**: worker-state-journal resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
