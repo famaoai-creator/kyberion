@@ -14,8 +14,8 @@ import {
   fitTextToBox,
   measureTextBlock,
   type LayoutFitResult,
-} from '@agent/core/src/native-pptx-engine/text-metrics';
-import { resolvePptxSurfaceDesign } from '@agent/core/src/native-pptx-engine/design-cascade';
+} from '@agent/core/native-pptx-engine/text-metrics';
+import { resolvePptxSurfaceDesign } from '@agent/core/native-pptx-engine/design-cascade';
 import * as path from 'node:path';
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
 const DEFAULT_MEDIA_RETRY = {
