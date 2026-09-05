@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile as readFoundationTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 export function resolveCliInputPath(inputPath: string): string {
   return assertSafeRepositoryPath(
@@ -11,9 +12,7 @@ export function resolveCliInputPath(inputPath: string): string {
 }
 
 export function readTextFile(filePath: string): string {
-  return safeReadFile(assertSafeRepositoryPath(filePath, { allowMissingLeaf: false }), {
-    encoding: 'utf8',
-  }) as string;
+  return readFoundationTextFile(assertSafeRepositoryPath(filePath, { allowMissingLeaf: false }));
 }
 
 export function readJsonFile<T = unknown>(filePath: string): T {
@@ -22,7 +21,7 @@ export function readJsonFile<T = unknown>(filePath: string): T {
     throw new Error(`[CLI_INPUT] JSON input must be a regular file: ${filePath}`);
   }
   return parseSafeJsonInput(
-    String(safeReadFile(safeFilePath, { encoding: 'utf8' }) || ''),
+    readFoundationTextFile(safeFilePath),
     `CLI JSON input ${filePath}`
   ) as T;
 }

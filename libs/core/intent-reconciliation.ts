@@ -5,9 +5,9 @@ import {
 } from './reasoning-backend.js';
 import { logger } from './core.js';
 import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { clamp } from './foundation/text.js';
+import { clamp, readTextFile } from './foundation/text.js';
 import {
   buildCompletionNextAction,
   type CompletionGoal,
@@ -155,7 +155,7 @@ function readEvidenceText(ref: string): string {
     if (BINARY_EVIDENCE_EXTENSIONS.has(ext)) return '';
   }
   try {
-    return normalizeReconciliationText(String(safeReadFile(safeRef, { encoding: 'utf8' }) || ''));
+    return normalizeReconciliationText(readTextFile(safeRef));
   } catch {
     return '';
   }

@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeLstat, safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 export interface AnalysisCorpusSnippet {
   ref: string;
@@ -120,7 +121,7 @@ export function buildAnalysisCorpusSnippets(refs: string[], limit = 5): Analysis
     if (!resolved) continue;
     try {
       if (!safeLstat(resolved).isFile()) continue;
-      const raw = safeReadFile(resolved, { encoding: 'utf8' }) as string;
+      const raw = readTextFile(resolved);
       const summary = summarizeContent(raw);
       snippets.push({
         ref,

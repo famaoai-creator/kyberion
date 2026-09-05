@@ -22521,3 +22521,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/scope-offboarding.ts`、`libs/core/task-scoped-grants.ts`、`libs/core/oauth-session-store.ts`、`libs/core/tenant-rate-limiter.ts`
 - **変更**: scope offboarding、task-scoped grant store、OAuth lock、tenant rate-limit lock の本文読込を foundation の `readTextFile` へ移行した。tenant／scope／grant authorization、lock ownership／expiry、offboarding audit semanticsは変更せず、secure-io は属性検証・lock／書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **4 files／61 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1554
+
+- **対象**: `libs/core/analysis-corpus.ts`、`libs/core/agent-identity.ts`、`libs/core/distill-knowledge-injector.ts`、`libs/core/intent-reconciliation.ts`、`libs/core/cognitive-routing.ts`、`libs/core/cli-input.ts`
+- **変更**: analysis corpus、agent identity journal、distill markdown、intent reconciliation、cognitive routing schema、CLI text／JSON input の本文読込を foundation の `readTextFile` へ移行した。path／tenant scope、identity journal、distill ranking、reconciliation／routing validation、CLI input boundary semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
+- **検証**: 対象テスト **6 files／60 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
