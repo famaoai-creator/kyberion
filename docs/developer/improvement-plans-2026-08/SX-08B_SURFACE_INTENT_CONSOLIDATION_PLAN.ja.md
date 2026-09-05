@@ -982,3 +982,9 @@ authorityのmission identity／grant audience解決に残っていた `MISSION_I
 coreのlogger／role configが参照する `MISSION_ID` の環境直読3箇所を、登録済み `getRegisteredEnvText` へ統一した。mission付きログ表示、role-state優先探索、shared／personal fallback、既存の静音・エラー出力 semanticsは変更していない。
 
 検証: core bundle **1 file / 19 tests passed**、対象ESLint、Prettier、`git diff --check`、build／typecheck通過。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 95
+
+operator CLIのmission context bannerに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。canonical mission state path解決、banner表示、CLIのJSON／printer boundary、既存のread-only command semanticsは変更していない。
+
+検証: CLI **2 files / 39 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
