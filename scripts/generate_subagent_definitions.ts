@@ -46,7 +46,8 @@ import {
 import { loadTeamRoleIndex } from '@agent/core/mission-team-index';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveCapabilityProfileForTeamRole } from '@agent/core/subagent-capability-profiles';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 import {
   buildAgyAgentDefinitionSource,
@@ -123,7 +124,7 @@ function loadProcedureMarkdown(authorityRole: string | undefined): string | null
   if (!authorityRole) return null;
   const filePath = pathResolver.knowledge(`product/roles/${authorityRole}/PROCEDURE.md`);
   if (!safeExistsSync(filePath)) return null;
-  return String(safeReadFile(filePath, { encoding: 'utf8' }) || '') || null;
+  return readTextFile(filePath) || null;
 }
 
 /**

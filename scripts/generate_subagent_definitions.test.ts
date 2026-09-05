@@ -42,6 +42,8 @@ describe('generate_subagent_definitions', () => {
       })
     );
     expect(source).toContain('loadTeamRoleIndex()');
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(filePath');
     expect(source).not.toContain('readJson<');
   });
 
