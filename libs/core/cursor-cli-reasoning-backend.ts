@@ -71,6 +71,26 @@ function normalizePermissionProfile(
 const DEFAULT_MODEL = 'auto';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_BIN = 'cursor-agent';
+const GOVERNED_ARGUMENTS = new Set([
+  '-p',
+  '--output-format',
+  '--model',
+  '--trust',
+  '--workspace',
+  '--mode',
+  '--sandbox',
+  '--force',
+]);
+
+function validateExtraArgs(args: readonly string[]): string[] {
+  for (const arg of args) {
+    const flag = arg.split('=', 1)[0];
+    if (GOVERNED_ARGUMENTS.has(flag)) {
+      throw new Error(`[cursor-cli] extra args may not override governed flag: ${flag}`);
+    }
+  }
+  return [...args];
+}
 
 const CursorCliEnvelopeSchema = z.object({
   type: z.string().optional(),
@@ -112,7 +132,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     this.bin = options.bin ?? DEFAULT_BIN;
     this.model = options.model ?? DEFAULT_MODEL;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.extraArgs = options.extraArgs ?? [];
+    this.extraArgs = validateExtraArgs(options.extraArgs ?? []);
     this.workspaceDir = options.workspaceDir ?? pathResolver.rootDir();
   }
 
