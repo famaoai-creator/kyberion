@@ -50,6 +50,7 @@ import {
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -587,6 +588,9 @@ export function ensureProjectOsScaffold(
         rootDir,
       });
       if (!safeExistsSync(sourcePath) || safeExistsSync(targetPath)) continue;
+      if (!safeLstat(sourcePath).isFile()) {
+        throw new Error(`project OS blueprint must be a regular file: ${sourcePath}`);
+      }
       const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
       safeWriteFile(
         targetPath,

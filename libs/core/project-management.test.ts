@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
@@ -13,7 +14,9 @@ import {
   bootstrapManagedProject,
   createManagedProjectTrack,
   createManagedProject,
+  ensureProjectOsScaffold,
   getProjectManagementView,
+  loadProjectOperatingSystemArtifactMap,
   reconcileProjectOperationalState,
 } from './project-management.js';
 import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
@@ -151,6 +154,42 @@ describe('project-management facade', () => {
     expect(repaired.status).toBe('repaired');
     expect(loadProjectRecord(PROJECT_ID)?.active_missions).toEqual([]);
     expect(loadProjectRecord(PROJECT_ID)?.active_task_sessions).toEqual([]);
+  });
+
+  it('rejects a directory used as a project OS blueprint', () => {
+    const knowledgeRoot = pathResolver.sharedTmp('project-os-blueprint-test');
+    const scaffoldRoot = pathResolver.sharedTmp('project-os-scaffold-test');
+    const firstArtifact = loadProjectOperatingSystemArtifactMap().lifecycle.find(
+      (phase) => phase.required.length > 0
+    )?.required[0];
+    if (!firstArtifact) throw new Error('expected a project OS blueprint fixture');
+    const blueprintPath = path.join(
+      knowledgeRoot,
+      'public',
+      'templates',
+      'blueprints',
+      firstArtifact + '.md'
+    );
+    const knowledgeSpy = vi
+      .spyOn(pathResolver, 'knowledge')
+      .mockImplementation((subPath = '') => path.join(knowledgeRoot, subPath));
+    safeMkdir(blueprintPath, { recursive: true });
+
+    try {
+      expect(() =>
+        ensureProjectOsScaffold(
+          'PRJ-PMC-BLUEPRINT',
+          'Blueprint Boundary Test',
+          'public',
+          'shared',
+          scaffoldRoot
+        )
+      ).toThrow('project OS blueprint must be a regular file');
+    } finally {
+      safeRmSync(knowledgeRoot, { recursive: true, force: true });
+      safeRmSync(scaffoldRoot, { recursive: true, force: true });
+      knowledgeSpy.mockRestore();
+    }
   });
 
   it('bootstraps a Project with a kickoff Task Session and mission seeds', () => {
