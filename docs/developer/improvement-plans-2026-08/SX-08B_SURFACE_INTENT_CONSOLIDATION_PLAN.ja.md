@@ -1596,3 +1596,11 @@ knowledge curation SLOのcatalog fallbackを削除し、SLO config未作成時�
 video visual patternの組み込みcatalogと、正本catalogの欠損・schema不正を組み込み値へ戻すfallbackを削除し、正本pattern packの読み込み障害をfail-closedで返す境界へ統一した。LLM出力の未知patternをcatalog先頭へ補正するrender継続／degraded表示、visual directionの無効入力に対する決定的補正は維持している。
 
 検証: video-visual-direction **1 file / 9 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 197
+
+recovery policyのactuator manifestを必須catalogへ変更し、manifestの欠損・schema不正を空policyへ収束させるfallbackを削除した。manifest内のrecovery_policy省略時にactuator側のretry default／fallback categoryを使う既存semanticsは維持し、不正manifestだけを明示拒否する。
+
+SDLC gate profile registryも必須化し、sdlc profile欠損時に空gateへ進む経路を削除した。track readinessのartifact照合、next-work proposal、skeleton materializationは変更していない。
+
+検証: recovery-policy／sdlc-gate-readiness **2 files / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。

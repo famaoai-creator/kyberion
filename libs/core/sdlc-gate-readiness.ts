@@ -72,18 +72,13 @@ const gateProfileRegistryCatalog = defineCatalog<GateProfileRegistryRecord>({
   id: 'gate-profile-registry',
   path: GATE_PROFILE_REGISTRY_PATH,
   schema: pathResolver.knowledge('product/schemas/gate-profile.schema.json'),
-  fallback: {
-    version: 'fallback',
-    profiles: { sdlc: { domain: 'delivery', gates: [] } },
-  },
 });
 
 function loadGateCatalog(): SdlcGateProfile {
   if (cachedCatalog) return cachedCatalog;
-  cachedCatalog = gateProfileRegistryCatalog.load().profiles.sdlc || {
-    domain: 'delivery',
-    gates: [],
-  };
+  const profile = gateProfileRegistryCatalog.load().profiles.sdlc;
+  if (!profile) throw new Error('[GATE_PROFILE_MISSING] sdlc profile is not governed');
+  cachedCatalog = profile;
   return cachedCatalog;
 }
 

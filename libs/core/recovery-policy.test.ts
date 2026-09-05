@@ -19,6 +19,7 @@ vi.mock('./secure-io.js', async () => {
     loadJson: loadJsonMock,
     safeExistsSync: existsMock,
     safeStat: statMock,
+    safeLstat: vi.fn(() => ({ isFile: () => true })),
   };
 });
 
@@ -134,5 +135,14 @@ describe('recovery-policy', () => {
 
     expect(options.shouldRetry?.(new Error('ENOSPC: resource unavailable'))).toBe(true);
     expect(options.shouldRetry?.(new Error('invalid input'))).toBe(false);
+  });
+
+  it('rejects a schema-invalid actuator manifest instead of dropping its policy', async () => {
+    manifestMock.mockReturnValue({ malformed: true });
+    const { loadRecoveryPolicy } = await import('./recovery-policy.js');
+
+    expect(() =>
+      loadRecoveryPolicy('active/shared/tmp/recovery-policy-test/manifest-invalid.json')
+    ).toThrow('Invalid catalog actuator-manifest-recovery-policy');
   });
 });
