@@ -56,6 +56,17 @@ Approval required before: external send
 2. Inspect the expected artifacts before treating the preview as final.
 3. Choose a task scenario and repeat the flow with another task ID.
 
+The same workflow is available through the unified operator CLI:
+
+```sh
+pnpm kyberion task scenario list
+pnpm kyberion task scenario init daily-email-triage
+pnpm kyberion task scenario run daily-email-triage --dry-run
+```
+
+The `pnpm task:list`, `pnpm task:init`, `pnpm task:run`, and `pnpm kyberion task smoke`
+commands remain supported for compatibility with existing automation.
+
 ## Related docs
 
 - [TaskScenario Roadmap](./TASK_SCENARIO_ROADMAP.md)

@@ -1,15 +1,26 @@
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assessDesktopObservationReadiness,
   buildDesktopRecording,
   computeDesktopRecordingHash,
   DesktopDemonstrationRecorder,
+  loadDesktopRecordingAtPath,
   listDesktopObservationSources,
   validateDesktopRecording,
 } from './desktop-recording.js';
-import { reconstructDesktopIntent, reviewDesktopIntent } from './desktop-intent-reconstruction.js';
+import { parseDesktopEventLine } from './desktop-event-feed.js';
+import {
+  loadDesktopIntentDraftAtPath,
+  reconstructDesktopIntent,
+  reviewDesktopIntent,
+} from './desktop-intent-reconstruction.js';
 import { assertObservationOpMappingsValid, chooseNativeOps } from './native-op-mapping.js';
 import { compileDesktopRecording } from './desktop-recording-compiler.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+
+const RECORDING_TEST_ROOT = pathResolver.sharedTmp('desktop-recording-loader-test');
 
 const snapshot = (overrides: Record<string, unknown> = {}) => ({
   application: 'Notes',
@@ -26,6 +37,36 @@ const snapshot = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('desktop recording and distillation', () => {
+  it('normalizes native desktop events before they enter the recording queue', () => {
+    expect(parseDesktopEventLine({ op: 'click_at', x: 10, y: 20, click_count: 2 })).toEqual({
+      op: 'click_at',
+      x: 10,
+      y: 20,
+      click_count: 2,
+    });
+    expect(parseDesktopEventLine({ op: 'press_key', params: { key_code: 36 } })).toEqual({
+      op: 'press_key',
+      params: { key_code: 36 },
+    });
+  });
+
+  it('rejects malformed or privacy-unsafe native event shapes', () => {
+    expect(parseDesktopEventLine([])).toBeUndefined();
+    expect(parseDesktopEventLine({ op: 'click_at', x: '10', y: 20 })).toBeUndefined();
+    expect(
+      parseDesktopEventLine({ op: 'click_at', x: 10, y: 20, params: { text: 'secret' } })
+    ).toBe(undefined);
+    expect(
+      parseDesktopEventLine({ op: 'press_key', params: { key_code: 36, key: 'return' } })
+    ).toBe(undefined);
+    expect(
+      parseDesktopEventLine({ op: 'press_key', params: { key_code: 70_000 } })
+    ).toBeUndefined();
+    expect(
+      parseDesktopEventLine({ op: 'press_key', params: { constructor: { polluted: true } } })
+    ).toBeUndefined();
+  });
+
   it('keeps observation tier separate and explains unavailable permissions', () => {
     expect(listDesktopObservationSources().map((source) => source.id)).toEqual([
       'active_window',
@@ -167,6 +208,49 @@ describe('desktop recording and distillation', () => {
       valid: false,
       errors: expect.arrayContaining(['recording_hash does not match the reviewed recording body']),
     });
+  });
+
+  it('loads persisted recordings through the regular-file contract boundary', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(RECORDING_TEST_ROOT, { recursive: true });
+    const recording = buildDesktopRecording([snapshot({ event: { op: 'screenshot' } })]);
+    const recordingPath = path.join(RECORDING_TEST_ROOT, 'recording.json');
+    safeWriteFile(recordingPath, `${JSON.stringify(recording)}\n`);
+
+    expect(loadDesktopRecordingAtPath(recordingPath).recording_id).toBe(recording.recording_id);
+  });
+
+  it('rejects a directory at the persisted recording path', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.json'), { recursive: true });
+
+    expect(() =>
+      loadDesktopRecordingAtPath(path.join(RECORDING_TEST_ROOT, 'recording.json'))
+    ).toThrow('recording must be a regular file');
+  });
+
+  it('loads persisted desktop intent artifacts through the regular-file boundary', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(RECORDING_TEST_ROOT, { recursive: true });
+    const recording = buildDesktopRecording([snapshot({ event: { op: 'screenshot' } })]);
+    const intentPath = path.join(RECORDING_TEST_ROOT, 'recording.intent.json');
+    safeWriteFile(intentPath, `${JSON.stringify(reconstructDesktopIntent(recording))}\n`);
+
+    expect(loadDesktopIntentDraftAtPath(intentPath).source_recording_id).toBe(
+      recording.recording_id
+    );
+    expect(() => loadDesktopIntentDraftAtPath(intentPath, 'other-recording')).toThrow(
+      'DESKTOP_INTENT_SCOPE_MISMATCH'
+    );
+  });
+
+  it('rejects a directory at the persisted desktop intent path', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.intent.json'), { recursive: true });
+
+    expect(() =>
+      loadDesktopIntentDraftAtPath(path.join(RECORDING_TEST_ROOT, 'recording.intent.json'))
+    ).toThrow('intent draft must be a regular file');
   });
 
   it('keeps an empty observation capture valid but non-executable', () => {

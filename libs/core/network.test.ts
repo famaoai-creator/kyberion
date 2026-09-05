@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { resetEgressPolicyCache, withEgressPayloadContext } from './egress-policy.js';
+import { _resetEgressPolicyCacheForTests, withEgressPayloadContext } from './egress-policy.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const mocks = vi.hoisted(() => ({
   axios: vi.fn(),
@@ -30,13 +30,21 @@ const tmpRoot = pathResolver.sharedTmp('network-policy-tests');
 describe('secureFetch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetEgressPolicyCache();
+    _resetEgressPolicyCacheForTests();
   });
 
   afterEach(() => {
     if (safeExistsSync(tmpRoot)) safeRmSync(tmpRoot, { recursive: true, force: true });
     delete process.env.KYBERION_EGRESS_POLICY_PATH;
-    resetEgressPolicyCache();
+    _resetEgressPolicyCacheForTests();
+  });
+
+  it('uses the canonical security policy without a fallback catalog', async () => {
+    const source = safeReadFile(pathResolver.rootResolve('libs/core/network.ts'), {
+      encoding: 'utf8',
+    }) as string;
+    expect(source).not.toContain('fallback: {}');
+    expect(source).not.toContain('fallbackOnInvalid');
   });
 
   it('blocks non-allowlisted hosts when egress policy is enforce', async () => {
@@ -151,5 +159,16 @@ describe('secureFetch', () => {
         }),
       })
     );
+  });
+
+  it('redacts unknown values without assuming an object response shape', async () => {
+    const { redactSensitiveObject } = await import('./network.js');
+
+    expect(redactSensitiveObject({ token: 'secret', nested: [{ value: 'safe' }] })).toEqual({
+      token: '[REDACTED_SECRET]',
+      nested: [{ value: 'safe' }],
+    });
+    expect(redactSensitiveObject(null)).toBeNull();
+    expect(redactSensitiveObject('plain text')).toBe('plain text');
   });
 });

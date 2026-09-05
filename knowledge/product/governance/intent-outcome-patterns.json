@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/intent-outcome-patterns.schema.json",
   "version": "1.0.0",
   "notes": [
     "This catalog defines the canonical completion pattern for each surface intent.",

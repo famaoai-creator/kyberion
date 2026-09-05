@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { buildMissionHistoryItems, collectCostSummary } from '../../../lib/su-surface-data';
 import {
@@ -17,7 +18,7 @@ export function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const budget = Number(
-    url.searchParams.get('budgetUsd') || process.env.CHRONOS_COST_BUDGET_USD || ''
+    url.searchParams.get('budgetUsd') || getRegisteredEnvText('CHRONOS_COST_BUDGET_USD') || ''
   );
   const requestedTenant = url.searchParams.get('tenant') || undefined;
   const summary = withViewerExecutionContext(resolvedViewer.context, () =>

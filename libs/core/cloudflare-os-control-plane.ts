@@ -4,10 +4,18 @@ import { auditChain } from './audit-chain.js';
 import { computeApprovalPayloadHash } from './approval-store.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
+  loadPersistedControlPlaneStateAtPath,
+  validatePersistedControlPlaneStateAtPath,
+  type PersistedControlPlaneState,
+} from './cloudflare-os-control-plane-state.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   safeExecResult,
 } from './secure-io.js';
@@ -26,6 +34,15 @@ export type HeldActionStatus =
 export type ResourceScope = 'read' | 'write';
 export type IntroductionMode = 'warn' | 'enforce';
 export type OsKnowledgeTier = 'personal' | 'confidential' | 'public';
+
+/** Validate the execution envelope without pretending to know generic `T`. */
+export function normalizeGovernedCodeEnvelope(value: unknown): { value: unknown } | undefined {
+  if (!isRecord(value) || !Object.prototype.hasOwnProperty.call(value, 'value')) return undefined;
+  if (value.value_undefined !== undefined && typeof value.value_undefined !== 'boolean') {
+    return undefined;
+  }
+  return { value: value.value_undefined === true ? undefined : value.value };
+}
 
 export interface SimulatedResult {
   provisionalRefs: string[];
@@ -251,24 +268,6 @@ export interface CloudflareOsControlPlaneOptions {
   auditRestoreFailures?: boolean;
 }
 
-interface PersistedControlPlaneState {
-  version: 1;
-  held: Array<Record<string, unknown>>;
-  introductions: ResourceIntroduction[];
-  observations: ObservationRecord[];
-  autoRules: AutoApproveRule[];
-  capabilities: CapabilityEdge[];
-  threadCapabilities: Record<string, string[]>;
-  blueprints: BlueprintContract[];
-  network: NetworkObservation[];
-  gadgets: PersistedGadget[];
-}
-
-interface PersistedGadget {
-  manifest: GadgetManifest;
-  operations: Array<GadgetOperationDescriptor & { governedCode: string }>;
-}
-
 const TIER_RANK: Record<OsKnowledgeTier, number> = { public: 0, confidential: 1, personal: 2 };
 
 function actor(input?: string): string {
@@ -337,8 +336,12 @@ export class CloudflareOsControlPlane {
   constructor(options: CloudflareOsControlPlaneOptions = {}) {
     this.persist = options.persist !== false;
     this.auditRestoreFailures = options.auditRestoreFailures !== false;
-    this.statePath =
-      options.statePath || pathResolver.shared('runtime/cloudflare-os/control-plane.json');
+    this.statePath = this.persist
+      ? assertSafeRepositoryPath(
+          options.statePath || pathResolver.shared('runtime/cloudflare-os/control-plane.json'),
+          { allowMissingLeaf: true }
+        )
+      : options.statePath || pathResolver.shared('runtime/cloudflare-os/control-plane.json');
     if (this.persist) this.restoreState();
   }
 
@@ -359,7 +362,7 @@ export class CloudflareOsControlPlane {
       ...input,
       id: input.id || randomUUID(),
       status: 'pending' as const,
-      submittedAt: new Date().toISOString(),
+      submittedAt: nowIso(),
       autoApproved: false,
       ...(input.simulatable && input.simulate ? { simulation: input.simulate(input.params) } : {}),
       effectBinding: input.effectBinding || input.op,
@@ -421,7 +424,7 @@ export class CloudflareOsControlPlane {
     record.status = decision === 'approved' ? 'approved' : 'rejected';
     record.resolvedBy = by;
     record.autoApproved = false;
-    record.decidedAt = new Date().toISOString();
+    record.decidedAt = nowIso();
     audit('held_action', 'decide', 'completed', {
       heldActionId: id,
       decision,
@@ -439,7 +442,7 @@ export class CloudflareOsControlPlane {
       op: assertNonEmpty(rule.op, 'auto-approve op'),
       actionTag: assertNonEmpty(rule.actionTag, 'auto-approve actionTag'),
       enabledBy: assertHumanActor(rule.enabledBy),
-      enabledAt: new Date().toISOString(),
+      enabledAt: nowIso(),
     };
     this.autoRules.push(normalized);
     this.persistState();
@@ -500,7 +503,7 @@ export class CloudflareOsControlPlane {
         refs
       );
       record.status = 'applied';
-      record.appliedAt = new Date().toISOString();
+      record.appliedAt = nowIso();
       audit('held_action', 'apply', 'completed', {
         heldActionId: id,
         resolvedBy: by,
@@ -540,7 +543,7 @@ export class CloudflareOsControlPlane {
   private grantIntroduction(
     input: Omit<ResourceIntroduction, 'id' | 'grantedAt' | 'revokedAt'>
   ): ResourceIntroduction {
-    const introduction = { ...input, id: randomUUID(), grantedAt: new Date().toISOString() };
+    const introduction = { ...input, id: randomUUID(), grantedAt: nowIso() };
     this.introductions.set(introduction.id, introduction);
     audit('resource_introduction', 'grant', 'completed', introduction);
     this.persistState();
@@ -572,7 +575,7 @@ export class CloudflareOsControlPlane {
   revokeIntroduction(id: string, revokedBy: string): void {
     const entry = this.introductions.get(id);
     if (!entry) throw new Error(`Resource introduction not found: ${id}`);
-    if (!entry.revokedAt) entry.revokedAt = new Date().toISOString();
+    if (!entry.revokedAt) entry.revokedAt = nowIso();
     audit('resource_introduction', 'revoke', 'completed', { id, revokedBy });
     this.persistState();
   }
@@ -609,7 +612,7 @@ export class CloudflareOsControlPlane {
   }
 
   recordObservation(input: Omit<ObservationRecord, 'id' | 'observedAt'>): ObservationRecord {
-    const record = { ...input, id: randomUUID(), observedAt: new Date().toISOString() };
+    const record = { ...input, id: randomUUID(), observedAt: nowIso() };
     this.observations.push(record);
     audit('observation', 'read', 'completed', record);
     this.persistState();
@@ -660,7 +663,7 @@ export class CloudflareOsControlPlane {
       `const bindings = Object.freeze(${JSON.stringify(bindings)});`,
       `const value = (${code});`,
       "if (value && typeof value.then === 'function') throw new Error('async governed code is not supported');",
-      'process.stdout.write(JSON.stringify({ value }));',
+      'process.stdout.write(JSON.stringify(value === undefined ? { value: null, value_undefined: true } : { value }));',
     ].join('\n');
     const result = safeExecResult(
       process.execPath,
@@ -673,7 +676,11 @@ export class CloudflareOsControlPlane {
       );
     }
     try {
-      return (JSON.parse(result.stdout) as { value: T }).value;
+      const envelope = normalizeGovernedCodeEnvelope(
+        parseSafeJsonInput(result.stdout, 'governed code response')
+      );
+      if (!envelope) throw new Error('missing value envelope');
+      return envelope.value as T;
     } catch (error) {
       throw new Error(
         `[POLICY_VIOLATION] Governed Code Mode returned invalid data: ${error instanceof Error ? error.message : String(error)}`
@@ -752,7 +759,7 @@ export class CloudflareOsControlPlane {
       subject,
       resource,
       scope,
-      grantedAt: new Date().toISOString(),
+      grantedAt: nowIso(),
       ...(options.parentId ? { parentId: options.parentId } : {}),
       ...(options.missionId ? { missionId: options.missionId } : {}),
       ...(options.targetAudience ? { targetAudience: options.targetAudience } : {}),
@@ -767,7 +774,7 @@ export class CloudflareOsControlPlane {
   revokeCapability(id: string, revokedBy: string): void {
     const edge = this.capabilities.get(id);
     if (!edge) throw new Error(`Capability edge not found: ${id}`);
-    edge.revokedAt ||= new Date().toISOString();
+    edge.revokedAt ||= nowIso();
     audit('capability', 'revoke', 'completed', { id, revokedBy });
     this.persistState();
   }
@@ -1092,7 +1099,7 @@ export class CloudflareOsControlPlane {
     record.status = 'approved';
     record.resolvedBy = `auto-approve:${rule.enabledBy}`;
     record.autoApproved = true;
-    record.decidedAt = new Date().toISOString();
+    record.decidedAt = nowIso();
     audit('held_action', 'decide', 'completed', {
       heldActionId: record.id,
       decision: 'approved',
@@ -1158,16 +1165,15 @@ export class CloudflareOsControlPlane {
         ];
       }),
     };
+    validatePersistedControlPlaneStateAtPath(this.statePath, state);
     safeWriteFile(this.statePath, JSON.stringify(state, null, 2) + '\n', { encoding: 'utf8' });
   }
 
   private restoreState(): void {
     if (!safeExistsSync(this.statePath)) return;
     try {
-      const state = JSON.parse(
-        String(safeReadFile(this.statePath, { encoding: 'utf8' }))
-      ) as PersistedControlPlaneState;
-      if (state.version !== 1) return;
+      const state = loadPersistedControlPlaneStateAtPath(this.statePath);
+      if (!state) return;
       for (const raw of state.held || []) {
         const record = raw as unknown as HeldActionRecord;
         record.apply = () => {
@@ -1228,10 +1234,8 @@ export class CloudflareOsControlPlane {
   private refreshPersistedObservations(): void {
     if (!this.persist || !safeExistsSync(this.statePath)) return;
     try {
-      const state = JSON.parse(
-        String(safeReadFile(this.statePath, { encoding: 'utf8' }))
-      ) as PersistedControlPlaneState;
-      if (state.version !== 1 || !Array.isArray(state.observations)) return;
+      const state = loadPersistedControlPlaneStateAtPath(this.statePath);
+      if (!state) return;
       this.observations.splice(0, this.observations.length, ...state.observations);
     } catch (error) {
       if (this.auditRestoreFailures) {

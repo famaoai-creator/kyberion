@@ -13,9 +13,16 @@
  */
 
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 
 export type AiDlcPhase = 'alignment' | 'execution' | 'test' | 'self_review' | 'complete';
@@ -56,6 +63,18 @@ export interface AiDlcPhaseState {
 
 const PHASE_ORDER: AiDlcPhase[] = ['alignment', 'execution', 'test', 'self_review', 'complete'];
 
+const AIDLC_PHASE_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/aidlc-phase-state.schema.json'
+);
+
+function aiDlcPhaseStateCatalog(filePath: string) {
+  return defineCatalog<AiDlcPhaseState>({
+    id: 'aidlc-phase-state',
+    path: filePath,
+    schema: AIDLC_PHASE_STATE_SCHEMA_PATH,
+  });
+}
+
 export function createAiDlcPhaseState(
   missionId: string,
   options: { taskBoardRef?: string; now?: string } = {}
@@ -66,7 +85,7 @@ export function createAiDlcPhaseState(
     ...(options.taskBoardRef ? { task_board_ref: options.taskBoardRef } : {}),
     phase: 'alignment',
     attempts: [],
-    updated_at: options.now ?? new Date().toISOString(),
+    updated_at: options.now ?? nowIso(),
   };
 }
 
@@ -124,7 +143,7 @@ export function advanceAiDlcPhase(
     | { phase: 'execution'; result: AiDlcPhaseResult }
     | { phase: 'test'; result: AiDlcPhaseResult & { passed: boolean } }
     | { phase: 'self_review'; result: AiDlcPhaseResult & { approved: boolean } },
-  now: string = new Date().toISOString()
+  now: string = nowIso()
 ): AiDlcPhaseState {
   const expected = nextPhase(state.phase);
   if (input.phase !== expected) {
@@ -181,7 +200,7 @@ export function advanceAiDlcPhase(
 export function tripAiDlcCircuitBreaker(
   state: AiDlcPhaseState,
   failure: AiDlcFailureContext,
-  now: string = new Date().toISOString()
+  now: string = nowIso()
 ): AiDlcPhaseState {
   return {
     ...state,
@@ -195,26 +214,46 @@ export function tripAiDlcCircuitBreaker(
 // ─── Persistence (mission evidence) ──────────────────────────────────────────
 
 export function aiDlcPhaseStatePath(missionId: string, baseDir?: string): string {
+  pathResolver.assertMissionIdArgument(missionId);
   // baseDir substitutes the missions root (tests); the per-mission evidence
   // namespace is preserved either way.
   const root = baseDir
     ? path.join(baseDir, missionId, 'evidence')
     : pathResolver.active(`missions/${missionId}/evidence`);
-  return path.join(root, 'aidlc-phase-state.json');
+  return assertSafeRepositoryPath(path.join(root, 'aidlc-phase-state.json'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function saveAiDlcPhaseState(state: AiDlcPhaseState, baseDir?: string): string {
   const filePath = aiDlcPhaseStatePath(state.mission_id, baseDir);
+  const validated = aiDlcPhaseStateCatalog(filePath).validate(state, filePath);
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, `${JSON.stringify(state, null, 2)}\n`);
+  safeWriteFile(filePath, `${JSON.stringify(validated, null, 2)}\n`);
   return filePath;
+}
+
+/** Load one persisted AI-DLC state through schema and mission scope validation. */
+export function loadAiDlcPhaseStateAtPath(filePath: string, missionId: string): AiDlcPhaseState {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[aidlc-phase-state] state must be a regular file: ${filePath}`);
+  }
+  const state = aiDlcPhaseStateCatalog(safeFilePath).load();
+  const expectedMissionId = missionId.trim().toUpperCase();
+  if (state.mission_id.trim().toUpperCase() !== expectedMissionId) {
+    throw new Error(
+      `[AIDLC_PHASE_STATE_SCOPE_MISMATCH] state belongs to ${state.mission_id}, expected ${expectedMissionId}`
+    );
+  }
+  return state;
 }
 
 export function loadAiDlcPhaseState(missionId: string, baseDir?: string): AiDlcPhaseState | null {
   const filePath = aiDlcPhaseStatePath(missionId, baseDir);
   if (!safeExistsSync(filePath)) return null;
   try {
-    return readJson<AiDlcPhaseState>(filePath);
+    return loadAiDlcPhaseStateAtPath(filePath, missionId);
   } catch {
     return null;
   }
@@ -235,11 +274,12 @@ export function resumeAiDlcPhaseState(
   if (state.phase === 'complete') {
     throw new Error(`[aidlc-phase-state] cannot resume completed mission ${missionId}`);
   }
+  const resumedAt = options.now ?? nowIso();
   const resumed: AiDlcPhaseState = {
     ...state,
     resume_count: (state.resume_count || 0) + 1,
-    last_resumed_at: options.now ?? new Date().toISOString(),
-    updated_at: options.now ?? new Date().toISOString(),
+    last_resumed_at: resumedAt,
+    updated_at: resumedAt,
   };
   saveAiDlcPhaseState(resumed, options.baseDir);
   return resumed;

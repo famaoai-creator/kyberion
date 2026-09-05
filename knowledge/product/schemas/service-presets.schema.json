@@ -3,7 +3,7 @@
   "title": "Service Preset",
   "description": "Canonical operation template for a single service endpoint.",
   "type": "object",
-  "required": ["service_id", "operations"],
+  "required": ["operations"],
   "properties": {
     "service_id": { "type": "string" },
     "name": { "type": "string" },

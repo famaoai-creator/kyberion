@@ -1,6 +1,12 @@
+import * as path from 'node:path';
 import * as pathResolver from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core/secure-io';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 export type ContractCheck = {
   id: string;
@@ -10,12 +16,47 @@ export type ContractCheck = {
 };
 
 export function readGovernanceJson(relativePath: string): unknown {
-  const payload = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
+  const safePath = assertSafeRepositoryPath(pathResolver.rootResolve(relativePath));
+  if (!safeLstat(safePath).isFile())
+    throw new Error(`Governance resource is not a file: ${relativePath}`);
+  const payload = readSafeJsonValueFile<unknown>(safePath, `governance JSON ${relativePath}`);
   if (payload && typeof payload === 'object' && !Array.isArray(payload) && '$schema' in payload) {
     const { $schema: _schema, ...contract } = payload;
     return contract;
   }
   return payload;
+}
+
+function safeGovernanceJsonEntries(relativeDir: string): string[] {
+  try {
+    const dir = assertSafeRepositoryPath(pathResolver.rootResolve(relativeDir), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) return [];
+    return safeReaddir(dir)
+      .filter((entry) => entry.endsWith('.json'))
+      .filter((entry) => {
+        try {
+          const candidate = assertSafeRepositoryPath(path.join(dir, entry));
+          return safeLstat(candidate).isFile();
+        } catch {
+          return false;
+        }
+      })
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+function readGovernanceJsonDirectory(relativeDir: string): unknown[] {
+  return safeGovernanceJsonEntries(relativeDir).flatMap((entry) => {
+    try {
+      return [readGovernanceJson(path.join(relativeDir, entry))];
+    } catch {
+      return [];
+    }
+  });
 }
 
 const GOLDEN_SCENARIO_CATALOG_ALLOWLIST = new Set([
@@ -24,11 +65,8 @@ const GOLDEN_SCENARIO_CATALOG_ALLOWLIST = new Set([
 ]);
 
 export function findUnmanagedGoldenScenarioCatalogs(): string[] {
-  const dir = pathResolver.rootResolve('knowledge/product/governance');
-  if (!safeExistsSync(dir)) return [];
-
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
+  return safeGovernanceJsonEntries('knowledge/product/governance')
+    .map((entry) => path.basename(entry))
     .filter((entry) => {
       const isGoldenScenarioCatalog =
         entry.includes('deterministic') ||
@@ -42,88 +80,39 @@ export function findUnmanagedGoldenScenarioCatalogs(): string[] {
 }
 
 export function readSurfaceManifestPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/product/governance/surfaces');
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .map((entry) => readGovernanceJson(`knowledge/product/governance/surfaces/${entry}`));
+  return readGovernanceJsonDirectory('knowledge/product/governance/surfaces');
 }
 
 export function readSurfaceProviderCatalogPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve(
+  return readGovernanceJsonDirectory(
     'knowledge/product/governance/surface-provider-manifest-catalogs'
   );
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .map((entry) =>
-      readGovernanceJson(`knowledge/product/governance/surface-provider-manifest-catalogs/${entry}`)
-    );
 }
 
 export function readServiceEndpointPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints');
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .map((entry) =>
-      readGovernanceJson(`knowledge/product/orchestration/service-endpoints/${entry}`)
-    );
+  return readGovernanceJsonDirectory('knowledge/product/orchestration/service-endpoints');
 }
 
 export function readServicePresetPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/product/orchestration/service-presets');
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/service-presets/${entry}`));
+  return readGovernanceJsonDirectory('knowledge/product/orchestration/service-presets');
 }
 
 export function readAgentProfilePayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/product/orchestration/agent-profiles');
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/agent-profiles/${entry}`));
+  return readGovernanceJsonDirectory('knowledge/product/orchestration/agent-profiles');
 }
 
 export function readVoiceProfilePayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/product/governance/voice-profiles');
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .map((entry) => readGovernanceJson(`knowledge/product/governance/voice-profiles/${entry}`));
+  return readGovernanceJsonDirectory('knowledge/product/governance/voice-profiles');
 }
 
 export function readSpecialistPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/product/orchestration/specialists');
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/specialists/${entry}`));
+  return readGovernanceJsonDirectory('knowledge/product/orchestration/specialists');
 }
 
 export function readAuthorityRolePayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/product/governance/authority-roles');
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .map((entry) => readGovernanceJson(`knowledge/product/governance/authority-roles/${entry}`));
+  return readGovernanceJsonDirectory('knowledge/product/governance/authority-roles');
 }
 
 export function readTeamRolePayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/product/orchestration/team-roles');
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/team-roles/${entry}`));
+  return readGovernanceJsonDirectory('knowledge/product/orchestration/team-roles');
 }

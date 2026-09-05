@@ -1,21 +1,22 @@
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
-import {
-  resolveDocumentContentsLabel,
-  resolveReportSectionTitle,
-  resolveThemeColorRole as resolveThemeColorRolePolicy,
-} from '@agent/core';
+import { resolveDocumentContentsLabel } from '@agent/core/document-contents-policy';
+import { resolveReportSectionTitle } from '@agent/core/document-outline-label-policy';
+import { resolveThemeColorRole as resolveThemeColorRolePolicy } from '@agent/core/media-theme-role-policy';
+import { nowIso } from '@agent/core/foundation';
+import type { DocxDesignProtocol } from '@agent/core/types/docx-protocol';
+import type { PdfDesignProtocol } from '@agent/core/types/pdf-protocol';
 import {
   buildMediaGenerationBoundary,
   buildReportNarrativeOutline,
   classifyRenderSemantic,
+  type DocumentCompositionPresetResolver,
+  type MediaTheme,
 } from './media-document-helpers.js';
+import type { MediaPptxPalette } from './media-layout-design-tokens.js';
 
 export interface MediaReportPipelineDeps {
-  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
-  resolveDocumentCompositionPreset: (
-    rootDir: string,
-    brief: any
-  ) => { profileId: string; preset: any };
+  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => MediaTheme | null;
+  resolveDocumentCompositionPreset: DocumentCompositionPresetResolver;
   resolveDocumentLayoutTemplate: (
     rootDir: string,
     brief: any
@@ -30,11 +31,45 @@ export interface MediaReportPipelineDeps {
     theme: any,
     locale?: string
   ) => { headingFont: string; bodyFont: string; accent: string };
-  themeToPptxPalette: (theme: any) => any;
+  themeToPptxPalette: (theme: MediaTheme | null) => MediaPptxPalette;
   normalizeFontFamily: (input: string) => string;
 }
 
-function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
+type MediaPdfAesthetic = NonNullable<PdfDesignProtocol['aesthetic']>;
+
+export interface MediaReportPdfProtocol extends Omit<PdfDesignProtocol, 'metadata' | 'aesthetic'> {
+  metadata: {
+    title?: string;
+    subject?: string;
+    author?: string;
+    creationDate?: string;
+    composition: unknown;
+    generationBoundary: unknown;
+    recommendedTheme: string;
+    branding: Record<string, unknown>;
+    sectionSemantics: unknown[];
+  };
+  aesthetic: MediaPdfAesthetic & {
+    branding?: NonNullable<MediaPdfAesthetic['branding']> & Record<string, unknown>;
+    templateId?: string;
+  };
+}
+
+export interface MediaReportDocxProtocol extends DocxDesignProtocol {
+  metadata: {
+    composition: unknown;
+    generationBoundary: unknown;
+    recommendedTheme: string;
+    branding: Record<string, unknown>;
+    sectionSemantics: unknown[];
+  };
+}
+
+function resolveThemeColorRole(
+  palette: MediaPptxPalette,
+  accentHex: string,
+  role?: string
+): string {
   const resolvedRole = resolveThemeColorRolePolicy(role, 'secondary');
   switch (resolvedRole) {
     case 'accent':
@@ -61,7 +96,7 @@ function hexToPdfRgb(
 }
 
 export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) {
-  function buildReportDocxProtocol(rootDir: string, brief: any): any {
+  function buildReportDocxProtocol(rootDir: string, brief: any): MediaReportDocxProtocol {
     const outline = buildReportNarrativeOutline(
       rootDir,
       brief,
@@ -382,7 +417,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
 
     return {
       version: '1.0.0',
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso(),
       source: {
         format: 'markdown',
         title: brief.payload.title || 'Report',
@@ -565,7 +600,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
               },
             },
             rPr: {
-              italics: evidenceCalloutBodyRule.italics ?? true,
+              italic: evidenceCalloutBodyRule.italics ?? true,
               color: {
                 val: resolveThemeColorRole(
                   palette,
@@ -655,7 +690,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
     };
   }
 
-  function buildReportPdfProtocol(rootDir: string, brief: any): any {
+  function buildReportPdfProtocol(rootDir: string, brief: any): MediaReportPdfProtocol {
     const outline = buildReportNarrativeOutline(
       rootDir,
       brief,
@@ -851,7 +886,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
         'pdf',
         'body'
       );
-      const pdfTokens = semanticTokens.pdf || {};
+      const pdfTokens = semanticTokens.pdf || semanticTokens;
       const isAppendix = semanticType === 'appendix';
       const sectionHeaderColor =
         pdfTokens.header_color === 'secondary'
@@ -1080,7 +1115,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
 
     return {
       version: '1.0.0',
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso(),
       source: {
         format: 'markdown',
         title: brief.payload.title || 'Report',
@@ -1090,7 +1125,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
         title: brief.payload.title || 'Report',
         subject: brief.document_profile || 'summary-report',
         author: 'Kyberion Media-Actuator',
-        creationDate: new Date().toISOString(),
+        creationDate: nowIso(),
         composition: outline,
         generationBoundary: outline.generation_boundary || buildMediaGenerationBoundary(outline),
         recommendedTheme: preset?.recommended_theme || 'kyberion-standard',

@@ -1,8 +1,11 @@
 import * as path from 'node:path';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveVision } from './vision-resolver.js';
 import {
   rawExistsSync,
@@ -39,11 +42,25 @@ function color(code: keyof typeof ANSI, text: string): string {
   return `${ANSI[code]}${text}${ANSI.reset}`;
 }
 
+function missionLogPrefix(): string {
+  const missionId = getRegisteredEnvText('MISSION_ID');
+  return missionId ? color('magenta', ` [${missionId}]`) : '';
+}
+
+function isQuietProcess(): boolean {
+  return (
+    getRegisteredEnvText('LOG_LEVEL') === 'silent' ||
+    process.argv.includes('--quiet') ||
+    process.argv.includes('--json')
+  );
+}
+
 export const logger = {
   _log: (level: string, msg: string) => {
-    if (process.env.NODE_ENV === 'test' && level !== 'error') return;
-    const ts = color('dim', new Date().toISOString());
-    const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
+    if (isQuietProcess() && level !== 'error') return;
+    if (getRegisteredEnvText('NODE_ENV') === 'test' && level !== 'error') return;
+    const ts = color('dim', nowIso());
+    const mid = missionLogPrefix();
     const prefix =
       level === 'error'
         ? color('red', ' [ERROR] ')
@@ -62,15 +79,16 @@ export const logger = {
   warn: (msg: string) => logger._log('warn', msg),
   error: (msg: string) => logger._log('error', msg),
   success: (msg: string) => {
-    const ts = color('dim', new Date().toISOString());
-    const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
+    if (isQuietProcess()) return;
+    const ts = color('dim', nowIso());
+    const mid = missionLogPrefix();
     console.log(ts + mid + color('green', ' [SUCCESS] ') + msg);
   },
 };
 
 export const ui = {
   spinner: (msg: string) => {
-    if (process.env.NODE_ENV === 'test') return { stop: () => {} };
+    if (getRegisteredEnvText('NODE_ENV') === 'test') return { stop: () => {} };
     const chars = ['\u25dc', '\u25dd', '\u25de', '\u25df'];
     let i = 0;
     const interval = setInterval(() => {
@@ -173,7 +191,8 @@ export const sre = {
 
     if (rawExistsSync(sigPath)) {
       try {
-        const signatures = JSON.parse(rawReadTextFile(sigPath));
+        const signatures = parseSafeJsonInput(rawReadTextFile(sigPath), 'error signatures');
+        if (!Array.isArray(signatures)) throw new Error('error signatures must be an array');
         for (const sig of signatures) {
           const regex = new RegExp(sig.pattern, 'i');
           if (regex.test(errorMessage)) {
@@ -272,7 +291,12 @@ export class Cache {
 
       if (rawExistsSync(diskPath)) {
         try {
-          const diskEntry = JSON.parse(rawReadTextFile(diskPath));
+          const diskEntry = parseSafeJsonInput(rawReadTextFile(diskPath), 'cache entry') as {
+            h?: string;
+            value: unknown;
+            timestamp: number;
+            ttl: number;
+          };
           if (diskEntry.h) {
             const actualHash = this._generateHash(diskEntry.value);
             if (actualHash !== diskEntry.h) {
@@ -312,7 +336,7 @@ export class Cache {
     const ttl = customTtlMs || this._ttlMs;
     const timestamp = Date.now();
 
-    if (process.env.NODE_ENV !== 'test') {
+    if (getRegisteredEnvText('NODE_ENV') !== 'test') {
       const mem = process.memoryUsage();
       const usageRatio = mem.heapUsed / mem.heapTotal;
       if (usageRatio > 0.8) {
@@ -390,7 +414,7 @@ export const _fileCache = new Cache(200, 3600000);
 // the caller's decision — CLI entry guards exit, daemons recover.
 export const errorHandler = (err: any, context = '') => {
   logger.error(context + ': ' + (err.message || err));
-  if (process.env.DEBUG) logger.error(String(err.stack));
+  if (getRegisteredEnvText('DEBUG')) logger.error(String(err.stack));
   throw err instanceof Error ? err : new Error(String(err));
 };
 
@@ -400,7 +424,7 @@ export const fileUtils = {
     return config ? config.active_role || config.role : 'Unknown';
   },
   getFullRoleConfig: () => {
-    const mid = process.env.MISSION_ID;
+    const mid = getRegisteredEnvText('MISSION_ID');
     const priorityPaths: string[] = [];
     if (mid) priorityPaths.push(pathResolver.active(`missions/${mid}/role-state.json`));
     priorityPaths.push(pathResolver.shared('governance/session.json'));
@@ -426,7 +450,7 @@ export const fileUtils = {
       if (cached && cached.mtimeMs === mtimeMs) return cached.data;
 
       const content = rawReadTextFile(resolved);
-      const data = JSON.parse(content);
+      const data = parseSafeJsonInput(content, `file ${filePath}`);
       if (stat.size < 5 * 1024 * 1024) {
         const persistCache = resolved.startsWith(pathResolver.knowledge('product/orchestration/'));
         _fileCache.set(resolved, { mtimeMs, data }, undefined, persistCache);

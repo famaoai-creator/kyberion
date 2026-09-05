@@ -7,7 +7,8 @@
 // change; every other op previously made determineActuatorStepType throw, so
 // those entries are strictly additive.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const EMPTY_INPUT_SCHEMA = {
   type: 'object',
@@ -163,7 +164,7 @@ export const AGENT_ACTUATOR_APPLY_OPS = [
   'prewarm_mission',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const schema = AGENT_CONTRACTS[op];
   return schema
     ? { op, kind, input_schema: schema, examples: AGENT_EXAMPLES[op] || [{}] }
@@ -172,7 +173,7 @@ function toSpec(op: string, kind: OpSpecKind) {
       : { op, kind };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...AGENT_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...AGENT_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

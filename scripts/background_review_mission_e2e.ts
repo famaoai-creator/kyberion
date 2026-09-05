@@ -12,27 +12,39 @@ import { createHash } from 'node:crypto';
 import {
   applyBackgroundReviewPipelinePatch,
   inspectBackgroundReviewProposal,
+} from '@agent/core/background-review-patch';
+import {
   registerReasoningBackend,
   resetReasoningBackend,
-  resolveSurfaceApprovalReply,
-  runSurfaceMessageConversation,
   stubReasoningBackend,
+} from '@agent/core/reasoning-backend';
+import { resolveSurfaceApprovalReply } from '@agent/core/surface-approval-ui';
+import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
+import {
   approvalRequestLogicalPath,
-  backgroundReviewNudgeStatePath,
-  clearSurfaceOutboxMessage,
-  findMissionPath,
   listApprovalRequests,
+  type ApprovalRequestRecord,
+} from '@agent/core/approval-store';
+import {
+  backgroundReviewNudgeStatePath,
+  recordBackgroundReviewActivity,
+} from '@agent/core/background-review-nudge';
+import {
+  clearSurfaceOutboxMessage,
   listSurfaceNotifications,
   listSurfaceOutboxMessages,
-  pathResolver,
-  recordBackgroundReviewActivity,
+} from '@agent/core/surface-coordination-store';
+import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeLstat,
   safeRmSync,
   safeWriteFile,
-  withExecutionContext,
-  type EventScope,
-  type ApprovalRequestRecord,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
+import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
+import type { EventScope } from '@agent/core/event-scope';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -43,21 +55,19 @@ function flag(argv: string[], name: string): string {
 
 function usage(): never {
   throw new Error(
-    'Usage: pnpm background-review:mission-e2e --mission-id <active-mission-id> [--surface presence|slack]'
+    'Usage: pnpm kyberion background-review mission-e2e --mission-id <active-mission-id> [--surface presence|slack]'
   );
 }
 
 function assertActiveMission(missionId: string): void {
   const missionPath = findMissionPath(missionId);
   if (!missionPath) throw new Error(`Mission not found: ${missionId}`);
-  const statePath = path.join(missionPath, 'mission-state.json');
-  const state = withExecutionContext('mission_controller', () =>
-    readJson<{
-      mission_id?: string;
-      status?: string;
-    }>(statePath)
-  );
-  if (state.mission_id?.toUpperCase() !== missionId || state.status !== 'active') {
+  const statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'));
+  if (!safeLstat(statePath).isFile()) {
+    throw new Error(`Mission state must be a regular file: ${statePath}`);
+  }
+  const state = withExecutionContext('mission_controller', () => loadStateAtPath(statePath));
+  if (!state || state.mission_id.toUpperCase() !== missionId || state.status !== 'active') {
     throw new Error(`Mission must be active: ${missionId} (status=${state.status || 'unknown'})`);
   }
 }
@@ -211,8 +221,12 @@ async function main(argv: string[]): Promise<void> {
       approvalRef: approval.id,
     });
     backupRef = applied.backup_ref;
-    const patched = readJson<{ steps?: unknown[] }>(targetPath);
-    if (patched.steps?.length !== 2) throw new Error('Mission E2E patch was not applied.');
+    const safeTargetPath = assertSafeRepositoryPath(targetPath);
+    if (!safeLstat(safeTargetPath).isFile()) {
+      throw new Error(`Mission pipeline target must be a regular file: ${safeTargetPath}`);
+    }
+    const patched = loadPipelineAdfAtPath(safeTargetPath);
+    if (patched.steps.length !== 2) throw new Error('Mission E2E patch was not applied.');
 
     process.stdout.write(
       `${JSON.stringify(

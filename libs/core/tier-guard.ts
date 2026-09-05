@@ -5,11 +5,14 @@
 
 import * as path from 'node:path';
 import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonObjectInput, parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { assertSandboxWriteAllowed } from './sandbox-policy.js';
 import type {
   TierLevel,
   TierWeightMap,
@@ -77,7 +80,9 @@ let corruptPolicyWarned = false;
 function loadPolicy(): PolicyLoad {
   if (!rawExistsSync(POLICY_PATH)) return { status: 'missing' };
   try {
-    return { status: 'loaded', policy: JSON.parse(rawReadTextFile(POLICY_PATH)) };
+    const policy = parseSafeJsonObjectInput(rawReadTextFile(POLICY_PATH), 'security policy');
+    if (!policy) throw new Error('security policy must not be empty');
+    return { status: 'loaded', policy };
   } catch (err) {
     if (!corruptPolicyWarned) {
       corruptPolicyWarned = true;
@@ -228,14 +233,23 @@ function isRegisteredActiveTenant(tenantSlug: string): boolean {
   const profilePath = pathResolver.rootResolve(`knowledge/personal/tenants/${tenantSlug}.json`);
   if (!rawExistsSync(profilePath)) return false;
   try {
-    const profile = JSON.parse(rawReadTextFile(profilePath)) as {
-      tenant_slug?: string;
-      status?: string;
-    };
+    const profile = normalizeRegisteredTenantProfile(
+      parseSafeJsonInput(rawReadTextFile(profilePath), 'registered tenant profile')
+    );
+    if (!profile) return false;
     return profile.tenant_slug === tenantSlug && profile.status === 'active';
   } catch {
     return false;
   }
+}
+
+export function normalizeRegisteredTenantProfile(value: unknown): {
+  tenant_slug: string;
+  status: string;
+} | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.tenant_slug !== 'string' || typeof value.status !== 'string') return null;
+  return { tenant_slug: value.tenant_slug, status: value.status };
 }
 
 interface TenantGroupProfile {
@@ -256,7 +270,7 @@ function loadTenantGroupProfile(groupId: string): TenantGroupProfile | null {
   const file = pathResolver.knowledge(`confidential/tenant-groups/${groupId}.json`);
   try {
     if (!rawExistsSync(file)) return null;
-    const profile = JSON.parse(rawReadTextFile(file)) as TenantGroupProfile;
+    const profile = parseSafeJsonInput(rawReadTextFile(file), 'tenant group profile');
     if (!isValidTenantGroupProfile(groupId, profile)) return null;
     return profile;
   } catch (_) {
@@ -264,20 +278,28 @@ function loadTenantGroupProfile(groupId: string): TenantGroupProfile | null {
   }
 }
 
-function isValidTenantGroupProfile(groupId: string, profile: TenantGroupProfile): boolean {
+export function isValidTenantGroupProfile(
+  groupId: string,
+  profile: unknown
+): profile is TenantGroupProfile {
+  if (!isRecord(profile)) return false;
+  const memberTenants = profile.member_tenants;
+  const sharedPrefixes = profile.shared_prefixes;
   return (
-    profile &&
     profile.tenant_group_id === groupId &&
+    typeof profile.tenant_group_id === 'string' &&
     (profile.status === 'active' ||
       profile.status === 'suspended' ||
       profile.status === 'archived') &&
-    Array.isArray(profile.member_tenants) &&
-    profile.member_tenants.length > 0 &&
-    profile.member_tenants.every((tenant) => isValidTenantSlug(String(tenant))) &&
-    Array.isArray(profile.shared_prefixes) &&
-    profile.shared_prefixes.length > 0 &&
-    profile.shared_prefixes.every((prefix) =>
-      new RegExp(`^knowledge/confidential/shared/${groupId}/`).test(String(prefix))
+    Array.isArray(memberTenants) &&
+    memberTenants.length > 0 &&
+    memberTenants.every((tenant) => typeof tenant === 'string' && isValidTenantSlug(tenant)) &&
+    Array.isArray(sharedPrefixes) &&
+    sharedPrefixes.length > 0 &&
+    sharedPrefixes.every(
+      (prefix) =>
+        typeof prefix === 'string' &&
+        new RegExp(`^knowledge/confidential/shared/${groupId}/`).test(prefix)
     )
   );
 }
@@ -549,8 +571,16 @@ function recordGroupAccess(input: {
 
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
+  try {
+    assertSandboxWriteAllowed(resolvedPath);
+  } catch (error) {
+    return {
+      allowed: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
   const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
-  const currentMission = process.env.MISSION_ID;
+  const currentMission = getRegisteredEnvText('MISSION_ID');
 
   if (isOutsideProjectRoot(relativePath)) {
     return {
@@ -687,6 +717,7 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   if (loaded.status === 'missing') return { allowed: true };
   if (loaded.status === 'corrupt') return CORRUPT_POLICY_DENIAL;
   const policy = loaded.policy;
+  const currentMission = getRegisteredEnvText('MISSION_ID');
 
   const {
     persona: currentPersona,
@@ -711,21 +742,21 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
 
   if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope))
     return { allowed: true };
-  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_read'))
+  if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_read'))
     return { allowed: true };
-  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_write'))
+  if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write'))
     return { allowed: true };
 
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
   if (
     roleRules?.allow_read?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
     )
   )
     return { allowed: true };
   if (
     roleRules?.allow_write?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
     )
   )
     return { allowed: true };
@@ -733,13 +764,13 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const personaRules = policy.persona_permissions?.[currentPersona];
   if (
     personaRules?.allow_read?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
     )
   )
     return { allowed: true };
   if (
     personaRules?.allow_write?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
     )
   )
     return { allowed: true };
@@ -802,10 +833,15 @@ function loadMarkerPatterns(): { name: string; regex: string }[] {
   try {
     const policyPath = pathResolver.knowledge('product/governance/knowledge-sync-rules.json');
     if (rawExistsSync(policyPath)) {
-      const rules = JSON.parse(rawReadTextFile(policyPath));
-      const pii = rules?.security?.pii_patterns || [];
+      const rules = parseSafeJsonObjectInput(rawReadTextFile(policyPath), 'knowledge sync rules');
+      if (!rules) return patterns;
+      const security = isRecord(rules) && isRecord(rules.security) ? rules.security : null;
+      const pii = security?.pii_patterns;
+      if (!Array.isArray(pii)) return patterns;
       for (const p of pii) {
-        if (p?.name && p?.regex) patterns.push({ name: p.name, regex: p.regex });
+        if (isRecord(p) && typeof p.name === 'string' && typeof p.regex === 'string') {
+          patterns.push({ name: p.name, regex: p.regex });
+        }
       }
     }
   } catch (err) {

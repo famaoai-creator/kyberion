@@ -6,10 +6,7 @@ import {
   markInboxEntry,
 } from '@agent/core/deliverable-inbox';
 import { enqueueReviewReentryRequest } from '@agent/core/review-reentry';
-import {
-  normalizeRejectionReasonCategory,
-  type RejectionReasonCategory,
-} from '@agent/core/rejection-reason';
+import { type RejectionReasonCategory } from '@agent/core/rejection-reason';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
@@ -18,6 +15,8 @@ import {
   viewerErrorResponse,
 } from '../../../lib/viewer-context';
 import { reviewDeliverable } from '../../../lib/deliverable-review';
+import { readChronosJsonObject } from '../../../lib/request-input';
+import { parseDeliverableReviewInput } from './deliverable-review-input';
 
 const VERDICT_TO_INBOX_STATUS = {
   accept: 'accepted',
@@ -77,27 +76,20 @@ export async function POST(req: NextRequest) {
     const resolvedViewer = resolveViewerContextForRequest(req);
     if (resolvedViewer.response) return resolvedViewer.response;
 
-    const body = await req.json();
-    const artifactId = typeof body?.artifactId === 'string' ? body.artifactId : '';
-    const verdict =
-      body?.verdict === 'accept' ||
-      body?.verdict === 'reject' ||
-      body?.verdict === 'request-changes'
-        ? body.verdict
-        : null;
-    const comment = typeof body?.comment === 'string' ? body.comment : '';
-    const reasonCategory = normalizeRejectionReasonCategory(body?.reasonCategory);
-    if (!artifactId || !verdict) {
-      return NextResponse.json({ error: 'Missing deliverable review payload' }, { status: 400 });
+    const parsedBody = await readChronosJsonObject(req, 'Chronos deliverable review');
+    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    let input;
+    try {
+      input = parseDeliverableReviewInput(parsedBody.body);
+    } catch (error) {
+      return viewerErrorResponse(error, 400);
     }
+    const { artifactId, verdict, comment, reasonCategory, tenant } = input;
     const artifact = loadArtifactRecord(artifactId);
     if (!artifact) {
       return NextResponse.json({ error: 'Deliverable not found' }, { status: 404 });
     }
-    const tenantSlugs = strictViewerScopeTenantSlugs(
-      resolvedViewer.context,
-      typeof body?.tenant === 'string' ? body.tenant : undefined
-    );
+    const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, tenant);
     if (
       tenantSlugs !== 'all' &&
       (!artifact.tenant_slug || !tenantSlugs.includes(artifact.tenant_slug))

@@ -1,13 +1,13 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { checkTypeRatchet } from './check_type_ratchet.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('check-type-ratchet');

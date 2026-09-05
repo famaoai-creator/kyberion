@@ -11,7 +11,7 @@ This directory is the canonical source for individual model registry entries.
 After changing an item or `index.json`, run:
 
 ```sh
-pnpm sync:model-registry
+pnpm kyberion sync model-registry
 pnpm check -- --only governance-rules
 ```
 

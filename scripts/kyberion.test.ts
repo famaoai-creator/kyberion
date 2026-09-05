@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   assertRequiredEnvironment,
   formatCliManifestHelp,
+  main,
   resolveCommand,
+  resolveCommandPath,
+  resolveScriptCommand,
   selectEntrypoint,
   validateKyberionStartupEnvironment,
 } from './kyberion.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 describe('kyberion command router', () => {
   it('routes operator-home commands through the home entrypoint', () => {
@@ -18,10 +23,64 @@ describe('kyberion command router', () => {
     expect(selectEntrypoint('schedule').id).toBe('operator-cli');
   });
 
+  it('routes pipeline execution through the governed single entrypoint', () => {
+    expect(selectEntrypoint('pipeline').id).toBe('pipeline-runner');
+    expect(resolveCommandPath(['pipeline', '--input', 'pipelines/baseline-check.json'])).toBe(
+      'pipeline'
+    );
+  });
+
+  it('routes readiness reporting through the existing vital checker', () => {
+    expect(selectEntrypoint('vital').id).toBe('operator-readiness');
+    expect(resolveCommandPath(['vital', '--format', 'json'])).toBe('vital');
+    expect(resolveScriptCommand('vital json')).toBeUndefined();
+  });
+
+  it('routes setup and voice readiness through existing governed scripts', () => {
+    expect(selectEntrypoint('setup report').id).toBe('operator-setup');
+    expect(selectEntrypoint('voice setup').id).toBe('operator-voice');
+    expect(resolveCommandPath(['setup', 'report', '--json'])).toBe('setup report');
+    expect(resolveCommandPath(['voice', 'setup', '--apply'])).toBe('voice setup');
+    expect(resolveScriptCommand('voice setup')).toBeUndefined();
+    expect(resolveScriptCommand('calendar workflow')).toBeUndefined();
+  });
+
+  it('resolves governed noun/verb paths before payload arguments', () => {
+    expect(resolveCommandPath(['schedule', 'register', 'nightly', 'pipelines/x.json'])).toBe(
+      'schedule register'
+    );
+    expect(resolveCommandPath(['task', 'plan', 'prepare the report'])).toBe('task plan');
+    expect(resolveCommandPath(['task', 'scenario', 'list'])).toBe('task scenario');
+    expect(selectEntrypoint('email status').id).toBe('operator-cli');
+  });
+
   it('routes organization and project controllers through the governed registry', () => {
     expect(selectEntrypoint('organization').id).toBe('organization-model');
-    expect(selectEntrypoint('org').id).toBe('organization-roles');
     expect(selectEntrypoint('project').id).toBe('project-controller');
+    expect(resolveCommandPath(['organization', 'role', 'create'])).toBe('organization');
+  });
+
+  it('resolves script-backed commands from the same registry', () => {
+    expect(resolveCommandPath(['backup', '--dry-run'])).toBe('backup');
+    expect(resolveScriptCommand('backup')).toMatchObject({
+      script: 'backup',
+      command: 'backup default',
+      audience: 'operator',
+    });
+    expect(resolveCommandPath(['onboard', 'apply', '--identity', 'identity.json'])).toBe('onboard');
+    expect(resolveCommandPath(['onboard', 'reset', '--force'])).toBe('onboard');
+  });
+
+  it('dispatches module-backed commands without a package-script alias', async () => {
+    expect(resolveScriptCommand('chronos uninstall')).toMatchObject({
+      module: 'scripts/install_chronos_launchd.ts',
+      args: ['--uninstall'],
+    });
+
+    const output: unknown[] = [];
+    await main(['chronos', 'uninstall'], (value) => output.push(value));
+    expect(output).toHaveLength(1);
+    expect(output[0]).toEqual(expect.stringContaining('Uninstall steps'));
   });
 
   it('rejects unknown commands instead of falling back to an executable surface', () => {
@@ -45,6 +104,47 @@ describe('kyberion command router', () => {
         entrypoints: [{ id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: [''] }],
       })
     ).toThrow('CLI command registry mismatch');
+  });
+
+  it('keeps unknown registered entrypoints from falling through to operator-home', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/kyberion.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain(
+      'throw new Error(`Unsupported kyberion entrypoint: ${entrypoint.id}`)'
+    );
+  });
+
+  it('fails closed when a dispatch key is defined more than once', () => {
+    const manifest = {
+      version: 1,
+      commands: [
+        {
+          id: 'home-a',
+          command: '',
+          noun: 'home',
+          verb: 'default',
+          entry: 'operator-home',
+          audience: 'user' as const,
+        },
+        {
+          id: 'home-b',
+          command: '',
+          noun: 'home',
+          verb: 'default',
+          entry: 'operator-home',
+          audience: 'user' as const,
+        },
+      ],
+      entrypoints: [{ id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: [''] }],
+    };
+
+    expect(() => selectEntrypoint('', manifest)).toThrow(
+      'CLI command registry has duplicate command'
+    );
+    expect(() => resolveCommand('', manifest)).toThrow(
+      'CLI command registry has duplicate command'
+    );
   });
 
   it('exposes command metadata from the governed registry', () => {
@@ -82,6 +182,21 @@ describe('kyberion command router', () => {
     expect(help).toContain('<home>');
     expect(help).toContain('ask');
     expect(help).toContain('governed registry');
+  });
+
+  it('routes help output through the supplied harness printer', async () => {
+    const output: unknown[] = [];
+    const { main } = await import('./kyberion.js');
+    await main(['--help'], (value) => output.push(value));
+    expect(output).toHaveLength(1);
+    expect(output[0]).toEqual(expect.stringContaining('governed registry'));
+  });
+
+  it('does not write directly to stdout from the unified router', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/kyberion.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain('console.log(');
   });
 
   it('fails closed when the startup environment misses a required registered setting', () => {

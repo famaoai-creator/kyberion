@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   rawExistsSync: vi.fn(),
+  rawLstatSync: vi.fn(),
   rawReaddir: vi.fn(),
   rawReadTextFile: vi.fn(),
   active: vi.fn((p: string) => `/repo/active/${p}`),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./fs-primitives.js', () => ({
   rawExistsSync: mocks.rawExistsSync,
+  rawLstatSync: mocks.rawLstatSync,
   rawReaddir: mocks.rawReaddir,
   rawReadTextFile: mocks.rawReadTextFile,
 }));
@@ -18,6 +20,7 @@ vi.mock('./fs-primitives.js', () => ({
 vi.mock('./secure-io.js', () => ({
   safeExistsSync: mocks.rawExistsSync,
   safeReadFile: mocks.rawReadTextFile,
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   loadJsonIfPresent: <T>(filePath: string): T | null => {
     try {
       return JSON.parse(String(mocks.rawReadTextFile(filePath))) as T;
@@ -32,12 +35,14 @@ vi.mock('./path-resolver.js', () => ({
   knowledge: mocks.knowledge,
   shared: vi.fn((p: string) => `/repo/active/shared/${p}`),
   findMissionPath: mocks.findMissionPath,
+  rootDir: vi.fn(() => '/repo'),
   pathResolver: {
     active: mocks.active,
     knowledge: mocks.knowledge,
     rootResolve: vi.fn((p: string) => `/repo/${p}`),
     shared: vi.fn((p: string) => `/repo/active/shared/${p}`),
     findMissionPath: mocks.findMissionPath,
+    rootDir: vi.fn(() => '/repo'),
   },
 }));
 
@@ -48,6 +53,7 @@ describe('authority branch coverage', () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.rawExistsSync.mockReset();
+    mocks.rawLstatSync.mockReset();
     mocks.rawReaddir.mockReset();
     mocks.rawReadTextFile.mockReset();
     mocks.active.mockReset();
@@ -57,6 +63,7 @@ describe('authority branch coverage', () => {
     mocks.findMissionPath.mockReset();
     mocks.findMissionPath.mockReturnValue(null);
     mocks.rawExistsSync.mockReturnValue(false);
+    mocks.rawLstatSync.mockReturnValue({ isSymbolicLink: () => false });
     mocks.rawReaddir.mockReturnValue([]);
     mocks.rawReadTextFile.mockReturnValue('{}');
 
@@ -192,6 +199,47 @@ describe('authority branch coverage', () => {
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
     expect(ctx.authorities).toEqual([]);
+  });
+
+  it('ignores malformed mission state and authority-role snapshot shapes', async () => {
+    process.env.MISSION_ID = 'MSN-MALFORMED';
+    process.env.MISSION_ROLE = 'unmapped_role';
+    mocks.rawExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/missions/MSN-MALFORMED/mission-state.json')
+    );
+    mocks.rawReadTextFile.mockImplementation((p: string) =>
+      p.endsWith('/missions/MSN-MALFORMED/mission-state.json') ? '[]' : '[]'
+    );
+
+    const { inferPersonaFromRole, resolveIdentityContext } = await import('./authority.js');
+    expect(resolveIdentityContext().persona).toBe('unknown');
+    expect(inferPersonaFromRole('unmapped_role')).toBe('unknown');
+  });
+
+  it('does not accept arbitrary personas or authorities from malformed records', async () => {
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ID = 'MSN-MALFORMED-GRANT';
+    mocks.rawExistsSync.mockImplementation(
+      (p: string) =>
+        p.endsWith('/active/shared/auth-grants.json') || p.endsWith('/authority-role-index.json')
+    );
+    mocks.rawReadTextFile.mockImplementation((p: string) => {
+      if (p.endsWith('/active/shared/auth-grants.json')) {
+        return JSON.stringify([
+          null,
+          {
+            missionId: 'MSN-MALFORMED-GRANT',
+            expiresAt: Date.now() + 60_000,
+            authority: 'NOT_AN_AUTHORITY',
+          },
+        ]);
+      }
+      return JSON.stringify({ authority_roles: { malformed_role: { default_persona: [] } } });
+    });
+
+    const { inferPersonaFromRole, resolveIdentityContext } = await import('./authority.js');
+    expect(resolveIdentityContext().authorities).toEqual([]);
+    expect(inferPersonaFromRole('malformed_role')).toBe('unknown');
   });
 
   it('buildExecutionEnv keeps existing persona when explicit persona is unknown', async () => {

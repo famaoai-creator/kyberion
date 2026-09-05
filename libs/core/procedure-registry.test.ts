@@ -1,12 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { PROCEDURE_RESOLUTION_THRESHOLDS, type ProcedureEntry } from './procedure-types.js';
+import { pathResolver } from './path-resolver.js';
 import {
   invalidateProcedureCache,
   loadProcedures,
+  readProcedureCatalog,
   resolveAllowlistedRecordingRef,
   resolveProcedure,
 } from './procedure-registry.js';
 import * as secureIo from './secure-io.js';
+
+vi.mock('./foundation/json.js', () => ({
+  readJson: <T>(filePath: string) => {
+    if (filePath.includes('procedures.schema.json')) {
+      return JSON.parse(
+        fs.readFileSync(path.resolve('knowledge/product/schemas/procedures.schema.json'), 'utf8')
+      ) as T;
+    }
+    return JSON.parse(String(secureIo.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+  },
+}));
+
 import {
   resetReasoningBackend,
   registerReasoningBackend,
@@ -123,6 +139,12 @@ describe('procedure-registry', () => {
         }
         return JSON.stringify({ schema_version: 'procedures.v1', procedures: [BROWSER_ENTRY] });
       });
+      // The catalog contents are supplied by the secure-read mock in this
+      // unit test, so let the path seam accept the virtual fixture paths.
+      vi.spyOn(secureIo, 'assertSafeRepositoryPath').mockImplementation((filePath) => filePath);
+      vi.spyOn(secureIo, 'safeLstat').mockReturnValue({
+        isFile: () => true,
+      } as unknown as fs.Stats);
 
       const entries = loadProcedures(true);
       expect(entries.map((entry) => entry.procedure_id)).toEqual([
@@ -130,6 +152,44 @@ describe('procedure-registry', () => {
         BROWSER_ENTRY.procedure_id,
       ]);
     });
+  });
+
+  it('rejects a catalog reached through a symbolic link before reading it', () => {
+    const target = pathResolver.sharedTmp(`procedure-catalog-target-${process.pid}.json`);
+    const link = pathResolver.knowledge(`personal/procedure-catalog-link-${process.pid}.json`);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify({ schema_version: 'procedures.v1', procedures: [] }));
+    fs.rmSync(link, { force: true });
+    fs.symlinkSync(target, link);
+    try {
+      expect(() => readProcedureCatalog(link)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(link, { force: true });
+      fs.rmSync(target, { force: true });
+    }
+  });
+
+  it('rejects a catalog directory before reading it', () => {
+    const directory = pathResolver.sharedTmp(`procedure-catalog-directory-${process.pid}`);
+    fs.mkdirSync(directory, { recursive: true });
+    try {
+      expect(() => readProcedureCatalog(directory)).toThrow(
+        '[PROCEDURE_REGISTRY] catalog must be a regular file'
+      );
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects dangerous JSON keys before schema validation', () => {
+    const catalog = pathResolver.sharedTmp(`procedure-catalog-dangerous-${process.pid}.json`);
+    secureIo.safeWriteFile(catalog, '{"__proto__":{"polluted":true}}');
+    try {
+      expect(() => readProcedureCatalog(catalog)).toThrow(/dangerous JSON key/);
+    } finally {
+      secureIo.safeRmSync(catalog, { force: true });
+    }
   });
 
   // -------------------------------------------------------------------------
@@ -171,6 +231,23 @@ describe('procedure-registry', () => {
           'knowledge/personal/browser-recordings/../../product/procedures.json'
         )
       ).toBeNull();
+    });
+
+    it('rejects a recording reached through a symbolic link', () => {
+      const store = pathResolver.knowledge('personal/browser-recordings');
+      const target = pathResolver.sharedTmp(`procedure-registry-target-${process.pid}.json`);
+      const link = path.join(store, `procedure-registry-link-${process.pid}.json`);
+      fs.mkdirSync(store, { recursive: true });
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, '{}');
+      fs.rmSync(link, { force: true });
+      fs.symlinkSync(target, link);
+      try {
+        expect(resolveAllowlistedRecordingRef(pathResolver.toRepoRelative(link))).toBeNull();
+      } finally {
+        fs.rmSync(link, { force: true });
+        fs.rmSync(target, { force: true });
+      }
     });
   });
 

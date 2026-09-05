@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { StubAudioBus } from './audio-bus.js';
 import { createVirtualAudioDeviceBridge } from './virtual-audio-device-bridge.js';
 import { createVirtualCameraBridge } from './virtual-camera-bridge.js';
-import { createVirtualDeviceInventoryBridge, VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID } from './virtual-device-inventory-bridge.js';
+import {
+  createVirtualDeviceInventoryBridge,
+  parseSystemProfilerItems,
+  VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID,
+} from './virtual-device-inventory-bridge.js';
 
 function makeCommandRunner() {
   return (command: string, args: string[]) => {
@@ -32,9 +36,7 @@ function makeCommandRunner() {
         stdout: JSON.stringify({
           SPCameraDataType: [
             {
-              _items: [
-                { _name: 'FaceTime HD Camera' },
-              ],
+              _items: [{ _name: 'FaceTime HD Camera' }],
             },
           ],
         }),
@@ -56,20 +58,14 @@ function makeCommandRunner() {
     }
     if (command === 'pactl' && args[0] === 'list' && args[2] === 'sources') {
       return {
-        stdout: [
-          '0\talsa_input.usb-Logitech',
-          '1\tBlackHole.monitor',
-        ].join('\n'),
+        stdout: ['0\talsa_input.usb-Logitech', '1\tBlackHole.monitor'].join('\n'),
         stderr: '',
         status: 0,
       };
     }
     if (command === 'pactl' && args[0] === 'list' && args[2] === 'sinks') {
       return {
-        stdout: [
-          '0\talsa_output.usb-Logitech',
-          '1\tmeeting_out',
-        ].join('\n'),
+        stdout: ['0\talsa_output.usb-Logitech', '1\tmeeting_out'].join('\n'),
         stderr: '',
         status: 0,
       };
@@ -93,6 +89,16 @@ describe('createVirtualDeviceInventoryBridge', () => {
       configurable: true,
       value: originalPlatform,
     });
+  });
+
+  it('rejects non-record system profiler sections and items', () => {
+    expect(
+      parseSystemProfilerItems(
+        { SPAudioDataType: [null, 'invalid', { _items: [null, [], { _name: 'Microphone' }] }] },
+        'SPAudioDataType'
+      )
+    ).toEqual([{ _name: 'Microphone' }]);
+    expect(parseSystemProfilerItems([], 'SPAudioDataType')).toEqual([]);
   });
 
   it('scans camera and audio candidates', async () => {

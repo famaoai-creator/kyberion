@@ -1,6 +1,8 @@
-import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
+import { loadAuthorityRoleIndex as loadGovernedAuthorityRoleIndex } from './authority-role-registry.js';
 import type { OrganizationProfile } from './organization-profile.js';
 import type {
   AuthorityRoleRecord,
@@ -28,6 +30,31 @@ interface OrganizationMissionTeamTemplateCatalog {
   version: string;
   organization_id?: string;
   templates: Record<string, Partial<MissionTeamTemplate>>;
+}
+
+const AGENT_PROFILE_INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-profile-index.schema.json'
+);
+const TEAM_ROLE_INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/team-role-index.schema.json'
+);
+const TEAM_ROLE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/team-role.schema.json');
+const MISSION_TEAM_TEMPLATES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-team-templates.schema.json'
+);
+const ORGANIZATION_TEAM_TEMPLATE_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/organization-team-template-catalog.schema.json'
+);
+
+function loadGovernedCatalog<T>(id: string, filePath: string, schemaPath: string): T {
+  return defineCatalog<T>({ id, path: filePath, schema: schemaPath }).load();
+}
+
+function knowledgePath(rootDir: string | undefined, relativePath: string): string {
+  const candidate = rootDir
+    ? path.join(rootDir, 'knowledge', ...relativePath.split('/'))
+    : pathResolver.knowledge(relativePath);
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 export interface OrganizationMissionTeamTemplateCatalogSummary {
@@ -69,9 +96,7 @@ function mergeMissionTeamTemplate(
 export function loadAgentProfileDirectory(
   rootDir?: string
 ): Record<string, AgentProfileRecord> | null {
-  const dir = rootDir
-    ? path.join(rootDir, 'knowledge', 'product', 'orchestration', 'agent-profiles')
-    : pathResolver.knowledge('product/orchestration/agent-profiles');
+  const dir = knowledgePath(rootDir, 'product/orchestration/agent-profiles');
   if (!safeExistsSync(dir)) return null;
 
   const profiles: Record<string, AgentProfileRecord> = {};
@@ -79,12 +104,11 @@ export function loadAgentProfileDirectory(
     .filter((entry) => entry.endsWith('.json'))
     .sort();
   for (const file of files) {
-    const fullPath = rootDir
-      ? path.join(rootDir, 'knowledge', 'product', 'orchestration', 'agent-profiles', file)
-      : pathResolver.knowledge(`product/orchestration/agent-profiles/${file}`);
-    const payload = loadJson<{ version?: string; agents?: Record<string, AgentProfileRecord> }>(
-      fullPath
-    );
+    const fullPath = assertSafeRepositoryPath(path.join(dir, file));
+    const payload = loadGovernedCatalog<{
+      version: string;
+      agents: Record<string, AgentProfileRecord>;
+    }>('agent-profile-index', fullPath, AGENT_PROFILE_INDEX_SCHEMA_PATH);
     const agentIds = Object.keys(payload.agents || {});
     if (agentIds.length !== 1) {
       throw new Error(`Agent profile file ${file} must contain exactly one agent profile`);
@@ -100,48 +124,26 @@ export function loadAgentProfileDirectory(
 }
 
 export function loadAgentProfileSnapshot(rootDir?: string): Record<string, AgentProfileRecord> {
-  const index = loadJson<{ agents: Record<string, AgentProfileRecord> }>(
-    rootDir
-      ? path.join(rootDir, 'knowledge', 'product', 'orchestration', 'agent-profile-index.json')
-      : pathResolver.knowledge('product/orchestration/agent-profile-index.json')
-  );
+  const indexPath = knowledgePath(rootDir, 'product/orchestration/agent-profile-index.json');
+  const index = loadGovernedCatalog<{
+    version: string;
+    agents: Record<string, AgentProfileRecord>;
+  }>('agent-profile-index', indexPath, AGENT_PROFILE_INDEX_SCHEMA_PATH);
   return index.agents;
 }
 
-export function loadAuthorityRoleIndex(): Record<string, AuthorityRoleRecord> {
-  const directory = pathResolver.knowledge('product/governance/authority-roles');
-  if (safeExistsSync(directory)) {
-    const roles: Record<string, AuthorityRoleRecord> = {};
-    const files = safeReaddir(directory)
-      .filter((entry) => entry.endsWith('.json'))
-      .sort();
-    if (files.length > 0) {
-      for (const file of files) {
-        const payload = loadJson<{ role?: string; [key: string]: unknown }>(
-          pathResolver.knowledge(`product/governance/authority-roles/${file}`)
-        );
-        const role = String(payload.role || '').trim();
-        if (!role) {
-          throw new Error(`Authority role file ${file} must declare a role id`);
-        }
-        if (role !== file.replace(/\.json$/i, '')) {
-          throw new Error(`Authority role file ${file} must match its role id (${role})`);
-        }
-        const { role: _role, ...record } = payload as { role?: string; [key: string]: unknown };
-        roles[role] = record as unknown as AuthorityRoleRecord;
-      }
-      return roles;
-    }
-  }
-
-  const index = loadJson<{ authority_roles: Record<string, AuthorityRoleRecord> }>(
-    pathResolver.knowledge('product/governance/authority-role-index.json')
-  );
-  return index.authority_roles;
+export function loadAuthorityRoleIndex(rootDir?: string): Record<string, AuthorityRoleRecord> {
+  const roles = loadGovernedAuthorityRoleIndex(rootDir);
+  return Object.fromEntries(
+    Object.entries(roles).map(([role, record]) => {
+      const { role: _role, ...withoutRole } = record;
+      return [role, withoutRole];
+    })
+  ) as Record<string, AuthorityRoleRecord>;
 }
 
-export function loadTeamRoleDirectory(): Record<string, TeamRoleRecord> | null {
-  const dir = pathResolver.knowledge('product/orchestration/team-roles');
+export function loadTeamRoleDirectory(rootDir?: string): Record<string, TeamRoleRecord> | null {
+  const dir = knowledgePath(rootDir, 'product/orchestration/team-roles');
   if (!safeExistsSync(dir)) return null;
 
   const roles: Record<string, TeamRoleRecord> = {};
@@ -149,8 +151,11 @@ export function loadTeamRoleDirectory(): Record<string, TeamRoleRecord> | null {
     .filter((entry) => entry.endsWith('.json'))
     .sort();
   for (const file of files) {
-    const payload = loadJson<{ role?: string; [key: string]: unknown }>(
-      pathResolver.knowledge(`product/orchestration/team-roles/${file}`)
+    const fullPath = assertSafeRepositoryPath(path.join(dir, file));
+    const payload = loadGovernedCatalog<Record<string, unknown>>(
+      'team-role',
+      fullPath,
+      TEAM_ROLE_SCHEMA_PATH
     );
     const role = String(payload.role || '').trim();
     if (!role) {
@@ -166,15 +171,20 @@ export function loadTeamRoleDirectory(): Record<string, TeamRoleRecord> | null {
   return Object.keys(roles).length > 0 ? roles : null;
 }
 
-export function loadTeamRoleSnapshot(): Record<string, TeamRoleRecord> {
-  const index = loadJson<{ team_roles: Record<string, TeamRoleRecord> }>(
-    pathResolver.knowledge('product/orchestration/team-role-index.json')
+export function loadTeamRoleSnapshot(rootDir?: string): Record<string, TeamRoleRecord> {
+  const index = loadGovernedCatalog<{
+    version: string;
+    team_roles: Record<string, TeamRoleRecord>;
+  }>(
+    'team-role-index',
+    knowledgePath(rootDir, 'product/orchestration/team-role-index.json'),
+    TEAM_ROLE_INDEX_SCHEMA_PATH
   );
   return index.team_roles;
 }
 
-export function loadTeamRoleIndex(): Record<string, TeamRoleRecord> {
-  return loadTeamRoleDirectory() || loadTeamRoleSnapshot();
+export function loadTeamRoleIndex(rootDir?: string): Record<string, TeamRoleRecord> {
+  return loadTeamRoleDirectory(rootDir) || loadTeamRoleSnapshot(rootDir);
 }
 
 export function loadAgentProfileIndex(rootDir?: string): Record<string, AgentProfileRecord> {
@@ -187,17 +197,29 @@ export function loadMissionTeamTemplates(
   organizationProfile?: OrganizationProfile | null,
   scope?: ScopeContext
 ): Record<string, MissionTeamTemplate> {
-  const index = loadJson<{ templates: Record<string, MissionTeamTemplate> }>(
-    pathResolver.knowledge('product/orchestration/mission-team-templates.json')
+  const index = loadGovernedCatalog<{
+    version: string;
+    templates: Record<string, MissionTeamTemplate>;
+  }>(
+    'mission-team-templates',
+    knowledgePath(undefined, 'product/orchestration/mission-team-templates.json'),
+    MISSION_TEAM_TEMPLATES_SCHEMA_PATH
   );
   const templates = { ...index.templates };
   const catalogId = resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile);
   if (catalogId) {
-    const catalogPath = pathResolver.knowledge(
-      `product/governance/organization-team-template-catalogs/${catalogId}.json`
+    const catalogPath = assertSafeRepositoryPath(
+      pathResolver.knowledge(
+        `product/governance/organization-team-template-catalogs/${catalogId}.json`
+      ),
+      { allowMissingLeaf: true }
     );
     if (safeExistsSync(catalogPath)) {
-      const catalog = loadJson<OrganizationMissionTeamTemplateCatalog>(catalogPath);
+      const catalog = loadGovernedCatalog<OrganizationMissionTeamTemplateCatalog>(
+        'organization-team-template-catalog',
+        catalogPath,
+        ORGANIZATION_TEAM_TEMPLATE_CATALOG_SCHEMA_PATH
+      );
       for (const [templateId, overlay] of Object.entries(catalog.templates || {})) {
         const base = templates[templateId] || templates.default;
         if (!base) continue;
@@ -213,27 +235,37 @@ export function loadMissionTeamTemplates(
   const tenant = normalizedScope?.tenant_slug;
   if (tenant && normalizedScope) {
     const overlayPaths = [
-      pathResolver.knowledge(`confidential/${tenant}/orchestration/mission-team-templates.json`),
+      assertSafeRepositoryPath(
+        pathResolver.knowledge(`confidential/${tenant}/orchestration/mission-team-templates.json`),
+        { allowMissingLeaf: true }
+      ),
       ...(normalizedScope.organization_id
         ? [
-            pathResolver.knowledge(
-              `confidential/${tenant}/organizations/${normalizedScope.organization_id}/orchestration/mission-team-templates.json`
+            assertSafeRepositoryPath(
+              pathResolver.knowledge(
+                `confidential/${tenant}/organizations/${normalizedScope.organization_id}/orchestration/mission-team-templates.json`
+              ),
+              { allowMissingLeaf: true }
             ),
           ]
         : []),
       ...(normalizedScope.project_id
         ? [
-            pathResolver.knowledge(
-              `confidential/${tenant}/organizations/${normalizedScope.organization_id || '_'}/projects/${normalizedScope.project_id}/orchestration/mission-team-templates.json`
+            assertSafeRepositoryPath(
+              pathResolver.knowledge(
+                `confidential/${tenant}/organizations/${normalizedScope.organization_id || '_'}/projects/${normalizedScope.project_id}/orchestration/mission-team-templates.json`
+              ),
+              { allowMissingLeaf: true }
             ),
           ]
         : []),
     ];
     for (const overlayPath of overlayPaths) {
       if (!safeExistsSync(overlayPath)) continue;
-      const overlayCatalog = loadJson<{ templates?: Record<string, Partial<MissionTeamTemplate>> }>(
-        overlayPath
-      );
+      const overlayCatalog = loadGovernedCatalog<{
+        version: string;
+        templates: Record<string, Partial<MissionTeamTemplate>>;
+      }>('mission-team-templates-overlay', overlayPath, MISSION_TEAM_TEMPLATES_SCHEMA_PATH);
       for (const [templateId, overlay] of Object.entries(overlayCatalog.templates || {})) {
         const base = templates[templateId] || templates.default;
         if (base) templates[templateId] = mergeMissionTeamTemplate(base, overlay);
@@ -244,7 +276,8 @@ export function loadMissionTeamTemplates(
 }
 
 export function listOrganizationMissionTeamTemplateCatalogSummaries(): OrganizationMissionTeamTemplateCatalogSummary[] {
-  const catalogDir = pathResolver.knowledge(
+  const catalogDir = knowledgePath(
+    undefined,
     'product/governance/organization-team-template-catalogs'
   );
   if (!safeExistsSync(catalogDir)) return [];
@@ -253,10 +286,12 @@ export function listOrganizationMissionTeamTemplateCatalogSummaries(): Organizat
     .filter((entry) => entry.endsWith('.json'))
     .sort()
     .map((file) => {
-      const catalogPath = pathResolver.knowledge(
-        `product/governance/organization-team-template-catalogs/${file}`
+      const catalogPath = assertSafeRepositoryPath(path.join(catalogDir, file));
+      const payload = loadGovernedCatalog<OrganizationMissionTeamTemplateCatalog>(
+        'organization-team-template-catalog',
+        catalogPath,
+        ORGANIZATION_TEAM_TEMPLATE_CATALOG_SCHEMA_PATH
       );
-      const payload = loadJson<OrganizationMissionTeamTemplateCatalog>(catalogPath);
       const templateEntries = Object.entries(payload.templates || {});
       const templateIds = templateEntries.map(([templateId]) => templateId).sort();
       let optionalRoleCount = 0;

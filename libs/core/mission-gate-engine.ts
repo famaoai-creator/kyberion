@@ -1,12 +1,20 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 
 import {
   type StructuredOutputSchemaName,
   resolveStructuredOutputSchema,
 } from './structured-output-contracts.js';
-import { safeExistsSync, safeExec, safeReadFile } from './secure-io.js';
-import { safeWriteFile, safeMkdir } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeExec,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+} from './secure-io.js';
 import { signA2AContent, verifyA2AContent } from './a2a-envelope-signature.js';
 import { createLogger } from './logger.js';
 import {
@@ -20,8 +28,9 @@ import {
   evaluateDefinitionOfReady,
   evaluateQualityContract,
   evaluateTestTraceability,
+  parseSoftwareQualityContract,
+  parseTestInventory,
   type SoftwareQualityContract,
-  type TestInventory,
   type SoftwareQualityReportSummary,
 } from './software-quality.js';
 import {
@@ -71,7 +80,7 @@ export function signHumanOverride(input: {
   approvedAt?: string;
   reason?: string;
 }): Record<string, unknown> {
-  const approvedAt = input.approvedAt ?? new Date().toISOString();
+  const approvedAt = input.approvedAt ?? nowIso();
   const { signature } = signA2AContent(
     overrideSignatureContent(input.gateId, input.approvedBy, approvedAt)
   );
@@ -138,17 +147,37 @@ function firstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
+function safeOptionalGatePath(filePath: string): string | undefined {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return undefined;
+  }
+}
+
 export function writeMissionGateRecord(input: MissionGateRecordInput): string {
-  const recordDir = input.recordPath ?? input.evidenceDir;
+  const recordPath = input.recordPath
+    ? assertSafeRepositoryPath(input.recordPath, { allowMissingLeaf: true })
+    : undefined;
+  const recordDir = recordPath
+    ? path.dirname(recordPath)
+    : input.evidenceDir
+      ? assertSafeRepositoryPath(input.evidenceDir, { allowMissingLeaf: true })
+      : undefined;
   if (!recordDir) {
     throw new Error('A recordPath or evidenceDir is required to write a mission gate record.');
   }
   safeMkdir(recordDir, { recursive: true });
-  const recordPath = input.recordPath
-    ? input.recordPath
-    : path.join(recordDir, `${input.gateId}-${Date.now().toString(36)}.json`);
+  const targetPath =
+    recordPath ||
+    assertSafeRepositoryPath(
+      path.join(recordDir, `${input.gateId}-${Date.now().toString(36)}.json`),
+      {
+        allowMissingLeaf: true,
+      }
+    );
   safeWriteFile(
-    recordPath,
+    targetPath,
     JSON.stringify(
       {
         mission_id: input.missionId,
@@ -159,11 +188,11 @@ export function writeMissionGateRecord(input: MissionGateRecordInput): string {
       2
     )
   );
-  return recordPath;
+  return targetPath;
 }
 
 export function recordMissionGateOverride(input: MissionGateOverrideInput): string {
-  const checkedAt = new Date().toISOString();
+  const checkedAt = nowIso();
   const verdict = input.outcome === 'passed' ? 'pass' : 'fail';
   return writeMissionGateRecord({
     missionId: input.missionId,
@@ -191,7 +220,7 @@ async function evaluateGateCheck(
 }> {
   const qualityContractFrom = (params: Record<string, unknown>): SoftwareQualityContract | null => {
     const value = params.contract ?? params.quality_contract;
-    return value && typeof value === 'object' ? (value as SoftwareQualityContract) : null;
+    return parseSoftwareQualityContract(value);
   };
   switch (check.kind) {
     case 'evidence_exists': {
@@ -202,7 +231,10 @@ async function evaluateGateCheck(
       if (evidencePaths.length === 0) {
         return { passed: false, reason: 'No evidence paths were provided.' };
       }
-      const missing = evidencePaths.filter((entry) => !safeExistsSync(entry));
+      const missing = evidencePaths.filter((entry) => {
+        const safePath = safeOptionalGatePath(entry);
+        return !safePath || !safeExistsSync(safePath);
+      });
       return missing.length === 0
         ? { passed: true }
         : { passed: false, reason: `Missing evidence: ${missing.join(', ')}` };
@@ -222,7 +254,7 @@ async function evaluateGateCheck(
         (typeof params.text === 'string'
           ? (() => {
               try {
-                return JSON.parse(params.text as string);
+                return parseSafeJsonInput(params.text as string, 'mission gate schema input');
               } catch {
                 return undefined;
               }
@@ -317,17 +349,18 @@ async function evaluateGateCheck(
       if (!artifactPath) {
         return { passed: false, reason: 'No deliverable path was provided.' };
       }
-      if (!safeExistsSync(artifactPath)) {
+      const safeArtifactPath = safeOptionalGatePath(artifactPath);
+      if (!safeArtifactPath || !safeExistsSync(safeArtifactPath)) {
         return { passed: false, reason: `Deliverable not found: ${artifactPath}` };
       }
-      const raw = safeReadFile(artifactPath, { encoding: 'utf8' }) as string;
+      const raw = safeReadFile(safeArtifactPath, { encoding: 'utf8' }) as string;
       let artifact: unknown = raw;
       try {
-        artifact = JSON.parse(raw);
+        artifact = parseSafeJsonInput(raw, 'mission gate deliverable');
       } catch {
         // Non-JSON deliverables (markdown, text) are evaluated as raw text.
       }
-      const extension = artifactPath.split('.').pop() ?? '';
+      const extension = safeArtifactPath.split('.').pop() ?? '';
       const kind =
         firstString(params.kind, params.deliverable_kind) ?? inferDeliverableKind(extension);
       if (!kind) {
@@ -359,7 +392,8 @@ async function evaluateGateCheck(
       if (!artifactPath) {
         return { passed: false, reason: 'llm_review: no deliverable path was provided.' };
       }
-      if (!safeExistsSync(artifactPath)) {
+      const safeArtifactPath = safeOptionalGatePath(artifactPath);
+      if (!safeArtifactPath || !safeExistsSync(safeArtifactPath)) {
         return { passed: false, reason: `llm_review: deliverable not found: ${artifactPath}` };
       }
       const criteria = toStringList(params.criteria);
@@ -374,7 +408,7 @@ async function evaluateGateCheck(
           reason: 'llm_review requires a real reasoning backend (stub active).',
         };
       }
-      const content = String(safeReadFile(artifactPath, { encoding: 'utf8' })).slice(0, 24_000);
+      const content = String(safeReadFile(safeArtifactPath, { encoding: 'utf8' })).slice(0, 24_000);
       const prompt = [
         'あなたは品質ゲートの審査員です。以下の成果物を判定基準に照らして審査してください。',
         '出力は次のJSONのみ(コードフェンス可): {"pass": true|false, "reasons": ["..."], "improvements": ["..."]}',
@@ -401,14 +435,17 @@ async function evaluateGateCheck(
             reason: `llm_review: unparsable verdict: ${response.slice(0, 200)}`,
           };
         }
-        const verdict = JSON.parse(jsonMatch[0]) as {
-          pass?: boolean;
-          reasons?: string[];
-          improvements?: string[];
-        };
+        const verdict = parseSafeJsonObjectInput(jsonMatch[0], 'llm review verdict');
+        if (!verdict) throw new Error('llm review verdict must be a JSON object');
         const reasons = [
-          ...(verdict.reasons ?? []),
-          ...(verdict.improvements ?? []).map((improvement) => `改善提案: ${improvement}`),
+          ...(Array.isArray(verdict.reasons)
+            ? verdict.reasons.filter((reason): reason is string => typeof reason === 'string')
+            : []),
+          ...(Array.isArray(verdict.improvements)
+            ? verdict.improvements
+                .filter((improvement): improvement is string => typeof improvement === 'string')
+                .map((improvement) => `改善提案: ${improvement}`)
+            : []),
         ]
           .filter(Boolean)
           .join(' / ');
@@ -445,10 +482,7 @@ async function evaluateGateCheck(
       const params = check.params || {};
       const contract = qualityContractFrom(params);
       const inventoryValue = params.inventory ?? params.test_inventory;
-      const inventory =
-        inventoryValue && typeof inventoryValue === 'object'
-          ? (inventoryValue as TestInventory)
-          : null;
+      const inventory = parseTestInventory(inventoryValue);
       if (!contract) return { passed: false, reason: 'No software quality contract was provided.' };
       if (!inventory) return { passed: false, reason: 'No test inventory was provided.' };
       const result = evaluateTestTraceability({
@@ -519,7 +553,7 @@ export async function evaluateMissionGate(input: {
   evidenceDir?: string;
   recordPath?: string;
 }): Promise<MissionGateEvaluation> {
-  const checkedAt = new Date().toISOString();
+  const checkedAt = nowIso();
   const checks: MissionGateEvaluation['checks'] = [];
   const reasons: string[] = [];
   for (const check of input.gate.checks) {

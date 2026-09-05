@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { derivePipelineStatus, type PipelineStepResult } from './pipeline-contract.js';
-import { handleStepError } from './src/pipeline-engine.js';
+import { handleStepError, type OnErrorConfig } from './src/pipeline-engine.js';
 import { evaluateCondition, resolveVars } from './src/logic-utils.js';
 import {
   deriveExecutionGraph,
@@ -19,23 +19,41 @@ import { resolveOpAccessClaims, type OpInputDomain } from './op-input-contracts.
 import type { ResourceClaim } from './tool-call-scheduler.js';
 import { runOpPreflight } from './op-preflight.js';
 import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
+import {
+  requireSandboxEnforcement,
+  withSandboxPolicy,
+  type SandboxPolicy,
+} from './sandbox-policy.js';
+import {
+  assertExecutionBounds,
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from './execution-bounds.js';
 
 export type AdfStepType = 'capture' | 'transform' | 'apply' | 'control';
 
 export interface AdfStep {
   type: AdfStepType;
   op: string;
-  params: any;
+  params: unknown;
   /** Optional budget projected from the governed actuator operation definition. */
   timeout_ms?: number;
+  /** Optional step-level approval metadata projected by the pipeline contract. */
+  budget?: { approval_required?: boolean; approval_ref?: string };
   /** Explicit shared-resource claims used by the graph frontier scheduler. */
   resource_claims?: Array<string | ResourceClaim>;
+  /** Optional graph dependencies and conditional execution metadata. */
+  depends_on?: string[];
+  consumes?: string | string[];
+  when?: unknown;
+  /** Shared step recovery contract. */
+  on_error?: OnErrorConfig;
 }
 
 function resolveAdfResourceClaims(
   step: AdfStep,
   context: AdfEngineContext,
-  resolve: (value: any, ctx: Record<string, any>) => any
+  resolve: (value: unknown, ctx: Record<string, any>) => unknown
 ): Array<string | ResourceClaim> {
   if (step.resource_claims !== undefined) return [...new Set(step.resource_claims)];
   const normalizedOp = String(step.op || '').replace(/^([a-z]+):/u, '$1:');
@@ -53,16 +71,20 @@ function resolveAdfResourceClaims(
 }
 
 export interface AdfEngineContext {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AdfRunOptions {
   maxSteps?: number;
   timeoutMs?: number;
+  /** Trusted caller-side presence signal for approval-gated steps. */
+  hasHuman?: boolean;
+  /** Trusted caller-side resolver for a bound approval decision. */
+  approvalGranted?: (step: AdfStep, context: AdfEngineContext) => boolean | Promise<boolean>;
   /** Log prefix for step progress lines (default '[ADF]'). */
   label?: string;
   /** Override the template resolver (default: shared resolveVars). */
-  resolveVars?: (value: any, ctx: Record<string, any>) => any;
+  resolveVars?: (value: unknown, ctx: Record<string, any>) => unknown;
   /**
    * Called when the repeat governor force-stops the run (KC-01). Default
    * records a governance action on the kill switch; tests inject a spy.
@@ -80,6 +102,8 @@ export interface AdfRunOptions {
   ) => Promise<{ blocked: boolean; reasons?: string[] } | void>;
   /** Maximum number of independent graph nodes to execute concurrently. */
   maxConcurrency?: number;
+  /** Resolved sandbox policy applied to every handler and nested ADF step. */
+  sandboxPolicy?: SandboxPolicy;
   /** Completed node ids restored from a durable pipeline run journal. */
   resumeCompletedNodeIds?: ReadonlySet<string>;
   /** Optional observer for durable DAG/run-graph artifacts. */
@@ -97,20 +121,30 @@ export interface AdfSkippedStep {
 }
 
 export interface AdfStepHandlers<Ctx extends AdfEngineContext = AdfEngineContext> {
-  capture: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
-  transform: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
+  capture: (
+    op: string,
+    params: unknown,
+    ctx: Ctx,
+    resolve: (value: unknown) => unknown
+  ) => Promise<Ctx>;
+  transform: (
+    op: string,
+    params: unknown,
+    ctx: Ctx,
+    resolve: (value: unknown) => unknown
+  ) => Promise<Ctx>;
   apply: (
     op: string,
-    params: any,
+    params: unknown,
     ctx: Ctx,
-    resolve: (value: any) => any
+    resolve: (value: unknown) => unknown
   ) => Promise<void | Ctx | AdfSkippedStep>;
   control?: (
     op: string,
-    params: any,
+    params: unknown,
     ctx: Ctx,
     runSteps: (steps: AdfStep[], seedCtx?: Ctx) => Promise<AdfRunResult<Ctx>>,
-    resolve: (value: any) => any
+    resolve: (value: unknown) => unknown
   ) => Promise<Ctx | AdfSkippedStep>;
 }
 
@@ -177,19 +211,22 @@ export async function executeAdfSteps<Ctx extends AdfEngineContext = AdfEngineCo
   handlers: AdfStepHandlers<Ctx>,
   hooks?: AdfStepHooks<Ctx>
 ): Promise<AdfRunResult<Ctx>> {
-  return await executeAdfStepsInternal(
-    steps,
-    initialCtx,
-    options,
-    handlers,
-    {
-      stepCount: 0,
-      startTime: Date.now(),
-      repeatGovernor: createToolCallRepeatGovernorState(),
-      loopDepth: 0,
-    },
-    hooks
-  );
+  if (options.sandboxPolicy) requireSandboxEnforcement(options.sandboxPolicy);
+  const run = (): Promise<AdfRunResult<Ctx>> =>
+    executeAdfStepsInternal(
+      steps,
+      initialCtx,
+      options,
+      handlers,
+      {
+        stepCount: 0,
+        startTime: Date.now(),
+        repeatGovernor: createToolCallRepeatGovernorState(),
+        loopDepth: 0,
+      },
+      hooks
+    );
+  return options.sandboxPolicy ? withSandboxPolicy(options.sandboxPolicy, run) : run();
 }
 
 async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineContext>(
@@ -200,13 +237,13 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
   state: AdfEngineState,
   hooks?: AdfStepHooks<Ctx>
 ): Promise<AdfRunResult<Ctx>> {
-  const maxSteps = options.maxSteps ?? 1000;
-  const timeoutMs = options.timeoutMs ?? 60_000;
+  const maxSteps = options.maxSteps ?? DEFAULT_MAX_PIPELINE_STEPS;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_PIPELINE_TIMEOUT_MS;
   const label = options.label || '[ADF]';
   let ctx = { ...initialCtx } as Ctx;
   const results: PipelineStepResult[] = [];
 
-  const resolve = (value: any) =>
+  const resolve = (value: unknown) =>
     options.resolveVars ? options.resolveVars(value, ctx) : resolveVars(value, ctx);
   const runNestedSteps = async (
     nestedSteps: AdfStep[],
@@ -219,9 +256,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
   // which is intentionally equivalent to a one-wide linear graph.
   const graphDeclared = steps.some(
     (step) =>
-      Array.isArray((step as any).depends_on) ||
-      (step as any).consumes !== undefined ||
-      (step as any).when !== undefined
+      Array.isArray(step.depends_on) || step.consumes !== undefined || step.when !== undefined
   );
   if (steps.length > 1 && (graphDeclared || (options.maxConcurrency ?? 1) > 1)) {
     const built = deriveExecutionGraph(steps as unknown as AdfStep[], Object.keys(ctx));
@@ -309,12 +344,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
 
   for (const step of steps) {
     state.stepCount += 1;
-    if (state.stepCount > maxSteps) {
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${maxSteps})`);
-    }
-    if (Date.now() - state.startTime > timeoutMs) {
-      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${timeoutMs}ms)`);
-    }
+    assertExecutionBounds(state, { maxSteps, timeoutMs });
 
     let executionParams = step.params;
     if (step.type !== 'control') {
@@ -364,11 +394,18 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       // reaches the handler; block/ask decisions are terminal and cannot be
       // recovered through a step's on_error fallback.
       ensureDefaultOpPreflight();
+      const resolvedParams = (resolve(step.params) || {}) as Record<string, unknown>;
       const preflight = await runOpPreflight({
         op: step.op,
-        params: (resolve(step.params) || {}) as Record<string, unknown>,
+        params: resolvedParams,
         context: ctx,
         source: 'actuator',
+        requiresApproval:
+          step.budget?.approval_required === true ||
+          resolvedParams._approval_required === true ||
+          ctx._approval_required === true,
+        approvalGranted: options.approvalGranted ? await options.approvalGranted(step, ctx) : false,
+        ...(options.hasHuman !== undefined ? { hasHuman: options.hasHuman } : {}),
       });
       if (preflight.decision !== 'allow') {
         const error = new Error(
@@ -436,21 +473,26 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       ctx = ((await hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'success' })) ||
         ctx) as Ctx;
       if (terminalRequested) break;
-    } catch (err: any) {
-      if (err?.adfControlFlow === 'suspend') throw err;
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      const controlFlow =
+        err && typeof err === 'object' && 'adfControlFlow' in err
+          ? (err as { adfControlFlow?: unknown }).adfControlFlow
+          : undefined;
+      if (controlFlow === 'suspend') throw error;
       // Native on_error support (skip / abort / fallback via handleStepError)
       // so every runner shares one recovery semantics instead of hand-rolled
       // copies. Fallback sub-pipelines run through the same engine, so their
       // failures propagate (AR-06) and their steps count against the budget.
-      const onError = (step as any).on_error;
-      if (onError && err?.adfControlFlow !== 'preflight') {
+      const onError = step.on_error;
+      if (onError && controlFlow !== 'preflight') {
         try {
           const recovery = await handleStepError(
-            err,
+            error,
             step,
             onError,
             ctx,
-            async (fallbackSteps: any[], errCtx: any) => {
+            async (fallbackSteps: NonNullable<OnErrorConfig['fallback']>, errCtx: unknown) => {
               const res = await runNestedSteps(fallbackSteps as AdfStep[], errCtx as Ctx);
               if (res.status === 'failed') {
                 throw new Error(
@@ -467,7 +509,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
             results.push({ op: step.op, status: 'recovered' });
             ctx = ((await hooks?.afterStep?.(step, state.stepCount, ctx, {
               status: 'recovered',
-              error: err.message,
+              error: error.message,
             })) || ctx) as Ctx;
             continue;
           }
@@ -475,11 +517,11 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
           /* recovery itself failed — fall through to the failure path */
         }
       }
-      logger.error(`  ${label} Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
+      logger.error(`  ${label} Step failed (${step.op}): ${error.message}`);
+      results.push({ op: step.op, status: 'failed', error: error.message });
       ctx = ((await hooks?.afterStep?.(step, state.stepCount, ctx, {
         status: 'failed',
-        error: err.message,
+        error: error.message,
       })) || ctx) as Ctx;
       break;
     }

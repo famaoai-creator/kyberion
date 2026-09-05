@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Message } from 'discord.js';
-import {
-  approvalRequestLogicalPath,
-  createSurfaceApprovalRequest,
-  loadApprovalRequest,
-  pathResolver,
-  safeRmSync,
-  withExecutionContext,
-} from '@agent/core';
-import type { SurfaceConversationMessageInput, SurfaceConversationResult } from '@agent/core';
+import { approvalRequestLogicalPath, loadApprovalRequest } from '@agent/core/approval-store';
+import { createSurfaceApprovalRequest } from '@agent/core/channel-surface';
+import type {
+  SurfaceConversationMessageInput,
+  SurfaceConversationResult,
+} from '@agent/core/channel-surface-types';
+import { withExecutionContext } from '@agent/core/authority';
+import * as pathResolver from '@agent/core/path-resolver';
+import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 
 vi.mock('discord.js', () => ({
   Client: class MockClient {},
@@ -20,8 +20,8 @@ const captured = vi.hoisted(() => ({
   conversationInputs: [] as { threadContext?: string; text: string }[],
 }));
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
+vi.mock('@agent/core/channel-surface', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/channel-surface')>();
   return {
     ...actual,
     runSurfaceMessageConversation: async (input: SurfaceConversationMessageInput) => {
@@ -44,6 +44,8 @@ import {
   buildDiscordThreadContextFromEntries,
   handleDiscordInteraction,
   handleDiscordMessage,
+  parseDiscordThreadHistoryEntry,
+  resolveDiscordThreadHistoryPath,
   type DiscordThreadHistoryEntry,
 } from './index.js';
 
@@ -69,6 +71,49 @@ afterEach(() => {
 });
 
 describe('discord bridge thread context', () => {
+  it('uses the shared exit-code convention instead of terminating the host process', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/discord-bridge/src/index.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toContain('process.exit(');
+  });
+
+  it('rejects malformed persisted thread history entries', () => {
+    expect(parseDiscordThreadHistoryEntry(['invalid'])).toBeNull();
+    expect(parseDiscordThreadHistoryEntry({ role: 'system' })).toBeNull();
+    expect(
+      parseDiscordThreadHistoryEntry({
+        role: 'assistant',
+        authorLabel: 'discord-surface-agent',
+        text: '了解しました',
+        messageId: '2',
+        threadTs: 'channel-1',
+        channelId: 'channel-1',
+        receivedAt: '2026-05-15T00:01:00.000Z',
+      })
+    ).toMatchObject({ role: 'assistant', text: '了解しました' });
+  });
+
+  it('rejects a symlinked persisted thread history path before reading it', () => {
+    const threadTs = `symlink-${RUN_ID}`;
+    const linkedPath = resolveDiscordThreadHistoryPath(threadTs);
+    const targetPath = pathResolver.resolve(
+      `active/shared/tmp/discord-thread-history-target-${RUN_ID}.jsonl`
+    );
+    withExecutionContext('surface_runtime', () => {
+      safeWriteFile(targetPath, '{"role":"assistant"}\n');
+      safeSymlinkSync(targetPath, linkedPath);
+      try {
+        expect(() => resolveDiscordThreadHistoryPath(threadTs)).toThrow('[RESOURCE_PATH_SYMLINK]');
+      } finally {
+        safeRmSync(linkedPath, { force: true });
+        safeRmSync(targetPath, { force: true });
+      }
+    });
+  });
+
   it('formats recent user and assistant entries', () => {
     const entries: DiscordThreadHistoryEntry[] = [
       {

@@ -1,23 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  approvalRequestLogicalPath,
-  buildBridgeEmptyReplyText,
-  createSurfaceApprovalRequest,
-  loadApprovalRequest,
-  pathResolver,
-  resolveOperatorLocale,
-  safeRmSync,
-  withExecutionContext,
-} from '@agent/core';
-import type { SurfaceConversationMessageInput, SurfaceConversationResult } from '@agent/core';
+import { Readable } from 'node:stream';
+import { approvalRequestLogicalPath, loadApprovalRequest } from '@agent/core/approval-store';
+import { buildBridgeEmptyReplyText } from '@agent/core/bridge-error-reply';
+import { createSurfaceApprovalRequest } from '@agent/core/channel-surface';
+import { withExecutionContext } from '@agent/core/authority';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import * as pathResolver from '@agent/core/path-resolver';
+import { safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import type {
+  SurfaceConversationMessageInput,
+  SurfaceConversationResult,
+} from '@agent/core/channel-surface-types';
 
 const captured = vi.hoisted(() => ({
   conversationInputs: [] as { threadContext?: string; text: string }[],
   replyText: 'ok',
 }));
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
+vi.mock('@agent/core/channel-surface', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/channel-surface')>();
   return {
     ...actual,
     runSurfaceMessageConversation: async (input: SurfaceConversationMessageInput) => {
@@ -40,6 +41,12 @@ import {
   buildTelegramThreadContextFromEntries,
   handleTelegramCallbackQuery,
   handleTelegramUpdate,
+  parseTelegramBridgeInput,
+  parseTelegramThreadHistoryEntry,
+  parseTelegramSendInput,
+  readTelegramJsonObject,
+  resolveTelegramBridgeInputPath,
+  resolveTelegramThreadHistoryPath,
   type TelegramThreadHistoryEntry,
 } from './index.js';
 
@@ -72,6 +79,111 @@ afterEach(() => {
 });
 
 describe('telegram bridge thread context', () => {
+  it('rejects malformed persisted thread history entries', () => {
+    expect(parseTelegramThreadHistoryEntry(['invalid'])).toBeNull();
+    expect(parseTelegramThreadHistoryEntry({ role: 'system' })).toBeNull();
+    expect(
+      parseTelegramThreadHistoryEntry({
+        role: 'user',
+        authorLabel: 'alice',
+        text: 'hello',
+        messageId: '1',
+        threadTs: 'chat-1',
+        chatId: 'chat-1',
+        receivedAt: '2026-05-15T00:00:00.000Z',
+      })
+    ).toMatchObject({ role: 'user', text: 'hello' });
+  });
+
+  it('rejects a symlinked persisted thread history path before reading it', () => {
+    const threadTs = `symlink-${RUN_ID}`;
+    const linkedPath = resolveTelegramThreadHistoryPath(threadTs);
+    const targetPath = pathResolver.resolve(
+      `active/shared/tmp/telegram-thread-history-target-${RUN_ID}.jsonl`
+    );
+    withExecutionContext('surface_runtime', () => {
+      safeWriteFile(targetPath, '{"role":"assistant"}\n');
+      safeSymlinkSync(targetPath, linkedPath);
+      try {
+        expect(() => resolveTelegramThreadHistoryPath(threadTs)).toThrow('[RESOURCE_PATH_SYMLINK]');
+      } finally {
+        safeRmSync(linkedPath, { force: true });
+        safeRmSync(targetPath, { force: true });
+      }
+    });
+  });
+
+  it('keeps file input inside the repository and limited to regular files', () => {
+    expect(() => resolveTelegramBridgeInputPath('/tmp/telegram-input.json')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    expect(() => resolveTelegramBridgeInputPath('scripts')).toThrow(
+      'input must be an existing regular file'
+    );
+  });
+
+  it('strictly validates direct send payloads before provider dispatch', () => {
+    expect(parseTelegramSendInput({ chatId: 42, text: 'hello' })).toEqual({
+      chatId: 42,
+      text: 'hello',
+    });
+    expect(
+      parseTelegramSendInput({ chatId: '@operator', text: 'hello', parseMode: 'Markdown' })
+    ).toEqual({
+      chatId: '@operator',
+      text: 'hello',
+      parseMode: 'Markdown',
+    });
+    expect(() => parseTelegramSendInput({ chatId: {}, text: 'hello' })).toThrow(
+      'telegram send chatId'
+    );
+    expect(() => parseTelegramSendInput({ chatId: 42, text: ['hello'] })).toThrow(
+      'telegram send text'
+    );
+    expect(() => parseTelegramSendInput({ chatId: 42, text: 'hello', extra: true })).toThrow(
+      'unexpected telegram send field'
+    );
+  });
+
+  it('validates persisted bridge envelopes before union narrowing', () => {
+    expect(parseTelegramBridgeInput({ action: 'webhook', update: { update_id: 1 } })).toEqual({
+      action: 'webhook',
+      update: { update_id: 1 },
+    });
+    expect(() => parseTelegramBridgeInput(null)).toThrow(
+      'telegram bridge input must be a JSON object'
+    );
+    expect(() => parseTelegramBridgeInput(['invalid'])).toThrow(
+      'telegram bridge input must be a JSON object'
+    );
+    expect(() => parseTelegramBridgeInput({ action: 'unexpected' })).toThrow(
+      'telegram bridge action must be send or webhook'
+    );
+    expect(() => parseTelegramBridgeInput({ update: ['invalid'] })).toThrow(
+      'telegram bridge update must be a JSON object'
+    );
+  });
+
+  it('rejects non-object HTTP JSON bodies before bridge dispatch', async () => {
+    await expect(readTelegramJsonObject(Readable.from(['[]']) as never)).rejects.toThrow(
+      'request body must be a JSON object'
+    );
+    await expect(readTelegramJsonObject(Readable.from(['null']) as never)).rejects.toThrow(
+      'request body must be a JSON object'
+    );
+    await expect(
+      readTelegramJsonObject(Readable.from(['{"message":{"constructor":{}}}']) as never)
+    ).rejects.toThrow('request body contains a dangerous JSON key');
+  });
+
+  it('returns object JSON bodies for webhook and send dispatch', async () => {
+    await expect(
+      readTelegramJsonObject(Readable.from(['{"message":{}}']) as never)
+    ).resolves.toEqual({
+      message: {},
+    });
+  });
+
   it('formats recent user and assistant entries', () => {
     const entries: TelegramThreadHistoryEntry[] = [
       {

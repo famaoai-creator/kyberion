@@ -9,7 +9,8 @@
  */
 
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 
 import {
   evaluateMissionGate,
@@ -29,13 +30,13 @@ import {
   type MissionWorkflowDesign,
 } from './mission-workflow-catalog.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
   safeReadFile,
-  safeWriteFile,
-  loadJson,
 } from './secure-io.js';
+import { loadMissionPhaseGateDefinitionAtPath } from './mission-phase-gate-definition-reader.js';
 import {
   type MissionClass,
   type MissionDeliveryShape,
@@ -45,6 +46,11 @@ import {
 
 import { loadState, saveState } from './mission-state.js';
 import type { MissionState } from './mission-types.js';
+import {
+  provisionMissionEntry,
+  writeProvisionedJson,
+  writeProvisionedText,
+} from './mission-orchestration-journal.js';
 
 export interface ApplyProcessTemplatePlanResult {
   tasks: ProcessTemplatePlannedTask[];
@@ -52,6 +58,20 @@ export interface ApplyProcessTemplatePlanResult {
   gatePaths: string[];
   taskBoardUpdated: boolean;
   skipped?: 'no_default_tasks' | 'existing_next_tasks';
+}
+
+function safeMissionArtifactPath(missionDir: string, relativePath: string): string {
+  return assertSafeRepositoryPath(path.join(missionDir, relativePath), {
+    allowMissingLeaf: true,
+  });
+}
+
+function missionRelativeArtifactPath(missionDir: string, filePath: string): string {
+  const relativePath = path.relative(missionDir, filePath);
+  if (!relativePath || relativePath === '..' || relativePath.startsWith(`..${path.sep}`)) {
+    throw new Error('[MISSION_PROCESS_PLAN] artifact must be inside mission directory');
+  }
+  return relativePath.split(path.sep).join('/');
 }
 
 /**
@@ -67,7 +87,8 @@ export function applyProcessTemplatePlan(input: {
   force?: boolean;
 }): ApplyProcessTemplatePlanResult {
   const { missionId, missionDir, design } = input;
-  const nextTasksPath = path.join(missionDir, 'NEXT_TASKS.json');
+  const safeMissionDir = assertSafeRepositoryPath(missionDir);
+  const nextTasksPath = safeMissionArtifactPath(safeMissionDir, 'NEXT_TASKS.json');
 
   const tasks = expandProcessTemplateTasks({ missionId, design });
   if (tasks.length === 0) {
@@ -111,50 +132,61 @@ export function applyProcessTemplatePlan(input: {
     }
   }
 
-  safeWriteFile(nextTasksPath, JSON.stringify(tasks, null, 2));
+  writeProvisionedJson({
+    missionId,
+    filePath: nextTasksPath,
+    targetPath: missionRelativeArtifactPath(safeMissionDir, nextTasksPath),
+    missionPathHint: safeMissionDir,
+    provisioned: provisionMissionEntry(tasks),
+  });
 
-  const gateDefsDir = path.join(missionDir, 'gates', 'definitions');
+  const gateDefsDir = safeMissionArtifactPath(safeMissionDir, 'gates/definitions');
   const gatePaths: string[] = [];
   for (const definition of processTemplateGateDefinitions(missionId, design)) {
     safeMkdir(gateDefsDir, { recursive: true });
-    const gatePath = path.join(gateDefsDir, `${definition.gate.id}.json`);
-    safeWriteFile(
-      gatePath,
-      JSON.stringify(
-        {
-          mission_id: missionId,
-          phase: definition.phase,
-          position: definition.position,
-          gate: definition.gate,
-        },
-        null,
-        2
-      )
+    const gatePath = safeMissionArtifactPath(
+      safeMissionDir,
+      `gates/definitions/${definition.gate.id}.json`
     );
+    writeProvisionedJson({
+      missionId,
+      filePath: gatePath,
+      targetPath: missionRelativeArtifactPath(safeMissionDir, gatePath),
+      missionPathHint: safeMissionDir,
+      provisioned: provisionMissionEntry({
+        mission_id: missionId,
+        phase: definition.phase,
+        position: definition.position,
+        gate: definition.gate,
+      }),
+    });
     gatePaths.push(gatePath);
   }
 
-  const taskBoardUpdated = renderPhaseChecklist(missionDir, design, tasks);
+  const taskBoardUpdated = renderPhaseChecklist(missionId, safeMissionDir, design, tasks);
   return { tasks, nextTasksPath, gatePaths, taskBoardUpdated };
 }
 
 function readTasksSafe(nextTasksPath: string): Array<Record<string, unknown>> {
-  try {
-    const parsed = loadJson<unknown>(nextTasksPath);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+  const tasks = loadMissionNextTaskObjectsAtPath(
+    nextTasksPath,
+    path.basename(path.dirname(nextTasksPath))
+  );
+  if (!tasks) {
+    throw new Error(`[MISSION_PROCESS_PLAN] invalid NEXT_TASKS.json: ${nextTasksPath}`);
   }
+  return tasks;
 }
 
 const CHECKLIST_HEADER = '## Process Phases';
 
 function renderPhaseChecklist(
+  missionId: string,
   missionDir: string,
   design: MissionWorkflowDesign,
   tasks: ProcessTemplatePlannedTask[]
 ): boolean {
-  const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
+  const taskBoardPath = safeMissionArtifactPath(missionDir, 'TASK_BOARD.md');
   if (!safeExistsSync(taskBoardPath)) return false;
   const board = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
   if (board.includes(CHECKLIST_HEADER)) return false;
@@ -172,7 +204,13 @@ function renderPhaseChecklist(
     }
     lines.push('');
   }
-  safeWriteFile(taskBoardPath, `${board.trimEnd()}\n${lines.join('\n')}`);
+  writeProvisionedText({
+    missionId,
+    filePath: taskBoardPath,
+    targetPath: missionRelativeArtifactPath(missionDir, taskBoardPath),
+    missionPathHint: missionDir,
+    provisioned: provisionMissionEntry(`${board.trimEnd()}\n${lines.join('\n')}`),
+  });
   return true;
 }
 
@@ -236,7 +274,7 @@ export async function planProcessTemplateTasks(args: {
     };
     state.history = state.history || [];
     state.history.push({
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'PLAN_TASKS',
       note: `Expanded process template ${design.workflow_id} into ${result.tasks.length} tasks.`,
     });
@@ -256,7 +294,7 @@ export interface StoredGateEvaluationResult {
 }
 
 function gateDefinitionPath(missionDir: string, gateId: string): string {
-  return path.join(missionDir, 'gates', 'definitions', `${gateId}.json`);
+  return safeMissionArtifactPath(missionDir, `gates/definitions/${gateId}.json`);
 }
 
 /**
@@ -310,17 +348,13 @@ export async function evaluateStoredMissionGate(args: {
   const definitionPath = gateDefinitionPath(missionDir, args.gateId);
   if (!safeExistsSync(definitionPath)) return { found: false };
 
-  const definition = loadJson<{
-    phase?: string;
-    position?: 'entry' | 'exit';
-    gate: MissionGateDefinition;
-  }>(definitionPath);
+  const definition = loadMissionPhaseGateDefinitionAtPath(definitionPath, missionId);
 
   const gate = resolveGateCheckPaths(definition.gate, missionDir, args.humanConfirmed ?? false);
   const evaluation = await evaluateMissionGate({
     missionId,
     gate,
-    evidenceDir: path.join(missionDir, 'gates', 'records'),
+    evidenceDir: safeMissionArtifactPath(missionDir, 'gates/records'),
   });
   return {
     found: true,
@@ -348,18 +382,21 @@ export async function evaluatePhaseEntryGate(args: {
   const missionId = args.missionId.toUpperCase();
   const missionDir = findMissionPath(missionId);
   if (!missionDir) return undefined;
-  const definitionsDir = path.join(missionDir, 'gates', 'definitions');
+  const definitionsDir = safeMissionArtifactPath(missionDir, 'gates/definitions');
   if (!safeExistsSync(definitionsDir)) return undefined;
   for (const entry of safeReaddir(definitionsDir) as string[]) {
     if (!entry.endsWith('.json')) continue;
-    let definition: { phase?: string; position?: string; gate?: { id?: string } };
+    let definition: ReturnType<typeof loadMissionPhaseGateDefinitionAtPath>;
     try {
-      definition = readJson(path.join(definitionsDir, entry));
+      definition = loadMissionPhaseGateDefinitionAtPath(
+        assertSafeRepositoryPath(path.join(definitionsDir, entry)),
+        missionId
+      );
     } catch {
       continue;
     }
     if (definition.phase !== args.phase || definition.position !== 'entry') continue;
-    const gateId = definition.gate?.id ?? entry.replace(/\.json$/u, '');
+    const gateId = definition.gate.id;
     const stored = await evaluateStoredMissionGate({ missionId, gateId });
     if (!stored.found || !stored.evaluation) return undefined;
     return {
@@ -374,7 +411,7 @@ export async function evaluatePhaseEntryGate(args: {
 function markPhaseTasksStatus(missionId: string, phase: string, status: string): number {
   const missionDir = findMissionPath(missionId.toUpperCase());
   if (!missionDir) return 0;
-  const nextTasksPath = path.join(missionDir, 'NEXT_TASKS.json');
+  const nextTasksPath = safeMissionArtifactPath(missionDir, 'NEXT_TASKS.json');
   if (!safeExistsSync(nextTasksPath)) return 0;
   const tasks = readTasksSafe(nextTasksPath);
   let changed = 0;
@@ -384,7 +421,15 @@ function markPhaseTasksStatus(missionId: string, phase: string, status: string):
       changed += 1;
     }
   }
-  if (changed > 0) safeWriteFile(nextTasksPath, JSON.stringify(tasks, null, 2));
+  if (changed > 0) {
+    writeProvisionedJson({
+      missionId,
+      filePath: nextTasksPath,
+      targetPath: missionRelativeArtifactPath(missionDir, nextTasksPath),
+      missionPathHint: missionDir,
+      provisioned: provisionMissionEntry(tasks),
+    });
+  }
   return changed;
 }
 
@@ -416,7 +461,7 @@ export async function activateMissionOnGateProgress(missionId: string): Promise<
   state.status = 'active';
   state.history = state.history || [];
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'GATE_ACTIVATE',
     note: 'Mission activated automatically on first passed process gate.',
   });

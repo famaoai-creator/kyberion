@@ -1,6 +1,8 @@
-import { pathResolver, safeExecResultAsync } from '@agent/core';
-import { defineCatalog, readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExecResultAsync } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type Gate = {
   id: string;
@@ -9,6 +11,7 @@ type Gate = {
   args?: string[];
   script?: string;
   timeout_ms?: number;
+  baseline?: string;
   owner: string;
   rationale: string;
 };
@@ -104,8 +107,9 @@ export function validateGateManifest(manifest: GateManifest, availableScripts?: 
 
 export function loadGateManifest(): GateManifest {
   const manifest = gateManifestCatalog.load();
-  const packageJson = readJson<{ scripts?: Record<string, string> }>(
-    pathResolver.rootResolve('package.json')
+  const packageJson = readSafeJsonFile<{ scripts?: Record<string, string> }>(
+    pathResolver.rootResolve('package.json'),
+    'package manifest for check runner'
   );
   validateGateManifest(manifest, new Set(Object.keys(packageJson.scripts || {})));
   return manifest;
@@ -130,7 +134,10 @@ export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?:
   return scoped;
 }
 
-export async function main(argv: string[] = []): Promise<number> {
+export async function main(
+  argv: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<number> {
   const args = argv[0] === '--' ? argv.slice(1) : argv;
   const supportedFlags = new Set(['--scope', '--only', '--json']);
   for (let index = 0; index < args.length; index += 1) {
@@ -139,11 +146,8 @@ export async function main(argv: string[] = []): Promise<number> {
     if (!supportedFlags.has(flag)) {
       const json = args.includes('--json');
       const message = `unknown check option: ${flag}`;
-      if (json)
-        console.log(
-          JSON.stringify({ scope: undefined, results: [], failed: 0, error: message }, null, 2)
-        );
-      else console.error(`[check] ERROR ${message}`);
+      if (json) print({ scope: undefined, results: [], failed: 0, error: message });
+      else print(`[check] ERROR ${message}`);
       return 1;
     }
     if (
@@ -152,11 +156,8 @@ export async function main(argv: string[] = []): Promise<number> {
     ) {
       const json = args.includes('--json');
       const message = `${flag} requires a value`;
-      if (json)
-        console.log(
-          JSON.stringify({ scope: undefined, results: [], failed: 0, error: message }, null, 2)
-        );
-      else console.error(`[check] ERROR ${message}`);
+      if (json) print({ scope: undefined, results: [], failed: 0, error: message });
+      else print(`[check] ERROR ${message}`);
       return 1;
     }
   }
@@ -166,11 +167,8 @@ export async function main(argv: string[] = []): Promise<number> {
   const only = onlyIndex >= 0 ? args[onlyIndex + 1] : undefined;
   const json = args.includes('--json');
   const error = (message: string): number => {
-    if (json)
-      console.log(
-        JSON.stringify({ scope: scopeValue, results: [], failed: 0, error: message }, null, 2)
-      );
-    else console.error(`[check] ERROR ${message}`);
+    if (json) print({ scope: scopeValue, results: [], failed: 0, error: message });
+    else print(`[check] ERROR ${message}`);
     return 1;
   };
   if (!isValidScope(scopeValue)) return error(`unknown check scope: ${String(scopeValue)}`);
@@ -233,15 +231,15 @@ export async function main(argv: string[] = []): Promise<number> {
     Array.from({ length: Math.min(MAX_CONCURRENT_GATES, gates.length) }, () => worker())
   );
   const failed = results.filter((result) => result.status === 'failed');
-  if (json) console.log(JSON.stringify({ scope, results, failed: failed.length }, null, 2));
+  if (json) print({ scope, results, failed: failed.length });
   else {
-    console.log(`[check] scope=${scope} gates=${results.length} failed=${failed.length}`);
+    print(`[check] scope=${scope} gates=${results.length} failed=${failed.length}`);
     for (const result of results) {
-      console.log(`- ${result.status.toUpperCase()} ${result.id}`);
+      print(`- ${result.status.toUpperCase()} ${result.id}`);
       if (result.status === 'failed') {
-        if (result.stderr) console.log(`  stderr: ${result.stderr}`);
-        if (result.stdout) console.log(`  stdout: ${result.stdout}`);
-        if (result.error) console.log(`  error: ${result.error}`);
+        if (result.stderr) print(`  stderr: ${result.stderr}`);
+        if (result.stdout) print(`  stdout: ${result.stdout}`);
+        if (result.error) print(`  error: ${result.error}`);
       }
     }
   }
@@ -250,9 +248,9 @@ export async function main(argv: string[] = []): Promise<number> {
 
 export const runChecks = defineScript({
   name: 'check',
-  flags: [],
+  flags: ['json', 'quiet'],
   async run(context) {
-    const status = await main(context.argv);
+    const status = await main(context.argv, context.print);
     if (status !== 0) throw new Error(`check command failed with exit code ${status}`);
   },
 });

@@ -283,7 +283,7 @@ Meeting-specific orientation:
 - Internal browser join helper: `libs/actuators/meeting-browser-driver/`.
 - Runtime loop: `libs/core/meeting-participation-coordinator.ts`.
 - Consent boundary: `voice-consent.json` is checked before meeting recording/capture and again before TTS speech.
-- Cross-OS dry-run: `pnpm run test:meeting-dry-run`.
+- Cross-OS dry-run: `pnpm test -- --suite meeting-dry-run`.
 
 ## 8. What to avoid
 

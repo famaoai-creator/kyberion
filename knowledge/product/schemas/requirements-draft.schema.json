@@ -111,7 +111,7 @@
       "additionalProperties": false,
       "required": ["id", "description", "priority"],
       "properties": {
-        "id": { "type": "string", "pattern": "^FR-[0-9A-Z]+$" },
+        "id": { "type": "string", "pattern": "^FR-[0-9A-Z][0-9A-Z-]*$" },
         "description": { "type": "string", "minLength": 1 },
         "priority": { "$ref": "#/$defs/priority" },
         "acceptance_criteria": {
@@ -133,7 +133,7 @@
       "additionalProperties": false,
       "required": ["id", "category", "description"],
       "properties": {
-        "id": { "type": "string", "pattern": "^NFR-[0-9A-Z]+$" },
+        "id": { "type": "string", "pattern": "^NFR-[0-9A-Z][0-9A-Z-]*$" },
         "category": {
           "type": "string",
           "enum": [
@@ -203,6 +203,7 @@
           "type": "string",
           "enum": ["open", "answered", "deferred"]
         },
+        "blocking": { "type": "boolean" },
         "source_refs": {
           "type": "array",
           "items": { "$ref": "#/$defs/sourceRef" }

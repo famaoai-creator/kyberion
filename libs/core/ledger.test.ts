@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { loadForScope, record, verifyIntegrity, verifyLedgerIntegrityDetailed } from './ledger.js';
+import {
+  loadForScope,
+  normalizeLedgerRecord,
+  record,
+  verifyIntegrity,
+  verifyLedgerIntegrityDetailed,
+} from './ledger.js';
 
 // We need to handle the hardcoded LEDGER_PATH in ledger.ts
 const LEDGER_FILE = path.join(process.cwd(), 'active/audit/system-ledger.jsonl');
@@ -110,5 +116,30 @@ describe('ledger core', () => {
     });
     expect(loadForScope({ tenant_slug: 'client-b' })).toHaveLength(0);
     expect(loadForScope({ scope_kind: 'system' })).toHaveLength(1);
+  });
+
+  it('rejects malformed persisted records before projection or verification', () => {
+    expect(normalizeLedgerRecord(null)).toBeUndefined();
+    expect(normalizeLedgerRecord([])).toBeUndefined();
+    expect(normalizeLedgerRecord({ type: 42 })).toBeUndefined();
+    expect(normalizeLedgerRecord({ scope: [] })).toBeUndefined();
+
+    fs.writeFileSync(
+      LEDGER_FILE,
+      [
+        JSON.stringify([]),
+        JSON.stringify({ type: 'SYSTEM_EVENT', scope: [] }),
+        JSON.stringify({ type: 'SYSTEM_EVENT', scope: { tier: 'public', scope_kind: 'system' } }),
+      ].join('\n') + '\n'
+    );
+
+    expect(loadForScope({ scope_kind: 'system' })).toHaveLength(1);
+    const report = verifyLedgerIntegrityDetailed();
+    expect(report.ok).toBe(false);
+    expect(report.corrupted).toEqual([
+      'line:1:invalid_record',
+      'line:2:invalid_record',
+      'line:3:parent_hash_mismatch',
+    ]);
   });
 });

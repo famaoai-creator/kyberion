@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Restricted Skills Policy",
+  "description": "Fail-closed skill restrictions with narrow-only tenant, organization, and project overlays.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "last_updated",
+    "restrictions",
+    "tenant_overrides",
+    "organization_overrides",
+    "project_overrides"
+  ],
+  "properties": {
+    "$schema": { "type": "string", "format": "uri-reference" },
+    "version": { "type": ["string", "number"] },
+    "last_updated": { "type": "string", "minLength": 1 },
+    "restrictions": { "$ref": "#/definitions/restrictions" },
+    "tenant_overrides": { "$ref": "#/definitions/overrides" },
+    "organization_overrides": { "$ref": "#/definitions/overrides" },
+    "project_overrides": { "$ref": "#/definitions/overrides" }
+  },
+  "definitions": {
+    "restriction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "reason", "allow_override"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "const": "restricted" },
+        "reason": { "type": "string", "minLength": 1 },
+        "allow_override": { "type": "boolean" }
+      }
+    },
+    "restrictions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/restriction" }
+    },
+    "overrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["restrictions"],
+        "properties": {
+          "restrictions": { "$ref": "#/definitions/restrictions" }
+        }
+      }
+    }
+  }
+}

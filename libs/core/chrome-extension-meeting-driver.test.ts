@@ -3,7 +3,10 @@ import { readFileSync, rmSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { StubAudioBus } from './audio-bus.js';
-import { ChromeExtensionMeetingJoinDriver } from './chrome-extension-meeting-driver.js';
+import {
+  ChromeExtensionMeetingJoinDriver,
+  parseChromeExtensionEvent,
+} from './chrome-extension-meeting-driver.js';
 import { pathResolver } from './path-resolver.js';
 import type { MeetingSession } from './meeting-session-types.js';
 
@@ -60,6 +63,12 @@ describe('ChromeExtensionMeetingJoinDriver on-device AI events', () => {
       await entry.session.leave().catch(() => undefined);
       rmSync(entry.path, { force: true });
     }
+  });
+
+  it('rejects malformed, array, and dangerous extension event payloads', () => {
+    expect(parseChromeExtensionEvent('{"event":"hello"}')).toMatchObject({ event: 'hello' });
+    expect(parseChromeExtensionEvent('[]')).toBeUndefined();
+    expect(parseChromeExtensionEvent('{"event":"hello","meta":{"__proto__":{}}}')).toBeUndefined();
   });
 
   it('requires the pre-shared extension credential before opening the control session', async () => {

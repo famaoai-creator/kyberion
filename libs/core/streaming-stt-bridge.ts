@@ -13,6 +13,7 @@
  * stub bindings).
  */
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 
 import type { AudioChunk, TranscriptChunk } from './meeting-session-types.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
@@ -49,7 +50,7 @@ export class StubStreamingSpeechToTextBridge implements StreamingSpeechToTextBri
           is_final: true,
           text: `stub-utterance-${utteranceIndex}`,
           confidence: 1.0,
-          emitted_at: new Date().toISOString(),
+          emitted_at: nowIso(),
         };
       }
     }

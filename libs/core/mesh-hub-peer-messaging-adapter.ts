@@ -1,6 +1,8 @@
 import * as crypto from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { isRecord } from './foundation/text.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
@@ -17,7 +19,13 @@ import {
   buildWorkCoordinationPeerCommandEnvelope,
   type WorkCoordinationPeerCommandEnvelope,
 } from './work-coordination-peer.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeRmSync,
+} from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { signA2AMessage } from './a2a-bridge.js';
@@ -137,14 +145,116 @@ function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: u
   return appendGovernedArtifactJsonl(role, logicalPath, record);
 }
 
-function readJsonl<T>(logicalPath: string): T[] {
-  if (!safeExistsSync(logicalPath)) return [];
-  const raw = String(safeReadFile(logicalPath, { encoding: 'utf8' }) || '');
+function persistedString(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`mesh-hub persisted ${key} must be a non-empty string`);
+  }
+  return value;
+}
+
+function persistedIso(record: Record<string, unknown>, key: string): void {
+  const value = persistedString(record, key);
+  if (!Number.isFinite(Date.parse(value))) {
+    throw new Error(`mesh-hub persisted ${key} must be an ISO timestamp`);
+  }
+}
+
+function parsePersistedSelector(value: unknown): MeshTargetSelector {
+  if (!isRecord(value) || typeof value.kind !== 'string') {
+    throw new Error('mesh-hub persisted selector is invalid');
+  }
+  switch (value.kind) {
+    case 'peer':
+      return { kind: 'peer', peer_id: persistedString(value, 'peer_id') };
+    case 'role':
+      return { kind: 'role', role: persistedString(value, 'role') };
+    case 'capability':
+      return {
+        kind: 'capability',
+        capability_id: persistedString(value, 'capability_id'),
+        ...(value.version === undefined ? {} : { version: persistedString(value, 'version') }),
+      };
+    case 'topic':
+      return { kind: 'topic', topic: persistedString(value, 'topic') };
+    default:
+      throw new Error('mesh-hub persisted selector kind is invalid');
+  }
+}
+
+/** Validate a proposal row before it becomes a tenant-scoped projection. */
+export function parseMeshHubRecipientProposal(value: unknown): MeshHubRecipientProposalRecord {
+  if (!isRecord(value) || value.kind !== 'mesh-hub-recipient-proposal') {
+    throw new Error('mesh-hub persisted proposal kind is invalid');
+  }
+  const tenantId = persistedString(value, 'tenant_id');
+  if (!isValidTenantSlug(tenantId)) throw new Error('mesh-hub persisted tenant is invalid');
+  persistedString(value, 'proposal_id');
+  persistedString(value, 'peer_id');
+  persistedString(value, 'request_id');
+  persistedString(value, 'message_id');
+  const requestKind = persistedString(value, 'request_kind');
+  if (!isMeshRequestKind(requestKind))
+    throw new Error('mesh-hub persisted request kind is invalid');
+  parsePersistedSelector(value.selector);
+  const proposalKind = persistedString(value, 'proposal_kind');
+  if (proposalKind !== 'a2a' && proposalKind !== 'workitem') {
+    throw new Error('mesh-hub persisted proposal kind is invalid');
+  }
+  const proposalRef = value.proposal_ref;
+  if (!isRecord(proposalRef)) throw new Error('mesh-hub persisted proposal reference is invalid');
+  const referenceType = persistedString(proposalRef, 'type');
+  const expectedType = proposalKind === 'a2a' ? 'a2a-message' : 'workitem-command';
+  if (referenceType !== expectedType || !isRecord(proposalRef.payload)) {
+    throw new Error('mesh-hub persisted proposal reference is invalid');
+  }
+  if (value.mission_controller_mutation !== 'deny') {
+    throw new Error('mesh-hub persisted mission mutation is invalid');
+  }
+  persistedIso(value, 'created_at');
+  return value as unknown as MeshHubRecipientProposalRecord;
+}
+
+/** Validate a decision row before it is joined to proposal state. */
+export function parseMeshHubRecipientProposalDecision(
+  value: unknown
+): MeshHubRecipientProposalDecision {
+  if (!isRecord(value) || value.kind !== 'mesh-hub-recipient-proposal-decision') {
+    throw new Error('mesh-hub persisted decision kind is invalid');
+  }
+  const tenantId = persistedString(value, 'tenant_id');
+  if (!isValidTenantSlug(tenantId)) throw new Error('mesh-hub persisted tenant is invalid');
+  persistedString(value, 'decision_id');
+  persistedString(value, 'proposal_id');
+  persistedString(value, 'peer_id');
+  const decision = persistedString(value, 'decision');
+  if (decision !== 'accepted' && decision !== 'rejected') {
+    throw new Error('mesh-hub persisted decision is invalid');
+  }
+  persistedString(value, 'actor_id');
+  persistedString(value, 'reason');
+  persistedIso(value, 'decided_at');
+  return value as unknown as MeshHubRecipientProposalDecision;
+}
+
+function readJsonl<T>(logicalPath: string, parse: (value: unknown) => T): T[] {
+  const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`mesh-hub persisted JSONL must be a regular file: ${safePath}`);
+  }
+  const raw = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
   return raw
     .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+    .flatMap((line) => {
+      try {
+        return [parse(parseSafeJsonInput(line, 'mesh peer message'))];
+      } catch {
+        return [];
+      }
+    });
 }
 
 function recordEvent(
@@ -440,11 +550,13 @@ export function listMeshHubRecipientProposals(
 ): MeshHubRecipientProposalView[] {
   const tenantId = normalizeTenantId(options.tenantId);
   const proposals = readJsonl<MeshHubRecipientProposalRecord>(
-    proposalsPath(options.namespace, tenantId, peerId)
-  );
+    proposalsPath(options.namespace, tenantId, peerId),
+    parseMeshHubRecipientProposal
+  ).filter((proposal) => proposal.tenant_id === tenantId);
   const decisions = readJsonl<MeshHubRecipientProposalDecision>(
-    proposalDecisionsPath(options.namespace, tenantId, peerId)
-  );
+    proposalDecisionsPath(options.namespace, tenantId, peerId),
+    parseMeshHubRecipientProposalDecision
+  ).filter((decision) => decision.tenant_id === tenantId);
   const latestDecision = new Map<string, MeshHubRecipientProposalDecision>();
   for (const decision of decisions) latestDecision.set(decision.proposal_id, decision);
 

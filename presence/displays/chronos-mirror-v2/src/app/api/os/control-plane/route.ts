@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { CloudflareOsReadOnlySurface, type CloudflareOsSurfaceAccess } from '@agent/core';
+import {
+  CloudflareOsReadOnlySurface,
+  type CloudflareOsSurfaceAccess,
+} from '@agent/core/cloudflare-os-surface';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,

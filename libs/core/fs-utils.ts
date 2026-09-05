@@ -1,10 +1,22 @@
 import * as path from 'node:path';
-import { loadProjectStandards } from './config-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { pathResolver } from './path-resolver.js';
 import { safeLstat, safeReaddir } from './secure-io.js';
 import { createLogger } from './logger.js';
 const logger = createLogger('fs-utils');
 
-const standards = loadProjectStandards();
+interface ProjectStandards {
+  ignore_dirs: string[];
+  ignore_extensions: string[];
+}
+
+const projectStandardsCatalog = defineCatalog<ProjectStandards>({
+  id: 'project-standards',
+  path: pathResolver.knowledge('public/common/project_standards.json'),
+  schema: pathResolver.knowledge('product/schemas/project-standards.schema.json'),
+});
+
+const standards = projectStandardsCatalog.load();
 
 export interface WalkOptions {
   maxDepth?: number;
@@ -30,10 +42,12 @@ export function* walk(dir: string, options: WalkOptions = {}): Generator<string>
     const ext = path.extname(entry).toLowerCase();
 
     try {
-      if (safeLstat(fullPath).isDirectory()) {
+      const stat = safeLstat(fullPath);
+      if (stat.isSymbolicLink()) continue;
+      if (stat.isDirectory()) {
         if (standards.ignore_dirs.includes(entry)) continue;
         yield* walk(fullPath, { ...options, currentDepth: currentDepth + 1 });
-      } else {
+      } else if (stat.isFile()) {
         if (standards.ignore_extensions.includes(ext)) continue;
         yield fullPath;
       }
@@ -69,10 +83,12 @@ export async function* walkAsync(dir: string, options: WalkOptions = {}): AsyncG
     const ext = path.extname(entry).toLowerCase();
 
     try {
-      if (safeLstat(fullPath).isDirectory()) {
+      const stat = safeLstat(fullPath);
+      if (stat.isSymbolicLink()) continue;
+      if (stat.isDirectory()) {
         if (standards.ignore_dirs.includes(entry)) continue;
         yield* walkAsync(fullPath, { ...options, currentDepth: currentDepth + 1 });
-      } else {
+      } else if (stat.isFile()) {
         if (standards.ignore_extensions.includes(ext)) continue;
         yield fullPath;
       }

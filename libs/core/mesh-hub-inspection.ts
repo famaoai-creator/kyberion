@@ -11,7 +11,7 @@ import {
 import { listMeshTopicSubscriptions } from './mesh-topic-registry.js';
 import { type MeshDeliveryRecord, type MeshTargetSelector } from './mesh-hub-contract.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { nowIso } from './foundation/time.js';
+import { normalizeIso, nowIso } from './foundation/time.js';
 
 export interface MeshHubPeerInspection {
   peer_id: string;
@@ -64,15 +64,6 @@ export interface MeshHubInspectionOptions {
   tenantId?: string;
   now?: string | Date;
   namespace?: string;
-}
-
-function normalizeIso(value?: string | Date): string {
-  const input = value ?? new Date();
-  const date = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`invalid_iso_timestamp:${String(value)}`);
-  }
-  return date.toISOString();
 }
 
 function heartbeatAgeMs(record: { heartbeat_at: string }, now: string): number {

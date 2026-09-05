@@ -1,8 +1,19 @@
 import { randomUUID } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeExec, safeExistsSync, safeRmSync } from './secure-io.js';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+  type IntentResolutionContract,
+} from './intent-resolution-contract.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
+  safeExistsSync,
+  safeLstat,
+  safeRmSync,
+} from './secure-io.js';
 import { buildExecutionEnv, withExecutionContext } from './authority.js';
 import {
   emitMissionOrchestrationObservation,
@@ -11,6 +22,8 @@ import {
 } from './mission-orchestration-events.js';
 import { appendGovernedArtifactJsonl, writeGovernedArtifactJson } from './artifact-store.js';
 import type { AgentRoutingDecision } from './intent-contract.js';
+import { nowIso } from './foundation/time.js';
+import type { SupportedLocale } from './locale.js';
 
 import { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
 
@@ -21,8 +34,56 @@ import type {
   SlackMissionProposalState,
   SurfaceMissionProposalState,
 } from './channel-surface-types.js';
+import { t } from './t.js';
+
+const SURFACE_MISSION_PROPOSAL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-mission-proposal-state.schema.json'
+);
+
+type PersistedSurfaceMissionProposalState = Omit<SurfaceMissionProposalState, 'surface'> &
+  Partial<Pick<SurfaceMissionProposalState, 'surface'>>;
 
 type SurfaceProposalRole = 'slack_bridge' | 'chronos_gateway';
+
+export interface MissionProposalStateBinding {
+  surface: string;
+  channel: string;
+  threadTs: string;
+}
+
+function proposalStateCatalogAtPath(filePath: string) {
+  return defineCatalog<PersistedSurfaceMissionProposalState>({
+    id: 'surface-mission-proposal-state',
+    path: filePath,
+    schema: SURFACE_MISSION_PROPOSAL_SCHEMA_PATH,
+  });
+}
+
+/** Load a persisted proposal through schema validation and ingress identity binding. */
+export function loadMissionProposalStateAtPath(
+  filePath: string,
+  expected?: Partial<MissionProposalStateBinding>
+): SurfaceMissionProposalState {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[SURFACE_MISSION_PROPOSAL] state must be a regular file: ${filePath}`);
+  }
+  const loaded = proposalStateCatalogAtPath(safeFilePath).load();
+  const surface = loaded.surface ?? expected?.surface;
+  if (!surface) {
+    throw new Error(`[SURFACE_MISSION_PROPOSAL] state is missing surface binding: ${safeFilePath}`);
+  }
+  const state: SurfaceMissionProposalState = { ...loaded, surface };
+  for (const key of ['surface', 'channel', 'threadTs'] as const) {
+    const expectedValue = expected?.[key];
+    if (expectedValue !== undefined && state[key] !== expectedValue) {
+      throw new Error(
+        `[SURFACE_MISSION_PROPOSAL_SCOPE_MISMATCH] ${key} '${state[key]}' does not match expected '${expectedValue}'`
+      );
+    }
+  }
+  return state;
+}
 
 function writeJsonAs(role: SurfaceProposalRole, logicalPath: string, record: unknown): string {
   return writeGovernedArtifactJson(role, logicalPath, record);
@@ -41,7 +102,7 @@ function emitSlackMissionEvent(event: Record<string, unknown>): string {
     'slack_bridge',
     'active/shared/observability/channels/slack/missions.jsonl',
     {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event_id: randomUUID(),
       channel: 'slack',
       ...event,
@@ -51,7 +112,7 @@ function emitSlackMissionEvent(event: Record<string, unknown>): string {
 
 function emitChronosMissionEvent(event: Record<string, unknown>): string {
   return appendJsonlAs('chronos_gateway', 'active/shared/observability/chronos/missions.jsonl', {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event_id: randomUUID(),
     channel: 'chronos',
     ...event,
@@ -93,7 +154,7 @@ export function saveMissionProposalState(params: {
       proposal: params.proposal,
       sourceText: params.sourceText,
       routingDecision: params.routingDecision,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso(),
     } satisfies SurfaceMissionProposalState
   );
 }
@@ -106,8 +167,13 @@ export function getMissionProposalState(
   const resolved = pathResolver.resolve(
     missionProposalStateLogicalPath(surface.trim().toLowerCase(), channel, threadTs)
   );
-  if (!safeExistsSync(resolved)) return null;
-  return readJson<SurfaceMissionProposalState>(resolved);
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeResolved)) return null;
+  return loadMissionProposalStateAtPath(safeResolved, {
+    surface: surface.trim().toLowerCase(),
+    channel,
+    threadTs,
+  });
 }
 
 export function clearMissionProposalState(
@@ -162,8 +228,14 @@ export function getSlackMissionProposalState(
 ): SlackMissionProposalState | null {
   const logicalPath = missionProposalStateLogicalPath('slack', channel, threadTs);
   const resolved = pathResolver.resolve(logicalPath);
-  if (!safeExistsSync(resolved)) return null;
-  return readJson<SlackMissionProposalState>(resolved);
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeResolved)) return null;
+  const state = loadMissionProposalStateAtPath(safeResolved, {
+    surface: 'slack',
+    channel,
+    threadTs,
+  });
+  return { ...state, surface: 'slack' };
 }
 
 export function saveSlackMissionProposalState(params: {
@@ -183,7 +255,7 @@ export function saveSlackMissionProposalState(params: {
       proposal: params.proposal,
       sourceText: params.sourceText,
       routingDecision: params.routingDecision,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso(),
     } satisfies SlackMissionProposalState
   );
 }
@@ -203,8 +275,14 @@ export function getChronosMissionProposalState(
 ): ChronosMissionProposalState | null {
   const logicalPath = missionProposalStateLogicalPath('chronos', 'chronos', sessionId);
   const resolved = pathResolver.resolve(logicalPath);
-  if (!safeExistsSync(resolved)) return null;
-  return readJson<ChronosMissionProposalState>(resolved);
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeResolved)) return null;
+  const state = loadMissionProposalStateAtPath(safeResolved, {
+    surface: 'chronos',
+    channel: 'chronos',
+    threadTs: sessionId,
+  });
+  return { ...state, surface: 'chronos', channel: 'chronos', threadTs: sessionId };
 }
 
 export function saveChronosMissionProposalState(params: {
@@ -223,7 +301,7 @@ export function saveChronosMissionProposalState(params: {
       proposal: params.proposal,
       sourceText: params.sourceText,
       routingDecision: params.routingDecision,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso(),
     } satisfies ChronosMissionProposalState
   );
 }
@@ -272,7 +350,7 @@ export async function resolveMissionProposalReply(params: {
     clearMissionProposalState(params.surface, params.channel, params.thread);
     return {
       handled: true,
-      reply: 'ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。',
+      reply: t('bridge:mission_proposal_cancelled', undefined, 'ja'),
     };
   }
   if (isMissionConfirmation(params.text)) {
@@ -288,16 +366,54 @@ export async function resolveMissionProposalReply(params: {
     return {
       handled: true,
       missionId: issued.missionId,
-      reply: [
-        `Mission ${issued.missionId} started.`,
-        `Type: ${issued.missionType} / Tier: ${issued.tier}`,
-        issued.orchestrationStatus === 'queued'
-          ? 'Background orchestration has been queued. 結果はこのチャットに届きます。'
-          : `Background orchestration could not be queued: ${issued.orchestrationError || 'unknown'}`,
-      ].join('\n'),
+      reply: buildMissionIssuanceReply(issued),
     };
   }
   return { handled: false };
+}
+
+/** Render the surface-neutral mission issuance result for messaging bridges. */
+export function buildMissionIssuanceReply(
+  issued: Pick<
+    SlackMissionIssuanceResult,
+    'missionId' | 'missionType' | 'tier' | 'persona' | 'orchestrationStatus' | 'orchestrationError'
+  > & { routingDecision?: AgentRoutingDecision },
+  options?: { locale?: SupportedLocale; includeDetails?: boolean }
+): string {
+  const locale = options?.locale ?? 'ja';
+  const details = options?.includeDetails
+    ? [
+        t('bridge:mission_issued_type', { missionType: issued.missionType }, locale),
+        t('bridge:mission_issued_tier', { tier: issued.tier }, locale),
+        t('bridge:mission_issued_persona', { persona: issued.persona }, locale),
+        issued.routingDecision
+          ? t(
+              'bridge:mission_issued_routing',
+              {
+                routing: `${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`,
+              },
+              locale
+            )
+          : undefined,
+      ].filter((line): line is string => Boolean(line))
+    : [
+        t(
+          'bridge:mission_issued_type_tier',
+          { missionType: issued.missionType, tier: issued.tier },
+          locale
+        ),
+      ];
+  return [
+    t('bridge:mission_issued_started', { missionId: issued.missionId }, locale),
+    ...details,
+    issued.orchestrationStatus === 'queued'
+      ? t('bridge:mission_issued_queued', undefined, locale)
+      : t(
+          'bridge:mission_issued_queue_failed',
+          { error: issued.orchestrationError || 'unknown' },
+          locale
+        ),
+  ].join('\n');
 }
 
 /**
@@ -313,6 +429,7 @@ export function stashMissionProposalForConfirmation(params: {
   sourceText?: string;
   routingDecision?: AgentRoutingDecision;
   fallbackSummary?: string;
+  intentResolution?: IntentResolutionContract;
 }): string {
   saveMissionProposalState({
     surface: params.surface,
@@ -323,8 +440,30 @@ export function stashMissionProposalForConfirmation(params: {
     routingDecision: params.routingDecision,
   });
   const summary =
-    String(params.proposal.summary || params.fallbackSummary || '').trim() || 'Mission proposal';
-  return `${summary}\n1) 作成する 2) やめる`;
+    String(params.proposal.summary || params.fallbackSummary || '').trim() ||
+    t('bridge:mission_proposal_fallback', undefined, 'ja');
+  return buildMissionProposalConfirmationText({
+    summary,
+    intentResolution: params.intentResolution,
+  });
+}
+
+export function buildMissionProposalConfirmationText(params: {
+  summary: string;
+  intentResolution?: IntentResolutionContract;
+}): string {
+  const locale = 'ja' as const;
+  return [
+    `${params.summary}\n${t('bridge:mission_proposal_confirmation_choices', undefined, locale)}`,
+    ...(params.intentResolution
+      ? [
+          `${t('bridge:contract_authority', undefined, locale)}: ${renderIntentAuthorityLabel(params.intentResolution.authority_level, locale)}`,
+          `${t('bridge:contract_next_action', undefined, locale)}: ${params.intentResolution.next_action.label}`,
+          `${t('bridge:contract_consequence', undefined, locale)}: ${params.intentResolution.next_action.consequence}`,
+          `${t('bridge:contract_outcome', undefined, locale)}: ${renderIntentOutcomeLabel(params.intentResolution.outcome_kind, locale)}`,
+        ]
+      : []),
+  ].join('\n');
 }
 
 export function isSlackMissionConfirmation(text: string): boolean {

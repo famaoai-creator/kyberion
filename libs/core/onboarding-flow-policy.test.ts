@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 
 import {
   loadOnboardingFlowPolicyCatalog,
@@ -7,6 +9,13 @@ import {
 } from './onboarding-flow-policy.js';
 
 describe('onboarding-flow-policy', () => {
+  it('uses the canonical catalog without a duplicated fallback definition', () => {
+    const source = safeReadFile(pathResolver.rootResolve('libs/core/onboarding-flow-policy.ts'), {
+      encoding: 'utf8',
+    }) as string;
+    expect(source).not.toContain('FALLBACK_CATALOG');
+  });
+
   it('loads the canonical onboarding flow labels in both locales (UX-03)', () => {
     const catalog = loadOnboardingFlowPolicyCatalog();
     expect(resolveOnboardingText(catalog.phase_titles.identity, 'en')).toBe('Identity & Purpose');

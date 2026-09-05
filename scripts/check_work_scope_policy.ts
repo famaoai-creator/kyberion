@@ -9,8 +9,8 @@ import {
   DERIVABLE_MANDATORY_TRIGGER_IDS,
   loadWorkScopePolicy,
   type WorkScopePolicy,
-} from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+} from '@agent/core/work-scope-decision';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export function collectWorkScopePolicyViolations(policy: WorkScopePolicy): string[] {
   const derivable = new Set<string>(DERIVABLE_MANDATORY_TRIGGER_IDS);
@@ -29,13 +29,15 @@ export const runCheckWorkScopePolicy = defineScript({
     const policy = loadWorkScopePolicy();
     const violations = collectWorkScopePolicyViolations(policy);
     if (violations.length > 0) {
-      for (const violation of violations) console.error(`[check:work-scope-policy] ${violation}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.map((violation) => `- ${violation}`)].join('\n')
+      );
     }
     context.print(
       `[check:work-scope-policy] OK — ${policy.mandatory_triggers.length} mandatory trigger(s) are reachable`
     );
+    return { violations };
   },
 });
 

@@ -5,15 +5,26 @@ import * as os from 'node:os';
 
 let sharedBase: string;
 
-vi.mock('./path-resolver.js', () => ({
-  shared: (sub = '') => path.join(sharedBase, sub),
-}));
+vi.mock('./path-resolver.js', async () => {
+  const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
+  return {
+    ...actual,
+    shared: (sub = '') => path.join(sharedBase, sub),
+    knowledge: (sub = '') => path.join(process.cwd(), 'knowledge', sub),
+    pathResolver: {
+      ...actual.pathResolver,
+      shared: (sub = '') => path.join(sharedBase, sub),
+      knowledge: (sub = '') => path.join(process.cwd(), 'knowledge', sub),
+    },
+  };
+});
 
 vi.mock('./secure-io.js', async () => {
   const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
     safeReadFile: (p: string, opts: any) => actualFs.readFileSync(p, opts),
     safeWriteFile: (p: string, content: string) => actualFs.writeFileSync(p, content),
+    assertSafeRepositoryPath: (p: string) => p,
     safeExistsSync: (p: string) => actualFs.existsSync(p),
     safeMkdir: (p: string, opts: any) => actualFs.mkdirSync(p, opts),
     safeUnlinkSync: (p: string) => actualFs.unlinkSync(p),
@@ -32,10 +43,21 @@ import {
   invalidateVaultEntry,
   listVaultEntries,
 } from './data-vault.js';
+import { registerFoundationIo } from './foundation/io.js';
 
 describe('data-vault', () => {
   beforeEach(() => {
     sharedBase = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-vault-test-'));
+    registerFoundationIo({
+      loadJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+      loadJsonIfPresent: <T>(filePath: string) =>
+        fs.existsSync(filePath) ? (JSON.parse(fs.readFileSync(filePath, 'utf8')) as T) : null,
+      appendFile: (filePath, content) => fs.appendFileSync(filePath, content),
+      exists: (filePath) => fs.existsSync(filePath),
+      readFile: (filePath) => fs.readFileSync(filePath, 'utf8'),
+      stat: (filePath) => fs.statSync(filePath),
+      writeFile: (filePath, content) => fs.writeFileSync(filePath, content),
+    });
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-04T00:00:00.000Z'));
   });
@@ -84,6 +106,24 @@ describe('data-vault', () => {
       expect(fetchFn2).not.toHaveBeenCalled();
       expect(result.fromCache).toBe(true);
       expect(result.data).toEqual({ content: 'original' });
+    });
+
+    it('fails closed when a persisted entry is tampered with', async () => {
+      await fetchWithVaultCache('notion', 'doc:tampered', vi.fn().mockResolvedValue({ value: 1 }), {
+        projectId: 'proj-tampered',
+        ttlMs: 60_000,
+      });
+      const fileName = fs.readdirSync(path.join(sharedBase, 'data-vault'))[0];
+      const filePath = path.join(sharedBase, 'data-vault', fileName);
+      const persisted = JSON.parse(fs.readFileSync(filePath, { encoding: 'utf8' })) as Record<
+        string,
+        unknown
+      >;
+      persisted.data = { value: 'tampered' };
+      fs.writeFileSync(filePath, JSON.stringify(persisted));
+
+      expect(getVaultEntry('notion', 'doc:tampered', 'proj-tampered')).toBeNull();
+      expect(listVaultEntries({ projectId: 'proj-tampered' })).toEqual([]);
     });
 
     it('re-fetches after TTL expiry', async () => {

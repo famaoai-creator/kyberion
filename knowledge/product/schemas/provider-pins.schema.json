@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "provider-pins.schema.json",
+  "title": "Mission provider decision pins",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "missionId": { "type": "string", "minLength": 1 },
+    "pins": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/pinnedEntry"
+      }
+    }
+  },
+  "required": ["version", "pins"],
+  "definitions": {
+    "pinnedEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "modelId": { "type": "string", "minLength": 1 },
+        "instance": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "orchestration": { "enum": ["leaf", "managed_workflow"] },
+        "pinnedAt": { "type": "string", "format": "date-time" },
+        "by": { "type": "string", "minLength": 1 }
+      },
+      "required": ["provider", "modelId", "instance", "orchestration", "pinnedAt", "by"]
+    }
+  }
+}

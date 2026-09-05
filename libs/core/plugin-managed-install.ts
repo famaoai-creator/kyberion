@@ -16,7 +16,9 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import {
   createApprovalRequest,
   computeApprovalPayloadHash,
@@ -35,13 +37,14 @@ import {
   type PluginTrustLabel,
 } from './plugin-source-trust.js';
 import {
+  assertSafeRepositoryPath,
   safeCopyFileSync,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeMoveSync,
-  safeReadFile,
   safeReaddir,
+  safeReadFile,
   safeRmSync,
   safeStat,
   safeWriteFile,
@@ -89,6 +92,9 @@ export interface InstallPluginManagedParams {
 }
 
 const MANAGED_RECORD_FILENAME = '.kyberion-managed-plugin.json';
+const MANAGED_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/managed-plugin-record.schema.json'
+);
 // Keep the Kyberion/Cowork and Claude Code locations first for compatibility,
 // then accept the Agent Plugins v1 portable root manifest.
 const MANIFEST_CANDIDATE_RELATIVE_PATHS = [
@@ -136,25 +142,27 @@ function readPluginManifestSafely(pluginRoot: string): {
     return { manifest: null, diagnostics };
   }
 
-  let raw: string;
-  try {
-    raw = safeReadFile(candidatePath, { encoding: 'utf8' }) as string;
-  } catch (err: unknown) {
-    diagnostics.push({
-      code: 'manifest_unreadable',
-      message: `Manifest could not be read: ${err instanceof Error ? err.message : String(err)}`,
-      severity: 'error',
-    });
-    return { manifest: null, diagnostics };
-  }
-
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(raw);
+    if (!safeLstat(candidatePath).isFile()) {
+      throw new Error(`plugin manifest must be a regular file: ${candidatePath}`);
+    }
+    parsed = parseSafeJsonObjectValue(
+      parseSafeJsonInput(
+        String(safeReadFile(candidatePath, { encoding: 'utf8' }) || ''),
+        `plugin manifest ${candidatePath}`,
+        { preserveParseError: true }
+      ),
+      `plugin manifest ${candidatePath}`
+    );
   } catch (err: unknown) {
+    const code = err instanceof SyntaxError ? 'manifest_invalid_json' : 'manifest_unreadable';
     diagnostics.push({
-      code: 'manifest_invalid_json',
-      message: `Manifest is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      code,
+      message:
+        code === 'manifest_invalid_json'
+          ? `Manifest is not valid JSON: ${err instanceof Error ? err.message : String(err)}`
+          : `Manifest could not be read: ${err instanceof Error ? err.message : String(err)}`,
       severity: 'error',
     });
     return { manifest: null, diagnostics };
@@ -166,6 +174,20 @@ function readPluginManifestSafely(pluginRoot: string): {
       : typeof parsed.name === 'string' && parsed.name.trim()
         ? parsed.name.trim()
         : '';
+  if (
+    (parsed.plugin_id !== undefined &&
+      (typeof parsed.plugin_id !== 'string' || parsed.plugin_id.trim() === '')) ||
+    (parsed.name !== undefined && (typeof parsed.name !== 'string' || parsed.name.trim() === '')) ||
+    (parsed.display_name !== undefined && typeof parsed.display_name !== 'string') ||
+    (parsed.version !== undefined && typeof parsed.version !== 'string')
+  ) {
+    diagnostics.push({
+      code: 'manifest_invalid_field',
+      message: 'Manifest identifier and display fields must be non-empty strings when present.',
+      severity: 'error',
+    });
+    return { manifest: null, diagnostics };
+  }
   if (!pluginIdField) {
     diagnostics.push({
       code: 'manifest_missing_field',
@@ -314,17 +336,233 @@ function resolveActivationStatus(params: {
 }
 
 function writeManagedRecord(managedDir: string, record: ManagedPluginRecord): void {
-  safeWriteFile(path.join(managedDir, MANAGED_RECORD_FILENAME), JSON.stringify(record, null, 2));
+  const recordPath = path.join(managedDir, MANAGED_RECORD_FILENAME);
+  const validated = defineCatalog<ManagedPluginRecord>({
+    id: 'managed-plugin-record',
+    path: recordPath,
+    schema: MANAGED_RECORD_SCHEMA_PATH,
+  }).validate(record, recordPath);
+  safeWriteFile(recordPath, JSON.stringify(validated, null, 2));
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
+function isValidTimestamp(value: unknown): value is string {
+  return isNonEmptyString(value) && !Number.isNaN(new Date(value).getTime());
+}
+
+function parsePersistedPluginManifest(value: unknown): PluginManifestInfo | null {
+  if (value === null) return null;
+  const record = parseSafeJsonObjectValue(value, 'managed plugin manifest');
+  if (!isNonEmptyString(record.pluginId))
+    throw new Error('managed plugin manifest pluginId invalid');
+  if (record.displayName !== undefined && typeof record.displayName !== 'string') {
+    throw new Error('managed plugin manifest displayName invalid');
+  }
+  if (record.version !== undefined && typeof record.version !== 'string') {
+    throw new Error('managed plugin manifest version invalid');
+  }
+  const displayName = record.displayName;
+  const version = record.version;
+  const raw = parseSafeJsonObjectValue(record.raw, 'managed plugin manifest raw');
+  return {
+    pluginId: record.pluginId,
+    ...(typeof displayName === 'string' ? { displayName } : {}),
+    ...(typeof version === 'string' ? { version } : {}),
+    raw,
+  };
+}
+
+function parsePersistedPluginDiagnostics(value: unknown): PluginManifestDiagnostic[] {
+  if (!Array.isArray(value)) throw new Error('managed plugin diagnostics must be an array');
+  return value.map((candidate, index) => {
+    const diagnostic = parseSafeJsonObjectValue(candidate, `managed plugin diagnostics[${index}]`);
+    if (
+      !isNonEmptyString(diagnostic.code) ||
+      !isNonEmptyString(diagnostic.message) ||
+      (diagnostic.severity !== 'error' && diagnostic.severity !== 'warning')
+    ) {
+      throw new Error(`managed plugin diagnostics[${index}] invalid`);
+    }
+    return {
+      code: diagnostic.code,
+      message: diagnostic.message,
+      severity: diagnostic.severity,
+    };
+  });
+}
+
+function parseManagedPluginRecord(value: unknown, managedDir: string): ManagedPluginRecord {
+  const record = parseSafeJsonObjectValue(value, 'managed plugin record');
+  const expectedKeys = new Set([
+    'pluginId',
+    'trust',
+    'trustReason',
+    'resolvedSourcePath',
+    'managedPath',
+    'manifest',
+    'diagnostics',
+    'activationStatus',
+    'approvalChannel',
+    'approvalRequestId',
+    'installedAt',
+  ]);
+  if (Object.keys(record).some((key) => !expectedKeys.has(key))) {
+    throw new Error('managed plugin record contains unknown fields');
+  }
+
+  const pluginId = normalizePluginId(String(record.pluginId || ''));
+  if (record.pluginId !== pluginId || !isNonEmptyString(record.trustReason)) {
+    throw new Error('managed plugin record identity invalid');
+  }
+  if (record.trust !== 'official' && record.trust !== 'curated' && record.trust !== 'third-party') {
+    throw new Error('managed plugin record trust invalid');
+  }
+  if (!isNonEmptyString(record.resolvedSourcePath)) {
+    throw new Error('managed plugin record source invalid');
+  }
+  if (!isNonEmptyString(record.managedPath)) {
+    throw new Error('managed plugin record managed path invalid');
+  }
+  const safeManagedDir = assertSafeRepositoryPath(managedDir, { allowMissingLeaf: true });
+  const persistedManagedDir = assertSafeRepositoryPath(record.managedPath, {
+    allowMissingLeaf: true,
+  });
+  if (path.resolve(safeManagedDir) !== path.resolve(persistedManagedDir)) {
+    throw new Error('managed plugin record managed path mismatch');
+  }
+
+  const manifest = parsePersistedPluginManifest(record.manifest);
+  const diagnostics = parsePersistedPluginDiagnostics(record.diagnostics);
+  if (
+    record.activationStatus !== 'activatable' &&
+    record.activationStatus !== 'pending_approval' &&
+    record.activationStatus !== 'blocked_broken_manifest'
+  ) {
+    throw new Error('managed plugin record activation status invalid');
+  }
+  if (!isValidTimestamp(record.installedAt)) {
+    throw new Error('managed plugin record installedAt invalid');
+  }
+
+  const hasApprovalChannel = record.approvalChannel !== undefined;
+  const hasApprovalRequestId = record.approvalRequestId !== undefined;
+  if (hasApprovalChannel !== hasApprovalRequestId) {
+    throw new Error('managed plugin record approval binding incomplete');
+  }
+  if (
+    (hasApprovalChannel && !isNonEmptyString(record.approvalChannel)) ||
+    (hasApprovalRequestId && !isNonEmptyString(record.approvalRequestId))
+  ) {
+    throw new Error('managed plugin record approval binding invalid');
+  }
+  if (manifest === null && !diagnostics.some((diagnostic) => diagnostic.severity === 'error')) {
+    throw new Error('managed plugin record missing manifest diagnostic');
+  }
+
+  return {
+    pluginId,
+    trust: record.trust,
+    trustReason: record.trustReason,
+    resolvedSourcePath: record.resolvedSourcePath,
+    managedPath: safeManagedDir,
+    manifest,
+    diagnostics,
+    activationStatus: record.activationStatus,
+    ...(hasApprovalChannel
+      ? {
+          approvalChannel: record.approvalChannel as string,
+          approvalRequestId: record.approvalRequestId as string,
+        }
+      : {}),
+    installedAt: record.installedAt,
+  };
+}
+
+function loadBoundPluginApproval(record: ManagedPluginRecord): ApprovalRequestRecord | undefined {
+  if (!record.approvalChannel || !record.approvalRequestId) return undefined;
+  const approval = loadApprovalRequest(record.approvalChannel, record.approvalRequestId);
+  if (!approval) return undefined;
+  if (
+    approval.correlationId !==
+    pluginApprovalCorrelationId(record.pluginId, record.resolvedSourcePath)
+  ) {
+    return undefined;
+  }
+  if (
+    approval.accountability?.payloadHash !==
+      computeApprovalPayloadHash({
+        plugin_id: record.pluginId,
+        trust: record.trust,
+        resolved_source_path: record.resolvedSourcePath,
+      }) ||
+    approval.accountability?.effectBinding !== pluginApprovalEffectBinding(record.pluginId)
+  ) {
+    return undefined;
+  }
+  return approval;
+}
+
+function verifyManagedPluginActivation(record: ManagedPluginRecord): ManagedPluginRecord {
+  let trust = record.trust;
+  let trustReason = record.trustReason;
+  try {
+    const derived = derivePluginTrustLabel(record.resolvedSourcePath).label;
+    if (trust === 'official' && derived !== 'official') {
+      trust = 'third-party';
+      trustReason =
+        'Persisted official trust did not match source provenance; defaulting to third-party.';
+    }
+  } catch {
+    if (trust === 'official') {
+      trust = 'third-party';
+      trustReason = 'Source provenance could not be verified; defaulting to third-party.';
+    }
+  }
+  const verified = { ...record, trust, trustReason };
+  return {
+    ...verified,
+    activationStatus: resolveActivationStatus({
+      diagnostics: verified.diagnostics,
+      trust,
+      approval: loadBoundPluginApproval(verified),
+    }),
+  };
 }
 
 function readManagedRecord(managedDir: string): ManagedPluginRecord | null {
   const recordPath = path.join(managedDir, MANAGED_RECORD_FILENAME);
   if (!safeExistsSync(recordPath)) return null;
   try {
-    return readJson<ManagedPluginRecord>(recordPath);
+    return verifyManagedPluginActivation(loadManagedPluginRecordAtPath(recordPath, managedDir));
   } catch {
     return null;
   }
+}
+
+/** Load a managed plugin record through the shared schema and file boundary. */
+export function loadManagedPluginRecordAtPath(
+  recordPath: string,
+  managedDir: string
+): ManagedPluginRecord {
+  const safeRecordPath = assertSafeRepositoryPath(recordPath, { allowMissingLeaf: false });
+  if (!safeLstat(safeRecordPath).isFile()) {
+    throw new Error(`managed plugin record must be a regular file: ${recordPath}`);
+  }
+  const validated = defineCatalog<ManagedPluginRecord>({
+    id: 'managed-plugin-record',
+    path: safeRecordPath,
+    schema: MANAGED_RECORD_SCHEMA_PATH,
+  }).load();
+  return parseManagedPluginRecord(validated, managedDir);
+}
+
+function resolveManagedRoot(managedRoot?: string): string {
+  return assertSafeRepositoryPath(managedRoot ? path.resolve(managedRoot) : defaultManagedRoot(), {
+    allowMissingLeaf: true,
+  });
 }
 
 /**
@@ -340,17 +578,20 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
   // caller's ambient role (mirrors approval-store's own `withRole` usage).
   return withExecutionContext('mission_controller', () => {
     const pluginId = normalizePluginId(params.pluginId);
-    const managedRoot = params.managedRoot
-      ? path.resolve(params.managedRoot)
-      : defaultManagedRoot();
-    const managedDir = path.join(managedRoot, pluginId);
+    const managedRoot = resolveManagedRoot(params.managedRoot);
+    const managedDir = assertSafeRepositoryPath(path.join(managedRoot, pluginId), {
+      allowMissingLeaf: true,
+    });
     const approvalChannel = params.approvalChannel?.trim() || DEFAULT_APPROVAL_CHANNEL;
 
     const trust = derivePluginTrustLabel(params.sourcePath, {
       curatedOriginPrefixes: params.curatedOriginPrefixes,
     });
 
-    const stagingDir = pathResolver.sharedTmp(`plugin-install/${pluginId}-${randomUUID()}`);
+    const stagingDir = assertSafeRepositoryPath(
+      pathResolver.sharedTmp(`plugin-install/${pluginId}-${randomUUID()}`),
+      { allowMissingLeaf: true }
+    );
     safeRmSync(stagingDir);
     stagePluginDirectory(path.resolve(params.sourcePath), stagingDir);
 
@@ -384,7 +625,7 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
       activationStatus: resolveActivationStatus({ diagnostics, trust: trust.label, approval }),
       approvalChannel: approval ? approvalChannel : undefined,
       approvalRequestId: approval?.id,
-      installedAt: new Date().toISOString(),
+      installedAt: nowIso(),
     };
     writeManagedRecord(managedDir, record);
     return record;
@@ -400,8 +641,10 @@ export function refreshManagedPluginActivation(
   pluginId: string,
   managedRoot?: string
 ): ManagedPluginRecord | null {
-  const root = managedRoot ? path.resolve(managedRoot) : defaultManagedRoot();
-  const managedDir = path.join(root, normalizePluginId(pluginId));
+  const root = resolveManagedRoot(managedRoot);
+  const managedDir = assertSafeRepositoryPath(path.join(root, normalizePluginId(pluginId)), {
+    allowMissingLeaf: true,
+  });
   const record = readManagedRecord(managedDir);
   if (!record) return null;
   if (record.activationStatus === 'blocked_broken_manifest') return record;
@@ -427,7 +670,7 @@ export function refreshManagedPluginActivation(
  * fail-closed execution.
  */
 export function listManagedPlugins(managedRoot?: string): ManagedPluginRecord[] {
-  const root = managedRoot ? path.resolve(managedRoot) : defaultManagedRoot();
+  const root = resolveManagedRoot(managedRoot);
   if (!safeExistsSync(root)) return [];
 
   const entries: ManagedPluginRecord[] = [];

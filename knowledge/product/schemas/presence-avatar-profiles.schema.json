@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/presence-avatar-profiles.schema.json",
+  "title": "Presence avatar profile registry",
+  "description": "Avatar profiles and aliases used by presence surfaces.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "defaultAgentId": { "type": "string", "minLength": 1 },
+    "aliases": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "profiles": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/profile" }
+    }
+  },
+  "definitions": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agentId", "displayName", "defaultAvatarAssetPath", "expressionAvatarMap"],
+      "properties": {
+        "agentId": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string", "minLength": 1 },
+        "defaultAvatarAssetPath": { "type": "string", "minLength": 1 },
+        "expressionAvatarMap": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

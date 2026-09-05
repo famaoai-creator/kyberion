@@ -1,9 +1,9 @@
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
-import type { ValidateFunction } from 'ajv';
-import { compileSchema } from './foundation/ajv.js';
+import type { SurfaceIntentResolutionOptions } from './router-contract.js';
 import {
   listSurfaceQueryOverlayCatalogEntries,
   loadSurfaceQueryOverlayCatalog,
@@ -59,30 +59,27 @@ const CONFIG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-query-providers.schema.json'
 );
 
+const providerConfigCatalogs = new Map<string, GovernedCatalog<SurfaceQueryProviderConfig>>();
 let cachedConfig: SurfaceQueryProviderConfig | null = null;
 let cachedConfigPath: string | null = null;
-let validateFn: ValidateFunction | null = null;
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(CONFIG_SCHEMA_PATH);
-  return validateFn;
+function providerConfigCatalog(filePath: string): GovernedCatalog<SurfaceQueryProviderConfig> {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const cached = providerConfigCatalogs.get(safeFilePath);
+  if (cached) return cached;
+  const catalog = defineCatalog<SurfaceQueryProviderConfig>({
+    id: 'surface-query-providers',
+    path: safeFilePath,
+    schema: CONFIG_SCHEMA_PATH,
+  });
+  providerConfigCatalogs.set(safeFilePath, catalog);
+  return catalog;
 }
 
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateConfig(value: unknown, label: string): SurfaceQueryProviderConfig {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid surface query provider config at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  return value as SurfaceQueryProviderConfig;
+function safeProviderConfigPath(filePath: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(filePath), {
+    allowMissingLeaf: true,
+  });
 }
 
 function mergeSection<T extends Record<string, unknown> | undefined>(base: T, overlay: T): T {
@@ -121,7 +118,7 @@ function getRoleOverlayPathForRole(role?: string): string | null {
   const catalogEntry = listSurfaceQueryOverlayCatalogEntries().find(
     (entry) => entry.kind === 'role' && entry.role === normalized
   );
-  return catalogEntry ? pathResolver.knowledge(catalogEntry.path) : null;
+  return catalogEntry ? safeProviderConfigPath(pathResolver.knowledge(catalogEntry.path)) : null;
 }
 
 function getPhaseOverlayPathForPhase(phase?: string): string | null {
@@ -130,16 +127,16 @@ function getPhaseOverlayPathForPhase(phase?: string): string | null {
   const catalogEntry = listSurfaceQueryOverlayCatalogEntries().find(
     (entry) => entry.kind === 'phase' && entry.phase === normalized
   );
-  return catalogEntry ? pathResolver.knowledge(catalogEntry.path) : null;
+  return catalogEntry ? safeProviderConfigPath(pathResolver.knowledge(catalogEntry.path)) : null;
 }
 
 function getPersonalOverlayPath(): string | null {
   const catalog = loadSurfaceQueryOverlayCatalog();
-  return (
+  return safeProviderConfigPath(
     getRegisteredEnvText('KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH')?.trim() ||
-    (catalog?.personal_overlay_path
-      ? pathResolver.knowledge(catalog.personal_overlay_path)
-      : DEFAULT_PERSONAL_OVERLAY_PATH)
+      (catalog?.personal_overlay_path
+        ? pathResolver.knowledge(catalog.personal_overlay_path)
+        : DEFAULT_PERSONAL_OVERLAY_PATH)
   );
 }
 
@@ -151,9 +148,9 @@ function getTenantOverlayPath(scope?: ScopeContext): string | null {
   const catalogEntry = listSurfaceQueryOverlayCatalogEntries().find(
     (entry) => entry.kind === 'tenant' && entry.tenant === normalizedTenant
   );
-  if (catalogEntry) return pathResolver.knowledge(catalogEntry.path);
-  return pathResolver.knowledge(
-    `confidential/${normalizedTenant}/presence/surface-query-providers.json`
+  if (catalogEntry) return safeProviderConfigPath(pathResolver.knowledge(catalogEntry.path));
+  return safeProviderConfigPath(
+    pathResolver.knowledge(`confidential/${normalizedTenant}/presence/surface-query-providers.json`)
   );
 }
 
@@ -164,15 +161,19 @@ function getEntityOverlayPath(scope?: ScopeContext): string[] {
   const paths: string[] = [];
   if (normalizedScope.organization_id) {
     paths.push(
-      pathResolver.knowledge(
-        `confidential/${tenant}/organizations/${normalizedScope.organization_id}/presence/surface-query-providers.json`
+      safeProviderConfigPath(
+        pathResolver.knowledge(
+          `confidential/${tenant}/organizations/${normalizedScope.organization_id}/presence/surface-query-providers.json`
+        )
       )
     );
   }
   if (normalizedScope.project_id) {
     paths.push(
-      pathResolver.knowledge(
-        `confidential/${tenant}/organizations/${normalizedScope.organization_id || '_'}/projects/${normalizedScope.project_id}/presence/surface-query-providers.json`
+      safeProviderConfigPath(
+        pathResolver.knowledge(
+          `confidential/${tenant}/organizations/${normalizedScope.organization_id || '_'}/projects/${normalizedScope.project_id}/presence/surface-query-providers.json`
+        )
       )
     );
   }
@@ -196,8 +197,9 @@ function getRequestedPhase(context: SurfaceQueryProviderContext): string | undef
 export function getSurfaceQueryProviderConfig(
   context: SurfaceQueryProviderContext = {}
 ): SurfaceQueryProviderConfig {
-  const configPath =
-    getRegisteredEnvText('KYBERION_SURFACE_QUERY_CONFIG_PATH') || DEFAULT_CONFIG_PATH;
+  const configPath = safeProviderConfigPath(
+    getRegisteredEnvText('KYBERION_SURFACE_QUERY_CONFIG_PATH') || DEFAULT_CONFIG_PATH
+  );
   loadSurfaceQueryOverlayCatalog();
   const overlayPaths = [
     getTenantOverlayPath(context.scope),
@@ -221,24 +223,21 @@ export function getSurfaceQueryProviderConfig(
     return cachedConfig;
   }
 
-  try {
-    let config = validateConfig(loadJson(configPath), configPath);
-    for (const overlayPath of overlayPaths) {
-      if (!safeExistsSync(overlayPath)) continue;
-      const overlay = validateConfig(loadJson(overlayPath), overlayPath);
-      config = mergeConfigs(config, overlay);
-    }
-    cachedConfig = config;
-  } catch {
-    cachedConfig = {};
+  let config = providerConfigCatalog(configPath).load();
+  for (const overlayPath of overlayPaths) {
+    if (!safeExistsSync(overlayPath)) continue;
+    const overlay = providerConfigCatalog(overlayPath).load();
+    config = mergeConfigs(config, overlay);
   }
+  cachedConfig = config;
   cachedConfigPath = cacheKey;
   return cachedConfig;
 }
 
-export function resetSurfaceQueryProviderConfigCache(): void {
+export function _resetSurfaceQueryProviderConfigCacheForTests(): void {
   cachedConfig = null;
   cachedConfigPath = null;
+  for (const catalog of providerConfigCatalogs.values()) catalog.reset();
 }
 
 export function isSurfaceLocationQuery(text: string): boolean {
@@ -285,8 +284,16 @@ export function extractSurfaceKnowledgeQuery(text: string): string | null {
   return stripped || trimmed;
 }
 
-export function classifySurfaceQueryIntent(text: string): SurfaceQueryIntent {
-  const packet = resolveIntentResolutionPacket(text);
+export function classifySurfaceQueryIntent(
+  text: string,
+  options: SurfaceIntentResolutionOptions = {}
+): SurfaceQueryIntent {
+  const packet =
+    options.packet ||
+    resolveIntentResolutionPacket(text, {
+      tier: options.tier,
+      tenantId: options.tenantId,
+    });
   if (
     packet.selected_intent_id === 'knowledge-query' ||
     packet.selected_intent_id === 'query-knowledge'

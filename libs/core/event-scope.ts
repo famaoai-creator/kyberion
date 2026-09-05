@@ -45,6 +45,78 @@ const EVENT_SCOPE_KINDS: readonly EventScopeKind[] = [
   'session',
 ];
 
+const EVENT_SCOPE_INPUT_KEYS = new Set([
+  'scope_kind',
+  'tier',
+  'tenant_slug',
+  'tenant_id',
+  'organization_id',
+  'project_id',
+  'mission_id',
+  'task_id',
+  'session_id',
+  'work_shape',
+  'customer_stance',
+  'viewer_principal',
+  'nhi_id',
+]);
+
+const EVENT_SCOPE_STRING_KEYS = new Set([
+  'scope_kind',
+  'tier',
+  'tenant_slug',
+  'tenant_id',
+  'organization_id',
+  'project_id',
+  'mission_id',
+  'task_id',
+  'session_id',
+  'work_shape',
+  'customer_stance',
+  'viewer_principal',
+  'nhi_id',
+]);
+
+/**
+ * Parse an untrusted boundary value without silently dropping malformed scope
+ * fields. Normalization is deliberately separate so callers can choose the
+ * appropriate authority/lineage check after shape validation.
+ */
+export function parseEventScopeInput(input: unknown): EventScopeInput {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('[EVENT_SCOPE_INPUT_INVALID] scope must be an object');
+  }
+
+  const record = input as Record<string, unknown>;
+  const parsed: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (!EVENT_SCOPE_INPUT_KEYS.has(key)) {
+      throw new Error(`[EVENT_SCOPE_INPUT_INVALID] unknown scope field '${key}'`);
+    }
+    if (value === undefined) continue;
+    if (EVENT_SCOPE_STRING_KEYS.has(key) && typeof value !== 'string') {
+      throw new Error(`[EVENT_SCOPE_INPUT_INVALID] scope field '${key}' must be a string`);
+    }
+    parsed[key] = value;
+  }
+
+  if (
+    parsed.tier !== undefined &&
+    !['personal', 'confidential', 'public'].includes(String(parsed.tier))
+  ) {
+    throw new Error(`[EVENT_SCOPE_INPUT_INVALID] invalid tier '${String(parsed.tier)}'`);
+  }
+  if (
+    parsed.scope_kind !== undefined &&
+    !EVENT_SCOPE_KINDS.includes(parsed.scope_kind as EventScopeKind)
+  ) {
+    throw new Error(
+      `[EVENT_SCOPE_INPUT_INVALID] invalid scope_kind '${String(parsed.scope_kind)}'`
+    );
+  }
+  return parsed as EventScopeInput;
+}
+
 const CONTAINMENT_KEYS: Array<keyof ScopeContext> = [
   'tenant_slug',
   'organization_id',

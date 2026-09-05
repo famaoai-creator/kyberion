@@ -1,22 +1,23 @@
 import * as path from 'node:path';
+import * as customerResolver from '@agent/core/customer-resolver';
 import {
-  customerResolver,
   listOrganizationMissionTeamTemplateCatalogSummariesForOrganization,
-  loadOrganizationProfile,
-  logger,
-  pathResolver,
   resolveOrganizationMissionTeamTemplateCatalogId,
-  safeExistsSync,
-  safeLstat,
-  safeReaddir,
-} from '@agent/core';
+} from '@agent/core/mission-team-index';
+import { loadOrganizationProfile } from '@agent/core/organization-profile';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { getOptionValue } from './mission-cli-args.js';
 import { withOrganizationContext } from './organization-context.js';
+
+type Print = (value: unknown) => void;
 
 export function listOrganizationCatalogs(
   organizationId?: string,
   jsonOutput = false,
-  argv: readonly string[] = []
+  argv: readonly string[] = [],
+  print: Print = () => undefined
 ) {
   return withOrganizationContext(organizationId, () => {
     const summaryOnly = argv.includes('--summary') || argv.includes('--compact');
@@ -64,7 +65,7 @@ export function listOrganizationCatalogs(
           optional_role_count: catalog.optional_role_count,
         })),
       };
-      console.log(JSON.stringify(payload, null, 2));
+      print(JSON.stringify(payload, null, 2));
       return;
     }
 
@@ -87,17 +88,17 @@ export function listOrganizationCatalogs(
     }
 
     const header = `${'SEL'.padEnd(4)} ${'CATALOG'.padEnd(20)} ${'ORG'.padEnd(14)} ${'TEMPLATES'.padEnd(10)} ${'REQ'.padStart(4)} ${'OPT'.padStart(4)} TEMPLATE IDS`;
-    console.log('');
-    console.log(header);
-    console.log('-'.repeat(header.length + 6));
+    print('');
+    print(header);
+    print('-'.repeat(header.length + 6));
     for (const catalog of filteredCatalogs) {
       const templateIds = catalog.template_ids.length ? catalog.template_ids.join(', ') : '-';
       const marker = catalog.selected ? '*' : ' ';
-      console.log(
+      print(
         `${marker.padEnd(4)} ${catalog.catalog_id.padEnd(20)} ${catalog.organization_id.padEnd(14)} ${String(catalog.template_count).padEnd(10)} ${String(catalog.required_role_count).padStart(4)} ${String(catalog.optional_role_count).padStart(4)} ${templateIds}`
       );
     }
-    console.log('');
+    print('');
     logger.info(`${filteredCatalogs.length} organization team template catalog(s) found.`);
   });
 }
@@ -105,7 +106,8 @@ export function listOrganizationCatalogs(
 export function listOrganizationProfiles(
   organizationId?: string,
   argv: readonly string[] = [],
-  rootDir = pathResolver.rootDir()
+  rootDir = pathResolver.rootDir(),
+  print: Print = () => undefined
 ) {
   const jsonOutput = argv.includes('--json');
   const summaryOnly = argv.includes('--summary') || argv.includes('--compact');
@@ -208,7 +210,7 @@ export function listOrganizationProfiles(
   }));
 
   if (jsonOutput) {
-    console.log(
+    print(
       JSON.stringify(
         {
           requested: requestedLabel,
@@ -250,24 +252,25 @@ export function listOrganizationProfiles(
     return;
   }
   const header = `${'SEL'.padEnd(4)} ${'SOURCE'.padEnd(10)} ${'ORG'.padEnd(14)} ${'TEAM'.padEnd(14)} ${'CATALOG'.padEnd(12)} ${'LLM'.padEnd(10)} STATUS`;
-  console.log('');
-  console.log(header);
-  console.log('-'.repeat(header.length + 6));
+  print('');
+  print(header);
+  print('-'.repeat(header.length + 6));
   for (const row of jsonRows) {
     const status = row.ready ? 'ready' : 'missing profile';
     const marker = row.active ? '*' : ' ';
-    console.log(
+    print(
       `${marker.padEnd(4)} ${row.source.padEnd(10)} ${`${row.name} (${row.organization_id})`.padEnd(14)} ${row.team_default_template.padEnd(14)} ${row.team_template_catalog_id.padEnd(12)} ${row.llm_default.padEnd(10)} ${status}`
     );
   }
-  console.log('');
+  print('');
   logger.info(`${jsonRows.length} organization profile(s) found.`);
 }
 
 export function showOrganizationProfile(
   organizationId?: string,
   summaryOnly = false,
-  jsonOutput = false
+  jsonOutput = false,
+  print: Print = () => undefined
 ) {
   return withOrganizationContext(organizationId, () => {
     const requestedLabel = organizationId?.trim() || 'default';
@@ -282,11 +285,11 @@ export function showOrganizationProfile(
         profile: null,
       };
       if (jsonOutput) {
-        console.log(JSON.stringify(payload, null, 2));
+        print(JSON.stringify(payload, null, 2));
         return;
       }
       logger.info(`[organization] requested=${requestedLabel} resolved=default selected=default`);
-      console.log(
+      print(
         JSON.stringify(
           { organization_id: 'default', selected_catalog: 'default', profile: null },
           null,
@@ -318,7 +321,7 @@ export function showOrganizationProfile(
       profile: organizationProfile,
     };
     if (jsonOutput) {
-      console.log(JSON.stringify(payload, null, 2));
+      print(JSON.stringify(payload, null, 2));
       return;
     }
     logger.info(
@@ -347,7 +350,7 @@ export function showOrganizationProfile(
     if (summaryOnly) {
       return;
     }
-    console.log(
+    print(
       JSON.stringify(
         {
           organization_id: organizationProfile.organization_id,
@@ -450,11 +453,15 @@ export function buildOrganizationDiscoveryReport() {
   };
 }
 
-export function showOrganizationDiscovery(jsonOutput = false, summaryOnly = false) {
+export function showOrganizationDiscovery(
+  jsonOutput = false,
+  summaryOnly = false,
+  print: Print = () => undefined
+) {
   const report = buildOrganizationDiscoveryReport();
 
   if (jsonOutput) {
-    console.log(JSON.stringify(report, null, 2));
+    print(JSON.stringify(report, null, 2));
     return;
   }
 
@@ -462,30 +469,30 @@ export function showOrganizationDiscovery(jsonOutput = false, summaryOnly = fals
   logger.info(
     'Use these entry points to switch organization context, inspect inventory, or copy commands.'
   );
-  console.log('');
+  print('');
   for (const doc of report.documents) {
-    console.log(`${doc.name}`);
-    console.log(`  path: ${doc.path}`);
-    console.log(`  purpose: ${doc.purpose}`);
-    console.log(`  text: ${doc.text_command}`);
-    console.log(`  json: ${doc.json_command}`);
-    console.log('');
+    print(`${doc.name}`);
+    print(`  path: ${doc.path}`);
+    print(`  purpose: ${doc.purpose}`);
+    print(`  text: ${doc.text_command}`);
+    print(`  json: ${doc.json_command}`);
+    print('');
   }
-  console.log('Canonical examples:');
+  print('Canonical examples:');
   for (const example of report.examples) {
-    console.log(`  - ${example.name}`);
-    console.log(`    path: ${example.path}`);
-    console.log(`    schema: ${example.schema}`);
-    console.log(`    purpose: ${example.purpose}`);
+    print(`  - ${example.name}`);
+    print(`    path: ${example.path}`);
+    print(`    schema: ${example.schema}`);
+    print(`    purpose: ${example.purpose}`);
   }
-  console.log('');
+  print('');
   if (summaryOnly) {
     return;
   }
-  console.log('Common questions:');
+  print('Common questions:');
   for (const item of report.common_questions) {
-    console.log(`  - ${item.question}`);
-    console.log(`    ${item.command}`);
+    print(`  - ${item.question}`);
+    print(`    ${item.command}`);
   }
-  console.log('');
+  print('');
 }

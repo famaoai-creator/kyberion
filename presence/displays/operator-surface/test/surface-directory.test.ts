@@ -17,7 +17,7 @@ describe('operator surface directory', () => {
     expect(slack?.auth_strategy).toBe('bearer');
     expect(slack?.required_secrets).toContain('SLACK_ACCESS_TOKEN');
     expect(slack?.use_cases).toContain('messaging-ingress');
-    expect(slack?.next_command).toMatch(/^pnpm surfaces:/);
+    expect(slack?.next_command).toBe('pnpm surfaces setup');
     expect(slack?.best_for).toContain('threaded remote requests');
     expect(Array.isArray(slack?.blocked_by)).toBe(true);
 
@@ -54,7 +54,11 @@ describe('operator surface directory', () => {
   it('shares launcher recommendations with other operator surfaces', () => {
     const recommendations = buildSurfaceLauncherRecommendations();
     expect(recommendations).toHaveLength(3);
-    expect(recommendations.map((entry) => entry.id)).toEqual(['chronos', 'voice-first-win', 'messaging']);
+    expect(recommendations.map((entry) => entry.id)).toEqual([
+      'chronos',
+      'voice-first-win',
+      'messaging',
+    ]);
     expect(recommendations[0]?.suggestedCommand).toMatch(/^pnpm /);
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { loadGateManifest, main, selectGates, validateGateManifest } from './run_checks.js';
 
 const gate = (id: string, scope: 'pr' | 'full' | 'release') => ({
@@ -10,6 +11,16 @@ const gate = (id: string, scope: 'pr' | 'full' | 'release') => ({
 });
 
 describe('manifest-driven check runner', () => {
+  it('uses the governed package manifest loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/run_checks.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain('readSafeJsonFile');
+    expect(source).not.toContain('readJson<{ scripts?: Record<string, string> }>(');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('print(`[check] ERROR ${message}`)');
+  });
+
   it('keeps --only inside the requested scope', () => {
     const manifest = {
       version: 1,
@@ -48,7 +59,9 @@ describe('manifest-driven check runner', () => {
   });
 
   it('fails closed for unknown options and missing option values', async () => {
-    await expect(main(['--unknown'])).resolves.toBe(1);
+    const output: unknown[] = [];
+    await expect(main(['--unknown'], (value) => output.push(value))).resolves.toBe(1);
+    expect(output).toEqual(['[check] ERROR unknown check option: --unknown']);
     await expect(main(['--', '--scope', 'pr', '--only', 'missing'])).resolves.toBe(1);
     await expect(main(['--scope'])).resolves.toBe(1);
     await expect(main(['--only'])).resolves.toBe(1);

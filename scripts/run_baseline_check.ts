@@ -1,60 +1,84 @@
 import * as path from 'node:path';
+import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
+import { validateService } from '@agent/core/service-validator';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { getRegisteredEnvText, isVitestProcess, parseSafeJsonInput } from '@agent/core/foundation';
 import {
-  SovereignSentinel,
-  validateService,
-  pathResolver,
-  resolveActiveProfileRoot,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
   safeReadFile,
-  safeWriteFile,
-  logger,
-  withExecutionContext,
-  loadServiceEndpointsCatalog,
-  killSwitch,
+} from '@agent/core/secure-io';
+import { logger } from '@agent/core/core';
+import { withExecutionContext } from '@agent/core/authority';
+import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
+import { killSwitch } from '@agent/core/kill-switch';
+import {
   readJanitorLastRunMs,
-  listOrphanNhiIdentities,
-  readReasoningDegraded,
+  readJanitorLastSubmissionMs as readJanitorLastSubmissionMarkerMs,
+  writeJanitorSubmissionMarker,
+  readSchedulerOpsAlertDays,
+  writeSchedulerOpsAlertDay,
+} from '@agent/core/storage-janitor';
+import { listOrphanNhiIdentities } from '@agent/core/nhi-lifecycle-governance';
+import { readReasoningDegraded } from '@agent/core/reasoning-degradation';
+import {
   readReasoningFailover,
   type ReasoningFailoverMarker,
-  validateEnv,
-  secretGuard,
+} from '@agent/core/reasoning-failover';
+import { validateEnv } from '@agent/core/env-validator';
+import { secretGuard } from '@agent/core/secret-guard';
+import {
   peekProviderCapabilityRegistry,
   loadProviderCapabilityRegistry,
   DEFAULT_PROVIDER_CAPABILITY_TTL_MS,
   type ProviderCapability,
-  readDaemonHeartbeat,
-  loadScheduleRegistry,
-  matchesCron,
+} from '@agent/core/provider-capability-registry';
+import { readDaemonHeartbeat, type DaemonHeartbeatStatus } from '@agent/core/daemon-heartbeat';
+import { loadScheduleRegistry, type ScheduledPipeline } from '@agent/core/pipeline-scheduler';
+import { matchesCron } from '@agent/core/cron-utils';
+import {
   sendOpsAlert,
+  resolveOpsAlertChannelStatus,
+  type OpsAlertReceipt,
+} from '@agent/core/ops-alert';
+import {
   collectFailedSchedules,
   sweepFailedSchedules,
-  enqueueOperationalLearningSignal,
+  type FailedScheduleFinding,
+} from '@agent/core/feedback-loop';
+import { enqueueOperationalLearningSignal } from '@agent/core/operational-learning';
+import {
   loadNotificationPreferences,
   resolveOperatorNotificationRoute,
-  resolveOpsAlertChannelStatus,
-  type DaemonHeartbeatStatus,
-  type ScheduledPipeline,
-  type FailedScheduleFinding,
-  type OpsAlertReceipt,
+} from '@agent/core/operator-notifications';
+import {
   hasRequiredServiceConnectionValue,
+  loadServiceConnectionReadinessConfig,
+} from '@agent/core/service-connection-readiness';
+import {
   assessDesktopObservationReadiness,
   listDesktopObservationSources,
-  macosAutomationBridge,
-} from '@agent/core';
+} from '@agent/core/desktop-recording';
+import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
+import {
+  loadBaselineCache,
+  storeBaselineCache,
+  type BaselineCacheSnapshot,
+} from '@agent/core/baseline-check-cache';
 import { scanTenantDrift } from './watch_tenant_drift.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type ReadinessRule = {
   required_keys_any?: string[];
 };
 
 const BASELINE_CACHE_TTL_MS = 60 * 60 * 1000;
-const BASELINE_CACHE_DIR = 'runtime/baseline-check-cache';
 const JANITOR_MAINTENANCE_TTL_MS = 24 * 60 * 60 * 1000;
-const JANITOR_SUBMIT_MARKER = 'runtime/state/janitor-last-submit.json';
 
 // AL-01: janitor liveness observation. The maintenance fallback above only
 // re-submits the janitor job — it cannot see a submission machinery that is
@@ -79,20 +103,33 @@ export function readAuditLedgerFreshness(
   nowMs = Date.now()
 ): AuditLedgerFreshness {
   try {
-    if (!safeExistsSync(auditDir)) {
+    const safeAuditDir = assertSafeRepositoryPath(auditDir, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeAuditDir) || !safeLstat(safeAuditDir).isDirectory()) {
       return { fresh: false, last_entry_ms: null, age_ms: null, reason: 'missing' };
     }
-    const files = safeReaddir(auditDir)
+    const files = safeReaddir(safeAuditDir)
       .filter((entry) => /^audit-\d{4}-\d{2}-\d{2}\.jsonl$/u.test(entry))
       .sort();
     let lastEntryMs: number | null = null;
     for (const file of files) {
-      const raw = String(safeReadFile(path.join(auditDir, file), { encoding: 'utf8' }) || '');
+      let safeFile: string;
+      try {
+        safeFile = assertSafeRepositoryPath(path.join(safeAuditDir, file), {
+          allowMissingLeaf: true,
+        });
+      } catch {
+        continue;
+      }
+      if (!safeExistsSync(safeFile) || !safeLstat(safeFile).isFile()) continue;
+      const raw = String(safeReadFile(safeFile, { encoding: 'utf8' }) || '');
       for (const line of raw.split(/\r?\n/u).reverse()) {
         if (!line.trim()) continue;
         try {
           const timestamp = Date.parse(
-            String((JSON.parse(line) as { timestamp?: unknown }).timestamp || '')
+            String(
+              (parseSafeJsonInput(line, 'baseline audit entry') as { timestamp?: unknown })
+                .timestamp || ''
+            )
           );
           if (Number.isFinite(timestamp)) {
             lastEntryMs = Math.max(lastEntryMs ?? 0, timestamp);
@@ -148,7 +185,6 @@ export const CHRONOS_DAEMON_ID = 'chronos-daemon';
 // so a slow tick or a single missed write never flaps the baseline.
 export const SCHEDULER_HEARTBEAT_MAX_AGE_MS = 10 * 60 * 1000;
 export const SCHEDULES_FIRING_WINDOW_MS = 24 * 60 * 60 * 1000;
-const SCHEDULER_ALERT_MARKER = 'runtime/state/scheduler-ops-alert-days.json';
 
 export interface SchedulerHealthCheck {
   ok: boolean;
@@ -298,100 +334,22 @@ export function evaluateSchedulerHealth(input: {
  * check runs hourly; without this gate a dead daemon would append 24 critical
  * alerts a day. Marker maps alert key -> last emitted UTC day (YYYY-MM-DD).
  */
-export function shouldEmitDailyOpsAlert(markerRaw: string | null, key: string, now: Date): boolean {
+export function shouldEmitDailyOpsAlert(
+  marker: Record<string, string> | null,
+  key: string,
+  now: Date
+): boolean {
   const today = now.toISOString().slice(0, 10);
-  if (!markerRaw) return true;
-  try {
-    const parsed = JSON.parse(markerRaw) as Record<string, unknown>;
-    return parsed?.[key] !== today;
-  } catch {
-    return true;
-  }
-}
-
-function readSchedulerAlertMarker(): string | null {
-  const markerPath = pathResolver.shared(SCHEDULER_ALERT_MARKER);
-  if (!safeExistsSync(markerPath)) return null;
-  try {
-    return safeReadFile(markerPath, { encoding: 'utf8' }) as string;
-  } catch {
-    return null;
-  }
-}
-
-function markSchedulerAlertDay(key: string, now: Date): void {
-  const markerPath = pathResolver.shared(SCHEDULER_ALERT_MARKER);
-  let existing: Record<string, unknown> = {};
-  const raw = readSchedulerAlertMarker();
-  if (raw) {
-    try {
-      existing = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      existing = {};
-    }
-  }
-  existing[key] = now.toISOString().slice(0, 10);
-  safeWriteFile(markerPath, JSON.stringify(existing, null, 2));
+  return marker?.[key] !== today;
 }
 
 let baselineConfigDegraded = false;
-
-type CachedEnvelope<T> = {
-  computed_at: string;
-  ttl_ms: number;
-  value: T;
-};
-
-type CachedSnapshot<T> = {
-  value: T;
-  cached: boolean;
-  age_ms?: number;
-};
 
 export type BaselineMaintenanceState = {
   submitted: boolean;
   pending: boolean;
   reason: string | null;
 };
-
-function cachePath(name: string): string {
-  return pathResolver.shared(`${BASELINE_CACHE_DIR}/${name}.json`);
-}
-
-function loadCachedSnapshot<T>(name: string): CachedSnapshot<T> | null {
-  const path = cachePath(name);
-  if (!safeExistsSync(path)) return null;
-  try {
-    const raw = safeReadFile(path, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as CachedEnvelope<T>;
-    const computedAt = new Date(parsed.computed_at).getTime();
-    if (!Number.isFinite(computedAt)) return null;
-    const ageMs = Date.now() - computedAt;
-    if (ageMs > parsed.ttl_ms) return null;
-    return {
-      value: parsed.value,
-      cached: true,
-      age_ms: ageMs,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function storeCachedSnapshot<T>(name: string, value: T, ttlMs: number): void {
-  safeWriteFile(
-    cachePath(name),
-    JSON.stringify(
-      {
-        computed_at: new Date().toISOString(),
-        ttl_ms: ttlMs,
-        value,
-      } satisfies CachedEnvelope<T>,
-      null,
-      2
-    )
-  );
-}
 
 function loadConnectionReadinessConfig(): {
   requiredServices: Record<string, ReadinessRule>;
@@ -409,10 +367,8 @@ function loadConnectionReadinessConfig(): {
       configDegraded: false,
     };
   }
-  try {
-    const raw = safeReadFile(configPath, { encoding: 'utf8' }) as string;
-    return parseConnectionReadinessConfig(raw, configPath);
-  } catch (_) {
+  const config = loadServiceConnectionReadinessConfig();
+  if (!config) {
     baselineConfigDegraded = true;
     logger.warn(
       `[baseline-check] service-connection-readiness config parse failed, falling back to defaults: ${configPath}`
@@ -423,6 +379,14 @@ function loadConnectionReadinessConfig(): {
       configDegraded: true,
     };
   }
+  baselineConfigDegraded = false;
+  return {
+    requiredServices: config.required_services || {},
+    tenantGuard: {
+      requireZeroDrift: config.tenant_guard?.require_zero_drift !== false,
+    },
+    configDegraded: false,
+  };
 }
 
 export function parseConnectionReadinessConfig(
@@ -434,7 +398,10 @@ export function parseConnectionReadinessConfig(
   configDegraded: boolean;
 } {
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = parseSafeJsonInput(raw, 'baseline configuration') as {
+      required_services?: Record<string, ReadinessRule>;
+      tenant_guard?: { require_zero_drift?: unknown };
+    };
     baselineConfigDegraded = false;
     return {
       requiredServices:
@@ -504,47 +471,31 @@ function checkServiceConnectionReadiness(
 }
 
 function getCachedTenantDrift() {
-  const cached = loadCachedSnapshot<ReturnType<typeof scanTenantDrift>>('tenant-drift');
+  const cached = loadBaselineCache<ReturnType<typeof scanTenantDrift>>('tenant-drift');
   if (cached) return cached;
   const value = scanTenantDrift();
-  storeCachedSnapshot('tenant-drift', value, BASELINE_CACHE_TTL_MS);
-  return { value, cached: false } satisfies CachedSnapshot<ReturnType<typeof scanTenantDrift>>;
+  storeBaselineCache('tenant-drift', value, BASELINE_CACHE_TTL_MS);
+  return { value, cached: false } satisfies BaselineCacheSnapshot<
+    ReturnType<typeof scanTenantDrift>
+  >;
 }
 
 function getCachedCoworkHealth() {
-  const cached = loadCachedSnapshot<ReturnType<typeof runCoworkHealthCheck>>('cowork-health');
+  const cached = loadBaselineCache<ReturnType<typeof runCoworkHealthCheck>>('cowork-health');
   if (cached) return cached;
   const value = runCoworkHealthCheck();
-  storeCachedSnapshot('cowork-health', value, BASELINE_CACHE_TTL_MS);
-  return { value, cached: false } satisfies CachedSnapshot<ReturnType<typeof runCoworkHealthCheck>>;
+  storeBaselineCache('cowork-health', value, BASELINE_CACHE_TTL_MS);
+  return { value, cached: false } satisfies BaselineCacheSnapshot<
+    ReturnType<typeof runCoworkHealthCheck>
+  >;
 }
 
 function readJanitorLastSubmissionMs(): number | null {
-  const markerPath = pathResolver.shared(JANITOR_SUBMIT_MARKER);
-  if (!safeExistsSync(markerPath)) return null;
-  try {
-    const raw = safeReadFile(markerPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as { submitted_at?: string };
-    const submittedAt = Date.parse(String(parsed?.submitted_at || ''));
-    return Number.isFinite(submittedAt) ? submittedAt : null;
-  } catch {
-    return null;
-  }
+  return readJanitorLastSubmissionMarkerMs();
 }
 
 function markJanitorSubmission(): void {
-  safeWriteFile(
-    pathResolver.shared(JANITOR_SUBMIT_MARKER),
-    JSON.stringify(
-      {
-        submitted_at: new Date().toISOString(),
-        pipeline_id: 'storage-janitor',
-        dry_run: false,
-      },
-      null,
-      2
-    )
-  );
+  writeJanitorSubmissionMarker();
 }
 
 function maybeSubmitJanitorMaintenanceJob(): {
@@ -740,7 +691,7 @@ export function resolveProviderCapabilitiesSnapshot(deps: {
 
 function getProviderCapabilitiesSnapshot(): ProviderCapabilitiesSnapshot {
   return resolveProviderCapabilitiesSnapshot({
-    probingEnabled: process.env[PROVIDER_CAPABILITY_PROBE_ENV] !== '0',
+    probingEnabled: getRegisteredEnvText(PROVIDER_CAPABILITY_PROBE_ENV) !== '0',
     peek: () => peekProviderCapabilityRegistry(),
     load: () => loadProviderCapabilityRegistry({ maxAgeMs: DEFAULT_PROVIDER_CAPABILITY_TTL_MS }),
   });
@@ -779,7 +730,7 @@ export async function runBaselineCheck() {
     summary: EMPTY_PROVIDER_CAPABILITIES_SUMMARY,
     cached: false,
     age_ms: null,
-    probing_enabled: process.env[PROVIDER_CAPABILITY_PROBE_ENV] !== '0',
+    probing_enabled: getRegisteredEnvText(PROVIDER_CAPABILITY_PROBE_ENV) !== '0',
   };
   try {
     providerCapabilities = getProviderCapabilitiesSnapshot();
@@ -857,12 +808,12 @@ export async function runBaselineCheck() {
     scheduler_alive: OpsAlertReceipt | null;
     failed_schedules: OpsAlertReceipt | null;
   } = { scheduler_alive: null, failed_schedules: null };
-  if (!process.env.VITEST) {
+  if (!isVitestProcess()) {
     try {
-      const markerRaw = readSchedulerAlertMarker();
+      const marker = readSchedulerOpsAlertDays();
       if (
         !schedulerHealth.scheduler_alive.ok &&
-        shouldEmitDailyOpsAlert(markerRaw, 'scheduler_alive', schedulerNow)
+        shouldEmitDailyOpsAlert(marker, 'scheduler_alive', schedulerNow)
       ) {
         schedulerAlerts.scheduler_alive = sendOpsAlert({
           severity: 'critical',
@@ -874,10 +825,10 @@ export async function runBaselineCheck() {
             enabled_schedule_count: schedulerHealth.enabled_schedule_count,
           },
           recommendation:
-            'Restart the scheduler (`pnpm chronos`) or install the LaunchAgent so it survives reboots (`pnpm chronos:install`, then apply the printed launchctl steps).',
+            'Restart the scheduler (`pnpm chronos`) or install the LaunchAgent so it survives reboots (`pnpm kyberion chronos install`, then apply the printed launchctl steps).',
           options: [
             'pnpm chronos  # foreground restart',
-            'pnpm chronos:install  # print LaunchAgent install steps',
+            'pnpm kyberion chronos install  # print LaunchAgent install steps',
             'pnpm daemon:watchdog -- --json  # confirm recovery',
           ],
           dedupe_key: 'scheduler:chronos-daemon-dead',
@@ -892,11 +843,11 @@ export async function runBaselineCheck() {
           evidenceRefs: ['baseline-check:scheduler_alive'],
           metadata: { heartbeat: schedulerHeartbeat },
         });
-        markSchedulerAlertDay('scheduler_alive', schedulerNow);
+        writeSchedulerOpsAlertDay('scheduler_alive', schedulerNow);
       }
       if (
         failedSchedules.length > 0 &&
-        shouldEmitDailyOpsAlert(markerRaw, 'failed_schedules', schedulerNow)
+        shouldEmitDailyOpsAlert(marker, 'failed_schedules', schedulerNow)
       ) {
         schedulerAlerts.failed_schedules = sweepFailedSchedules().alert;
         enqueueOperationalLearningSignal({
@@ -909,7 +860,7 @@ export async function runBaselineCheck() {
           evidenceRefs: failedSchedules.map((schedule) => `schedule:${schedule.id}`),
           metadata: { failed_schedules: failedSchedules },
         });
-        markSchedulerAlertDay('failed_schedules', schedulerNow);
+        writeSchedulerOpsAlertDay('failed_schedules', schedulerNow);
       }
     } catch (err: any) {
       logger.warn(
@@ -1116,7 +1067,7 @@ export const runBaselineCheckCli = defineScript({
       const report = await runBaselineCheck();
       context.print(report);
       if (report.status === 'needs_recovery' && report.circuit_broken) {
-        process.exitCode = 1;
+        throw new ScriptExitError(1, '', true, report);
       }
       return report;
     } catch (error) {
@@ -1128,8 +1079,7 @@ export const runBaselineCheckCli = defineScript({
         error: error instanceof Error ? error.message : String(error),
       };
       context.print(fatalReport);
-      process.exitCode = 1;
-      return fatalReport;
+      throw new ScriptExitError(1, '', true, fatalReport);
     }
   },
 });

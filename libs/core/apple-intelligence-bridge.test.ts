@@ -16,10 +16,14 @@ import {
   recognizeImageLocallyWithAppleVision,
   transcribeAudioLocallyWithAppleSpeech,
   verifyRenderedTextWithAppleVision,
-  resetAppleIntelligenceAvailabilityCache,
-  resetAppleImageGenerationAvailabilityCache,
+  _resetAppleIntelligenceAvailabilityCacheForTests,
+  _resetAppleImageGenerationAvailabilityCacheForTests,
   setAfmRunnerForTests,
   summarizeLocallyWithAppleFm,
+  normalizeAppleImageGenerationAvailability,
+  normalizeAppleImageGenerationResult,
+  normalizeAppleIntelligenceAvailability,
+  normalizeAppleVisionResult,
   type AfmRunner,
 } from './apple-intelligence-bridge.js';
 
@@ -39,8 +43,8 @@ function installRunner(
 describe('apple intelligence bridge', () => {
   beforeEach(() => {
     calls.length = 0;
-    resetAppleIntelligenceAvailabilityCache();
-    resetAppleImageGenerationAvailabilityCache();
+    _resetAppleIntelligenceAvailabilityCacheForTests();
+    _resetAppleImageGenerationAvailabilityCacheForTests();
     delete process.env.KYBERION_APPLE_FM;
   });
 
@@ -51,6 +55,35 @@ describe('apple intelligence bridge', () => {
       force: true,
     });
     delete process.env.KYBERION_APPLE_FM;
+  });
+
+  it('normalizes external availability, vision, and image result shapes', () => {
+    expect(normalizeAppleIntelligenceAvailability([])).toBeUndefined();
+    expect(normalizeAppleIntelligenceAvailability({ available: 'true' })).toBeUndefined();
+    expect(
+      normalizeAppleIntelligenceAvailability({ available: false, reason: 'notSupported' })
+    ).toEqual({ available: false, reason: 'notSupported' });
+    expect(
+      normalizeAppleVisionResult({
+        text: 'headline',
+        labels: [
+          { label: 'document', confidence: 0.44 },
+          { label: 'bad', confidence: 'x' },
+        ],
+      })
+    ).toEqual({ text: 'headline', labels: [{ label: 'document', confidence: 0.44 }] });
+    expect(normalizeAppleVisionResult({ text: 'headline', labels: [] })).toEqual({
+      text: 'headline',
+      labels: [],
+    });
+    expect(normalizeAppleImageGenerationAvailability({ available: 1 })).toBeUndefined();
+    expect(
+      normalizeAppleImageGenerationResult({ path: '/tmp/out.png', style: 'illustration' })
+    ).toEqual({
+      path: '/tmp/out.png',
+      style: 'illustration',
+    });
+    expect(normalizeAppleImageGenerationResult({ path: 42 })).toBeUndefined();
   });
 
   it('is disabled via KYBERION_APPLE_FM=0 without touching any process', async () => {
@@ -225,7 +258,7 @@ describe('apple intelligence bridge', () => {
       if (args[0] === 'availability') return { ok: true, stdout: '{"available":true}', stderr: '' };
       return { ok: true, stdout: 'something_else', stderr: '' };
     });
-    resetAppleIntelligenceAvailabilityCache();
+    _resetAppleIntelligenceAvailabilityCacheForTests();
     expect(await classifyLocallyWithAppleFm('x', ['a', 'b'])).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
 {
+  "$schema": "../../../product/schemas/video-motion-patterns.schema.json",
   "version": "1.0.0",
   "_meta": "MP-02 motion vocabulary. The compiler emits animation from these entries instead of literal @keyframes, and the reasoning backend may only SELECT ids from this catalog — never invent timing or curves. Durations are seconds. All patterns are transform/opacity/clip-path only so a seeking renderer stays deterministic.",
 

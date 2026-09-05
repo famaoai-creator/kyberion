@@ -1,4 +1,6 @@
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import * as path from 'node:path';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type {
   ExecutionGraph,
@@ -8,6 +10,7 @@ import type {
   GraphExecutionOutcome,
 } from './graph-scheduler.js';
 import { hashPipelineOutput } from './pipeline-run-journal.js';
+import { nowIso } from './foundation/time.js';
 
 export interface GraphRunArtifactNode {
   id: string;
@@ -27,6 +30,18 @@ export interface GraphRunArtifact {
   edges: GraphEdge[];
 }
 
+const GRAPH_RUN_ARTIFACT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/graph-run-artifact.schema.json'
+);
+
+function graphRunArtifactCatalog(filePath: string) {
+  return defineCatalog<GraphRunArtifact>({
+    id: 'graph-run-artifact',
+    path: filePath,
+    schema: GRAPH_RUN_ARTIFACT_SCHEMA_PATH,
+  });
+}
+
 export function createGraphRunArtifact<T>(
   graph: ExecutionGraph<T>,
   runId?: string,
@@ -36,7 +51,7 @@ export function createGraphRunArtifact<T>(
     version: 1,
     ...(runId ? { run_id: runId } : {}),
     ...(traceId ? { trace_id: traceId } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     nodes: graph.nodes.map((node) => ({
       id: node.id,
       status: 'pending' as const,
@@ -62,14 +77,20 @@ export function recordGraphRunNode<T, C>(
 
 export function graphRunArtifactPath(runId?: string): string {
   const safe = String(runId || 'run').replace(/[^a-zA-Z0-9._-]+/g, '-');
-  return pathResolver.shared(`runtime/run-graphs/${safe}.json`);
+  return assertSafeRepositoryPath(pathResolver.shared(`runtime/run-graphs/${safe}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function persistGraphRunArtifact(artifact: GraphRunArtifact, filePath?: string): string {
-  const target = filePath || graphRunArtifactPath(artifact.run_id);
-  const dir = target.replace(/[/\\][^/\\]+$/, '');
+  const target = assertSafeRepositoryPath(filePath || graphRunArtifactPath(artifact.run_id), {
+    allowMissingLeaf: true,
+  });
+  const dir = path.dirname(target);
+  assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   artifact.artifact_path = target;
-  safeWriteFile(target, `${JSON.stringify(artifact, null, 2)}\n`);
+  const canonical = graphRunArtifactCatalog(target).validate(artifact, target);
+  safeWriteFile(target, `${JSON.stringify(canonical, null, 2)}\n`);
   return target;
 }

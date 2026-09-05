@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "quarantine-record.schema.json",
+  "title": "Security Quarantine Record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "minLength": 1 },
+    "recorded_at": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "indicators": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "content": { "type": "string" },
+    "content_truncated": { "type": "boolean" },
+    "securityTainted": { "const": true }
+  },
+  "required": ["id", "recorded_at", "source", "reason", "indicators", "content", "securityTainted"]
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "migration-state.schema.json",
+  "title": "Applied migration state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["applied"],
+  "properties": {
+    "applied": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

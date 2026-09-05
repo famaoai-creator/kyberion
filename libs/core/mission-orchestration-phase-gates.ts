@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import {
   evaluateMissionGate,
   writeMissionGateRecord,
@@ -5,25 +6,88 @@ import {
 } from './mission-gate-engine.js';
 import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import { latestSnapshot } from './intent-snapshot-store.js';
-import { missionDir } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
+import {
+  loadMissionPhaseGateDefinitionAtPath,
+  type PersistedPhaseGateDefinition,
+} from './mission-phase-gate-definition-reader.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import {
+  loadMissionNextTaskRecordsAtPath,
+  type MissionNextTaskRecord,
+} from './mission-next-task-reader.js';
+
+function safeMissionPath(missionId: string, relativePath: string, allowMissingLeaf = true): string {
+  const missionPath = assertSafeRepositoryPath(
+    findMissionPath(missionId) || missionDir(missionId, 'public'),
+    { allowMissingLeaf }
+  );
+  return assertSafeRepositoryPath(path.join(missionPath, relativePath), {
+    allowMissingLeaf,
+  });
+}
 
 export type MissionGateRecord = {
+  mission_id?: string;
   gate_id?: string;
+  title?: string;
   verdict?: 'pass' | 'fail';
   reason?: string;
+  reasons?: string[];
   failure_count?: number;
   checked_at?: string;
   should_realign?: boolean;
   next_status?: string;
+  phase?: string;
+  position?: string;
+  source?: string;
+  drift_score?: number;
+  review_summary?: Record<string, unknown>;
+  evidence_path?: string;
+  checks?: Array<{ kind: string; passed: boolean; reason?: string }>;
+  override?: boolean;
+  override_outcome?: 'passed' | 'rejected';
+  note?: string;
+  confirmed_by?: string;
+  confirmed_at?: string;
+  source_gate_id?: string;
 };
 
-export interface PersistedPhaseGateDefinition {
-  phase: string;
-  position: 'entry' | 'exit';
-  gate: MissionGateDefinition;
+const MISSION_GATE_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-gate-record.schema.json'
+);
+
+export {
+  loadMissionPhaseGateDefinitionAtPath,
+  type PersistedPhaseGateDefinition,
+} from './mission-phase-gate-definition-reader.js';
+
+/** Load one persisted gate result through schema and mission binding. */
+export function loadMissionGateRecordAtPath(
+  filePath: string,
+  missionId: string
+): MissionGateRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[MISSION_GATE_RECORD] record must be a regular file: ${filePath}`);
+  }
+  const record = defineCatalog<MissionGateRecord>({
+    id: 'mission-gate-record',
+    path: safeFilePath,
+    schema: MISSION_GATE_RECORD_SCHEMA_PATH,
+  }).load();
+  const expectedMissionId = missionId.trim().toUpperCase();
+  if (record.mission_id?.trim().toUpperCase() !== expectedMissionId) {
+    throw new Error(
+      `[MISSION_GATE_RECORD_SCOPE_MISMATCH] record belongs to ${
+        record.mission_id || ''
+      }, expected ${expectedMissionId}`
+    );
+  }
+  return record;
 }
 
 export interface PhaseExitGateOutcome {
@@ -33,14 +97,9 @@ export interface PhaseExitGateOutcome {
 }
 
 export function loadMissionStateSnapshot(missionId: string): Record<string, unknown> | null {
-  const statePath = `${missionDir(missionId, 'public')}/mission-state.json`;
+  const statePath = safeMissionPath(missionId, 'mission-state.json');
   if (!safeExistsSync(statePath)) return null;
-  try {
-    const parsed = loadJson<unknown>(statePath);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
+  return loadMissionStateAtPath(statePath) as unknown as Record<string, unknown> | null;
 }
 
 export function missionClassOf(missionId: string): string | undefined {
@@ -60,14 +119,16 @@ export function missionRiskProfileOf(missionId: string): string | undefined {
 }
 
 function loadMissionGateRecords(missionId: string): MissionGateRecord[] {
-  const gateDir = `${missionDir(missionId, 'public')}/gates`;
+  const gateDir = safeMissionPath(missionId, 'gates');
   if (!safeExistsSync(gateDir)) return [];
   return safeReaddir(gateDir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
       try {
-        const parsed = loadJson<unknown>(`${gateDir}/${entry}`);
-        return parsed && typeof parsed === 'object' ? (parsed as MissionGateRecord) : null;
+        return loadMissionGateRecordAtPath(
+          assertSafeRepositoryPath(path.join(gateDir, entry)),
+          missionId
+        );
       } catch {
         return null;
       }
@@ -112,21 +173,16 @@ export function resolvePhaseGateMode(): 'off' | 'warn' | 'enforce' {
 }
 
 export function loadMissionPhaseGateDefinitions(missionId: string): PersistedPhaseGateDefinition[] {
-  const defsDir = `${missionDir(missionId, 'public')}/gates/definitions`;
+  const defsDir = safeMissionPath(missionId, path.join('gates', 'definitions'));
   if (!safeExistsSync(defsDir)) return [];
   return safeReaddir(defsDir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
       try {
-        const parsed = readJson<unknown>(`${defsDir}/${entry}`);
-        if (!parsed || typeof parsed !== 'object') return null;
-        const gate = (parsed as Record<string, unknown>).gate;
-        if (!gate || typeof gate !== 'object') return null;
-        return {
-          phase: String((parsed as Record<string, unknown>).phase || ''),
-          position: (parsed as Record<string, unknown>).position === 'entry' ? 'entry' : 'exit',
-          gate: gate as MissionGateDefinition,
-        } satisfies PersistedPhaseGateDefinition;
+        return loadMissionPhaseGateDefinitionAtPath(
+          assertSafeRepositoryPath(path.join(defsDir, entry)),
+          missionId
+        );
       } catch {
         return null;
       }
@@ -138,11 +194,12 @@ function enrichGateWithTaskOutcomes(
   missionId: string,
   gate: MissionGateDefinition
 ): MissionGateDefinition {
-  const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
-  let tasks: Array<Record<string, unknown>> = [];
+  const nextTasksPath = safeMissionPath(missionId, 'NEXT_TASKS.json');
+  let tasks: MissionNextTaskRecord[] = [];
   try {
-    const parsed = loadJson<unknown>(nextTasksPath);
-    if (Array.isArray(parsed)) tasks = parsed as Array<Record<string, unknown>>;
+    if (safeExistsSync(nextTasksPath)) {
+      tasks = loadMissionNextTaskRecordsAtPath(nextTasksPath, missionId) || [];
+    }
   } catch {
     /* no task board — checks keep their declared params */
   }
@@ -194,13 +251,13 @@ export async function evaluateMissionPhaseExitGates(
         : await evaluateMissionGate({
             missionId,
             gate: enrichGateWithTaskOutcomes(missionId, definition.gate),
-            evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+            evidenceDir: safeMissionPath(missionId, 'gates'),
           });
     if (definition.gate.id === 'INTENT_DRIFT' && driftSummary) {
       writeMissionGateRecord({
         missionId,
         gateId: 'INTENT_DRIFT',
-        evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+        evidenceDir: safeMissionPath(missionId, 'gates'),
         payload: {
           phase: definition.phase,
           position: 'exit',
@@ -231,7 +288,7 @@ export async function evaluateMissionPhaseExitGates(
     writeMissionGateRecord({
       missionId,
       gateId: 'INTENT_DRIFT',
-      evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+      evidenceDir: safeMissionPath(missionId, 'gates'),
       payload: {
         phase: latestSnapshot(missionId)?.stage || 'execution',
         position: 'exit',

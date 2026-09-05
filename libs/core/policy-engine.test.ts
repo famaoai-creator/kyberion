@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { policyEngine } from './policy-engine.js';
 import { registerFoundationIo } from './foundation/io.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeWriteFile } from './secure-io.js';
 
 // This suite imports policy-engine directly, before secure-io is part of the
 // module graph. Keep the fixture explicit and read-only instead of installing
@@ -76,5 +78,23 @@ describe('policyEngine (SA-05)', () => {
       });
       expect(decision.allowed, `ring3 should deny ${operation}`).toBe(false);
     }
+  });
+
+  it('drops malformed YAML policies and rules before evaluation', () => {
+    const root = pathResolver.sharedTmp('policy-engine-normalization-test');
+    safeMkdir(root, { recursive: true });
+    const policyPath = `${root}/policies.yaml`;
+    safeWriteFile(
+      policyPath,
+      `policies:\n  - name: valid-policy\n    rules:\n      - field: operation\n        operator: eq\n        value: blocked\n        action: deny\n        priority: 10\n  - name: invalid-policy\n    rules:\n      - field: operation\n        operator: unknown\n        value: ignored\n        action: deny\n        priority: 10\n`
+    );
+
+    policyEngine.loadFromFile(policyPath);
+
+    expect(policyEngine.getPolicyCounts()).toEqual({ loaded: 1, declared: 2 });
+    expect(policyEngine.evaluate({ agentId: 'worker-1', operation: 'blocked' }).allowed).toBe(
+      false
+    );
+    expect(policyEngine.evaluate({ agentId: 'worker-1', operation: 'other' }).allowed).toBe(true);
   });
 });

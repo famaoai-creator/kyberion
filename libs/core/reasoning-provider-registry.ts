@@ -13,8 +13,7 @@ import type { IntentExtractorCandidate } from './intent-extractor.js';
 import type { VoiceBridgeCandidate } from './voice-bridge.js';
 import type { BackendInputModality } from './backend-capability-profile.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertModuleInvariant } from './invariants.js';
 import { isRecord } from './foundation/text.js';
 
@@ -44,7 +43,14 @@ export interface ReasoningProviderRuntimeBundle {
 export type ReasoningProviderConformanceStatus = 'verified' | 'declared' | 'unavailable' | 'failed';
 
 export interface ReasoningProviderConformanceCheck {
-  name: 'prompt' | 'structured_output' | 'abort' | 'usage';
+  name:
+    | 'prompt'
+    | 'structured_output'
+    | 'abort'
+    | 'failover'
+    | 'egress_scope'
+    | 'usage'
+    | 'sandbox_enforcement';
   status: ReasoningProviderConformanceStatus;
   evidence: string;
 }
@@ -83,10 +89,13 @@ export type ReasoningProviderFactory = (
 
 interface RegistryFile {
   version?: string;
-  providers?: unknown;
+  providers: unknown[];
 }
 
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/reasoning-provider-registry.json');
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/reasoning-provider-registry.schema.json'
+);
 
 const KNOWN_MODES = new Set<ReasoningBackendMode>([
   'claude-cli',
@@ -99,6 +108,7 @@ const KNOWN_MODES = new Set<ReasoningBackendMode>([
   'grok-cli',
   'grok-api',
   'copilot',
+  'cursor-cli',
   'local',
   'ollama',
   'vllm',
@@ -112,24 +122,26 @@ const KNOWN_MODES = new Set<ReasoningBackendMode>([
   'stub',
 ]);
 
-const FALLBACK_CAPABILITIES: ReasoningProviderCapabilities = {
-  reasoning: true,
-  structured_output: true,
-  abort: false,
-  session_continuity: false,
-  input_modalities: ['text'],
-};
-
 const INPUT_MODALITIES = new Set<BackendInputModality>(['text', 'image', 'audio']);
+
+const reasoningProviderCatalog = defineCatalog<RegistryFile>({
+  id: 'reasoning-provider-registry',
+  path: REGISTRY_PATH,
+  schema: REGISTRY_SCHEMA_PATH,
+});
 
 let cachedDescriptors: readonly ReasoningProviderDescriptor[] | null = null;
 const registeredFactories = new Map<ReasoningBackendMode, ReasoningProviderFactory>();
-const CONFORMANCE_CHECK_NAMES = ['prompt', 'structured_output', 'abort', 'usage'] as const;
+const CONFORMANCE_CHECK_NAMES = [
+  'prompt',
+  'structured_output',
+  'abort',
+  'failover',
+  'egress_scope',
+  'usage',
+  'sandbox_enforcement',
+] as const;
 const CONFORMANCE_STATUSES = ['verified', 'declared', 'unavailable', 'failed'] as const;
-
-function parseBoolean(value: unknown, fallback: boolean): boolean {
-  return typeof value === 'boolean' ? value : fallback;
-}
 
 function isInputModality(value: unknown): value is BackendInputModality {
   return typeof value === 'string' && INPUT_MODALITIES.has(value as BackendInputModality);
@@ -137,18 +149,20 @@ function isInputModality(value: unknown): value is BackendInputModality {
 
 function parseInputModalities(
   rawCapabilities: Record<string, unknown>
-): readonly BackendInputModality[] {
-  if (Array.isArray(rawCapabilities.input_modalities)) {
-    const modalities = rawCapabilities.input_modalities.filter(isInputModality);
-    if (modalities.includes('text')) return modalities;
+): readonly BackendInputModality[] | null {
+  if (
+    !Array.isArray(rawCapabilities.input_modalities) ||
+    !rawCapabilities.input_modalities.every(isInputModality)
+  ) {
+    return null;
   }
-
-  // Read legacy registries during the migration window, but never expose the
-  // legacy boolean as part of the runtime capability contract.
-  return parseBoolean(rawCapabilities.images, false) ? ['text', 'image'] : ['text'];
+  const modalities = rawCapabilities.input_modalities as BackendInputModality[];
+  return modalities.includes('text') ? modalities : null;
 }
 
-function parseDescriptor(value: unknown): ReasoningProviderDescriptor | null {
+export function parseReasoningProviderDescriptor(
+  value: unknown
+): ReasoningProviderDescriptor | null {
   if (
     !isRecord(value) ||
     typeof value.mode !== 'string' ||
@@ -156,27 +170,38 @@ function parseDescriptor(value: unknown): ReasoningProviderDescriptor | null {
   ) {
     return null;
   }
-  if (typeof value.provider !== 'string' || typeof value.module !== 'string') return null;
-  const rawCapabilities = isRecord(value.capabilities) ? value.capabilities : {};
-  const rawEnvKeys = Array.isArray(value.env_keys) ? value.env_keys : [];
+  if (
+    typeof value.provider !== 'string' ||
+    !value.provider.trim() ||
+    typeof value.module !== 'string' ||
+    !value.module.trim() ||
+    !isRecord(value.capabilities) ||
+    !Array.isArray(value.env_keys) ||
+    value.env_keys.some((entry) => typeof entry !== 'string' || !entry.trim())
+  ) {
+    return null;
+  }
+  const rawCapabilities = value.capabilities;
+  const reasoning = rawCapabilities.reasoning;
+  const structuredOutput = rawCapabilities.structured_output;
+  const abort = rawCapabilities.abort;
+  const sessionContinuity = rawCapabilities.session_continuity;
+  const requiredBooleanCapabilities = [reasoning, structuredOutput, abort, sessionContinuity];
+  if (requiredBooleanCapabilities.some((entry) => typeof entry !== 'boolean')) return null;
+  const inputModalities = parseInputModalities(rawCapabilities);
+  if (!inputModalities) return null;
   const descriptor: ReasoningProviderDescriptor = {
     mode: value.mode as ReasoningBackendMode,
-    provider: value.provider,
-    module: value.module,
+    provider: value.provider.trim(),
+    module: value.module.trim(),
     capabilities: {
-      reasoning: parseBoolean(rawCapabilities.reasoning, FALLBACK_CAPABILITIES.reasoning),
-      structured_output: parseBoolean(
-        rawCapabilities.structured_output,
-        FALLBACK_CAPABILITIES.structured_output
-      ),
-      abort: parseBoolean(rawCapabilities.abort, FALLBACK_CAPABILITIES.abort),
-      session_continuity: parseBoolean(
-        rawCapabilities.session_continuity,
-        FALLBACK_CAPABILITIES.session_continuity
-      ),
-      input_modalities: parseInputModalities(rawCapabilities),
+      reasoning: reasoning as boolean,
+      structured_output: structuredOutput as boolean,
+      abort: abort as boolean,
+      session_continuity: sessionContinuity as boolean,
+      input_modalities: inputModalities,
     },
-    env_keys: rawEnvKeys.filter((entry): entry is string => typeof entry === 'string'),
+    env_keys: value.env_keys.map((entry) => entry.trim()),
   };
   // The prompt-reconstruction invariant is documented until PI-05 supplies
   // the durable request log; descriptor validation remains runtime-owned.
@@ -209,16 +234,27 @@ function assertConformanceEvidence(
       !CONFORMANCE_CHECK_NAMES.includes(check.name) ||
       !CONFORMANCE_STATUSES.includes(check.status) ||
       typeof check.evidence !== 'string' ||
+      !check.evidence.trim() ||
       seen.has(check.name)
     ) {
       throw new Error(`[REASONING_PROVIDER_CONFORMANCE_INVALID] ${mode}`);
     }
     seen.add(check.name);
   }
-  if (seen.size !== CONFORMANCE_CHECK_NAMES.length || !evidence.passed) {
+  if (
+    seen.size !== CONFORMANCE_CHECK_NAMES.length ||
+    !evidence.passed ||
+    evidence.checks.some((check) => check.status === 'failed')
+  ) {
     throw new Error(`[REASONING_PROVIDER_CONFORMANCE_FAILED] ${mode}`);
   }
-  const requiredLiveChecks = new Set(['prompt', 'structured_output', 'abort']);
+  const requiredLiveChecks = new Set([
+    'prompt',
+    'structured_output',
+    'abort',
+    'failover',
+    'egress_scope',
+  ]);
   const hasVerifiedLiveContract =
     evidence.live &&
     evidence.checks.every(
@@ -230,25 +266,16 @@ function assertConformanceEvidence(
 }
 
 function loadDescriptors(): readonly ReasoningProviderDescriptor[] {
-  if (!safeExistsSync(REGISTRY_PATH)) return [];
-  let parsed: RegistryFile;
-  try {
-    parsed = readJson<RegistryFile>(REGISTRY_PATH);
-  } catch (error) {
-    throw new Error(
-      `Invalid reasoning provider registry at ${REGISTRY_PATH}: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  }
-  if (!Array.isArray(parsed.providers)) {
-    throw new Error(
-      `Invalid reasoning provider registry at ${REGISTRY_PATH}: providers must be an array`
-    );
-  }
-  const descriptors = parsed.providers
-    .map(parseDescriptor)
-    .filter((entry): entry is ReasoningProviderDescriptor => entry !== null);
+  const parsed = reasoningProviderCatalog.load();
+  const descriptors = parsed.providers.map((entry, index) => {
+    const descriptor = parseReasoningProviderDescriptor(entry);
+    if (!descriptor) {
+      throw new Error(
+        `[REASONING_PROVIDER_REGISTRY_INVALID] provider entry ${index} is not a valid governed descriptor`
+      );
+    }
+    return descriptor;
+  });
   const seen = new Set<ReasoningBackendMode>();
   for (const descriptor of descriptors) {
     if (seen.has(descriptor.mode)) {
@@ -321,4 +348,5 @@ export function buildRegisteredReasoningProvider(
 export function resetReasoningProviderRegistryForTests(): void {
   registeredFactories.clear();
   cachedDescriptors = null;
+  reasoningProviderCatalog.reset();
 }

@@ -5,8 +5,9 @@ import {
   resetMeetingJoinDriverRegistry,
   redactMeetingUrl,
   resolveMeetingPlatform,
+  resolveMeetingPlatformFromUrl,
   validateMeetingTarget,
-} from '@agent/core';
+} from '@agent/core/meeting-join-driver';
 import {
   installBrowserMeetingJoinDriver,
   createBrowserMeetingJoinDriver,
@@ -18,27 +19,44 @@ import {
   ZOOM_SELECTORS,
 } from './index.js';
 
-// Mock @agent/core for cookie-store tests
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
-  const safeReadFile = vi.fn().mockReturnValue('[]');
+vi.mock('@agent/core/core', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
+vi.mock('@agent/core/path-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
   return {
     ...actual,
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      success: vi.fn(),
-    },
     pathResolver: {
       ...actual.pathResolver,
       rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
     },
+  };
+});
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
+  return {
+    ...actual,
+    assertSafeRepositoryPath: vi.fn((filePath: string) => filePath),
     safeExistsSync: vi.fn().mockReturnValue(false),
-    safeReadFile,
-    loadJson: vi.fn((filePath: string) => JSON.parse(String(safeReadFile(filePath)))),
+    safeLstat: vi.fn(() => ({ isFile: () => true })),
+    safeReadFile: vi.fn().mockReturnValue('[]'),
     safeWriteFile: vi.fn(),
     safeMkdir: vi.fn(),
+  };
+});
+
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    readJson: vi.fn(() => []),
   };
 });
 
@@ -204,6 +222,23 @@ describe('resolveMeetingPlatform', () => {
     ).toThrow(/not allow-listed/i);
   });
 
+  it('uses DNS label boundaries for host inference and validation', () => {
+    expect(resolveMeetingPlatformFromUrl('https://evilzoom.us/j/123')).toBeNull();
+    expect(resolveMeetingPlatformFromUrl('https://company.zoom.us/j/123')).toBe('zoom');
+    expect(
+      validateMeetingTarget({ url: 'https://company.zoom.us/j/123', platform: 'zoom' }).platform
+    ).toBe('zoom');
+    expect(
+      validateMeetingTarget({ url: 'https://zoom.us./j/123', platform: 'zoom' }).platform
+    ).toBe('zoom');
+    expect(() =>
+      validateMeetingTarget({ url: 'https://user:pass@zoom.us/j/123', platform: 'zoom' })
+    ).toThrow(/invalid meeting URL host/i);
+    expect(() =>
+      validateMeetingTarget({ url: 'https://zoom.us/j/123', platform: 'unknown' } as never)
+    ).toThrow(/unsupported meeting platform/i);
+  });
+
   it('redacts meeting urls down to host-only values', () => {
     expect(redactMeetingUrl('https://meet.google.com/abc-defg-hij?foo=bar')).toBe(
       'meet.google.com'
@@ -217,7 +252,7 @@ describe('cookie-store', () => {
   });
 
   it('readCookies returns empty array when file does not exist', async () => {
-    const { safeExistsSync } = await import('@agent/core');
+    const { safeExistsSync } = await import('@agent/core/secure-io');
     vi.mocked(safeExistsSync).mockReturnValue(false);
 
     const { readCookies } = await import('./cookie-store.js');
@@ -226,7 +261,7 @@ describe('cookie-store', () => {
   });
 
   it('readCookies returns parsed cookies when file exists', async () => {
-    const { safeExistsSync, safeReadFile } = await import('@agent/core');
+    const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
     vi.mocked(safeExistsSync).mockReturnValue(true);
     vi.mocked(safeReadFile).mockReturnValue(JSON.stringify([{ name: 'session', value: 'abc' }]));
 
@@ -236,7 +271,7 @@ describe('cookie-store', () => {
   });
 
   it('readCookies returns empty array when file contains invalid JSON', async () => {
-    const { safeExistsSync, safeReadFile } = await import('@agent/core');
+    const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
     vi.mocked(safeExistsSync).mockReturnValue(true);
     vi.mocked(safeReadFile).mockReturnValue('not-valid-json');
 
@@ -246,7 +281,7 @@ describe('cookie-store', () => {
   });
 
   it('readCookies returns empty array when file contains non-array JSON', async () => {
-    const { safeExistsSync, safeReadFile } = await import('@agent/core');
+    const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
     vi.mocked(safeExistsSync).mockReturnValue(true);
     vi.mocked(safeReadFile).mockReturnValue(JSON.stringify({ not: 'an array' }));
 
@@ -255,8 +290,19 @@ describe('cookie-store', () => {
     expect(cookies).toEqual([]);
   });
 
+  it('readCookies returns empty array when a persisted cookie has an invalid shape', async () => {
+    const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
+    vi.mocked(safeExistsSync).mockReturnValue(true);
+    vi.mocked(safeReadFile).mockReturnValue(
+      JSON.stringify([{ name: 'session', value: 'abc', expires: 'never' }])
+    );
+
+    const { readCookies } = await import('./cookie-store.js');
+    expect(readCookies('test-account')).toEqual([]);
+  });
+
   it('writeCookies calls safeWriteFile with serialized cookies', async () => {
-    const { safeWriteFile, safeMkdir } = await import('@agent/core');
+    const { safeWriteFile, safeMkdir } = await import('@agent/core/secure-io');
 
     const { writeCookies } = await import('./cookie-store.js');
     const testCookies = [{ name: 'session', value: 'xyz' }];
@@ -269,9 +315,22 @@ describe('cookie-store', () => {
     expect(safeMkdir).toHaveBeenCalled();
   });
 
+  it('writeCookies rejects an invalid cookie shape before persistence', async () => {
+    const { writeCookies } = await import('./cookie-store.js');
+
+    expect(() =>
+      writeCookies('test-account', [{ name: 'session', value: 'xyz', secure: 'yes' }])
+    ).toThrow('cookie payload has an invalid shape');
+  });
+
   it('cookiePathFor returns path containing account slug', async () => {
     const { cookiePathFor } = await import('./cookie-store.js');
     const cookiePath = cookiePathFor('my-account');
     expect(cookiePath).toContain('my-account.json');
+  });
+
+  it('rejects an account slug that would escape the cookie directory', async () => {
+    const { cookiePathFor } = await import('./cookie-store.js');
+    expect(() => cookiePathFor('../outside')).toThrow(/single safe path segment/);
   });
 });

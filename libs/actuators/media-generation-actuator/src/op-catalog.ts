@@ -3,7 +3,8 @@
 // shared pools, so every entry is strictly additive: pipelines reached them
 // via explicit step roles, and determineActuatorStepType threw unknown-op.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 const MEDIA_CAPTURE_SCHEMA: InputSchema = {
@@ -219,14 +220,14 @@ export const MEDIA_GENERATION_ACTUATOR_APPLY_OPS = [
 
 export const MEDIA_GENERATION_ACTUATOR_CONTROL_OPS = ['pipeline'] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const schema = MEDIA_GENERATION_CONTRACTS[op];
   return schema
     ? { op, kind, input_schema: schema, examples: MEDIA_GENERATION_EXAMPLES[op] || [{}] }
     : { op, kind };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...MEDIA_GENERATION_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...MEDIA_GENERATION_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

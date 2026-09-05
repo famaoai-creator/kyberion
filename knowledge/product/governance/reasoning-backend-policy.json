@@ -6,7 +6,9 @@
     "nemotron": "nemotron-api",
     "grok": "grok-cli",
     "grok-build": "grok-cli",
-    "xai": "grok-api"
+    "xai": "grok-api",
+    "cursor": "cursor-cli",
+    "cursor-agent": "cursor-cli"
   },
   "allowed_modes": [
     "claude-cli",
@@ -19,6 +21,7 @@
     "grok-cli",
     "grok-api",
     "copilot",
+    "cursor-cli",
     "local",
     "ollama",
     "vllm",
@@ -50,6 +53,10 @@
     {
       "env": "KYBERION_GROK_API_KEY",
       "mode": "grok-api"
+    },
+    {
+      "env": "CURSOR_API_KEY",
+      "mode": "cursor-cli"
     },
     {
       "env": "KYBERION_NEMOTRON_URL",
@@ -118,6 +125,11 @@
       "env_any": ["GROK_CLI", "GROK_VERSION"],
       "provider": "grok",
       "mode": "grok-cli"
+    },
+    {
+      "env_any": ["CURSOR_CLI", "CURSOR_AGENT"],
+      "provider": "cursor",
+      "mode": "cursor-cli"
     }
   ],
   "provider_fallback_order": [
@@ -140,6 +152,10 @@
     {
       "provider": "copilot",
       "mode": "copilot"
+    },
+    {
+      "provider": "cursor",
+      "mode": "cursor-cli"
     }
   ],
   "default_mode": "claude-cli",

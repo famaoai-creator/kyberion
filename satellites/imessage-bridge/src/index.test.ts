@@ -1,20 +1,39 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runChannelTurn, type IMessageStimulus, type SurfaceConversationResult } from '@agent/core';
+import { runChannelTurn } from '@agent/core/channel-adapter';
+import type { IMessageStimulus } from '@agent/core/imessage-utils';
+import type { SurfaceConversationResult } from '@agent/core/channel-surface-types';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const stubs = vi.hoisted(() => ({
   sent: [] as string[],
   historyFails: false,
+  history: [] as IMessageStimulus[],
 }));
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
+vi.mock('@agent/core/bluebubbles-adapter', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/bluebubbles-adapter')>();
   return {
     ...actual,
     resolveBlueBubblesConfig: () => undefined,
+  };
+});
+
+vi.mock('@agent/core/imessage-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/imessage-utils')>();
+  return {
+    ...actual,
     getIMessageHistory: () => {
       if (stubs.historyFails) throw new Error('imessage store unavailable');
-      return [];
+      return stubs.history;
     },
+  };
+});
+
+vi.mock('@agent/core/imessage-bridge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/imessage-bridge')>();
+  return {
+    ...actual,
     sendIMessage: async (request: { text: string }) => {
       stubs.sent.push(request.text);
       return { ok: true };
@@ -22,7 +41,11 @@ vi.mock('@agent/core', async (importOriginal) => {
   };
 });
 
-import { buildIMessageChannelAdapter } from './index.js';
+import {
+  buildIMessageChannelAdapter,
+  parseIMessageBridgeInput,
+  resolveIMessageBridgeInputPath,
+} from './index.js';
 
 const MESSAGE: IMessageStimulus = {
   id: '42',
@@ -52,6 +75,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   stubs.sent.length = 0;
   stubs.historyFails = false;
+  stubs.history.length = 0;
 });
 
 afterEach(() => {
@@ -59,6 +83,71 @@ afterEach(() => {
 });
 
 describe('imessage bridge processing note', () => {
+  it('uses the shared exit-code convention instead of terminating the host process', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/imessage-bridge/src/index.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toContain('process.exit(');
+  });
+
+  it('keeps file input inside the repository and limited to regular files', () => {
+    expect(() => resolveIMessageBridgeInputPath('/tmp/imessage-input.json')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    expect(() => resolveIMessageBridgeInputPath('scripts')).toThrow(
+      'input must be an existing regular file'
+    );
+  });
+
+  it('rejects non-object and non-string send input before dispatch', () => {
+    expect(() => parseIMessageBridgeInput(null)).toThrow('request body must be a JSON object');
+    expect(() => parseIMessageBridgeInput({ text: ['not-a-string'] })).toThrow(
+      'text must be a string'
+    );
+    expect(() => parseIMessageBridgeInput({ attachments: ['ok', 42] })).toThrow(
+      'attachments must be an array of strings'
+    );
+  });
+
+  it('preserves valid send input without coercing its fields', () => {
+    expect(
+      parseIMessageBridgeInput({
+        action: 'send',
+        recipient: 'chat-guid',
+        text: 'hello',
+        serviceName: 'bluebubbles',
+        attachments: ['active/shared/tmp/file.png'],
+      })
+    ).toEqual({
+      action: 'send',
+      recipient: 'chat-guid',
+      text: 'hello',
+      serviceName: 'bluebubbles',
+      attachments: ['active/shared/tmp/file.png'],
+    });
+  });
+
+  it('passes only prior turns as thread context', async () => {
+    stubs.history.push(
+      {
+        ...MESSAGE,
+        id: '41',
+        text: '前の相談',
+        date: '2026-05-15T00:00:00.000Z',
+      },
+      MESSAGE
+    );
+
+    const context = await buildIMessageChannelAdapter(MESSAGE).threadContext?.(TURN_INPUT);
+
+    expect(context).toContain('Recent iMessage thread context:');
+    expect(context).toContain('User (+15550000000): 前の相談');
+    expect(context).not.toContain('ちょっと相談があります');
+    expect(context).not.toContain('Current incoming message:');
+  });
+
   it('never fires the processing note when the turn fails before typing starts', async () => {
     // M3g-ii: the note used to be armed before runChannelTurn and cancelled
     // only through the typing handle, so a buildThreadContext failure left it

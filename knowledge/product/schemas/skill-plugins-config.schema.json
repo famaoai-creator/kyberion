@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "skill-plugins-config.schema.json",
+  "title": "Skill Plugins Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "format": "uri-reference" },
+    "plugins": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "tenant_overrides": { "$ref": "#/definitions/overrides" },
+    "organization_overrides": { "$ref": "#/definitions/overrides" },
+    "project_overrides": { "$ref": "#/definitions/overrides" }
+  },
+  "definitions": {
+    "overrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "plugins": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

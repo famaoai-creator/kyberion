@@ -1,5 +1,6 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/shared-tmp-allowlist.schema.json",
+  "documentation_only": true,
   "$comment": "AL-02 sharedTmp() ratchet ledger. Enforced by tests/shared-tmp-ratchet.test.ts: every production (non-test) call site of pathResolver.sharedTmp() in libs/ and scripts/ must be registered here at file granularity with its exact call count. New artifacts should use writeScopedArtifact (libs/core/artifact-store.ts) instead of the tmp floor. classification: 'legit-tmp' = genuinely consumable/intermediate data, tmp is the right place; 'migrate-candidate' = scope-owned artifact that should move to writeScopedArtifact in a later increment (AL-02 fixes the count at zero growth; migrations follow the plan).",
   "version": "1.0.0",
   "plan": "docs/developer/improvement-plans-2026-07/ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md",

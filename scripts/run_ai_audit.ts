@@ -18,26 +18,28 @@
  */
 
 import * as path from 'node:path';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning-backend';
 import {
-  createStandardYargs,
-  delegateStructured,
-  finalizeAndPersist,
   getInstalledReasoningMode,
-  getReasoningBackend,
   installReasoningBackends,
-  logger,
-  pathResolver,
+} from '@agent/core/reasoning-bootstrap';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   safeExistsSync,
   safeLstat,
   safeReadFile,
   safeReaddir,
   safeWriteFile,
-  TraceContext,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+
+type Print = (value: unknown) => void;
 
 export const AI_AUDIT_CASES_SCHEMA = z.object({
   cases: z
@@ -374,7 +376,7 @@ export async function runAiAudit(options: RunAiAuditOptions = {}): Promise<{
     ? resolveFromRoot(options.outputDir)
     : pathResolver.sharedTmp('ai-audit');
   const reportPath = path.join(outputDir, 'report.json');
-  const runId = `ai-audit-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
+  const runId = `ai-audit-${nowIso().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
   const trace = new TraceContext('ai-audit', { correlationId: runId });
 
   const enumerated = enumerateInvariants(options.invariantsDir);
@@ -424,7 +426,7 @@ export async function runAiAudit(options: RunAiAuditOptions = {}): Promise<{
 
   const report: AiAuditReport = {
     run_id: runId,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     status,
     backend_mode: backendMode,
     skip_reason: skipReason,
@@ -458,8 +460,8 @@ export function renderReport(report: AiAuditReport, reportPath: string): string 
   return lines.join('\n');
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
+  const argv = await createStandardYargs(['node', 'run_ai_audit', ...args])
     .option('dir', { type: 'string', describe: 'Invariants directory (default: tests_ai)' })
     .option('json', { type: 'boolean', default: false, describe: 'Print the raw report JSON' })
     .option('concurrency', { type: 'number', describe: 'Parallel invariant audits (default: 3)' })
@@ -472,19 +474,21 @@ async function main(): Promise<void> {
   });
 
   if (argv.json) {
-    console.log(JSON.stringify(report, null, 2));
+    print(JSON.stringify(report, null, 2));
   } else {
-    console.log(renderReport(report, reportPath));
+    print(renderReport(report, reportPath));
   }
-  process.exitCode = exitCode;
+  setProcessExitCode(exitCode);
 }
 
-const isDirectRun =
+export const runAiAuditScript = defineScript({
+  name: 'ai-audit',
+  flags: [],
+  run: ({ argv, print }) => main(argv, print),
+});
+
+if (
   isDirectScript(import.meta.url, 'run_ai_audit.ts') ||
-  isDirectScript(import.meta.url, 'run_ai_audit.js');
-if (isDirectRun) {
-  main().catch((error) => {
-    console.error(`[ai-audit] fatal: ${error?.message ?? error}`);
-    process.exitCode = 1;
-  });
-}
+  isDirectScript(import.meta.url, 'run_ai_audit.js')
+)
+  void runAiAuditScript();

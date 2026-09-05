@@ -104,10 +104,7 @@ vi.mock('./audit-chain', () => ({
   },
 }));
 
-vi.mock('./kill-switch.js', () => ({
-  killSwitch: {
-    logAction: mocks.logAction,
-  },
+vi.mock('./governance-action-recorder.js', () => ({
   recordGovernanceAction: (agentId: string, operation: string, reason: string, violation = false) =>
     mocks.logAction(agentId, `${operation}:${reason}`, violation),
 }));
@@ -664,8 +661,8 @@ describe('a2a-bridge', () => {
       // module generation's signature/identity modules while the test imports
       // fresh ones. Drop it so this generation rebuilds a consistent instance.
       delete (globalThis as Record<symbol, unknown>)[Symbol.for('@kyberion/a2a-bridge')];
-      const { resetA2ASecretCache } = await import('./a2a-envelope-signature.js');
-      resetA2ASecretCache();
+      const { _resetA2ASecretCacheForTests } = await import('./a2a-envelope-signature.js');
+      _resetA2ASecretCacheForTests();
     });
 
     afterEach(async () => {
@@ -842,15 +839,15 @@ describe('a2a-bridge', () => {
       process.env.KYBERION_A2A_SECRET = 'ni03-bridge-test-secret';
       // See NI-02 describe: the a2aBridge singleton survives vi.resetModules().
       delete (globalThis as Record<symbol, unknown>)[Symbol.for('@kyberion/a2a-bridge')];
-      const { resetA2ASecretCache } = await import('./a2a-envelope-signature.js');
-      resetA2ASecretCache();
+      const { _resetA2ASecretCacheForTests } = await import('./a2a-envelope-signature.js');
+      _resetA2ASecretCacheForTests();
     });
 
     afterEach(async () => {
       if (savedSecret === undefined) delete process.env.KYBERION_A2A_SECRET;
       else process.env.KYBERION_A2A_SECRET = savedSecret;
-      const { resetA2ASecretCache } = await import('./a2a-envelope-signature.js');
-      resetA2ASecretCache();
+      const { _resetA2ASecretCacheForTests } = await import('./a2a-envelope-signature.js');
+      _resetA2ASecretCacheForTests();
       delete (globalThis as Record<symbol, unknown>)[Symbol.for('@kyberion/a2a-bridge')];
     });
 

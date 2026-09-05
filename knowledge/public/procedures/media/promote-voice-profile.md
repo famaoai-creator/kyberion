@@ -19,7 +19,7 @@ This is the step that makes a registered profile usable for:
 ## CLI
 
 ```bash
-pnpm voice:profile:promote \
+pnpm kyberion voice profile-promote \
   --receipt active/shared/tmp/voice-profile-registration/reg-user-ja-001.json \
   --approved-by operator \
   --target-status active \

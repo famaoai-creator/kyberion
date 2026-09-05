@@ -3,7 +3,7 @@ import {
   ShareGrantLiveSessionRegistry,
   ShareGrantLiveSessionValidationError,
 } from './share-grant-live-sessions.js';
-import { safeRmSync } from './secure-io.js';
+import { safeRmSync, safeWriteFile } from './secure-io.js';
 
 describe('ShareGrantLiveSessionRegistry', () => {
   it('evicts only sessions belonging to the revoked link and resource', () => {
@@ -114,6 +114,57 @@ describe('ShareGrantLiveSessionRegistry', () => {
           connectedAt: '2026-08-09T00:02:00.000Z',
         })
       ).toThrow('already been revoked');
+    } finally {
+      safeRmSync(storePath, { force: true });
+    }
+  });
+
+  it('rejects malformed persisted state before applying any session', () => {
+    const storePath = 'active/shared/tmp/os13-malformed-live-session-state.json';
+    try {
+      safeWriteFile(
+        storePath,
+        JSON.stringify({
+          version: 1,
+          sessions: [
+            {
+              sessionId: 'valid-session',
+              linkId: 'link-a',
+              resourceRef: 'artifact:one',
+              connectedAt: '2026-08-09T00:00:00.000Z',
+            },
+            {
+              sessionId: 'malformed-session',
+              linkId: 'link-a',
+              resourceRef: 'artifact:two',
+              connectedAt: 'not-a-timestamp',
+            },
+          ],
+          revokedScopes: [],
+        }),
+        { encoding: 'utf8', mkdir: true }
+      );
+
+      expect(() => new ShareGrantLiveSessionRegistry({ storePath, persist: true })).toThrow(
+        ShareGrantLiveSessionValidationError
+      );
+    } finally {
+      safeRmSync(storePath, { force: true });
+    }
+  });
+
+  it('rejects unknown persisted state fields at the catalog boundary', () => {
+    const storePath = 'active/shared/tmp/os13-unknown-live-session-state.json';
+    try {
+      safeWriteFile(
+        storePath,
+        JSON.stringify({ version: 1, sessions: [], revokedScopes: [], unexpected: true }),
+        { encoding: 'utf8', mkdir: true }
+      );
+
+      expect(() => new ShareGrantLiveSessionRegistry({ storePath, persist: true })).toThrow(
+        ShareGrantLiveSessionValidationError
+      );
     } finally {
       safeRmSync(storePath, { force: true });
     }

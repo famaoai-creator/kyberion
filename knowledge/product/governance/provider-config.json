@@ -10,7 +10,8 @@
     "agy": "Gemini 3.7 Flash (Medium)",
     "codex": "gpt-5.6-sol",
     "grok": "grok-4.6",
-    "copilot": "auto"
+    "copilot": "auto",
+    "cursor": "auto"
   },
   "runtime_defaults": {
     "anthropic-default": "claude-opus-5",
@@ -19,7 +20,8 @@
     "gemini-fast": "gemini-3.1-flash-lite",
     "openai-vision": "gpt-5.5",
     "codex-default": "gpt-5.6-sol",
-    "copilot-default": "auto"
+    "copilot-default": "auto",
+    "cursor-default": "auto"
   },
   "lifecycle": {
     "gemini": {

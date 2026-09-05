@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "generation-cost-settlement.schema.json",
+  "title": "Persisted generation provider cost settlement",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "kind": { "const": "generation-cost-settlement" },
+    "settlement_id": { "type": "string", "minLength": 1 },
+    "job_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "action": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "backend_id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["settled", "unavailable"] },
+    "currency": { "const": "USD" },
+    "actual_cost_usd": { "type": "number", "minimum": 0 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope_kind": {
+          "type": "string",
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string" },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "work_shape": { "type": "string" },
+        "customer_stance": { "type": "string" },
+        "viewer_principal": { "type": "string" },
+        "nhi_id": { "type": "string" }
+      },
+      "required": ["scope_kind", "tier"]
+    },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "source": { "const": "provider-reported" },
+    "resource_usage_recorded": { "type": "boolean" }
+  },
+  "required": [
+    "kind",
+    "settlement_id",
+    "job_id",
+    "action",
+    "status",
+    "currency",
+    "scope",
+    "observed_at",
+    "source"
+  ],
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "settled" } } },
+      "then": { "required": ["actual_cost_usd"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "unavailable" } } },
+      "then": { "not": { "required": ["actual_cost_usd"] } }
+    }
+  ]
+}

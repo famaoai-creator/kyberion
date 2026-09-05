@@ -1,10 +1,13 @@
 import {
-  loadJson,
+  assertSafeRepositoryPath,
   safeExistsSync,
-  pathResolver,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
+import { parsePersistedPipelineStrategy, parseSafeJsonInput } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import { randomUUID } from 'node:crypto';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import {
@@ -21,7 +24,7 @@ import {
   revealFinderPath,
   openFinderPath,
 } from '@agent/core/os-automation';
-import { emitComputerSurfacePatch } from '@agent/core';
+import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
 import { systemFocusHelpers } from './system-focus-helpers.js';
 import { executePipeline } from './system-pipeline-helpers.js';
 
@@ -798,13 +801,22 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
 }
 
 async function performReconcile(input: SystemAction) {
-  const strategyPath = pathResolver.rootResolve(
-    input.strategy_path || 'knowledge/product/governance/system-strategy.json'
+  const strategyPath = assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      input.strategy_path || 'knowledge/product/governance/system-strategy.json'
+    ),
+    { allowMissingLeaf: true }
   );
-  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = loadJson<{
-    strategies: Array<{ pipeline: SystemPipelineStep[]; params?: Record<string, unknown> }>;
-  }>(strategyPath);
+  if (!safeExistsSync(strategyPath) || !safeLstat(strategyPath).isFile()) {
+    throw new Error(`Strategy not found: ${strategyPath}`);
+  }
+  const config = parsePersistedPipelineStrategy(
+    parseSafeJsonInput(
+      String(safeReadFile(strategyPath, { encoding: 'utf8' }) || ''),
+      'system strategy'
+    ),
+    'system strategy'
+  );
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }

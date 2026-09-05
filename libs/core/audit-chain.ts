@@ -3,6 +3,10 @@ import { isValidTenantSlug } from './entity-scope.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { rootDir } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
 export { registerLockIo } from './src/lock-utils.js';
@@ -24,6 +28,10 @@ import {
 } from './event-scope.js';
 
 const logger = createLogger('audit-chain');
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 /**
  * Hash-Chained Audit Trail v1.0
@@ -62,6 +70,98 @@ export interface AuditEntry {
   currentHash: string;
 }
 
+function persistedString(
+  record: Record<string, unknown>,
+  key: string,
+  options: { nullable?: boolean; optional?: boolean } = {}
+): string | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    if (options.optional) return undefined;
+    throw new Error(`audit.${key} must be a non-empty string`);
+  }
+  if (options.nullable && value === null) return undefined;
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`audit.${key} must be a non-empty string`);
+  }
+  return value;
+}
+
+/**
+ * Validate the persisted shape before a mirror or projection treats JSON as
+ * an AuditEntry. Hash verification remains the caller's responsibility; this
+ * boundary only prevents malformed records from becoming typed evidence.
+ */
+export function normalizePersistedAuditEntry(value: unknown): AuditEntry {
+  if (!isRecord(value)) throw new Error('audit entry must be a JSON object');
+
+  const id = persistedString(value, 'id');
+  const timestamp = persistedString(value, 'timestamp');
+  const agentId = persistedString(value, 'agentId');
+  const action = persistedString(value, 'action');
+  const operation = persistedString(value, 'operation');
+  const previousHash = persistedString(value, 'previousHash');
+  const currentHash = persistedString(value, 'currentHash');
+  const result = value.result;
+  if (
+    result !== 'allowed' &&
+    result !== 'denied' &&
+    result !== 'error' &&
+    result !== 'completed' &&
+    result !== 'failed'
+  ) {
+    throw new Error('audit.result is invalid');
+  }
+
+  const reason = persistedString(value, 'reason', { nullable: true, optional: true });
+  const correlationId = persistedString(value, 'correlationId', { nullable: true, optional: true });
+  const tenantSlug = persistedString(value, 'tenantSlug', { nullable: true, optional: true });
+  const chainKeyId = persistedString(value, 'chain_key_id', { nullable: true, optional: true });
+
+  const metadata = value.metadata;
+  if (metadata !== undefined && !isRecord(metadata)) {
+    throw new Error('audit.metadata must be an object');
+  }
+  const compliance = value.compliance;
+  if (value.compliance !== undefined) {
+    if (!isRecord(compliance)) throw new Error('audit.compliance must be an object');
+    persistedString(compliance, 'framework');
+    persistedString(compliance, 'control');
+  }
+  const scope = value.scope;
+  if (scope !== undefined && !isRecord(scope)) {
+    throw new Error('audit.scope must be an object');
+  }
+  if (
+    value.chain_alg !== undefined &&
+    value.chain_alg !== 'sha256' &&
+    value.chain_alg !== 'hmac-sha256'
+  ) {
+    throw new Error('audit.chain_alg is invalid');
+  }
+
+  return {
+    id: id!,
+    timestamp: timestamp!,
+    agentId: agentId!,
+    action: action!,
+    operation: operation!,
+    result,
+    ...(reason ? { reason } : {}),
+    ...(correlationId ? { correlationId } : {}),
+    ...(metadata !== undefined ? { metadata } : {}),
+    ...(compliance !== undefined ? { compliance: compliance as AuditEntry['compliance'] } : {}),
+    ...(tenantSlug ? { tenantSlug } : {}),
+    ...(scope !== undefined ? { scope: scope as AuditEntry['scope'] } : {}),
+    ...(value.chain_alg !== undefined
+      ? { chain_alg: value.chain_alg as AuditEntry['chain_alg'] }
+      : {}),
+    ...(chainKeyId ? { chain_key_id: chainKeyId } : {}),
+    previousHash: previousHash!,
+    currentHash: currentHash!,
+  };
+}
+
 export interface AuditVerifyOptions {
   since?: string;
 }
@@ -82,12 +182,32 @@ export interface AuditChainIo {
   mkdir(dirPath: string): void;
   readdir(dirPath: string): string[];
   append(filePath: string, content: string): void;
+  assertSafePath(
+    filePath: string,
+    options?: { allowMissingLeaf?: boolean; rootDir?: string }
+  ): string;
 }
 
 let auditIo: AuditChainIo | undefined;
 
+type AuditForwarderPublisher = (entry: AuditEntry) => Promise<void> | void;
+let auditForwarderPublisher: AuditForwarderPublisher | undefined;
+
+/**
+ * Register the optional SIEM publisher without making the audit chain import
+ * the forwarder implementation. The forwarder depends on network redaction,
+ * which depends on secure-io; keeping this seam here preserves the one-way
+ * foundation dependency graph.
+ */
+export function registerAuditForwarderPublisher(publisher: AuditForwarderPublisher): () => void {
+  auditForwarderPublisher = publisher;
+  return () => {
+    if (auditForwarderPublisher === publisher) auditForwarderPublisher = undefined;
+  };
+}
+
 function testAuditChainIo(): AuditChainIo | undefined {
-  if (!process.env.VITEST) return undefined;
+  if (!isVitestProcess()) return undefined;
   return (
     globalThis as typeof globalThis & {
       __kyberionVitestIo?: { auditIo?: AuditChainIo };
@@ -100,6 +220,18 @@ let auditChainInstance: AuditChainImpl | undefined;
 export function registerAuditChainIo(io: AuditChainIo): void {
   auditIo = io;
   auditChainInstance?.initializeFromDisk();
+}
+
+function safeAuditPath(
+  filePath: string,
+  options: { allowMissingLeaf?: boolean } = {}
+): string | null {
+  if (!auditIo) return null;
+  try {
+    return auditIo.assertSafePath(filePath, options);
+  } catch {
+    return null;
+  }
 }
 
 class AuditChainImpl {
@@ -162,7 +294,7 @@ class AuditChainImpl {
       this.seedFromDisk();
       this.entryCount++;
       const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
-      const timestamp = new Date().toISOString();
+      const timestamp = nowIso();
 
       const requestedTenantSlug =
         entry.tenantSlug ?? entry.scope?.tenant_slug ?? resolveCurrentTenantSlug();
@@ -213,29 +345,21 @@ class AuditChainImpl {
       return nextEntry;
     });
 
-    // Fan-out to the registered audit forwarder (SIEM / log sink). Dynamic
-    // import to keep the forwarder optional and break the circular type
-    // dependency (forwarder imports AuditEntry from this module).
+    // Fan-out to the optional audit forwarder (SIEM / log sink). The
+    // publisher is registered by audit-forwarder when that optional module is
+    // loaded, so the audit chain remains independent of network code.
     void this.fanOutToForwarder(fullEntry);
 
     return fullEntry;
   }
 
   private fanOutToForwarder(entry: AuditEntry): void {
-    import('./audit-forwarder.js')
-      .then(async ({ getAuditForwarder }) => {
-        const forwarder = getAuditForwarder();
-        if (forwarder.name === 'stub') return;
-        try {
-          await forwarder.publish(entry);
-        } catch (err: any) {
-          logger.warn(
-            `[audit-chain] forwarder ${forwarder.name} threw for ${entry.id}: ${err?.message ?? err}`
-          );
-        }
-      })
-      .catch((err) => {
-        logger.warn(`[audit-chain] failed to load audit-forwarder: ${err?.message ?? err}`);
+    const publisher = auditForwarderPublisher;
+    if (!publisher) return;
+    Promise.resolve()
+      .then(() => publisher(entry))
+      .catch((err: unknown) => {
+        logger.warn(`[audit-chain] forwarder failed for ${entry.id}: ${errorMessage(err)}`);
       });
   }
 
@@ -379,20 +503,35 @@ class AuditChainImpl {
     }
 
     const customersDir = path.join(pathResolver.rootDir(), 'customer');
-    if (!auditIo.exists(customersDir)) return { ok: true, findings };
+    const safeCustomersDir = safeAuditPath(customersDir, { allowMissingLeaf: true });
+    if (!safeCustomersDir) return { ok: false, findings: ['tenant_mirror_path_unsafe:root'] };
+    if (!auditIo.exists(safeCustomersDir)) return { ok: true, findings };
 
-    for (const slug of auditIo.readdir(customersDir)) {
-      const mirrorDir = path.join(customersDir, slug, 'logs', 'audit');
-      if (!auditIo.exists(mirrorDir)) continue;
+    // Tenant identity comes from the chained master entries, not from arbitrary
+    // directory names under the customer stance overlay.
+    for (const slug of masterByTenant.keys()) {
+      if (!isValidTenantSlug(slug)) continue;
+      const mirrorDir = path.join(safeCustomersDir, slug, 'logs', 'audit');
+      const safeMirrorDir = safeAuditPath(mirrorDir, { allowMissingLeaf: true });
+      if (!safeMirrorDir) {
+        findings.push(`tenant_mirror_path_unsafe:${slug}`);
+        continue;
+      }
+      if (!auditIo.exists(safeMirrorDir)) continue;
 
       const mirrorFiles = auditIo
-        .readdir(mirrorDir)
+        .readdir(safeMirrorDir)
         .filter((fileName) => AuditChainImpl.AUDIT_FILE_RE.test(fileName))
         .sort((left, right) => left.localeCompare(right));
 
       const mirrorEntries: AuditEntry[] = [];
       for (const fileName of mirrorFiles) {
-        mirrorEntries.push(...this.readAuditFileEntries(path.join(mirrorDir, fileName)));
+        const mirrorFile = safeAuditPath(path.join(safeMirrorDir, fileName));
+        if (!mirrorFile) {
+          findings.push(`tenant_mirror_path_unsafe:${slug}:${fileName}`);
+          continue;
+        }
+        mirrorEntries.push(...this.readAuditFileEntries(mirrorFile));
       }
 
       const masterSet = masterByTenant.get(slug) || [];
@@ -497,7 +636,7 @@ class AuditChainImpl {
         .trim()
         .split('\n')
         .filter(Boolean)
-        .map((line) => JSON.parse(line));
+        .map((line) => normalizePersistedAuditEntry(parseSafeJsonInput(line, 'audit chain entry')));
     } catch (_) {
       return [];
     }
@@ -512,7 +651,7 @@ class AuditChainImpl {
       if (!auditIo.exists(this.auditDir)) {
         auditIo.mkdir(this.auditDir);
       }
-      auditIo.append(this.getFilePath(), `${JSON.stringify(entry)}\n`);
+      auditIo.append(this.getFilePath(entry.timestamp), `${JSON.stringify(entry)}\n`);
     } catch (err: any) {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
     }
@@ -531,24 +670,28 @@ class AuditChainImpl {
     if (entry.tenantSlug && isValidTenantSlug(entry.tenantSlug)) {
       try {
         const stanceDir = path.join(rootDir(), 'customer', entry.tenantSlug);
-        if (!auditIo.exists(stanceDir)) return;
-        const tenantAuditDir = path.join(stanceDir, 'logs', 'audit');
-        if (!auditIo.exists(tenantAuditDir)) {
-          auditIo.mkdir(tenantAuditDir);
+        const safeStanceDir = safeAuditPath(stanceDir, { allowMissingLeaf: true });
+        if (!safeStanceDir || !auditIo.exists(safeStanceDir)) return;
+        const tenantAuditDir = path.join(safeStanceDir, 'logs', 'audit');
+        const safeTenantAuditDir = safeAuditPath(tenantAuditDir, { allowMissingLeaf: true });
+        if (!safeTenantAuditDir) return;
+        if (!auditIo.exists(safeTenantAuditDir)) {
+          auditIo.mkdir(safeTenantAuditDir);
         }
-        const date = new Date().toISOString().slice(0, 10);
-        auditIo.append(
-          path.join(tenantAuditDir, `audit-${date}.jsonl`),
-          `${JSON.stringify(entry)}\n`
-        );
+        const date = entry.timestamp.slice(0, 10);
+        const mirrorFile = safeAuditPath(path.join(safeTenantAuditDir, `audit-${date}.jsonl`), {
+          allowMissingLeaf: true,
+        });
+        if (!mirrorFile) return;
+        auditIo.append(mirrorFile, `${JSON.stringify(entry)}\n`);
       } catch (err: any) {
         logger.warn(`[AUDIT_CHAIN] Tenant mirror failed for ${entry.tenantSlug}: ${err.message}`);
       }
     }
   }
 
-  private getFilePath(): string {
-    const date = new Date().toISOString().slice(0, 10);
+  private getFilePath(timestamp: string): string {
+    const date = timestamp.slice(0, 10);
     return path.join(this.auditDir, `audit-${date}.jsonl`);
   }
 }
@@ -593,7 +736,7 @@ function resolveCurrentTenantSlug(): string | undefined {
   if (fromEnv && isValidTenantSlug(fromEnv)) {
     return fromEnv;
   }
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   if (!missionId) return undefined;
   // Walk up looking for a mission-state.json with tenant_slug.
   const candidates = [

@@ -39,6 +39,8 @@ import type { MissionState } from './mission-types.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
 import { countWords as countWordsFromDispatchIO } from './mission-dispatch-io.js';
 import { type MissionExecutionSurface } from './mission-execution-surface.js';
+import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 
 /**
  * Confidential missions default to external_egress=deny. A model-backed
@@ -310,7 +312,7 @@ export function buildDispatchResponseArtifact(input: {
     prompt: input.prompt,
     response_text: input.responseText,
     response_excerpt: input.responseText.slice(0, 800),
-    written_at: new Date().toISOString(),
+    written_at: nowIso(),
   };
   return { filePath, payload };
 }
@@ -614,7 +616,7 @@ export function buildTaskResultClarificationPacket(input: {
         required_input: need,
         impact: 'The work item remains blocked until the missing input is available.',
       })),
-      maxQuestions: Math.min(3, Math.max(1, needs.length)),
+      maxQuestions: clamp(needs.length, 1, 3),
     },
     `Clarification needed for work item ${input.item.item_id}`,
     'The task result still has unresolved needs_input and cannot be marked complete yet.'

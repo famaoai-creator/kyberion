@@ -1,5 +1,6 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/sdlc-gate-catalog.schema.json",
+  "documentation_only": true,
   "concept": "sdlc-gate-catalog",
   "version": "1.0.0",
   "deprecated": true,

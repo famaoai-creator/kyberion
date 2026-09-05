@@ -1,14 +1,11 @@
-import {
-  getAllFiles,
-  pathResolver,
-  resolvePipelineInputPlaceholders,
-  safeReadFile,
-} from '@agent/core';
-import * as addFormatsModule from 'ajv-formats';
+import { getAllFiles } from '@agent/core/fs-utils';
+import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolvePipelineInputPlaceholders } from '@agent/core/pipeline-input-contract';
 import { createAjv } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
-
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 type JsonSchema = Record<string, unknown>;
 
@@ -59,7 +56,6 @@ export function scanPipelineOpSchemas(
   pipelines: PipelineDocument[]
 ): PipelineSchemaScanReport {
   const ajv = createAjv();
-  addFormats(ajv);
   const validators = new Map<string, ReturnType<typeof ajv.compile>>();
   for (const actuator of discovery.actuators || []) {
     const domain = String(actuator.n || '').replace(/-actuator$/, '');
@@ -103,13 +99,7 @@ export function scanPipelineOpSchemas(
 }
 
 function readDiscovery(): PipelineSchemaDiscovery {
-  return JSON.parse(
-    String(
-      safeReadFile(pathResolver.knowledge('product/orchestration/actuator-op-discovery.json'), {
-        encoding: 'utf8',
-      }) || '{}'
-    )
-  ) as PipelineSchemaDiscovery;
+  return loadActuatorOpDiscoveryAtPath();
 }
 
 function readPipelines(): PipelineDocument[] {
@@ -118,10 +108,13 @@ function readPipelines(): PipelineDocument[] {
     const absolute = pathResolver.rootResolve(root);
     return getAllFiles(absolute).filter((file) => file.endsWith('.json'));
   });
-  return [...new Set(files)].sort().map((file) => ({
-    path: file.replace(`${pathResolver.rootDir()}/`, ''),
-    value: JSON.parse(String(safeReadFile(file, { encoding: 'utf8' }) || '{}')),
-  }));
+  return [...new Set(files)].sort().map((file) => {
+    const safeFile = assertSafeRepositoryPath(file);
+    return {
+      path: safeFile.replace(`${pathResolver.rootDir()}/`, ''),
+      value: readSafeJsonValueFile<unknown>(safeFile, `pipeline schema coverage ${safeFile}`),
+    };
+  });
 }
 
 export function findPipelineOpSchemaViolations(): PipelineSchemaScanReport {
@@ -134,17 +127,20 @@ export const runCheckPipelineOpSchemaCoverage = defineScript({
   run(context) {
     const report = findPipelineOpSchemaViolations();
     if (report.violations.length > 0) {
-      console.error(
-        `[check:pipeline-op-schemas] FAILED (${report.violations.length} violation(s), ${report.checked} schema-bound steps checked)`
+      throw new ScriptExitError(
+        1,
+        [
+          `FAILED (${report.violations.length} violation(s), ${report.checked} schema-bound steps checked)`,
+          ...report.violations.map(
+            (violation) => `- ${violation.path} ${violation.op}: ${violation.errors.join('; ')}`
+          ),
+        ].join('\n')
       );
-      for (const violation of report.violations) {
-        console.error(`- ${violation.path} ${violation.op}: ${violation.errors.join('; ')}`);
-      }
-      throw new Error(`${report.violations.length} pipeline op schema violation(s)`);
     }
     context.print(
       `[check:pipeline-op-schemas] OK (${report.checked} schema-bound steps checked across ${report.steps} steps)`
     );
+    return report;
   },
 });
 

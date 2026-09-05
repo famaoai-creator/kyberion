@@ -2,7 +2,7 @@ import * as path from 'node:path';
 
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 import { isManagedPluginActivationAllowed, listManagedPlugins } from './plugin-managed-install.js';
 import { type ResourceProvenance, type ResourceTrust } from './resource-provenance.js';
 
@@ -205,15 +205,16 @@ function readFacet(
   filePath: string,
   pluginId?: string
 ): ResolvedFacet {
-  const parsed = parseFrontmatter(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  const safeFilePath = assertSafeRepositoryPath(filePath);
+  const parsed = parseFrontmatter(safeReadFile(safeFilePath, { encoding: 'utf8' }) as string);
   return {
     kind,
     name,
     source,
-    path: filePath,
+    path: safeFilePath,
     content: parsed.content,
     frontmatter: parsed.frontmatter,
-    provenance: facetProvenance(source, filePath, pluginId),
+    provenance: facetProvenance(source, safeFilePath, pluginId),
   };
 }
 

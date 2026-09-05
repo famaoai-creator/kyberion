@@ -16,6 +16,7 @@ import {
   safeReaddir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
 } from './secure-io.js';
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
@@ -113,6 +114,38 @@ describe('validateAndRepairAdf', () => {
     if (originalKnowledgeDeliveryDir === undefined)
       delete process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
     else process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = originalKnowledgeDeliveryDir;
+  });
+
+  it('rejects an ADF repair target outside the repository root', async () => {
+    await expect(
+      validateAndRepairAdf('../../outside-adf.json', 'capability-input')
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects an ADF repair target reached through a symbolic link', async () => {
+    const targetPath = writeFixture(
+      'symlink-target.json',
+      JSON.stringify({ capability: 'demo', action: 'run' })
+    );
+    const linkPath = fixturePath('symlink-adf.json');
+    safeSymlinkSync(targetPath, linkPath);
+
+    await expect(validateAndRepairAdf(linkPath, 'capability-input')).rejects.toThrow(
+      '[RESOURCE_PATH_SYMLINK]'
+    );
+  });
+
+  it('rejects an ADF repair target replaced with a directory', async () => {
+    const filePath = writeFixture(
+      'directory-adf.json',
+      JSON.stringify({ capability: 'demo', action: 'run' })
+    );
+    safeRmSync(filePath);
+    safeMkdir(filePath);
+
+    await expect(validateAndRepairAdf(filePath, 'capability-input')).rejects.toThrow(
+      '[ADF_REPAIR] repair target must be a regular file'
+    );
   });
 
   it('routes work-item ADF repair through the coordinated native path', async () => {
@@ -284,6 +317,21 @@ describe('validateAndRepairAdf', () => {
     expect(JSON.parse(readFixture(filePath))).toEqual({ capability: 'demo', action: 'run' });
   });
 
+  it('does not treat dangerous JSON keys as a valid ADF input', async () => {
+    const delegateTask = vi.fn(async () => JSON.stringify({ capability: 'demo', action: 'run' }));
+    registerFakeRepairBackend(delegateTask);
+    const filePath = writeFixture(
+      'dangerous.json',
+      '{"capability":"demo","action":"run","meta":{"__proto__":{"x":1}}}'
+    );
+
+    const result = await validateAndRepairAdf(filePath, 'capability-input');
+
+    expect(result.repaired).toBe(true);
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(readFixture(filePath))).toEqual({ capability: 'demo', action: 'run' });
+  });
+
   it('repairs lightweight JSON defects without delegating to the reasoning backend', async () => {
     const delegateTask = vi.fn(stubReasoningBackend.delegateTask);
     registerFakeRepairBackend(delegateTask);
@@ -336,6 +384,20 @@ describe('validateAndRepairAdf', () => {
     expect(readFixture(filePath)).toBe(original);
   });
 
+  it('does not adopt a delegated non-object repair result', async () => {
+    const delegateTask = vi.fn(async () => JSON.stringify(['not', 'an', 'ADF object']));
+    registerFakeRepairBackend(delegateTask);
+    const original = JSON.stringify({ capability: 'demo' }, null, 2);
+    const filePath = writeFixture('non-object-repair.json', original);
+
+    const result = await validateAndRepairAdf(filePath, 'capability-input');
+
+    expect(result.repaired).toBe(false);
+    expect(result.errors?.join('\n')).toContain('action');
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(readFixture(filePath)).toBe(original);
+  });
+
   it('rejects pipeline ADF guardrail violations without delegating', async () => {
     const delegateTask = vi.fn(stubReasoningBackend.delegateTask);
     registerFakeRepairBackend(delegateTask);
@@ -363,7 +425,7 @@ describe('validateAndRepairAdf', () => {
       )
     );
 
-    const result = await validateAndRepairAdf(filePath, 'pipeline-adf');
+    const result = await validateAndRepairAdf(filePath, 'pipeline-adf', { trustResolved: true });
 
     expect(result.repaired).toBe(false);
     expect(result.report).toContain('ADF guardrails failed');
@@ -383,6 +445,7 @@ describe('validateAndRepairAdf', () => {
     );
 
     const result = await validateAndRepairAdf(filePath, 'pipeline-adf', {
+      trustResolved: true,
       step: { op: 'demo:step', id: 'failed-step', params: { value: 'before' } },
       failure: {
         category: 'runtime_error',
@@ -396,6 +459,17 @@ describe('validateAndRepairAdf', () => {
     expect(JSON.parse(readFixture(filePath))).toEqual({
       steps: [{ op: 'demo:step', params: {} }],
     });
+  });
+
+  it('blocks project-local pipeline repair without a trust decision', async () => {
+    const filePath = writeFixture(
+      'untrusted-pipeline.json',
+      JSON.stringify({ steps: [{ op: 'demo:step', params: {} }] })
+    );
+
+    await expect(validateAndRepairAdf(filePath, 'pipeline-adf')).rejects.toThrow(
+      '[TRUST_REQUIRED]'
+    );
   });
 
   describe('KP-02: delegateTask knowledge context', () => {

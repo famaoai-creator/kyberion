@@ -1,29 +1,93 @@
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
 import {
-  loadJson,
-  logger,
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
+} from '@agent/core/document-contents-policy';
+import {
   resolveReportSectionTitle,
   resolveReportSummaryTitle,
+} from '@agent/core/document-outline-label-policy';
+import {
   resolveProposalSectionKeywords,
   resolveProposalEvidenceIndex,
-  resolveSignalToneRank,
+} from '@agent/core/media-semantic-map';
+import { resolveSignalToneRank } from '@agent/core/media-style-policy';
+import {
   resolveDocumentTypeFromClues as resolveDocumentTypeFromCluesPolicy,
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
-  loadMediaSignalEntryPolicyCatalog,
-  loadTrackerSheetPolicyCatalog,
-  isLegacyMediaOp,
-} from '@agent/core';
+} from '@agent/core/document-inference-policy';
+import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media-signal-entry-policy';
+import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
+import { isLegacyMediaOp } from '@agent/core/legacy-media-ops';
+import { loadJsonValue } from './media-catalog-loaders.js';
+import type { CreativeDesignTypography } from '@agent/core/creative-design-resolver';
 import * as path from 'node:path';
 
 export type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
 export type ProtocolKind = 'pptx' | 'docx' | 'pdf' | 'xlsx';
+export interface MediaThemeLayer {
+  colors?: Record<string, string>;
+  fonts?: Record<string, string>;
+  typography?: CreativeDesignTypography;
+  [key: string]: unknown;
+}
+export interface MediaTheme {
+  colors?: Record<string, string>;
+  fonts?: Record<string, string>;
+  typography?: CreativeDesignTypography;
+  theme?: MediaThemeLayer;
+  assets?: { logo_url?: string; [key: string]: unknown };
+  [key: string]: unknown;
+}
+export interface MediaCompositionBranding {
+  logo_url?: string;
+  brand_name?: string;
+  tone?: 'professional' | 'creative' | 'technical' | 'casual';
+  [key: string]: unknown;
+}
+export interface MediaCompositionPreset {
+  artifact_family?: string;
+  document_type?: string;
+  design_system_id?: string;
+  narrative_pattern_id?: string;
+  recommended_layout_template_id?: string;
+  recommended_theme?: string;
+  branding?: MediaCompositionBranding;
+  prompt_guide?: unknown[];
+  source_design?: Record<string, unknown> | null;
+  design_recommendations?: unknown[];
+  [key: string]: unknown;
+}
+export interface MediaDocumentCompositionCatalog {
+  defaults: Record<string, unknown>;
+  profiles: Record<string, MediaCompositionPreset>;
+}
+export interface MediaGenerationBoundary {
+  source_of_truth: {
+    document_profile: string;
+    design_system_id: string;
+    knowledge_controls: string[];
+  };
+  llm_zone: {
+    allowed: string[];
+    forbidden: string[];
+  };
+  compiler_zone: {
+    responsibilities: string[];
+  };
+  renderer_zone: {
+    responsibilities: string[];
+  };
+  rule: string;
+}
 export type DocumentCompositionPresetResolver = (
   rootDir: string,
   brief: any
-) => { profileId: string; preset: any };
-export type DocumentCompositionCatalogLoader = (rootDir: string) => any;
+) => { profileId: string; preset: MediaCompositionPreset };
+export type DocumentCompositionCatalogLoader = (rootDir: string) => MediaDocumentCompositionCatalog;
 
 export function warnLegacyMediaOp(op: string): void {
   if (!isLegacyMediaOp(op)) return;
@@ -32,7 +96,7 @@ export function warnLegacyMediaOp(op: string): void {
   );
 }
 
-export function buildMediaGenerationBoundary(briefOrOutline: any): any {
+export function buildMediaGenerationBoundary(briefOrOutline: any): MediaGenerationBoundary {
   return {
     source_of_truth: {
       document_profile: String(briefOrOutline?.document_profile || ''),
@@ -565,8 +629,14 @@ export function normalizeSpreadsheetDocumentBrief(rootDir: string, input: any): 
 
   let protocol = input.payload.protocol;
   if (!protocol && input.payload.protocol_path) {
-    const protocolPath = path.resolve(rootDir, input.payload.protocol_path);
-    protocol = loadJson<unknown>(protocolPath);
+    const protocolPath = assertSafeRepositoryPath(
+      path.resolve(rootDir, input.payload.protocol_path),
+      { allowMissingLeaf: true }
+    );
+    protocol = parseSafeJsonObjectValue(
+      loadJsonValue(protocolPath),
+      `spreadsheet protocol ${protocolPath}`
+    );
   }
   if (!protocol && (!Array.isArray(input.payload.columns) || !Array.isArray(input.payload.rows))) {
     throw new Error(
@@ -685,8 +755,8 @@ function inferDocumentProfileId(
   if (family && docType) {
     const catalog = loadDocumentCompositionCatalog(rootDir);
     for (const [profileId, profile] of Object.entries(catalog.profiles || {})) {
-      if (String((profile as any).artifact_family || '') !== family) continue;
-      if (String((profile as any).document_type || '') !== docType) continue;
+      if (String(profile.artifact_family || '') !== family) continue;
+      if (String(profile.document_type || '') !== docType) continue;
       return profileId;
     }
   }

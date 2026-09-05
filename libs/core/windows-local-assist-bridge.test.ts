@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  resetWindowsLocalAssistAvailabilityCache,
+  _resetWindowsLocalAssistAvailabilityCacheForTests,
   windowsLocalAssistPrompt,
   classifyLocallyWithWindowsAi,
 } from './windows-local-assist-bridge.js';
@@ -9,7 +9,7 @@ describe('windows local assist bridge', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env.KYBERION_WINDOWS_AI_ENDPOINT;
-    resetWindowsLocalAssistAvailabilityCache();
+    _resetWindowsLocalAssistAvailabilityCacheForTests();
   });
 
   it('discovers the local endpoint and returns chat text', async () => {
@@ -46,5 +46,38 @@ describe('windows local assist bridge', () => {
     await expect(classifyLocallyWithWindowsAi('help me', ['support', 'sales'])).resolves.toBe(
       'support'
     );
+  });
+
+  it('fails closed when the chat response content is not a string', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ choices: [{ message: { content: { leaked: true } } }] }), {
+          status: 200,
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.KYBERION_WINDOWS_AI_ENDPOINT = 'http://127.0.0.1:5272';
+
+    await expect(windowsLocalAssistPrompt('malformed response')).resolves.toBeNull();
+  });
+
+  it('ignores an endpoint from a status response with a dangerous key', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('{"endpoint":"http://127.0.0.1:6000","__proto__":{}}', { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ choices: [{ message: { content: 'safe fallback' } }] }), {
+          status: 200,
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.KYBERION_WINDOWS_AI_ENDPOINT = 'http://127.0.0.1:5272';
+
+    await expect(windowsLocalAssistPrompt('use fallback')).resolves.toBe('safe fallback');
+    expect(fetchMock.mock.calls[1][0]).toBe('http://127.0.0.1:5272/v1/chat/completions');
   });
 });

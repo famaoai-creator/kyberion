@@ -34,7 +34,7 @@ status: archived
 - **完了(代表スライス)**: `agent-lifecycle`、`acp-mediator`、`agent-adapter`、`reasoning-bootstrap`、`intent-contract`、`codex-cli-query`、`anthropic-*`、`GeminiCliBackend`、OCR bridge の実行既定値を routing/defaults 経由に寄せた。
 - **完了(代表スライス)**: 公式 docs 確認に基づき、Anthropic は `claude-opus-4-8` / `claude-sonnet-5`、Gemini は `gemini-3.5-flash` / `gemini-3.1-flash-lite`、OpenAI/Codex primary は `gpt-5.5` を既定にした。`gpt-5.4-mini` は fast lane の既存 candidate として維持。
 - **完了(代表スライス)**: `knowledge/product/governance/model-registry.json` と `reasoning-level-policy.json` の primary route を `openai:gpt-5.5` に更新した。
-- **検証済み**: `pnpm exec vitest run libs/core/reasoning-model-routing.test.ts`、`pnpm run typecheck`、`pnpm run check:contract-schemas`、`pnpm check -- --scope full --only catalogs`、`pnpm lint`。
+- **検証済み**: `pnpm exec vitest run libs/core/reasoning-model-routing.test.ts`、`pnpm run typecheck`、`pnpm run check -- --scope full --only contract-schemas`、`pnpm check -- --scope full --only catalogs`、`pnpm lint`。
 - **完了**: `provider-discovery.ts` と `metrics.ts` の fallback は knowledge tier の fallback JSON に外出しし、コード内の model ID リテラルを消した。`provider-discovery.ts` / `metrics.ts` の code ヒットは routing / settings 以外になくなった。
 
 ### Task 1: 現状マップの作成 — `claude-haiku`

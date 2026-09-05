@@ -97,6 +97,46 @@ describe('audit-chain — tenant mirror', () => {
     expect(files[0]).toMatch(/audit-\d{4}-\d{2}-\d{2}\.jsonl/);
   });
 
+  it('uses the recorded timestamp date for master and tenant mirror files', async () => {
+    const { auditChain } = await loadFreshAuditChain(new Date('2026-07-01T23:59:59.999Z'));
+    const recorded = auditChain.record({
+      agentId: 'agent-1',
+      action: 'date-boundary',
+      operation: 'audit',
+      result: 'completed',
+      tenantSlug: 'sbiss',
+    });
+    const date = recorded.timestamp.slice(0, 10);
+
+    expect(
+      fs.existsSync(path.join(testRoot, 'active', 'shared', 'logs', 'audit', `audit-${date}.jsonl`))
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(testRoot, 'customer', 'sbiss', 'logs', 'audit', `audit-${date}.jsonl`)
+      )
+    ).toBe(true);
+  });
+
+  it('publishes through the optional forwarder seam without importing its implementation', async () => {
+    const { auditChain, registerAuditForwarderPublisher } = await import('./audit-chain.js');
+    const entries: string[] = [];
+    const dispose = registerAuditForwarderPublisher((entry) => {
+      entries.push(entry.id);
+    });
+
+    const recorded = auditChain.record({
+      agentId: 'test',
+      action: 'forward',
+      operation: 'op',
+      result: 'completed',
+    });
+    await Promise.resolve();
+    dispose();
+
+    expect(entries).toEqual([recorded.id]);
+  });
+
   it('does not create a stance overlay for a slug that has none (EG-14)', async () => {
     const { auditChain } = await import('./audit-chain.js');
     auditChain.record({
@@ -155,6 +195,25 @@ describe('audit-chain — tenant mirror', () => {
     expect(entries[0].tenantSlug).toBe('sbiss');
     expect(entries[0].action).toBe('login');
     expect(entries[0].correlationId).toBe('corr-audit-001');
+  });
+
+  it('does not mirror through a symlinked tenant overlay', async () => {
+    const outsideRoot = path.join(testRoot, 'outside-customer');
+    const linkedRoot = path.join(testRoot, 'customer', 'sbiss');
+    fs.rmSync(linkedRoot, { recursive: true, force: true });
+    fs.mkdirSync(outsideRoot, { recursive: true });
+    fs.symlinkSync(outsideRoot, linkedRoot, 'dir');
+    const { auditChain } = await import('./audit-chain.js');
+
+    auditChain.record({
+      agentId: 'agent-1',
+      action: 'login',
+      operation: 'auth',
+      result: 'allowed',
+      tenantSlug: 'sbiss',
+    });
+
+    expect(fs.existsSync(path.join(outsideRoot, 'logs', 'audit'))).toBe(false);
   });
 
   it('does not mirror when no tenantSlug', async () => {

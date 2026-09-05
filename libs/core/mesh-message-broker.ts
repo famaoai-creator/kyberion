@@ -2,8 +2,17 @@ import * as crypto from 'node:crypto';
 
 import { withExecutionContext } from './authority.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+} from './secure-io.js';
 import { nowIso } from './foundation/time.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
   MeshDeliveryRecord,
@@ -122,8 +131,12 @@ function tenantRoot(namespace: string | undefined, tenantId: string): string {
 
 function tenantIds(namespace?: string): string[] {
   const root = `${meshHubRoot(namespace)}/tenants`;
-  if (!safeExistsSync(root)) return [];
-  return safeReaddir(root).filter((entry) => isValidTenantSlug(entry));
+  const safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeRoot)) return [];
+  if (!safeLstat(safeRoot).isDirectory()) {
+    throw new Error(`mesh-hub tenant root must be a directory: ${safeRoot}`);
+  }
+  return safeReaddir(safeRoot).filter((entry) => isValidTenantSlug(entry));
 }
 
 function deliveriesPath(namespace: string | undefined, tenantId: string): string {
@@ -157,25 +170,42 @@ function selectorSummary(selector: MeshTargetSelector): Record<string, string> {
   }
 }
 
-function readJsonl<T>(logicalPath: string): T[] {
-  if (!safeExistsSync(logicalPath)) return [];
-  const raw = String(safeReadFile(logicalPath, { encoding: 'utf8' }) || '');
-  return raw
+function readJsonl<T>(logicalPath: string, normalize: (value: unknown) => T | undefined): T[] {
+  const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`mesh-hub persisted JSONL must be a regular file: ${safePath}`);
+  }
+  const raw = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
+  const records: T[] = [];
+  for (const line of raw
     .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+    .map((value) => value.trim())
+    .filter(Boolean)) {
+    try {
+      const normalized = normalize(parseSafeJsonInput(line, 'mesh delivery record'));
+      if (normalized !== undefined) records.push(normalized);
+    } catch {
+      // A corrupt append-only row must not make the hub unreadable.
+    }
+  }
+  return records;
 }
 
-function latestByKey<T extends Record<string, any>>(rows: T[], key: string): T[] {
+function latestByKey<T>(rows: T[], key: string): T[] {
   const index = new Map<string, T>();
   for (const row of rows) {
+    if (!isRecord(row)) continue;
     const value = row[key];
     if (typeof value === 'string' && value) {
       index.set(value, row);
     }
   }
   return Array.from(index.values());
+}
+
+function asJsonRecord<T>(value: unknown): T | undefined {
+  return isRecord(value) ? (value as unknown as T) : undefined;
 }
 
 function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: unknown): string {
@@ -185,7 +215,11 @@ function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: u
 function loadCurrentDeliveries(namespace?: string, tenantId?: string): MeshHubDeliveryRecord[] {
   const tenants = tenantId ? [tenantId] : tenantIds(namespace);
   return latestByKey(
-    tenants.flatMap((id) => readJsonl<MeshHubDeliveryRecord>(deliveriesPath(namespace, id))),
+    tenants.flatMap((id) =>
+      readJsonl<MeshHubDeliveryRecord>(deliveriesPath(namespace, id), (value) =>
+        asJsonRecord<MeshHubDeliveryRecord>(value)
+      )
+    ),
     'delivery_id'
   );
 }
@@ -233,7 +267,11 @@ function findCurrentDeliveryByIdempotency(
 function loadCurrentDeadLetters(namespace?: string, tenantId?: string): MeshDeadLetterRecord[] {
   const tenants = tenantId ? [tenantId] : tenantIds(namespace);
   return latestByKey(
-    tenants.flatMap((id) => readJsonl<MeshDeadLetterRecord>(deadLettersPath(namespace, id))),
+    tenants.flatMap((id) =>
+      readJsonl<MeshDeadLetterRecord>(deadLettersPath(namespace, id), (value) =>
+        asJsonRecord<MeshDeadLetterRecord>(value)
+      )
+    ),
     'dead_letter_id'
   );
 }

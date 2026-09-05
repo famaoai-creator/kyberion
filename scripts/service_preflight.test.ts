@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual as any,
+    ...(actual as any),
     inspectServiceAuth: mocks.inspectServiceAuth,
     loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
     probeServiceRuntime: mocks.probeServiceRuntime,
@@ -25,8 +25,27 @@ vi.mock('@agent/core/cli-utils', () => ({
   createStandardYargs: mocks.createStandardYargs,
 }));
 
+vi.mock('@agent/core/service-runtime-registry', () => ({
+  probeServiceRuntime: mocks.probeServiceRuntime,
+  getServiceRuntimeRecord: mocks.getServiceRuntimeRecord,
+}));
+
+vi.mock('@agent/core/service-endpoint-registry', () => ({
+  loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
+}));
+
+vi.mock('@agent/core/service-validator', () => ({
+  inspectServiceAuth: mocks.inspectServiceAuth,
+}));
+
+vi.mock('@agent/core/secure-io', () => ({
+  safeExecResult: mocks.safeExecResult,
+}));
+
 describe('service_preflight', () => {
-  const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => undefined as never) as any);
+  const exitSpy = vi
+    .spyOn(process, 'exit')
+    .mockImplementation(((code?: number) => undefined as never) as any);
   const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -43,8 +62,12 @@ describe('service_preflight', () => {
       services: {
         voice: { preset_path: 'knowledge/product/orchestration/service-presets/voice.json' },
         meeting: { preset_path: 'knowledge/product/orchestration/service-presets/meeting.json' },
-        'media-generation': { preset_path: 'knowledge/product/orchestration/service-presets/media-generation.json' },
-        'google-workspace': { preset_path: 'knowledge/product/orchestration/service-presets/google-workspace.json' },
+        'media-generation': {
+          preset_path: 'knowledge/product/orchestration/service-presets/media-generation.json',
+        },
+        'google-workspace': {
+          preset_path: 'knowledge/product/orchestration/service-presets/google-workspace.json',
+        },
       },
     });
     mocks.inspectServiceAuth.mockImplementation((serviceId: string) => {
@@ -134,5 +157,28 @@ describe('service_preflight', () => {
     expect(report.ready).toBe(true);
     expect(report.reports[0].directProbeReady).toBeNull();
     expect(report.reports[0].status).toBe('ready');
+  });
+
+  it('rejects primitive and array bridge responses at the probe boundary', async () => {
+    const { parseJsonProbeOutput } = await import('./service_preflight.js');
+
+    expect(parseJsonProbeOutput('[{"status":"ok"}]')).toEqual({
+      ok: false,
+      reason: 'invalid_json_output',
+    });
+    expect(parseJsonProbeOutput('{"status":true}')).toEqual({
+      ok: false,
+      payload: { status: true },
+      reason: 'unrecognized_status',
+    });
+  });
+
+  it('rejects bridge responses containing dangerous JSON keys', async () => {
+    const { parseJsonProbeOutput } = await import('./service_preflight.js');
+
+    expect(parseJsonProbeOutput('{"status":"ok","meta":{"constructor":{}}}')).toEqual({
+      ok: false,
+      reason: 'invalid_json_output',
+    });
   });
 });

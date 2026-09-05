@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/project-operating-system-artifact-map.schema.json",
+  "title": "Project operating system artifact map",
+  "description": "The governed project lifecycle artifact and dependency map.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["concept", "layers", "lifecycle", "dependencies"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "concept": { "type": "string", "minLength": 1 },
+    "layers": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/layer" }
+    },
+    "lifecycle": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/lifecyclePhase" }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "definitions": {
+    "artifactList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "scope", "artifacts"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "scope": { "type": "string", "enum": ["project", "track", "mixed"] },
+        "artifacts": { "$ref": "#/definitions/artifactList" }
+      }
+    },
+    "lifecyclePhase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "scope", "required"],
+      "properties": {
+        "phase": { "type": "string", "minLength": 1 },
+        "scope": { "type": "string", "enum": ["project", "track", "mixed"] },
+        "required": { "$ref": "#/definitions/artifactList" }
+      }
+    }
+  }
+}

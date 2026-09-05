@@ -1,17 +1,17 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as customerResolver from './customer-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeCopyFileSync,
   safeExistsSync,
-  safeReadFile,
   safeReaddir,
   safeMkdir,
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 
 export interface VoiceProfileRecord {
@@ -35,26 +35,17 @@ export interface VoiceProfileRegistry {
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/voice-profile-registry.json'
 );
+const VOICE_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-profile-registry.schema.json'
+);
+const VOICE_PROFILE_OVERLAY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-profile-registry-overlay.schema.json'
+);
 const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('product/governance/voice-profiles');
 const DEFAULT_CUSTOMER_OVERLAY_PATH = 'voice/profile-registry.json';
 const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge(
   'personal/voice/profile-registry.json'
 );
-
-const FALLBACK_REGISTRY: VoiceProfileRegistry = {
-  version: 'fallback',
-  default_profile_id: 'operator-en-default',
-  profiles: [
-    {
-      profile_id: 'operator-en-default',
-      display_name: 'Operator English Default',
-      tier: 'public',
-      languages: ['en'],
-      default_engine_id: 'local_say',
-      status: 'active',
-    },
-  ],
-};
 
 let cachedRegistryPath: string | null = null;
 let cachedRegistry: VoiceProfileRegistry | null = null;
@@ -68,10 +59,43 @@ function sortRegistry(registry: VoiceProfileRegistry): VoiceProfileRegistry {
   };
 }
 
-function readRegistryFile(registryPath: string, label: string): VoiceProfileRegistry {
-  return safeJsonParse<VoiceProfileRegistry>(
-    safeReadFile(registryPath, { encoding: 'utf8' }) as string,
-    label
+function requireSafePathSegment(value: string, label: string): string {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/]/u.test(normalized)) {
+    throw new Error(`${label} must be a single safe path segment`);
+  }
+  return normalized;
+}
+
+function readRegistryFile(
+  registryPath: string,
+  label: string,
+  schemaPath = VOICE_PROFILE_SCHEMA_PATH
+): VoiceProfileRegistry {
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath);
+  try {
+    return defineCatalog<VoiceProfileRegistry>({
+      id: 'voice-profile-registry',
+      path: safeRegistryPath,
+      schema: schemaPath,
+    }).load();
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(`Invalid ${label}: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+/** Load one persisted registry through the shared schema and path boundary. */
+export function loadVoiceProfileRegistryAtPath(
+  registryPath: string,
+  options: { allowEmpty?: boolean } = {}
+): VoiceProfileRegistry {
+  return readRegistryFile(
+    registryPath,
+    'voice profile registry',
+    options.allowEmpty ? VOICE_PROFILE_OVERLAY_SCHEMA_PATH : VOICE_PROFILE_SCHEMA_PATH
   );
 }
 
@@ -79,8 +103,9 @@ function loadRegistryDirectory(
   dirPath: string,
   fallbackDefaultProfileId = ''
 ): VoiceProfileRegistry | null {
-  if (!safeExistsSync(dirPath)) return null;
-  const files = safeReaddir(dirPath)
+  const safeDirPath = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDirPath)) return null;
+  const files = safeReaddir(safeDirPath)
     .filter((entry) => entry.endsWith('.json'))
     .sort();
   if (!files.length) return null;
@@ -88,7 +113,7 @@ function loadRegistryDirectory(
   const profiles = new Map<string, VoiceProfileRecord>();
   let defaultProfileId = '';
   for (const file of files) {
-    const fullPath = `${dirPath}/${file}`;
+    const fullPath = path.join(safeDirPath, file);
     const payload = readRegistryFile(fullPath, `voice profile registry item ${file}`);
     const records = payload.profiles || [];
     if (records.length !== 1) {
@@ -122,19 +147,32 @@ function loadRegistryDirectory(
     : null;
 }
 
+export function loadVoiceProfileRegistryDirectory(
+  dirPath = getRegistryDir(),
+  fallbackDefaultProfileId = ''
+): VoiceProfileRegistry {
+  const registry = loadRegistryDirectory(dirPath, fallbackDefaultProfileId);
+  if (!registry) {
+    throw new Error(`Voice profile registry directory is empty: ${dirPath}`);
+  }
+  return registry;
+}
+
 function writeRegistryDirectory(dirPath: string, registry: VoiceProfileRegistry): void {
-  safeMkdir(dirPath, { recursive: true });
+  const safeDirPath = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
+  safeMkdir(safeDirPath, { recursive: true });
   const nextIds = new Set(registry.profiles.map((profile) => profile.profile_id));
-  const existing = safeExistsSync(dirPath)
-    ? safeReaddir(dirPath).filter((entry) => entry.endsWith('.json'))
+  const existing = safeExistsSync(safeDirPath)
+    ? safeReaddir(safeDirPath).filter((entry) => entry.endsWith('.json'))
     : [];
   for (const file of existing) {
     const profileId = file.replace(/\.json$/i, '');
     if (!nextIds.has(profileId)) {
-      safeRmSync(`${dirPath}/${file}`, { force: true });
+      safeRmSync(path.join(safeDirPath, file), { force: true });
     }
   }
   for (const profile of registry.profiles) {
+    const profileId = requireSafePathSegment(profile.profile_id, 'voice profile profile_id');
     const payload = {
       version: registry.version,
       default_profile_id:
@@ -143,7 +181,11 @@ function writeRegistryDirectory(dirPath: string, registry: VoiceProfileRegistry)
           : registry.default_profile_id,
       profiles: [profile],
     };
-    safeWriteFile(`${dirPath}/${profile.profile_id}.json`, JSON.stringify(payload, null, 2));
+    const profilePath = path.join(safeDirPath, `${profileId}.json`);
+    safeWriteFile(
+      assertSafeRepositoryPath(profilePath, { allowMissingLeaf: true }),
+      JSON.stringify(payload, null, 2)
+    );
   }
 }
 
@@ -164,13 +206,16 @@ function getPersonalOverlayPath(): string | null {
   const configured =
     getRegisteredEnvText('KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH')?.trim() ||
     DEFAULT_PERSONAL_OVERLAY_PATH;
-  return safeExistsSync(configured) ? configured : null;
+  const safePath = assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
+  return safeExistsSync(safePath) ? safePath : null;
 }
 
 function getCustomerOverlayPath(): string | null {
   if (getRegisteredEnvText('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim()) return null;
   const configured = customerResolver.customerRoot(DEFAULT_CUSTOMER_OVERLAY_PATH);
-  return configured && safeExistsSync(configured) ? configured : null;
+  if (!configured) return null;
+  const safePath = assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
+  return safeExistsSync(safePath) ? safePath : null;
 }
 
 export function getPersonalVoiceProfileRegistryPath(): string {
@@ -211,35 +256,31 @@ function emptyRegistry(defaultProfileId = ''): VoiceProfileRegistry {
 
 function readRegistryFileIfPresent(
   registryPath: string,
-  label: string
+  label: string,
+  schemaPath = VOICE_PROFILE_SCHEMA_PATH
 ): VoiceProfileRegistry | null {
-  if (!safeExistsSync(registryPath)) return null;
-  return readRegistryFile(registryPath, label);
+  const safePath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return null;
+  return readRegistryFile(safePath, label, schemaPath);
 }
 
 function loadBaseVoiceProfileRegistry(): VoiceProfileRegistry {
   const registryPath = getRegistryPath();
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
   const useCanonicalDirectory =
     !getRegisteredEnvText('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim() ||
     registryPath === DEFAULT_REGISTRY_PATH;
   const registryDir = useCanonicalDirectory ? getRegistryDir() : null;
 
-  if (!safeExistsSync(registryPath)) {
-    return (
-      (useCanonicalDirectory ? loadRegistryDirectory(registryDir || getRegistryDir()) : null) ||
-      FALLBACK_REGISTRY
-    );
+  if (!safeExistsSync(safeRegistryPath)) {
+    const directoryRegistry = useCanonicalDirectory
+      ? loadRegistryDirectory(registryDir || getRegistryDir())
+      : null;
+    if (directoryRegistry) return directoryRegistry;
+    throw new Error(`Voice profile registry not found: ${registryPath}`);
   }
 
-  let parsed: VoiceProfileRegistry;
-  try {
-    parsed = readRegistryFile(registryPath, 'voice profile registry');
-  } catch (error: any) {
-    logger.warn(
-      `[VOICE_PROFILE_REGISTRY] Failed to load base registry at ${registryPath}: ${error.message}`
-    );
-    return FALLBACK_REGISTRY;
-  }
+  const parsed = readRegistryFile(safeRegistryPath, 'voice profile registry');
 
   return (
     (useCanonicalDirectory
@@ -259,8 +300,11 @@ export function getWritableVoiceProfileRegistryForTier(tier: VoiceProfileRecord[
     const registryPath = getPersonalVoiceProfileRegistryPath();
     return {
       registry:
-        readRegistryFileIfPresent(registryPath, 'personal voice profile registry') ||
-        emptyRegistry(),
+        readRegistryFileIfPresent(
+          registryPath,
+          'personal voice profile registry',
+          VOICE_PROFILE_OVERLAY_SCHEMA_PATH
+        ) || emptyRegistry(),
       registryPath,
     };
   }
@@ -276,11 +320,12 @@ function resolveVoiceProfileSampleStoreDir(
   tier: VoiceProfileRecord['tier']
 ): string | null {
   const normalizedProfileId = String(profileId || '').trim();
-  if (!normalizedProfileId) {
-    throw new Error('voice profile profile_id must not be empty');
-  }
+  requireSafePathSegment(normalizedProfileId, 'voice profile profile_id');
 
-  return pathResolver.shared(`runtime/voice-profiles/${normalizedProfileId}`);
+  return assertSafeRepositoryPath(
+    pathResolver.shared(`runtime/voice-profiles/${normalizedProfileId}`),
+    { allowMissingLeaf: true }
+  );
 }
 
 export function materializeVoiceProfileSampleRefs(
@@ -290,18 +335,28 @@ export function materializeVoiceProfileSampleRefs(
   const targetDir = resolveVoiceProfileSampleStoreDir(profile.profile_id, profile.tier);
   safeMkdir(targetDir, { recursive: true });
   return samples.map((sample) => {
-    const sourcePath = pathResolver.rootResolve(String(sample.path || '').trim());
+    const sampleId = requireSafePathSegment(sample.sample_id, 'voice sample sample_id');
+    const sourcePath = assertSafeRepositoryPath(String(sample.path || '').trim(), {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(sourcePath)) {
       throw new Error(`voice sample does not exist (${sample.path})`);
     }
 
     const ext = path.extname(sourcePath).replace(/^\./u, '').toLowerCase() || 'wav';
-    const targetPath = `${targetDir}/${String(sample.sample_id || '').trim()}.${ext}`;
+    const targetPath = assertSafeRepositoryPath(path.join(targetDir, `${sampleId}.${ext}`), {
+      allowMissingLeaf: true,
+    });
     if (sourcePath !== targetPath) {
       safeCopyFileSync(sourcePath, targetPath);
-      const transcriptPath = `${sourcePath}.transcript.txt`;
+      const transcriptPath = assertSafeRepositoryPath(`${sourcePath}.transcript.txt`, {
+        allowMissingLeaf: true,
+      });
       if (safeExistsSync(transcriptPath)) {
-        safeCopyFileSync(transcriptPath, `${targetPath}.transcript.txt`);
+        safeCopyFileSync(
+          transcriptPath,
+          assertSafeRepositoryPath(`${targetPath}.transcript.txt`, { allowMissingLeaf: true })
+        );
       }
     }
     return targetPath;
@@ -315,6 +370,7 @@ export function resetVoiceProfileRegistryCache(): void {
 
 export function getVoiceProfileRegistry(): VoiceProfileRegistry {
   const registryPath = getRegistryPath();
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
   const customerOverlayPath = getCustomerOverlayPath();
   const overlayPath = getPersonalOverlayPath();
   const useCanonicalDirectory =
@@ -326,26 +382,19 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
     .join('::');
   if (cachedRegistryPath === cacheKey && cachedRegistry) return cachedRegistry;
 
-  if (!safeExistsSync(registryPath)) {
+  if (!safeExistsSync(safeRegistryPath)) {
     const directoryRegistry = useCanonicalDirectory
       ? loadRegistryDirectory(registryDir || getRegistryDir())
       : null;
+    if (!directoryRegistry) {
+      throw new Error(`Voice profile registry not found: ${registryPath}`);
+    }
     cachedRegistryPath = cacheKey;
-    cachedRegistry = directoryRegistry || FALLBACK_REGISTRY;
+    cachedRegistry = directoryRegistry;
     return cachedRegistry;
   }
 
-  let parsed: VoiceProfileRegistry;
-  try {
-    parsed = readRegistryFile(registryPath, 'voice profile registry');
-  } catch (error: any) {
-    logger.warn(
-      `[VOICE_PROFILE_REGISTRY] Failed to load base registry at ${registryPath}: ${error.message}`
-    );
-    cachedRegistryPath = cacheKey;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
+  const parsed = readRegistryFile(safeRegistryPath, 'voice profile registry');
 
   const directoryRegistry = useCanonicalDirectory
     ? loadRegistryDirectory(registryDir || getRegistryDir(), parsed.default_profile_id)
@@ -355,10 +404,10 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
   let customerOverlay: VoiceProfileRegistry | null = null;
   if (customerOverlayPath) {
     try {
-      const customerRaw = safeReadFile(customerOverlayPath, { encoding: 'utf8' }) as string;
-      customerOverlay = safeJsonParse<VoiceProfileRegistry>(
-        customerRaw,
-        'customer voice profile registry'
+      customerOverlay = readRegistryFile(
+        customerOverlayPath,
+        'customer voice profile registry',
+        VOICE_PROFILE_OVERLAY_SCHEMA_PATH
       );
     } catch (error: any) {
       logger.warn(
@@ -375,9 +424,10 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
 
   try {
     const personalOverlay = overlayPath
-      ? safeJsonParse<VoiceProfileRegistry>(
-          safeReadFile(overlayPath, { encoding: 'utf8' }) as string,
-          'personal voice profile registry'
+      ? readRegistryFile(
+          overlayPath,
+          'personal voice profile registry',
+          VOICE_PROFILE_OVERLAY_SCHEMA_PATH
         )
       : null;
     const baseWithPersonal = personalOverlay
@@ -415,7 +465,7 @@ export function getVoiceProfileRecord(profileId?: string): VoiceProfileRecord {
   return (
     registry.profiles.find((profile) => profile.profile_id === resolvedProfileId) ||
     registry.profiles.find((profile) => profile.profile_id === registry.default_profile_id) ||
-    FALLBACK_REGISTRY.profiles[0]
+    registry.profiles[0]
   );
 }
 
@@ -423,12 +473,13 @@ export function writeVoiceProfileRegistry(
   registry: VoiceProfileRegistry,
   registryPath = getRegistryPath()
 ): string {
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
   const normalized = sortRegistry(registry);
-  safeWriteFile(registryPath, JSON.stringify(normalized, null, 2));
-  if (registryPath === DEFAULT_REGISTRY_PATH || registryPath === getRegistryPath()) {
+  safeWriteFile(safeRegistryPath, JSON.stringify(normalized, null, 2));
+  if (safeRegistryPath === DEFAULT_REGISTRY_PATH || safeRegistryPath === getRegistryPath()) {
     writeRegistryDirectory(getRegistryDir(), normalized);
   }
   cachedRegistryPath = null;
   cachedRegistry = null;
-  return registryPath;
+  return safeRegistryPath;
 }

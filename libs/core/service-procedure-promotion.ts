@@ -1,12 +1,16 @@
 import path from 'node:path';
 import { compileServiceRecording } from './service-recording-compiler.js';
-import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
+import {
+  invalidateProcedureCache,
+  readProcedureCatalog,
+  resolveAllowlistedRecordingRef,
+  validateProcedureCatalog,
+} from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { validatePipelineAdf, type PipelineAdf } from './pipeline-contract.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
-import { validateServiceRecording } from './service-recording.js';
+import { loadServiceRecordingAtPath } from './service-recording.js';
 import type { ProcedureCatalog, ProcedureEntry } from './procedure-types.js';
 
 const PROCEDURE_ID_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
@@ -46,16 +50,12 @@ export function promoteServiceProcedure(
 
   const recordingAbs = resolveAllowlistedRecordingRef(options.recordingRef);
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
-  const raw = loadJson<unknown>(recordingAbs);
-  const validation = validateServiceRecording(raw);
-  if (!validation.value) {
-    throw new Error(`recording failed validation: ${validation.errors.join('; ')}`);
-  }
-  if (validation.value.review?.status !== 'approved') {
+  const recording = loadServiceRecordingAtPath(recordingAbs);
+  if (recording.review?.status !== 'approved') {
     throw new Error('recording review must be approved before promotion');
   }
 
-  const compiled = compileServiceRecording(validation.value, {
+  const compiled = compileServiceRecording(recording, {
     procedureId,
     intentPhrases,
     recordingRef: pathResolver.toRepoRelative(recordingAbs),
@@ -78,20 +78,26 @@ export function promoteServiceProcedure(
     );
   }
 
-  const catalogPath = options.catalogPath ?? PERSONAL_CATALOG_PATH;
+  const catalogPath = assertSafeRepositoryPath(options.catalogPath ?? PERSONAL_CATALOG_PATH, {
+    allowMissingLeaf: true,
+  });
   let catalog: ProcedureCatalog = { schema_version: 'procedures.v1', procedures: [] };
   if (safeExistsSync(catalogPath)) {
-    catalog = readJson<ProcedureCatalog>(catalogPath);
+    catalog = readProcedureCatalog(catalogPath);
   }
   if (!Array.isArray(catalog.procedures)) catalog.procedures = [];
   if (catalog.procedures.some((entry) => entry.procedure_id === procedureId)) {
     throw new Error(`procedure_id "${procedureId}" already exists in the selected catalog`);
   }
 
-  const pipelinePath = pathResolver.rootResolve(compiled.procedureEntry.pipeline_ref);
+  const pipelinePath = assertSafeRepositoryPath(
+    pathResolver.rootResolve(compiled.procedureEntry.pipeline_ref),
+    { allowMissingLeaf: true }
+  );
+  catalog.procedures.push(compiled.procedureEntry);
+  validateProcedureCatalog(catalog, catalogPath);
   safeMkdir(path.dirname(pipelinePath), { recursive: true });
   safeWriteFile(pipelinePath, `${JSON.stringify(pipeline, null, 2)}\n`);
-  catalog.procedures.push(compiled.procedureEntry);
   safeMkdir(path.dirname(catalogPath), { recursive: true });
   safeWriteFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
   invalidateProcedureCache();

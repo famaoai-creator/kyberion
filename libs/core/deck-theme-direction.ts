@@ -1,4 +1,5 @@
 import { createLogger } from './logger.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 
 // Deck counterpart of video-visual-direction (agy/media design quality):
@@ -59,7 +60,7 @@ export async function selectDeckTheme(input: SelectDeckThemeInput): Promise<stri
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
     let parsed: any;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'deck theme response');
     } catch {
       parsed = tryRepairJson(jsonText);
     }
@@ -126,7 +127,7 @@ export async function draftDeckSectionBodies(
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
     let parsed: any;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'deck section draft response');
     } catch {
       parsed = tryRepairJson(jsonText);
     }

@@ -1,5 +1,5 @@
 import { classifyTaskSessionIntent } from './task-session.js';
-import { resolveIntentResolutionPacket } from './intent-resolution.js';
+import { resolveIntentResolutionPacket, type IntentResolutionPacket } from './intent-resolution.js';
 import {
   deriveSurfaceDelegationReceiverForProvider,
   resolveSurfaceConversationReceiverForProvider,
@@ -22,6 +22,7 @@ import type { UserIntentFlow } from './intent-contract.js';
 export interface SurfaceRuntimeRouteContext {
   input: SurfaceConversationInput;
   compiledFlow: UserIntentFlow | null;
+  resolutionPacket?: IntentResolutionPacket;
   resolvedIntent?: SurfaceIntentResolution;
   computedReceiver?: SurfaceDelegationReceiver;
   structuredQuery: string;
@@ -137,7 +138,8 @@ export function surfaceRoutingText(input: SurfaceConversationInput): {
 export function shouldCompileSurfaceIntent(
   input: SurfaceConversationInput,
   routingText: string,
-  ruleBasedReceiver?: SurfaceDelegationReceiver
+  ruleBasedReceiver?: SurfaceDelegationReceiver,
+  resolvedPacket?: IntentResolutionPacket
 ): boolean {
   const originalText = (input.surfaceText || input.query || '').trim();
   const normalized = routingText.trim();
@@ -155,10 +157,12 @@ export function shouldCompileSurfaceIntent(
   // direct A2A handoff. Other surfaces still pass forced receivers through
   // the shared compiler so a caller cannot bypass governed classification.
   if (input.agentId === 'presence-surface-agent' && ruleBasedReceiver) return false;
-  const packet = resolveIntentResolutionPacket(originalText, {
-    tier: input.scope?.tier,
-    tenantId: input.scope?.tenant_slug,
-  });
+  const packet =
+    resolvedPacket ||
+    resolveIntentResolutionPacket(originalText, {
+      tier: input.scope?.tier,
+      tenantId: input.scope?.tenant_slug,
+    });
   const selectedShape = packet.selected_resolution?.shape;
   const governedShape =
     selectedShape === 'task_session' ||
@@ -179,7 +183,10 @@ export function shouldCompileSurfaceIntent(
   if (
     confidentGovernedIntent ||
     ((packet.selected_confidence || 0) >= 0.8 && approvalIntent) ||
-    classifyTaskSessionIntent(originalText)
+    classifyTaskSessionIntent(originalText, packet, {
+      tier: input.scope?.tier,
+      tenantId: input.scope?.tenant_slug,
+    })
   ) {
     return true;
   }

@@ -1,7 +1,16 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import { isValidTenantSlug } from './entity-scope.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { logger } from './core.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import type { DealRecord, DealStage } from './deal-store.js';
@@ -99,19 +108,35 @@ export function buildModePromptLines(mode: CustomerConversationMode): string[] {
  * cite documented workarounds instead of improvising.
  */
 export function loadSupportGrounding(tenantSlug: string): { knownIssues: string; found: boolean } {
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[CUSTOMER_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
   const candidates = [
-    pathResolver.knowledge(path.join('confidential', tenantSlug, 'support', 'known-issues.md')),
-    pathResolver.knowledge('product/sales/known-issues.md'),
+    assertSafeRepositoryPath(
+      pathResolver.knowledge(path.join('confidential', tenantSlug, 'support', 'known-issues.md')),
+      { allowMissingLeaf: true }
+    ),
+    assertSafeRepositoryPath(pathResolver.knowledge('product/sales/known-issues.md'), {
+      allowMissingLeaf: true,
+    }),
   ];
   for (const candidate of candidates) {
     try {
       if (safeExistsSync(candidate)) {
+        if (!safeLstat(candidate).isFile()) {
+          throw new Error(
+            '[CUSTOMER_GROUNDING] known-issues resource must be a regular file: ' + candidate
+          );
+        }
         return {
           knownIssues: String(safeReadFile(candidate, { encoding: 'utf8' })).slice(0, 4000),
           found: true,
         };
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('[CUSTOMER_GROUNDING]')) {
+        throw error;
+      }
       // unreadable grounding is the same as missing grounding
     }
   }
@@ -128,13 +153,34 @@ export interface DealRequirementsCapture {
   requirements: ExtractedRequirements;
 }
 
+const DEAL_REQUIREMENTS_CAPTURE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/deal-requirements-capture.schema.json'
+);
+
 function dealRequirementsPath(tenantSlug: string, dealId: string): string {
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/.test(dealId)) {
+    throw new Error(`[DEAL_SCOPE] invalid deal id: ${dealId}`);
+  }
   // Lives in the deal's document directory (customer/<tenant>/deals/<id>/,
   // same convention as deal-documents) — NOT as a sibling of DEAL-*.json,
   // which listDeals() would misread as a deal record.
-  return pathResolver.rootResolve(
-    path.join('customer', tenantSlug, 'deals', dealId, 'requirements.json')
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      path.join('customer', tenantSlug, 'deals', dealId, 'requirements.json')
+    ),
+    { allowMissingLeaf: true }
   );
+}
+
+function dealRequirementsCaptureCatalog(filePath: string) {
+  return defineCatalog<DealRequirementsCapture>({
+    id: 'deal-requirements-capture',
+    path: filePath,
+    schema: DEAL_REQUIREMENTS_CAPTURE_SCHEMA_PATH,
+  });
 }
 
 export function readDealRequirementsCapture(
@@ -143,8 +189,8 @@ export function readDealRequirementsCapture(
 ): DealRequirementsCapture | null {
   const filePath = dealRequirementsPath(tenantSlug, dealId);
   try {
-    if (!safeExistsSync(filePath)) return null;
-    return readJson<DealRequirementsCapture>(filePath);
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
+    return dealRequirementsCaptureCatalog(filePath).load();
   } catch (err) {
     logger.warn(
       `[customer-conversation-modes] unreadable requirements capture ${filePath}: ${err instanceof Error ? err.message : String(err)}`
@@ -162,14 +208,15 @@ export function saveDealRequirementsCapture(input: {
   const capture: DealRequirementsCapture = {
     deal_id: input.dealId,
     tenant_slug: input.tenantSlug,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     turns_captured: (previous?.turns_captured || 0) + 1,
     requirements: input.requirements,
   };
   const filePath = dealRequirementsPath(input.tenantSlug, input.dealId);
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(capture, null, 2));
-  return capture;
+  const validated = dealRequirementsCaptureCatalog(filePath).validate(capture, filePath);
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  return validated;
 }
 
 /**

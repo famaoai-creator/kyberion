@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import {
   getChronosAccessRoleOrThrow,
   guardRequest,
@@ -10,6 +11,7 @@ import {
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
+  strictViewerTier,
   ViewerContextError,
   viewerErrorResponse,
   type ViewerContext,
@@ -44,9 +46,11 @@ import {
 import {
   extractMissionDependencies,
   normalizeMissionAssets,
+  parseNextTaskRecords,
   parseTaskBoard,
   summarizeNextTasks,
 } from '../../../lib/mission-progress';
+import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission-next-task-reader';
 import { applyBrowserSessionControl } from '../../../lib/browser-session-control';
 import { buildRuntimeTopology } from '../../../lib/runtime-topology';
 import {
@@ -88,16 +92,16 @@ import {
   materializeTrackArtifactSkeleton,
   normalizeSurfaceDefinition,
   pathResolver,
+  assertSafeRepositoryPath,
   promoteMemoryCandidateToKnowledge,
   promotePersonalMemoryCandidates,
   probeSurfaceHealth,
   restartAgentRuntime,
   safeExec,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
-  loadJson,
   safeReaddir,
-  safeStat,
   saveDistillCandidateRecord,
   saveMissionSeedRecord,
   saveProjectRecord,
@@ -109,8 +113,8 @@ import {
   updateMemoryPromotionCandidateStatus,
 } from '../../../lib/intelligence-primitives';
 import { listWorkItems } from '@agent/core/work-coordination';
-import { getProjectManagementView } from '@agent/core';
-import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
+import { getProjectManagementView } from '@agent/core/project-management';
+import { listMissionsInSearchDirs, loadState, loadStateAtPath } from '@agent/core/mission-state';
 
 export interface RuntimeTopologySurfaceInput {
   id: string;
@@ -334,6 +338,14 @@ export interface ControlActionDetail {
 export type TenantScope = string[] | 'all';
 
 export function missionTenantSlug(missionId: string): string | undefined {
+  return missionScope(missionId)?.tenant;
+}
+
+export function missionTier(missionId: string): string | undefined {
+  return missionScope(missionId)?.tier;
+}
+
+function missionScope(missionId: string): { tenant?: string; tier?: string } | undefined {
   const normalized = String(missionId || '').trim();
   if (!normalized) return undefined;
   try {
@@ -341,7 +353,11 @@ export function missionTenantSlug(missionId: string): string | undefined {
     if (matches.length !== 1) return undefined;
     const directory = path.dirname(matches[0].missionPath);
     const state = loadState(normalized, { directories: [directory] });
-    return state?.tenant_slug || state?.tenant_id;
+    if (!state) return undefined;
+    return {
+      tenant: state.tenant_slug || state.tenant_id,
+      tier: typeof state.tier === 'string' ? state.tier : undefined,
+    };
   } catch {
     return undefined;
   }
@@ -352,10 +368,34 @@ export function missionVisibleToTenant(
   tenantSlugs: TenantScope
 ): boolean {
   if (!missionId) return false;
-  const tenant = missionTenantSlug(missionId);
+  const tenant = missionScope(missionId)?.tenant;
   if (!tenant) return false;
   if (tenantSlugs === 'all') return true;
   return Boolean(tenant && tenantSlugs.includes(tenant));
+}
+
+export function missionVisibleToScope(
+  missionId: string | undefined,
+  tenantSlugs: TenantScope,
+  tierAccess?: readonly string[]
+): boolean {
+  if (!missionId) return false;
+  const scope = missionScope(missionId);
+  if (!scope?.tenant) return false;
+  if (tenantSlugs !== 'all' && !tenantSlugs.includes(scope.tenant)) return false;
+  if (!tierAccess) return true;
+  return Boolean(scope.tier && tierAccess.includes(scope.tier));
+}
+
+/** Events without a mission are global control data and are treated as confidential. */
+export function observationVisibleToScope(
+  missionId: string | undefined,
+  tenantSlugs: TenantScope,
+  tierAccess?: readonly string[]
+): boolean {
+  if (missionId) return missionVisibleToScope(missionId, tenantSlugs, tierAccess);
+  if (tenantSlugs !== 'all') return false;
+  return !tierAccess || tierAccess.includes('confidential');
 }
 
 export function projectVisibleToTenant(
@@ -398,13 +438,17 @@ export function filterServiceBindingsToTenant(
 
 export function surfaceOutboxVisibleToTenant(
   message: { correlation_id?: string },
-  tenantSlugs: TenantScope
+  tenantSlugs: TenantScope,
+  tierAccess?: readonly string[]
 ): boolean {
-  if (tenantSlugs === 'all') return true;
+  if (tenantSlugs === 'all' && !tierAccess) return true;
   const correlationId = String(message.correlation_id || '')
     .trim()
     .toUpperCase();
-  return correlationId.startsWith('MSN-') && missionVisibleToTenant(correlationId, tenantSlugs);
+  return (
+    correlationId.startsWith('MSN-') &&
+    missionVisibleToScope(correlationId, tenantSlugs, tierAccess)
+  );
 }
 
 export function missionScopeError(
@@ -413,7 +457,21 @@ export function missionScopeError(
   requestedTenant?: string
 ): NextResponse | null {
   const allowedTenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
-  if (missionVisibleToTenant(missionId, allowedTenants)) return null;
+  const tier = missionTier(missionId);
+  if (
+    missionVisibleToTenant(missionId, allowedTenants) &&
+    tier &&
+    (() => {
+      try {
+        strictViewerTier(viewer, tier as OsKnowledgeTier);
+        return true;
+      } catch {
+        return false;
+      }
+    })()
+  ) {
+    return null;
+  }
   return NextResponse.json(
     { error: 'Mission is outside the viewer tenant scope' },
     { status: 403 }
@@ -426,7 +484,19 @@ export function projectScopeError(
   requestedTenant?: string
 ): NextResponse | null {
   const allowedTenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
-  if (projectVisibleToTenant(project, allowedTenants)) return null;
+  if (
+    projectVisibleToTenant(project, allowedTenants) &&
+    (() => {
+      try {
+        strictViewerTier(viewer, project.tier);
+        return true;
+      } catch {
+        return false;
+      }
+    })()
+  ) {
+    return null;
+  }
   return NextResponse.json(
     { error: 'Project is outside the viewer tenant scope' },
     { status: 403 }
@@ -569,9 +639,16 @@ export function buildChronosNextActions(input: {
 }
 
 export function collectWorkCoordinationSummary(
-  tenantSlugs: string[] | 'all' = 'all'
+  tenantSlugs: string[] | 'all' = 'all',
+  tierAccess?: readonly string[]
 ): WorkCoordinationSummary {
-  const items = listWorkItems({ tenantSlugs: tenantSlugs === 'all' ? undefined : tenantSlugs });
+  const items = listWorkItems({
+    tenantSlugs: tenantSlugs === 'all' ? undefined : tenantSlugs,
+  }).filter((item) => {
+    if (!tierAccess) return true;
+    const project = loadProjectRecord(item.project_id);
+    return Boolean(project && tierAccess.includes(project.tier));
+  });
   const summary: WorkCoordinationSummary = {
     total: items.length,
     backlog: 0,
@@ -797,9 +874,23 @@ export function resolveProjectRootPath(
   return metadataRoot || null;
 }
 
-export function readJson<T = any>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  return loadJson<T>(filePath);
+function safeMissionResourcePath(filePath: string): string | null {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return null;
+  }
+}
+
+function loadMissionNextTasksForProjection(
+  filePath: string,
+  missionDirectoryName: string
+): ReturnType<typeof parseNextTaskRecords> {
+  try {
+    return parseNextTaskRecords(loadMissionNextTaskObjectsAtPath(filePath, missionDirectoryName));
+  } catch {
+    return null;
+  }
 }
 
 export function collectActiveMissions(): MissionSummary[] {
@@ -811,24 +902,34 @@ export function collectActiveMissions(): MissionSummary[] {
 
   for (const root of missionRoots) {
     try {
-      if (!safeExistsSync(root.dir)) continue;
-      for (const item of safeReaddir(root.dir)) {
-        const missionPath = path.join(root.dir, item);
-        const state = readJson<any>(path.join(missionPath, 'mission-state.json'));
-        if (!state || !['active', 'planned', 'paused', 'failed'].includes(state.status)) continue;
-        const nextTasks = readJson<any[]>(path.join(missionPath, 'NEXT_TASKS.json')) || [];
-        const planReady = safeExistsSync(path.join(missionPath, 'PLAN.md'));
-        const nextTaskCount = Array.isArray(nextTasks) ? nextTasks.length : 0;
+      const safeRoot = safeMissionResourcePath(root.dir);
+      if (!safeRoot || !safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) continue;
+      for (const item of safeReaddir(safeRoot)) {
+        const missionPath = safeMissionResourcePath(path.join(safeRoot, item));
+        if (!missionPath || !safeExistsSync(missionPath) || !safeLstat(missionPath).isDirectory()) {
+          continue;
+        }
+        const statePath = safeMissionResourcePath(path.join(missionPath, 'mission-state.json'));
+        const state = statePath ? loadStateAtPath(statePath) : null;
+        const status = state?.status;
+        if (!status || !['active', 'planned', 'paused', 'failed'].includes(status)) continue;
+        const nextTaskRecords =
+          loadMissionNextTasksForProjection(path.join(missionPath, 'NEXT_TASKS.json'), item) || [];
+        const planPath = safeMissionResourcePath(path.join(missionPath, 'PLAN.md'));
+        const planReady = Boolean(
+          planPath && safeExistsSync(planPath) && safeLstat(planPath).isFile()
+        );
+        const nextTaskCount = nextTaskRecords.length;
         const controlSummary =
-          state.status === 'paused' || state.status === 'failed'
-            ? `${state.status} mission`
+          status === 'paused' || status === 'failed'
+            ? `${status} mission`
             : planReady
               ? nextTaskCount > 0
                 ? 'execution ready'
                 : 'plan ready'
               : 'planning pending';
         const controlTone: MissionSummary['controlTone'] =
-          state.status === 'paused' || state.status === 'failed'
+          status === 'paused' || status === 'failed'
             ? 'attention'
             : planReady
               ? nextTaskCount > 0
@@ -838,7 +939,7 @@ export function collectActiveMissions(): MissionSummary[] {
         missions.push({
           missionId: state.mission_id || item,
           tenantSlug: state.tenant_slug || state.tenant_id,
-          status: state.status,
+          status,
           tier: state.tier || root.tier,
           missionType: state.mission_type,
           projectId: state.relationships?.project?.project_id,
@@ -869,27 +970,34 @@ export function collectMissionProgress(activeMissions: MissionSummary[]): Missio
   for (const mission of activeMissions) {
     const missionPath = missionRoots
       .map((root) => path.join(root, mission.missionId))
-      .find((candidate) => safeExistsSync(candidate));
+      .map((candidate) => safeMissionResourcePath(candidate))
+      .find((candidate): candidate is string =>
+        Boolean(candidate && safeExistsSync(candidate) && safeLstat(candidate).isDirectory())
+      );
     if (!missionPath) continue;
 
-    const taskBoardPath = path.join(missionPath, 'TASK_BOARD.md');
-    const nextTasksPath = path.join(missionPath, 'NEXT_TASKS.json');
-    const statePath = path.join(missionPath, 'mission-state.json');
-    const taskBoard = safeExistsSync(taskBoardPath)
-      ? String(safeReadFile(taskBoardPath, { encoding: 'utf8' }) || '')
-      : '';
-    const nextTasks = readJson<Array<{ status?: string }>>(nextTasksPath) || [];
-    const missionState = readJson<Record<string, unknown>>(statePath) || {};
+    const taskBoardPath = safeMissionResourcePath(path.join(missionPath, 'TASK_BOARD.md'));
+    const nextTasksPath = safeMissionResourcePath(path.join(missionPath, 'NEXT_TASKS.json'));
+    const statePath = safeMissionResourcePath(path.join(missionPath, 'mission-state.json'));
+    const taskBoard =
+      taskBoardPath && safeExistsSync(taskBoardPath) && safeLstat(taskBoardPath).isFile()
+        ? String(safeReadFile(taskBoardPath, { encoding: 'utf8' }) || '')
+        : '';
+    const nextTasks = nextTasksPath
+      ? loadMissionNextTasksForProjection(nextTasksPath, path.basename(missionPath)) || []
+      : [];
+    const missionState = statePath ? loadStateAtPath(statePath) : null;
     const board = parseTaskBoard(taskBoard);
     const nextTaskSummary = summarizeNextTasks(nextTasks);
     const generatedAssets: MissionProgressSummary['generatedAssets'] = [];
     for (const dirName of ['deliverables', 'artifacts', 'outputs', 'evidence'] as const) {
-      const dirPath = path.join(missionPath, dirName);
-      if (!safeExistsSync(dirPath)) continue;
+      const dirPath = safeMissionResourcePath(path.join(missionPath, dirName));
+      if (!dirPath || !safeExistsSync(dirPath) || !safeLstat(dirPath).isDirectory()) continue;
       for (const entry of safeReaddir(dirPath)) {
-        const fullPath = path.join(dirPath, entry);
+        const fullPath = safeMissionResourcePath(path.join(dirPath, entry));
+        if (!fullPath) continue;
         try {
-          const stats = safeStat(fullPath);
+          const stats = safeLstat(fullPath);
           if (stats.isFile()) {
             generatedAssets.push({
               path: `${dirName}/${entry}`,
@@ -909,7 +1017,7 @@ export function collectMissionProgress(activeMissions: MissionSummary[]): Missio
       ...board,
       ...nextTaskSummary,
       dependencies: extractMissionDependencies(
-        missionState.relationships as Record<string, unknown> | undefined
+        missionState?.relationships as Record<string, unknown> | undefined
       ),
       generatedAssets: normalizeMissionAssets(generatedAssets),
     });

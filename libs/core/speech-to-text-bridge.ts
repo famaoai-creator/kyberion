@@ -19,7 +19,17 @@
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
-import { safeExistsSync, safeExecResult, safeReadFile, safeWriteFile } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeExecResult,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
 import { resolveLocale } from './locale.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
@@ -67,6 +77,10 @@ export interface SpeechToTextBridge {
   /** Stable tie-breaker; higher values are preferred when capabilities match. */
   priority?: number;
   transcribe(input: TranscribeInput): Promise<TranscribeResult>;
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 export const NO_TIMESTAMP_STT_CAPABILITIES: SpeechToTextCapabilities = {
@@ -145,23 +159,83 @@ export function normalizeSpeechToTextResult(
   };
 }
 
+export function parseSpeechToTextCapabilities(
+  value: unknown
+): SpeechToTextCapabilities | undefined {
+  if (!isRecord(value) || typeof value.timestamps !== 'boolean') return undefined;
+  if (
+    value.granularity !== 'none' &&
+    value.granularity !== 'segment' &&
+    value.granularity !== 'word'
+  ) {
+    return undefined;
+  }
+  return {
+    timestamps: value.timestamps,
+    granularity: value.granularity,
+    ...(typeof value.local_only === 'boolean' ? { local_only: value.local_only } : {}),
+    ...(typeof value.confidence === 'boolean' ? { confidence: value.confidence } : {}),
+  };
+}
+
+function parseStructuredSegments(value: unknown): TranscriptSegment[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.start_sec !== 'number' ||
+      !Number.isFinite(entry.start_sec) ||
+      typeof entry.end_sec !== 'number' ||
+      !Number.isFinite(entry.end_sec) ||
+      typeof entry.text !== 'string'
+    ) {
+      return [];
+    }
+    return [{ start_sec: entry.start_sec, end_sec: entry.end_sec, text: entry.text }];
+  });
+}
+
+function projectStructuredOutput(record: Record<string, unknown>): Partial<TranscribeResult> {
+  const capabilities = parseSpeechToTextCapabilities(record.capabilities);
+  const segments = parseStructuredSegments(record.segments);
+  return {
+    ...(typeof record.text === 'string' ? { text: record.text } : {}),
+    ...(typeof record.language === 'string' ? { language: record.language } : {}),
+    ...(capabilities ? { capabilities } : {}),
+    ...(segments ? { segments } : {}),
+  };
+}
+
 function parseStructuredOutput(stdout: string): Partial<TranscribeResult> {
+  const parseRecord = (candidate: string): Record<string, unknown> | undefined => {
+    try {
+      const parsed: unknown = parseSafeJsonInput(candidate, 'speech-to-text response');
+      return isRecord(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const parsed = parseRecord(stdout);
+  if (parsed) {
+    return projectStructuredOutput(parsed);
+  }
+
   try {
-    return JSON.parse(stdout) as Partial<TranscribeResult>;
-  } catch {
     // Swift/CoreML loaders and model runtimes may print informational lines;
     // accept the final JSON object while keeping malformed output fatal.
     for (const line of stdout.split(/\r?\n/u).reverse()) {
       const trimmed = line.trim();
       if (!trimmed.startsWith('{')) continue;
-      try {
-        return JSON.parse(trimmed) as Partial<TranscribeResult>;
-      } catch {
-        continue;
+      const lineRecord = parseRecord(trimmed);
+      if (lineRecord) {
+        return projectStructuredOutput(lineRecord);
       }
     }
-    throw new Error('structured output was not valid JSON');
+  } catch {
+    // Keep the stable error below even when a future candidate parser throws.
   }
+  throw new Error('structured output was not valid JSON');
 }
 
 function deriveSidecar(audioAbs: string): string {
@@ -173,6 +247,21 @@ function defaultTranscriptPath(audioAbs: string): string {
   return path.join(parsed.dir, `${parsed.name}.transcript.txt`);
 }
 
+function resolveAudioPath(audioPath: string): string {
+  return assertSafeRepositoryPath(rootResolve(audioPath));
+}
+
+function resolveTranscriptPath(outputPath: string | undefined, audioAbs: string): string {
+  const candidate = outputPath ? rootResolve(outputPath) : defaultTranscriptPath(audioAbs);
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+}
+
+function assertRegularFile(filePath: string, label: string): void {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[stt-bridge] ${label} must be a regular file: ${filePath}`);
+  }
+}
+
 /**
  * Stub bridge — accepts a sidecar `<audio>.transcript.txt` next to the
  * audio file as a pre-baked transcript. Never tries to actually decode
@@ -182,9 +271,13 @@ export const stubSpeechToTextBridge: SpeechToTextBridge = {
   name: 'stub',
   capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
   async transcribe(input) {
-    const audioAbs = rootResolve(input.audioPath);
-    const sidecar = deriveSidecar(audioAbs);
+    const audioAbs = resolveAudioPath(input.audioPath);
+    if (safeExistsSync(audioAbs)) assertRegularFile(audioAbs, 'audio input');
+    const sidecar = assertSafeRepositoryPath(deriveSidecar(audioAbs), {
+      allowMissingLeaf: true,
+    });
     if (safeExistsSync(sidecar)) {
+      assertRegularFile(sidecar, 'transcript sidecar');
       const text = safeReadFile(sidecar, { encoding: 'utf8' }) as string;
       logger.warn(
         `[stt-bridge:stub] using pre-baked sidecar ${sidecar} — register a real SpeechToTextBridge to decode audio.`
@@ -247,10 +340,11 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
   }
 
   async transcribe(input: TranscribeInput): Promise<TranscribeResult> {
-    const audioAbs = rootResolve(input.audioPath);
+    const audioAbs = resolveAudioPath(input.audioPath);
     if (!safeExistsSync(audioAbs)) {
       throw new Error(`[stt-bridge:shell] audio file not found: ${input.audioPath}`);
     }
+    assertRegularFile(audioAbs, 'audio input');
     // I18N-06: an unset transcribe language falls back to the resolved
     // locale (identity/env/OS) instead of an empty string, matching the
     // stub bridge above and `python-voice-bridge.ts`'s TTS language (I18N-01).
@@ -258,7 +352,7 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
     const cmd = this.options.command
       .replace(/\{\{audio\}\}/gu, audioAbs)
       .replace(/\{\{language\}\}/gu, resolvedLanguage);
-    const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
+    const shell = this.options.shell ?? envText(process.env, 'SHELL') ?? '/bin/sh';
     const stdout = execFileSync(shell, ['-c', cmd], {
       encoding: 'utf8',
       timeout: this.options.timeoutMs ?? 5 * 60 * 1000,
@@ -276,9 +370,8 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
       }
     }
     const text = String(structured.text || stdout).trim();
-    const outputPath = input.outputPath
-      ? rootResolve(input.outputPath)
-      : defaultTranscriptPath(audioAbs);
+    const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+    if (safeExistsSync(outputPath)) assertRegularFile(outputPath, 'transcript output');
     safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
     return {
       text,
@@ -300,9 +393,10 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
 export function installFluidAudioSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  if (env.KYBERION_STT_COMMAND?.trim()) return false;
-  const command = env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim();
+  if (envText(env, 'KYBERION_STT_COMMAND')?.trim()) return false;
+  const command = envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim();
   if (!command) return false;
+  const timeoutText = envText(env, 'KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS');
   registerSpeechToTextBridge(
     new ShellSpeechToTextBridge({
       name: 'fluid-audio-parakeet',
@@ -310,9 +404,7 @@ export function installFluidAudioSpeechToTextBridgeIfAvailable(
       structuredOutput: true,
       priority: 100,
       capabilities: { timestamps: true, granularity: 'segment', local_only: true },
-      ...(env.KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS
-        ? { timeoutMs: parseInt(env.KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS, 10) }
-        : {}),
+      ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
     })
   );
   logger.success('[stt-bridge] installed FluidAudio Parakeet bridge');
@@ -327,25 +419,31 @@ export function installFluidAudioSpeechToTextBridgeIfAvailable(
 export function installShellSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  const command = env.KYBERION_STT_COMMAND?.trim();
+  const command = envText(env, 'KYBERION_STT_COMMAND')?.trim();
   if (!command) return false;
   let capabilities: SpeechToTextCapabilities | undefined;
-  if (env.KYBERION_STT_CAPABILITIES?.trim()) {
+  const capabilitiesText = envText(env, 'KYBERION_STT_CAPABILITIES')?.trim();
+  if (capabilitiesText) {
     try {
-      capabilities = JSON.parse(env.KYBERION_STT_CAPABILITIES) as SpeechToTextCapabilities;
-    } catch (error: any) {
-      logger.warn(`[stt-bridge] ignored invalid KYBERION_STT_CAPABILITIES: ${error.message}`);
+      const parsed: unknown = parseSafeJsonInput(capabilitiesText, 'speech-to-text capabilities');
+      capabilities = parseSpeechToTextCapabilities(parsed);
+      if (!capabilities) {
+        logger.warn('[stt-bridge] ignored invalid KYBERION_STT_CAPABILITIES shape');
+      }
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      logger.warn(`[stt-bridge] ignored invalid KYBERION_STT_CAPABILITIES: ${detail}`);
     }
   }
+  const priorityText = envText(env, 'KYBERION_STT_PRIORITY');
+  const timeoutText = envText(env, 'KYBERION_STT_TIMEOUT_MS');
   registerSpeechToTextBridge(
     new ShellSpeechToTextBridge({
       command,
-      ...(env.KYBERION_STT_OUTPUT_FORMAT === 'json' ? { structuredOutput: true } : {}),
+      ...(envText(env, 'KYBERION_STT_OUTPUT_FORMAT') === 'json' ? { structuredOutput: true } : {}),
       ...(capabilities ? { capabilities } : {}),
-      ...(env.KYBERION_STT_PRIORITY ? { priority: parseInt(env.KYBERION_STT_PRIORITY, 10) } : {}),
-      ...(env.KYBERION_STT_TIMEOUT_MS
-        ? { timeoutMs: parseInt(env.KYBERION_STT_TIMEOUT_MS, 10) }
-        : {}),
+      ...(priorityText ? { priority: parseInt(priorityText, 10) } : {}),
+      ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
     })
   );
   logger.success(`[stt-bridge] installed ShellSpeechToTextBridge from KYBERION_STT_COMMAND`);
@@ -355,16 +453,21 @@ export function installShellSpeechToTextBridgeIfAvailable(
 /**
  * Use the governed MLX Whisper runtime when no explicit STT adapter was set.
  * This keeps the model process behind the SpeechToTextBridge boundary while
- * allowing the realtime CLI to work immediately after `voice:setup --apply`.
+ * allowing the realtime CLI to work immediately after `kyberion voice setup --apply`.
  */
 export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  if (env.KYBERION_STT_COMMAND?.trim() || env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()) {
+  if (
+    envText(env, 'KYBERION_STT_COMMAND')?.trim() ||
+    envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
+  ) {
     return false;
   }
   const pythonBin = resolveManagedToolPythonBin('mlx_whisper');
-  const bridgeScript = rootResolve('libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py');
+  const bridgeScript = assertSafeRepositoryPath(
+    rootResolve('libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py')
+  );
   if (!pythonBin || !safeExistsSync(bridgeScript)) return false;
 
   registerSpeechToTextBridge({
@@ -372,7 +475,7 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
     priority: 90,
     capabilities: { timestamps: true, granularity: 'segment', local_only: true },
     async transcribe(input) {
-      const audioAbs = rootResolve(input.audioPath);
+      const audioAbs = resolveAudioPath(input.audioPath);
       if (!safeExistsSync(audioAbs)) {
         throw new Error(`[stt-bridge:mlx_whisper] audio file not found: ${input.audioPath}`);
       }
@@ -381,7 +484,7 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
           action: 'transcribe',
           params: { audio_path: audioAbs, ...(input.language ? { language: input.language } : {}) },
         }),
-        env: { KYBERION_PROJECT_ROOT: rootResolve('.') },
+        env: { KYBERION_PROJECT_ROOT: assertSafeRepositoryPath(rootResolve('.')) },
         timeoutMs: 120_000,
         maxOutputMB: 2,
       });
@@ -393,9 +496,7 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
       const response = parseStructuredOutput(result.stdout);
       const text = String(response.text || '').trim();
       if (!text) throw new Error('[stt-bridge:mlx_whisper] backend returned empty text');
-      const outputPath = input.outputPath
-        ? rootResolve(input.outputPath)
-        : defaultTranscriptPath(audioAbs);
+      const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
       safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
       return {
         text,

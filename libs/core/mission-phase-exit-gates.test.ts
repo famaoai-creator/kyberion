@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   evaluateMissionPhaseExitGates,
+  loadMissionGateRecordAtPath,
   loadMissionPhaseGateDefinitions,
   resolvePhaseGateMode,
 } from './mission-orchestration-worker.js';
@@ -62,6 +63,139 @@ describe('mission phase exit gates (MO-02)', () => {
     expect(definitions).toHaveLength(1);
     expect(definitions[0].gate.id).toBe('GATE_A');
     expect(definitions[0].position).toBe('exit');
+  });
+
+  it('skips schema-invalid and cross-mission gate definitions', () => {
+    const definitionsDir = path.join(missionPath, 'gates', 'definitions');
+    fs.mkdirSync(definitionsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(definitionsDir, 'UNKNOWN_KIND.json'),
+      JSON.stringify({
+        mission_id: missionId,
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'UNKNOWN_KIND', checks: [{ kind: 'not-a-gate-kind' }] },
+      })
+    );
+    fs.writeFileSync(
+      path.join(definitionsDir, 'OTHER_MISSION.json'),
+      JSON.stringify({
+        mission_id: 'MSN-OTHER-MISSION',
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'OTHER_MISSION', checks: [] },
+      })
+    );
+
+    expect(loadMissionPhaseGateDefinitions(missionId)).toEqual([]);
+  });
+
+  it('loads gate definitions from an existing confidential mission root', () => {
+    const confidentialMissionId = `MSN-GATE-CONF-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const confidentialMissionPath = missionDir(confidentialMissionId, 'confidential');
+    const definitionsDir = path.join(confidentialMissionPath, 'gates', 'definitions');
+    fs.mkdirSync(definitionsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(definitionsDir, 'CONFIDENTIAL_GATE.json'),
+      JSON.stringify({
+        mission_id: confidentialMissionId,
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'CONFIDENTIAL_GATE', checks: [] },
+      })
+    );
+
+    try {
+      expect(loadMissionPhaseGateDefinitions(confidentialMissionId)).toEqual([
+        expect.objectContaining({
+          phase: 'execution',
+          position: 'exit',
+          gate: expect.objectContaining({ id: 'CONFIDENTIAL_GATE' }),
+        }),
+      ]);
+    } finally {
+      fs.rmSync(confidentialMissionPath, { recursive: true, force: true });
+    }
+  });
+
+  it('does not load gate definitions through a symlinked mission directory', () => {
+    const externalMissionPath = path.join(
+      path.dirname(missionPath),
+      `external-${missionId.toLowerCase()}`
+    );
+    const externalDefinitions = path.join(externalMissionPath, 'gates', 'definitions');
+    fs.mkdirSync(externalDefinitions, { recursive: true });
+    fs.writeFileSync(
+      path.join(externalDefinitions, 'ESCAPED.json'),
+      JSON.stringify({
+        mission_id: missionId,
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'ESCAPED', checks: [] },
+      })
+    );
+    fs.rmSync(missionPath, { recursive: true, force: true });
+    fs.symlinkSync(externalMissionPath, missionPath, 'dir');
+    try {
+      expect(() => loadMissionPhaseGateDefinitions(missionId)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.unlinkSync(missionPath);
+      fs.rmSync(externalMissionPath, { recursive: true, force: true });
+      fs.mkdirSync(missionPath, { recursive: true });
+    }
+  });
+
+  it('skips a gate definition that is a symlink to an external file', () => {
+    const externalDefinition = path.join(
+      path.dirname(missionPath),
+      `external-${missionId.toLowerCase()}.json`
+    );
+    fs.writeFileSync(
+      externalDefinition,
+      JSON.stringify({
+        mission_id: missionId,
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'ESCAPED', checks: [] },
+      })
+    );
+    const definitionsDir = path.join(missionPath, 'gates', 'definitions');
+    fs.mkdirSync(definitionsDir, { recursive: true });
+    fs.symlinkSync(externalDefinition, path.join(definitionsDir, 'ESCAPED.json'));
+    try {
+      expect(loadMissionPhaseGateDefinitions(missionId)).toEqual([]);
+    } finally {
+      fs.unlinkSync(path.join(definitionsDir, 'ESCAPED.json'));
+      fs.rmSync(externalDefinition, { force: true });
+    }
+  });
+
+  it('rejects invalid, cross-mission, and directory gate records at the read boundary', () => {
+    const recordsDir = path.join(missionPath, 'gates');
+    fs.mkdirSync(recordsDir, { recursive: true });
+    const invalidPath = path.join(recordsDir, 'invalid-record.json');
+    fs.writeFileSync(
+      invalidPath,
+      JSON.stringify({ mission_id: missionId, gate_id: 'GATE_A', verdict: 'maybe' })
+    );
+    expect(() => loadMissionGateRecordAtPath(invalidPath, missionId)).toThrow(
+      'Invalid catalog mission-gate-record'
+    );
+
+    const crossMissionPath = path.join(recordsDir, 'cross-mission.json');
+    fs.writeFileSync(
+      crossMissionPath,
+      JSON.stringify({ mission_id: 'MSN-OTHER', gate_id: 'GATE_A', verdict: 'pass' })
+    );
+    expect(() => loadMissionGateRecordAtPath(crossMissionPath, missionId)).toThrow(
+      'MISSION_GATE_RECORD_SCOPE_MISMATCH'
+    );
+
+    const recordDirectory = path.join(recordsDir, 'record-directory.json');
+    fs.mkdirSync(recordDirectory);
+    expect(() => loadMissionGateRecordAtPath(recordDirectory, missionId)).toThrow(
+      'record must be a regular file'
+    );
   });
 
   it('passes when required evidence exists and records the evaluation', async () => {
@@ -128,6 +262,22 @@ describe('mission phase exit gates (MO-02)', () => {
     const failedIds = outcome.failures.map((failure) => failure.gate_id);
     expect(failedIds).toEqual(['REVIEW_PENDING']);
     expect(outcome.failures[0].reasons.join(' ')).toContain('status: requested');
+  });
+
+  it('fails closed when NEXT_TASKS contains a malformed task record', async () => {
+    fs.writeFileSync(
+      path.join(missionPath, 'NEXT_TASKS.json'),
+      JSON.stringify([{ task_id: 'review-1', status: 'completed' }, { task_id: 42 }])
+    );
+    writeGateDefinition('REVIEW_PASSED', {
+      id: 'REVIEW_PASSED',
+      checks: [{ kind: 'reviewer_approved', params: { task_id: 'review-1' } }],
+    });
+
+    const outcome = await evaluateMissionPhaseExitGates(missionId);
+    expect(outcome.passed).toBe(false);
+    expect(outcome.failures[0]?.gate_id).toBe('REVIEW_PASSED');
+    expect(outcome.failures[0]?.reasons.join(' ')).toContain('not found in NEXT_TASKS.json');
   });
 
   it('evaluates blocking intent drift at the phase exit boundary even without a catalog gate', async () => {

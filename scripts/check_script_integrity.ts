@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReadFile, safeStat } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile, readSafeJsonValueFile } from './lib/json-input.js';
 
 const ROOT = pathResolver.rootDir();
 
@@ -12,6 +13,8 @@ export interface ScriptIntegrityOptions {
   pipelineRoots?: string[];
   pathExists?: (repoRelativePath: string) => boolean;
 }
+
+const SCRIPT_HARNESS_BOOTSTRAP_ALLOWLIST = new Set(['scripts/clean_entrypoint.ts']);
 
 const DEFAULT_PIPELINE_ROOTS = [
   'pipelines',
@@ -107,6 +110,31 @@ function collectPackageScriptReferences(value: string, scripts: Set<string>): st
     if (match[1].includes(':')) refs.add(match[1]);
   }
   return [...refs];
+}
+
+/**
+ * Package scripts that execute authored TypeScript must expose the shared
+ * script harness. The build bootstrap is the only exception: it runs before
+ * package dist exists and therefore cannot import the normal harness.
+ */
+export function findScriptHarnessViolations(
+  packageScripts: Record<string, string>,
+  sourceForScript: (repoRelativePath: string) => string | undefined
+): string[] {
+  const violations: string[] = [];
+  for (const [scriptName, command] of Object.entries(packageScripts)) {
+    const owner = `package.json scripts.${scriptName}`;
+    for (const reference of collectCommandReferences(command)) {
+      if (!reference.startsWith('scripts/') || !reference.endsWith('.ts')) continue;
+      if (SCRIPT_HARNESS_BOOTSTRAP_ALLOWLIST.has(reference)) continue;
+      const source = sourceForScript(reference);
+      if (source === undefined) continue;
+      if (!/\bdefine(?:Script|Generator)\s*\(/u.test(source)) {
+        violations.push(`${owner}: ${reference} must execute through scripts/lib/harness.ts`);
+      }
+    }
+  }
+  return violations;
 }
 
 const PNPM_BUILT_INS = new Set([
@@ -265,10 +293,20 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
     ((repoRelativePath: string) => safeExistsSync(pathResolver.rootResolve(repoRelativePath)));
   const packageJsonPath = options.packageJsonPath || pathResolver.rootResolve('package.json');
   const scanRepositoryDocs = options.packageJsonPath === undefined;
-  const packageJson = readJson<{
+  const packageJson = readSafeJsonFile<{
     scripts?: Record<string, string>;
-  }>(packageJsonPath);
+  }>(packageJsonPath, 'script integrity package manifest');
   const packageScripts = new Set(Object.keys(packageJson.scripts || {}));
+
+  if (options.packageJsonPath === undefined) {
+    violations.push(
+      ...findScriptHarnessViolations(packageJson.scripts || {}, (repoRelativePath) => {
+        const sourcePath = pathResolver.rootResolve(repoRelativePath);
+        if (!safeExistsSync(sourcePath)) return undefined;
+        return String(safeReadFile(sourcePath, { encoding: 'utf8' }));
+      })
+    );
+  }
 
   for (const [scriptName, command] of Object.entries(packageJson.scripts || {})) {
     const owner = `package.json scripts.${scriptName}`;
@@ -282,7 +320,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
   const pipelineRoots = options.pipelineRoots || DEFAULT_PIPELINE_ROOTS;
   for (const file of listPipelineFiles(pipelineRoots)) {
     const owner = toRepoRelative(file);
-    const payload = readJson<unknown>(file);
+    const payload = readSafeJsonValueFile<unknown>(file, `script integrity pipeline ${owner}`);
     scanValue(owner, payload, violations, pathExists, packageScripts);
   }
 
@@ -333,7 +371,7 @@ export const runCheckScriptIntegrity = defineScript({
   run(context) {
     const violations = checkScriptIntegrity();
     if (violations.length > 0) {
-      throw new Error(violations.join('; '));
+      throw new ScriptExitError(1, violations.map((violation) => `- ${violation}`).join('\n'));
     }
     context.print('[check:script-integrity] OK');
   },

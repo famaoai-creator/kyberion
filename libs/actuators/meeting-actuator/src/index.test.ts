@@ -2,8 +2,11 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { compileSchemaFromPath, pathResolver, safeReadFile, safeReaddir } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeReadFile, safeReaddir, safeRmSync } from '@agent/core/secure-io';
 import { handleAction } from './index.js';
+import { parseMeetingActionInput, parseMeetingActionResult } from './meeting-actuator-helpers.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -13,6 +16,53 @@ describe('meeting-actuator', () => {
     pathResolver.rootDir(),
     'knowledge/product/schemas/meeting-action.schema.json'
   );
+
+  it('normalizes the meeting bridge result envelope before audit and delivery', () => {
+    expect(
+      parseMeetingActionResult({
+        status: 'success',
+        action: 'status',
+        platform: 'meet',
+        join_backend: 'meeting-browser-driver',
+        elapsed: 1.25,
+      })
+    ).toMatchObject({ status: 'success', action: 'status', elapsed: 1.25 });
+  });
+
+  it('rejects malformed bridge result fields and primitive roots', () => {
+    expect(parseMeetingActionResult(null)).toBeUndefined();
+    expect(parseMeetingActionResult({ status: 'ok' })).toBeUndefined();
+    expect(
+      parseMeetingActionResult({ status: 'success', platform: { host: 'evil' } })
+    ).toBeUndefined();
+    expect(parseMeetingActionResult({ status: 'success', partial_state: 'true' })).toBeUndefined();
+    expect(parseMeetingActionResult({ status: 'success', elapsed: Number.NaN })).toBeUndefined();
+  });
+
+  it('uses the safe parser at the action and bridge JSON boundaries', () => {
+    const source = safeReadFile(
+      path.join(
+        pathResolver.rootDir(),
+        'libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts'
+      ),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(source).toContain("parseSafeJsonInput(normalized, 'meeting bridge result')");
+    expect(source).toContain("parseSafeJsonInput(inputContent, 'meeting action input')");
+    expect(source).not.toContain('handleAction(JSON.parse(inputContent))');
+  });
+
+  it('rejects malformed typed action input after safe JSON parsing', () => {
+    expect(() => parseMeetingActionInput([])).toThrow(/must be an object/);
+    expect(() => parseMeetingActionInput({ action: 'explode', params: {} })).toThrow(
+      /unknown action/
+    );
+    expect(() => parseMeetingActionInput({ action: 'join' })).toThrow(/params must be an object/);
+    expect(parseMeetingActionInput({ action: 'pipeline', steps: [] })).toEqual({
+      action: 'pipeline',
+      steps: [],
+    });
+  });
 
   it('emits a join action that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
@@ -104,6 +154,46 @@ describe('meeting-actuator', () => {
     expect((result as any).status).toBe('succeeded');
     expect((result as any).context.fairness.total_items).toBe(0);
     expect((result as any).context.fairness.dominant_speaker).toBeNull();
+  });
+
+  it('rejects transcript paths outside the repository before reading them', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'extract_action_items',
+          params: { transcript_path: '/tmp/external-meeting-transcript.txt' },
+        },
+      ],
+    });
+
+    const error = (result as any).results.find((entry: any) => entry.error)?.error || '';
+    expect(error).toContain('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a directory transcript path before reading it', async () => {
+    const fixtureDir = pathResolver.active(`shared/tmp/meeting-transcript-${process.pid}`);
+    const transcriptDir = path.join(fixtureDir, 'transcript.txt');
+    safeMkdir(transcriptDir, { recursive: true });
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'apply',
+            op: 'extract_action_items',
+            params: { transcript_path: pathResolver.toRepoRelative(transcriptDir) },
+          },
+        ],
+      });
+
+      const error = result.results.find((entry) => entry.error)?.error || '';
+      expect(error).toContain('[MEETING_RESOURCE_FILE]');
+    } finally {
+      safeRmSync(fixtureDir, { recursive: true, force: true });
+    }
   });
 });
 

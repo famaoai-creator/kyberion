@@ -1,13 +1,22 @@
 import { createLogger } from './logger.js';
 const logger = createLogger('agent-adapter');
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeReaddir,
+  safeReadFile,
+} from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';
 import { getRegisteredEnvText, safeChildEnv } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
+import { resolveActiveProviderPermissionArgs } from './provider-permission-profiles.js';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import {
   CodexAppServerAdapter,
   CodexExecutionEnhancer,
@@ -16,6 +25,11 @@ import {
   type CodexExecutionEnhancerOptions,
   type CodexNativeSubagentInfo,
 } from './agent-codex-app-server-adapter.js';
+import type {
+  RequestPermissionRequest,
+  RequestPermissionResponse,
+  SessionNotification,
+} from '@agentclientprotocol/sdk';
 
 export {
   CodexAppServerAdapter,
@@ -26,6 +40,10 @@ export {
 };
 
 const PROJECT_ROOT = pathResolver.rootDir();
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 interface SpawnedCliResult {
   status: number | null;
@@ -111,6 +129,8 @@ async function getACPSdk() {
   return await import('@agentclientprotocol/sdk');
 }
 
+type ACPConnection = InstanceType<typeof import('@agentclientprotocol/sdk').ClientSideConnection>;
+
 /**
  * Universal Agent Adapter (UAA) v1.5
  * Truly Universal: Handles deeply nested ID structures and complex turn lifecycles.
@@ -155,6 +175,7 @@ export interface AgentAdapter {
   boot(): Promise<void>;
   ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
   shutdown(): Promise<void>;
+  getLog?(limit?: number): { ts: number; type: string; content: string }[];
   getRuntimeInfo?(): Record<string, unknown>;
   refreshContext?(): Promise<{
     mode: 'soft' | 'stateless';
@@ -231,8 +252,8 @@ function isSafeReadOnlyPermissionTitle(title: string): boolean {
   return allowPatterns.some((pattern) => pattern.test(normalized));
 }
 
-function isNativeSubagentToolCall(toolCall: any): boolean {
-  if (!toolCall || typeof toolCall !== 'object') return false;
+function isNativeSubagentToolCall(toolCall: unknown): boolean {
+  if (!isRecord(toolCall)) return false;
   return [toolCall.name, toolCall.title, toolCall.toolName, toolCall.tool_name]
     .filter((value): value is string => typeof value === 'string')
     .some((value) => /(?:^|[_:.-])spawn[_:.-]?subagent(?:$|[_:.-])/i.test(value));
@@ -242,6 +263,23 @@ function firstStringValue(...values: unknown[]): string | undefined {
   return values.find(
     (value): value is string => typeof value === 'string' && value.trim().length > 0
   );
+}
+
+function extractAcpSessionId(response: unknown): string | undefined {
+  if (!isRecord(response)) return undefined;
+  const thread = isRecord(response.thread) ? response.thread : undefined;
+  return firstStringValue(response.sessionId, response.threadId, thread?.id);
+}
+
+function parseProviderJsonObject(raw: string): Record<string, unknown> | undefined {
+  try {
+    const parsed: unknown = parseSafeJsonInput(raw, 'provider JSON response');
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function applyEnhancersBeforeAsk(
@@ -293,7 +331,7 @@ interface ACPDialect {
 
 abstract class BaseACPAdapter implements AgentAdapter {
   protected child: ChildProcess | null = null;
-  protected connection: any = null;
+  protected connection: ACPConnection | null = null;
   protected acpSessionId: string | null = null;
   protected accumulatedResponse: string = '';
   protected accumulatedThought: string = '';
@@ -308,7 +346,9 @@ abstract class BaseACPAdapter implements AgentAdapter {
     protected authMethod: string = 'oauth-personal'
   ) {}
 
-  protected async requestPermission(params: any): Promise<any> {
+  protected async requestPermission(
+    params: RequestPermissionRequest
+  ): Promise<RequestPermissionResponse> {
     const title = (params.toolCall?.title || '').toLowerCase();
     if (isSafeReadOnlyPermissionTitle(title)) {
       const optionId = params.options?.[0]?.optionId;
@@ -324,7 +364,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
     registerEnhancer(this.enhancers, enhancer);
   }
 
-  protected handleSessionUpdate(_params: any): void {}
+  protected handleSessionUpdate(_params: SessionNotification): void {}
 
   public async boot(): Promise<void> {
     logger.info(`[UAA] Spawning: ${this.bootCommand} ${this.bootArgs.join(' ')}`);
@@ -383,26 +423,38 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
     const { ClientSideConnection, ndJsonStream } = await getACPSdk();
     this.connection = new ClientSideConnection(
-      (agent) => ({
-        sessionUpdate: async (params: any) => {
+      () => ({
+        sessionUpdate: async (params: SessionNotification) => {
           logger.info(`[UAA_NOTIF] ${JSON.stringify(params)}`);
           this.handleSessionUpdate(params);
 
           // RECURSIVE SCAN for text/thought chunks
-          const findContent = (obj: any) => {
-            if (!obj || typeof obj !== 'object') return;
+          const findContent = (value: unknown): void => {
+            if (Array.isArray(value)) {
+              for (const item of value) findContent(item);
+              return;
+            }
+            if (!isRecord(value)) return;
+            const content = isRecord(value.content) ? value.content : undefined;
 
             // Look for Gemini-style update
-            if (obj.sessionUpdate === 'agent_message_chunk' && obj.content?.text) {
-              this.accumulatedResponse += obj.content.text;
-            } else if (obj.sessionUpdate === 'agent_thought_chunk' && obj.content?.text) {
-              this.accumulatedThought += obj.content.text;
+            if (
+              value.sessionUpdate === 'agent_message_chunk' &&
+              typeof content?.text === 'string'
+            ) {
+              this.accumulatedResponse += content.text;
+            } else if (
+              value.sessionUpdate === 'agent_thought_chunk' &&
+              typeof content?.text === 'string'
+            ) {
+              this.accumulatedThought += content.text;
             }
 
             // Look for Codex-style turn update
-            if (obj.turn?.items) {
-              for (const item of obj.turn.items) {
-                if (item.type === 'message' && item.text) {
+            const turn = isRecord(value.turn) ? value.turn : undefined;
+            if (Array.isArray(turn?.items)) {
+              for (const item of turn.items) {
+                if (isRecord(item) && item.type === 'message' && typeof item.text === 'string') {
                   // Only add if not already present (simplified deduplication)
                   if (!this.accumulatedResponse.includes(item.text)) {
                     this.accumulatedResponse += item.text;
@@ -412,9 +464,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
             }
 
             // Recurse into objects/arrays
-            for (const key in obj) {
-              if (typeof obj[key] === 'object') findContent(obj[key]);
-            }
+            for (const nested of Object.values(value)) findContent(nested);
           };
 
           findContent(params);
@@ -432,13 +482,16 @@ abstract class BaseACPAdapter implements AgentAdapter {
         extMethod: async (m, p) => ({}),
         extNotification: async (m, p) => {},
       }),
-      ndJsonStream(Writable.toWeb(sdkOutput) as any, Readable.toWeb(sdkInput) as any)
+      ndJsonStream(
+        Writable.toWeb(sdkOutput) as unknown as WritableStream<Uint8Array>,
+        Readable.toWeb(sdkInput) as unknown as ReadableStream<Uint8Array>
+      )
     );
 
     await waitForBootSignal(this.child, `agent-adapter:${this.bootCommand}`);
     await this.connection.initialize({
       protocolVersion: 1,
-      capabilities: {},
+      clientCapabilities: {},
       clientInfo: { name: 'Kyberion', version: '1.0.0' },
     });
 
@@ -451,14 +504,14 @@ abstract class BaseACPAdapter implements AgentAdapter {
       logger.warn(`suppressed error in createTerminal: ${err}`);
     }
 
-    const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, {
+    const sessionRes = await this.connection.extMethod(this.dialect.newSession, {
       cwd: PROJECT_ROOT,
       workingDirectory: PROJECT_ROOT,
       mcpServers: [],
     });
 
     // ROBUST ID EXTRACTION: Check all known locations
-    this.acpSessionId = sessionRes.sessionId || sessionRes.threadId || sessionRes.thread?.id;
+    this.acpSessionId = extractAcpSessionId(sessionRes) ?? null;
 
     if (!this.acpSessionId) {
       throw new Error(`Failed to extract session ID from response: ${JSON.stringify(sessionRes)}`);
@@ -485,7 +538,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
     this.accumulatedResponse = '';
     this.accumulatedThought = '';
 
-    const response: any = await this.connection.extMethod(this.dialect.prompt, {
+    const response = await this.connection.extMethod(this.dialect.prompt, {
       sessionId: this.acpSessionId,
       threadId: this.acpSessionId,
       prompt: [{ type: 'text', text: enhanced.prompt }],
@@ -499,17 +552,21 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
     // If accumulatedResponse is empty, try to extract from the result object
     let finalText = this.accumulatedResponse;
-    if (!finalText && response.turn?.content) {
-      finalText = (response.turn.content as any[])
-        .filter((p) => p.type === 'text')
-        .map((p) => p.text)
+    const turn = isRecord(response.turn) ? response.turn : undefined;
+    if (!finalText && Array.isArray(turn?.content)) {
+      finalText = turn.content
+        .filter(
+          (part): part is Record<string, unknown> =>
+            isRecord(part) && part.type === 'text' && typeof part.text === 'string'
+        )
+        .map((part) => part.text)
         .join('\n');
     }
 
     const agentResponse: AgentResponse = {
       text: finalText,
       thought: this.accumulatedThought,
-      stopReason: (response as any).stopReason || 'completed',
+      stopReason: firstStringValue(response.stopReason) || 'completed',
       trace,
     };
     return applyEnhancersAfterAsk(this.enhancers, agentResponse);
@@ -536,12 +593,12 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
   public async refreshContext(): Promise<{ mode: 'soft'; sessionId?: string | null }> {
     if (!this.connection) throw new Error('Agent not booted.');
-    const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, {
+    const sessionRes = await this.connection.extMethod(this.dialect.newSession, {
       cwd: PROJECT_ROOT,
       workingDirectory: PROJECT_ROOT,
       mcpServers: [],
     });
-    this.acpSessionId = sessionRes.sessionId || sessionRes.threadId || sessionRes.thread?.id;
+    this.acpSessionId = extractAcpSessionId(sessionRes) ?? null;
     return { mode: 'soft', sessionId: this.acpSessionId };
   }
 }
@@ -636,10 +693,12 @@ export class GrokAdapter extends BaseACPAdapter {
     }
   }
 
-  protected async requestPermission(params: any): Promise<any> {
+  protected async requestPermission(
+    params: RequestPermissionRequest
+  ): Promise<RequestPermissionResponse> {
     if (this.activePermissionMode === 'workspace-write') {
-      const option = params.options?.find((candidate: any) =>
-        ['allow_once', 'allow_always'].includes(candidate?.kind || candidate?.optionId)
+      const option = params.options.find((candidate) =>
+        ['allow_once', 'allow_always'].includes(candidate.kind || candidate.optionId)
       );
       if (option?.optionId) {
         return { outcome: { outcome: 'selected' as const, optionId: option.optionId } };
@@ -652,35 +711,39 @@ export class GrokAdapter extends BaseACPAdapter {
   private nativeSubagentCompleted = false;
   private nativeSubagentChildId: string | undefined;
 
-  protected handleSessionUpdate(params: any): void {
-    const update = params?.update ?? params;
+  protected handleSessionUpdate(params: SessionNotification): void {
+    const envelope = params as unknown as Record<string, unknown>;
+    const update = isRecord(envelope.update) ? envelope.update : envelope;
+    const toolCall = isRecord(envelope.toolCall) ? envelope.toolCall : undefined;
+    const updateToolCall = isRecord(update.toolCall) ? update.toolCall : undefined;
     if (
-      isNativeSubagentToolCall(params?.toolCall) ||
-      isNativeSubagentToolCall(update?.toolCall) ||
-      isNativeSubagentToolCall(update?.tool_call)
+      isNativeSubagentToolCall(toolCall) ||
+      isNativeSubagentToolCall(updateToolCall) ||
+      isNativeSubagentToolCall(update.tool_call)
     ) {
       this.nativeSubagentObserved = true;
       this.nativeSubagentChildId =
         firstStringValue(
-          params?.subagentId,
-          params?.subagent_id,
-          params?.childSessionId,
-          params?.child_session_id,
-          params?.toolCall?.subagentId,
-          params?.toolCall?.subagent_id,
-          update?.subagentId,
-          update?.subagent_id,
-          update?.childSessionId,
-          update?.child_session_id,
-          update?.threadId,
-          update?.thread_id
+          envelope.subagentId,
+          envelope.subagent_id,
+          envelope.childSessionId,
+          envelope.child_session_id,
+          toolCall?.subagentId,
+          toolCall?.subagent_id,
+          update.subagentId,
+          update.subagent_id,
+          update.childSessionId,
+          update.child_session_id,
+          update.threadId,
+          update.thread_id
         ) ?? this.nativeSubagentChildId;
     }
 
     // The available-commands notification advertises `spawn_subagent` in a
     // tools list; it is not evidence that the model invoked it. Only inspect
     // protocol updates whose kind represents an actual tool/subagent event.
-    const updateKind = String(update?.sessionUpdate ?? params?._meta?.updateType ?? '');
+    const meta = isRecord(envelope._meta) ? envelope._meta : undefined;
+    const updateKind = String(update.sessionUpdate ?? meta?.updateType ?? '');
     if (!/(tool|subagent)/i.test(updateKind)) return;
     const serialized = JSON.stringify(update);
     if (/spawn[_-]?subagent/i.test(serialized)) {
@@ -694,18 +757,18 @@ export class GrokAdapter extends BaseACPAdapter {
       this.nativeSubagentCompleted = true;
       this.nativeSubagentChildId =
         firstStringValue(
-          params?.subagentId,
-          params?.subagent_id,
-          params?.childSessionId,
-          params?.child_session_id,
-          params?.toolCall?.subagentId,
-          params?.toolCall?.subagent_id,
-          update?.subagentId,
-          update?.subagent_id,
-          update?.childSessionId,
-          update?.child_session_id,
-          update?.threadId,
-          update?.thread_id
+          envelope.subagentId,
+          envelope.subagent_id,
+          envelope.childSessionId,
+          envelope.child_session_id,
+          toolCall?.subagentId,
+          toolCall?.subagent_id,
+          update.subagentId,
+          update.subagent_id,
+          update.childSessionId,
+          update.child_session_id,
+          update.threadId,
+          update.thread_id
         ) ?? this.nativeSubagentChildId;
     }
   }
@@ -714,7 +777,7 @@ export class GrokAdapter extends BaseACPAdapter {
     prompt: string,
     options: AgentAskOptions = {}
   ): Promise<AgentResponse> {
-    if (process.env.GROK_SUBAGENTS === '0') {
+    if (getRegisteredEnvText('GROK_SUBAGENTS') === '0') {
       throw new Error(
         '[SUBAGENT_UNAVAILABLE] Grok native subagents are disabled by GROK_SUBAGENTS=0.'
       );
@@ -766,7 +829,7 @@ export class GrokAdapter extends BaseACPAdapter {
   public getRuntimeInfo(): Record<string, unknown> {
     return {
       ...super.getRuntimeInfo(),
-      supportsNativeSubagents: process.env.GROK_SUBAGENTS !== '0',
+      supportsNativeSubagents: getRegisteredEnvText('GROK_SUBAGENTS') !== '0',
       lastNativeSubagent: this.lastNativeSubagentInfo,
     };
   }
@@ -848,7 +911,10 @@ export class GeminiWisdomEnhancer implements AgentEnhancer {
     prompt: string,
     options?: AgentAskOptions
   ): Promise<{ prompt: string; options?: AgentAskOptions }> {
-    const wisdomDir = path.join(PROJECT_ROOT, 'knowledge/product/evolution');
+    const wisdomDir = assertSafeRepositoryPath(
+      path.join(PROJECT_ROOT, 'knowledge/product/evolution'),
+      { allowMissingLeaf: true }
+    );
     let wisdomContext = '';
 
     try {
@@ -861,7 +927,8 @@ export class GeminiWisdomEnhancer implements AgentEnhancer {
           .slice(-5);
 
         for (const file of mdFiles) {
-          const content = safeReadFile(path.join(wisdomDir, file), { encoding: 'utf8' }) as string;
+          const wisdomFile = assertSafeRepositoryPath(path.join(wisdomDir, file));
+          const content = safeReadFile(wisdomFile, { encoding: 'utf8' }) as string;
           wisdomContext += `\n--- Lesson from ${file} ---\n${content}\n`;
         }
       }
@@ -907,15 +974,21 @@ export class CodexAdapter implements AgentAdapter {
     const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
     const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
     logger.info(`[UAA] Codex Executing prompt: "${summarizePromptForLog(enhanced.prompt)}"`);
+    assertReasoningEgressAllowed('codex-cli');
 
     try {
       // Pass the text as a single argument to npx/codex exec
-      const res = await runCliProcess('npx', ['codex', 'exec', '--json', enhanced.prompt], {
-        env: safeChildEnv() as NodeJS.ProcessEnv,
-        cwd: PROJECT_ROOT,
-        timeoutMs: 300000,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
+      const activePermissionArgs = resolveActiveProviderPermissionArgs('codex') ?? [];
+      const res = await runCliProcess(
+        'npx',
+        ['codex', 'exec', ...activePermissionArgs, '--json', enhanced.prompt],
+        {
+          env: safeChildEnv() as NodeJS.ProcessEnv,
+          cwd: PROJECT_ROOT,
+          timeoutMs: 300000,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }
+      );
 
       if (res.status !== 0) {
         logger.error(`[UAA] Codex Exit Code: ${res.status}`);
@@ -923,16 +996,17 @@ export class CodexAdapter implements AgentAdapter {
         return { text: '', stopReason: 'error', trace };
       }
 
-      const parsed = JSON.parse(res.stdout);
+      const parsed = parseProviderJsonObject(res.stdout);
+      if (!parsed) throw new Error('Codex returned a non-object JSON response');
       const agentResponse: AgentResponse = {
-        text: parsed.message || parsed.content || res.stdout,
-        thought: parsed.thought,
+        text: firstStringValue(parsed.message, parsed.content) || res.stdout,
+        ...(typeof parsed.thought === 'string' ? { thought: parsed.thought } : {}),
         stopReason: 'completed',
         trace,
       };
       return applyEnhancersAfterAsk(this.enhancers, agentResponse);
-    } catch (e: any) {
-      logger.error(`[UAA] Codex Exec failed: ${e.message}`);
+    } catch (e: unknown) {
+      logger.error(`[UAA] Codex Exec failed: ${errorMessage(e)}`);
       return { text: '', stopReason: 'error', trace };
     }
   }
@@ -983,6 +1057,7 @@ export class AgyAdapter implements AgentAdapter {
       `[UAA] Agy asking (${isInteractive ? 'interactive' : 'non-interactive'}): "${text.slice(0, 80)}..."`
     );
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
+    assertReasoningEgressAllowed('agy-cli');
 
     try {
       const bin =
@@ -999,7 +1074,12 @@ export class AgyAdapter implements AgentAdapter {
       }
 
       args.push(text);
-      args.push('--dangerously-skip-permissions');
+      const activePermissionArgs = resolveActiveProviderPermissionArgs('agy');
+      if (activePermissionArgs) {
+        args.push(...activePermissionArgs);
+      } else {
+        args.push('--dangerously-skip-permissions');
+      }
 
       // 1. Session Persistence & Continuity
       const session = (options?.conversationId as string | undefined) || options?.intentId;
@@ -1057,11 +1137,12 @@ export class AgyAdapter implements AgentAdapter {
       if (jsonStartIdx !== -1) {
         const cleanStdout = lines.slice(jsonStartIdx).join('\n');
         try {
-          const cliResult = JSON.parse(cleanStdout);
+          const cliResult = parseProviderJsonObject(cleanStdout);
+          if (!cliResult) throw new Error('Agy returned a non-object JSON response');
           this.usageSummary = extractUsageSummary(cliResult);
           return {
-            text: (cliResult.response || output).trim(),
-            thought: cliResult.thought,
+            text: (firstStringValue(cliResult.response) || output).trim(),
+            ...(typeof cliResult.thought === 'string' ? { thought: cliResult.thought } : {}),
             stopReason: res.status === 0 ? 'completed' : 'error',
           };
         } catch (_) {
@@ -1073,8 +1154,8 @@ export class AgyAdapter implements AgentAdapter {
         text: output,
         stopReason: res.status === 0 ? 'completed' : 'error',
       };
-    } catch (e: any) {
-      logger.error(`[UAA] Agy failed: ${e.message}`);
+    } catch (e: unknown) {
+      logger.error(`[UAA] Agy failed: ${errorMessage(e)}`);
       return { text: '', stopReason: 'error' };
     }
   }
@@ -1152,6 +1233,7 @@ export class ClaudeAdapter implements AgentAdapter {
   public async ask(text: string): Promise<AgentResponse> {
     logger.info(`[UAA] Claude asking: "${text.slice(0, 80)}..."`);
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
+    assertReasoningEgressAllowed('claude-cli');
     try {
       const args = ['-p', text, '--output-format', 'json'];
 
@@ -1170,19 +1252,30 @@ export class ClaudeAdapter implements AgentAdapter {
       if (this.options.sessionId) {
         args.push('--session-id', this.options.sessionId);
       }
-      if (this.options.permissionMode) {
+      const activePermissionArgs = resolveActiveProviderPermissionArgs('claude');
+      if (activePermissionArgs) {
+        args.push(...activePermissionArgs);
+      } else if (this.options.permissionMode) {
         args.push('--permission-mode', this.options.permissionMode);
       }
 
       // Tool restrictions from manifest
-      if (this.options.allowedTools && this.options.allowedTools.length > 0) {
+      if (
+        !activePermissionArgs &&
+        this.options.allowedTools &&
+        this.options.allowedTools.length > 0
+      ) {
         // Claude CLI separates tool availability (--tools) from automatic
         // permission approval (--allowedTools). Supplying only the latter
         // can leave print-mode workers with no executable tools at all.
         args.push('--tools', this.options.allowedTools.join(','));
         args.push('--allowedTools', ...this.options.allowedTools);
       }
-      if (this.options.disallowedTools && this.options.disallowedTools.length > 0) {
+      if (
+        !activePermissionArgs &&
+        this.options.disallowedTools &&
+        this.options.disallowedTools.length > 0
+      ) {
         args.push('--disallowedTools', ...this.options.disallowedTools);
       }
 
@@ -1199,11 +1292,12 @@ export class ClaudeAdapter implements AgentAdapter {
       this.logBuffer.push({ ts: Date.now(), type: 'agent', content: output.slice(0, 500) });
       if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
       try {
-        const parsed = JSON.parse(output);
+        const parsed = parseProviderJsonObject(output);
+        if (!parsed) throw new Error('Claude returned a non-object JSON response');
         this.usageSummary = extractUsageSummary(parsed);
         return {
-          text: parsed.result || parsed.content || parsed.message || output,
-          thought: parsed.thought,
+          text: firstStringValue(parsed.result, parsed.content, parsed.message) || output,
+          ...(typeof parsed.thought === 'string' ? { thought: parsed.thought } : {}),
           stopReason: result.status === 0 ? 'completed' : 'error',
         };
       } catch (_) {
@@ -1213,8 +1307,8 @@ export class ClaudeAdapter implements AgentAdapter {
           stopReason: result.status === 0 ? 'completed' : 'error',
         };
       }
-    } catch (e: any) {
-      logger.error(`[UAA] Claude failed: ${e.message}`);
+    } catch (e: unknown) {
+      logger.error(`[UAA] Claude failed: ${errorMessage(e)}`);
       return { text: '', stopReason: 'error' };
     }
   }

@@ -1,4 +1,7 @@
 import { secureFetch, type SecureFetchOptions } from './network.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { isRecord } from './foundation/text.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { safeReadFile, safeStat, validateUrl } from './secure-io.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
 import { assertReasoningEgressAllowedAtEndpoint } from './reasoning-egress-scope.js';
@@ -33,6 +36,10 @@ import type {
 export const GEMINI_API_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 export const GEMINI_API_DEFAULT_MODEL = 'gemini-3.6-flash';
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 export interface GeminiApiBackendOptions {
   apiKey: string;
   model: string;
@@ -65,6 +72,94 @@ interface GeminiGenerateContentResponse {
     finishReason?: string;
   }>;
   error?: { message?: string };
+}
+
+/** Normalize the subset of Gemini responses consumed by this backend. */
+export function normalizeGeminiGenerateContentResponse(
+  value: unknown
+): GeminiGenerateContentResponse | null {
+  if (!isRecord(value)) return null;
+
+  let error: GeminiGenerateContentResponse['error'];
+  if (value.error !== undefined) {
+    if (!isRecord(value.error)) return null;
+    const message = optionalString(value.error.message);
+    if (message === null) return null;
+    error = {
+      ...(message !== undefined ? { message } : {}),
+    };
+  }
+
+  let candidates: NonNullable<GeminiGenerateContentResponse['candidates']> | undefined;
+  if (value.candidates !== undefined) {
+    if (!Array.isArray(value.candidates)) return null;
+    candidates = [];
+    for (const candidate of value.candidates) {
+      if (!isRecord(candidate)) return null;
+      let content:
+        | NonNullable<NonNullable<GeminiGenerateContentResponse['candidates']>[number]['content']>
+        | undefined;
+      const candidateContent = candidate.content;
+      if (candidateContent !== undefined) {
+        if (!isRecord(candidateContent)) return null;
+        let parts: NonNullable<NonNullable<typeof content>['parts']> | undefined;
+        const candidateParts = candidateContent.parts;
+        if (candidateParts !== undefined) {
+          if (!Array.isArray(candidateParts)) return null;
+          parts = [];
+          for (const part of candidateParts) {
+            if (!isRecord(part)) return null;
+            let functionCall:
+              NonNullable<NonNullable<typeof parts>[number]['functionCall']> | undefined;
+            const rawFunctionCall = part.functionCall;
+            if (rawFunctionCall !== undefined) {
+              if (!isRecord(rawFunctionCall)) return null;
+              const name = optionalString(rawFunctionCall.name);
+              if (name === null) return null;
+              const argsValue = rawFunctionCall.args;
+              const args =
+                argsValue === undefined ? undefined : isRecord(argsValue) ? argsValue : null;
+              if (args === null) return null;
+              const id = optionalString(rawFunctionCall.id);
+              if (id === null) return null;
+              functionCall = {
+                ...(name !== undefined ? { name } : {}),
+                ...(args !== undefined ? { args } : {}),
+                ...(id !== undefined ? { id } : {}),
+              };
+            }
+            const text = optionalString(part.text);
+            if (text === null) return null;
+            if (text === undefined && functionCall === undefined) return null;
+            parts.push({
+              ...(text !== undefined ? { text } : {}),
+              ...(functionCall !== undefined ? { functionCall } : {}),
+            });
+          }
+        }
+        content = {
+          ...(parts !== undefined ? { parts } : {}),
+        };
+      }
+      const finishReason = optionalString(candidate.finishReason);
+      if (finishReason === null) return null;
+      candidates.push({
+        ...(content !== undefined ? { content } : {}),
+        ...(finishReason !== undefined ? { finishReason } : {}),
+      });
+    }
+  }
+
+  if (error === undefined && candidates === undefined) return null;
+  return {
+    ...(candidates !== undefined ? { candidates } : {}),
+    ...(error !== undefined ? { error } : {}),
+  };
+}
+
+function optionalString(value: unknown): string | undefined | null {
+  if (value === undefined) return undefined;
+  return typeof value === 'string' ? value : null;
 }
 
 interface GeminiGenerateContentRequest {
@@ -236,7 +331,7 @@ export class GeminiApiBackend implements ReasoningBackend {
           }
         : {}),
     };
-    const response = (await this.request({
+    const rawResponse = await this.request({
       method: 'POST',
       url: endpointFor(this.baseURL, this.model),
       headers: {
@@ -247,7 +342,9 @@ export class GeminiApiBackend implements ReasoningBackend {
       authenticateRequest: true,
       timeout: this.timeoutMs,
       ...(signal ? { signal } : {}),
-    })) as GeminiGenerateContentResponse;
+    });
+    const response = normalizeGeminiGenerateContentResponse(rawResponse);
+    if (!response) throw new Error('[gemini-api] response had an invalid shape');
 
     if (response?.error?.message) {
       throw new Error(`[gemini-api] generateContent failed: ${response.error.message}`);
@@ -373,7 +470,10 @@ export class GeminiApiBackend implements ReasoningBackend {
         const data = trimmed.slice(5).trim();
         if (!data || data === '[DONE]') return '';
         try {
-          return responseText(JSON.parse(data) as GeminiGenerateContentResponse, false);
+          const parsed = normalizeGeminiGenerateContentResponse(
+            parseSafeJsonInput(data, 'Gemini API response')
+          );
+          return parsed ? responseText(parsed, false) : '';
         } catch {
           return '';
         }
@@ -402,7 +502,7 @@ export class GeminiApiBackend implements ReasoningBackend {
     signal?: AbortSignal
   ): Promise<GeminiGenerateContentResponse> {
     assertReasoningEgressAllowedAtEndpoint(this.name, this.baseURL);
-    const response = (await this.request({
+    const rawResponse = await this.request({
       method: 'POST',
       url: endpointFor(this.baseURL, this.model),
       headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
@@ -410,7 +510,9 @@ export class GeminiApiBackend implements ReasoningBackend {
       authenticateRequest: true,
       timeout: this.timeoutMs,
       ...(signal ? { signal } : {}),
-    })) as GeminiGenerateContentResponse;
+    });
+    const response = normalizeGeminiGenerateContentResponse(rawResponse);
+    if (!response) throw new Error('[gemini-api] response had an invalid shape');
     if (response?.error?.message) {
       throw new Error(`[gemini-api] generateContent failed: ${response.error.message}`);
     }
@@ -502,17 +604,17 @@ export function buildGeminiApiBackendFromEnv(
   modelOverride?: string,
   samplingParams?: Pick<SamplingParams, 'stop'>
 ): GeminiApiBackend | null {
-  const apiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
+  const apiKey = envText(env, 'GEMINI_API_KEY')?.trim() || envText(env, 'GOOGLE_API_KEY')?.trim();
   if (!apiKey) return null;
   return new GeminiApiBackend({
     apiKey,
     model: normalizeModel(
       modelOverride?.trim() ||
-        env.KYBERION_GEMINI_MODEL?.trim() ||
-        env.KYBERION_REASONING_MODEL?.trim() ||
+        envText(env, 'KYBERION_GEMINI_MODEL')?.trim() ||
+        envText(env, 'KYBERION_REASONING_MODEL')?.trim() ||
         GEMINI_API_DEFAULT_MODEL
     ),
-    baseURL: env.KYBERION_GEMINI_URL?.trim(),
+    baseURL: envText(env, 'KYBERION_GEMINI_URL')?.trim(),
     samplingParams,
   });
 }
@@ -521,11 +623,13 @@ export function buildGeminiApiBackendFromEnv(
 export async function probeGeminiApiBackendAvailability(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<{ available: boolean; reason?: string }> {
-  const apiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
+  const apiKey = envText(env, 'GEMINI_API_KEY')?.trim() || envText(env, 'GOOGLE_API_KEY')?.trim();
   if (!apiKey) {
     return { available: false, reason: 'GEMINI_API_KEY or GOOGLE_API_KEY is not set' };
   }
-  const baseURL = normalizeBaseUrl(env.KYBERION_GEMINI_URL?.trim() || GEMINI_API_DEFAULT_BASE_URL);
+  const baseURL = normalizeBaseUrl(
+    envText(env, 'KYBERION_GEMINI_URL')?.trim() || GEMINI_API_DEFAULT_BASE_URL
+  );
   try {
     assertReasoningEgressAllowedAtEndpoint('gemini-api', baseURL);
     await secureFetch({

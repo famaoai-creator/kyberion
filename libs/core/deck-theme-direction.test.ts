@@ -29,6 +29,17 @@ describe('deck theme selection (pptx design quality)', () => {
     expect(theme).toBe('kyberion-standard');
   });
 
+  it('rejects a catalog selection containing a dangerous nested key', async () => {
+    const theme = await selectDeckTheme({
+      title: 'T',
+      summary: 'S',
+      catalog: CATALOG,
+      defaultTheme: 'kyberion-standard',
+      generate: async () => '{"theme_id":"warm-earth","meta":{"__proto__":{}}}',
+    });
+    expect(theme).toBe('kyberion-standard');
+  });
+
   it('degrades to the default on backend failure or empty catalog', async () => {
     const failed = await selectDeckTheme({
       title: 'T',
@@ -96,5 +107,14 @@ describe('deck section body drafting (llm_zone draft_body_content)', () => {
       generate: async () => 'not json',
     });
     expect(garbage).toEqual({});
+  });
+
+  it('rejects section drafts containing a dangerous key', async () => {
+    const drafts = await draftDeckSectionBodies({
+      title: 'T',
+      sections: SECTIONS,
+      generate: async () => '{"intro":"導入本文。","__proto__":{}}',
+    });
+    expect(drafts).toEqual({});
   });
 });

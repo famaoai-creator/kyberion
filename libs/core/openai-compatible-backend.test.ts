@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   OpenAiCompatibleBackend,
   buildNemotronBackendFromEnv,
@@ -179,6 +181,62 @@ describe('openai-compatible-backend', () => {
     expect(firstBody.messages[1].content).not.toContain('sk-test-1234567890abcdef');
   });
 
+  it('rejects malformed chat completion message and tool-call shapes', async () => {
+    for (const payload of [
+      [],
+      { choices: [{ message: { role: 'assistant', content: 42 } }] },
+      { choices: [{ message: { role: 'assistant', content: 'ok', tool_calls: [{}] } }] },
+      { choices: [{ message: { role: 'assistant', content: [{ type: 'text' }] } }] },
+      { choices: [{ message: { role: 'assistant', content: 'ok', nested: { constructor: {} } } }] },
+    ]) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        )
+      );
+      const backend = new OpenAiCompatibleBackend({
+        baseURL: 'http://127.0.0.1:11434/v1',
+        apiKey: 'not-needed',
+        model: 'llama3',
+      });
+      await expect(backend.prompt('malformed response')).rejects.toThrow(
+        'invalid chat completion response'
+      );
+    }
+  });
+
+  it('rejects model file tools that traverse a symbolic link', async () => {
+    const tempDir = fs.mkdtempSync(path.join(process.cwd(), 'active/shared/tmp/openai-tool-'));
+    const targetDir = path.join(tempDir, 'target');
+    const linkDir = path.join(tempDir, 'linked');
+    fs.mkdirSync(targetDir);
+    fs.symlinkSync(targetDir, linkDir, 'dir');
+    try {
+      const backend = new OpenAiCompatibleBackend({
+        baseURL: 'http://127.0.0.1:11434/v1',
+        apiKey: 'not-needed',
+        model: 'llama3',
+        toolsEnabled: true,
+        allowedTools: ['read_file'],
+      });
+      const result = await (
+        backend as unknown as {
+          handleToolCall(name: string, args: string): Promise<string>;
+        }
+      ).handleToolCall(
+        'read_file',
+        JSON.stringify({ path: path.relative(process.cwd(), path.join(linkDir, 'secret.txt')) })
+      );
+      expect(result).toContain('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('returns caller-provided governed tool calls without executing them', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       new Response(
@@ -288,6 +346,51 @@ describe('openai-compatible-backend', () => {
     expect(deltas).toEqual(['最初の', '文です。']);
     const bodyJson = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(bodyJson.stream).toBe(true);
+  });
+
+  it('ignores malformed streaming deltas before yielding text', async () => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":42}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: []\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+        )
+    );
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'qwen2.5',
+    });
+
+    const deltas: string[] = [];
+    for await (const delta of backend.streamPrompt('malformed stream')) deltas.push(delta);
+    expect(deltas).toEqual(['ok']);
+  });
+
+  it('rejects non-object tool arguments before any tool side effect', async () => {
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'qwen2.5',
+      toolsEnabled: true,
+      allowedTools: ['shell_exec'],
+    });
+    const result = await (
+      backend as unknown as {
+        handleToolCall(name: string, args: string): Promise<string>;
+      }
+    ).handleToolCall('shell_exec', '[]');
+    expect(result).toContain('arguments must be a JSON object');
   });
 
   it('does not advertise tools unless the route explicitly enables an allowlist', async () => {

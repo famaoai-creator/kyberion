@@ -22,6 +22,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
 import {
   buildProviderChildEnv,
+  resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
@@ -34,6 +35,7 @@ import {
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
 import {
   CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
@@ -73,6 +75,10 @@ import type {
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
 
 /**
  * Task-weight → claude model mapping (①モデル振り分け): fast tasks run on
@@ -502,11 +508,12 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * provider-permission-profiles.ts) throws before any spawn is attempted.
    */
   private resolvePermissionArgs(profile?: ProviderPermissionProfileName): string[] {
-    if (!profile) return [];
-    const resolution = resolveProviderPermissionArgs(profile, 'claude');
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('claude', profile);
+    if (!effectiveProfile) return [];
+    const resolution = resolveProviderPermissionArgs(effectiveProfile, 'claude');
     if (resolution.kind === 'refused') {
       throw new Error(
-        `[shell-claude-cli] permission profile "${profile}" refused: ${resolution.reason}`
+        `[shell-claude-cli] permission profile "${effectiveProfile}" refused: ${resolution.reason}`
       );
     }
     return [...resolution.args];
@@ -655,7 +662,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       .join('\n\n');
 
     const args = [
-      '--dangerously-skip-permissions',
+      ...(resolveEffectiveProviderPermissionProfile('claude')
+        ? this.resolvePermissionArgs()
+        : ['--dangerously-skip-permissions']),
       '-p',
       prompt,
       ...(input.maxTurns !== undefined ? ['--max-turns', String(input.maxTurns)] : []),
@@ -676,7 +685,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       .join('\n\n');
 
     const args = [
-      '--dangerously-skip-permissions',
+      ...(resolveEffectiveProviderPermissionProfile('claude')
+        ? this.resolvePermissionArgs()
+        : ['--dangerously-skip-permissions']),
       '-p',
       prompt,
       ...(input.maxTurns !== undefined ? ['--max-turns', String(input.maxTurns)] : []),
@@ -711,7 +722,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     const stdout = await this.spawnCli(args, params.userPrompt);
     let cliResult: any;
     try {
-      cliResult = JSON.parse(stdout);
+      cliResult = parseSafeJsonInput(stdout, 'Claude CLI response');
     } catch (err: any) {
       throw new Error(
         `[shell-claude-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`
@@ -800,9 +811,10 @@ function resolveClaudeSubagentProfile(
 ): ProviderPermissionProfileName {
   const requested = options?.profile || options?.role || 'implementer';
   try {
-    return getSubagentCapabilityProfile(requested).name as ProviderPermissionProfileName;
+    const profile = getSubagentCapabilityProfile(requested).name as ProviderPermissionProfileName;
+    return resolveEffectiveProviderPermissionProfile('claude', profile) ?? profile;
   } catch {
-    return 'implementer';
+    return resolveEffectiveProviderPermissionProfile('claude', 'implementer') ?? 'implementer';
   }
 }
 
@@ -823,7 +835,7 @@ export function probeShellClaudeCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number } = {}
 ): ShellClaudeCliAvailability {
-  const explicitBin = options.bin?.trim() || env.KYBERION_CLAUDE_CLI_BIN?.trim();
+  const explicitBin = options.bin?.trim() || envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim();
   const bin = explicitBin || 'claude';
   const timeoutMs = options.timeoutMs ?? 5_000;
 
@@ -935,18 +947,18 @@ export async function runClaudeCliQuery<T>({
 export function buildClaudeCliOptionsFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): ShellClaudeCliBackendOptions {
-  const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim();
-  const model = env.KYBERION_CLAUDE_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_CLAUDE_CLI_TIMEOUT_MS?.trim();
+  const bin = envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim();
+  const model = envText(env, 'KYBERION_CLAUDE_CLI_MODEL')?.trim();
+  const timeoutRaw = envText(env, 'KYBERION_CLAUDE_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const extraRaw = env.KYBERION_CLAUDE_CLI_EXTRA_ARGS?.trim();
+  const extraRaw = envText(env, 'KYBERION_CLAUDE_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
   return {
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
     ...(timeoutMs && !Number.isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
-    ...(env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1' ? { nativeSubagent: true } : {}),
+    ...(envText(env, 'KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1' ? { nativeSubagent: true } : {}),
   };
 }
 
@@ -958,25 +970,25 @@ export function buildShellClaudeCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[shell-claude-cli] backend unavailable (bin=${env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}. If the reason mentions "${CLAUDE_CLI_PLACEHOLDER_SIGNATURE}", run \`pnpm approve-builds\` (approve @anthropic-ai/claude-code) or set KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude.`
+      `[shell-claude-cli] backend unavailable (bin=${envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}. If the reason mentions "${CLAUDE_CLI_PLACEHOLDER_SIGNATURE}", run \`pnpm approve-builds\` (approve @anthropic-ai/claude-code) or set KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude.`
     );
     return null;
   }
 
   // Prefer an explicit pin; otherwise honor the binary the probe actually
   // validated (LC-03: may be a fallback outside node_modules/.bin).
-  const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim() || availability.bin?.trim();
-  const model = modelOverride?.trim() || env.KYBERION_CLAUDE_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_CLAUDE_CLI_TIMEOUT_MS?.trim();
+  const bin = envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim() || availability.bin?.trim();
+  const model = modelOverride?.trim() || envText(env, 'KYBERION_CLAUDE_CLI_MODEL')?.trim();
+  const timeoutRaw = envText(env, 'KYBERION_CLAUDE_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const extraRaw = env.KYBERION_CLAUDE_CLI_EXTRA_ARGS?.trim();
+  const extraRaw = envText(env, 'KYBERION_CLAUDE_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
   const backend = new ShellClaudeCliBackend({
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
-    ...(env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1' ? { nativeSubagent: true } : {}),
+    ...(envText(env, 'KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1' ? { nativeSubagent: true } : {}),
   });
   logger.info(
     `[shell-claude-cli] backend ready (bin=${bin ?? 'claude'}, model=${model ?? 'opus'})`

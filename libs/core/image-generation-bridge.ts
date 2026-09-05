@@ -1,13 +1,22 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExecResult, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExecResult,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { executeServicePreset } from './service-engine.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import {
   generateImageLocallyWithApplePlayground,
   probeAppleImageGeneration,
@@ -24,11 +33,58 @@ import {
 
 function getFallbackTargetPath(request: ImageGenerationRequest): string {
   const filename = `generated-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.jpg`;
-  return request.targetPath || pathResolver.resolve(`active/shared/tmp/${filename}`);
+  const candidate = request.targetPath || pathResolver.resolve(`active/shared/tmp/${filename}`);
+  assertSafeRepositoryPath(pathResolver.resolve(candidate), { allowMissingLeaf: true });
+  return candidate;
 }
 
 function isAppleSiliconMac(): boolean {
   return process.platform === 'darwin' && process.arch === 'arm64';
+}
+
+function imageBytesFromResponse(value: unknown): string | undefined {
+  if (typeof value === 'string') return normalizeImageBytes(value);
+  if (!isRecord(value)) return undefined;
+  let safeValue: Record<string, unknown>;
+  try {
+    safeValue = parseSafeJsonObjectValue(value, 'image generation response');
+  } catch {
+    return undefined;
+  }
+  const direct = normalizeImageBytes(safeValue.imageBytes);
+  if (direct) return direct;
+  if (Array.isArray(safeValue.generatedImages)) {
+    const first = safeValue.generatedImages[0];
+    if (isRecord(first) && isRecord(first.image)) {
+      const nested = normalizeImageBytes(first.image.imageBytes);
+      if (nested) return nested;
+    }
+  }
+  if (isRecord(safeValue.result)) return normalizeImageBytes(safeValue.result.imageBytes);
+  return undefined;
+}
+
+function normalizeImageBytes(candidate: unknown): string | undefined {
+  if (typeof candidate !== 'string') return undefined;
+  const normalized = candidate.trim();
+  if (!normalized || normalized.length % 4 === 1 || !/^[A-Za-z0-9+/]+=*$/u.test(normalized)) {
+    return undefined;
+  }
+  const decoded = Buffer.from(normalized, 'base64');
+  if (decoded.length === 0) return undefined;
+  const withoutPadding = normalized.replace(/=+$/u, '');
+  if (decoded.toString('base64').replace(/=+$/u, '') !== withoutPadding) return undefined;
+  return normalized;
+}
+
+function dallEImageBytesFromResponse(value: unknown): string | undefined {
+  try {
+    const safeValue = parseSafeJsonObjectValue(value, 'OpenAI DALL-E response');
+    if (!Array.isArray(safeValue.data) || !isRecord(safeValue.data[0])) return undefined;
+    return normalizeImageBytes(safeValue.data[0].b64_json);
+  } catch {
+    return undefined;
+  }
 }
 
 function resolveLocalFluxDimensions(request: ImageGenerationRequest): {
@@ -171,17 +227,18 @@ export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
     const startedAt = Date.now();
     try {
+      const targetPath = request.targetPath ? getFallbackTargetPath(request) : undefined;
       // Delegate to existing ComfyUI service preset
       const res = await executeServicePreset('media-generation', 'generate_image', {
         prompt: request.prompt,
         aspect_ratio: request.aspectRatio,
-        target_path: request.targetPath,
+        target_path: targetPath,
         await_completion: request.awaitCompletion ?? true,
       });
 
       return {
         status: res?.prompt_id ? 'submitted' : 'succeeded',
-        path: res?.copied_to || res?.target_path || request.targetPath,
+        path: res?.copied_to || res?.target_path || targetPath,
         provider: this.id,
         promptId: res?.prompt_id,
         elapsedMs: Date.now() - startedAt,
@@ -202,7 +259,7 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
   readonly id = 'gemini_service';
 
   async isAvailable(): Promise<boolean> {
-    if (!process.env.GEMINI_API_KEY) return false;
+    if (!getRegisteredEnvText('GEMINI_API_KEY')) return false;
     try {
       resolveServiceBinding('gemini', 'secret-guard');
       return true;
@@ -224,12 +281,7 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
         'secret-guard'
       );
 
-      const imageBytes =
-        typeof response === 'string'
-          ? response
-          : (response as any)?.imageBytes ||
-            (response as any)?.generatedImages?.[0]?.image?.imageBytes ||
-            (response as any)?.result?.imageBytes;
+      const imageBytes = imageBytesFromResponse(response);
 
       if (!imageBytes || typeof imageBytes !== 'string') {
         throw new Error('Gemini image service returned no image bytes');
@@ -261,13 +313,15 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'llm_api';
 
   async isAvailable(): Promise<boolean> {
-    return Boolean(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY);
+    return Boolean(
+      getRegisteredEnvText('GEMINI_API_KEY') || getRegisteredEnvText('OPENAI_API_KEY')
+    );
   }
 
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
     const startedAt = Date.now();
-    const apiKeyGemini = process.env.GEMINI_API_KEY;
-    const apiKeyOpenAI = process.env.OPENAI_API_KEY;
+    const apiKeyGemini = getRegisteredEnvText('GEMINI_API_KEY');
+    const apiKeyOpenAI = getRegisteredEnvText('OPENAI_API_KEY');
 
     const order = request.providerPreference || ['gemini', 'openai'];
 
@@ -316,8 +370,8 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
       throw new Error(`Gemini Imagen API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = (await res.json()) as any;
-    const base64Bytes = data.generatedImages?.[0]?.image?.imageBytes;
+    const data = (await res.json()) as unknown;
+    const base64Bytes = imageBytesFromResponse(data);
     if (!base64Bytes) {
       throw new Error('Gemini Imagen API returned no image bytes');
     }
@@ -367,8 +421,8 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
       throw new Error(`OpenAI DALL-E API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = (await res.json()) as any;
-    const base64Bytes = data.data?.[0]?.b64_json;
+    const data = await res.json();
+    const base64Bytes = dallEImageBytesFromResponse(data);
     if (!base64Bytes) {
       throw new Error('OpenAI DALL-E API returned no image bytes');
     }
@@ -508,7 +562,10 @@ function writeHostBridgeRequest(
   request: ImageGenerationRequest,
   targetPath: string
 ): void {
-  const requestFilePath = pathResolver.resolve(`active/shared/tmp/${config.requestFileName}`);
+  const requestFilePath = assertSafeRepositoryPath(
+    pathResolver.resolve(`active/shared/tmp/${config.requestFileName}`),
+    { allowMissingLeaf: true }
+  );
   const outputDir = path.dirname(requestFilePath);
   if (!safeExistsSync(outputDir)) {
     safeMkdir(outputDir, { recursive: true });
@@ -524,7 +581,7 @@ function writeHostBridgeRequest(
           prompt: request.prompt,
           targetPath,
           aspectRatio: request.aspectRatio || '1:1',
-          timestamp: new Date().toISOString(),
+          timestamp: nowIso(),
         },
         null,
         2
@@ -568,15 +625,15 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
 }
 
 function envFlagEnabled(name: string): boolean {
-  return process.env[name] === 'true';
+  return getRegisteredEnvText(name) === 'true';
 }
 
 function envAnyEnabled(names: string[]): boolean {
-  return names.some((name) => Boolean(process.env[name]));
+  return names.some((name) => Boolean(getRegisteredEnvText(name)));
 }
 
 function envEquals(name: string, expected: string): boolean {
-  return process.env[name] === expected;
+  return getRegisteredEnvText(name) === expected;
 }
 
 export class HostAgentImageGenerationProvider extends BaseHostBridgeImageGenerationProvider {

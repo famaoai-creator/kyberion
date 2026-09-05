@@ -1,4 +1,5 @@
 import { safeExecResult } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export interface ShellAdapter {
   readonly shell: string;
@@ -10,10 +11,12 @@ export interface CommandLocatorAdapter {
 }
 
 const windowsShell: ShellAdapter = { shell: 'powershell.exe', args: ['-Command'] };
-const posixShell: ShellAdapter = { shell: process.env.SHELL || '/bin/bash', args: ['-lc'] };
+function resolvePosixShell(): ShellAdapter {
+  return { shell: getRegisteredEnvText('SHELL') || '/bin/bash', args: ['-lc'] };
+}
 
 export function resolveShellAdapter(platform: NodeJS.Platform = process.platform): ShellAdapter {
-  return platform === 'win32' ? windowsShell : posixShell;
+  return platform === 'win32' ? windowsShell : resolvePosixShell();
 }
 
 export const commandLocatorAdapter: CommandLocatorAdapter = {

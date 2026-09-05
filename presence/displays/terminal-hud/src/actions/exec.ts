@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { pathResolver } from '@agent/core';
+import { safeChildEnv } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult } from '@agent/core/secure-io';
 
 export interface HudExecResult {
@@ -21,7 +22,7 @@ function defaultExec(
   const result = safeExecResult(command, args, {
     cwd: pathResolver.rootDir(),
     timeoutMs: options.timeoutMs ?? 120000,
-    env: options.env ? { ...process.env, ...options.env } : process.env,
+    env: { ...safeChildEnv(), ...options.env },
   });
   const output = [result.stdout, result.stderr]
     .map((chunk) => chunk?.trim())

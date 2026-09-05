@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto';
 import * as net from 'node:net';
 import * as path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeUnlinkSync, safeExistsSync } from './secure-io.js';
 import { ToolRepeatAdvisor, type ToolRepeatObservation } from './tool-repeat-advisor.js';
@@ -91,6 +94,50 @@ interface RunnerOutput {
   stdout?: string;
   calls?: number;
   error?: string;
+}
+
+export function normalizeProgrammaticRpcRequest(value: unknown): RpcRequest {
+  if (!isRecord(value)) throw new Error('[PTC_RPC] request must be a JSON object.');
+  if (typeof value.token !== 'string' || !value.token.trim()) {
+    throw new Error('[PTC_RPC] request token must be a non-empty string.');
+  }
+  if (typeof value.id !== 'string' || !value.id.trim()) {
+    throw new Error('[PTC_RPC] request id must be a non-empty string.');
+  }
+  if (value.method !== 'call_op' || typeof value.op !== 'string' || !OP_PATTERN.test(value.op)) {
+    throw new Error('[PTC_RPC] invalid op request.');
+  }
+  if (!isRecord(value.params)) throw new Error('[PTC_RPC] request params must be an object.');
+  return {
+    token: value.token,
+    id: value.id,
+    method: 'call_op',
+    op: value.op,
+    params: value.params,
+  };
+}
+
+export function normalizeProgrammaticRunnerOutput(value: unknown): RunnerOutput {
+  if (!isRecord(value)) throw new Error('[PTC_RUNNER] output must be a JSON object.');
+  if (typeof value.ok !== 'boolean') throw new Error('[PTC_RUNNER] output.ok must be boolean.');
+  if (value.stdout !== undefined && typeof value.stdout !== 'string') {
+    throw new Error('[PTC_RUNNER] output.stdout must be a string.');
+  }
+  if (
+    value.calls !== undefined &&
+    (typeof value.calls !== 'number' || !Number.isInteger(value.calls) || value.calls < 0)
+  ) {
+    throw new Error('[PTC_RUNNER] output.calls must be a non-negative integer.');
+  }
+  if (value.error !== undefined && typeof value.error !== 'string') {
+    throw new Error('[PTC_RUNNER] output.error must be a string.');
+  }
+  return {
+    ok: value.ok,
+    ...(typeof value.stdout === 'string' ? { stdout: value.stdout } : {}),
+    ...(typeof value.calls === 'number' ? { calls: value.calls } : {}),
+    ...(typeof value.error === 'string' ? { error: value.error } : {}),
+  };
 }
 
 function boundedInteger(value: unknown, fallback: number, max: number): number {
@@ -182,7 +229,8 @@ function parseRunnerOutput(raw: string): RunnerOutput {
   const line = raw.trim().split(/\r?\n/u).filter(Boolean).at(-1);
   if (!line) throw new Error('[PTC_RUNNER] runner returned no output.');
   try {
-    return JSON.parse(line) as RunnerOutput;
+    const parsed: unknown = parseSafeJsonInput(line, 'PTC runner output');
+    return normalizeProgrammaticRunnerOutput(parsed);
   } catch {
     throw new Error('[PTC_RUNNER] runner returned invalid output.');
   }
@@ -233,7 +281,8 @@ export async function executeProgrammaticToolCall(
         queue = queue.then(async () => {
           let request: RpcRequest;
           try {
-            request = JSON.parse(line) as RpcRequest;
+            const parsed: unknown = parseSafeJsonInput(line, 'PTC RPC request');
+            request = normalizeProgrammaticRpcRequest(parsed);
           } catch {
             writeLine(socket, { id: 'invalid', ok: false, error: '[PTC_RPC] invalid JSON.' });
             return;
@@ -322,10 +371,10 @@ export async function executeProgrammaticToolCall(
     const runner = options.runner || defaultRunner();
     const childEnv: NodeJS.ProcessEnv = {
       KYBERION_PTC_CHILD: '1',
-      PATH: process.env.PATH,
-      NODE_ENV: process.env.NODE_ENV,
-      LANG: process.env.LANG,
-      LC_ALL: process.env.LC_ALL,
+      PATH: getRegisteredEnvText('PATH'),
+      NODE_ENV: getRegisteredEnvText('NODE_ENV'),
+      LANG: getRegisteredEnvText('LANG'),
+      LC_ALL: getRegisteredEnvText('LC_ALL'),
     };
     child = spawn(runner.command, runner.args, {
       cwd: runner.cwd || pathResolver.rootDir(),

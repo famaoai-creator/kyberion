@@ -1,6 +1,14 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { logger } from './core.js';
 import { findMissionPath } from './path-resolver.js';
 import { Semaphore } from './semaphore.js';
@@ -20,6 +28,81 @@ export interface ConversationTurn {
 
 const MAX_TURNS = 500;
 const conversationLocks = new Map<string, Semaphore>();
+const JSON_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isSafeJsonTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(isSafeJsonTree);
+  if (value === null || typeof value !== 'object') return true;
+  return Object.entries(value).every(
+    ([key, nested]) => !JSON_DANGEROUS_KEYS.has(key) && isSafeJsonTree(nested)
+  );
+}
+
+function parseConversationTurn(value: unknown): ConversationTurn | undefined {
+  if (!isRecord(value) || !isSafeJsonTree(value)) return undefined;
+  const ts = value.ts;
+  const sender = value.sender;
+  const receiver = value.receiver;
+  const performative = value.performative;
+  const prompt = value.prompt;
+  const result = value.result;
+  const providerSessionId = value.provider_session_id;
+  const missionId = value.mission_id;
+  const tier = value.tier;
+  if (
+    typeof ts !== 'string' ||
+    Number.isNaN(Date.parse(ts)) ||
+    typeof sender !== 'string' ||
+    !sender.trim() ||
+    typeof receiver !== 'string' ||
+    !receiver.trim() ||
+    typeof performative !== 'string' ||
+    !performative.trim()
+  ) {
+    return undefined;
+  }
+  if (
+    (prompt !== undefined && typeof prompt !== 'string') ||
+    (result !== undefined && typeof result !== 'string') ||
+    (providerSessionId !== undefined && typeof providerSessionId !== 'string') ||
+    (missionId !== undefined && typeof missionId !== 'string') ||
+    (tier !== undefined && tier !== 'public' && tier !== 'confidential' && tier !== 'personal')
+  ) {
+    return undefined;
+  }
+  const promptValue = typeof prompt === 'string' ? prompt : undefined;
+  const resultValue = typeof result === 'string' ? result : undefined;
+  const providerSessionIdValue =
+    typeof providerSessionId === 'string' ? providerSessionId : undefined;
+  const missionIdValue = typeof missionId === 'string' ? missionId : undefined;
+  const tierValue: ConversationTurn['tier'] | undefined =
+    tier === 'public' || tier === 'confidential' || tier === 'personal' ? tier : undefined;
+  return {
+    ts,
+    sender,
+    receiver,
+    performative,
+    ...(promptValue !== undefined ? { prompt: promptValue } : {}),
+    ...(resultValue !== undefined ? { result: resultValue } : {}),
+    ...(providerSessionIdValue !== undefined
+      ? { provider_session_id: providerSessionIdValue }
+      : {}),
+    ...(missionIdValue !== undefined ? { mission_id: missionIdValue } : {}),
+    ...(tierValue !== undefined ? { tier: tierValue } : {}),
+  };
+}
+
+function parseConversationTurnLine(line: string): ConversationTurn | undefined {
+  try {
+    return parseConversationTurn(parseSafeJsonInput(line, 'A2A conversation entry'));
+  } catch {
+    return undefined;
+  }
+}
 
 function getConversationLock(conversationId: string): Semaphore {
   let lock = conversationLocks.get(conversationId);
@@ -45,7 +128,7 @@ function resolveConversationFilePath(conversationId: string): string {
   if (!filePath.startsWith(`${conversationsDir}${path.sep}`)) {
     throw new Error('Invalid conversation path');
   }
-  return filePath;
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
 }
 
 function resolveMissionTier(
@@ -85,7 +168,7 @@ export async function appendConversationTurn(
     const tier = resolveMissionTier(turnData.missionId);
 
     const turn: ConversationTurn = {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       sender: turnData.sender,
       receiver: turnData.receiver,
       performative: turnData.performative,
@@ -101,9 +184,9 @@ export async function appendConversationTurn(
       try {
         const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
         lines = content.split('\n').filter((l) => l.trim().length > 0);
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.warn(
-          `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${err?.message}`
+          `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${errorMessage(err)}`
         );
       }
     }
@@ -116,9 +199,9 @@ export async function appendConversationTurn(
 
     try {
       safeWriteFile(filePath, lines.join('\n') + '\n');
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.warn(
-        `[A2A_CONVERSATION_STORE] Failed to write conversation file ${filePath}: ${err?.message}`
+        `[A2A_CONVERSATION_STORE] Failed to write conversation file ${filePath}: ${errorMessage(err)}`
       );
     }
   });
@@ -138,10 +221,11 @@ export function readConversationHistory(conversationId: string): ConversationTur
     return content
       .split('\n')
       .filter((l) => l.trim().length > 0)
-      .map((l) => JSON.parse(l));
-  } catch (err: any) {
+      .map(parseConversationTurnLine)
+      .filter((turn): turn is ConversationTurn => turn !== undefined);
+  } catch (err: unknown) {
     logger.warn(
-      `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${err?.message}`
+      `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${errorMessage(err)}`
     );
     return [];
   }

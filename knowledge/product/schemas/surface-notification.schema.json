@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "surface-notification.schema.json",
+  "title": "Persisted surface notification",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "notification_id": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string" },
+    "surface": {
+      "type": "string",
+      "enum": [
+        "slack",
+        "chronos",
+        "presence",
+        "imessage",
+        "discord",
+        "telegram",
+        "cowork",
+        "cli",
+        "terminal"
+      ]
+    },
+    "channel": { "type": "string" },
+    "thread_ts": { "type": "string" },
+    "source_agent_id": { "type": "string" },
+    "title": { "type": "string" },
+    "text": { "type": "string" },
+    "status": { "type": "string", "enum": ["info", "success", "error"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "scope": { "$ref": "#/definitions/scope" }
+  },
+  "required": [
+    "notification_id",
+    "surface",
+    "channel",
+    "thread_ts",
+    "source_agent_id",
+    "title",
+    "text",
+    "status",
+    "created_at"
+  ],
+  "definitions": {
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope_kind": {
+          "type": "string",
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string" },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "work_shape": { "type": "string" },
+        "customer_stance": { "type": "string" },
+        "viewer_principal": { "type": "string" },
+        "nhi_id": { "type": "string" }
+      },
+      "required": ["scope_kind", "tier"]
+    }
+  }
+}

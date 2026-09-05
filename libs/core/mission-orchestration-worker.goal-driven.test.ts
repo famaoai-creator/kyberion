@@ -21,7 +21,9 @@ vi.mock('./mission-context-pack.js', async (importOriginal) => {
 
 import {
   goalIdForWorkItem,
+  isGoalDrivenTaskResumable,
   provisionGoalDrivenTaskKnowledge,
+  resolveManualGoalDriveScope,
   runGoalDrivenWorkItem,
 } from './mission-orchestration-worker.js';
 import { buildMissionContextPack, type MissionContextPack } from './mission-context-pack.js';
@@ -33,6 +35,7 @@ import { createGoal, type GoalRuntimeState } from './worker-goal.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import { logger } from './core.js';
+import { withExecutionContext } from './authority.js';
 
 const knowledgeFeedbackTestRoot = pathResolver.sharedTmp(
   `goal-driven-tests/knowledge-feedback/${process.pid}`
@@ -189,6 +192,37 @@ afterEach(() => {
 });
 
 describe('acceptance #1: goal-driven work item runs multi-turn to structured completion', () => {
+  it('derives manual-drive scope from the authoritative context pack', () => {
+    expect(
+      resolveManualGoalDriveScope({
+        missionId: 'MSN-DRIVE-SCOPE',
+        taskId: 'T1',
+        agentId: 'agent-1',
+        securityScope: {
+          tenant_slug: 'acme',
+          mission_id: 'MSN-DRIVE-SCOPE',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'mission-execution',
+        },
+      })
+    ).toMatchObject({
+      scope_kind: 'mission',
+      tenant_slug: 'acme',
+      mission_id: 'MSN-DRIVE-SCOPE',
+      task_id: 'T1',
+      session_id: 'goal-MSN-DRIVE-SCOPE-T1',
+      nhi_id: 'agent-1',
+    });
+    expect(() =>
+      resolveManualGoalDriveScope({
+        missionId: 'MSN-DRIVE-SCOPE',
+        taskId: 'T1',
+        agentId: 'agent-1',
+      })
+    ).toThrow('[MANUAL_DRIVE_SCOPE_REQUIRED]');
+  });
+
   it('drives create -> turns -> complete, with the KC-02 envelope sequence observable', async () => {
     const backend = scriptedBackend([
       goalUpdate({ status: 'continue' }),
@@ -303,6 +337,36 @@ describe('acceptance #3: kill/restart -> restore yields a paused goal that does 
     expect(resumed.finalState).toBe('complete');
     expect(resumeBackend.prompts.length).toBeGreaterThan(0);
     expect(appliedSequence(events)).toContain('complete');
+  });
+});
+
+describe('mission worker recovery target selection', () => {
+  it('selects only a persisted paused goal, never a fresh or non-goal task', () => {
+    return withExecutionContext('mission_controller', () => {
+      const missionId = `MSN-GOAL-RECOVERY-${process.pid}-${Date.now()}`;
+      const taskId = 'TASK-PAUSED';
+      const journalPath = `${pathResolver.missionDir(missionId, 'public')}/coordination/goal-journal-${taskId}.jsonl`;
+      safeRmSync(pathResolver.missionDir(missionId, 'public'), { recursive: true, force: true });
+      try {
+        const journal = new WorkerStateJournal({ journalPath });
+        journal.recordGoal(
+          createGoal({
+            goalId: goalIdForWorkItem(missionId, taskId),
+            objective: 'resume the interrupted task',
+            missionId,
+          })
+        );
+        expect(isGoalDrivenTaskResumable(missionId, { task_id: taskId, goal_driven: true })).toBe(
+          true
+        );
+        expect(
+          isGoalDrivenTaskResumable(missionId, { task_id: 'TASK-FRESH', goal_driven: true })
+        ).toBe(false);
+        expect(isGoalDrivenTaskResumable(missionId, { task_id: taskId })).toBe(false);
+      } finally {
+        safeRmSync(pathResolver.missionDir(missionId, 'public'), { recursive: true, force: true });
+      }
+    });
   });
 });
 

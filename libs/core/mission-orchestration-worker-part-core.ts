@@ -1,4 +1,5 @@
 import { AgentBusyError } from './a2a-bridge.js';
+import * as path from 'node:path';
 import { notifyOperator } from './operator-notifications.js';
 import { type DelegationChain } from './delegation-chain.js';
 import { missionCoordinationBus } from './mission-coordination-bus.js';
@@ -11,6 +12,7 @@ import {
 import { logger } from './core.js';
 import { canonicalizeTeamRole } from './working-principles.js';
 import { TraceContext } from './src/trace.js';
+import { nowIso } from './foundation/time.js';
 import { type GapRecorder } from './gap-phase.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
@@ -267,6 +269,7 @@ export async function dispatchPlannedMissionTaskCore(
       missionId: input.missionId,
       filePath: clarificationPacketPath,
       targetPath: `evidence/task-clarification-${input.task.task_id}.json`,
+      missionPathHint: path.dirname(path.dirname(clarificationPacketPath)),
       provisioned: provisionMissionEntry({
         mission_id: input.missionId,
         task_id: input.task.task_id,
@@ -275,7 +278,7 @@ export async function dispatchPlannedMissionTaskCore(
         clarification_packet_path: clarificationPacketPath,
         needs: taskResultNeeds,
         status: 'needs_input',
-        written_at: new Date().toISOString(),
+        written_at: nowIso(),
       }),
     });
     input.task.status = 'blocked';

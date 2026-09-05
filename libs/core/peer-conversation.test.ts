@@ -11,6 +11,7 @@ import {
   createPeerConversationSession,
   listPeerConversationSessions,
   loadPeerConversationSession,
+  parsePeerConversationTranscriptEntry,
   sendPeerConversationMessageToPeer,
 } from './peer-conversation.js';
 
@@ -29,6 +30,53 @@ afterEach(() => {
 });
 
 describe('peer conversation', () => {
+  it('validates transcript entries before peer response projection', () => {
+    expect(
+      parsePeerConversationTranscriptEntry({
+        message_id: 'PCM-1',
+        kind: 'reply',
+        direction: 'inbound',
+        sender_peer_id: 'peer-b-test',
+        recipient_peer_id: 'peer-a-test',
+        text: 'ack',
+        created_at: new Date().toISOString(),
+      })
+    ).toMatchObject({ kind: 'reply', sender_peer_id: 'peer-b-test' });
+    expect(() => parsePeerConversationTranscriptEntry(null)).toThrow(
+      'invalid_peer_conversation_transcript_entry'
+    );
+    expect(() =>
+      parsePeerConversationTranscriptEntry({
+        message_id: 'PCM-1',
+        kind: 'reply',
+        direction: 'inbound',
+        sender_peer_id: 'peer-b-test',
+        recipient_peer_id: 'peer-a-test',
+        text: 'ack',
+        created_at: new Date().toISOString(),
+        related_work_item_ids: [42],
+      })
+    ).toThrow('invalid_peer_conversation_transcript_related_work_item_ids');
+  });
+
+  it('rejects traversal-shaped tenant, peer, and session identifiers before storage access', () => {
+    expect(() =>
+      createPeerConversationSession({
+        localPeerId: 'peer-a-test',
+        remotePeerId: 'peer-b-test',
+        tenantId: TENANT_ID,
+        sessionId: '../../outside',
+        topic: 'invalid-session',
+      })
+    ).toThrow('invalid_peer_conversation_session_id');
+    expect(() => loadPeerConversationSession(TENANT_ID, '../outside', 'PCS-test')).toThrow(
+      'invalid_peer_conversation_peer_id'
+    );
+    expect(() => clearPeerConversationRuntime('../outside', 'peer-a-test')).toThrow(
+      'invalid_peer_conversation_tenant_id'
+    );
+  });
+
   it('creates and persists a conversation session with transcript entries', () => {
     const session = createPeerConversationSession({
       localPeerId: 'peer-a-test',

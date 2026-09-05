@@ -26,6 +26,19 @@ export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): 
     }
     taskIds.add(taskId);
 
+    const drive = (() => {
+      if (task.drive === undefined) return undefined;
+      if (task.drive === 'automatic' || task.drive === 'manual') return task.drive;
+      throw new Error(
+        `Invalid NEXT_TASKS.json for ${missionId}: task ${taskId} drive must be automatic or manual`
+      );
+    })();
+    if (drive && task.goal_driven !== true) {
+      throw new Error(
+        `Invalid NEXT_TASKS.json for ${missionId}: task ${taskId} drive requires goal_driven=true`
+      );
+    }
+
     const dependencies = Array.isArray(task.dependencies)
       ? task.dependencies.map((dependency) => String(dependency || '').trim()).filter(Boolean)
       : [];
@@ -222,6 +235,7 @@ export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): 
         : {}),
       // KD-01 adoption: opt-in goal-driven execution (default OFF).
       ...(task.goal_driven === true ? { goal_driven: true } : {}),
+      ...(drive ? { drive } : {}),
       ...(task.goal_budget && typeof task.goal_budget === 'object'
         ? (() => {
             const rawBudget = task.goal_budget as Record<string, unknown>;

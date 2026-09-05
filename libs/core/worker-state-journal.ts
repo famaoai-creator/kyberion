@@ -1,4 +1,5 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * Event-sourced worker state restore contract (KD-03).
  *
@@ -44,7 +45,15 @@ import { z } from 'zod';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { withFencedWriterLeaseSync, writerLeaseResourceId } from './writer-lease.js';
 import {
   demoteActiveOnResume,
@@ -107,20 +116,27 @@ export function appendValidatedJournalEvent<TEnvelope>(
   options: AppendValidatedJournalEventOptions<TEnvelope>
 ): TEnvelope {
   assertNotDuringRestore('appendValidatedJournalEvent');
+  const journalPath = assertSafeRepositoryPath(options.journalPath, { allowMissingLeaf: true });
   const validated = options.kernel.validatePayload(options.opName, options.payload);
   const envelope = options.buildEnvelope({
     seq: options.seq,
-    ts: (options.now ?? (() => new Date().toISOString()))(),
+    ts: (options.now ?? nowIso)(),
     payload: validated,
   });
-  const leasePath = path.join(path.dirname(options.journalPath), 'writer-lease.json');
+  const leasePath = assertSafeRepositoryPath(
+    path.join(path.dirname(journalPath), 'writer-lease.json'),
+    { allowMissingLeaf: true }
+  );
   return withFencedWriterLeaseSync({
     resourceId: writerLeaseResourceId(leasePath),
     ownerId: `process:${process.pid}`,
     leasePath,
     fn: () => {
-      ensureJournalDirectory(options.journalPath);
-      appendJsonLine(options.journalPath, envelope);
+      const currentJournalPath = assertSafeRepositoryPath(journalPath, {
+        allowMissingLeaf: true,
+      });
+      ensureJournalDirectory(currentJournalPath);
+      appendJsonLine(currentJournalPath, envelope);
       return envelope;
     },
   });
@@ -200,8 +216,10 @@ export class EventSourcingKernel {
 }
 
 function ensureJournalDirectory(filePath: string): void {
-  const dir = filePath.replace(/[/\\][^/\\]+$/, '');
-  if (dir && dir !== filePath && !safeExistsSync(dir)) {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const dir = path.dirname(safeFilePath);
+  assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  if (dir && dir !== safeFilePath && !safeExistsSync(dir)) {
     safeMkdir(dir, { recursive: true });
   }
 }
@@ -598,11 +616,16 @@ export class WorkerStateJournal {
   private seq = 0;
 
   constructor(options: WorkerStateJournalOptions) {
-    this.journalPath = pathResolver.rootResolve(options.journalPath);
-    this.indexPath = options.indexPath
-      ? pathResolver.rootResolve(options.indexPath)
-      : `${this.journalPath}.index.json`;
-    this.now = options.now ?? (() => new Date().toISOString());
+    this.journalPath = assertSafeRepositoryPath(pathResolver.rootResolve(options.journalPath), {
+      allowMissingLeaf: true,
+    });
+    this.indexPath = assertSafeRepositoryPath(
+      options.indexPath
+        ? pathResolver.rootResolve(options.indexPath)
+        : `${this.journalPath}.index.json`,
+      { allowMissingLeaf: true }
+    );
+    this.now = options.now ?? nowIso;
   }
 
   /** Register an ordered post-restore hook (lower `order` runs first). */
@@ -730,8 +753,10 @@ export class WorkerStateJournal {
     });
     const summary = summarize(state, read.maxSeq);
     try {
-      this.ensureDir(this.indexPath);
-      safeWriteFile(this.indexPath, `${JSON.stringify(summary, null, 2)}\n`);
+      const indexPath = assertSafeRepositoryPath(this.indexPath, { allowMissingLeaf: true });
+      this.ensureDir(indexPath);
+      const validated = goalDelegationSummarySchema.parse(summary);
+      safeWriteFile(indexPath, `${JSON.stringify(validated, null, 2)}\n`);
     } catch (error) {
       // The index is derived and rebuildable; never fail on a write hiccup.
       logger.warn(
@@ -744,13 +769,13 @@ export class WorkerStateJournal {
   }
 
   private loadIndex(): GoalDelegationSummary | null {
-    if (!safeExistsSync(this.indexPath)) return null;
     try {
-      const raw = String(safeReadFile(this.indexPath, { encoding: 'utf-8' }));
+      const indexPath = assertSafeRepositoryPath(this.indexPath, { allowMissingLeaf: true });
+      if (!safeExistsSync(indexPath)) return null;
       // Reconstruct explicitly: zod v4 infers `.nullable()` keys as optional,
       // so round-trip through the hand-written contract shape instead of the
       // schema's looser inferred type.
-      const parsed = goalDelegationSummarySchema.parse(JSON.parse(raw));
+      const parsed = goalDelegationSummarySchema.parse(readJson(indexPath));
       return {
         goalId: parsed.goalId ?? null,
         goalState: parsed.goalState ?? null,
@@ -763,7 +788,7 @@ export class WorkerStateJournal {
     } catch {
       // Corrupt derived index: wipe so the next reader reprojects cleanly.
       try {
-        safeRmSync(this.indexPath, { force: true });
+        safeRmSync(assertSafeRepositoryPath(this.indexPath), { force: true });
       } catch {
         /* best-effort */
       }
@@ -780,15 +805,18 @@ export class WorkerStateJournal {
   }
 
   private readJournal(): ReadResult {
-    if (!safeExistsSync(this.journalPath)) return { events: [], maxSeq: -1 };
-    const raw = String(safeReadFile(this.journalPath, { encoding: 'utf-8' }));
+    const journalPath = assertSafeRepositoryPath(this.journalPath, { allowMissingLeaf: true });
+    if (!safeExistsSync(journalPath)) return { events: [], maxSeq: -1 };
+    const raw = String(safeReadFile(journalPath, { encoding: 'utf-8' }));
     const events: JournalEventEnvelope[] = [];
     let maxSeq = -1;
     for (const line of raw.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       try {
-        const parsed = journalEventEnvelopeSchema.parse(JSON.parse(trimmed));
+        const parsed = journalEventEnvelopeSchema.parse(
+          parseSafeJsonInput(trimmed, 'worker journal entry')
+        );
         const migrated = migrateEnvelope(parsed);
         events.push(migrated);
         if (migrated.seq > maxSeq) maxSeq = migrated.seq;

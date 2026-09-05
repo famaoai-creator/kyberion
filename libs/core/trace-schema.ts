@@ -222,6 +222,88 @@ export const TRACE_SPAN_DEFINITIONS = {
 export type TraceSpanKind = keyof typeof TRACE_SPAN_DEFINITIONS;
 
 /**
+ * Persisted extension spans emitted by current actuators and lifecycle
+ * bridges. They do not yet have an exact attribute contract, but their names
+ * are still governed here so strict replay consumers can reject arbitrary
+ * injected span names without dropping existing trace history.
+ */
+export const TRACE_EXTENSION_SPAN_NAMES = [
+  'action.completed',
+  'action.received',
+  'actuator.resolved',
+  'ai-audit',
+  'browser.action',
+  'capability.missing',
+  'checkpoint.recorded',
+  'checkpoint.requested',
+  'evidence.recorded',
+  'gap_phases',
+  'git.commit',
+  'git.stage',
+  'goto',
+  'intent_delta.emit',
+  'knowledge_delivered',
+  'ledger.synced',
+  'mission_run',
+  'mission_run_failed',
+  'mission_run_started',
+  'mission_task_dispatch',
+  'mission_task_dispatch_finished',
+  'mission_task_dispatch_started',
+  'op.preflight',
+  'project_ledger.sync',
+  'state.save',
+  'step.completed',
+  'step.failed',
+  'step.started',
+  'volatile_gc.skipped',
+] as const;
+
+/** Namespaces with a dynamic suffix, such as `system:exec` or a pipeline id. */
+export const TRACE_EXTENSION_SPAN_PREFIXES = [
+  'apply:',
+  'browser-pipeline:',
+  'browser:',
+  'calendar-actuator:',
+  'capture:',
+  'code-actuator:',
+  'code:',
+  'control:',
+  'core:',
+  'media-actuator:',
+  'media-generation-actuator:',
+  'media-generation:',
+  'media:',
+  'meeting-actuator:',
+  'meeting:',
+  'mission-controller:',
+  'mission_controller:',
+  'mission:',
+  'meeting_participate:',
+  'meeting_participation:',
+  'modeling:',
+  'pipeline:',
+  'phase.report.',
+  'super-pipeline:',
+  'system:',
+  'transform:',
+  'voice-actuator:',
+  'voice:',
+  'working-memory:',
+] as const;
+
+export function isGovernedTraceSpanName(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return (
+    Boolean(resolveTraceSpanKind(normalized)) ||
+    TRACE_EXTENSION_SPAN_NAMES.includes(
+      normalized as (typeof TRACE_EXTENSION_SPAN_NAMES)[number]
+    ) ||
+    TRACE_EXTENSION_SPAN_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+  );
+}
+
+/**
  * Exact compile-time vocabulary for span attributes. Object literals checked
  * with `satisfies ExactTelemetryAttributes<...>` reject undeclared keys while
  * keeping the runtime TraceContext API backwards-compatible for extension
@@ -448,8 +530,8 @@ export function validateTraceReplay(
       issues.push({ path: `${path}.name`, message: 'span name must be a non-empty string' });
     }
     const kind = name ? resolveTraceSpanKind(name) : undefined;
-    if (!kind && options.strictUnknownSpans) {
-      issues.push({ path: `${path}.name`, message: `span kind is not governed: ${name}` });
+    if (options.strictUnknownSpans && !isGovernedTraceSpanName(name)) {
+      issues.push({ path: `${path}.name`, message: `span name is not governed: ${name}` });
     }
     if (kind && parentKind && validateTraceParent(kind, parentKind).length > 0) {
       issues.push(
@@ -475,6 +557,12 @@ export function validateTraceReplay(
         if (!isTraceRecord(event) || typeof event.name !== 'string' || !event.name.trim()) {
           issues.push({ path: `${path}.events[${index}]`, message: 'event name is required' });
           continue;
+        }
+        if (!validTimestamp(event.timestamp)) {
+          issues.push({
+            path: `${path}.events[${index}].timestamp`,
+            message: 'event timestamp must be an ISO timestamp',
+          });
         }
         issues.push(
           ...validateReplayEvent(

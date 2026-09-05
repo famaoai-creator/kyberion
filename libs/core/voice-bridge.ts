@@ -11,6 +11,7 @@
  */
 
 import { logger } from './core.js';
+import { nowIso } from './foundation/time.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 import {
   listDemotedProviders,
@@ -204,7 +205,7 @@ export const stubVoiceBridge: VoiceBridge = {
       written_to: input.outputPath,
       _synthetic: true,
       person_slug: basename(input.counterpartyRef),
-      visited_at: new Date().toISOString(),
+      visited_at: nowIso(),
       transcript: [],
       stance: 'neutral',
       conditions: [],

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mission-provisioned-entry-record.schema.json",
+  "title": "Mission Provisioned Entry Record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "entry_id": { "type": "string", "minLength": 1 },
+    "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "target_path": { "type": "string", "minLength": 1 },
+    "phase": { "enum": ["provisioned", "verified"] }
+  },
+  "required": ["ts", "entry_id", "content_hash", "target_path", "phase"]
+}

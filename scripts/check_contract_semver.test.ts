@@ -5,6 +5,7 @@
  * (kept in sync) and test the rules directly. This is a guard against rule drift.
  */
 import { describe, it, expect } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 
 interface Fingerprint {
   actuator_id: string;
@@ -61,6 +62,19 @@ const baseFp: Fingerprint = {
 };
 
 describe('classifyBump', () => {
+  it('uses the governed parser for contract schema fingerprints', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_contract_semver.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('parseSafeJsonInput(raw,');
+    expect(source).toContain('readSafeJsonFile');
+    expect(source).not.toContain('readJson<Manifest>');
+    expect(source).not.toContain('readJson<BaselineFile>');
+    expect(source).not.toContain('JSON.parse(raw)');
+  });
+
   it('returns none for identical surfaces', () => {
     expect(classifyBump(baseFp, { ...baseFp })).toBe('none');
   });

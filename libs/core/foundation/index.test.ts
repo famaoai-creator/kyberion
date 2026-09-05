@@ -8,6 +8,8 @@ import { pathResolver } from '../path-resolver.js';
 import {
   clamp,
   getRegisteredEnv,
+  getRegisteredEnvText,
+  isVitestProcess,
   normalizeText,
   parseIso,
   readTextFile,
@@ -80,9 +82,15 @@ describe('foundation helpers', () => {
     const environment: Record<string, string | undefined> = {};
     setRegisteredEnv('KYBERION_FOUNDATION_TEST', 'enabled', environment);
     expect(getRegisteredEnv('KYBERION_FOUNDATION_TEST', { env: environment })).toBe('enabled');
+    expect(getRegisteredEnvText('KYBERION_FOUNDATION_TEST', { env: environment })).toBe('enabled');
     expect(environment.KYBERION_FOUNDATION_TEST).toBe('enabled');
     setRegisteredEnv('KYBERION_FOUNDATION_TEST', undefined, environment);
     expect(environment.KYBERION_FOUNDATION_TEST).toBeUndefined();
+  });
+
+  it('detects the test runtime without consulting the repository registry', () => {
+    expect(isVitestProcess({ VITEST: '1' })).toBe(true);
+    expect(isVitestProcess({ VITEST: undefined })).toBe(false);
   });
 
   it('builds a least-privilege child environment from the shared allowlist', () => {
@@ -97,5 +105,18 @@ describe('foundation helpers', () => {
         env: { KYBERION_PROVIDER_DEMOTION_TTL_MS: '2500' },
       })
     ).toBe(2500);
+  });
+
+  it('can preserve empty environment values for presence-sensitive probes', () => {
+    const environment = { KYBERION_EMPTY_FOUNDATION_TEST: '' };
+    expect(getRegisteredEnvText('KYBERION_EMPTY_FOUNDATION_TEST', { env: environment })).toBe(
+      undefined
+    );
+    expect(
+      getRegisteredEnvText('KYBERION_EMPTY_FOUNDATION_TEST', {
+        env: environment,
+        preserveEmpty: true,
+      })
+    ).toBe('');
   });
 });

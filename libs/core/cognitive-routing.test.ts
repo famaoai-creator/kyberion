@@ -3,15 +3,21 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCognitiveRouteDecision,
   formatCognitiveRouteDecision,
+  loadCognitiveRoutingSchema,
 } from './cognitive-routing.js';
 
 describe('cognitive routing', () => {
+  it('loads the governed routing schema as safe JSON', () => {
+    expect(loadCognitiveRoutingSchema()).toMatchObject({ type: 'object' });
+  });
+
   it('routes deterministic pipeline tasks to zero_llm', () => {
     const decision = buildCognitiveRouteDecision({
       mission_id: 'MSN-COGNITIVE-ROUTING-001',
       item_id: 'WIT-ROUTE-001',
       title: 'Execute the verified pipeline',
-      description: 'Run the deterministic pipeline using the stored pipeline_ref and write the result artifact.',
+      description:
+        'Run the deterministic pipeline using the stored pipeline_ref and write the result artifact.',
       metadata: {
         pipeline_ref: 'pipelines/verified-release.json',
       },
@@ -33,7 +39,8 @@ describe('cognitive routing', () => {
       mission_id: 'MSN-COGNITIVE-ROUTING-002',
       item_id: 'WIT-ROUTE-002',
       title: 'Review the security-sensitive architecture change',
-      description: 'Investigate the design, compare alternatives, and validate compliance implications before implementation.',
+      description:
+        'Investigate the design, compare alternatives, and validate compliance implications before implementation.',
       metadata: {
         priority: 'urgent',
       },
@@ -51,7 +58,8 @@ describe('cognitive routing', () => {
       mission_id: 'MSN-COGNITIVE-ROUTING-003',
       item_id: 'WIT-ROUTE-003',
       title: 'Update the ticket reflection',
-      description: 'Add the response summary, comment, and close the issue after the result is recorded.',
+      description:
+        'Add the response summary, comment, and close the issue after the result is recorded.',
       metadata: {
         target_path: 'coordination/tickets/replies/task-1.json',
       },

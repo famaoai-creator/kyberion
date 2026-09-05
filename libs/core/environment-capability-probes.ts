@@ -22,15 +22,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  loadJson,
-  safeExistsSync,
-  safeReadFile,
-  safeReaddir,
-  safeStat,
-  safeExec,
-} from './secure-io.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeStat, safeExec } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { normalizePersistedAuditEntry } from './audit-chain.js';
 
 function kyberionEnv(name: string): string | undefined {
   return getRegisteredEnvText(name);
@@ -54,6 +50,7 @@ import {
 import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
 import { probeGeminiApiBackendAvailability } from './gemini-api-backend.js';
 import { probeGrokApiBackendAvailability } from './grok-api-backend.js';
+import { probeAnthropicApiBackendAvailability } from './anthropic-api-probe.js';
 import {
   normalizeReasoningBackendMode,
   type ReasoningBackendMode,
@@ -89,10 +86,13 @@ export async function probeExplicitReasoningBackend(
   deps: {
     binaryProbe?: (command: string, args: readonly string[]) => boolean;
     claudeProbe?: () => { available: boolean; reason?: string };
+    anthropicProbe?: (env: NodeJS.ProcessEnv) => Promise<{ available: boolean; reason?: string }>;
   } = {}
 ): Promise<{ available: boolean; reason?: string }> {
   const binaryProbe = deps.binaryProbe ?? binaryAvailable;
   const claudeProbe = deps.claudeProbe ?? (() => probeShellClaudeCliAvailability(env));
+  const anthropicProbe =
+    deps.anthropicProbe ?? ((selectedEnv) => probeAnthropicApiBackendAvailability(selectedEnv));
   const backend = normalizeReasoningBackendMode(backendRaw as ReasoningBackendMode);
 
   const unavailable = (detail: string): { available: boolean; reason: string } => ({
@@ -117,7 +117,9 @@ export async function probeExplicitReasoningBackend(
         : unavailable(probe.reason ?? 'claude CLI probe failed');
     }
     case 'claude-agent': {
-      if (env.CLAUDE_API_KEY?.trim()) return { available: true };
+      if (getRegisteredEnvText('CLAUDE_API_KEY', { env })?.trim()) {
+        return { available: true };
+      }
       const probe = claudeProbe();
       return probe.available
         ? { available: true }
@@ -149,10 +151,19 @@ export async function probeExplicitReasoningBackend(
       return binaryProbe('gh', ['copilot', '--', '--help'])
         ? { available: true }
         : unavailable('`gh copilot -- --help` failed');
-    case 'anthropic':
-      return env.ANTHROPIC_API_KEY
+    case 'cursor-cli':
+      return binaryProbe(
+        getRegisteredEnvText('KYBERION_CURSOR_CLI_BIN', { env })?.trim() || 'cursor-agent',
+        ['--version']
+      )
         ? { available: true }
-        : unavailable('ANTHROPIC_API_KEY is not set');
+        : unavailable('`cursor-agent --version` failed');
+    case 'anthropic': {
+      const probe = await anthropicProbe(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'Anthropic API probe failed');
+    }
     case 'gemini-api': {
       const probe = await probeGeminiApiBackendAvailability(env);
       return probe.available
@@ -239,25 +250,25 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   if (binaryAvailable('grok', ['--version'])) {
     return { available: true };
   }
-  if (process.env.CLAUDE_API_KEY !== undefined || probeShellClaudeCliAvailability().available) {
+  if (kyberionEnv('CLAUDE_API_KEY') || probeShellClaudeCliAvailability().available) {
     return { available: true };
   }
-  if (Boolean(process.env.ANTHROPIC_API_KEY)) {
+  if (Boolean(kyberionEnv('ANTHROPIC_API_KEY'))) {
     return { available: true };
   }
-  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+  if (kyberionEnv('GEMINI_API_KEY') || kyberionEnv('GOOGLE_API_KEY')) {
     const geminiProbe = await probeGeminiApiBackendAvailability(process.env);
     if (geminiProbe.available) return { available: true };
   }
-  if (process.env.XAI_API_KEY || kyberionEnv('KYBERION_GROK_API_KEY')) {
+  if (kyberionEnv('XAI_API_KEY') || kyberionEnv('KYBERION_GROK_API_KEY')) {
     const grokApiProbe = await probeGrokApiBackendAvailability(process.env);
     if (grokApiProbe.available) return { available: true };
   }
-  if (process.env.OPENROUTER_API_KEY || kyberionEnv('KYBERION_OPENROUTER_KEY')) {
+  if (kyberionEnv('OPENROUTER_API_KEY') || kyberionEnv('KYBERION_OPENROUTER_KEY')) {
     const openrouterProbe = await probeOpenRouterBackendAvailability(process.env);
     if (openrouterProbe.available) return { available: true };
   }
-  if (Boolean(kyberionEnv('KYBERION_OLLAMA_URL')) || Boolean(process.env.OLLAMA_HOST)) {
+  if (Boolean(kyberionEnv('KYBERION_OLLAMA_URL')) || Boolean(kyberionEnv('OLLAMA_HOST'))) {
     const ollamaProbe = await probeOllamaBackendAvailability(process.env);
     if (ollamaProbe.available) return { available: true };
   }
@@ -305,26 +316,21 @@ async function probeAuditChain(): Promise<{ available: boolean; reason?: string 
     // First run / fresh checkout — creating it later is normal.
     return { available: true };
   }
+  let lineNumber = 0;
   try {
     const text = safeReadFile(chainPath, { encoding: 'utf8' }) as string;
-    let lineNumber = 0;
     for (const raw of text.split('\n')) {
       lineNumber += 1;
       const line = raw.trim();
       if (!line) continue;
-      const entry = JSON.parse(line);
-      if (typeof entry.id !== 'string' || typeof entry.action !== 'string') {
-        return {
-          available: false,
-          reason: `audit-chain malformed at line ${lineNumber}: missing id/action`,
-        };
-      }
+      const entry = parseSafeJsonInput(line, 'environment audit entry');
+      normalizePersistedAuditEntry(entry);
     }
     return { available: true };
   } catch (err: any) {
     return {
       available: false,
-      reason: `audit-chain parse failed: ${err?.message ?? err}`,
+      reason: `audit-chain parse failed at line ${lineNumber}: ${err?.message ?? err}`,
     };
   }
 }
@@ -390,8 +396,20 @@ function readRootEnginesNodeRange(): string | null {
   try {
     const pkgPath = pathResolver.rootResolve('package.json');
     if (!safeExistsSync(pkgPath)) return null;
-    const pkg = loadJson<{ engines?: { node?: unknown } }>(pkgPath);
-    const range = pkg.engines?.node;
+    return parseNodeEnginesRange(readJson<unknown>(pkgPath));
+  } catch {
+    return null;
+  }
+}
+
+export function parseNodeEnginesRange(value: unknown): string | null {
+  try {
+    const pkg = parseSafeJsonObjectValue(value, 'package.json');
+    const engines =
+      pkg.engines === undefined
+        ? null
+        : parseSafeJsonObjectValue(pkg.engines, 'package.json engines');
+    const range = engines?.node;
     return typeof range === 'string' && range.trim() !== '' ? range : null;
   } catch {
     return null;

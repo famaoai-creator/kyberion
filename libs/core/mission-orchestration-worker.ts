@@ -3,6 +3,7 @@ export { resolveMissionPlanningPacket } from './mission-orchestration-planning.j
 
 export {
   evaluateMissionPhaseExitGates,
+  loadMissionGateRecordAtPath,
   loadMissionPhaseGateDefinitions,
   resolvePhaseGateMode,
 } from './mission-orchestration-phase-gates.js';
@@ -18,6 +19,8 @@ import {
   goalIdForWorkItem,
   runGoalDrivenWorkItem,
   provisionGoalDrivenTaskKnowledge,
+  resolveManualGoalDriveScope,
+  isGoalDrivenTaskResumable,
 } from './mission-orchestration-worker-part-dispatch.js';
 import {
   isDraftRefineCandidate,
@@ -42,6 +45,8 @@ export {
   goalIdForWorkItem,
   runGoalDrivenWorkItem,
   provisionGoalDrivenTaskKnowledge,
+  resolveManualGoalDriveScope,
+  isGoalDrivenTaskResumable,
   isDraftRefineCandidate,
   isBestOfNCandidate,
   persistPlanningPacket,

@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/legacy-customer-financials.schema.json",
+  "title": "Legacy Customer Financial Fields",
+  "type": "object",
+  "properties": {
+    "financials_prev_fy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

@@ -139,6 +139,25 @@ describe('intent use-case scenario', () => {
     expect(validateIntentUseCaseScenario(scenario)).toMatchObject({ valid: true });
   });
 
+  it('keeps the derived confidence within the shared 0..1 boundary', () => {
+    const base = fixture();
+    const high = buildIntentUseCaseScenario({
+      ...base,
+      packet: { ...base.packet, selected_confidence: 1 },
+      executionBrief: { ...base.executionBrief, confidence: 1 },
+      intentContract: { ...base.intentContract, confidence: 1 },
+    });
+    const low = buildIntentUseCaseScenario({
+      ...base,
+      packet: { ...base.packet, selected_confidence: 0 },
+      executionBrief: { ...base.executionBrief, confidence: 0 },
+      intentContract: { ...base.intentContract, confidence: 0 },
+    });
+
+    expect(high.confidence).toBe(1);
+    expect(low.confidence).toBe(0);
+  });
+
   it('selects approval and runtime handoffs before execution', () => {
     const approval = fixture({
       intentContract: {

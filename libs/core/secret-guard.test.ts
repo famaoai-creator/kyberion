@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getSecret, getActiveSecrets, secretGuard } from './secret-guard.js';
 import { validateSovereignBoundary } from './tier-guard.js';
+import * as secureIo from './secure-io.js';
 
 describe('secret-guard core', () => {
   beforeEach(() => {
@@ -23,7 +24,22 @@ describe('secret-guard core', () => {
     const content = 'The secret is super-secret-value-123 inside log.';
     const result = validateSovereignBoundary(content, getActiveSecrets());
     expect(result.safe).toBe(false);
-    expect(result.detected.some(d => d.includes('SECRET_LEAK'))).toBe(true);
+    expect(result.detected.some((d) => d.includes('SECRET_LEAK'))).toBe(true);
+  });
+
+  it('rejects a connection resource before reading when its repository path is unsafe', () => {
+    const pathAssertion = vi.spyOn(secureIo, 'assertSafeRepositoryPath').mockImplementation(() => {
+      throw new Error('[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link');
+    });
+
+    try {
+      expect(() => secretGuard.loadConnectionDocument('unsafe-connection')).toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+      expect(pathAssertion).toHaveBeenCalled();
+    } finally {
+      pathAssertion.mockRestore();
+    }
   });
 
   describe('TIBA Scoped Identity', () => {

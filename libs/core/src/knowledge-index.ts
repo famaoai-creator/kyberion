@@ -1,17 +1,18 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { readJson } from '../foundation/json.js';
+import { parseSafeJsonEntriesInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
+import { nowIso } from '../foundation/time.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExistsSync,
   safeReadFile,
   safeReaddir,
-  safeWriteFile,
   safeMkdir,
   safeStat,
+  safeLstat,
   safeUnlinkSync,
-  loadJson,
+  assertSafeRepositoryPath,
 } from '../secure-io.js';
 import {
   getEmbeddingBackend,
@@ -23,6 +24,17 @@ import {
   loadKnowledgeRankingWeights,
   type KnowledgeRankingMetadata,
 } from '../ranking-signals.js';
+import { loadKnowledgeUsageAggregateAtPath } from '../knowledge-usage-aggregate.js';
+import {
+  loadKnowledgeIndexCacheAtPath,
+  writeKnowledgeIndexCacheAtPath,
+  type KnowledgeIndexCache,
+  type KnowledgeIndexCacheEntry,
+} from '../knowledge-index-cache.js';
+import {
+  loadKnowledgeIndexUsageAtPath,
+  writeKnowledgeIndexUsageAtPath,
+} from '../knowledge-index-usage.js';
 import { physicalScopedPath } from '../physical-namespace.js';
 import type { ScopeContext } from '../scope-context.js';
 import { currentScope } from '../scope-context.js';
@@ -130,39 +142,54 @@ function usageAggregatePath(scope?: ScopeContext): string {
   } else {
     base = shared('runtime/feedback-loop/knowledge-usage/usage.json');
   }
-  if (!scope?.tenant_slug) return base;
-  const scopeKind = scope.session_id
-    ? 'session'
-    : scope.task_id
-      ? 'task'
-      : scope.mission_id
-        ? 'mission'
-        : scope.project_id
-          ? 'project'
-          : scope.organization_id
-            ? 'organization'
-            : 'tenant';
-  const relative = base.replace(/^.*?(?=active\/shared\/runtime)/, '');
-  const feedbackRoot = 'active/shared/runtime/feedback-loop';
-  const scopedScope = { ...scope, scope_kind: scopeKind } as const;
-  const relativeBase = relative.replace(/^\/+/, '');
-  const scoped =
-    relativeBase === feedbackRoot || relativeBase.startsWith(`${feedbackRoot}/`)
-      ? path.posix.join(
-          physicalScopedPath(feedbackRoot, scopedScope),
-          ...relativeBase.slice(feedbackRoot.length).replace(/^\/+/, '').split('/').filter(Boolean)
-        )
-      : physicalScopedPath(relativeBase, scopedScope);
-  let rootResolve: ((relativePath: string) => string) | undefined;
   try {
-    const candidate = resolver.rootResolve;
-    if (typeof candidate === 'function') rootResolve = candidate.bind(resolver);
+    if (!scope?.tenant_slug) {
+      return assertSafeRepositoryPath(base, { allowMissingLeaf: true });
+    }
+    const scopeKind = scope.session_id
+      ? 'session'
+      : scope.task_id
+        ? 'task'
+        : scope.mission_id
+          ? 'mission'
+          : scope.project_id
+            ? 'project'
+            : scope.organization_id
+              ? 'organization'
+              : 'tenant';
+    const relative = base.replace(/^.*?(?=active\/shared\/runtime)/, '');
+    const feedbackRoot = 'active/shared/runtime/feedback-loop';
+    const scopedScope = { ...scope, scope_kind: scopeKind } as const;
+    const relativeBase = relative.replace(/^\/+/, '');
+    const scoped =
+      relativeBase === feedbackRoot || relativeBase.startsWith(`${feedbackRoot}/`)
+        ? path.posix.join(
+            physicalScopedPath(feedbackRoot, scopedScope),
+            ...relativeBase
+              .slice(feedbackRoot.length)
+              .replace(/^\/+/, '')
+              .split('/')
+              .filter(Boolean)
+          )
+        : physicalScopedPath(relativeBase, scopedScope);
+    let rootResolve: ((relativePath: string) => string) | undefined;
+    try {
+      const candidate = resolver.rootResolve;
+      if (typeof candidate === 'function') rootResolve = candidate.bind(resolver);
+    } catch {
+      rootResolve = undefined;
+    }
+    const resolved = rootResolve
+      ? rootResolve(scoped)
+      : nestedResolver?.rootDir?.()
+        ? path.join(nestedResolver.rootDir!(), scoped)
+        : scoped;
+    return assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
   } catch {
-    rootResolve = undefined;
+    // Usage feedback is optional. An invalid external override must not widen
+    // the read surface or make knowledge ranking unavailable.
+    return '';
   }
-  if (rootResolve) return rootResolve(scoped);
-  const rootDir = nestedResolver?.rootDir?.();
-  return rootDir ? path.join(rootDir, scoped) : scoped;
 }
 
 function loadUsageYieldValues(scope?: ScopeContext): Map<string, number> {
@@ -170,18 +197,11 @@ function loadUsageYieldValues(scope?: ScopeContext): Map<string, number> {
   const filePath = usageAggregatePath(scope);
   if (!filePath || !safeExistsSync(filePath)) return values;
   try {
-    const entries = readJson<unknown>(filePath);
-    if (!Array.isArray(entries)) return values;
+    const entries = loadKnowledgeUsageAggregateAtPath(filePath);
     for (const entry of entries) {
-      if (!entry || typeof entry !== 'object') continue;
-      const row = entry as {
-        document_path?: unknown;
-        used_count?: unknown;
-        not_used_count?: unknown;
-      };
-      if (typeof row.document_path !== 'string') continue;
-      const used = typeof row.used_count === 'number' ? row.used_count : 0;
-      const notUsed = typeof row.not_used_count === 'number' ? row.not_used_count : 0;
+      const row = entry;
+      const used = row.used_count;
+      const notUsed = row.not_used_count;
       if (used + notUsed > 0) values.set(row.document_path, used / (used + notUsed));
     }
   } catch {
@@ -284,7 +304,7 @@ export class KnowledgeHintIndex {
 
   constructor(hints: KnowledgeHint[], scope?: KnowledgeScope) {
     this.hints = hints;
-    this.builtAt = new Date().toISOString();
+    this.builtAt = nowIso();
     this.scope = scope;
     this.embedCache = new Map();
   }
@@ -299,18 +319,8 @@ export function clearKnowledgeEmbedCache(): void {
 
 // ─── Disk-cache helpers ───────────────────────────────────────────────────────
 
-interface DiskCacheEntry {
-  source: string;
-  textHash: string;
-  vector: number[];
-}
-
-interface DiskCache {
-  scopeHash: string;
-  model: string;
-  builtAt: string;
-  entries: DiskCacheEntry[];
-}
+type DiskCacheEntry = KnowledgeIndexCacheEntry;
+type DiskCache = KnowledgeIndexCache;
 
 export function computeScopeHash(scope: KnowledgeScope, modelName?: string): string {
   const key = JSON.stringify({
@@ -332,9 +342,17 @@ function computeTextHash(text: string): string {
 
 function cacheDir(): string {
   const override = getRegisteredEnvText('KYBERION_KI_CACHE_DIR')?.trim();
-  if (override) return override;
   const root = path.dirname(pathResolver.knowledge());
-  return path.join(root, 'active', 'shared', 'cache');
+  const fallback = path.join(root, 'active', 'shared', 'cache');
+  if (!override) return assertSafeRepositoryPath(fallback, { allowMissingLeaf: true });
+  try {
+    const candidate = path.isAbsolute(override) ? override : pathResolver.rootResolve(override);
+    return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+  } catch {
+    // Cache is an optional optimization. Never write to an ungoverned
+    // override; use the canonical repository cache instead.
+    return assertSafeRepositoryPath(fallback, { allowMissingLeaf: true });
+  }
 }
 
 function cacheFilePath(scopeHash: string): string {
@@ -358,9 +376,7 @@ function usageFilePath(): string {
 
 function loadUsageMap(): Record<string, string> {
   try {
-    if (!safeExistsSync(usageFilePath())) return {};
-    const parsed = loadJson<Record<string, string>>(usageFilePath());
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    return loadKnowledgeIndexUsageAtPath(usageFilePath());
   } catch {
     /* corrupt usage map: rebuild from scratch */
     return {};
@@ -370,10 +386,10 @@ function loadUsageMap(): Record<string, string> {
 function touchScopeUsage(scopeHash: string): void {
   try {
     const usage = loadUsageMap();
-    usage[scopeHash] = new Date().toISOString();
+    usage[scopeHash] = nowIso();
     const dir = cacheDir();
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(usageFilePath(), JSON.stringify(usage));
+    writeKnowledgeIndexUsageAtPath(usageFilePath(), usage);
   } catch {
     /* usage tracking is best-effort; eviction falls back to mtime */
   }
@@ -417,7 +433,7 @@ export function enforceKnowledgeCacheBudget(): void {
     }
     if (evictedScopes.length > 0) {
       for (const scope of evictedScopes) delete usage[scope];
-      safeWriteFile(usageFilePath(), JSON.stringify(usage));
+      writeKnowledgeIndexUsageAtPath(usageFilePath(), usage);
     }
   } catch {
     /* eviction is best-effort; an oversized cache is not fatal */
@@ -427,20 +443,15 @@ export function enforceKnowledgeCacheBudget(): void {
 function loadDiskCache(scopeHash: string): Map<string, { textHash: string; vector: Float32Array }> {
   const result = new Map<string, { textHash: string; vector: Float32Array }>();
   const filePath = cacheFilePath(scopeHash);
-  if (!safeExistsSync(filePath)) return result;
-  try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const cache: DiskCache = JSON.parse(raw);
-    for (const entry of cache.entries) {
-      result.set(entry.source, {
-        textHash: entry.textHash,
-        vector: new Float32Array(entry.vector),
-      });
-    }
-    touchScopeUsage(scopeHash);
-  } catch {
-    // Corrupt or unreadable cache — ignore, will rebuild
+  const cache = loadKnowledgeIndexCacheAtPath(filePath);
+  if (!cache) return result;
+  for (const entry of cache.entries) {
+    result.set(entry.source, {
+      textHash: entry.textHash,
+      vector: new Float32Array(entry.vector),
+    });
   }
+  touchScopeUsage(scopeHash);
   return result;
 }
 
@@ -452,10 +463,10 @@ function saveDiskCache(scopeHash: string, modelName: string, entries: DiskCacheE
     const cache: DiskCache = {
       scopeHash,
       model: modelName,
-      builtAt: new Date().toISOString(),
+      builtAt: nowIso(),
       entries,
     };
-    safeWriteFile(filePath, JSON.stringify(cache));
+    writeKnowledgeIndexCacheAtPath(filePath, cache);
     touchScopeUsage(scopeHash);
     enforceKnowledgeCacheBudget();
   } catch {
@@ -831,6 +842,94 @@ function _scanCustomerOverlayTier(
 
 // ─── Low-level scanners ───────────────────────────────────────────────────────
 
+/**
+ * Validate a scanner candidate before reading it. `knowledgeBase` is a
+ * fixture-injectable knowledge root, so this checks against its containing
+ * project root rather than the process repository root. Every existing
+ * component is lstat'ed: lexical containment alone would allow a knowledge
+ * entry to escape through a symlink.
+ */
+function isSafeScannerPath(knowledgeBase: string, candidate: string): boolean {
+  const projectRoot = path.resolve(path.dirname(knowledgeBase));
+  const absolute = path.resolve(candidate);
+  const relative = path.relative(projectRoot, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    return false;
+  }
+
+  let current = projectRoot;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (safeLstat(current).isSymbolicLink()) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function scannerSource(knowledgeBase: string, filePath: string): string {
+  return path.relative(knowledgeBase, filePath).replaceAll('\\', '/');
+}
+
+function parseKnowledgeHint(
+  value: unknown
+): Omit<KnowledgeHint, 'source' | 'tier' | 'customerId'> | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'knowledge hint');
+    const topic = record.topic;
+    const hint = record.hint;
+    const confidence = record.confidence;
+    const tags = record.tags;
+    if (typeof topic !== 'string' || topic.trim() === '') return null;
+    if (typeof hint !== 'string' || hint.trim() === '') return null;
+
+    const normalizedConfidence =
+      confidence === undefined
+        ? 0.5
+        : typeof confidence === 'number' &&
+            Number.isFinite(confidence) &&
+            confidence >= 0 &&
+            confidence <= 1
+          ? confidence
+          : null;
+    if (normalizedConfidence === null) return null;
+
+    const normalizedTags =
+      tags === undefined
+        ? undefined
+        : Array.isArray(tags) &&
+            tags.every((tag): tag is string => typeof tag === 'string' && tag.trim() !== '')
+          ? tags
+          : null;
+    if (normalizedTags === null) return null;
+
+    const optionalString = (key: string): string | undefined => {
+      const candidate = record[key];
+      if (candidate === undefined) return undefined;
+      return typeof candidate === 'string' && candidate.trim() ? candidate : undefined;
+    };
+
+    return {
+      topic,
+      hint,
+      confidence: normalizedConfidence,
+      ...(normalizedTags === undefined ? {} : { tags: [...normalizedTags] }),
+      ...(optionalString('last_updated') ? { last_updated: optionalString('last_updated') } : {}),
+      ...(optionalString('doc_authority')
+        ? { doc_authority: optionalString('doc_authority') }
+        : {}),
+      ...(optionalString('scope') ? { scope: optionalString('scope') } : {}),
+      ...(typeof record.usage_yield === 'number' && Number.isFinite(record.usage_yield)
+        ? { usage_yield: record.usage_yield }
+        : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function _loadJsonHints(
   dir: string,
   knowledgeBase: string,
@@ -838,6 +937,7 @@ function _loadJsonHints(
   customerId: string | undefined,
   hints: KnowledgeHint[]
 ): void {
+  if (!isSafeScannerPath(knowledgeBase, dir)) return;
   let files: string[];
   try {
     files = safeReaddir(dir);
@@ -848,31 +948,20 @@ function _loadJsonHints(
   for (const file of files) {
     if (!file.endsWith('.json')) continue;
     const filePath = path.join(dir, file);
+    if (!isSafeScannerPath(knowledgeBase, filePath)) continue;
     try {
-      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(content);
-      const entries: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
-      const relSource = path.relative(knowledgeBase, filePath);
+      const entries = parseSafeJsonEntriesInput(
+        String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
+        `knowledge hint file ${filePath}`
+      );
+      const relSource = scannerSource(knowledgeBase, filePath);
       for (const entry of entries) {
-        if (
-          entry !== null &&
-          typeof entry === 'object' &&
-          'topic' in entry &&
-          'hint' in entry &&
-          typeof (entry as Record<string, unknown>).topic === 'string' &&
-          typeof (entry as Record<string, unknown>).hint === 'string'
-        ) {
-          const e = entry as Record<string, unknown>;
+        const parsedHint = parseKnowledgeHint(entry);
+        if (parsedHint) {
           hints.push({
-            topic: e.topic as string,
-            hint: e.hint as string,
+            ...parsedHint,
             source: relSource,
-            confidence: typeof e.confidence === 'number' ? (e.confidence as number) : 0.5,
-            tags: Array.isArray(e.tags) ? (e.tags as string[]) : undefined,
             tier,
-            ...(typeof e.last_updated === 'string' ? { last_updated: e.last_updated } : {}),
-            ...(typeof e.doc_authority === 'string' ? { doc_authority: e.doc_authority } : {}),
-            ...(typeof e.scope === 'string' ? { scope: e.scope } : {}),
             ...(customerId ? { customerId } : {}),
           });
         }
@@ -892,6 +981,7 @@ function _scanMarkdownHints(
   options: { excludeDirectories?: ReadonlySet<string> } = {},
   atRoot = true
 ): void {
+  if (!isSafeScannerPath(knowledgeBase, dir)) return;
   let entries: string[];
   try {
     entries = safeReaddir(dir);
@@ -901,6 +991,7 @@ function _scanMarkdownHints(
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry);
+    if (!isSafeScannerPath(knowledgeBase, fullPath)) continue;
 
     if (entry === 'hints') continue; // Already handled as JSON
 
@@ -909,7 +1000,7 @@ function _scanMarkdownHints(
         const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
         const title = _extractMarkdownTitle(content, entry);
         if (title) {
-          const relSource = path.relative(knowledgeBase, fullPath);
+          const relSource = scannerSource(knowledgeBase, fullPath);
           const tags = _extractFrontmatterTags(content);
           const excerpt = _extractFirstParagraph(content);
           const rankingMetadata = _extractRankingMetadata(content, relSource);

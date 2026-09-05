@@ -18,10 +18,20 @@ import {
   type DistillCandidateRecord,
 } from './distill-candidate-registry.js';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
 import { applyConsolidationActions, type ConsolidationAction } from './memory-notebook.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -37,6 +47,9 @@ const MEMORY_NOTEBOOK_REF_PATTERN =
   /^(?:knowledge\/(?:personal|confidential|public)\/missions\/[A-Za-z0-9._-]+|active\/missions\/(?:personal|confidential|public)\/[A-Za-z0-9._-]+|active\/shared\/runtime\/session\/[A-Za-z0-9._-]+|active\/personal)\/MEMORY\.md$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const CANDIDATE_ID_PATTERN = /^[A-Za-z0-9._-]+$/u;
+const MANAGED_SKILL_PROVENANCE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/background-review-managed-skill-provenance.schema.json'
+);
 
 export interface BackgroundPipelineAppendStepPatch {
   operation: 'append_step';
@@ -136,7 +149,10 @@ function resolvePipelineTarget(targetRef: unknown): { ref: string; absolute: str
   if (!(absolute === root || absolute.startsWith(`${root}${path.sep}`))) {
     throw new Error(`[POLICY_VIOLATION] Pipeline target escapes repository root: ${ref}`);
   }
-  return { ref, absolute };
+  return {
+    ref,
+    absolute: assertSafeRepositoryPath(absolute, { allowMissingLeaf: true }),
+  };
 }
 
 function parsePipelinePatch(value: unknown): BackgroundPipelineAppendStepPatch {
@@ -461,7 +477,7 @@ export function applyBackgroundReviewPipelinePatch(
 
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(before) as Record<string, unknown>;
+    parsed = parseSafeJsonInput(before, 'pipeline target') as Record<string, unknown>;
   } catch (error) {
     throw new Error(
       `Pipeline target is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
@@ -502,14 +518,17 @@ export function applyBackgroundReviewPipelinePatch(
     after_sha256: afterSha256,
     approved_by: approvedBy,
     approval_ref: approvalRef,
-    backed_up_at: new Date().toISOString(),
+    backed_up_at: nowIso(),
     original_content: before,
   };
 
   withExecutionContext('ecosystem_architect', () => {
-    const backupDir = path.dirname(pathResolver.rootResolve(backup));
+    const backupPath = assertSafeRepositoryPath(pathResolver.rootResolve(backup), {
+      allowMissingLeaf: true,
+    });
+    const backupDir = path.dirname(backupPath);
     if (!safeExistsSync(backupDir)) safeMkdir(backupDir, { recursive: true });
-    safeWriteFile(pathResolver.rootResolve(backup), `${JSON.stringify(backupPayload, null, 2)}\n`);
+    safeWriteFile(backupPath, `${JSON.stringify(backupPayload, null, 2)}\n`);
     safeWriteFile(target.absolute, nextContent);
   });
 
@@ -526,7 +545,7 @@ export function applyBackgroundReviewPipelinePatch(
         backup_ref: backup,
         approved_by: approvedBy,
         approval_ref: approvalRef,
-        applied_at: new Date().toISOString(),
+        applied_at: nowIso(),
       },
     },
   });
@@ -541,13 +560,41 @@ export function applyBackgroundReviewPipelinePatch(
   };
 }
 
-interface ManagedSkillProvenance {
-  version?: unknown;
-  managed_by?: unknown;
-  owner?: unknown;
-  skill_ref?: unknown;
-  allow_append_only?: unknown;
-  registered_by?: unknown;
+export interface ManagedSkillProvenance {
+  version: 1;
+  managed_by: 'background-review';
+  owner: 'background-review-agent';
+  skill_ref: string;
+  allow_append_only: true;
+  registered_by: string;
+}
+
+function managedSkillProvenanceCatalog(sidecarPath: string) {
+  return defineCatalog<ManagedSkillProvenance>({
+    id: 'background-review-managed-skill-provenance',
+    path: sidecarPath,
+    schema: MANAGED_SKILL_PROVENANCE_SCHEMA_PATH,
+  });
+}
+
+/** Load managed-skill provenance through schema, regular-file, and skill binding checks. */
+export function loadManagedSkillProvenanceAtPath(
+  sidecarPath: string,
+  skillRef: string
+): ManagedSkillProvenance {
+  const safeSidecarPath = assertSafeRepositoryPath(sidecarPath, { allowMissingLeaf: true });
+  if (!safeLstat(safeSidecarPath).isFile()) {
+    throw new Error(
+      `[POLICY_VIOLATION] Managed skill provenance must be a regular file: ${sidecarPath}`
+    );
+  }
+  const provenance = managedSkillProvenanceCatalog(safeSidecarPath).load();
+  if (provenance.skill_ref !== skillRef) {
+    throw new Error(
+      `[POLICY_VIOLATION] Managed skill provenance skill reference mismatch: ${skillRef}`
+    );
+  }
+  return provenance;
 }
 
 function resolveManagedSkillTarget(targetRef: unknown): {
@@ -564,18 +611,23 @@ function resolveManagedSkillTarget(targetRef: unknown): {
   if (!(absolute === root || absolute.startsWith(`${root}${path.sep}`))) {
     throw new Error(`[POLICY_VIOLATION] Skill target escapes repository root: ${ref}`);
   }
-  if (!safeExistsSync(absolute)) throw new Error(`Skill target not found: ${ref}`);
+  const safeAbsolute = assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeAbsolute)) throw new Error(`Skill target not found: ${ref}`);
 
-  const sidecar = path.join(path.dirname(absolute), 'provenance.json');
+  const sidecar = assertSafeRepositoryPath(
+    path.join(path.dirname(safeAbsolute), 'provenance.json'),
+    { allowMissingLeaf: true }
+  );
   if (!safeExistsSync(sidecar)) {
     throw new Error(`[POLICY_VIOLATION] Managed skill provenance sidecar is missing: ${ref}`);
   }
   let provenance: ManagedSkillProvenance;
   try {
-    provenance = JSON.parse(
-      String(safeReadFile(sidecar, { encoding: 'utf8' }))
-    ) as ManagedSkillProvenance;
+    provenance = loadManagedSkillProvenanceAtPath(sidecar, ref);
   } catch (error) {
+    if (error instanceof Error && error.message.includes('Invalid catalog')) {
+      throw new Error(`[POLICY_VIOLATION] Managed skill provenance is not valid: ${error.message}`);
+    }
     throw new Error(
       `[POLICY_VIOLATION] Managed skill provenance is not valid JSON: ${
         error instanceof Error ? error.message : String(error)
@@ -596,7 +648,7 @@ function resolveManagedSkillTarget(targetRef: unknown): {
       `[POLICY_VIOLATION] Managed skill provenance does not authorize append-only patching: ${ref}`
     );
   }
-  return { ref, absolute, provenance };
+  return { ref, absolute: safeAbsolute, provenance };
 }
 
 function resolveMemoryTarget(targetRef: unknown): { ref: string; absolute: string } {
@@ -609,8 +661,9 @@ function resolveMemoryTarget(targetRef: unknown): { ref: string; absolute: strin
   if (!(absolute === root || absolute.startsWith(`${root}${path.sep}`))) {
     throw new Error(`[POLICY_VIOLATION] Memory target escapes repository root: ${ref}`);
   }
-  if (!safeExistsSync(absolute)) throw new Error(`Memory target not found: ${ref}`);
-  return { ref, absolute };
+  const safeAbsolute = assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeAbsolute)) throw new Error(`Memory target not found: ${ref}`);
+  return { ref, absolute: safeAbsolute };
 }
 
 function applySkillSection(content: string, section: string): string {
@@ -679,14 +732,17 @@ export function applyBackgroundReviewMemoryConsolidationPatch(
     after_sha256: afterSha256,
     approved_by: approvedBy,
     approval_ref: approvalRef,
-    backed_up_at: new Date().toISOString(),
+    backed_up_at: nowIso(),
     original_content: before,
   };
 
   withExecutionContext('ecosystem_architect', () => {
-    const backupDir = path.dirname(pathResolver.rootResolve(backup));
+    const backupPath = assertSafeRepositoryPath(pathResolver.rootResolve(backup), {
+      allowMissingLeaf: true,
+    });
+    const backupDir = path.dirname(backupPath);
     if (!safeExistsSync(backupDir)) safeMkdir(backupDir, { recursive: true });
-    safeWriteFile(pathResolver.rootResolve(backup), `${JSON.stringify(backupPayload, null, 2)}\n`);
+    safeWriteFile(backupPath, `${JSON.stringify(backupPayload, null, 2)}\n`);
     safeWriteFile(target.absolute, nextContent);
   });
 
@@ -703,7 +759,7 @@ export function applyBackgroundReviewMemoryConsolidationPatch(
         backup_ref: backup,
         approved_by: approvedBy,
         approval_ref: approvalRef,
-        applied_at: new Date().toISOString(),
+        applied_at: nowIso(),
       },
     },
   });
@@ -769,14 +825,17 @@ export function applyBackgroundReviewSkillPatch(
     after_sha256: afterSha256,
     approved_by: approvedBy,
     approval_ref: approvalRef,
-    backed_up_at: new Date().toISOString(),
+    backed_up_at: nowIso(),
     original_content: before,
   };
 
   withExecutionContext('ecosystem_architect', () => {
-    const backupDir = path.dirname(pathResolver.rootResolve(backup));
+    const backupPath = assertSafeRepositoryPath(pathResolver.rootResolve(backup), {
+      allowMissingLeaf: true,
+    });
+    const backupDir = path.dirname(backupPath);
     if (!safeExistsSync(backupDir)) safeMkdir(backupDir, { recursive: true });
-    safeWriteFile(pathResolver.rootResolve(backup), `${JSON.stringify(backupPayload, null, 2)}\n`);
+    safeWriteFile(backupPath, `${JSON.stringify(backupPayload, null, 2)}\n`);
     safeWriteFile(target.absolute, nextContent);
   });
 
@@ -793,7 +852,7 @@ export function applyBackgroundReviewSkillPatch(
         backup_ref: backup,
         approved_by: approvedBy,
         approval_ref: approvalRef,
-        applied_at: new Date().toISOString(),
+        applied_at: nowIso(),
       },
     },
   });

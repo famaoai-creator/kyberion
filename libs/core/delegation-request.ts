@@ -1,7 +1,8 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { safeWriteFile } from './secure-io.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import type { IntentCompilerProvider, IntentContract } from './intent-contract.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
@@ -100,12 +101,28 @@ function createRequestId() {
   return `assistant-delegation-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function assertRequestIdPathSegment(requestId: string): string {
+  const normalized = String(requestId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('[ASSISTANT_DELEGATION_REQUEST_ID] request id must be a single path segment');
+  }
+  return normalized;
+}
+
 export function getAssistantDelegationRequestPath(requestId: string) {
-  return pathResolver.sharedTmp(`delegation-requests/${requestId}.json`);
+  const safeRequestId = assertRequestIdPathSegment(requestId);
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`delegation-requests/${safeRequestId}.json`),
+    { allowMissingLeaf: true }
+  );
 }
 
 export function getAssistantDelegationResultPath(requestId: string) {
-  return pathResolver.sharedTmp(`delegation-results/${requestId}.json`);
+  const safeRequestId = assertRequestIdPathSegment(requestId);
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`delegation-results/${safeRequestId}.json`),
+    { allowMissingLeaf: true }
+  );
 }
 
 export function buildAssistantDelegationRequest(
@@ -115,7 +132,7 @@ export function buildAssistantDelegationRequest(
   const request: AssistantDelegationRequest = {
     kind: 'assistant-delegation-request',
     request_id: requestId,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     source: input.source,
     goal: input.intentContract.goal.summary,
     source_text: input.sourceText,

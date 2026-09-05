@@ -1,18 +1,19 @@
 /** EG-09/12: cross-entity drift and boundary conformance checker. */
 import * as path from 'node:path';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { listProjectRecords } from '@agent/core/project-registry';
 import {
-  pathResolver,
   safeExistsSync,
   safeReadFile,
   safeReaddir,
   safeExecResult,
   safeStat,
-  listProjectRecords,
-  withExecutionContext,
-} from '@agent/core';
-import { getRegisteredEnvBool, readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { getRegisteredEnvBool } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 export interface EntityGovernanceReport {
   status: 'ok' | 'drift';
@@ -142,12 +143,12 @@ export function collectEntityGovernanceReport(
   let policy: any = null;
   let catalog: any = null;
   try {
-    policy = readJson<unknown>(policyPath);
+    policy = readSafeJsonFile<Record<string, unknown>>(policyPath, 'security policy');
   } catch (error) {
     violations.push(`security policy unreadable: ${String(error)}`);
   }
   try {
-    catalog = readJson<unknown>(catalogPath);
+    catalog = readSafeJsonFile<Record<string, unknown>>(catalogPath, 'retention catalog');
   } catch (error) {
     violations.push(`retention catalog unreadable: ${String(error)}`);
   }
@@ -294,7 +295,8 @@ export const runCheckEntityGovernance = defineScript({
     const strictWarnings =
       context.argv.includes('--strict-warnings') ||
       getRegisteredEnvBool('KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS') === true;
-    if (shouldFailEntityGovernance(report, strictWarnings)) process.exitCode = 1;
+    if (shouldFailEntityGovernance(report, strictWarnings)) throw new ScriptExitError(1);
+    return report;
   },
 });
 

@@ -1,4 +1,6 @@
 import { appendJsonLine } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 /**
  * libs/core/nerve-bridge.ts
  * Kyberion Autonomous Nerve System (KANS) - Nerve Bridge v1.2
@@ -10,13 +12,16 @@ import { appendJsonLine } from './foundation/json.js';
 
 import * as os from 'node:os';
 import { createLogger } from './logger.js';
-import { pathResolver } from './path-resolver.js';
 import { subscribeJsonl } from './jsonl-tail.js';
-import { isStimulusExpired, rotateStimuliJournalIfNeeded } from './stimuli-journal.js';
+import {
+  isStimulusExpired,
+  normalizeNerveMessage,
+  rotateStimuliJournalIfNeeded,
+  stimuliJournalPath,
+} from './stimuli-journal.js';
 
 const logger = createLogger('nerve-bridge');
 
-const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const NODE_ID = `${os.hostname()}-${process.pid}`;
 
 export interface NerveMessage {
@@ -48,7 +53,7 @@ export function sendNerveMessage(input: {
 }): string {
   const msg: NerveMessage = {
     id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     from: input.from,
     node_id: NODE_ID,
     to: input.to,
@@ -57,13 +62,13 @@ export function sendNerveMessage(input: {
     payload: input.payload,
     metadata: {
       reply_to: input.replyTo,
-      mission_id: process.env.MISSION_ID,
+      mission_id: getRegisteredEnvText('MISSION_ID'),
       ttl: 60,
     },
   };
 
   try {
-    appendJsonLine(STIMULI_PATH, msg);
+    appendJsonLine(stimuliJournalPath(), msg);
     rotateStimuliJournalIfNeeded();
     logger.info(`📡 [BRIDGE:${NODE_ID}] Message sent: ${msg.intent} (${msg.from} -> ${msg.to})`);
   } catch (err) {
@@ -101,7 +106,7 @@ export function listenToNerve(
   logger.info(`👂 [BRIDGE:${NODE_ID}] Nerve '${nerveId}' started listening...`);
 
   return subscribeJsonl<NerveMessage>(
-    STIMULI_PATH,
+    stimuliJournalPath(),
     (msg) => {
       // Not addressed to us, or emitted by this very process (loopback).
       if (msg.to !== nerveId && msg.to !== 'broadcast') return;
@@ -115,6 +120,7 @@ export function listenToNerve(
     {
       intervalMs: options.intervalMs ?? 1000,
       fromBeginning: options.fromBeginning ?? false,
+      parse: normalizeNerveMessage,
       ...(options.signal ? { signal: options.signal } : {}),
       onMalformed: (line, err) =>
         logger.warn(

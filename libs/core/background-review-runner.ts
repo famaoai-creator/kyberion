@@ -531,7 +531,7 @@ export async function runBackgroundReviewFork(
               `承認要求: ${approval.id}`,
               `候補: ${candidateId}`,
               `返信: appr:${approval.id}:approve または appr:${approval.id}:reject`,
-              `承認: pnpm cli -- approve ${approval.id} background-review`,
+              `承認: pnpm kyberion approve ${approval.id} background-review`,
               '承認後に候補の apply を実行してください。',
             ].join('\n');
             if (input.surface === 'presence') {

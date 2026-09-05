@@ -161,9 +161,21 @@ describe('ingest:parse_document golden normalization (DA-04 acceptance 1)', () =
     );
   });
 
+  it('rejects a source path outside the repository before reading it', async () => {
+    await expect(
+      parseDocument({ source_path: '/tmp/external-ingest-source.txt', format: 'text' })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('rejects malformed slack_thread payloads', async () => {
     await expect(
       parseDocument({ content_text: '{"not":"an array"}', format: 'slack_thread' })
     ).rejects.toThrow(/JSON array/);
+    await expect(
+      parseDocument({
+        content_text: '[{"user":"alice","ts":"1","text":"ok","__proto__":{"x":true}}]',
+        format: 'slack_thread',
+      })
+    ).rejects.toThrow(/dangerous JSON key/);
   });
 });

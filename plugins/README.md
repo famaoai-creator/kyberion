@@ -51,8 +51,8 @@ This prints the derived trust label and, for anything non-official, the
 pending approval request id and how to decide it:
 
 ```bash
-pnpm cli -- approvals
-pnpm cli -- approve <request-id> <storage-channel>
+pnpm kyberion approvals
+pnpm kyberion approve <request-id> <storage-channel>
 ```
 
 Only after that decision is `approved` does the managed copy become

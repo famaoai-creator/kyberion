@@ -1,4 +1,5 @@
 import type { ImageGenerationMode } from './image-generation-types.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export interface LocalFluxGenerationPolicy {
   packageSpec: string;
@@ -19,30 +20,40 @@ function parsePositiveInteger(raw: string | undefined, fallback: number): number
 }
 
 function resolveLocalFluxModel(env: NodeJS.ProcessEnv, mode?: ImageGenerationMode): string {
-  return env.KYBERION_MFLUX_MODEL?.trim() || (
-    mode === 'artistic' ? 'dev' : 'schnell'
+  return (
+    getRegisteredEnvText('KYBERION_MFLUX_MODEL', { env })?.trim() ||
+    (mode === 'artistic' ? 'dev' : 'schnell')
   );
 }
 
 export function resolveLocalFluxGenerationPolicy(
   env: NodeJS.ProcessEnv = process.env,
-  mode?: ImageGenerationMode,
+  mode?: ImageGenerationMode
 ): LocalFluxGenerationPolicy {
   const model = resolveLocalFluxModel(env, mode);
   const stepsFallback = model === 'dev' ? 20 : 4;
 
   return {
-    packageSpec: env.KYBERION_MFLUX_PACKAGE?.trim() || 'mflux',
+    packageSpec: getRegisteredEnvText('KYBERION_MFLUX_PACKAGE', { env })?.trim() || 'mflux',
     model,
-    steps: parsePositiveInteger(env.KYBERION_MFLUX_STEPS?.trim(), stepsFallback),
-    quantize: parsePositiveInteger(env.KYBERION_MFLUX_QUANTIZE?.trim(), 8),
-    timeoutMs: parsePositiveInteger(env.KYBERION_MFLUX_TIMEOUT_MS?.trim(), 30 * 60 * 1000),
+    steps: parsePositiveInteger(
+      getRegisteredEnvText('KYBERION_MFLUX_STEPS', { env })?.trim(),
+      stepsFallback
+    ),
+    quantize: parsePositiveInteger(
+      getRegisteredEnvText('KYBERION_MFLUX_QUANTIZE', { env })?.trim(),
+      8
+    ),
+    timeoutMs: parsePositiveInteger(
+      getRegisteredEnvText('KYBERION_MFLUX_TIMEOUT_MS', { env })?.trim(),
+      30 * 60 * 1000
+    ),
   };
 }
 
 export function resolveImageGenerationPolicy(
   env: NodeJS.ProcessEnv = process.env,
-  mode?: ImageGenerationMode,
+  mode?: ImageGenerationMode
 ): ImageGenerationPolicy {
   return {
     localFlux: resolveLocalFluxGenerationPolicy(env, mode),

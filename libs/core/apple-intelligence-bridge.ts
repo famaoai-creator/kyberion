@@ -2,6 +2,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeStat } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
@@ -40,6 +42,17 @@ const SWIFT_MODULE_CACHE_DIR = `${BINARY_CACHE_DIR}/module-cache`;
 export interface AppleIntelligenceAvailability {
   available: boolean;
   reason?: string;
+}
+
+export function normalizeAppleIntelligenceAvailability(
+  value: unknown
+): AppleIntelligenceAvailability | undefined {
+  if (!isRecord(value) || typeof value.available !== 'boolean') return undefined;
+  if (value.reason !== undefined && typeof value.reason !== 'string') return undefined;
+  return {
+    available: value.available,
+    ...(typeof value.reason === 'string' ? { reason: value.reason } : {}),
+  };
 }
 
 interface AfmRunResult {
@@ -189,7 +202,7 @@ function resolveAppleSpeechLocale(language?: string): string {
   return APPLE_SPEECH_LOCALE_DEFAULTS[normalized.toLowerCase()] || normalized;
 }
 
-export function resetAppleIntelligenceAvailabilityCache(): void {
+export function _resetAppleIntelligenceAvailabilityCacheForTests(): void {
   cachedAvailability = null;
 }
 
@@ -219,14 +232,14 @@ async function probeUncached(): Promise<AppleIntelligenceAvailability> {
     return { available: false, reason: `probe failed: ${result.stderr.slice(0, 200)}` };
   }
   try {
-    const parsed = JSON.parse(result.stdout.trim()) as AppleIntelligenceAvailability;
-    return {
-      available: Boolean(parsed.available),
-      ...(parsed.reason ? { reason: parsed.reason } : {}),
-    };
+    const parsed = normalizeAppleIntelligenceAvailability(
+      parseSafeJsonInput(result.stdout.trim(), 'Apple Intelligence availability response')
+    );
+    if (parsed) return parsed;
   } catch {
-    return { available: false, reason: `unparseable probe output: ${result.stdout.slice(0, 120)}` };
+    // fall through to the stable unavailable result below
   }
+  return { available: false, reason: `unparseable probe output: ${result.stdout.slice(0, 120)}` };
 }
 
 export interface AppleFmPromptOptions {
@@ -289,6 +302,30 @@ export interface AppleVisionResult {
   labels: Array<{ label: string; confidence: number }>;
 }
 
+export function normalizeAppleVisionResult(value: unknown): AppleVisionResult | undefined {
+  if (!isRecord(value) || typeof value.text !== 'string' || !Array.isArray(value.labels)) {
+    return undefined;
+  }
+  return {
+    text: value.text,
+    labels: value.labels.flatMap((entry) => {
+      if (
+        !isRecord(entry) ||
+        typeof entry.label !== 'string' ||
+        typeof entry.confidence !== 'number' ||
+        !Number.isFinite(entry.confidence)
+      ) {
+        return [];
+      }
+      return [{ label: entry.label, confidence: entry.confidence }];
+    }),
+  };
+}
+
+function normalizeTextPayload(value: unknown): { text: string } | undefined {
+  return isRecord(value) && typeof value.text === 'string' ? { text: value.text } : undefined;
+}
+
 /**
  * On-device image understanding via the Vision framework (OCR + scene
  * labels; no LLM). Ideal for verifying rendered artifacts — "does the
@@ -319,11 +356,10 @@ export async function recognizeImageLocallyWithAppleVision(
     const start = line.indexOf('{"text"');
     if (start === -1) continue;
     try {
-      const parsed = JSON.parse(line.slice(start)) as AppleVisionResult;
-      return {
-        text: String(parsed.text || ''),
-        labels: Array.isArray(parsed.labels) ? parsed.labels : [],
-      };
+      const parsed = normalizeAppleVisionResult(
+        parseSafeJsonInput(line.slice(start), 'Apple Vision response')
+      );
+      if (parsed) return parsed;
     } catch {
       continue;
     }
@@ -391,8 +427,8 @@ export async function transcribeAudioLocallyWithAppleSpeech(
     logger.warn(`[apple-fm] transcribe failed: ${result.stderr.slice(0, 200)}`);
     return null;
   }
-  const parsed = parseLastJsonLine<{ text?: string }>(result.stdout, '{"text"');
-  const text = String(parsed?.text || '').trim();
+  const parsed = parseLastJsonLine(result.stdout, '{"text"', normalizeTextPayload);
+  const text = parsed?.text.trim() || '';
   return text.length > 0 ? text : null;
 }
 
@@ -406,12 +442,26 @@ export interface AppleImageGenerationAvailability {
   reason?: string;
 }
 
+export function normalizeAppleImageGenerationAvailability(
+  value: unknown
+): AppleImageGenerationAvailability | undefined {
+  return normalizeAppleIntelligenceAvailability(value);
+}
+
+export function normalizeAppleImageGenerationResult(
+  value: unknown
+): AppleImageGenerationResult | undefined {
+  if (!isRecord(value) || typeof value.path !== 'string' || !value.path.trim()) return undefined;
+  if (value.style !== undefined && typeof value.style !== 'string') return undefined;
+  return { path: value.path, style: typeof value.style === 'string' ? value.style : '' };
+}
+
 let cachedImageGenerationAvailability: {
   checkedAt: number;
   value: AppleImageGenerationAvailability;
 } | null = null;
 
-export function resetAppleImageGenerationAvailabilityCache(): void {
+export function _resetAppleImageGenerationAvailabilityCacheForTests(): void {
   cachedImageGenerationAvailability = null;
 }
 
@@ -442,19 +492,15 @@ export async function probeAppleImageGeneration(): Promise<AppleImageGenerationA
       if (!result.ok) {
         value = { available: false, reason: `probe failed: ${result.stderr.slice(0, 200)}` };
       } else {
-        const parsed = parseLastJsonLine<AppleImageGenerationAvailability>(
+        const parsed = parseLastJsonLine(
           result.stdout,
-          '{"available"'
+          '{"available"',
+          normalizeAppleImageGenerationAvailability
         );
-        value = parsed
-          ? {
-              available: Boolean(parsed.available),
-              ...(parsed.reason ? { reason: parsed.reason } : {}),
-            }
-          : {
-              available: false,
-              reason: `unparseable probe output: ${result.stdout.slice(0, 120)}`,
-            };
+        value = parsed || {
+          available: false,
+          reason: `unparseable probe output: ${result.stdout.slice(0, 120)}`,
+        };
       }
     }
   }
@@ -494,9 +540,7 @@ export async function generateImageLocallyWithApplePlayground(
     logger.warn(`[apple-fm] imagine failed: ${result.stderr.slice(0, 200)}`);
     return null;
   }
-  const parsed = parseLastJsonLine<AppleImageGenerationResult>(result.stdout, '{"path"');
-  if (!parsed?.path) return null;
-  return { path: parsed.path, style: String(parsed.style || '') };
+  return parseLastJsonLine(result.stdout, '{"path"', normalizeAppleImageGenerationResult);
 }
 
 // ----- SpeechToTextBridge adapter (meeting minutes / requirements audio) -----
@@ -560,14 +604,21 @@ export async function installAppleSpeechToTextBridgeIfAvailable(): Promise<boole
 }
 
 /** macOS frameworks print loader noise to stdout; scan for the last JSON line. */
-function parseLastJsonLine<T>(stdout: string, marker: string): T | null {
+function parseLastJsonLine<T>(
+  stdout: string,
+  marker: string,
+  normalize: (value: unknown) => T | undefined
+): T | null {
   const lines = stdout.split('\n');
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const line = lines[index].trim();
     const start = line.indexOf(marker);
     if (start === -1) continue;
     try {
-      return JSON.parse(line.slice(start)) as T;
+      const parsed = normalize(
+        parseSafeJsonInput(line.slice(start), 'Apple Intelligence response')
+      );
+      if (parsed) return parsed;
     } catch {
       continue;
     }

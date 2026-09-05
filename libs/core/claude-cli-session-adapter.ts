@@ -30,6 +30,8 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import {
   buildProviderChildEnv,
   type ProviderPermissionProfileName,
@@ -82,6 +84,103 @@ interface ContentBlock {
   is_error?: boolean;
   content?: unknown;
   input?: { subagent_type?: string; run_in_background?: unknown };
+}
+
+function normalizeContentBlock(value: unknown): ContentBlock | undefined {
+  if (!isRecord(value)) return undefined;
+  const stringFields = ['type', 'name', 'id', 'text', 'tool_use_id'] as const;
+  for (const field of stringFields) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return undefined;
+  }
+  if (value.is_error !== undefined && typeof value.is_error !== 'boolean') return undefined;
+  if (value.input !== undefined) {
+    if (!isRecord(value.input)) return undefined;
+    if (value.input.subagent_type !== undefined && typeof value.input.subagent_type !== 'string') {
+      return undefined;
+    }
+    if (
+      value.input.run_in_background !== undefined &&
+      typeof value.input.run_in_background !== 'boolean'
+    ) {
+      return undefined;
+    }
+  }
+  return {
+    ...(typeof value.type === 'string' ? { type: value.type } : {}),
+    ...(typeof value.name === 'string' ? { name: value.name } : {}),
+    ...(typeof value.id === 'string' ? { id: value.id } : {}),
+    ...(typeof value.text === 'string' ? { text: value.text } : {}),
+    ...(typeof value.tool_use_id === 'string' ? { tool_use_id: value.tool_use_id } : {}),
+    ...(typeof value.is_error === 'boolean' ? { is_error: value.is_error } : {}),
+    ...(value.content !== undefined ? { content: value.content } : {}),
+    ...(isRecord(value.input)
+      ? {
+          input: {
+            ...(typeof value.input.subagent_type === 'string'
+              ? { subagent_type: value.input.subagent_type }
+              : {}),
+            ...(typeof value.input.run_in_background === 'boolean'
+              ? { run_in_background: value.input.run_in_background }
+              : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+/** Normalize one untrusted Claude stream-json envelope before protocol dispatch. */
+export function normalizeClaudeStreamMessage(value: unknown): StreamMessage | undefined {
+  if (!isRecord(value)) return undefined;
+  const stringFields = ['type', 'subtype', 'session_id', 'result'] as const;
+  for (const field of stringFields) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return undefined;
+  }
+  if (
+    value.parent_tool_use_id !== undefined &&
+    value.parent_tool_use_id !== null &&
+    typeof value.parent_tool_use_id !== 'string'
+  ) {
+    return undefined;
+  }
+  if (value.is_error !== undefined && typeof value.is_error !== 'boolean') return undefined;
+  for (const field of ['agents', 'tools'] as const) {
+    if (
+      value[field] !== undefined &&
+      (!Array.isArray(value[field]) || !value[field].every((entry) => typeof entry === 'string'))
+    ) {
+      return undefined;
+    }
+  }
+  let message: StreamMessage['message'];
+  if (value.message !== undefined) {
+    if (!isRecord(value.message)) return undefined;
+    if (value.message.content !== undefined) {
+      if (!Array.isArray(value.message.content)) return undefined;
+      message = {
+        content: value.message.content.flatMap((block) => {
+          const normalized = normalizeContentBlock(block);
+          return normalized ? [normalized] : [];
+        }),
+      };
+    } else {
+      message = {};
+    }
+  }
+  return {
+    ...(typeof value.type === 'string' ? { type: value.type } : {}),
+    ...(typeof value.subtype === 'string' ? { subtype: value.subtype } : {}),
+    ...(typeof value.session_id === 'string' ? { session_id: value.session_id } : {}),
+    ...(typeof value.parent_tool_use_id === 'string'
+      ? { parent_tool_use_id: value.parent_tool_use_id }
+      : value.parent_tool_use_id === null
+        ? { parent_tool_use_id: null }
+        : {}),
+    ...(typeof value.is_error === 'boolean' ? { is_error: value.is_error } : {}),
+    ...(typeof value.result === 'string' ? { result: value.result } : {}),
+    ...(Array.isArray(value.agents) ? { agents: [...value.agents] as string[] } : {}),
+    ...(Array.isArray(value.tools) ? { tools: [...value.tools] as string[] } : {}),
+    ...(message ? { message } : {}),
+  };
 }
 
 interface ObservedDelegation {
@@ -364,14 +463,16 @@ export class ClaudeCliSessionAdapter {
   }
 
   private consumeMessage(line: string): void {
-    let message: StreamMessage;
+    let parsed: unknown;
     try {
-      message = JSON.parse(line) as StreamMessage;
+      parsed = parseSafeJsonInput(line, 'Claude CLI session response');
     } catch {
       // Non-protocol noise on stdout is not fatal on its own; a turn that
       // never reaches a `result` still fails closed on its own budget.
       return;
     }
+    const message = normalizeClaudeStreamMessage(parsed);
+    if (!message) return;
     if (typeof message.session_id === 'string') this.sessionId = message.session_id;
     if (message.type === 'system' && message.subtype === 'init') {
       this.registeredAgents = Array.isArray(message.agents) ? [...message.agents] : [];
@@ -423,7 +524,7 @@ export class ClaudeCliSessionAdapter {
   private observeContent(turn: TurnState, message: StreamMessage): void {
     const content = message.message?.content;
     if (!Array.isArray(content)) return;
-    for (const raw of content as ContentBlock[]) {
+    for (const raw of content) {
       if (
         raw?.type === 'tool_use' &&
         typeof raw.name === 'string' &&

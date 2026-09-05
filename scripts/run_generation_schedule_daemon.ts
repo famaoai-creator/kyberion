@@ -1,7 +1,11 @@
 /* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
-import { logger, pathResolver, recordDaemonHeartbeat, sendOpsAlert } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
+import { sendOpsAlert } from '@agent/core/ops-alert';
 import { spawn } from 'node:child_process';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEFAULT_INTERVAL_MS = Number(
   getRegisteredEnvText('KYBERION_GENERATION_SCHEDULE_INTERVAL_MS') || 60_000
@@ -32,7 +36,7 @@ async function runTick(): Promise<void> {
   });
 }
 
-async function main() {
+async function main(_args: string[] = []) {
   recordDaemonHeartbeat(DAEMON_ID, {
     status: 'starting',
     details: { tick_interval_ms: DEFAULT_INTERVAL_MS },
@@ -60,16 +64,30 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  const message = err?.message ?? String(err);
-  logger.error(message);
-  recordDaemonHeartbeat(DAEMON_ID, { status: 'error', details: { error: message } });
-  sendOpsAlert({
-    severity: 'critical',
-    title: 'Generation schedule daemon fatal error',
-    context: { daemon_id: DAEMON_ID, error: message },
-    recommendation: 'Restart the generation schedule daemon unit and inspect its logs.',
-    dedupe_key: `${DAEMON_ID}:fatal`,
-  });
-  process.exitCode = 1;
+const runGenerationScheduleDaemon = defineScript({
+  name: 'generation:schedule-daemon',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      await main(argv);
+    } catch (err: any) {
+      const message = err?.message ?? String(err);
+      recordDaemonHeartbeat(DAEMON_ID, { status: 'error', details: { error: message } });
+      sendOpsAlert({
+        severity: 'critical',
+        title: 'Generation schedule daemon fatal error',
+        context: { daemon_id: DAEMON_ID, error: message },
+        recommendation: 'Restart the generation schedule daemon unit and inspect its logs.',
+        dedupe_key: `${DAEMON_ID}:fatal`,
+      });
+      throw new ScriptExitError(1, message);
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'run_generation_schedule_daemon.ts') ||
+  isDirectScript(import.meta.url, 'run_generation_schedule_daemon.js')
+) {
+  void runGenerationScheduleDaemon();
+}

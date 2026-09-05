@@ -1,16 +1,22 @@
 import {
   ingestAudioIntoDealRequirements,
-  listCustomerChannelBindings,
-  listDeals,
-  listDistillCandidateRecords,
-  materializeExecutionFeedbackCandidate,
   readDealRequirementsCapture,
-  recordExecutionFeedback,
+} from '@agent/core/customer-conversation-modes';
+import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
+import { listDeals } from '@agent/core/deal-store';
+import {
+  listDistillCandidateRecords,
   updateDistillCandidateRecord,
-} from '@agent/core';
-import type { VocabularyKey } from '@agent/core';
+} from '@agent/core/distill-candidate-registry';
+import {
+  materializeExecutionFeedbackCandidate,
+  recordExecutionFeedback,
+} from '@agent/core/execution-feedback';
+import type { VocabularyKey } from '@agent/core/t';
+import { ScriptExitError } from './lib/harness.js';
 
 export type HomeUi = (key: VocabularyKey, params?: Record<string, string | number>) => string;
+export type HomePrint = (value: unknown) => void;
 
 export function handleFeedbackSubcommand(
   ui: HomeUi,
@@ -23,15 +29,15 @@ export function handleFeedbackSubcommand(
     procedureId?: string;
     correlationId?: string;
     json?: boolean;
-  }
+  },
+  print: HomePrint = () => undefined
 ): void {
   const intentId = String(argv.intentId || '').trim();
   const outcome = String(argv.outcome || '').trim() as
     'satisfied' | 'partially_satisfied' | 'dissatisfied';
   if (!intentId || !['satisfied', 'partially_satisfied', 'dissatisfied'].includes(outcome)) {
-    console.error(ui('recorder:recorder_feedback_usage'));
-    process.exitCode = 1;
-    return;
+    print(ui('recorder:recorder_feedback_usage'));
+    throw new ScriptExitError(1, '', true);
   }
   const feedback = recordExecutionFeedback({
     scenario_id: argv.scenarioId || `use-case-${intentId}`,
@@ -49,24 +55,20 @@ export function handleFeedbackSubcommand(
   });
   const payload = { feedback, summary: improvement.summary, candidate: improvement.candidate };
   if (argv.json) {
-    console.log(JSON.stringify(payload, null, 2));
+    print(JSON.stringify(payload, null, 2));
     return;
   }
-  console.log(
+  print(
     ui('recorder:recorder_feedback_recorded', {
       id: feedback.feedback_id,
       outcome: feedback.outcome,
     })
   );
   if (improvement.candidate) {
-    console.log(
-      ui('recorder:recorder_feedback_candidate', { id: improvement.candidate.candidate_id })
-    );
-    console.log(
-      ui('recorder:recorder_feedback_review', { id: improvement.candidate.candidate_id })
-    );
+    print(ui('recorder:recorder_feedback_candidate', { id: improvement.candidate.candidate_id }));
+    print(ui('recorder:recorder_feedback_review', { id: improvement.candidate.candidate_id }));
   } else {
-    console.log(ui('recorder:recorder_no_improvement'));
+    print(ui('recorder:recorder_no_improvement'));
   }
 }
 
@@ -77,7 +79,8 @@ export function handleImprovements(
     deny?: string;
     note?: string;
     json?: boolean;
-  }
+  },
+  print: HomePrint = () => undefined
 ): void {
   if (argv.approve || argv.deny) {
     const candidateId = String(argv.approve || argv.deny);
@@ -85,9 +88,8 @@ export function handleImprovements(
       (entry) => entry.candidate_id === candidateId
     );
     if (!candidate || candidate.status !== 'proposed') {
-      console.error(ui('recorder:recorder_improvement_not_found', { id: candidateId }));
-      process.exitCode = 1;
-      return;
+      print(ui('recorder:recorder_improvement_not_found', { id: candidateId }));
+      throw new ScriptExitError(1, '', true);
     }
     const reviewed = updateDistillCandidateRecord(candidateId, {
       status: argv.approve ? 'promoted' : 'archived',
@@ -101,32 +103,32 @@ export function handleImprovements(
         },
       },
     });
-    console.log(
+    print(
       ui('recorder:recorder_improvement_updated', {
         id: reviewed?.candidate_id || candidateId,
         status: reviewed?.status || 'unknown',
       })
     );
-    if (argv.approve) console.log(ui('recorder:recorder_catalog_review_note'));
+    if (argv.approve) print(ui('recorder:recorder_catalog_review_note'));
     return;
   }
   const candidates = listDistillCandidateRecords().filter(
     (candidate) => candidate.metadata?.improvement_kind === 'execution_feedback'
   );
   if (argv.json) {
-    console.log(JSON.stringify(candidates, null, 2));
+    print(JSON.stringify(candidates, null, 2));
     return;
   }
   if (candidates.length === 0) {
-    console.log(ui('recorder:recorder_no_candidates'));
+    print(ui('recorder:recorder_no_candidates'));
     return;
   }
-  console.log(ui('recorder:recorder_improvement_header', { count: candidates.length }));
+  print(ui('recorder:recorder_improvement_header', { count: candidates.length }));
   for (const candidate of candidates) {
-    console.log(`  [${candidate.candidate_id}] ${candidate.status} ${candidate.title}`);
-    console.log(`      ${candidate.summary}`);
+    print(`  [${candidate.candidate_id}] ${candidate.status} ${candidate.title}`);
+    print(`      ${candidate.summary}`);
   }
-  console.log(ui('recorder:recorder_improvement_approve'));
+  print(ui('recorder:recorder_improvement_approve'));
 }
 
 // Customer-path operator view: which deals are live, at what stage, and what
@@ -136,7 +138,8 @@ export async function handleDealsIngestAudio(
   argv: {
     ingestAudio?: string;
     audio?: string;
-  }
+  },
+  print: HomePrint = () => undefined
 ): Promise<void> {
   const bindings = listCustomerChannelBindings();
   const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
@@ -144,14 +147,12 @@ export async function handleDealsIngestAudio(
     .flatMap((tenantSlug) => listDeals(tenantSlug).map((deal) => ({ tenantSlug, deal })))
     .find((entry) => entry.deal.deal_id === argv.ingestAudio);
   if (!match) {
-    console.error(ui('recorder:recorder_deal_not_found', { id: argv.ingestAudio || '' }));
-    process.exitCode = 1;
-    return;
+    print(ui('recorder:recorder_deal_not_found', { id: argv.ingestAudio || '' }));
+    throw new ScriptExitError(1, '', true);
   }
   if (!argv.audio) {
-    console.error(ui('recorder:recorder_deal_audio_usage'));
-    process.exitCode = 1;
-    return;
+    print(ui('recorder:recorder_deal_audio_usage'));
+    throw new ScriptExitError(1, '', true);
   }
   const result = await ingestAudioIntoDealRequirements({
     tenantSlug: match.tenantSlug,
@@ -160,19 +161,19 @@ export async function handleDealsIngestAudio(
     projectName: match.deal.summary?.slice(0, 80),
   });
   if (!result) {
-    console.error(ui('recorder:recorder_deal_audio_failed'));
-    process.exitCode = 1;
-    return;
+    print(ui('recorder:recorder_deal_audio_failed'));
+    throw new ScriptExitError(1, '', true);
   }
-  console.log(ui('recorder:recorder_deal_audio_updated', { count: result.capture.turns_captured }));
+  print(ui('recorder:recorder_deal_audio_updated', { count: result.capture.turns_captured }));
   if (result.transcript_path)
-    console.log(ui('recorder:recorder_deal_transcript', { path: result.transcript_path }));
-  console.log(ui('recorder:recorder_deal_requirements_next', { id: match.deal.deal_id }));
+    print(ui('recorder:recorder_deal_transcript', { path: result.transcript_path }));
+  print(ui('recorder:recorder_deal_requirements_next', { id: match.deal.deal_id }));
 }
 
 export function handleDealsSubcommand(
   ui: HomeUi,
-  argv: { requirements?: string; json?: boolean }
+  argv: { requirements?: string; json?: boolean },
+  print: HomePrint = () => undefined
 ): void {
   const bindings = listCustomerChannelBindings();
   const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
@@ -183,13 +184,12 @@ export function handleDealsSubcommand(
   if (argv.requirements) {
     const match = deals.find((entry) => entry.deal.deal_id === argv.requirements);
     if (!match) {
-      console.error(ui('recorder:recorder_deal_not_found', { id: argv.requirements }));
-      process.exitCode = 1;
-      return;
+      print(ui('recorder:recorder_deal_not_found', { id: argv.requirements }));
+      throw new ScriptExitError(1, '', true);
     }
     const capture = readDealRequirementsCapture(match.tenantSlug, match.deal.deal_id);
     if (!capture) {
-      console.log(
+      print(
         ui('recorder:recorder_deal_requirements_none', {
           id: match.deal.deal_id,
           stage: match.deal.stage,
@@ -198,11 +198,11 @@ export function handleDealsSubcommand(
       return;
     }
     if (argv.json) {
-      console.log(JSON.stringify(capture, null, 2));
+      print(JSON.stringify(capture, null, 2));
       return;
     }
     const req = capture.requirements;
-    console.log(
+    print(
       ui('recorder:recorder_deal_requirements_header', {
         id: match.deal.deal_id,
         turns: capture.turns_captured,
@@ -210,33 +210,33 @@ export function handleDealsSubcommand(
       })
     );
     for (const fr of req.functional_requirements || []) {
-      console.log(`  [${fr.priority}] ${fr.id}: ${fr.description}`);
+      print(`  [${fr.priority}] ${fr.id}: ${fr.description}`);
     }
     for (const nfr of req.non_functional_requirements || []) {
-      console.log(`  [nfr:${nfr.category}] ${nfr.description}`);
+      print(`  [nfr:${nfr.category}] ${nfr.description}`);
     }
     const open = (req.open_questions || []).filter((q) => (q.status || 'open') === 'open');
     if (open.length > 0) {
-      console.log(ui('recorder:recorder_deal_open_questions'));
-      for (const q of open) console.log(`    - ${q.blocking ? '[blocking] ' : ''}${q.question}`);
+      print(ui('recorder:recorder_deal_open_questions'));
+      for (const q of open) print(`    - ${q.blocking ? '[blocking] ' : ''}${q.question}`);
     }
     return;
   }
 
   if (argv.json) {
-    console.log(JSON.stringify(deals, null, 2));
+    print(JSON.stringify(deals, null, 2));
     return;
   }
   if (deals.length === 0) {
-    console.log(ui('recorder:recorder_deal_empty'));
+    print(ui('recorder:recorder_deal_empty'));
     return;
   }
-  console.log(ui('recorder:recorder_deal_header', { count: deals.length }));
+  print(ui('recorder:recorder_deal_header', { count: deals.length }));
   for (const { tenantSlug, deal } of deals) {
-    console.log(
+    print(
       `  [${deal.deal_id}] ${tenantSlug} / ${deal.stage.padEnd(10)} ${deal.summary.slice(0, 60)}`
     );
   }
-  console.log('');
-  console.log(ui('recorder:recorder_deal_requirements_command'));
+  print('');
+  print(ui('recorder:recorder_deal_requirements_command'));
 }

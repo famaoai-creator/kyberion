@@ -14,27 +14,12 @@ export interface TrackerSheetPolicyCatalog {
 const CATALOG_PATH = pathResolver.knowledge('product/governance/tracker-sheet-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/tracker-sheet-policy.schema.json');
 
-const FALLBACK_CATALOG: TrackerSheetPolicyCatalog = {
-  version: '1.0.0',
-  sheet_titles: {
-    overview: 'Overview',
-    execution_board: 'Execution Board',
-    signals: 'Signals and Risks',
-  },
-  summary_empty_message: 'No summary cards provided.',
-};
-
 const catalog = defineCatalog<TrackerSheetPolicyCatalog>({
   id: 'tracker-sheet-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadTrackerSheetPolicyCatalog(): TrackerSheetPolicyCatalog {
   return catalog.load();
-}
-
-export function resetTrackerSheetPolicyCatalogCache(): void {
-  catalog.reset();
 }

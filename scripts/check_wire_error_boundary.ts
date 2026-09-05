@@ -1,7 +1,7 @@
 /** PI-02: reject raw exception interpolation in network-facing error replies. */
 import * as path from 'node:path';
 import { safeReadFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const root = process.cwd();
 export const WIRE_ERROR_BOUNDARY_FILES = [
@@ -9,18 +9,35 @@ export const WIRE_ERROR_BOUNDARY_FILES = [
   'libs/core/peer-messaging.ts',
   'presence/displays/chronos-mirror-v2/src/lib/viewer-context.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts',
+  'presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/connections/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/deliverable-preview/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/deliverable-review/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/intelligence/stream/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/knowledge-ref/route.ts',
+  'presence/displays/chronos-mirror-v2/src/app/api/knowledge-feedback/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/mission-asset/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/organization-operating-model/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/os/share-grants/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/plan-preview/route.ts',
+  'presence/displays/chronos-mirror-v2/src/app/api/runtime-file/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/workitems/route.ts',
+  'presence/displays/presence-studio/server.ts',
+  'presence/displays/presence-studio/presence-studio-runtime-data.ts',
+  'scripts/browser_bridge_host.ts',
+  'presence/displays/computer-surface/server.ts',
+  'presence/displays/concierge/src/lib/viewer-context.ts',
+  'presence/displays/concierge/src/app/api/approvals/[id]/route.ts',
+  'presence/displays/concierge/src/app/api/config-missions/route.ts',
+  'presence/displays/concierge/src/app/api/notification-preferences/route.ts',
+  'presence/displays/concierge/src/app/api/outcomes/[id]/route.ts',
+  'presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts',
+  'presence/displays/concierge/src/app/api/plugins/route.ts',
+  'presence/displays/concierge/src/app/api/response-status/route.ts',
+  'presence/displays/concierge/src/app/api/setup/route.ts',
+  'presence/displays/concierge/src/app/api/voice/listen-once/route.ts',
 ];
 const DEFAULT_WIRE_ERROR_FILE = WIRE_ERROR_BOUNDARY_FILES[0];
 
@@ -35,9 +52,32 @@ export function findWireErrorBoundaryViolations(
     findings.push(`${file}: raw exception interpolation in wire text near offset ${match.index}`);
   }
   if (file.includes('/app/api/')) {
-    const rawObjectPattern = /\berror:\s*(?:err|error)(?:\?\.)?\.message\b/gu;
+    const rawObjectPattern =
+      /\berror:\s*(?:err|error)(?:\.|\?\.)message\b|\berror:\s*(?:err|error)\s+instanceof\s+Error\s*\?\s*(?:err|error)(?:\.|\?\.)message\b/gu;
     for (const match of source.matchAll(rawObjectPattern)) {
       findings.push(`${file}: raw exception message in JSON error near offset ${match.index}`);
+    }
+  }
+  if (file.includes('/app/api/') && /\bdebug(?:Error|Stack)\s*:/u.test(source)) {
+    findings.push(`${file}: raw debug error fields are exposed on the wire`);
+  }
+  if (file.includes('/presence-studio/') || file.includes('/computer-surface/')) {
+    const rawJsonPattern =
+      /\.json\(\s*\{[^}]{0,400}?\berror:\s*(?:err|error)(?:\.|\?\.)message\b|\.json\(\s*\{[^}]{0,400}?\berror:\s*(?:err|error)\s+instanceof\s+Error\s*\?\s*(?:err|error)(?:\.|\?\.)message\b|\.json\(\s*\{[^}]{0,400}?\berror:\s*`[^`]*\$\{(?:err|error)/gu;
+    for (const match of source.matchAll(rawJsonPattern)) {
+      findings.push(`${file}: raw exception message in JSON error near offset ${match.index}`);
+    }
+  }
+  if (
+    file === 'scripts/browser_bridge_host.ts' ||
+    file.endsWith('/scripts/browser_bridge_host.ts')
+  ) {
+    const rawBridgePattern =
+      /\berror:\s*(?:`[^`]*\$\{(?:err|error)[^}]*\}|(?:err|error)\s+instanceof\s+Error\s*\?\s*(?:err|error)(?:\.|\?\.)message|(?:err|error)(?:\.|\?\.)message)/gu;
+    for (const match of source.matchAll(rawBridgePattern)) {
+      findings.push(
+        `${file}: raw exception message in browser bridge response near offset ${match.index}`
+      );
     }
   }
   return findings;
@@ -56,12 +96,13 @@ export const runCheckWireErrorBoundary = defineScript({
   run(context) {
     const findings = scanWireErrorBoundary();
     if (findings.length > 0) {
-      console.error('[check_wire_error_boundary] FAILED');
-      for (const finding of findings) console.error(`- ${finding}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...findings.map((finding) => `- ${finding}`)].join('\n')
+      );
     }
     context.print('[check_wire_error_boundary] OK');
+    return { findings };
   },
 });
 

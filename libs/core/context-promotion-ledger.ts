@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { safeMkdir } from './secure-io.js';
@@ -56,7 +57,7 @@ export function recordContextPromotion(
   if (TIER_SENSITIVITY[input.target_tier] >= TIER_SENSITIVITY[input.source_tier]) {
     throw new Error('[CONTEXT_PROMOTION_INVALID] promotion must target a less sensitive tier');
   }
-  const approvedAt = input.approved_at || new Date().toISOString();
+  const approvedAt = input.approved_at || nowIso();
   const expiresAt = requireText('expires_at', input.expires_at);
   if (Date.parse(expiresAt) <= Date.parse(approvedAt)) {
     throw new Error('[CONTEXT_PROMOTION_INVALID] expires_at must be after approved_at');
@@ -131,7 +132,7 @@ export function validateContextPromotion(input: {
       return { allowed: false, reason: `[CONTEXT_PROMOTION_MISMATCH] ${field}` };
     }
   }
-  if (Date.parse(authorization.expires_at) <= Date.parse(input.now || new Date().toISOString())) {
+  if (Date.parse(authorization.expires_at) <= Date.parse(input.now || nowIso())) {
     return { allowed: false, reason: '[CONTEXT_PROMOTION_EXPIRED]' };
   }
   return { allowed: true };

@@ -1,5 +1,7 @@
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { loadDocumentationSourceMapAtPath } from '@agent/core/documentation-source-map';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const DOCUMENTATION_SOURCE_MAP = 'docs/documentation-source-map.json';
 
@@ -171,9 +173,9 @@ export function checkDocumentationSourceMap(): string[] {
 
   let manifest: SourceMap;
   try {
-    manifest = JSON.parse(read(DOCUMENTATION_SOURCE_MAP)) as SourceMap;
+    manifest = loadDocumentationSourceMapAtPath(mapPath);
   } catch (error) {
-    return [`${DOCUMENTATION_SOURCE_MAP}: invalid JSON (${String(error)})`];
+    return [`${DOCUMENTATION_SOURCE_MAP}: invalid catalog (${String(error)})`];
   }
 
   const pathCandidates = new Set<string>();
@@ -202,10 +204,13 @@ export const runCheckDocumentationSourceMap = defineScript({
   run(context) {
     const failures = checkDocumentationSourceMap();
     if (failures.length > 0) {
-      for (const failure of failures) console.error(`- ${failure}`);
-      throw new Error(`${failures.length} documentation source-map violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...failures.map((failure) => `- ${failure}`)].join('\n')
+      );
     }
     context.print('[check:documentation-source-map] OK (3 categories)');
+    return { failures };
   },
 });
 

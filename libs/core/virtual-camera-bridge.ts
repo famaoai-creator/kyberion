@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeExec,
@@ -8,6 +9,7 @@ import {
   safeRmSync,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import type { VideoFrame } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
 import type {
@@ -116,7 +118,7 @@ const PLACEHOLDER_PNG = Buffer.from(
 );
 
 function defaultOutputPath(): string {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = nowIso().replace(/[:.]/g, '-');
   return path.join(DEFAULT_OUTPUT_DIR, `camera-${stamp}.png`);
 }
 
@@ -248,7 +250,10 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
   }
 
   async capturePhoto(input: VirtualCameraCaptureRequest): Promise<VirtualCameraCaptureResult> {
-    const savePath = path.resolve(input.save_path ?? defaultOutputPath());
+    const savePath = assertSafeRepositoryPath(
+      pathResolver.rootResolve(input.save_path ?? defaultOutputPath()),
+      { allowMissingLeaf: true }
+    );
     const devicePreference = normalizeDevicePreference(
       input.device_preference ?? this.opts.device_preference
     );
@@ -303,10 +308,15 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
 
     if (chosen.backend === 'swift-avfoundation') {
       const bin = this.opts.swift_bin ?? 'swift';
-      const script = pathResolver.rootResolve('libs/core/virtual-camera-capture.swift');
-      const tempCapture = path.resolve(
-        path.dirname(savePath),
-        `${path.basename(savePath, path.extname(savePath))}-${Date.now()}.jpg`
+      const script = assertSafeRepositoryPath(
+        pathResolver.rootResolve('libs/core/virtual-camera-capture.swift')
+      );
+      const tempCapture = assertSafeRepositoryPath(
+        path.join(
+          path.dirname(savePath),
+          `${path.basename(savePath, path.extname(savePath))}-${Date.now()}.jpg`
+        ),
+        { allowMissingLeaf: true }
       );
       const deviceArg = selectedCamera ?? devicePreference;
       const args = [script, '--output', tempCapture];

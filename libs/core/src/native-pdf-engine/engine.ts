@@ -17,6 +17,7 @@
 import * as path from 'path';
 import * as zlib from 'zlib';
 import * as crypto from 'crypto';
+import { nowIso } from '../../foundation/time.js';
 import {
   PdfWriter,
   hasNonAscii,
@@ -832,7 +833,7 @@ function buildSignaturePlaceholder(
   const [sx, sy, sw, sh] = rect;
 
   const subFilter = sigOpts.subFilter || 'adbe.pkcs7.detached';
-  const now = new Date().toISOString().replace(/[-:T]/g, '').substring(0, 14);
+  const now = nowIso().replace(/[-:T]/g, '').substring(0, 14);
   const dateStr = `D:${now}Z`;
 
   let sigDict = `<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /${subFilter}`;

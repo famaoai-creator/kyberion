@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import { normalizeMissionVisionRef, parseMissionVisionRef } from './mission-creation.js';
 
 const ROOT = pathResolver.rootDir();

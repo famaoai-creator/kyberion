@@ -167,3 +167,10 @@ A policy, approval, scope, or egress gate.
 | -------- | ------------------------------------------ |
 | decision | A governed decision made during the span.  |
 | error    | A normalized failure observed by the span. |
+
+## Extension replay vocabulary
+
+Strict replay consumers accept these explicitly governed extension names and dynamic namespaces.
+
+- Exact names: `action.completed`, `action.received`, `actuator.resolved`, `ai-audit`, `browser.action`, `capability.missing`, `checkpoint.recorded`, `checkpoint.requested`, `evidence.recorded`, `gap_phases`, `git.commit`, `git.stage`, `goto`, `intent_delta.emit`, `knowledge_delivered`, `ledger.synced`, `mission_run`, `mission_run_failed`, `mission_run_started`, `mission_task_dispatch`, `mission_task_dispatch_finished`, `mission_task_dispatch_started`, `op.preflight`, `project_ledger.sync`, `state.save`, `step.completed`, `step.failed`, `step.started`, `volatile_gc.skipped`
+- Dynamic namespaces: `apply:`, `browser-pipeline:`, `browser:`, `calendar-actuator:`, `capture:`, `code-actuator:`, `code:`, `control:`, `core:`, `media-actuator:`, `media-generation-actuator:`, `media-generation:`, `media:`, `meeting-actuator:`, `meeting:`, `mission-controller:`, `mission_controller:`, `mission:`, `meeting_participate:`, `meeting_participation:`, `modeling:`, `pipeline:`, `phase.report.`, `super-pipeline:`, `system:`, `transform:`, `voice-actuator:`, `voice:`, `working-memory:`

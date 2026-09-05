@@ -1,5 +1,7 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeWriteFile, safeExistsSync, safeLstat } from './secure-io.js';
 import * as path from 'node:path';
 import * as nodePath from 'node:path';
 
@@ -23,6 +25,25 @@ interface FallbackRegistry {
 }
 
 const REGISTRY_RELATIVE = nodePath.join('active', 'shared', 'tmp', 'config-fallback-registry.json');
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/config-fallback-registry.schema.json'
+);
+
+function registryCatalog(filePath: string) {
+  return defineCatalog<FallbackRegistry>({
+    id: 'config-fallback-registry',
+    path: filePath,
+    schema: REGISTRY_SCHEMA_PATH,
+  });
+}
+
+export function loadConfigFallbackRegistryAtPath(filePath: string): FallbackRegistry {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[CONFIG_FALLBACKS] registry must be a regular file: ${filePath}`);
+  }
+  return registryCatalog(safeFilePath).load();
+}
 
 function classifyError(err: unknown): ConfigFallbackReason {
   const msg = String(err instanceof Error ? err.message : err);
@@ -35,7 +56,7 @@ function readRegistry(): FallbackRegistry {
   try {
     const p = path.join(pathResolver.rootDir(), REGISTRY_RELATIVE);
     if (!safeExistsSync(p)) return { version: '1.0.0', entries: [] };
-    return loadJson<FallbackRegistry>(p);
+    return loadConfigFallbackRegistryAtPath(p);
   } catch {
     return { version: '1.0.0', entries: [] };
   }
@@ -44,7 +65,8 @@ function readRegistry(): FallbackRegistry {
 function writeRegistry(registry: FallbackRegistry): void {
   try {
     const p = path.join(pathResolver.rootDir(), REGISTRY_RELATIVE);
-    safeWriteFile(p, JSON.stringify(registry, null, 2));
+    const validated = registryCatalog(p).validate(registry, p);
+    safeWriteFile(p, JSON.stringify(validated, null, 2));
   } catch {
     /* silent — observability must never break the caller */
   }
@@ -61,7 +83,7 @@ export function recordConfigFallback(opts: {
 }): void {
   try {
     const { knowledgePath, error, defaults } = opts;
-    const now = new Date().toISOString();
+    const now = nowIso();
     const reason = classifyError(error);
     const errorMsg = String(error instanceof Error ? error.message : error).slice(0, 500);
 
@@ -105,10 +127,11 @@ export function markResolved(knowledgePaths: string[]): void {
   try {
     const registry = readRegistry();
     const pathSet = new Set(knowledgePaths);
+    const resolvedAt = nowIso();
     for (const entry of registry.entries) {
       if (pathSet.has(entry.knowledge_path)) {
         entry.resolved = true;
-        entry.resolved_at = new Date().toISOString();
+        entry.resolved_at = resolvedAt;
       }
     }
     writeRegistry(registry);

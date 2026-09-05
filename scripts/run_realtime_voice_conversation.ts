@@ -3,48 +3,56 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import {
+  assertSafeRepositoryPath,
   buildSafeExecEnv,
-  checkMeetingParticipationConsent,
-  createStandardYargs,
-  createVoiceActuatorServeClient,
+  safeExistsSync,
+  safeMkdir,
+} from '@agent/core/secure-io';
+import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { createVoiceActuatorServeClient } from '@agent/core/actuator-serve-client';
+import {
   ensureRealtimeVoiceConversationSession,
   generateRealtimeAssistantReply,
   streamRealtimeAssistantReply,
-  getSpeechToTextBridge,
-  getStreamingSttBridge,
-  getStreamingTtsBridge,
-  installAppleSpeechToTextBridgeIfAvailable,
-  installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
-  installManagedMlxWhisperStreamingSttBridgeIfAvailable,
-  installReasoningBackends,
-  installShellStreamingSttBridgeFromEnv,
-  installShellStreamingTtsBridgeFromEnv,
-  installSileroVadBackend,
-  installTenVadBackend,
-  pathResolver,
-  probeAudioPlayback,
-  probePcmAudioStreaming,
-  playPcmAudioStream,
-  probeMicCapture,
   recordRealtimeVoiceConversationExchange,
-  recordVadTurn,
-  resolveManagedToolPythonBin,
-  resolveVadBackend,
   runRealtimeVoiceConversationTurn,
-  safeExistsSync,
-  safeMkdir,
-  startRealtimeVoiceLoop,
   synthesizeRealtimeVoice,
-  type PlaybackHandle,
-  type AudioChunk,
+} from '@agent/core/realtime-voice-conversation';
+import type { PlaybackHandle } from '@agent/core/audio-playback';
+import type { AudioChunk } from '@agent/core/meeting-session-types';
+import {
+  getSpeechToTextBridge,
+  installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
+} from '@agent/core/speech-to-text-bridge';
+import { getStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
+import { getStreamingTtsBridge } from '@agent/core/streaming-tts-bridge';
+import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
+import {
+  installManagedMlxWhisperStreamingSttBridgeIfAvailable,
+  installShellStreamingSttBridgeFromEnv,
+} from '@agent/core/shell-streaming-stt-bridge';
+import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell-streaming-tts-bridge';
+import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
+import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
+import { pathResolver } from '@agent/core/path-resolver';
+import { probeAudioPlayback } from '@agent/core/audio-playback';
+import { playPcmAudioStream, probePcmAudioStreaming } from '@agent/core/streaming-voice-playback';
+import { probeMicCapture } from '@agent/core/mic-capture';
+import { recordVadTurn, type VadTurnState } from '@agent/core/vad-turn-recorder';
+import { resolveManagedToolPythonBin } from '@agent/core/tool-runtime-registry';
+import { resolveVadBackend } from '@agent/core/vad-registry';
+import {
+  startRealtimeVoiceLoop,
   type RealtimeVoiceLoopEvent,
-  type StreamingSpeechToTextBridge,
-  type StreamingTextToSpeechBridge,
-  type VadTurnState,
-} from '@agent/core';
+} from '@agent/core/realtime-voice-loop';
+import type { StreamingSpeechToTextBridge } from '@agent/core/streaming-stt-bridge';
+import type { StreamingTextToSpeechBridge } from '@agent/core/streaming-tts-bridge';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { parseSafeJsonInput } from './lib/json-input.js';
 
 type DeliveryMode = 'none' | 'artifact' | 'artifact_and_playback';
 type PersonalVoiceMode = 'allow_fallback' | 'require_personal_voice';
@@ -101,8 +109,8 @@ export interface RealtimeVoiceConversationLoopDeps {
 
 function resolvePythonBin(env: NodeJS.ProcessEnv = process.env): string {
   const candidates = [
-    env.KYBERION_PYTHON_BIN,
-    env.KYBERION_PYTHON,
+    getRegisteredEnvText('KYBERION_PYTHON_BIN', { env }),
+    getRegisteredEnvText('KYBERION_PYTHON', { env }),
     resolveManagedToolPythonBin('mlx_whisper'),
     resolveManagedToolPythonBin('mlx_audio'),
     '.venv/bin/python3',
@@ -122,7 +130,19 @@ function resolvePythonBin(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 function resolveRecordBridgePath(): string {
-  return pathResolver.rootResolve('libs/actuators/voice-actuator/scripts/record_bridge.py');
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve('libs/actuators/voice-actuator/scripts/record_bridge.py')
+  );
+}
+
+function resolveVoiceRepositoryPath(
+  value: unknown,
+  label: string,
+  allowMissingLeaf = false
+): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`${label} is required`);
+  return assertSafeRepositoryPath(pathResolver.resolve(requested), { allowMissingLeaf });
 }
 
 function buildRecordPayload(outputPath: string, durationSec: number): string {
@@ -135,28 +155,60 @@ function buildRecordPayload(outputPath: string, durationSec: number): string {
   });
 }
 
-function parseTrailingJson(raw: string): any {
+export interface RecorderBridgeResponse {
+  status?: 'success' | 'error' | 'manual_action_required';
+  path?: string;
+  message?: string;
+  error?: string;
+}
+
+export function parseRecorderBridgeResponse(raw: string): RecorderBridgeResponse {
   const lines = raw.split(/\r?\n/).reverse();
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed.startsWith('{')) continue;
+    let parsed: unknown;
     try {
-      return JSON.parse(trimmed);
+      parsed = parseSafeJsonInput(trimmed, 'recorder bridge response');
     } catch {
       continue;
     }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('recorder bridge response must be a JSON object');
+    }
+    const record = parsed as Record<string, unknown>;
+    if (
+      record.status !== undefined &&
+      record.status !== 'success' &&
+      record.status !== 'error' &&
+      record.status !== 'manual_action_required'
+    ) {
+      throw new Error('recorder bridge response has an invalid status');
+    }
+    for (const key of ['path', 'message', 'error']) {
+      if (record[key] !== undefined && typeof record[key] !== 'string') {
+        throw new Error(`recorder bridge response field ${key} must be a string`);
+      }
+    }
+    if (record.status === undefined && typeof record.error !== 'string') {
+      throw new Error('recorder bridge response is missing status');
+    }
+    return record as RecorderBridgeResponse;
   }
   throw new Error(`Could not find JSON payload in recorder output:\n${raw}`);
 }
 
-async function runRecorderTurn(input: {
-  turnIndex: number;
-  sessionId: string;
-  recordBridgePath: string;
-  pythonBin: string;
-  recordSeconds: number;
-  recordOutputDir: string;
-}): Promise<string> {
+async function runRecorderTurn(
+  input: {
+    turnIndex: number;
+    sessionId: string;
+    recordBridgePath: string;
+    pythonBin: string;
+    recordSeconds: number;
+    recordOutputDir: string;
+  },
+  print: (value: unknown) => void = () => undefined
+): Promise<string> {
   safeMkdir(input.recordOutputDir, { recursive: true });
   const turnLabel = String(input.turnIndex + 1).padStart(2, '0');
   const audioPath = path.join(input.recordOutputDir, `turn-${turnLabel}.wav`);
@@ -173,12 +225,11 @@ async function runRecorderTurn(input: {
   child.stdout.on('data', (chunk: Buffer) => {
     const text = chunk.toString('utf8');
     stdout += text;
-    process.stdout.write(text);
   });
   child.stderr.on('data', (chunk: Buffer) => {
     const text = chunk.toString('utf8');
     stderr += text;
-    process.stderr.write(text);
+    if (text.trim()) print(text.trimEnd());
   });
 
   const exitCode = await new Promise<number>((resolve, reject) => {
@@ -192,13 +243,18 @@ async function runRecorderTurn(input: {
     );
   }
 
-  const parsed = parseTrailingJson(stdout);
+  const parsed = parseRecorderBridgeResponse(stdout);
   if (parsed.status !== 'success') {
     throw new Error(
       `Recorder bridge error: ${parsed.message || parsed.error || JSON.stringify(parsed)}`
     );
   }
-  return String(parsed.path || audioPath);
+  if (parsed.path === undefined) return audioPath;
+  const returnedPath = resolveVoiceRepositoryPath(parsed.path, 'recorder output path');
+  if (path.resolve(returnedPath) !== path.resolve(audioPath)) {
+    throw new Error('Recorder bridge returned an unexpected output path');
+  }
+  return returnedPath;
 }
 
 function buildRecordOutputDir(sessionId: string): string {
@@ -218,10 +274,13 @@ function describeVadState(state: VadTurnState): string {
   }
 }
 
-async function runVadRecorderTurn(input: {
-  turnIndex: number;
-  options: RealtimeVoiceConversationCliOptions;
-}): Promise<string> {
+async function runVadRecorderTurn(
+  input: {
+    turnIndex: number;
+    options: RealtimeVoiceConversationCliOptions;
+  },
+  print: (value: unknown) => void = () => undefined
+): Promise<string> {
   const { options } = input;
   safeMkdir(options.recordOutputDir, { recursive: true });
   const turnLabel = String(input.turnIndex + 1).padStart(2, '0');
@@ -235,13 +294,13 @@ async function runVadRecorderTurn(input: {
     ...(options.vadThresholdRms !== undefined ? { rmsThreshold: options.vadThresholdRms } : {}),
     endpointMs: options.vadEndpointMs,
     maxUtteranceSeconds: options.maxUtteranceSeconds,
-    onState: (state) => console.log(describeVadState(state)),
+    onState: (state) => print(describeVadState(state)),
   });
   const threshold =
     result.noiseFloorRms === null
       ? `threshold=${result.rmsThreshold}`
       : `threshold=${result.rmsThreshold} (noise floor ${Math.round(result.noiseFloorRms)})`;
-  console.log(
+  print(
     `   ${(result.durationMs / 1000).toFixed(1)}s captured, ` +
       `${result.endpointed ? 'endpoint detected' : 'max utterance cap hit'}, ${threshold}`
   );
@@ -259,7 +318,8 @@ function normalizeTurns(value: unknown): number | undefined {
 
 export async function runRealtimeVoiceConversationInteractive(
   options: RealtimeVoiceConversationCliOptions,
-  deps: RealtimeVoiceConversationLoopDeps = {}
+  deps: RealtimeVoiceConversationLoopDeps = {},
+  print: (value: unknown) => void = () => undefined
 ): Promise<void> {
   const consent = checkMeetingParticipationConsent({
     ...(options.mission ? { mission_id: options.mission } : {}),
@@ -286,16 +346,19 @@ export async function runRealtimeVoiceConversationInteractive(
   const recordTurnAudio =
     deps.recordTurnAudio ??
     (options.recorder === 'vad'
-      ? (turnIndex: number) => runVadRecorderTurn({ turnIndex, options })
+      ? (turnIndex: number) => runVadRecorderTurn({ turnIndex, options }, print)
       : (turnIndex: number) =>
-          runRecorderTurn({
-            turnIndex,
-            sessionId: options.sessionId,
-            recordBridgePath: options.recordBridgePath,
-            pythonBin: options.pythonBin,
-            recordSeconds: options.recordSeconds,
-            recordOutputDir: options.recordOutputDir,
-          }));
+          runRecorderTurn(
+            {
+              turnIndex,
+              sessionId: options.sessionId,
+              recordBridgePath: options.recordBridgePath,
+              pythonBin: options.pythonBin,
+              recordSeconds: options.recordSeconds,
+              recordOutputDir: options.recordOutputDir,
+            },
+            print
+          ));
 
   const promptForContinue =
     deps.promptForContinue ??
@@ -322,9 +385,7 @@ export async function runRealtimeVoiceConversationInteractive(
     if (turnIndex > 0 && options.recorder === 'fixed') {
       await promptForContinue('\nPress Enter to record the next turn, or Ctrl+C to stop. ');
     }
-    console.log(
-      `\n=== Turn ${turnIndex + 1}${Number.isFinite(maxTurns) ? ` / ${maxTurns}` : ''} ===`
-    );
+    print(`\n=== Turn ${turnIndex + 1}${Number.isFinite(maxTurns) ? ` / ${maxTurns}` : ''} ===`);
     const audioPath = await recordTurnAudio(turnIndex);
     const result = await runTurn({
       sessionId: options.sessionId,
@@ -339,11 +400,11 @@ export async function runRealtimeVoiceConversationInteractive(
       personalVoiceMode: options.personalVoiceMode,
     });
 
-    console.log(`User: ${result.user_text}`);
-    console.log(`Assistant: ${result.assistant_text}`);
-    console.log(`Transcript: ${result.transcript_path}`);
+    print(`User: ${result.user_text}`);
+    print(`Assistant: ${result.assistant_text}`);
+    print(`Transcript: ${result.transcript_path}`);
     if (result.audio_artifact_path) {
-      console.log(`Audio artifact: ${result.audio_artifact_path}`);
+      print(`Audio artifact: ${result.audio_artifact_path}`);
     }
   }
 }
@@ -380,7 +441,8 @@ const IMMEDIATE_PLAYBACK: PlaybackHandle = {
 };
 
 export async function runRealtimeVoiceConversationLoop(
-  options: RealtimeVoiceConversationCliOptions
+  options: RealtimeVoiceConversationCliOptions,
+  print: (value: unknown) => void = () => undefined
 ): Promise<void> {
   const sttBridge = getSpeechToTextBridge();
   if (sttBridge.name === 'stub') {
@@ -423,7 +485,7 @@ export async function runRealtimeVoiceConversationLoop(
   installTenVadBackend();
   const resolvedVad = resolveVadBackend(options.vadBackend);
   if (resolvedVad.degradedFrom) {
-    console.warn(
+    print(
       `⚠️  VAD backend '${resolvedVad.degradedFrom}' unavailable (${resolvedVad.degradedReason}); using 'energy'.`
     );
   }
@@ -435,12 +497,12 @@ export async function runRealtimeVoiceConversationLoop(
     const installed = installShellStreamingSttBridgeFromEnv();
     if (installed.installed) {
       streamingStt = getStreamingSttBridge('shell');
-      console.log('🔁 streaming STT: KYBERION_STT_COMMAND (partials during speech)');
+      print('🔁 streaming STT: KYBERION_STT_COMMAND (partials during speech)');
     } else {
       const managed = installManagedMlxWhisperStreamingSttBridgeIfAvailable();
       if (managed.installed && managed.bridge_id) {
         streamingStt = getStreamingSttBridge(managed.bridge_id);
-        console.log('🔁 streaming STT: managed mlx_whisper (resident per utterance)');
+        print('🔁 streaming STT: managed mlx_whisper (resident per utterance)');
       }
     }
   }
@@ -466,7 +528,7 @@ export async function runRealtimeVoiceConversationLoop(
         );
       }
       streamingTts = getStreamingTtsBridge('shell');
-      console.log('🔊 streaming TTS: KYBERION_TTS_COMMAND → direct PCM playback');
+      print('🔊 streaming TTS: KYBERION_TTS_COMMAND → direct PCM playback');
     }
   }
 
@@ -502,15 +564,13 @@ export async function runRealtimeVoiceConversationLoop(
           return synthesis.artifactPath;
         };
 
-  console.log(
+  print(
     `\n=== Realtime voice loop — session ${session.session_id} ` +
       `(vad=${vadBackend.backend_id}, barge-in=${options.bargeIn ? 'on' : 'off'}, ` +
       `stt=${streamingStt ? 'streaming' : 'batch'}) ===`
   );
   if (options.bargeIn) {
-    console.log(
-      '   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。'
-    );
+    print('   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。');
   }
 
   try {
@@ -552,7 +612,7 @@ export async function runRealtimeVoiceConversationLoop(
       ...(!playbackEnabled ? { play: () => IMMEDIATE_PLAYBACK } : {}),
       onEvent: (event) => {
         const message = describeLoopEvent(event);
-        if (message) console.log(message);
+        if (message) print(message);
       },
       onTurn: (turn) => {
         recordRealtimeVoiceConversationExchange({
@@ -561,9 +621,9 @@ export async function runRealtimeVoiceConversationLoop(
           assistantText: turn.assistant_text,
           userAudioRef: turn.audio_path,
         });
-        console.log(`\nUser: ${turn.user_text}`);
-        console.log(`${session.assistant_name}: ${turn.assistant_text}`);
-        console.log(
+        print(`\nUser: ${turn.user_text}`);
+        print(`${session.assistant_name}: ${turn.assistant_text}`);
+        print(
           `   [turn ${turn.turn + 1}] stt=${turn.metrics.stt_ms}ms (${turn.stt_mode}) ` +
             `llm=${turn.metrics.llm_ms}ms first-audio=${turn.metrics.tts_first_audio_ms ?? '-'}ms ` +
             `speak=${turn.metrics.speak_ms}ms${turn.interrupted ? ' (interrupted)' : ''}`
@@ -572,7 +632,7 @@ export async function runRealtimeVoiceConversationLoop(
     });
 
     const report = await handle.done;
-    console.log(
+    print(
       `\n=== Loop finished: ${report.turns_completed} turns, ` +
         `${report.interruptions} barge-ins, ended by ${report.ended_by} ===`
     );
@@ -584,7 +644,10 @@ export async function runRealtimeVoiceConversationLoop(
   }
 }
 
-async function runOneShotConversation(options: RealtimeVoiceConversationCliOptions): Promise<void> {
+async function runOneShotConversation(
+  options: RealtimeVoiceConversationCliOptions,
+  print: (value: unknown) => void
+): Promise<void> {
   if (!options.audio) {
     throw new Error('--audio is required unless --interactive is set');
   }
@@ -600,7 +663,7 @@ async function runOneShotConversation(options: RealtimeVoiceConversationCliOptio
     deliveryMode: options.deliveryMode,
     personalVoiceMode: options.personalVoiceMode,
   });
-  console.log(JSON.stringify(result, null, 2));
+  print(JSON.stringify(result, null, 2));
 }
 
 export function parseRealtimeVoiceConversationCli(
@@ -690,16 +753,19 @@ export function parseRealtimeVoiceConversationCli(
     })(),
     turns: normalizeTurns(argv.turns),
     recordBridgePath: argv['record-bridge-path']
-      ? pathResolver.rootResolve(String(argv['record-bridge-path']))
+      ? resolveVoiceRepositoryPath(argv['record-bridge-path'], 'record bridge path')
       : resolveRecordBridgePath(),
     pythonBin: argv['python-bin'] ? String(argv['python-bin']) : resolvePythonBin(),
     recordOutputDir: argv['record-output-dir']
-      ? pathResolver.rootResolve(String(argv['record-output-dir']))
+      ? resolveVoiceRepositoryPath(argv['record-output-dir'], 'record output directory', true)
       : buildRecordOutputDir(sessionId),
   };
 }
 
-export async function main(): Promise<void> {
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
   await installReasoningBackends();
   // The general bootstrap probes Apple Speech asynchronously. Await it here so
   // the realtime CLI can use macOS-native STT before falling back to MLX.
@@ -713,7 +779,7 @@ export async function main(): Promise<void> {
     installManagedMlxWhisperSpeechToTextBridgeIfAvailable();
   }
 
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs(['node', 'run_realtime_voice_conversation', ...args])
     .option('session-id', { type: 'string', demandOption: true })
     .option('audio', { type: 'string' })
     .option('profile-id', { type: 'string' })
@@ -809,21 +875,24 @@ export async function main(): Promise<void> {
     // VAD mode runs the full-duplex loop; 'fixed' keeps the legacy
     // press-Enter / fixed-duration turn recorder.
     if (options.recorder === 'vad') {
-      await runRealtimeVoiceConversationLoop(options);
+      await runRealtimeVoiceConversationLoop(options, print);
       return;
     }
-    await runRealtimeVoiceConversationInteractive(options);
+    await runRealtimeVoiceConversationInteractive(options, {}, print);
     return;
   }
-  await runOneShotConversation(options);
+  await runOneShotConversation(options, print);
 }
+
+const runRealtimeVoiceConversationScript = defineScript({
+  name: 'voice:realtime-conversation',
+  flags: [],
+  run: ({ argv, print }) => main(argv, print),
+});
 
 if (
   isDirectScript(import.meta.url, 'run_realtime_voice_conversation.ts') ||
   isDirectScript(import.meta.url, 'run_realtime_voice_conversation.js')
 ) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  void runRealtimeVoiceConversationScript();
 }

@@ -45,4 +45,29 @@ describe('process definition registry', () => {
     expect(audit.errors[0]).toContain('missing');
     expect(() => assertProcessDefinitionRegistry()).not.toThrow();
   });
+
+  it('rejects registered source paths outside the repository root', () => {
+    const registry = loadProcessDefinitionRegistry();
+    expect(() =>
+      auditProcessDefinitionRegistry({
+        ...registry,
+        sources: [{ ...registry.sources[0]!, path: '../outside.json' }],
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('validates registered JSON sources through their schema boundary', () => {
+    const registry = loadProcessDefinitionRegistry();
+    expect(() =>
+      auditProcessDefinitionRegistry({
+        ...registry,
+        sources: [
+          {
+            ...registry.sources[0]!,
+            path: 'knowledge/product/governance/process-definition-registry.json',
+          },
+        ],
+      })
+    ).toThrow('Invalid catalog process-definition-source-mission-workflow-catalog');
+  });
 });

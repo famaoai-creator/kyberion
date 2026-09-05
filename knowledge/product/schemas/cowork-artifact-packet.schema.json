@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cowork-artifact-packet.schema.json",
+  "title": "Cowork artifact packet",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "delivery_id": { "type": "string", "minLength": 1 },
+    "delivered_at": { "type": "string", "format": "date-time" },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "next_action": { "type": "string", "minLength": 1 },
+    "intent_resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request_id": { "type": "string", "minLength": 1 },
+        "normalized_intent": { "type": "string", "minLength": 1 },
+        "missing_inputs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "resolution_shape": {
+          "enum": ["direct_answer", "task_session", "mission", "project_bootstrap"]
+        },
+        "outcome_kind": {
+          "enum": ["answer", "artifact", "approval_ready_plan", "service_change", "status_report"]
+        },
+        "authority_level": {
+          "enum": ["autonomous", "approval_required", "human_clarification_required"]
+        },
+        "next_action": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["request_approval", "provide_input", "continue"] },
+            "label": { "type": "string", "minLength": 1 },
+            "consequence": { "type": "string", "minLength": 1 }
+          },
+          "required": ["kind", "label", "consequence"]
+        },
+        "project_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "project_id": { "type": "string", "minLength": 1 },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "required": ["confidence"]
+        },
+        "rationale": { "type": "string", "minLength": 1 }
+      },
+      "required": [
+        "request_id",
+        "normalized_intent",
+        "missing_inputs",
+        "resolution_shape",
+        "outcome_kind",
+        "authority_level",
+        "next_action",
+        "rationale"
+      ]
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "content": { "type": "string" },
+          "content_type": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 }
+        },
+        "required": ["content_type"],
+        "oneOf": [
+          { "required": ["path"], "not": { "required": ["content"] } },
+          { "required": ["content"], "not": { "required": ["path"] } }
+        ]
+      }
+    }
+  },
+  "required": ["delivery_id", "delivered_at", "title", "summary", "artifacts"]
+}

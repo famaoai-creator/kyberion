@@ -23,7 +23,18 @@
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeUnlink, safeWriteFile } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeLstat,
+  safeReadFile,
+  safeUnlink,
+  safeWriteFile,
+} from './secure-io.js';
 
 /** Default repo-relative base directory for cursor state files. */
 export const DEFAULT_INGEST_CURSORS_DIR = 'active/shared/runtime/ingest-cursors';
@@ -69,12 +80,12 @@ function assertSourceSystem(sourceSystem: string): void {
 }
 
 function cursorsBaseDir(options: SyncCursorPathOptions): string {
-  if (options.cursorsDir) {
-    return path.isAbsolute(options.cursorsDir)
+  const candidate = options.cursorsDir
+    ? path.isAbsolute(options.cursorsDir)
       ? options.cursorsDir
-      : path.join(options.rootDir ?? pathResolver.rootDir(), options.cursorsDir);
-  }
-  return path.join(options.rootDir ?? pathResolver.rootDir(), DEFAULT_INGEST_CURSORS_DIR);
+      : path.join(options.rootDir ?? pathResolver.rootDir(), options.cursorsDir)
+    : path.join(options.rootDir ?? pathResolver.rootDir(), DEFAULT_INGEST_CURSORS_DIR);
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 /** Absolute path of the cursor state file for a tenant × source system. */
@@ -85,7 +96,10 @@ export function syncCursorPath(
 ): string {
   assertTenantSlug(tenantSlug);
   assertSourceSystem(sourceSystem);
-  return path.join(cursorsBaseDir(options), tenantSlug, `${sourceSystem}.json`);
+  return assertSafeRepositoryPath(
+    path.join(cursorsBaseDir(options), tenantSlug, `${sourceSystem}.json`),
+    { allowMissingLeaf: true }
+  );
 }
 
 function isCursorValue(value: unknown): value is string | Record<string, string> {
@@ -96,25 +110,55 @@ function isCursorValue(value: unknown): value is string | Record<string, string>
   );
 }
 
-function assertCursorState(state: SyncCursorState, file: string): void {
+function assertCursorState(
+  state: unknown,
+  file: string,
+  expectedTenantSlug?: string,
+  expectedSourceSystem?: string
+): asserts state is SyncCursorState {
   const problems: string[] = [];
-  if (!state || typeof state !== 'object') {
+  if (!isRecord(state)) {
     throw new Error(`[ingest-sync-cursors] ${file}: state must be an object`);
   }
-  if (!isValidTenantSlug(String(state.tenant_slug ?? ''))) problems.push('tenant_slug invalid');
-  if (!SOURCE_SYSTEM_RE.test(String(state.source_system ?? ''))) {
+  const tenantSlug = typeof state.tenant_slug === 'string' ? state.tenant_slug : '';
+  const sourceSystem = typeof state.source_system === 'string' ? state.source_system : '';
+  if (!isValidTenantSlug(tenantSlug)) problems.push('tenant_slug invalid');
+  if (!SOURCE_SYSTEM_RE.test(sourceSystem)) {
     problems.push('source_system invalid');
   }
-  if (!SYNC_CURSOR_KINDS.includes(state.cursor_kind)) {
+  if (expectedTenantSlug !== undefined && tenantSlug !== expectedTenantSlug) {
+    problems.push('tenant_slug does not match the requested tenant');
+  }
+  if (expectedSourceSystem !== undefined && sourceSystem !== expectedSourceSystem) {
+    problems.push('source_system does not match the requested source');
+  }
+  if (!SYNC_CURSOR_KINDS.includes(state.cursor_kind as SyncCursorKind)) {
     problems.push(`cursor_kind must be one of ${SYNC_CURSOR_KINDS.join('|')}`);
   }
   if (!isCursorValue(state.cursor_value)) {
     problems.push('cursor_value must be a string or a string map');
   }
-  if (typeof state.last_synced_at !== 'string') problems.push('last_synced_at must be a string');
-  if (typeof state.last_success_at !== 'string') problems.push('last_success_at must be a string');
-  if (!Number.isInteger(state.consecutive_failures) || state.consecutive_failures < 0) {
+  if (
+    typeof state.last_synced_at !== 'string' ||
+    !Number.isFinite(Date.parse(state.last_synced_at))
+  ) {
+    problems.push('last_synced_at must be a valid timestamp');
+  }
+  if (
+    typeof state.last_success_at !== 'string' ||
+    (state.last_success_at !== '' && !Number.isFinite(Date.parse(state.last_success_at)))
+  ) {
+    problems.push('last_success_at must be empty or a valid timestamp');
+  }
+  if (
+    typeof state.consecutive_failures !== 'number' ||
+    !Number.isInteger(state.consecutive_failures) ||
+    state.consecutive_failures < 0
+  ) {
     problems.push('consecutive_failures must be a non-negative integer');
+  }
+  if (state.note !== undefined && typeof state.note !== 'string') {
+    problems.push('note must be a string');
   }
   if (problems.length > 0) {
     throw new Error(
@@ -142,6 +186,9 @@ export function readSyncCursor(
   // and force a full re-fetch to fix something it cannot fix.
   let source: string;
   try {
+    if (!safeLstat(file).isFile()) {
+      throw new Error('cursor state must be a regular file');
+    }
     source = String(safeReadFile(file, { encoding: 'utf8' }));
   } catch (error) {
     throw new Error(
@@ -153,16 +200,16 @@ export function readSyncCursor(
       )}. Fail-closed: the watermark is intact — resolve access before re-running the sync.`
     );
   }
-  let state: SyncCursorState;
+  let state: unknown;
   try {
-    state = JSON.parse(source) as SyncCursorState;
+    state = parseSafeJsonInput(source, `ingest sync cursor state at ${file}`);
   } catch (error) {
     throw new Error(
       `[ingest-sync-cursors] cursor state at ${file} is not valid JSON: ${(error as Error).message}. ` +
         'Fail-closed: resetSyncCursor to restart from a full re-fetch.'
     );
   }
-  assertCursorState(state, file);
+  assertCursorState(state, file, tenantSlug, sourceSystem);
   return state;
 }
 
@@ -199,7 +246,7 @@ export function advanceSyncCursor(
   advance: SyncCursorAdvance,
   options: SyncCursorPathOptions = {}
 ): SyncCursorState {
-  const now = advance.now ?? new Date().toISOString();
+  const now = advance.now ?? nowIso();
   const previous = readSyncCursor(tenantSlug, sourceSystem, options);
   const state: SyncCursorState = {
     tenant_slug: tenantSlug,
@@ -237,7 +284,7 @@ export function recordSyncFailure(
   failure: SyncCursorFailure = {},
   options: SyncCursorPathOptions = {}
 ): SyncCursorState {
-  const now = failure.now ?? new Date().toISOString();
+  const now = failure.now ?? nowIso();
   const previous = readSyncCursor(tenantSlug, sourceSystem, options);
   const state: SyncCursorState = previous
     ? {

@@ -2,7 +2,12 @@
 
 import * as React from 'react';
 import type { ConciergeLocale } from './i18n';
-import type { VoiceInputDevice, VoiceListenOnceResponse, VoiceStatusResponse } from './voice-types';
+import {
+  parseVoiceListenOnceResponse,
+  parseVoiceStatusResponse,
+  type VoiceInputDevice,
+  type VoiceListenOnceResponse,
+} from './voice-types';
 
 /**
  * CS-02 voice hook — owns the two-tier voice state for the conversation dock.
@@ -126,9 +131,11 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
   const refreshStatus = React.useCallback(async () => {
     try {
       const response = await fetch('/api/voice/status');
-      const payload = (await response.json()) as VoiceStatusResponse;
+      const payload = parseVoiceStatusResponse(await response.json());
+      if (!payload) throw new Error('invalid voice status response');
       setTier(payload.available ? 1 : 0);
       setSttBackends(Array.isArray(payload.sttBackends) ? payload.sttBackends : []);
+      setSttBackend(payload.selectedSttBackend || '');
       setInputDevices(Array.isArray(payload.inputDevices) ? payload.inputDevices : []);
       if (payload.speech?.status !== 'speaking') setServerSpeaking(false);
     } catch {
@@ -198,7 +205,8 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
       void (async () => {
         try {
           const response = await fetch('/api/voice/status');
-          const payload = (await response.json()) as VoiceStatusResponse;
+          const payload = parseVoiceStatusResponse(await response.json());
+          if (!payload) return;
           if (payload.speech?.status !== 'speaking') {
             clearSpeechPoll();
             setServerSpeaking(false);
@@ -269,12 +277,14 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          backend: sttBackend || undefined,
+          // Empty selection is an explicit Auto override; omitting backend
+          // is reserved for callers that want the persisted profile choice.
+          backend: sttBackend || 'auto',
           device: inputDevice || undefined,
           locale: speechLocale(localeRef.current),
         }),
       });
-      const payload = (await response.json().catch(() => null)) as VoiceListenOnceResponse | null;
+      const payload = parseVoiceListenOnceResponse(await response.json().catch(() => null));
       if (!payload) return { ok: false, error: `listen_failed_${response.status}` };
       // spoken=true means the server-side TTS is reading the reply right now;
       // mirror it in the speaking indicator (with the stop button).

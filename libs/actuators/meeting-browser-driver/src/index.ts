@@ -23,19 +23,22 @@
  *     required for Meet, which has no public bot SDK)
  */
 
+import { logger } from '@agent/core/core';
+import { retry } from '@agent/core/async-utils';
+import { nowIso } from '@agent/core/foundation';
 import {
   registerMeetingJoinDriver,
-  abortableAudioChunks,
-  logger,
-  retry,
-  type AudioBus,
-  type AudioChunk,
   validateMeetingTarget,
   type MeetingJoinDriver,
+} from '@agent/core/meeting-join-driver';
+import {
+  abortableAudioChunks,
+  type AudioChunk,
   type MeetingSession,
   type MeetingSessionState,
   type MeetingTarget,
-} from '@agent/core';
+} from '@agent/core/meeting-session-types';
+import type { AudioBus } from '@agent/core/audio-bus';
 import {
   MEET_SELECTORS,
   TEAMS_SELECTORS,
@@ -50,7 +53,7 @@ import {
   trySelectors,
   waitForAnyVisibleSelector,
 } from './meeting-browser-driver-helpers.js';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import * as path from 'node:path';
 
 /* Playwright type stand-ins so this file compiles without playwright
@@ -425,7 +428,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
         throw new Error(`[browser-driver] no join button matched (${platform})`);
       }
       state.status = 'in_meeting';
-      state.joined_at = new Date().toISOString();
+      state.joined_at = nowIso();
 
       // Persist cookies so next run skips the login.
       try {
@@ -475,7 +478,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
           buildRetryOptions()
         );
         state.status = 'ended';
-        state.left_at = new Date().toISOString();
+        state.left_at = nowIso();
         if (runtime.cleanup_mode === 'browser' && runtime.browser) {
           await retry(
             async () => runtime.browser?.close().catch(() => undefined),

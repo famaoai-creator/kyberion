@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { safeMkdir, safeSymlinkSync, safeWriteFile, safeRmSync } from '@agent/core/secure-io';
 
 import {
   buildSystemStatusReport,
@@ -39,6 +39,40 @@ describe('collectProviderDemotions', () => {
     expect(collectProviderDemotions(T0, statePath)).toEqual([]);
     safeWriteFile(statePath, '{broken');
     expect(collectProviderDemotions(T0, statePath)).toEqual([]);
+  });
+
+  it('fails closed for unsafe or incorrectly typed demotion records', () => {
+    const dir = pathResolver.sharedTmp(`system-status-tests/${Date.now()}-unsafe`);
+    safeMkdir(dir, { recursive: true });
+    const statePath = path.join(dir, 'provider-health.json');
+    safeWriteFile(
+      statePath,
+      JSON.stringify({
+        demotions: [
+          {
+            provider: 'codex',
+            instance: 'default',
+            until: T0 + 60_000,
+            reason: 'rate_limited',
+            ['__proto__']: { poisoned: true },
+          },
+          { provider: 'gemini', instance: 7, until: T0 + 60_000, reason: 'invalid' },
+        ],
+      })
+    );
+
+    expect(collectProviderDemotions(T0, statePath)).toEqual([]);
+  });
+
+  it('does not follow a symlinked provider health state file', () => {
+    const dir = pathResolver.sharedTmp(`system-status-tests/${Date.now()}-linked`);
+    safeMkdir(dir, { recursive: true });
+    const target = path.join(dir, 'target.json');
+    const link = path.join(dir, 'provider-health.json');
+    safeWriteFile(target, JSON.stringify({ demotions: [{ provider: 'codex', until: T0 + 1 }] }));
+    safeSymlinkSync(target, link);
+    expect(collectProviderDemotions(T0, link)).toEqual([]);
+    safeRmSync(dir, { recursive: true, force: true });
   });
 });
 

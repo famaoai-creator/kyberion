@@ -44,7 +44,9 @@ describe('readValidatedPipelineAdf', () => {
       { encoding: 'utf8' }
     );
 
-    expect(() => readValidatedPipelineAdf(filePath)).toThrow('Invalid pipeline ADF guardrails');
+    expect(() => readValidatedPipelineAdf(filePath, { trustResolved: true })).toThrow(
+      'Invalid pipeline ADF guardrails'
+    );
   });
 
   it('passes a benign pipeline through', () => {
@@ -75,10 +77,29 @@ describe('readValidatedPipelineAdf', () => {
       { encoding: 'utf8' }
     );
 
-    expect(readValidatedPipelineAdf(filePath)).toEqual(
+    expect(readValidatedPipelineAdf(filePath, { trustResolved: true })).toEqual(
       expect.objectContaining({
         steps: expect.any(Array),
       })
+    );
+  });
+
+  it('fails closed when a trust-sensitive input omits the trust decision', () => {
+    expect(() => readValidatedPipelineAdf('roles/PROCEDURE.md')).toThrow(
+      '[TRUST_REQUIRED] project-local pipeline/template'
+    );
+  });
+
+  it('rejects workflow inputs outside the repository before reading or importing', async () => {
+    const outsidePath = path.join(pathResolver.rootDir(), '..', 'external-workflow.json');
+    await expect(readValidatedWorkflowAdf(outsidePath, { trustResolved: true })).rejects.toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
+  it('rejects a directory as a workflow input before reading it', async () => {
+    await expect(readValidatedWorkflowAdf('scripts', { trustResolved: true })).rejects.toThrow(
+      '[ADF_INPUT] input must be an existing regular file'
     );
   });
 
@@ -109,7 +130,7 @@ describe('readValidatedPipelineAdf', () => {
       { encoding: 'utf8' }
     );
 
-    await expect(readValidatedWorkflowAdf(filePath)).resolves.toEqual(
+    await expect(readValidatedWorkflowAdf(filePath, { trustResolved: true })).resolves.toEqual(
       expect.objectContaining({
         name: 'workflow-module-test',
         steps: expect.any(Array),
@@ -134,7 +155,7 @@ describe('readValidatedPipelineAdf', () => {
       'scripts/demos/workflow-as-code-example.ts'
     );
 
-    await expect(readValidatedWorkflowAdf(examplePath)).resolves.toEqual(
+    await expect(readValidatedWorkflowAdf(examplePath, { trustResolved: true })).resolves.toEqual(
       expect.objectContaining({
         name: 'workflow-as-code-example',
         action: 'pipeline',
@@ -154,7 +175,9 @@ describe('readValidatedPipelineAdf', () => {
     'pipelines/launch-first-run-onboarding.json',
     'pipelines/system-upgrade-check.json',
   ])('loads representative checked-in pipeline %s with the wrapper baseline', async (relative) => {
-    await expect(readValidatedWorkflowAdf(pathResolver.rootResolve(relative))).resolves.toEqual(
+    await expect(
+      readValidatedWorkflowAdf(pathResolver.rootResolve(relative), { trustResolved: true })
+    ).resolves.toEqual(
       expect.objectContaining({
         steps: expect.any(Array),
       })
@@ -167,9 +190,21 @@ describe('readValidatedPipelineAdf', () => {
       'pipelines/fragments/_test-run-pipeline-include-cycle.json'
     );
 
-    await expect(readValidatedWorkflowAdf(cyclePath)).rejects.toThrow(
+    await expect(readValidatedWorkflowAdf(cyclePath, { trustResolved: true })).rejects.toThrow(
       'circular reference detected'
     );
+  });
+
+  it('keeps repaired include fragments behind the safe JSON boundary', async () => {
+    const source = String(
+      (await import('@agent/core/secure-io')).safeReadFile(
+        pathResolver.rootResolve('scripts/refactor/adf-input.ts'),
+        { encoding: 'utf8' }
+      )
+    );
+
+    expect(source).toContain('parseSafeJsonInput(JSON.stringify(repaired)');
+    expect(source).not.toContain('return JSON.parse(raw)');
   });
 
   it('applies the pre-trust boundary to static pipeline fragments', async () => {

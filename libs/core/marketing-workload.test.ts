@@ -12,6 +12,8 @@ import {
   validateMarketingImageArtifact,
   validateMarketingTextArtifact,
   validateMarketingCompletionEvidence,
+  validateMarketingReviewAggregation,
+  validatePublicationVerification,
   validatePublicationApproval,
   validatePublicationClassification,
   validateVideoTechnicalArtifacts,
@@ -139,6 +141,47 @@ describe('marketing workload gates', () => {
         'thumbnail is missing',
         'CTA URL is invalid',
       ])
+    );
+  });
+
+  it('rejects unknown publication verification fields', () => {
+    const verification = {
+      gate_id: 'G6' as const,
+      status: 'passed' as const,
+      reasons: [],
+      evidence: ['dry-run:not-a-publication'],
+      approval_id: 'approval-001',
+      shared_approval_request_id: 'request-001',
+      artifact_hashes: { video: artifact },
+      sensitive_data_scan: { pii_findings: [], secret_findings: [], passed: true },
+      rendered_artifact: 'active/shared/exports/preview.html',
+      network_access: false as const,
+      counts_as_publication: false as const,
+    };
+
+    expect(() => validatePublicationVerification({ ...verification, unexpected: true })).toThrow(
+      'Invalid catalog publication-verification'
+    );
+  });
+
+  it('rejects unknown marketing review aggregation fields', () => {
+    const result = {
+      run_id: 'run-001',
+      risk_level: 1 as const,
+      gate: {
+        gate_id: 'G4' as const,
+        status: 'passed' as const,
+        reasons: [],
+        evidence: ['G4:validated'],
+      },
+      reviews: [],
+      blocking_findings: [],
+      ready_for_approval: true,
+      evidence: ['review.json'],
+    };
+
+    expect(() => validateMarketingReviewAggregation({ ...result, unexpected: true })).toThrow(
+      'Invalid catalog marketing-review-aggregation'
     );
   });
 
@@ -377,6 +420,7 @@ describe('marketing workload gates', () => {
   it('rejects unsafe customer selectors and preserves the no-customer fallback', () => {
     const defaultPolicy = loadMarketingRiskPolicy({});
     expect(defaultPolicy.allowed_channels).toContain('linkedin');
+    expect(defaultPolicy.levels['4'].dry_run_required).toBe(true);
     expect(() => loadMarketingRiskPolicy({ KYBERION_CUSTOMER: '../other-customer' })).toThrow(
       'Invalid KYBERION_CUSTOMER'
     );

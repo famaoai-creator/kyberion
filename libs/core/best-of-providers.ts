@@ -87,8 +87,8 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
-import { appendJsonLine } from './foundation/json.js';
+import { safeExistsSync, safeMkdir } from './secure-io.js';
+import { appendJsonLine, parseSafeJsonObjectValue, readJsonLines } from './foundation/json.js';
 import { checkProviderEgress } from './provider-egress-gate.js';
 import {
   peekProviderCapabilityRegistry,
@@ -97,7 +97,10 @@ import {
 import { withDelegationSlot } from './delegation-concurrency.js';
 import { resolveProviderBackend } from './provider-backend-resolver.js';
 import type { TierLevel } from './types.js';
-import type { PlanningReviewVerdictResult } from './structured-output-contracts.js';
+import {
+  PlanningReviewVerdictSchema,
+  type PlanningReviewVerdictResult,
+} from './structured-output-contracts.js';
 
 /**
  * Env flag that opts the default `seams.getBackend` into real per-provider
@@ -362,18 +365,116 @@ function persistVerdictRecord(record: BestOfProvidersVerdictRecord, filePath: st
   }
 }
 
-/** Test/ops-only: read back the persisted verdict-record JSONL log as-is. */
+function parseBestOfProvidersVerdictRecord(
+  value: unknown,
+  lineNumber: number
+): BestOfProvidersVerdictRecord {
+  const label = `best-of-providers verdict line ${lineNumber}`;
+  const record = parseSafeJsonObjectValue(value, label);
+  const allowedKeys = new Set([
+    'ts',
+    'data_tier',
+    'instruction_digest',
+    'verdict',
+    'winner',
+    'participants',
+    'votes',
+    'excluded',
+    'degraded',
+  ]);
+  const unknownKey = Object.keys(record).find((key) => !allowedKeys.has(key));
+  if (unknownKey) throw new Error(`${label} contains unknown field: ${unknownKey}`);
+
+  if (typeof record.ts !== 'string' || record.ts.trim() === '') {
+    throw new Error(`${label}.ts must be a non-empty string`);
+  }
+  const ts = record.ts;
+  if (
+    record.data_tier !== 'personal' &&
+    record.data_tier !== 'confidential' &&
+    record.data_tier !== 'public'
+  ) {
+    throw new Error(`${label}.data_tier is invalid`);
+  }
+  const dataTier = record.data_tier;
+  if (
+    typeof record.instruction_digest !== 'string' ||
+    !/^[a-f0-9]{16}$/u.test(record.instruction_digest)
+  ) {
+    throw new Error(`${label}.instruction_digest is invalid`);
+  }
+  const instructionDigest = record.instruction_digest;
+  const verdict = PlanningReviewVerdictSchema.safeParse(record.verdict);
+  if (!verdict.success) throw new Error(`${label}.verdict is invalid`);
+  const winnerValue = record.winner;
+  if (winnerValue !== null && typeof winnerValue !== 'string') {
+    throw new Error(`${label}.winner is invalid`);
+  }
+  const winner: string | null = winnerValue === null ? null : (winnerValue as string);
+  if (
+    !Array.isArray(record.participants) ||
+    record.participants.some((provider) => typeof provider !== 'string' || provider.trim() === '')
+  ) {
+    throw new Error(`${label}.participants is invalid`);
+  }
+  const participants = record.participants as string[];
+  const votes = parseSafeJsonObjectValue(record.votes, `${label}.votes`);
+  const normalizedVotes: Record<string, number> = {};
+  for (const [provider, vote] of Object.entries(votes)) {
+    if (provider.trim() === '' || typeof vote !== 'number' || !Number.isInteger(vote) || vote < 0) {
+      throw new Error(`${label}.votes is invalid`);
+    }
+    normalizedVotes[provider] = vote;
+  }
+  if (!Array.isArray(record.excluded)) throw new Error(`${label}.excluded is invalid`);
+  const excluded = record.excluded.map((candidate, index) => {
+    const item = parseSafeJsonObjectValue(candidate, `${label}.excluded[${index}]`);
+    if (Object.keys(item).some((key) => key !== 'provider' && key !== 'reason')) {
+      throw new Error(`${label}.excluded[${index}] contains unknown field`);
+    }
+    if (
+      typeof item.provider !== 'string' ||
+      item.provider.trim() === '' ||
+      typeof item.reason !== 'string'
+    ) {
+      throw new Error(`${label}.excluded[${index}] is invalid`);
+    }
+    return { provider: item.provider, reason: item.reason };
+  });
+  const degradedValue = record.degraded;
+  if (
+    degradedValue !== undefined &&
+    degradedValue !== 'single-provider' &&
+    degradedValue !== 'no-eligible-providers'
+  ) {
+    throw new Error(`${label}.degraded is invalid`);
+  }
+
+  return {
+    ts,
+    data_tier: dataTier,
+    instruction_digest: instructionDigest,
+    verdict: verdict.data,
+    winner,
+    participants,
+    votes: normalizedVotes,
+    excluded,
+    ...(degradedValue === undefined
+      ? {}
+      : { degraded: degradedValue as BestOfProvidersDegradation }),
+  };
+}
+
+/** Test/ops-only: read valid persisted verdict records from the JSONL log. */
 export function peekBestOfProvidersVerdictLog(
   filePath: string = pathResolver.shared(BEST_OF_PROVIDERS_VERDICT_LOG_RELATIVE_PATH)
 ): BestOfProvidersVerdictRecord[] {
   try {
     if (!safeExistsSync(filePath)) return [];
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    return raw
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as BestOfProvidersVerdictRecord);
+    return readJsonLines(filePath, {
+      onMalformed: 'skip',
+      map: parseBestOfProvidersVerdictRecord,
+    });
   } catch {
     return [];
   }

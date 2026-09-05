@@ -26,15 +26,19 @@
  */
 
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
+import { nowIso } from '@agent/core/foundation';
 import {
-  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { defineScript, isDirectScript } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 interface ExportedSymbol {
   file: string;
@@ -51,10 +55,7 @@ interface DeadCodeCandidate extends ExportedSymbol {
 const ROOT = pathResolver.rootDir();
 const REPORT_PATH = pathResolver.shared('exports/dead-code-candidates.json');
 
-const SCAN_ROOTS = [
-  path.join(ROOT, 'libs'),
-  path.join(ROOT, 'scripts'),
-];
+const SCAN_ROOTS = [path.join(ROOT, 'libs'), path.join(ROOT, 'scripts')];
 const SEARCH_ROOTS = [
   path.join(ROOT, 'libs'),
   path.join(ROOT, 'scripts'),
@@ -73,9 +74,7 @@ const EXCLUDE_FILES = (p: string): boolean =>
   p.endsWith('.tsbuildinfo');
 
 // Files to NEVER flag as candidates (public API surface, by definition exported "for outside").
-const PUBLIC_API_PATHS = new Set([
-  'libs/core/index.ts',
-]);
+const PUBLIC_API_PATHS = new Set(['libs/core/index.ts']);
 
 function walkTs(dir: string): string[] {
   if (!safeExistsSync(dir)) return [];
@@ -86,7 +85,12 @@ function walkTs(dir: string): string[] {
     const stat = safeStat(full);
     if (stat.isDirectory()) {
       out.push(...walkTs(full));
-    } else if (stat.isFile() && full.endsWith('.ts') && !full.endsWith('.test.ts') && !EXCLUDE_FILES(full)) {
+    } else if (
+      stat.isFile() &&
+      full.endsWith('.ts') &&
+      !full.endsWith('.test.ts') &&
+      !EXCLUDE_FILES(full)
+    ) {
       out.push(full);
     }
   }
@@ -133,14 +137,22 @@ function extractExports(file: string): ExportedSymbol[] {
   return symbols;
 }
 
-function countOccurrences(symbol: string, files: string[], excludeFile: string): { external: number; internal: number } {
+function countOccurrences(
+  symbol: string,
+  files: string[],
+  excludeFile: string
+): { external: number; internal: number } {
   // Word-boundary match. Avoid matching inside larger identifiers.
   const re = new RegExp(`\\b${escapeRegExp(symbol)}\\b`, 'g');
   let external = 0;
   let internal = 0;
   for (const f of files) {
     let text: string;
-    try { text = safeReadFile(f, { encoding: 'utf8' }) as string; } catch { continue; }
+    try {
+      text = safeReadFile(f, { encoding: 'utf8' }) as string;
+    } catch {
+      continue;
+    }
     const matches = text.match(re);
     if (!matches) continue;
     if (f === excludeFile) {
@@ -156,12 +168,16 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function main(): void {
+function main(print: Print = () => undefined): void {
   const sourceFiles = SCAN_ROOTS.flatMap(walkTs);
-  const allFiles = SEARCH_ROOTS.flatMap(walkAny).filter(p => /\.(ts|js|json|md|yml|yaml)$/.test(p));
+  const allFiles = SEARCH_ROOTS.flatMap(walkAny).filter((p) =>
+    /\.(ts|js|json|md|yml|yaml)$/.test(p)
+  );
 
-  console.log(`🔎 Scanning ${sourceFiles.length} TS source files for dead-code candidates...`);
-  console.log(`   Searching across ${allFiles.length} files in libs/scripts/satellites/presence/tests/pipelines/docs.\n`);
+  print(`🔎 Scanning ${sourceFiles.length} TS source files for dead-code candidates...`);
+  print(
+    `   Searching across ${allFiles.length} files in libs/scripts/satellites/presence/tests/pipelines/docs.\n`
+  );
 
   const candidates: DeadCodeCandidate[] = [];
   for (const file of sourceFiles) {
@@ -190,15 +206,15 @@ function main(): void {
     byFile.get(c.file)!.push(c);
   }
 
-  console.log(`Found ${candidates.length} candidate symbols across ${byFile.size} files.\n`);
+  print(`Found ${candidates.length} candidate symbols across ${byFile.size} files.\n`);
 
   const sortedFiles = [...byFile.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 30);
   for (const [f, syms] of sortedFiles) {
-    console.log(`  ${syms.length.toString().padStart(3)}  ${f}`);
+    print(`  ${syms.length.toString().padStart(3)}  ${f}`);
     for (const s of syms.slice(0, 5)) {
-      console.log(`        ${s.kind.padEnd(8)} ${s.name}  (line ${s.line})`);
+      print(`        ${s.kind.padEnd(8)} ${s.name}  (line ${s.line})`);
     }
-    if (syms.length > 5) console.log(`        ... and ${syms.length - 5} more`);
+    if (syms.length > 5) print(`        ... and ${syms.length - 5} more`);
   }
   void sourceFiles; // sourceFiles count is reflected in candidates; suppress unused-warning if any.
 
@@ -209,7 +225,7 @@ function main(): void {
     REPORT_PATH,
     JSON.stringify(
       {
-        generated_at: new Date().toISOString(),
+        generated_at: nowIso(),
         total_candidates: candidates.length,
         files_with_candidates: byFile.size,
         candidates,
@@ -223,13 +239,25 @@ function main(): void {
         ],
       },
       null,
-      2,
+      2
     ) + '\n',
-    { encoding: 'utf8' },
+    { encoding: 'utf8' }
   );
 
-  console.log(`\n📝 Full report: ${path.relative(ROOT, REPORT_PATH)}`);
-  console.log('\n⚠️  This is advisory. Verify each candidate by hand before deleting.');
+  print(`\n📝 Full report: ${path.relative(ROOT, REPORT_PATH)}`);
+  print('\n⚠️  This is advisory. Verify each candidate by hand before deleting.');
 }
 
-main();
+export const runDeadCodeFinder = defineScript({
+  name: 'find-dead-code',
+  flags: [],
+  run({ print }) {
+    main(print);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'find_dead_code.ts') ||
+  isDirectScript(import.meta.url, 'find_dead_code.js')
+)
+  void runDeadCodeFinder();

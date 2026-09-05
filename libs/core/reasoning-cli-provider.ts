@@ -27,7 +27,9 @@ import {
 import { GrokCliIntentExtractor } from './grok-cli-intent-extractor.js';
 import { GrokCliVoiceBridge } from './grok-cli-voice-bridge.js';
 import { buildCopilotAcpBackendFromEnv } from './copilot-acp-reasoning-backend.js';
+import { buildCursorCliBackendFromEnv } from './cursor-cli-reasoning-backend.js';
 import { maybeWrapWithDispatcher } from './agent-dispatch.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import type { ReasoningProviderRuntimeBundle } from './reasoning-provider-registry.js';
 
@@ -41,6 +43,10 @@ export interface CliProviderBuildOptions {
 
 function cliEnv(options: CliProviderBuildOptions): NodeJS.ProcessEnv {
   return options.env ?? process.env;
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 /**
@@ -58,7 +64,7 @@ export function buildCliProviderBundle(
       const backend = buildShellClaudeCliBackendFromEnv(env, undefined, options.model);
       if (!backend) return null;
       const cliOptions = {
-        ...buildClaudeCliOptionsFromEnv(),
+        ...buildClaudeCliOptionsFromEnv(env),
         ...(options.model ? { model: options.model } : {}),
         bin: backend.getBinaryPath(),
       };
@@ -78,7 +84,7 @@ export function buildCliProviderBundle(
       };
     }
     case 'codex-cli': {
-      const baseOptions = buildCodexCliQueryOptionsFromEnv();
+      const baseOptions = buildCodexCliQueryOptionsFromEnv(env);
       const codexOptions = {
         ...baseOptions,
         ...(options.model ? { model: options.model } : {}),
@@ -100,7 +106,9 @@ export function buildCliProviderBundle(
       };
     }
     case 'claude-agent': {
-      if (!env.CLAUDECODE && !env.ANTHROPIC_API_KEY && !options.force) return null;
+      if (!envText(env, 'CLAUDECODE') && !envText(env, 'ANTHROPIC_API_KEY') && !options.force) {
+        return null;
+      }
       return {
         mode,
         backend: {
@@ -127,8 +135,8 @@ export function buildCliProviderBundle(
       if (!backend && !options.force) return null;
       if (!backend) return null;
       const geminiOptions = {
-        bin: env.KYBERION_GEMINI_CLI_BIN?.trim() || undefined,
-        model: options.model ?? env.KYBERION_GEMINI_CLI_MODEL?.trim() ?? undefined,
+        bin: envText(env, 'KYBERION_GEMINI_CLI_BIN')?.trim() || undefined,
+        model: options.model ?? envText(env, 'KYBERION_GEMINI_CLI_MODEL')?.trim() ?? undefined,
       };
       return {
         mode,
@@ -151,7 +159,9 @@ export function buildCliProviderBundle(
       if (!backend) return null;
       const agyOptions = {
         bin:
-          env.KYBERION_ANTIGRAVITY_CLI_BIN?.trim() || env.KYBERION_AGY_CLI_BIN?.trim() || undefined,
+          envText(env, 'KYBERION_ANTIGRAVITY_CLI_BIN')?.trim() ||
+          envText(env, 'KYBERION_AGY_CLI_BIN')?.trim() ||
+          undefined,
       };
       return {
         mode,
@@ -169,9 +179,9 @@ export function buildCliProviderBundle(
       };
     }
     case 'grok-cli': {
-      if (!buildShellGrokCliBackendFromEnv() && !options.force) return null;
+      if (!buildShellGrokCliBackendFromEnv(env) && !options.force) return null;
       const grokOptions = {
-        ...buildGrokCliOptionsFromEnv(),
+        ...buildGrokCliOptionsFromEnv(env),
         ...(options.model ? { model: options.model } : {}),
       };
       const backend = new GrokCliBackend(grokOptions);
@@ -195,6 +205,15 @@ export function buildCliProviderBundle(
       return {
         mode,
         backend: { backend, provider, label: mode },
+      };
+    }
+    case 'cursor-cli': {
+      const backend = buildCursorCliBackendFromEnv(env, undefined, options.model);
+      if (!backend && !options.force) return null;
+      if (!backend) return null;
+      return {
+        mode,
+        backend: { backend: maybeWrapWithDispatcher(backend), provider, label: mode },
       };
     }
     default:

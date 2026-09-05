@@ -1,21 +1,30 @@
 import * as path from 'node:path';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
-  auditChain,
-  customerResolver,
-  createStandardYargs,
-  currentScope,
-  loadIntentContractMemorySnapshot,
-  renderStatus,
-  resolveLocale,
-  resolveVocabularyLocale,
-  safeExistsSync,
-  safeReadFile,
-  safeReaddir,
-  pathResolver,
-} from '@agent/core';
-import type { AuditEntry, IntentContractMemoryEntry, Trace } from '@agent/core';
-import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  stripSharedScriptFlags,
+} from './lib/harness.js';
+import { auditChain } from '@agent/core/audit-chain';
+import * as customerResolver from '@agent/core/customer-resolver';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { currentScope } from '@agent/core/scope-context';
+import { loadIntentContractMemorySnapshot } from '@agent/core/intent-contract-learning';
+import {
+  loadIntentDeltasAtPath,
+  loadIntentSnapshotsAtPath,
+} from '@agent/core/intent-snapshot-store';
+import { renderStatus, resolveVocabularyLocale } from '@agent/core/ux-vocabulary';
+import { resolveLocale } from '@agent/core/locale';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { readJsonLines } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { validateTraceReplay } from '@agent/core/trace-schema';
+import type { AuditEntry } from '@agent/core/audit-chain';
+import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
+import type { IntentDelta, IntentSnapshot } from '@agent/core/intent-delta';
+import type { Trace } from '@agent/core/trace';
+import { listMissionsInSearchDirs, loadState, loadStateAtPath } from './refactor/mission-state.js';
 import type { MissionState } from './refactor/mission-types.js';
 
 type IntentTraceSource = 'mission' | 'snapshot' | 'delta' | 'memory' | 'trace' | 'audit';
@@ -39,13 +48,13 @@ interface IntentTraceMissionHit {
 interface IntentTraceSnapshotHit {
   missionId: string;
   filePath: string;
-  snapshot: Record<string, any>;
+  snapshot: IntentSnapshot;
 }
 
 interface IntentTraceDeltaHit {
   missionId: string;
   filePath: string;
-  delta: Record<string, any>;
+  delta: IntentDelta;
 }
 
 interface IntentTraceTraceHit {
@@ -83,21 +92,41 @@ function normalizeTimestamp(value?: string): string {
   return value;
 }
 
-function safeJsonLines(filePath: string): Array<Record<string, any>> {
-  if (!safeExistsSync(filePath)) return [];
-  const raw = safeReadFile(filePath, { encoding: 'utf8', label: filePath }) as string;
-  return raw
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .flatMap((line) => {
-      try {
-        const parsed = JSON.parse(line);
-        return parsed && typeof parsed === 'object' ? [parsed as Record<string, any>] : [];
-      } catch {
-        return [];
+function safeIntentPath(filePath: string, allowMissingLeaf = false): string | null {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf });
+  } catch {
+    return null;
+  }
+}
+
+function safeJsonLines(filePath: string): Array<Record<string, unknown>> {
+  const safeFilePath = safeIntentPath(filePath);
+  if (!safeFilePath || !safeExistsSync(safeFilePath)) return [];
+  return readJsonLines<Record<string, unknown>>(safeFilePath, {
+    onMalformed: 'skip',
+    map(value) {
+      if (
+        value === null ||
+        typeof value !== 'object' ||
+        Array.isArray(value) ||
+        hasDangerousJsonKey(value)
+      ) {
+        throw new Error('intent trace JSONL entry must be a safe object');
       }
-    });
+      return value as Record<string, unknown>;
+    },
+  });
+}
+
+function hasDangerousJsonKey(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasDangerousJsonKey);
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    Object.keys(record).some((key) => ['__proto__', 'constructor', 'prototype'].includes(key)) ||
+    Object.values(record).some(hasDangerousJsonKey)
+  );
 }
 
 function compactText(value: unknown, maxLength = 96): string {
@@ -250,8 +279,9 @@ function loadSnapshotEntries(
   evidencePath: string | null
 ): IntentTraceSnapshotHit[] {
   if (!evidencePath) return [];
-  const snapshotFile = path.join(evidencePath, 'intent-snapshots.jsonl');
-  return safeJsonLines(snapshotFile).map((snapshot) => ({
+  const snapshotFile = safeIntentPath(path.join(evidencePath, 'intent-snapshots.jsonl'));
+  if (!snapshotFile) return [];
+  return loadIntentSnapshotsAtPath(snapshotFile).map((snapshot) => ({
     missionId,
     filePath: snapshotFile,
     snapshot,
@@ -260,8 +290,9 @@ function loadSnapshotEntries(
 
 function loadDeltaEntries(missionId: string, evidencePath: string | null): IntentTraceDeltaHit[] {
   if (!evidencePath) return [];
-  const deltaFile = path.join(evidencePath, 'intent-deltas.jsonl');
-  return safeJsonLines(deltaFile).map((delta) => ({
+  const deltaFile = safeIntentPath(path.join(evidencePath, 'intent-deltas.jsonl'));
+  if (!deltaFile) return [];
+  return loadIntentDeltasAtPath(deltaFile).map((delta) => ({
     missionId,
     filePath: deltaFile,
     delta,
@@ -269,14 +300,16 @@ function loadDeltaEntries(missionId: string, evidencePath: string | null): Inten
 }
 
 function loadTraceRecords(traceDir: string): IntentTraceTraceHit[] {
-  if (!safeExistsSync(traceDir)) return [];
+  const safeTraceDir = safeIntentPath(traceDir);
+  if (!safeTraceDir || !safeExistsSync(safeTraceDir)) return [];
   const traces: IntentTraceTraceHit[] = [];
-  for (const entry of safeReaddir(traceDir)) {
-    const filePath = path.join(traceDir, entry);
-    if (!safeExistsSync(filePath)) continue;
+  for (const entry of safeReaddir(safeTraceDir)) {
+    const filePath = safeIntentPath(path.join(safeTraceDir, entry));
+    if (!filePath || !safeExistsSync(filePath)) continue;
     for (const record of safeJsonLines(filePath)) {
       if (!record || typeof record !== 'object') continue;
-      const trace = record as Trace;
+      if (validateTraceReplay(record, { strictUnknownSpans: true }).length > 0) continue;
+      const trace = record as unknown as Trace;
       traces.push({ filePath, trace });
     }
   }
@@ -294,16 +327,20 @@ function resolveTraceSearchDirs(): string[] {
 function discoverAccessibleMissionRoots(): Array<{ missionId: string; missionPath: string }> {
   const discovered: Array<{ missionId: string; missionPath: string }> = [];
   const visit = (dir: string): void => {
-    if (!safeExistsSync(dir)) return;
-    for (const entry of safeReaddir(dir)) {
-      const entryPath = path.join(dir, entry);
-      const statePath = path.join(entryPath, 'mission-state.json');
+    const safeDir = safeIntentPath(dir);
+    if (!safeDir || !safeExistsSync(safeDir)) return;
+    for (const entry of safeReaddir(safeDir)) {
+      const entryPath = safeIntentPath(path.join(safeDir, entry));
+      if (!entryPath) continue;
+      const statePath = safeIntentPath(path.join(entryPath, 'mission-state.json'));
+      if (!statePath) continue;
       if (safeExistsSync(statePath)) {
         discovered.push({ missionId: entry, missionPath: entryPath });
         continue;
       }
       if (safeExistsSync(entryPath)) {
-        const nestedState = path.join(entryPath, 'mission-state.json');
+        const nestedState = safeIntentPath(path.join(entryPath, 'mission-state.json'));
+        if (!nestedState) continue;
         if (safeExistsSync(nestedState)) {
           discovered.push({ missionId: path.basename(entryPath), missionPath: entryPath });
         }
@@ -338,27 +375,23 @@ function collectMissionHits(
 ): IntentTraceMissionHit[] {
   return missionRoots
     .map(({ missionId, missionPath }) => {
+      const safeMissionPath = safeIntentPath(missionPath);
+      if (!safeMissionPath) return null;
       const state =
         loadMissionState(missionId) ||
         (() => {
-          const statePath = path.join(missionPath, 'mission-state.json');
-          if (!safeExistsSync(statePath)) return null;
-          try {
-            return JSON.parse(
-              String(safeReadFile(statePath, { encoding: 'utf8' }))
-            ) as MissionState;
-          } catch {
-            return null;
-          }
+          const statePath = safeIntentPath(path.join(safeMissionPath, 'mission-state.json'));
+          if (!statePath) return null;
+          return loadStateAtPath(statePath);
         })();
       if (!state) return null;
       const correlationIds = extractMissionCorrelationIds(state);
       if (!correlationIds.includes(correlationId)) return null;
       return {
         missionId,
-        missionPath,
+        missionPath: safeMissionPath,
         state,
-        evidencePath: path.join(missionPath, 'evidence'),
+        evidencePath: safeIntentPath(path.join(safeMissionPath, 'evidence'), true),
         matchedCorrelationId: correlationId,
       };
     })
@@ -546,8 +579,8 @@ export function renderIntentTraceReport(
   return `${header.join('\n')}\n\n${formatRows(rows, maxRows)}`;
 }
 
-function printJson(report: IntentTraceReportData): void {
-  const sanitized = {
+function serializeJsonReport(report: IntentTraceReportData): Record<string, unknown> {
+  return {
     ...report,
     missions: report.missions.map((mission) => ({
       ...mission,
@@ -567,11 +600,16 @@ function printJson(report: IntentTraceReportData): void {
       filePath: pathResolver.toRepoRelative(traceHit.filePath),
     })),
   };
-  console.log(JSON.stringify(sanitized, null, 2));
 }
 
-export async function main(argv: string[] = []): Promise<void> {
-  const parsed = await createStandardYargs(['node', 'intent', ...argv])
+const INTENT_TRACE_USAGE = 'Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]';
+
+export async function main(
+  argv: string[] = [],
+  print: (value: unknown) => void = () => undefined,
+  json = argv.includes('--json')
+): Promise<void> {
+  const parsed = await createStandardYargs(['node', 'intent', ...stripSharedScriptFlags(argv)])
     .command(
       'trace <correlationId>',
       'Render the full intent timeline for a correlation id',
@@ -580,11 +618,6 @@ export async function main(argv: string[] = []): Promise<void> {
           .positional('correlationId', {
             type: 'string',
             describe: 'Correlation id to trace',
-          })
-          .option('json', {
-            type: 'boolean',
-            default: false,
-            description: 'Emit the collected report as JSON',
           })
           .option('limit', {
             type: 'number',
@@ -598,37 +631,31 @@ export async function main(argv: string[] = []): Promise<void> {
 
   const command = String(parsed._[0] || '');
   if (command !== 'trace') {
-    console.error('Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]');
-    throw new ScriptExitError(
-      1,
-      'Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]'
-    );
+    print(INTENT_TRACE_USAGE);
+    throw new ScriptExitError(1, INTENT_TRACE_USAGE);
   }
 
   const correlationId = String(parsed.correlationId || parsed._[1] || '').trim();
   if (!correlationId) {
-    console.error('Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]');
-    throw new ScriptExitError(
-      1,
-      'Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]'
-    );
+    print(INTENT_TRACE_USAGE);
+    throw new ScriptExitError(1, INTENT_TRACE_USAGE);
   }
 
   const report = collectIntentTraceReport(correlationId);
-  if (parsed.json) {
-    printJson(report);
+  if (json) {
+    print(serializeJsonReport(report));
     return;
   }
 
-  console.log(renderIntentTraceReport(report, { maxRows: Number(parsed.limit) || 200 }));
+  print(renderIntentTraceReport(report, { maxRows: Number(parsed.limit) || 200 }));
 }
 
 const isDirect =
   isDirectScript(import.meta.url, 'intent.ts') || isDirectScript(import.meta.url, 'intent.js');
-export const runIntentTrace = defineScript({
-  name: 'intent:trace',
-  flags: [],
-  run: async ({ argv }) => main(argv),
+export const runIntent = defineScript({
+  name: 'intent',
+  flags: ['json', 'quiet'],
+  run: async ({ argv, print, json }) => main(argv, print, json),
 });
 
-if (isDirect) void runIntentTrace();
+if (isDirect) void runIntent();

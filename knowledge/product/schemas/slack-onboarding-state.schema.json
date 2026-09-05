@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/slack-onboarding-state.schema.json",
+  "title": "Slack Onboarding State",
+  "description": "Persisted per-thread Slack onboarding state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["channel", "threadTs", "currentField", "answers", "completed", "updatedAt"],
+  "properties": {
+    "channel": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "threadTs": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "currentField": {
+      "enum": ["name", "language", "interaction_style", "primary_domain", "vision", "agent_id"]
+    },
+    "answers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "language": { "type": "string" },
+        "interaction_style": { "type": "string" },
+        "primary_domain": { "type": "string" },
+        "vision": { "type": "string" },
+        "agent_id": { "type": "string" }
+      }
+    },
+    "completed": { "type": "boolean" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

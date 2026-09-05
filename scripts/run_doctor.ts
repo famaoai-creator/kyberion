@@ -1,44 +1,54 @@
 #!/usr/bin/env node
 import {
   listEnvironmentManifestIds,
-  listScheduledPipelines,
   loadEnvironmentManifest,
-  getGovernanceControlSummary,
   probeManifest,
-  pathResolver,
-  readJanitorLastRunMs,
-  safeExistsSync,
-  safeReadFile,
-  inspectMeshHub,
-  type SurfaceAsyncChannel,
-  isSurfaceOutboxDue,
+} from '@agent/core/environment-capability';
+import { readJanitorLastRunMs, readJanitorLastSubmissionMs } from '@agent/core/storage-janitor';
+import { inspectMeshHub } from '@agent/core/mesh-hub-inspection';
+import { getGovernanceControlSummary } from '@agent/core/governance-status';
+import { listScheduledPipelines } from '@agent/core/pipeline-scheduler';
+import {
   listSurfaceDeadLetters,
   listSurfaceDeadTargets,
   listSurfaceOutboxMessages,
+} from '@agent/core/surface-coordination-store';
+import { isSurfaceOutboxDue } from '@agent/core/surface-delivery';
+import type { SurfaceAsyncChannel } from '@agent/core/channel-surface-types';
+import {
   assessDesktopObservationReadiness,
   listDesktopObservationSources,
-  macosAutomationBridge,
-} from '@agent/core';
-import { buildNextAction, formatNextAction } from '@agent/core';
-import { formatEnvValidationReport, validateEnv } from '@agent/core';
-import {
-  discoverProviders,
-  evaluateDegradation,
-  listDemotedProviders,
-  loadHealthThresholds,
-  metrics,
-  type EnvValidationReport,
-  type LatencyRegression,
-} from '@agent/core';
-import { getEmbeddingBackend, installEmbeddingBackendIfAvailable } from '@agent/core';
-import { probeAppleIntelligence } from '@agent/core';
-import { collectMissionHygieneReport, formatMissionHygieneLine } from '@agent/core';
+} from '@agent/core/desktop-recording';
+import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
+import { buildNextAction, formatNextAction } from '@agent/core/next-action';
+import { formatEnvValidationReport, validateEnv } from '@agent/core/env-validator';
+import { evaluateDegradation, loadHealthThresholds } from '@agent/core/health-degradation';
+import { discoverProviders } from '@agent/core/provider-discovery';
+import { listDemotedProviders } from '@agent/core/provider-health-view';
+import { metrics } from '@agent/core/metrics';
+import type { EnvValidationReport } from '@agent/core/env-validator';
+import type { LatencyRegression } from '@agent/core/health-degradation';
+import { getEmbeddingBackend } from '@agent/core/embedding-backend';
+import { installEmbeddingBackendIfAvailable } from '@agent/core/embedding-bootstrap';
+import { probeAppleIntelligence } from '@agent/core/apple-intelligence-bridge';
+import { collectMissionHygieneReport, formatMissionHygieneLine } from '@agent/core/mission-hygiene';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { t } from '@agent/core/t';
 import { summarizeBackupStatus } from './backup.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
-import { defineScript, isDirectScript, type ScriptContext } from './lib/harness.js';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import {
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  stripSharedScriptFlags,
+  type ScriptContext,
+} from './lib/harness.js';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import {
+  formatAppPreflightReport,
+  runAppPreflight,
+  type AppPreflightReport,
+} from './app_preflight.js';
 
 const DEFAULT_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend'];
 const MISSION_MANIFESTS = [
@@ -52,7 +62,6 @@ const RUNTIME_PRESETS: Record<string, string[]> = {
   browser: ['meeting-participation-runtime'],
   baseline: DEFAULT_MANIFESTS,
 };
-const JANITOR_SUBMIT_MARKER = 'runtime/state/janitor-last-submit.json';
 const JANITOR_MAINTENANCE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface DoctorRunReport {
@@ -71,6 +80,7 @@ export interface DoctorRunReport {
   surfaceDeliveryLines: string[];
   localCapabilityLines: string[];
   desktopObservationLines: string[];
+  appPreflight?: AppPreflightReport;
 }
 
 /**
@@ -197,7 +207,9 @@ export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
       );
     }
     if (report.dead_letter_count > 0) {
-      lines.push('  - inspect dead letters via `pnpm mesh:deliver --json` and mesh-hub-inspection');
+      lines.push(
+        '  - inspect dead letters via `pnpm kyberion mesh deliver --json` and mesh-hub-inspection'
+      );
     }
     return lines;
   } catch (err) {
@@ -259,19 +271,8 @@ export function collectBackupDoctorLines(): string[] {
 
 export function collectMaintenanceDoctorLines(): string[] {
   const lastRunMs = readJanitorLastRunMs();
-  const submitPath = pathResolver.shared(JANITOR_SUBMIT_MARKER);
-  const submitPending = safeExistsSync(submitPath);
-  let lastSubmittedAt: number | null = null;
-  if (submitPending) {
-    try {
-      const raw = safeReadFile(submitPath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(raw) as { submitted_at?: string };
-      const submittedAt = Date.parse(String(parsed?.submitted_at || ''));
-      lastSubmittedAt = Number.isFinite(submittedAt) ? submittedAt : null;
-    } catch {
-      lastSubmittedAt = null;
-    }
-  }
+  const lastSubmittedAt = readJanitorLastSubmissionMs();
+  const submitPending = lastSubmittedAt !== null;
 
   if (lastRunMs === null && !submitPending) {
     return ['Maintenance: janitor idle; no last run marker'];
@@ -357,22 +358,38 @@ export async function collectDoctorReport(argv: {
   runtime?: string;
   all?: boolean;
   mission?: string;
+  platform?: 'ios' | 'android' | 'all';
+  full?: boolean;
 }): Promise<DoctorRunReport> {
-  const missionId = argv.mission ? String(argv.mission) : process.env.MISSION_ID || undefined;
-  if (missionId) process.env.MISSION_ID = missionId;
+  const missionId = argv.mission
+    ? String(argv.mission)
+    : getRegisteredEnvText('MISSION_ID') || undefined;
+  if (missionId) setRegisteredEnv('MISSION_ID', missionId);
 
-  const manifestIds = argv.all
-    ? listEnvironmentManifestIds()
-    : argv.manifest
-      ? [String(argv.manifest)]
-      : argv.runtime
-        ? (RUNTIME_PRESETS[String(argv.runtime)] ?? [String(argv.runtime)])
-        : missionId
-          ? MISSION_MANIFESTS
-          : DEFAULT_MANIFESTS;
+  const appPreflight =
+    argv.runtime === 'app'
+      ? runAppPreflight({
+          platform: argv.platform,
+          full: argv.full,
+        })
+      : undefined;
+  const manifestIds =
+    argv.runtime === 'app'
+      ? []
+      : argv.all
+        ? listEnvironmentManifestIds()
+        : argv.manifest
+          ? [String(argv.manifest)]
+          : argv.runtime
+            ? (RUNTIME_PRESETS[String(argv.runtime)] ?? [String(argv.runtime)])
+            : missionId
+              ? MISSION_MANIFESTS
+              : DEFAULT_MANIFESTS;
 
   const summaries: DoctorRunReport['summaries'] = [];
-  let totalMissing = 0;
+  let totalMissing = appPreflight
+    ? appPreflight.items.filter((entry) => entry.status === 'fail').length
+    : 0;
 
   for (const manifestId of manifestIds) {
     const manifest = loadEnvironmentManifest(manifestId);
@@ -405,6 +422,7 @@ export async function collectDoctorReport(argv: {
     surfaceDeliveryLines: collectSurfaceDeliveryDoctorLines(),
     localCapabilityLines: await collectLocalCapabilityDoctorLines(),
     desktopObservationLines: collectDesktopObservationDoctorLines(),
+    ...(appPreflight ? { appPreflight } : {}),
   };
 }
 
@@ -433,85 +451,108 @@ async function collectLocalCapabilityDoctorLines(): Promise<string[]> {
   }
 }
 
-async function parseDoctorArguments(args: string[]): Promise<{
+type DoctorArguments = {
   manifest?: string;
   runtime?: string;
   all?: boolean;
   mission?: string;
-  json?: boolean;
-}> {
-  return createStandardYargs(['node', 'run_doctor', ...args])
+  platform?: 'ios' | 'android' | 'all';
+  full?: boolean;
+};
+
+function normalizeDoctorArguments(args: string[]): string[] {
+  return stripSharedScriptFlags(args);
+}
+
+async function parseDoctorArguments(args: string[]): Promise<DoctorArguments> {
+  const parsed = await createStandardYargs([
+    'node',
+    'run_doctor',
+    ...normalizeDoctorArguments(args),
+  ])
     .option('manifest', { type: 'string' })
     .option('runtime', {
       type: 'string',
-      describe: 'Runtime preset to inspect: meeting, voice, browser, or baseline',
+      describe: 'Runtime preset to inspect: app, meeting, voice, browser, or baseline',
     })
     .option('all', { type: 'boolean', default: false })
     .option('mission', { type: 'string' })
-    .option('json', { type: 'boolean', default: false })
+    .option('platform', { type: 'string', choices: ['ios', 'android', 'all'], default: 'all' })
+    .option('full', { type: 'boolean', default: false })
     .parseSync();
+  return {
+    ...parsed,
+    platform: parsed.platform as DoctorArguments['platform'],
+  };
 }
 
-function printDoctorReport(
-  report: DoctorRunReport,
-  argv: { manifest?: string; runtime?: string; all?: boolean; mission?: string; json?: boolean },
-  print: (value: unknown) => void
-): void {
-  if (argv.json) {
-    print(report);
-    process.exitCode = report.totalMissing === 0 ? 0 : 1;
-    return;
-  }
+export function formatDoctorReport(report: DoctorRunReport, argv: DoctorArguments): string {
+  const lines: string[] = [];
   for (const line of report.rollupLines) {
-    print(line);
+    lines.push(line);
   }
-  print('');
+  lines.push('');
   for (const summary of report.summaries) {
     for (const line of summary.lines) {
-      print(line);
+      lines.push(line);
     }
-    print('');
+    lines.push('');
   }
   for (const line of report.scheduleLines) {
-    print(line);
+    lines.push(line);
   }
   for (const line of report.maintenanceLines) {
-    print(line);
+    lines.push(line);
   }
   for (const line of report.governanceLines) {
-    print(line);
+    lines.push(line);
   }
   for (const line of report.backupLines) {
-    print(line);
+    lines.push(line);
   }
   for (const line of report.localCapabilityLines) {
-    print(line);
+    lines.push(line);
   }
   for (const line of report.meshDeliveryLines) {
-    print(line);
+    lines.push(line);
   }
   for (const line of report.surfaceDeliveryLines) {
-    print(line);
+    lines.push(line);
   }
   for (const line of report.desktopObservationLines) {
-    print(line);
+    lines.push(line);
   }
-  print('');
+  if (report.appPreflight) {
+    lines.push(...formatAppPreflightReport(report.appPreflight).split('\n'));
+  }
+  lines.push('');
+
+  if (report.appPreflight) {
+    if (report.totalMissing === 0) {
+      lines.push('App runtime preflight is satisfied.');
+    } else {
+      lines.push(
+        'Next step: resolve the app preflight items above, then rerun `pnpm kyberion doctor -- --runtime app`.'
+      );
+    }
+    return lines.join('\n');
+  }
 
   if (report.totalMissing === 0) {
-    print('All required capabilities are satisfied.');
+    lines.push('All required capabilities are satisfied.');
     if (!argv.manifest && !argv.runtime && !argv.all) {
-      print(
+      lines.push(
         'Want the right surface next? Run `pnpm setup:report --persona first-time-user` for a recommended surface guide.'
       );
     }
-    process.exitCode = 0;
-    return;
+    return lines.join('\n');
   }
 
-  const missionId = argv.mission ? String(argv.mission) : process.env.MISSION_ID || undefined;
+  const missionId = argv.mission
+    ? String(argv.mission)
+    : getRegisteredEnvText('MISSION_ID') || undefined;
   if (!missionId && !argv.manifest && !argv.runtime && !argv.all) {
-    print(
+    lines.push(
       'Tip: pass `--runtime meeting --mission <id>` to include browser, voice, audio, and mission-scoped consent checks.'
     );
   }
@@ -526,16 +567,16 @@ function printDoctorReport(
   );
   if (firstMissingSummary) {
     const nextStep = formatMissingCapabilityNextStep(firstMissingSummary);
-    print(
+    lines.push(
       needsMeetingHint && !isReasoningBackendSummary(firstMissingSummary)
         ? `${nextStep.message} For meeting runtime gaps, use \`pnpm env:bootstrap --manifest meeting-participation-runtime --apply\`.`
         : nextStep.message
     );
-    print(
+    lines.push(
       'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
     );
     if (onDemandActuator) {
-      print(
+      lines.push(
         `For actuator-level pulls, run \`pnpm deps:check --actuator ${onDemandActuator}\` before starting that surface.`
       );
     }
@@ -548,30 +589,31 @@ function printDoctorReport(
       suggested_command: nextStep.command,
     });
     for (const line of formatNextAction(nextAction)) {
-      print(line);
+      lines.push(line);
     }
   } else {
-    print('Next step: inspect doctor findings above and rerun the relevant setup command.');
-    print(
+    lines.push('Next step: inspect doctor findings above and rerun the relevant setup command.');
+    lines.push(
       'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
     );
     if (onDemandActuator) {
-      print(
+      lines.push(
         `For actuator-level pulls, run \`pnpm deps:check --actuator ${onDemandActuator}\` before starting that surface.`
       );
     }
   }
-  process.exitCode = 1;
+  return lines.join('\n');
 }
 
 export const runDoctor = defineScript<DoctorRunReport>({
   name: 'doctor',
-  // Doctor owns its yargs options; do not consume them as shared harness flags.
-  flags: [],
   async run(context: ScriptContext): Promise<DoctorRunReport> {
     const argv = await parseDoctorArguments(context.argv);
     const report = await collectDoctorReport(argv);
-    printDoctorReport(report, argv, context.print);
+    context.print(context.json ? report : formatDoctorReport(report, argv));
+    if (report.totalMissing > 0) {
+      throw new ScriptExitError(1, '', true, report);
+    }
     return report;
   },
 });

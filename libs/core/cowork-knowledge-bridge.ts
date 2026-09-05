@@ -24,14 +24,17 @@
 import { createHash } from 'node:crypto';
 import * as nodePath from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
-  loadJson,
   safeReaddir,
   safeWriteFile,
   safeMkdir,
 } from './secure-io.js';
+import { nowIso } from './foundation/time.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -79,9 +82,13 @@ export interface BridgeSyncResult {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SYNC_STATE_LOGICAL = 'active/shared/runtime/cowork-sync-state.json';
+const SYNC_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/cowork-sync-state.schema.json'
+);
 const POLICY_PATH = pathResolver.rootResolve(
   'knowledge/product/governance/cowork-sync-policy.json'
 );
+const POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/cowork-sync-policy.schema.json');
 
 // ─── Sync state helpers ───────────────────────────────────────────────────────
 
@@ -91,26 +98,55 @@ function syncStateLogicalPath(scope?: ScopeContext): string {
     : SYNC_STATE_LOGICAL;
 }
 
+function syncStateCatalogAtPath(statePath: string) {
+  return defineCatalog<SyncState>({
+    id: 'cowork-sync-state',
+    path: statePath,
+    schema: SYNC_STATE_SCHEMA_PATH,
+  });
+}
+
+function emptySyncState(): SyncState {
+  return { ingested: {}, supplied: {}, last_sync_at: '' };
+}
+
+/** Load Cowork sync state through schema and regular-file validation. */
+export function loadCoworkSyncStateAtPath(statePath: string): SyncState {
+  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeStatePath).isFile()) {
+    throw new Error(`[COWORK_SYNC_STATE] state must be a regular file: ${statePath}`);
+  }
+  return syncStateCatalogAtPath(safeStatePath).load();
+}
+
 function loadSyncState(scope?: ScopeContext): SyncState {
-  const resolved = pathResolver.resolve(syncStateLogicalPath(scope));
+  const resolved = assertSafeRepositoryPath(pathResolver.resolve(syncStateLogicalPath(scope)), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(resolved)) {
-    return { ingested: {}, supplied: {}, last_sync_at: '' };
+    return emptySyncState();
   }
   try {
-    return loadJson<SyncState>(resolved);
+    return loadCoworkSyncStateAtPath(resolved);
   } catch {
-    return { ingested: {}, supplied: {}, last_sync_at: '' };
+    return emptySyncState();
   }
 }
 
 function saveSyncState(state: SyncState, scope?: ScopeContext): void {
-  const resolved = pathResolver.resolve(syncStateLogicalPath(scope));
+  const resolved = assertSafeRepositoryPath(pathResolver.resolve(syncStateLogicalPath(scope)), {
+    allowMissingLeaf: true,
+  });
   const dir = nodePath.dirname(resolved);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(
-    resolved,
-    JSON.stringify({ ...state, last_sync_at: new Date().toISOString() }, null, 2)
+  if (safeExistsSync(resolved) && !safeLstat(resolved).isFile()) {
+    throw new Error(`[COWORK_SYNC_STATE] state must be a regular file: ${resolved}`);
+  }
+  const validated = syncStateCatalogAtPath(resolved).validate(
+    { ...state, last_sync_at: nowIso() },
+    resolved
   );
+  safeWriteFile(resolved, JSON.stringify(validated, null, 2));
 }
 
 function sha256(content: string): string {
@@ -140,10 +176,16 @@ interface SyncPolicy {
   };
 }
 
+const policyCatalog = defineCatalog<SyncPolicy>({
+  id: 'cowork-sync-policy',
+  path: POLICY_PATH,
+  schema: POLICY_SCHEMA_PATH,
+});
+
 function loadPolicy(): SyncPolicy | null {
   if (!safeExistsSync(POLICY_PATH)) return null;
   try {
-    return loadJson<SyncPolicy>(POLICY_PATH);
+    return policyCatalog.load();
   } catch {
     return null;
   }
@@ -207,8 +249,17 @@ export function ingestCoworkArtifacts(
   );
 
   for (const rawPath of artifactPaths) {
-    const absPath = nodePath.isAbsolute(rawPath) ? rawPath : pathResolver.rootResolve(rawPath);
     const sourceRef = rawPath;
+    let absPath: string;
+    try {
+      absPath = assertSafeRepositoryPath(
+        nodePath.isAbsolute(rawPath) ? rawPath : pathResolver.rootResolve(rawPath),
+        { allowMissingLeaf: true }
+      );
+    } catch (err) {
+      result.errors.push(`Cannot read ${sourceRef}: ${err}`);
+      continue;
+    }
 
     if (!safeExistsSync(absPath)) {
       result.errors.push(`File not found: ${sourceRef}`);
@@ -294,7 +345,9 @@ export function supplyKnowledgeToCowork(
   const state = loadSyncState(options.scope);
   const result: SupplyResult = { delivered: 0, skipped_unchanged: 0, errors: [] };
 
-  const publicRoot = pathResolver.rootResolve('knowledge/public');
+  const publicRoot = assertSafeRepositoryPath(pathResolver.rootResolve('knowledge/public'), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(publicRoot)) {
     result.errors.push('knowledge/public does not exist');
     return result;
@@ -308,7 +361,14 @@ export function supplyKnowledgeToCowork(
   const hintsToDeliver: { path: string; content: string }[] = [];
 
   for (const domain of domains) {
-    const domainDir = nodePath.join(publicRoot, domain);
+    let domainDir: string;
+    try {
+      domainDir = assertSafeRepositoryPath(nodePath.join(publicRoot, domain), {
+        allowMissingLeaf: true,
+      });
+    } catch {
+      continue;
+    }
     if (!safeExistsSync(domainDir)) continue;
     collectMarkdownFiles(
       domainDir,
@@ -377,7 +437,12 @@ function collectMarkdownFiles(
   for (const entry of entries) {
     const addedThisCall = collected.length - initialCount;
     if (addedThisCall >= remaining) break;
-    const fullPath = nodePath.join(dir, entry);
+    let fullPath: string;
+    try {
+      fullPath = assertSafeRepositoryPath(nodePath.join(dir, entry));
+    } catch {
+      continue;
+    }
     if (entry.endsWith('.md') || entry.endsWith('.txt')) {
       try {
         const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
@@ -411,7 +476,10 @@ export function runCoworkKnowledgeSync(params: {
   scope?: ScopeContext;
 }): BridgeSyncResult {
   const direction = params.direction ?? 'both';
-  const statePath = pathResolver.resolve(syncStateLogicalPath(params.scope));
+  const statePath = assertSafeRepositoryPath(
+    pathResolver.resolve(syncStateLogicalPath(params.scope)),
+    { allowMissingLeaf: true }
+  );
 
   const syncResult: BridgeSyncResult = { direction, sync_state_path: statePath };
 

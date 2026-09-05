@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { safeReadFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
 import {
   loadMediaSignalEntryPolicyCatalog,
@@ -16,5 +18,14 @@ describe('media-signal-entry-policy', () => {
     ]);
     expect(resolveMediaSignalEntryPolicy('risks')?.default_tone).toBe('warning');
     expect(resolveMediaSignalEntryPolicy('incidents')?.signal_type).toBe('incident');
+  });
+
+  it('keeps the canonical catalog as the only policy definition', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/media-signal-entry-policy.ts'))
+    );
+
+    expect(source).not.toContain('FALLBACK_');
+    expect(source).not.toContain('fallback:');
   });
 });

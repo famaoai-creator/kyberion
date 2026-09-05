@@ -1,6 +1,11 @@
-import { grantVoiceConsent, pathResolver, resolveVars, safeExecResult } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { grantVoiceConsent } from '@agent/core/voice-consent';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveVars } from '@agent/core/logic-utils';
+import { safeExecResult } from '@agent/core/secure-io';
+import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline-contract';
+import { validateProductivityTaskPlan } from '@agent/core/productivity-task-plan';
+import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 import { applyOnboardingInput } from './onboarding_apply.js';
 import { runCampaignSuite } from './campaign_suite.js';
 import { runAiAudit } from './run_ai_audit.js';
@@ -61,7 +66,7 @@ function parseJsonPayload(raw: unknown, label: string): Record<string, unknown> 
   );
   const unwrapped = wrapped ? wrapped[1] : text;
   const fenced = unwrapped.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const parsed = JSON.parse((fenced ? fenced[1] : unwrapped).trim()) as unknown;
+  const parsed = parseSafeJsonInput((fenced ? fenced[1] : unwrapped).trim(), label);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error(`${label} must decode to an object`);
   }
@@ -95,32 +100,28 @@ export function runInlineProductivityDryRunValidation(
   if (plan.kind !== 'productivity-task-plan') {
     throw new Error('invalid productivity task plan kind');
   }
-  if (
-    (plan.execution as Record<string, unknown> | undefined)?.mode !== 'dry_run' ||
-    (plan.execution as Record<string, unknown> | undefined)?.external_effects_executed !== false
-  ) {
-    throw new Error('productivity task plan must be dry-run only');
+  let validatedPlan;
+  try {
+    validatedPlan = validateProductivityTaskPlan(plan);
+  } catch (error) {
+    throw new Error(
+      `invalid productivity task plan shape: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
   }
-  if (
-    !Array.isArray(plan.steps) ||
-    plan.steps.some((item) => (item as Record<string, unknown>)?.execution_mode !== 'preview_only')
-  ) {
-    throw new Error('all productivity steps must remain preview_only');
-  }
-  const approval = plan.approval as Record<string, unknown> | undefined;
   return exportValue(
     params,
     step,
     {
       kind: 'productivity-review-package',
       mission_id: ctx.mission_id,
-      status: approval?.required ? 'approval_required' : 'ready_for_local_draft',
-      request: plan.request,
-      domains: plan.domains,
-      steps: plan.steps,
-      approval: plan.approval,
-      missing_inputs: plan.missing_inputs,
-      evidence_plan: plan.evidence_plan,
+      status: validatedPlan.approval.required ? 'approval_required' : 'ready_for_local_draft',
+      request: validatedPlan.request,
+      domains: validatedPlan.domains,
+      steps: validatedPlan.steps,
+      approval: validatedPlan.approval,
+      missing_inputs: validatedPlan.missing_inputs,
+      evidence_plan: validatedPlan.evidence_plan,
       external_effects_executed: false,
     },
     ctx
@@ -235,9 +236,15 @@ export async function runInlineOnboardingApply(
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const raw = resolveVars(params.input ?? ctx.onboarding_input ?? ctx, ctx);
-  const input = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const input = parseInlineOnboardingInput(raw);
   const result = await applyOnboardingInput(input as any);
   return exportValue(params, step, result, ctx);
+}
+
+export function parseInlineOnboardingInput(raw: unknown): Record<string, unknown> {
+  return typeof raw === 'string'
+    ? parseSafeJsonObjectInput(raw, 'onboarding input') || {}
+    : parseSafeJsonObjectValue(raw, 'onboarding input');
 }
 
 export function runInlineCampaignSuite(
@@ -603,7 +610,10 @@ export async function runInlineMissionStartFromIssues(
     raw && typeof raw === 'object' && !Array.isArray(raw)
       ? ((raw as Record<string, unknown>).stdout ?? (raw as Record<string, unknown>).output ?? raw)
       : raw;
-  const issues = typeof candidate === 'string' ? JSON.parse(candidate) : candidate;
+  const issues = parseSafeJsonInput(
+    typeof candidate === 'string' ? candidate : JSON.stringify(candidate) || '',
+    'mission start issues'
+  );
   if (!Array.isArray(issues))
     throw new Error('core:run_mission_start_from_issues requires an array');
   const started: string[] = [];

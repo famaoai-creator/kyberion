@@ -5,9 +5,11 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(
     (target: string) =>
       String(target).includes('espeak-ng') ||
+      String(target).endsWith('.py') ||
       String(target).endsWith('.aiff') ||
       String(target).endsWith('.wav')
   ),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeStat: vi.fn(() => ({ size: 4096 })),
   safeMkdir: vi.fn(),
   safeExecResult: vi.fn(() => ({
@@ -132,24 +134,52 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = (await vi.importActual('@agent/core')) as any;
+// Keep the doubles on the canonical module boundaries used by the runtime
+// helper. The production secure-io guard must not see the test's /tmp paths.
+vi.mock('@agent/core/secure-io', () => ({
+  assertSafeRepositoryPath: (candidate: string) => {
+    const value = String(candidate);
+    if (value.startsWith('/var/') || value.includes('../')) {
+      throw new Error(
+        `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${value}`
+      );
+    }
+    return value;
+  },
+  safeExec: mocks.safeExec,
+  safeExecResult: mocks.safeExecResult,
+  safeExistsSync: mocks.safeExistsSync,
+  safeMkdir: mocks.safeMkdir,
+  safeReadFile: mocks.safeReadFile,
+  safeLstat: mocks.safeLstat,
+  safeStat: mocks.safeStat,
+}));
+vi.mock('@agent/core/path-resolver', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/path-resolver')>(
+    '@agent/core/path-resolver'
+  );
   return {
     ...actual,
-    getVoiceEngineRecord: mocks.getVoiceEngineRecord,
-    getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
-    logger: mocks.logger,
-    safeExec: mocks.safeExec,
-    safeExistsSync: mocks.safeExistsSync,
-    safeMkdir: mocks.safeMkdir,
-    safeExecResult: mocks.safeExecResult,
-    safeReadFile: mocks.safeReadFile,
-    safeStat: mocks.safeStat,
-    getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
-    retry: mocks.retry,
-    resolveManagedToolPythonBin: mocks.resolveManagedToolPythonBin,
+    pathResolver: {
+      ...actual.pathResolver,
+      rootResolve: vi.fn((value: string) => value),
+      sharedTmp: vi.fn((value: string) => `/tmp/${value}`),
+    },
   };
 });
+vi.mock('@agent/core/voice-engine-registry', () => ({
+  getVoiceEngineRecord: mocks.getVoiceEngineRecord,
+  getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
+  resolveVoiceEngineForPlatform: mocks.getVoiceEngineRecord,
+}));
+vi.mock('@agent/core/voice-tts-config', () => ({
+  getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
+}));
+vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
+vi.mock('@agent/core/tool-runtime-registry', () => ({
+  resolveManagedToolPythonBin: mocks.resolveManagedToolPythonBin,
+}));
+vi.mock('@agent/core/core', () => ({ logger: mocks.logger }));
 
 describe('voice runtime helpers', () => {
   beforeEach(() => {
@@ -171,6 +201,66 @@ describe('voice runtime helpers', () => {
       }
       return '';
     });
+  });
+
+  it('accepts a successful local STT response', async () => {
+    const { parseVoiceSttBridgeResponse } = await import('./voice-runtime-helpers.js');
+    expect(
+      parseVoiceSttBridgeResponse({ status: 'success', text: 'hello', language: 'en' })
+    ).toEqual({ status: 'success', text: 'hello', language: 'en' });
+  });
+
+  it('preserves validated capabilities and transcript segments', async () => {
+    const { parseVoiceSttBridgeResponse } = await import('./voice-runtime-helpers.js');
+    expect(
+      parseVoiceSttBridgeResponse({
+        status: 'success',
+        text: 'hello',
+        capabilities: { timestamps: true, granularity: 'segment' },
+        segments: [{ start_sec: 0, end_sec: 1, text: 'hello' }],
+      })
+    ).toMatchObject({
+      capabilities: { timestamps: true, granularity: 'segment' },
+      segments: [{ start_sec: 0, end_sec: 1, text: 'hello' }],
+    });
+  });
+
+  it('rejects a successful response without transcript text', async () => {
+    const { parseVoiceSttBridgeResponse } = await import('./voice-runtime-helpers.js');
+    expect(parseVoiceSttBridgeResponse({ status: 'success' })).toBeUndefined();
+    expect(parseVoiceSttBridgeResponse({ status: 'success', text: 123 })).toBeUndefined();
+  });
+
+  it('rejects primitive and malformed capability responses', async () => {
+    const { parseVoiceSttBridgeResponse } = await import('./voice-runtime-helpers.js');
+    expect(parseVoiceSttBridgeResponse([])).toBeUndefined();
+    expect(
+      parseVoiceSttBridgeResponse({
+        status: 'success',
+        text: 'hello',
+        capabilities: { timestamps: true, granularity: 'invalid' },
+      })
+    ).toBeUndefined();
+  });
+
+  it('rejects voice profile and artifact paths outside the repository', async () => {
+    const { resolveArtifactPath, resolveProfileRefAudio } =
+      await import('./voice-runtime-helpers.js');
+    expect(() => resolveArtifactPath('boundary', 'wav', '/var/external-voice.wav')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    expect(() => resolveProfileRefAudio({ sample_refs: ['/var/external-reference.wav'] })).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
+  it('rejects a non-regular voice reference before bridge execution', async () => {
+    const { resolveProfileRefAudio } = await import('./voice-runtime-helpers.js');
+    mocks.safeLstat.mockReturnValueOnce({ isFile: () => false });
+
+    expect(() => resolveProfileRefAudio({ sample_refs: ['/tmp/reference.wav'] })).toThrow(
+      'existing regular file'
+    );
   });
 
   // darwin-only: exercises the macOS say → espeak fallback chain; the engine

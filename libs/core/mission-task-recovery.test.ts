@@ -13,6 +13,7 @@ import { safeExistsSync, safeMkdir, safeRmSync, safeReadFile, safeWriteFile } fr
 import { recoverMissionRequestedTasks } from './mission-task-recovery.js';
 import { dispatchMissionTickets } from '../../scripts/refactor/mission-ticket-dispatch.js';
 import type { MissionState } from '../../scripts/refactor/mission-types.js';
+import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
 
 const missionId = 'MSN-RECOVERY-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -63,6 +64,22 @@ afterEach(() => {
 });
 
 describe('mission task recovery', () => {
+  it('does not recover from a malformed NEXT_TASKS projection', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([{ task_id: 'task-1', status: 'requested' }, { task_id: 42 }])
+    );
+
+    expect(recoverMissionRequestedTasks(missionId)).toMatchObject({
+      requested_count: 0,
+      waiting_count: 0,
+      reissued_count: 0,
+      skipped_count: 0,
+      recovered_task_ids: [],
+      records: [],
+    });
+  });
+
   it('waits for active leases and reissues only expired requested tasks', async () => {
     const state = makeMissionState();
     safeWriteFile(
@@ -129,5 +146,15 @@ describe('mission task recovery', () => {
       lease_expires_at: expect.any(String),
       resumed_at: expect.any(String),
     });
+
+    const nextTasksReceipts = loadProvisionedEntryRecords(missionId).filter(
+      (record) => record.target_path === 'NEXT_TASKS.json'
+    );
+    expect(
+      nextTasksReceipts.filter((record) => record.phase === 'provisioned').length
+    ).toBeGreaterThan(0);
+    expect(
+      nextTasksReceipts.filter((record) => record.phase === 'verified').length
+    ).toBeGreaterThan(0);
   });
 });

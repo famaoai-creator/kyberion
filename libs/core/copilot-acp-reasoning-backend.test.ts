@@ -21,11 +21,36 @@ vi.mock('./acp-mediator.js', () => ({
   },
 }));
 
-import { CopilotAcpReasoningBackend } from './copilot-acp-reasoning-backend.js';
+import {
+  buildCopilotAcpBackendFromEnv,
+  CopilotAcpReasoningBackend,
+} from './copilot-acp-reasoning-backend.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 describe('CopilotAcpReasoningBackend', () => {
   beforeEach(() => {
     mediatorInstances.length = 0;
+  });
+
+  it('routes Copilot model environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/copilot-acp-reasoning-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  it('uses an injected model environment when building the backend', () => {
+    buildCopilotAcpBackendFromEnv({ KYBERION_COPILOT_MODEL: 'copilot-injected-model' });
+
+    expect(mediatorInstances[0]?.options).toMatchObject({
+      modelId: 'copilot-injected-model',
+      bootArgs: ['copilot', '--', '--acp', '--no-ask-user', '--model', 'copilot-injected-model'],
+    });
   });
 
   it('starts Copilot through ACP without granting all permissions', async () => {
@@ -43,6 +68,20 @@ describe('CopilotAcpReasoningBackend', () => {
     });
     expect(mediatorInstances[0]?.options.bootArgs).not.toContain('--allow-all');
     expect(mediatorInstances[0]?.instance.boot).toHaveBeenCalledOnce();
+  });
+
+  it('refuses before boot when an active sandbox policy has no ACP projection', async () => {
+    const backend = new CopilotAcpReasoningBackend({ command: 'gh' });
+    const policy = resolveSandboxPolicy({
+      provider: 'kyberion',
+      mode: 'read-only',
+      networkAccess: true,
+    });
+
+    await expect(
+      withSandboxPolicy(policy, () => backend.prompt('inspect the task'))
+    ).rejects.toThrow('[SANDBOX_POLICY_UNSUPPORTED]');
+    expect(mediatorInstances[0]?.instance.boot).not.toHaveBeenCalled();
   });
 
   it('reuses a booted ACP session for repeated prompts', async () => {

@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEPRECATED = new Map(
   describeOps()
@@ -67,12 +68,14 @@ export const runCheckDeprecatedWisdomOps = defineScript({
       context.print('[check:deprecated-wisdom-ops] OK (no deprecated Wisdom ops in catalogs)');
     } else {
       for (const finding of findings) {
-        console.warn(
-          `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
-        );
+        if (!context.json)
+          context.print(
+            `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
+          );
       }
-      if (context.argv.includes('--fail')) process.exitCode = 1;
+      if (context.argv.includes('--fail')) throw new ScriptExitError(1);
     }
+    return { findings };
   },
 });
 

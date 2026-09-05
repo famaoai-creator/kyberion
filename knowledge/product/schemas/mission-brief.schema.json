@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mission alignment brief",
+  "description": "A partial alignment draft. Unknown fields are rejected so approval hashes cover a canonical contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "missionId": { "type": "string" },
+    "title": { "type": "string" },
+    "intent": { "type": "string" },
+    "persona": { "type": "string" },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "sovereignSwitch": {
+      "type": "string",
+      "enum": ["governance-first", "autonomous-yolo"]
+    },
+    "victoryConditions": { "type": "array", "items": { "type": "string" } },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in": { "type": "array", "items": { "type": "string" } },
+        "out": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "flow": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "step": { "type": ["string", "number"] },
+          "title": { "type": "string" },
+          "detail": { "type": "string" },
+          "pipeline": { "type": "string" }
+        }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "who": { "type": "string" },
+          "role": { "type": "string" }
+        }
+      }
+    },
+    "deliverables": { "type": "array", "items": { "type": "string" } },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "risk": { "type": "string" },
+          "level": { "type": ["string", "number"] },
+          "mitigation": { "type": "string" }
+        }
+      }
+    },
+    "openItems": { "type": "array", "items": { "type": "string" } },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sudoGate": { "type": ["string", "boolean"] },
+        "riskLevel": { "type": ["string", "number"] },
+        "approvalRequired": { "type": "boolean" }
+      }
+    },
+    "estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "effort": { "type": "string" },
+        "cost": { "type": "string" }
+      }
+    },
+    "projectId": { "type": "string" },
+    "projectPath": { "type": "string" },
+    "trackId": { "type": "string" },
+    "trackType": { "type": "string" },
+    "lifecycleModel": { "type": "string" }
+  }
+}

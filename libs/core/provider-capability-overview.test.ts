@@ -1,7 +1,24 @@
-import { describe, expect, it } from 'vitest';
-import { buildProviderCapabilitySnapshot } from './provider-capability-overview.js';
-import type { CapabilityRegistry, DiscoveredCapability, ProbeResult } from './provider-capability-scanner.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  buildProviderCapabilitySnapshot,
+  loadProviderCapabilitySnapshotAtPath,
+  parseProviderCapabilitySnapshot,
+} from './provider-capability-overview.js';
+import type {
+  CapabilityRegistry,
+  DiscoveredCapability,
+  ProbeResult,
+} from './provider-capability-scanner.js';
 import type { ProviderInfo } from './provider-discovery.js';
+
+const snapshotRoot = pathResolver.sharedTmp(`provider-capability-overview-${process.pid}`);
+
+afterEach(() => {
+  safeRmSync(snapshotRoot, { recursive: true, force: true });
+});
 
 describe('provider-capability-overview', () => {
   it('builds a stable snapshot from discovered capabilities and provider status', () => {
@@ -117,6 +134,60 @@ describe('provider-capability-overview', () => {
         },
       ],
     });
-    expect(snapshot.capabilities.map((capability) => capability.capability_id)).toEqual(['cap.one', 'cap.two']);
+    expect(snapshot.capabilities.map((capability) => capability.capability_id)).toEqual([
+      'cap.one',
+      'cap.two',
+    ]);
+    expect(parseProviderCapabilitySnapshot(snapshot)).toEqual(snapshot);
+  });
+
+  it('rejects polluted or structurally invalid persisted snapshots', () => {
+    expect(() =>
+      parseProviderCapabilitySnapshot({
+        generated_at: '2026-05-26T00:00:00.000Z',
+        registered_capabilities: 1,
+        available_capabilities: 1,
+        available_providers: [],
+        missing_providers: [],
+        providers: [],
+        capabilities: [],
+        unexpected: true,
+      })
+    ).toThrow('contains unknown field(s)');
+    expect(() =>
+      parseProviderCapabilitySnapshot(
+        JSON.parse(
+          '{"generated_at":"2026-05-26T00:00:00.000Z","registered_capabilities":1,"available_capabilities":1,"available_providers":[],"missing_providers":[],"providers":[{"provider":"alpha","installed":true,"version":null,"protocol":"json-rpc","healthy":true,"__proto__":{}}],"capabilities":[]}'
+        )
+      )
+    ).toThrow('dangerous JSON key');
+  });
+
+  it('loads persisted snapshots through the schema-bound catalog', () => {
+    const snapshotPath = path.join(snapshotRoot, 'provider-capabilities.json');
+    safeMkdir(snapshotRoot, { recursive: true });
+    safeWriteFile(
+      snapshotPath,
+      JSON.stringify({
+        generated_at: '2026-05-26T00:00:00.000Z',
+        registered_capabilities: 0,
+        available_capabilities: 0,
+        available_providers: [],
+        missing_providers: [],
+        providers: [],
+        capabilities: [],
+      })
+    );
+
+    expect(loadProviderCapabilitySnapshotAtPath(snapshotPath)).toMatchObject({
+      generated_at: '2026-05-26T00:00:00.000Z',
+      providers: [],
+      capabilities: [],
+    });
+
+    safeWriteFile(snapshotPath, JSON.stringify({ providers: [] }));
+    expect(() => loadProviderCapabilitySnapshotAtPath(snapshotPath)).toThrow(
+      /Invalid catalog provider-capability-snapshot/u
+    );
   });
 });

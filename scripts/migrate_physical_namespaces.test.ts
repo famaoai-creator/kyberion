@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { safeMkdir, safeRmSync, safeWriteFile, pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   feedbackScopes,
   intentScopes,
@@ -58,5 +59,43 @@ describe('physical namespace migration CLI', () => {
     expect(intentScopes(intent)).toMatchObject({ disposition: 'unscoped-legacy' });
     expect(ledgerScopes(ledger)).toMatchObject({ disposition: 'unscoped-legacy' });
     safeRmSync(root, { recursive: true, force: true });
+  });
+
+  it('rejects unsafe or non-object JSONL records before scope inference', () => {
+    const root = pathResolver.sharedTmp(`physical-namespace-shape-test/${process.pid}`);
+    const feedback = `${root}/feedback.jsonl`;
+    const ledger = `${root}/ledger.jsonl`;
+    const promotion = `${root}/promotion.jsonl`;
+    safeMkdir(root, { recursive: true });
+    safeWriteFile(feedback, '[1]\n');
+    safeWriteFile(ledger, '{"visible_to":[1]}\n');
+    safeWriteFile(promotion, '{"scope":[]}\n');
+
+    expect(feedbackScopes(feedback)).toMatchObject({ disposition: 'invalid' });
+    expect(ledgerScopes(ledger)).toMatchObject({ disposition: 'invalid' });
+    expect(promotionScopes(promotion)).toMatchObject({ disposition: 'invalid' });
+    safeRmSync(root, { recursive: true, force: true });
+  });
+
+  it('rejects dangerous keys in intent memory before reading entries', () => {
+    const root = pathResolver.sharedTmp(`physical-namespace-dangerous-json-test/${process.pid}`);
+    const intent = `${root}/intent-contract-memory.json`;
+    safeMkdir(root, { recursive: true });
+    safeWriteFile(intent, '{"entries":[{"__proto__":{"tenant_slug":"acme"}}]}');
+
+    expect(intentScopes(intent)).toMatchObject({ disposition: 'invalid' });
+    safeRmSync(root, { recursive: true, force: true });
+  });
+
+  it('routes migration plans through the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/migrate_physical_namespaces.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
   });
 });

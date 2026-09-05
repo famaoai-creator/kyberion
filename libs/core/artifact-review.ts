@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
 import type { DeliverableKind } from './deliverable-quality.js';
 
 export type ArtifactReviewVerdict = 'approved' | 'changes_requested' | 'rejected';
@@ -86,12 +87,21 @@ function getReceiptValidator(): ValidateFunction {
   return receiptValidator;
 }
 
+function artifactReviewReceiptCatalog(filePath: string) {
+  return defineCatalog<ArtifactReviewReceipt>({
+    id: 'artifact-review-receipt',
+    path: filePath,
+    schema: RECEIPT_SCHEMA_PATH,
+  });
+}
+
 export function artifactReviewSha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
 export function hashArtifactForReview(path: string): string {
-  return artifactReviewSha256(safeReadFile(path) as Buffer);
+  const safePath = assertSafeRepositoryPath(path);
+  return artifactReviewSha256(safeReadFile(safePath, { encoding: null }) as Buffer);
 }
 
 export function inferArtifactReviewKind(path: string): DeliverableKind {
@@ -139,7 +149,7 @@ export function buildArtifactReviewReceipt(
     verdict: blocking ? 'changes_requested' : 'approved',
     findings,
     acceptance_criteria: [...input.acceptanceCriteria],
-    reviewed_at: input.reviewedAt || new Date().toISOString(),
+    reviewed_at: input.reviewedAt || nowIso(),
   };
 }
 
@@ -161,10 +171,11 @@ export function validateArtifactReviewReceipt(value: unknown): {
 }
 
 export function loadArtifactReviewReceipt(path: string): ArtifactReviewReceipt {
-  const value = readJson<unknown>(path);
+  const safePath = assertSafeRepositoryPath(path);
+  const value = artifactReviewReceiptCatalog(safePath).load();
   const validation = validateArtifactReviewReceipt(value);
   if (!validation.valid || !validation.receipt) {
-    throw new Error(`Invalid artifact review receipt ${path}: ${validation.errors.join('; ')}`);
+    throw new Error(`Invalid artifact review receipt ${safePath}: ${validation.errors.join('; ')}`);
   }
   return validation.receipt;
 }

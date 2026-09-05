@@ -1,49 +1,15 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  getRegisteredEnv,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeReaddir,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
-
-type TaskTrigger =
-  | { type: 'schedule'; cron: string; timezone?: string }
-  | { type: 'event'; event_name: string; source?: string }
-  | { type: 'manual'; prompt: string };
-
-type TaskScenario = {
-  id: string;
-  title: string;
-  description: string;
-  trigger: TaskTrigger;
-  input: {
-    sources: string[];
-    required_params: string[];
-    optional_params?: string[];
-  };
-  first_run: {
-    reasoning_required: boolean;
-    questions: string[];
-    profile_output: string;
-  };
-  repeat_run: {
-    pipeline_template: string;
-    params_from_profile: boolean;
-    profile_input?: string;
-  };
-  result: {
-    artifacts: string[];
-    summary_format: 'markdown' | 'json' | 'text';
-  };
-  approval_boundary: {
-    required_for: string[];
-    default_action: 'draft-only' | 'notify-only' | 'requires-human-approval';
-  };
-};
+import { loadTaskScenario, type TaskScenario } from './lib/task-scenario.js';
 
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
 
@@ -51,26 +17,32 @@ function resolveScenarioDir(): string {
   const override = (
     getRegisteredEnv<string>('KYBERION_TASK_SCENARIO_DIR') as string | undefined
   )?.trim();
-  return override ? path.resolve(override) : DEFAULT_SCENARIO_DIR;
+  return override
+    ? assertSafeRepositoryPath(path.resolve(override), { allowMissingLeaf: true })
+    : DEFAULT_SCENARIO_DIR;
 }
 
 function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
-  if (!safeExistsSync(scenarioDir) || !safeLstat(scenarioDir).isDirectory()) {
+  const safeScenarioDir = assertSafeRepositoryPath(scenarioDir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeScenarioDir) || !safeLstat(safeScenarioDir).isDirectory()) {
     return [];
   }
 
-  return safeReaddir(scenarioDir)
+  return safeReaddir(safeScenarioDir)
     .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => path.join(scenarioDir, entry))
+    .map((entry) => assertSafeRepositoryPath(path.join(safeScenarioDir, entry)))
+    .filter((filePath) => safeLstat(filePath).isFile())
     .sort((left, right) => left.localeCompare(right));
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return readJson<TaskScenario>(filePath);
+  return loadTaskScenario(filePath);
 }
 
 function resolveProfilePath(scenario: TaskScenario): string {
-  return pathResolver.rootResolve(scenario.first_run.profile_output);
+  return assertSafeRepositoryPath(pathResolver.rootResolve(scenario.first_run.profile_output), {
+    allowMissingLeaf: true,
+  });
 }
 
 function formatRepeatTrigger(trigger: TaskScenario['trigger']): string {
@@ -85,7 +57,7 @@ function formatRepeatTrigger(trigger: TaskScenario['trigger']): string {
 
 function formatReadiness(scenario: TaskScenario): { status: string; next: string } {
   const profilePath = resolveProfilePath(scenario);
-  if (safeExistsSync(profilePath)) {
+  if (safeExistsSync(profilePath) && safeLstat(profilePath).isFile()) {
     return {
       status: 'ready for dry-run',
       next: `pnpm task:run ${scenario.id} --dry-run`,
@@ -122,30 +94,33 @@ export function listTaskScenarios(scenarioDir = resolveScenarioDir()): TaskScena
   return files.map(loadScenario);
 }
 
-export function printTaskScenarios(scenarios: TaskScenario[]): void {
+export function formatTaskScenarios(scenarios: TaskScenario[]): string {
   if (scenarios.length === 0) {
-    console.error(
-      `No TaskScenario files found under ${path.relative(pathResolver.rootDir(), resolveScenarioDir()) || resolveScenarioDir()}.`
-    );
-    console.error(
-      'Add at least one JSON file to knowledge/product/task-scenarios/*.json and run pnpm task:list again.'
-    );
     throw new Error('No repeatable TaskScenario definitions were found');
   }
 
-  console.log('Available repeatable tasks:\n');
+  const lines = ['Available repeatable tasks:\n'];
   for (const scenario of scenarios) {
-    console.log(formatScenarioSummary(scenario).join('\n'));
-    console.log('');
+    lines.push(formatScenarioSummary(scenario).join('\n'), '');
   }
+  return lines.join('\n');
 }
 
-export async function main(argv: string[] = []): Promise<void> {
-  const args = [...argv];
-  const json = args.includes('--json');
+export function printTaskScenarios(
+  scenarios: TaskScenario[],
+  print: (value: string) => void
+): void {
+  print(formatTaskScenarios(scenarios));
+}
+
+export async function main(
+  _argv: string[] = [],
+  print: (value: unknown) => void = () => undefined,
+  json = false
+): Promise<void> {
   if (json) {
     const scenarios = listTaskScenarios();
-    console.log(JSON.stringify(scenarios, null, 2));
+    print({ status: 'ok', scenarios });
     return;
   }
 
@@ -153,21 +128,19 @@ export async function main(argv: string[] = []): Promise<void> {
   if (scenarios.length === 0) {
     // `task:list` is also the readiness probe used before `task:init`; an
     // empty catalog is an actionable state, not an uncaught CLI exception.
-    console.error(
-      `No TaskScenario files found under ${path.relative(pathResolver.rootDir(), resolveScenarioDir()) || resolveScenarioDir()}.`
-    );
-    console.error(
-      'Add at least one JSON file to knowledge/product/task-scenarios/*.json and run pnpm task:list again.'
+    print(
+      `No TaskScenario files found under ${path.relative(pathResolver.rootDir(), resolveScenarioDir()) || resolveScenarioDir()}.\n` +
+        'Add at least one JSON file to knowledge/product/task-scenarios/*.json and run pnpm task:list again.'
     );
     return;
   }
-  printTaskScenarios(scenarios);
+  printTaskScenarios(scenarios, (value) => print(value));
 }
 
 export const runTaskList = defineScript({
   name: 'task:list',
-  flags: [],
-  run: (context) => main(context.argv),
+  flags: ['json', 'quiet'],
+  run: (context) => main(context.argv, context.print, context.json),
 });
 
 if (

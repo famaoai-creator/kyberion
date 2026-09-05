@@ -1,8 +1,10 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import {
   checkFirstWinSmoke,
+  validateCanonicalFirstWinDocumentation,
   validateFirstWinLifecyclePipeline,
   validateVerifySessionPipeline,
 } from './check_first_win_smoke.js';
@@ -37,6 +39,31 @@ describe('check_first_win_smoke', () => {
     safeWriteFile(readmePath, '# Kyberion\n', { encoding: 'utf8' });
     const violations = checkFirstWinSmoke();
     expect(violations.some((line) => line.startsWith('README.md: missing'))).toBe(true);
+  });
+
+  it('requires the canonical five-command first-win block across entry documents', () => {
+    const canonical = [
+      'pnpm install',
+      'pnpm build',
+      'pnpm env:bootstrap --manifest kyberion-toolchain',
+      'pnpm doctor',
+      'pnpm pipeline --input pipelines/verify-session.json',
+    ];
+    const block = (commands: string[]) =>
+      ['# kyberion-first-win', '', '```bash', ...commands, '```'].join('\n');
+
+    expect(
+      validateCanonicalFirstWinDocumentation([
+        { file: 'README.md', source: block(canonical) },
+        { file: 'docs/QUICKSTART.md', source: block(canonical) },
+        { file: 'docs/INITIALIZATION.md', source: block([...canonical].reverse()) },
+      ])
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('docs/INITIALIZATION.md: canonical first-win command 1'),
+        expect.stringContaining('docs/INITIALIZATION.md: canonical first-win commands differ'),
+      ])
+    );
   });
 
   it('requires verify-session to be a clean local screenshot smoke', () => {
@@ -82,6 +109,16 @@ describe('check_first_win_smoke', () => {
         ],
       })
     ).toEqual([]);
+  });
+
+  it('uses the validated ADF reader for pipeline files', async () => {
+    const source = String(
+      safeReadFile(path.join(ROOT, 'scripts/check_first_win_smoke.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain("import { readValidatedPipelineAdf } from './refactor/adf-input.js'");
+    expect(source).toContain('return readValidatedPipelineAdf(file)');
+    expect(source).not.toContain('readFoundationJson');
+    expect(source).not.toContain('function readJson(');
   });
 
   it('rejects a shell wrapper in place of the typed lifecycle smoke op', () => {

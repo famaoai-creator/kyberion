@@ -1,10 +1,11 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as nodePath from 'node:path';
-import { sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
+import { knowledge, sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
 import {
   safeReaddir,
   safeExecResult,
-  safeReadFile,
   safeLstat,
   safeStat,
   safeUnlinkSync,
@@ -15,6 +16,13 @@ import {
   safeRmSync,
 } from './secure-io.js';
 import { logger } from './core.js';
+import { loadVaultEntryAtPath } from './data-vault.js';
+import {
+  DELEGATION_CHILDREN_REGISTRY_SUBPATH,
+  loadDelegationChildrenRegistryAtPath,
+  writeDelegationChildrenRegistryAtPath,
+  type DelegationChildRecord,
+} from './delegation-child-registry.js';
 import {
   loadRetentionCatalog,
   retentionTtlMsForPath,
@@ -110,32 +118,8 @@ export interface SweepTrashResult {
   purged: string[];
 }
 
-/**
- * XP-06 zombie sweep: shape mirrors (deliberately duplicated, not imported —
- * see the comment on `DELEGATION_CHILDREN_REGISTRY_SUBPATH` below)
- * `DelegationChildRecord` in `delegation-concurrency.ts`, the module that
- * writes this registry in real time as CLI delegations start/finish.
- */
-export interface DelegationChildRecord {
-  id: string;
-  provider: string;
-  pid?: number;
-  startedAt: string;
-  deadlineAt: string;
-  budgetMs: number;
-  /** OS process start time, used to prevent PID-reuse kills after a restart. */
-  pidStartedAt?: string;
-}
-
-/**
- * Kept as a literal (not imported from `delegation-concurrency.ts`) so this
- * module's existing test-mocking convention (`vi.mock('./path-resolver.js', ...)`
- * with a minimal named-export surface) keeps working unchanged — importing
- * the sibling module would pull in `semaphore.ts` and its own lazy
- * `kill-switch.ts` wiring, none of which this file needs. Keep this string
- * in sync with `DELEGATION_CHILDREN_REGISTRY_SUBPATH` if either changes.
- */
-const DELEGATION_CHILDREN_REGISTRY_SUBPATH = 'runtime/delegation-children.json';
+/** XP-06 zombie sweep uses the same schema-bound record contract as its producer. */
+export type { DelegationChildRecord } from './delegation-child-registry.js';
 
 export interface SweepDelegationChildrenOptions {
   dryRun: boolean;
@@ -271,17 +255,12 @@ function readTrashIndex(): Map<string, number> {
   const trashedAt = new Map<string, number>();
   if (!safeExistsSync(indexPath)) return trashedAt;
   try {
-    for (const line of String(safeReadFile(indexPath, { encoding: 'utf8' })).split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const record = JSON.parse(trimmed) as { path?: unknown; trashed_at?: unknown };
-        const ms = Date.parse(String(record.trashed_at ?? ''));
-        if (typeof record.path === 'string' && Number.isFinite(ms)) {
-          trashedAt.set(record.path, ms);
-        }
-      } catch {
-        // torn line — the rest of the index still replays
+    for (const record of readJsonLines<{ path?: unknown; trashed_at?: unknown }>(indexPath, {
+      onMalformed: 'skip',
+    })) {
+      const ms = Date.parse(String(record.trashed_at ?? ''));
+      if (typeof record.path === 'string' && Number.isFinite(ms)) {
+        trashedAt.set(record.path, ms);
       }
     }
   } catch (err) {
@@ -296,7 +275,7 @@ function recordTrashEntry(originalRepoRelative: string): void {
   try {
     appendJsonLine(trashIndexPath(), {
       path: originalRepoRelative,
-      trashed_at: new Date().toISOString(),
+      trashed_at: nowIso(),
     });
   } catch (err) {
     // Losing the record only costs precision (mtime fallback), never data.
@@ -312,7 +291,7 @@ function pruneTrashIndex(trashedAt: Map<string, number>): void {
   for (const [repoRel, ms] of trashedAt) {
     const filePath = nodePath.join(trashRootDir(), ...repoRel.split('/'));
     if (safeExistsSync(filePath)) {
-      surviving.push(JSON.stringify({ path: repoRel, trashed_at: new Date(ms).toISOString() }));
+      surviving.push(JSON.stringify({ path: repoRel, trashed_at: nowIso(new Date(ms)) }));
     }
   }
   try {
@@ -337,7 +316,7 @@ function pruneTrashIndex(trashedAt: Map<string, number>): void {
 export function appendRetentionAudit(record: Record<string, unknown>): void {
   try {
     appendJsonLine(sharedLogsAudit(STORAGE_RETENTION_AUDIT_FILENAME), {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       ...record,
     });
   } catch (err) {
@@ -513,9 +492,8 @@ export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
     if (!filePath.endsWith('.json')) continue;
     try {
       if (!safeExistsSync(filePath)) continue;
-      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      const entry = JSON.parse(raw);
-      if (entry.expiresAt && Date.parse(entry.expiresAt) <= Date.now()) {
+      const entry = loadVaultEntryAtPath(filePath);
+      if (entry?.expiresAt && Date.parse(entry.expiresAt) <= Date.now()) {
         expired.push(filePath);
         if (!opts.dryRun) {
           safeUnlinkSync(filePath);
@@ -749,14 +727,11 @@ export function listUncoveredRuntimeDirs(catalog?: LoadedRetentionCatalog): stri
 
 function readDelegationChildrenRegistry(): DelegationChildRecord[] {
   const filePath = shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH);
-  if (!safeExistsSync(filePath)) return [];
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw);
-  return Array.isArray(parsed) ? parsed : [];
+  return loadDelegationChildrenRegistryAtPath(filePath);
 }
 
 function writeDelegationChildrenRegistry(records: DelegationChildRecord[]): void {
-  safeWriteFile(shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH), JSON.stringify(records, null, 2));
+  writeDelegationChildrenRegistryAtPath(records, shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH));
 }
 
 function resolveProcessStartTime(pid: number): string | undefined {
@@ -766,9 +741,7 @@ function resolveProcessStartTime(pid: number): string | undefined {
       maxOutputMB: 1,
     });
     const parsed = Date.parse(result.stdout.trim());
-    return result.status === 0 && Number.isFinite(parsed)
-      ? new Date(parsed).toISOString()
-      : undefined;
+    return result.status === 0 && Number.isFinite(parsed) ? nowIso(new Date(parsed)) : undefined;
   } catch {
     return undefined;
   }
@@ -975,16 +948,18 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     retentionCatalogSource: catalog.source,
     retentionCatalogWarnings: catalog.warnings,
     errors,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     dryRun: opts.dryRun,
   };
 
   if (!opts.dryRun) {
     try {
-      safeWriteFile(
-        shared(JANITOR_MARKER_SUBPATH),
-        JSON.stringify({ completed_at: report.timestamp, errors: errors.length }, null, 2)
+      const markerPath = shared(JANITOR_MARKER_SUBPATH);
+      const marker = janitorLastRunCatalog(markerPath).validate(
+        { completed_at: report.timestamp, errors: errors.length },
+        markerPath
       );
+      safeWriteFile(markerPath, JSON.stringify(marker, null, 2));
     } catch (err) {
       // The marker only powers the staleness gate; a real run without a marker
       // just means the next session re-runs the janitor.
@@ -997,18 +972,104 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
 }
 
 const JANITOR_MARKER_SUBPATH = 'runtime/state/janitor-last-run.json';
+const JANITOR_SUBMIT_MARKER_SUBPATH = 'runtime/state/janitor-last-submit.json';
+const SCHEDULER_ALERT_MARKER_SUBPATH = 'runtime/state/scheduler-ops-alert-days.json';
+const JANITOR_LAST_RUN_SCHEMA_PATH = knowledge(
+  'product/schemas/janitor-last-run-marker.schema.json'
+);
+const JANITOR_SUBMISSION_SCHEMA_PATH = knowledge(
+  'product/schemas/janitor-submission-marker.schema.json'
+);
+const SCHEDULER_ALERT_SCHEMA_PATH = knowledge(
+  'product/schemas/scheduler-ops-alert-days.schema.json'
+);
+
+type JanitorLastRunMarker = { completed_at: string; errors: number };
+type JanitorSubmissionMarker = {
+  submitted_at: string;
+  pipeline_id: 'storage-janitor';
+  dry_run: false;
+};
+export type SchedulerOpsAlertDays = Record<string, string>;
+
+function janitorLastRunCatalog(filePath: string) {
+  return defineCatalog<JanitorLastRunMarker>({
+    id: 'janitor-last-run-marker',
+    path: filePath,
+    schema: JANITOR_LAST_RUN_SCHEMA_PATH,
+  });
+}
+
+function janitorSubmissionCatalog(filePath: string) {
+  return defineCatalog<JanitorSubmissionMarker>({
+    id: 'janitor-submission-marker',
+    path: filePath,
+    schema: JANITOR_SUBMISSION_SCHEMA_PATH,
+  });
+}
+
+function schedulerAlertCatalog(filePath: string) {
+  return defineCatalog<SchedulerOpsAlertDays>({
+    id: 'scheduler-ops-alert-days',
+    path: filePath,
+    schema: SCHEDULER_ALERT_SCHEMA_PATH,
+  });
+}
 
 export function readJanitorLastRunMs(): number | null {
   const markerPath = shared(JANITOR_MARKER_SUBPATH);
   if (!safeExistsSync(markerPath)) return null;
   try {
-    const parsed = readJson<Record<string, unknown>>(markerPath);
-    const ts =
-      typeof parsed.completed_at === 'string' ? Date.parse(parsed.completed_at) : Number.NaN;
+    if (!safeLstat(markerPath).isFile()) return null;
+    const parsed = janitorLastRunCatalog(markerPath).load();
+    const ts = Date.parse(parsed.completed_at);
     return Number.isFinite(ts) ? ts : null;
   } catch {
     return null;
   }
+}
+
+export function readJanitorLastSubmissionMs(): number | null {
+  const markerPath = shared(JANITOR_SUBMIT_MARKER_SUBPATH);
+  if (!safeExistsSync(markerPath)) return null;
+  try {
+    if (!safeLstat(markerPath).isFile()) return null;
+    const parsed = janitorSubmissionCatalog(markerPath).load();
+    const ts = Date.parse(parsed.submitted_at);
+    return Number.isFinite(ts) ? ts : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeJanitorSubmissionMarker(): void {
+  const markerPath = shared(JANITOR_SUBMIT_MARKER_SUBPATH);
+  const marker = janitorSubmissionCatalog(markerPath).validate(
+    { submitted_at: nowIso(), pipeline_id: 'storage-janitor', dry_run: false },
+    markerPath
+  );
+  safeWriteFile(markerPath, JSON.stringify(marker, null, 2));
+}
+
+export function readSchedulerOpsAlertDays(): SchedulerOpsAlertDays | null {
+  const markerPath = shared(SCHEDULER_ALERT_MARKER_SUBPATH);
+  if (!safeExistsSync(markerPath)) return null;
+  try {
+    if (!safeLstat(markerPath).isFile()) return null;
+    return schedulerAlertCatalog(markerPath).load();
+  } catch {
+    return null;
+  }
+}
+
+export function writeSchedulerOpsAlertDay(key: string, now = new Date()): void {
+  const markerPath = shared(SCHEDULER_ALERT_MARKER_SUBPATH);
+  const existing = readSchedulerOpsAlertDays() ?? {};
+  const marker = schedulerAlertCatalog(markerPath).validate(
+    { ...existing, [key]: now.toISOString().slice(0, 10) },
+    markerPath
+  );
+  safeWriteFile(markerPath, JSON.stringify(marker, null, 2));
 }
 
 /**

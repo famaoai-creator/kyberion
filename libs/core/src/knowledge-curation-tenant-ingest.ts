@@ -24,7 +24,7 @@
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { safeExistsSync, safeReadFile } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '../secure-io.js';
 import {
   COMMON_TENANT_SLUG,
   listAssets,
@@ -82,7 +82,13 @@ function sortCodepoint(values: string[]): string[] {
 function resolvePathOptions(options?: IngestLedgerPathOptions): IngestLedgerPathOptions {
   if (options && Object.keys(options).length > 0) return options;
   const override = getRegisteredEnvText('KYBERION_CURATION_TENANT_ROOTDIR')?.trim();
-  return override ? { rootDir: pathResolver.rootResolve(override) } : {};
+  return override
+    ? {
+        rootDir: assertSafeRepositoryPath(pathResolver.rootResolve(override), {
+          allowMissingLeaf: true,
+        }),
+      }
+    : {};
 }
 
 /**

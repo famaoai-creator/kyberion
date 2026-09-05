@@ -25,14 +25,20 @@
  */
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { readJson } from '../foundation/json.js';
+import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import {
+  loadKnowledgeTaxonomyAtPath,
+  type KnowledgeTaxonomyDirectoryDefault,
+} from '../knowledge-taxonomy.js';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
   safeReadFile,
   safeStat,
+  safeLstat,
   safeWriteFile,
 } from '../secure-io.js';
 import { loadKnowledgeUsageAggregate } from './knowledge-feedback-loop.js';
@@ -65,6 +71,25 @@ const DEFAULT_SLO_CONFIG: CurationSloConfig = {
   },
   default_freshness_days: 180,
 };
+
+const CURATION_SLO_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-curation-slo.schema.json'
+);
+const curationSloCatalogs = new Map<
+  string,
+  GovernedCatalog<CurationSloConfig & { version: string }>
+>();
+
+function safeCurationOverridePath(override: string | undefined, canonical: string): string {
+  if (!override) return canonical;
+  try {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(override), {
+      allowMissingLeaf: true,
+    });
+  } catch {
+    return canonical;
+  }
+}
 
 export interface CurationLowYieldHint {
   document_path: string;
@@ -125,42 +150,88 @@ type ArchiveHistoryEntry = {
   last_week: string;
 };
 
+const ARCHIVE_HISTORY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-curation-archive-history.schema.json'
+);
+
+function archiveHistoryCatalogAtPath(filePath: string) {
+  return defineCatalog<ArchiveHistoryEntry[]>({
+    id: 'knowledge-curation-archive-history',
+    path: filePath,
+    schema: ARCHIVE_HISTORY_SCHEMA_PATH,
+  });
+}
+
 function sloConfigPath(): string {
   const override = getRegisteredEnvText('KYBERION_CURATION_SLO_CONFIG_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.knowledge('product/governance/knowledge-curation-slo.json');
+  return safeCurationOverridePath(
+    override,
+    pathResolver.knowledge('product/governance/knowledge-curation-slo.json')
+  );
+}
+
+function curationSloCatalog(
+  filePath: string
+): GovernedCatalog<CurationSloConfig & { version: string }> {
+  const cached = curationSloCatalogs.get(filePath);
+  if (cached) return cached;
+  const catalog = defineCatalog<CurationSloConfig & { version: string }>({
+    id: 'knowledge-curation-slo',
+    path: filePath,
+    schema: CURATION_SLO_SCHEMA_PATH,
+  });
+  curationSloCatalogs.set(filePath, catalog);
+  return catalog;
 }
 
 function taxonomyPath(): string {
   const override = getRegisteredEnvText('KYBERION_CURATION_TAXONOMY_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.knowledge('product/governance/knowledge-taxonomy.json');
+  return safeCurationOverridePath(
+    override,
+    pathResolver.knowledge('product/governance/knowledge-taxonomy.json')
+  );
 }
 
 function reportPath(): string {
   const override = getRegisteredEnvText('KYBERION_CURATION_REPORT_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.knowledge('product/governance/CURATION_REPORT.md');
+  return safeCurationOverridePath(
+    override,
+    pathResolver.knowledge('product/governance/CURATION_REPORT.md')
+  );
 }
 
 function archiveHistoryPath(tenantSlug?: string): string {
   if (tenantSlug) {
-    return pathResolver.rootResolve(
-      physicalScopedPath(
-        'active/shared/runtime/feedback-loop',
-        { tier: 'confidential', tenant_slug: tenantSlug, scope_kind: 'tenant' },
-        'curation-archive-history.json'
-      )
+    return assertSafeRepositoryPath(
+      pathResolver.rootResolve(
+        physicalScopedPath(
+          'active/shared/runtime/feedback-loop',
+          { tier: 'confidential', tenant_slug: tenantSlug, scope_kind: 'tenant' },
+          'curation-archive-history.json'
+        )
+      ),
+      { allowMissingLeaf: true }
     );
   }
   const override = getRegisteredEnvText('KYBERION_CURATION_ARCHIVE_HISTORY_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('runtime/feedback-loop/curation-archive-history.json');
+  return safeCurationOverridePath(
+    override,
+    pathResolver.shared('runtime/feedback-loop/curation-archive-history.json')
+  );
 }
 
 /** Physical archive-history location used by the weekly steward report. */
 export function knowledgeCurationArchiveHistoryPath(tenantSlug?: string): string {
   return archiveHistoryPath(tenantSlug);
+}
+
+/** Load one curation archive-history file through its schema and path boundary. */
+export function loadKnowledgeCurationArchiveHistoryAtPath(filePath: string): ArchiveHistoryEntry[] {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`[CURATION_ARCHIVE_HISTORY_FILE] history must be a regular file: ${filePath}`);
+  }
+  return archiveHistoryCatalogAtPath(safePath).load();
 }
 
 function weekKey(now: Date): string {
@@ -174,15 +245,7 @@ function readArchiveHistory(tenantSlug?: string): ArchiveHistoryEntry[] {
   const filePath = archiveHistoryPath(tenantSlug);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = readJson<unknown>(filePath);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (entry): entry is ArchiveHistoryEntry =>
-        Boolean(entry) &&
-        typeof entry === 'object' &&
-        typeof (entry as ArchiveHistoryEntry).key === 'string' &&
-        typeof (entry as ArchiveHistoryEntry).last_week === 'string'
-    );
+    return loadKnowledgeCurationArchiveHistoryAtPath(filePath);
   } catch {
     return [];
   }
@@ -280,7 +343,11 @@ function observeArchiveHistory(
     const historyPath = archiveHistoryPath(tenantSlug);
     const parent = path.dirname(historyPath);
     if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
-    safeWriteFile(historyPath, JSON.stringify([...nextHistory.values()], null, 2) + '\n');
+    const validated = archiveHistoryCatalogAtPath(historyPath).validate(
+      [...nextHistory.values()],
+      historyPath
+    );
+    safeWriteFile(historyPath, JSON.stringify(validated, null, 2) + '\n');
     advisories.push(...archiveCandidatesFromReport(scopedReport, now, history));
   }
   return advisories;
@@ -292,10 +359,6 @@ export function knowledgeCurationSloConfigPath(): string {
 
 export function knowledgeCurationReportPath(): string {
   return reportPath();
-}
-
-function isPositiveNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function registeredKnowledgeTenants(): string[] {
@@ -312,49 +375,27 @@ function usageScopeForTenant(tenantSlug: string): ScopeContext {
 
 /**
  * SLO thresholds are config, not code: this is the only place defaults are
- * declared, and they are used only when the config file is absent/invalid
- * (fail-open — a missing/malformed config must not crash the weekly
- * pipeline, it should just fall back to conservative defaults).
+ * declared. A missing config starts an unconfigured report with conservative
+ * defaults; a present but malformed config is rejected instead of being
+ * silently replaced.
  */
 export function loadCurationSloConfig(): CurationSloConfig {
   const filePath = sloConfigPath();
-  if (!safeExistsSync(filePath)) return { ...DEFAULT_SLO_CONFIG };
-  try {
-    const parsed = readJson<Partial<CurationSloConfig>>(filePath);
-    const freshnessByKind: Record<string, number> = {};
-    if (parsed.freshness_days_by_kind && typeof parsed.freshness_days_by_kind === 'object') {
-      for (const [kind, days] of Object.entries(parsed.freshness_days_by_kind)) {
-        if (isPositiveNumber(days)) freshnessByKind[kind] = days;
-      }
-    }
-    return {
-      low_yield_delivery_threshold: isPositiveNumber(parsed.low_yield_delivery_threshold)
-        ? parsed.low_yield_delivery_threshold
-        : DEFAULT_SLO_CONFIG.low_yield_delivery_threshold,
-      freshness_days_by_kind:
-        Object.keys(freshnessByKind).length > 0
-          ? freshnessByKind
-          : { ...DEFAULT_SLO_CONFIG.freshness_days_by_kind },
-      default_freshness_days: isPositiveNumber(parsed.default_freshness_days)
-        ? parsed.default_freshness_days
-        : DEFAULT_SLO_CONFIG.default_freshness_days,
-    };
-  } catch {
+  if (!safeExistsSync(filePath)) {
     return { ...DEFAULT_SLO_CONFIG };
   }
+  const parsed = curationSloCatalog(filePath).load();
+  return {
+    low_yield_delivery_threshold: parsed.low_yield_delivery_threshold,
+    freshness_days_by_kind: { ...parsed.freshness_days_by_kind },
+    default_freshness_days: parsed.default_freshness_days,
+  };
 }
 
-interface TaxonomyDirectoryDefault {
-  path_prefix: string;
-  kind: string;
-}
-
-function loadTaxonomyDirectoryDefaults(): TaxonomyDirectoryDefault[] {
+function loadTaxonomyDirectoryDefaults(): KnowledgeTaxonomyDirectoryDefault[] {
   const filePath = taxonomyPath();
-  if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = readJson<{ directory_defaults?: TaxonomyDirectoryDefault[] }>(filePath);
-    return Array.isArray(parsed.directory_defaults) ? parsed.directory_defaults : [];
+    return loadKnowledgeTaxonomyAtPath(filePath).directory_defaults;
   } catch {
     return [];
   }
@@ -368,13 +409,23 @@ function loadTaxonomyDirectoryDefaults(): TaxonomyDirectoryDefault[] {
  */
 function scanRoots(): string[] {
   const override = getRegisteredEnvText('KYBERION_CURATION_SCAN_ROOTS')?.trim();
-  if (override) {
-    return override
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  }
-  return loadTaxonomyDirectoryDefaults().map((entry) => entry.path_prefix);
+  const roots = override
+    ? override
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    : loadTaxonomyDirectoryDefaults().map((entry) => entry.path_prefix);
+  return roots.flatMap((root) => {
+    try {
+      return [
+        assertSafeRepositoryPath(pathResolver.rootResolve(root), {
+          allowMissingLeaf: true,
+        }),
+      ];
+    } catch {
+      return [];
+    }
+  });
 }
 
 function extractFrontmatterValue(content: string, key: string): string | undefined {
@@ -393,7 +444,7 @@ function extractFrontmatterValue(content: string, key: string): string | undefin
 
 function kindForPath(
   relPath: string,
-  directoryDefaults: TaxonomyDirectoryDefault[]
+  directoryDefaults: KnowledgeTaxonomyDirectoryDefault[]
 ): string | undefined {
   const normalized = relPath.replace(/\\/g, '/');
   for (const entry of directoryDefaults) {
@@ -411,7 +462,7 @@ interface ScannedDoc {
 
 function scanMarkdownDocs(
   root: string,
-  directoryDefaults: TaxonomyDirectoryDefault[],
+  directoryDefaults: KnowledgeTaxonomyDirectoryDefault[],
   out: ScannedDoc[]
 ): void {
   let entries: string[];
@@ -422,7 +473,12 @@ function scanMarkdownDocs(
   }
   for (const entry of entries) {
     if (entry.startsWith('.')) continue;
-    const fullPath = path.join(root, entry);
+    let fullPath: string;
+    try {
+      fullPath = assertSafeRepositoryPath(path.join(root, entry));
+    } catch {
+      continue;
+    }
     let stat;
     try {
       stat = safeStat(fullPath);
@@ -499,7 +555,7 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
   const directoryDefaults = loadTaxonomyDirectoryDefaults();
   const docs: ScannedDoc[] = [];
   for (const root of scanRoots()) {
-    scanMarkdownDocs(pathResolver.rootResolve(root), directoryDefaults, docs);
+    scanMarkdownDocs(root, directoryDefaults, docs);
   }
 
   const freshnessBreaches: CurationFreshnessBreach[] = [];

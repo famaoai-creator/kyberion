@@ -19,6 +19,9 @@ vi.mock('@agent/core/calendar-workflow', () => ({
 import {
   CalendarBackendRegistry,
   createDefaultCalendarBackendRegistry,
+  normalizeCalendarEventList,
+  normalizeCalendarEventMutation,
+  normalizeCalendarSummaryList,
   type CalendarBackendAdapter,
   selectCalendarBackend,
 } from './calendar-backend.js';
@@ -125,5 +128,42 @@ describe('gws calendar backend adapter', () => {
         end_date: '2026-07-25T11:00:00+09:00',
       })
     ).resolves.toEqual({ status: 'success', title: 'Planning', id: 'event-1' });
+  });
+});
+
+describe('JXA calendar response boundary', () => {
+  it('normalizes calendar summaries without trusting the parsed root', () => {
+    expect(normalizeCalendarSummaryList([{ name: 'Work', id: 'primary' }])).toEqual([
+      { name: 'Work', id: 'primary' },
+    ]);
+    expect(() => normalizeCalendarSummaryList({ calendars: [] })).toThrow(
+      'calendars response must be an array'
+    );
+    expect(() => normalizeCalendarSummaryList([{ name: 42 }])).toThrow(
+      'invalid calendar summary at index 0'
+    );
+  });
+
+  it('normalizes event and mutation responses before backend projection', () => {
+    expect(
+      normalizeCalendarEventList([
+        {
+          title: 'Planning',
+          start: '2026-07-25T10:00:00Z',
+          end: '2026-07-25T11:00:00Z',
+          calendar: 'Work',
+          location: '',
+          description: '',
+        },
+      ])
+    ).toHaveLength(1);
+    expect(() => normalizeCalendarEventList([null])).toThrow('invalid calendar event at index 0');
+    expect(normalizeCalendarEventMutation({ status: 'success', title: 'Planning' })).toEqual({
+      status: 'success',
+      title: 'Planning',
+    });
+    expect(() => normalizeCalendarEventMutation({ status: 'success', title: 7 })).toThrow(
+      'invalid osascript event mutation response'
+    );
   });
 });

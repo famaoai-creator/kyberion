@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "provider-health-state.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "demotions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": { "type": "string", "minLength": 1 },
+          "instance": { "type": "string", "minLength": 1 },
+          "until": { "type": "integer", "minimum": 0 },
+          "reason": { "type": "string", "minLength": 1 }
+        },
+        "required": ["provider", "instance", "until", "reason"]
+      }
+    }
+  },
+  "required": ["version", "demotions"]
+}

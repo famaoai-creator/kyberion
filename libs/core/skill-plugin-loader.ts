@@ -26,9 +26,14 @@
  */
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { ValidateFunction } from 'ajv';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { compileSchema } from './foundation/ajv.js';
+import { isRecord } from './foundation/text.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import {
   derivePluginTrustLabel,
   isPathContainedIn,
@@ -85,7 +90,134 @@ export interface SkillPluginLoadResult {
 export interface RestrictedSkillRecord {
   name?: string;
   status?: string;
+  reason?: string;
   allow_override?: boolean;
+}
+
+interface RestrictedSkillsPolicy {
+  version: string | number;
+  last_updated: string;
+  restrictions: RestrictedSkillRecord[];
+  tenant_overrides: Record<string, { restrictions: RestrictedSkillRecord[] }>;
+  organization_overrides: Record<string, { restrictions: RestrictedSkillRecord[] }>;
+  project_overrides: Record<string, { restrictions: RestrictedSkillRecord[] }>;
+}
+
+const PLUGIN_CONTRIBUTION_KEYS = [
+  'seams',
+  'ops',
+  'providers',
+  'hooks',
+  'prompt_sections',
+  'facets',
+] as const;
+
+export function normalizePluginContributionDeclaration(
+  value: unknown
+): PluginContributionDeclaration | undefined {
+  if (!isRecord(value)) return undefined;
+  const declaration: PluginContributionDeclaration = {};
+  for (const key of PLUGIN_CONTRIBUTION_KEYS) {
+    const rawValues = value[key];
+    if (rawValues === undefined) continue;
+    if (
+      !Array.isArray(rawValues) ||
+      rawValues.some((entry) => typeof entry !== 'string' || !entry.trim())
+    ) {
+      throw new Error(`[PLUGIN_MANIFEST_INVALID] provides.${key} must be a non-empty string array`);
+    }
+    declaration[key] = rawValues.map((entry) => entry.trim());
+  }
+  return declaration;
+}
+
+const RESTRICTED_SKILLS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/restricted-skills.schema.json'
+);
+const SKILL_PLUGINS_CONFIG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/skill-plugins-config.schema.json'
+);
+const restrictedSkillsCatalogs = new Map<string, GovernedCatalog<RestrictedSkillsPolicy>>();
+let skillPluginsConfigValidateFn: ValidateFunction | null = null;
+
+interface SkillPluginsConfig {
+  plugins?: string[];
+  tenant_overrides?: Record<string, { plugins?: string[] }>;
+  organization_overrides?: Record<string, { plugins?: string[] }>;
+  project_overrides?: Record<string, { plugins?: string[] }>;
+}
+
+/**
+ * Project/plugin configuration may live outside this repository, so the
+ * repository-only assertion is not appropriate here. We still reject a
+ * symlink at the trust-input itself before parsing it: configuration and
+ * manifests must not silently redirect to another scope.
+ */
+function assertNoSymlinkTraversal(filePath: string): string {
+  const absolute = path.resolve(filePath);
+  try {
+    if (safeLstat(absolute).isSymbolicLink()) {
+      throw new Error(
+        `[PLUGIN_RESOURCE_SYMLINK] resource path cannot traverse a symbolic link: ${filePath}`
+      );
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[PLUGIN_RESOURCE_SYMLINK]')) {
+      throw error;
+    }
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  return absolute;
+}
+
+function getRestrictedSkillsCatalog(rootDir?: string): GovernedCatalog<RestrictedSkillsPolicy> {
+  const policyPath = rootDir
+    ? path.join(rootDir, 'knowledge', 'product', 'governance', 'restricted-skills.json')
+    : pathResolver.knowledge('product/governance/restricted-skills.json');
+  let catalog = restrictedSkillsCatalogs.get(policyPath);
+  if (!catalog) {
+    catalog = defineCatalog<RestrictedSkillsPolicy>({
+      id: 'restricted-skills',
+      path: policyPath,
+      schema: RESTRICTED_SKILLS_SCHEMA_PATH,
+    });
+    restrictedSkillsCatalogs.set(policyPath, catalog);
+  }
+  return catalog;
+}
+
+function ensureSkillPluginsConfigValidator(): ValidateFunction {
+  if (skillPluginsConfigValidateFn) return skillPluginsConfigValidateFn;
+  skillPluginsConfigValidateFn = compileSchema(SKILL_PLUGINS_CONFIG_SCHEMA_PATH);
+  return skillPluginsConfigValidateFn;
+}
+
+/**
+ * Load a project-owned plugin configuration without applying the
+ * repository-only catalog boundary: project cwd may be outside this repo.
+ * The resource itself remains symlink- and schema-gated before selectors are
+ * interpreted.
+ */
+export function loadSkillPluginsConfigAtPath(filePath: string): SkillPluginsConfig {
+  const safeFilePath = assertNoSymlinkTraversal(filePath);
+  if (!safeExistsSync(safeFilePath)) {
+    throw new Error(`[PLUGIN_CONFIG_MISSING] ${safeFilePath}`);
+  }
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[PLUGIN_CONFIG_INVALID] config must be a regular file: ${filePath}`);
+  }
+  const parsed = parseSafeJsonInput(
+    String(safeReadFile(safeFilePath, { encoding: 'utf8' })),
+    `skill plugin config ${safeFilePath}`
+  );
+  const validate = ensureSkillPluginsConfigValidator();
+  if (!validate(parsed)) {
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim())
+      .join('; ');
+    throw new Error(`[PLUGIN_CONFIG_INVALID] ${safeFilePath}: ${errors}`);
+  }
+  return parsed as SkillPluginsConfig;
 }
 
 /**
@@ -110,28 +242,20 @@ export function evaluateSkillRestrictionRecords(
 /** Consume the governed restricted-skills catalog at the skill execution gate. */
 export function isSkillAllowed(
   skillName: string,
-  scope?: ScopeContext
+  scope?: ScopeContext,
+  rootDir?: string
 ): { allowed: boolean; reason?: string } {
-  const policyPath = pathResolver.knowledge('product/governance/restricted-skills.json');
+  const policyPath = getRestrictedSkillsCatalog(rootDir).path();
   if (!safeExistsSync(policyPath)) return { allowed: true };
   try {
-    const parsed = loadJson<{
-      restrictions?: RestrictedSkillRecord[];
-      tenant_overrides?: Record<string, { restrictions?: RestrictedSkillRecord[] }>;
-      organization_overrides?: Record<string, { restrictions?: RestrictedSkillRecord[] }>;
-      project_overrides?: Record<string, { restrictions?: RestrictedSkillRecord[] }>;
-    }>(policyPath);
+    const parsed = getRestrictedSkillsCatalog(rootDir).load();
     const records = [
-      ...(parsed.restrictions || []),
-      ...(scope?.tenant_slug
-        ? parsed.tenant_overrides?.[scope.tenant_slug]?.restrictions || []
-        : []),
+      ...parsed.restrictions,
+      ...(scope?.tenant_slug ? parsed.tenant_overrides[scope.tenant_slug]?.restrictions || [] : []),
       ...(scope?.organization_id
-        ? parsed.organization_overrides?.[scope.organization_id]?.restrictions || []
+        ? parsed.organization_overrides[scope.organization_id]?.restrictions || []
         : []),
-      ...(scope?.project_id
-        ? parsed.project_overrides?.[scope.project_id]?.restrictions || []
-        : []),
+      ...(scope?.project_id ? parsed.project_overrides[scope.project_id]?.restrictions || [] : []),
     ];
     return evaluateSkillRestrictionRecords(skillName, records);
   } catch {
@@ -145,17 +269,10 @@ export function isSkillAllowed(
  * existing fail-open contract for the rest of the plugin surface).
  */
 export function readSkillPluginsConfig(cwd: string, scope?: ScopeContext): string[] {
-  const configPath = path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME);
-  if (!safeExistsSync(configPath)) return [];
   try {
-    const raw = safeReadFile(configPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as {
-      plugins?: unknown;
-      tenant_overrides?: Record<string, { plugins?: unknown }>;
-      organization_overrides?: Record<string, { plugins?: unknown }>;
-      project_overrides?: Record<string, { plugins?: unknown }>;
-    };
-    if (!parsed) return [];
+    const configPath = assertNoSymlinkTraversal(path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME));
+    if (!safeExistsSync(configPath)) return [];
+    const parsed = loadSkillPluginsConfigAtPath(configPath);
     const base = (Array.isArray(parsed.plugins) ? parsed.plugins : []).filter(
       (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0
     );
@@ -204,17 +321,17 @@ function readPluginManifestProvides(resolvedPath: string): {
       path.join(cursor, 'plugin.json'),
       path.join(cursor, '.claude-plugin', 'plugin.json'),
     ];
-    const manifestPath = candidates.find((candidate) => safeExistsSync(candidate));
+    const manifestPath = candidates
+      .map((candidate) => assertNoSymlinkTraversal(candidate))
+      .find((candidate) => safeExistsSync(candidate));
     if (manifestPath) {
       try {
-        const parsed = JSON.parse(
-          String(safeReadFile(manifestPath, { encoding: 'utf8' }))
-        ) as Record<string, unknown>;
-        const rawProvides = parsed.provides;
-        const provides =
-          rawProvides && typeof rawProvides === 'object' && !Array.isArray(rawProvides)
-            ? (rawProvides as PluginContributionDeclaration)
-            : undefined;
+        const parsed = parseSafeJsonInput(
+          String(safeReadFile(manifestPath, { encoding: 'utf8' })),
+          `plugin manifest ${manifestPath}`
+        );
+        if (!isRecord(parsed)) throw new Error('plugin manifest root must be a JSON object');
+        const provides = normalizePluginContributionDeclaration(parsed.provides);
         return {
           pluginId:
             typeof parsed.plugin_id === 'string'
@@ -334,13 +451,13 @@ export async function loadAuthorizedSkillPlugins(
   cwd: string = process.cwd(),
   managedRoot?: string,
   scope?: ScopeContext,
-  options: { trustResolved?: boolean } = {}
+  options: { trustResolved?: boolean } = { trustResolved: false }
 ): Promise<SkillPluginLoadResult> {
   // PI-03: `.kyberion-plugins.json` is itself a trust-sensitive project
   // resource. A pre-trust caller may observe that the resource exists for
   // diagnostics, but must not parse selectors or import any configured code.
   const configPath = path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME);
-  if (options.trustResolved === false && safeExistsSync(configPath)) {
+  if (options.trustResolved !== true && safeExistsSync(configPath)) {
     return {
       loaded: [],
       diagnostics: [

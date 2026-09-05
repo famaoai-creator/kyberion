@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "model-role-outcome.schema.json",
+  "title": "Model role outcome",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mission_id", "task_id", "team_role", "model_id", "final_status", "recorded_at"],
+  "properties": {
+    "mission_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "team_role": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "model_id": { "type": "string", "minLength": 1 },
+    "final_status": { "type": "string", "minLength": 1 },
+    "recorded_at": { "type": "string", "format": "date-time" }
+  }
+}

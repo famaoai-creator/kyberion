@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/llm-selection-preferences.schema.json",
+  "title": "LLM Selection Preferences",
+  "description": "Persisted reasoning runtime selection for the active profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "provider"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "provider": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "model_id": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

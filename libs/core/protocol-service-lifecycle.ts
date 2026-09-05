@@ -3,10 +3,11 @@ import * as path from 'node:path';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
+import { parseSafeJsonInput } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
 import { getProtocolServiceRegistryEntry } from './protocol-service-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 
 export type ProtocolServiceLifecycleAction =
   'start' | 'stop' | 'reconnect' | 'restore' | 'restore_quarantine' | 'health_check';
@@ -270,7 +271,9 @@ export function readProtocolServiceLifecycleReceipts(
   scopeInput: EventScopeInput
 ): ProtocolServiceLifecycleReceipt[] {
   const logicalPath = protocolServiceLifecycleLogicalPath(serviceId, scopeInput);
-  const absolutePath = pathResolver.resolve(logicalPath);
+  const absolutePath = assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(absolutePath)) return [];
   const lines = String(safeReadFile(absolutePath, { encoding: 'utf8' }) || '')
     .split(/\r?\n/u)
@@ -280,7 +283,7 @@ export function readProtocolServiceLifecycleReceipts(
   return lines.map((line, index) => {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(line) as unknown;
+      parsed = parseSafeJsonInput(line, `protocol lifecycle receipt line ${index + 1}`);
     } catch {
       throw new Error(`[PROTOCOL_LIFECYCLE_RECEIPT_INVALID] invalid JSON at line ${index + 1}`);
     }

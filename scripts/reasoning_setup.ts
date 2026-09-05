@@ -1,4 +1,5 @@
-import { loadEnvironmentManifest, logger, probeManifest } from '@agent/core';
+import { loadEnvironmentManifest, probeManifest } from '@agent/core/environment-capability';
+import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
@@ -37,29 +38,35 @@ const REASONING_SETUP_GUIDANCE = [
   'Use `KYBERION_REASONING_BACKEND=stub` only when you intentionally want offline deterministic placeholders.',
 ];
 
-export async function runReasoningSetup(): Promise<{ must: number; should: number; nice: number }> {
+export async function runReasoningSetup(options: { quiet?: boolean } = {}): Promise<{
+  must: number;
+  should: number;
+  nice: number;
+}> {
   const manifest = loadEnvironmentManifest('reasoning-backend');
   const probeStatuses = await probeManifest(manifest);
   const summary = summarizeManifestDoctor(manifest, probeStatuses);
 
-  logger.info('');
-  logger.info(
-    formatSetupSummaryLine([
-      ['must', summary.counts.must],
-      ['should', summary.counts.should],
-      ['nice', summary.counts.nice],
-    ])
-  );
-  for (const line of formatDoctorSummary(summary)) {
-    logger.info(line);
-  }
-  if (summary.counts.must > 0) {
+  if (!options.quiet) {
     logger.info('');
-    for (const line of REASONING_SETUP_GUIDANCE) {
+    logger.info(
+      formatSetupSummaryLine([
+        ['must', summary.counts.must],
+        ['should', summary.counts.should],
+        ['nice', summary.counts.nice],
+      ])
+    );
+    for (const line of formatDoctorSummary(summary)) {
       logger.info(line);
     }
+    if (summary.counts.must > 0) {
+      logger.info('');
+      for (const line of REASONING_SETUP_GUIDANCE) {
+        logger.info(line);
+      }
+    }
+    logger.info('');
   }
-  logger.info('');
 
   return summary.counts;
 }

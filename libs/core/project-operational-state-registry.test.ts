@@ -3,7 +3,7 @@ import AjvModule from 'ajv';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import {
   listProjectOperationalStates,
   loadProjectOperationalState,
@@ -161,6 +161,59 @@ describe('project-operational-state-registry', () => {
       updated_at: new Date('2026-06-05T00:00:00.000Z').toISOString(),
     });
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('persists the canonical operational state payload returned by the catalog', () => {
+    const filePath = saveProjectOperationalState({
+      project_id: 'PRJ-TEST-OPS',
+      name: 'Canonical Project OS',
+      summary: 'Operational state metadata is canonicalized before persistence.',
+      status: 'active',
+      tier: 'public',
+      tenant_slug: 'tenant-alpha',
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveProjectOperationalState>[0]);
+
+    const persisted = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as Record<
+      string,
+      unknown
+    >;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.project_id).toBe('PRJ-TEST-OPS');
+  });
+
+  it('persists canonical mission links and track states', () => {
+    const missionLink = saveProjectMissionLink({
+      project_id: 'PRJ-TEST-OPS',
+      tier: 'public',
+      tenant_slug: 'tenant-alpha',
+      mission_id: 'MSN-TEST-CANONICAL',
+      relationship_type: 'primary',
+      summary: 'Canonical mission link.',
+      status: 'active',
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveProjectMissionLink>[0]);
+    const trackState = saveProjectTrackState({
+      project_id: 'PRJ-TEST-OPS',
+      tier: 'public',
+      tenant_slug: 'tenant-alpha',
+      track_id: 'TRK-TEST-CANONICAL',
+      name: 'Canonical track',
+      summary: 'Canonical track state.',
+      status: 'active',
+      active_mission_ids: ['MSN-TEST-CANONICAL'],
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveProjectTrackState>[0]);
+
+    const persistedMissionLink = JSON.parse(
+      String(safeReadFile(missionLink, { encoding: 'utf8' }))
+    ) as Record<string, unknown>;
+    const persistedTrackState = JSON.parse(
+      String(safeReadFile(trackState, { encoding: 'utf8' }))
+    ) as Record<string, unknown>;
+    expect(persistedMissionLink).not.toHaveProperty('$schema');
+    expect(persistedTrackState).not.toHaveProperty('$schema');
+    expect(persistedTrackState.active_mission_ids).toEqual(['MSN-TEST-CANONICAL']);
   });
 
   it('keeps tenantless public state in the shared partition without serializing shared', () => {

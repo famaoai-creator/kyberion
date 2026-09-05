@@ -1,13 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
-import {
-  authorizeSkillPlugin,
-  listManagedPlugins,
-  loadApprovalRequest,
-  pathResolver,
-  readSkillPluginsConfig,
-  withExecutionContext,
-} from '@agent/core';
+import { authorizeSkillPlugin, readSkillPluginsConfig } from '@agent/core/skill-plugin-loader';
+import { listManagedPlugins } from '@agent/core/plugin-managed-install';
+import { loadApprovalRequest } from '@agent/core/approval-store';
+import { pathResolver } from '@agent/core/path-resolver';
+import { withExecutionContext } from '@agent/core/authority';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +35,9 @@ export interface PluginListEntry {
   approval_status?: string;
 }
 
-export function GET() {
+export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   try {
     const entries = withExecutionContext('sovereign_concierge', () => {
       const rootDir = pathResolver.rootDir();
@@ -81,9 +81,6 @@ export function GET() {
 
     return NextResponse.json({ ok: true, plugins: entries });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error, 500);
   }
 }

@@ -8,12 +8,16 @@ const mocks = vi.hoisted(() => ({
     rootDir: vi.fn(() => '/tmp/kyberion'),
   },
   safeCopyFileSync: vi.fn(),
+  assertSafeRepositoryPath: vi.fn((target: string) => target),
   safeExistsSync: vi.fn(),
   safeLstat: vi.fn(),
   safeMkdir: vi.fn(),
   safeReadFile: vi.fn(),
   safeReaddir: vi.fn(),
-  classifyError: vi.fn((err: any) => ({ category: 'unknown', message: String(err?.message || err) })),
+  classifyError: vi.fn((err: any) => ({
+    category: 'unknown',
+    message: String(err?.message || err),
+  })),
   formatClassification: vi.fn((c: any) => JSON.stringify(c)),
 }));
 
@@ -27,6 +31,28 @@ vi.mock('@agent/core', () => ({
   safeMkdir: mocks.safeMkdir,
   safeReadFile: mocks.safeReadFile,
   safeReaddir: mocks.safeReaddir,
+}));
+
+vi.mock('@agent/core/path-resolver', () => ({
+  pathResolver: mocks.pathResolver,
+}));
+
+vi.mock('@agent/core/secure-io', () => ({
+  assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
+  safeCopyFileSync: mocks.safeCopyFileSync,
+  safeExistsSync: mocks.safeExistsSync,
+  safeLstat: mocks.safeLstat,
+  safeMkdir: mocks.safeMkdir,
+  safeReaddir: mocks.safeReaddir,
+}));
+
+vi.mock('@agent/core/error-classifier', () => ({
+  classifyError: mocks.classifyError,
+  formatClassification: mocks.formatClassification,
+}));
+
+vi.mock('@agent/core/governance', () => ({
+  withExecutionContext: async (_role: string, run: () => unknown) => await run(),
 }));
 
 describe('customer_create', () => {
@@ -66,12 +92,33 @@ describe('customer_create', () => {
 
     expect(created.root).toBe(dest);
     expect(fs.existsSync(path.join(dest, 'README.md'))).toBe(true);
-    expect(fs.readFileSync(path.join(dest, 'connections', 'slack.json'), 'utf8')).toBe('{"id":"slack"}');
-    expect(fs.readFileSync(path.join(dest, 'policy', 'approval.json'), 'utf8')).toBe('{"mode":"template"}');
+    expect(fs.readFileSync(path.join(dest, 'connections', 'slack.json'), 'utf8')).toBe(
+      '{"id":"slack"}'
+    );
+    expect(fs.readFileSync(path.join(dest, 'policy', 'approval.json'), 'utf8')).toBe(
+      '{"mode":"template"}'
+    );
   });
 
   it('rejects invalid slugs', async () => {
     const mod = await import('./customer_create.js');
     expect(() => mod.createCustomer('../bad')).toThrow('Invalid customer slug');
+  });
+
+  it('routes help output through the injected printer', async () => {
+    const mod = await import('./customer_create.js');
+    const output: unknown[] = [];
+
+    expect(() => mod.main(['--help'], (value) => output.push(value))).toThrow();
+    expect(output).toEqual(['Usage: customer_create <slug>']);
+  });
+
+  it('formats creation output without writing to stdout', async () => {
+    mocks.pathResolver.rootDir.mockReturnValue('/tmp/kyberion');
+    const mod = await import('./customer_create.js');
+
+    expect(mod.formatCreatedCustomer('/tmp/kyberion/customer/acme')).toEqual([
+      'Created customer template at customer/acme',
+    ]);
   });
 });

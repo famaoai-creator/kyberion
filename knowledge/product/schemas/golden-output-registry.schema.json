@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/golden-output-registry.schema.json",
+  "title": "Golden output pipeline registry",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "pipeline"],
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      },
+      "pipeline": {
+        "type": "string",
+        "pattern": "^(?![\\\\/])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+\\.json$"
+      },
+      "note": { "type": "string" },
+      "input": { "type": "object" },
+      "ignore_paths": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

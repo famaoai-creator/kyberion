@@ -16,7 +16,8 @@ import {
   inferOptionalRoleHints,
   summarizeRequestText,
 } from './mission-team-brief-utils.js';
-import { safeWriteFile, safeExistsSync, safeMkdir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
+import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 
 export interface MissionTeamCompositionBriefInput {
   missionId?: string;
@@ -56,10 +57,24 @@ export function writeMissionTeamBrief(
   missionPath: string,
   brief: MissionTeamCompositionBrief
 ): string {
-  const evidenceDir = path.join(missionPath, 'evidence');
+  const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
+  const evidenceDir = assertSafeRepositoryPath(path.join(safeMissionPath, 'evidence'), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(evidenceDir)) safeMkdir(evidenceDir, { recursive: true });
-  const targetPath = path.join(evidenceDir, 'team-composition-brief.json');
-  safeWriteFile(targetPath, JSON.stringify(brief, null, 2));
+  const targetPath = assertSafeRepositoryPath(
+    path.join(evidenceDir, 'team-composition-brief.json'),
+    {
+      allowMissingLeaf: true,
+    }
+  );
+  writeProvisionedJson({
+    missionId: brief.mission_id,
+    filePath: targetPath,
+    targetPath: path.relative(safeMissionPath, targetPath).split(path.sep).join('/'),
+    missionPathHint: safeMissionPath,
+    provisioned: provisionMissionEntry(brief),
+  });
   return targetPath;
 }
 

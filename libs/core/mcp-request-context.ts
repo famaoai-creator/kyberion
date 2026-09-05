@@ -1,4 +1,5 @@
 import { normalizeEventScope, type EventScope } from './event-scope.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export type McpCallerRole = 'operator' | 'agent' | 'cowork' | 'service' | 'unknown';
 
@@ -49,6 +50,10 @@ function clean(value: string | undefined): string | undefined {
   return normalized || undefined;
 }
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 /**
  * Resolve MCP request identity from the server-side binding.
  * A tenant supplied by a client can only narrow an existing binding; it can
@@ -56,7 +61,7 @@ function clean(value: string | undefined): string | undefined {
  */
 export function resolveMcpRequestContext(input: McpRequestContextInput = {}): McpRequestContext {
   const env = input.env || process.env;
-  const boundTenant = clean(env.KYBERION_MCP_TENANT || env.KYBERION_TENANT);
+  const boundTenant = clean(envText(env, 'KYBERION_MCP_TENANT') || envText(env, 'KYBERION_TENANT'));
   const requestedTenant = clean(input.requested_tenant);
   if (requestedTenant && !boundTenant) {
     throw new Error('[MCP_SCOPE_REQUIRED] client tenant cannot establish authorization');
@@ -75,7 +80,7 @@ export function resolveMcpRequestContext(input: McpRequestContextInput = {}): Mc
     throw new Error(`[MCP_SCOPE_REQUIRED] tier '${tier}' requires a server-bound tenant`);
   }
 
-  const nhiId = clean(env.KYBERION_MCP_NHI || env.KYBERION_NHI_ACTOR);
+  const nhiId = clean(envText(env, 'KYBERION_MCP_NHI') || envText(env, 'KYBERION_NHI_ACTOR'));
   const scope = normalizeEventScope({
     scope_kind: input.task_id
       ? 'task'
@@ -92,10 +97,13 @@ export function resolveMcpRequestContext(input: McpRequestContextInput = {}): Mc
     ...(clean(input.task_id) ? { task_id: clean(input.task_id) } : {}),
     ...(nhiId ? { nhi_id: nhiId } : {}),
   });
-  const callerRole = clean(env.KYBERION_MCP_CALLER_ROLE || env.MISSION_ROLE) as
-    McpCallerRole | undefined;
+  const callerRole = clean(
+    envText(env, 'KYBERION_MCP_CALLER_ROLE') || envText(env, 'MISSION_ROLE')
+  ) as McpCallerRole | undefined;
   return {
-    principal: clean(env.KYBERION_MCP_PRINCIPAL || env.KYBERION_PERSONA) || 'mcp-client',
+    principal:
+      clean(envText(env, 'KYBERION_MCP_PRINCIPAL') || envText(env, 'KYBERION_PERSONA')) ||
+      'mcp-client',
     caller_role:
       callerRole && ['operator', 'agent', 'cowork', 'service'].includes(callerRole)
         ? callerRole

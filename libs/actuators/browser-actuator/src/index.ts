@@ -1,22 +1,24 @@
+import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
 import {
-  logger,
-  emitComputerSurfacePatch,
   buildBrowserExtensionPipelineCandidate,
   preflightBrowserExtensionSession,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-  defineCatalogBackedActuator,
-} from '@agent/core';
+} from '@agent/core/browser-extension-bridge';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import {
   buildBrowserElementPresentPipeline,
   createBrowserInteractionHelpers,
 } from './browser-interaction-helpers.js';
 import { executePipeline as executeBrowserPipeline } from './browser-pipeline-helpers.js';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { Page } from '@playwright/test';
-import { runActuatorCli } from '@agent/core';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 
 /**
@@ -192,18 +194,13 @@ async function buildSnapshot(
 const main = async () => {
   await runActuatorCli({
     name: 'browser-actuator',
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+if (isDirectEntry(import.meta.url, 'libs/actuators/browser-actuator/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, 'browser-actuator');
 }
 
 export {

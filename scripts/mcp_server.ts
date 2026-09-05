@@ -19,8 +19,15 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const runMcpServer = defineScript({
   name: 'mcp:server',
-  flags: [],
-  async run() {
+  async run({ dryRun, check, print }) {
+    if (dryRun || check) {
+      const result = {
+        dry_run: true,
+        operation: 'mcp-server.connect-stdio',
+      };
+      print(result);
+      return result;
+    }
     await startMcpServerStdio();
   },
 });

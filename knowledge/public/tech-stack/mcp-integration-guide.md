@@ -56,12 +56,13 @@ For high-demand public MCP servers, we create individual connector capabilities 
 
 - **Shared Engine**: a shared MCP client engine provides the common MCP client logic behind connector capabilities.
 - **Individual Skills**:
-    - `mcp-aws-knowledge-connector`: Wraps `@modelcontextprotocol/server-aws-kb-retrieval` (npx).
-    - `mcp-terraform-connector`: Wraps `terraform-mcp-server` (npx).
+  - `mcp-aws-knowledge-connector`: Wraps `@modelcontextprotocol/server-aws-kb-retrieval` (npx).
+  - `mcp-terraform-connector`: Wraps `terraform-mcp-server` (npx).
 
 Example execution:
+
 ```bash
-npm run cli -- run mcp-terraform-connector --action call_tool --name providerDetails --arguments '{"provider": "aws", "namespace": "hashicorp"}'
+pnpm kyberion run mcp-terraform-connector --action call_tool --name providerDetails --arguments '{"provider": "aws", "namespace": "hashicorp"}'
 ```
 
 ## 4. Strategic Value for Autonomy

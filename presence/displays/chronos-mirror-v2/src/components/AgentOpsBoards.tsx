@@ -6,6 +6,7 @@ import { ChronosOffice } from './ChronosOffice';
 import { LiveTerminalDrawer } from './LiveTerminalDrawer';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
+import { parseAgentActivityBoardResponse } from '../lib/agent-activity-response';
 
 type Blocker = { kind: string; reason: string };
 type Entry = {
@@ -81,8 +82,11 @@ export function AgentOpsBoards({
           cache: 'no-store',
         }
       );
-      const activity = await activityResponse.json();
-      if (activity.ok) setBoard(activity.board);
+      const activity = parseAgentActivityBoardResponse(
+        await activityResponse.json().catch(() => null)
+      );
+      if (!activityResponse.ok || !activity) throw new Error('Invalid agent activity response');
+      setBoard(activity.board);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

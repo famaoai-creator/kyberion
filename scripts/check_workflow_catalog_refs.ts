@@ -15,26 +15,17 @@
  */
 
 import * as path from 'node:path';
+import { expandProcessTemplateTasks } from '@agent/core/mission-process-task-expansion';
 import {
-  expandProcessTemplateTasks,
+  loadMissionWorkflowCatalog,
   normalizeWorkflowPhases,
-  pathResolver,
-  safeExistsSync,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+} from '@agent/core/mission-workflow-catalog';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-workflow-catalog.json');
-
-type CatalogTemplate = {
-  id: string;
-  phases: Array<string | Record<string, unknown>>;
-};
-
-function main(): number {
-  const catalog = readJson<{
-    templates: CatalogTemplate[];
-  }>(CATALOG_PATH);
+export function checkWorkflowCatalogRefs(): string[] {
+  const catalog = loadMissionWorkflowCatalog();
   const violations: string[] = [];
 
   for (const template of catalog.templates) {
@@ -79,22 +70,25 @@ function main(): number {
     }
   }
 
-  if (violations.length > 0) {
-    console.error('❌ Workflow catalog reference check failed:');
-    for (const violation of violations) console.error(`  - ${violation}`);
-    return 1;
-  }
-  console.log('✅ Workflow catalog references and process-template expansions are valid.');
-  return 0;
+  return violations;
 }
 
 export const runCheckWorkflowCatalogRefs = defineScript({
   name: 'check:workflow-catalog-refs',
   flags: [],
-  run() {
-    const status = main();
-    if (status !== 0)
-      throw new Error(`workflow catalog reference check failed with exit code ${status}`);
+  run(context) {
+    const violations = checkWorkflowCatalogRefs();
+    if (violations.length > 0) {
+      throw new ScriptExitError(
+        1,
+        [
+          '❌ Workflow catalog reference check failed:',
+          ...violations.map((violation) => `  - ${violation}`),
+        ].join('\n')
+      );
+    }
+    context.print('✅ Workflow catalog references and process-template expansions are valid.');
+    return { violations };
   },
 });
 

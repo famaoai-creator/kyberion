@@ -11,6 +11,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from json_boundary import JsonInputError, parse_json_object
 
 
 def _generate(params: dict) -> dict:
@@ -65,8 +66,8 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw, "espeak TTS input")
+    except JsonInputError as exc:
         print(json.dumps({"status": "error", "error": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 

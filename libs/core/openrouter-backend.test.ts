@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   OpenRouterBackend,
   buildOpenRouterBackendFromEnv,
@@ -124,5 +126,72 @@ describe('openrouter-backend', () => {
 
     expect(result.available).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed completion messages instead of narrowing them by assertion', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ choices: [{ message: { role: 'assistant', content: 42 } }] }),
+            { status: 200 }
+          )
+        )
+    );
+
+    const backend = new OpenRouterBackend({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: 'or-test-key',
+      model: 'openrouter/free',
+    });
+
+    await expect(backend.prompt('Say hello')).rejects.toThrow('invalid chat completion response');
+  });
+
+  it('rejects non-object tool arguments before a tool path is resolved', async () => {
+    const backend = new OpenRouterBackend({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: 'or-test-key',
+      model: 'openrouter/free',
+      toolsEnabled: true,
+      allowedTools: ['read_file'],
+    });
+    const result = await (
+      backend as unknown as {
+        handleToolCall(name: string, args: string): Promise<string>;
+      }
+    ).handleToolCall('read_file', '[]');
+
+    expect(result).toBe('Error: OpenRouter tool arguments must be a JSON object.');
+  });
+
+  it('rejects model file tools that traverse a symbolic link', async () => {
+    const tempDir = fs.mkdtempSync(path.join(process.cwd(), 'active/shared/tmp/openrouter-tool-'));
+    const targetDir = path.join(tempDir, 'target');
+    const linkDir = path.join(tempDir, 'linked');
+    fs.mkdirSync(targetDir);
+    fs.symlinkSync(targetDir, linkDir, 'dir');
+    try {
+      const backend = new OpenRouterBackend({
+        baseURL: 'https://openrouter.ai/api/v1',
+        apiKey: 'or-test-key',
+        model: 'meta-llama/llama-3-70b-instruct',
+        toolsEnabled: true,
+        allowedTools: ['read_file'],
+      });
+      const result = await (
+        backend as unknown as {
+          handleToolCall(name: string, args: string): Promise<string>;
+        }
+      ).handleToolCall(
+        'read_file',
+        JSON.stringify({ path: path.relative(process.cwd(), path.join(linkDir, 'secret.txt')) })
+      );
+      expect(result).toContain('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

@@ -1,6 +1,4 @@
-import type { ValidateFunction } from 'ajv';
-import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import type {
   MissionClass,
@@ -97,6 +95,7 @@ type WorkflowTemplate = {
   id: string;
   pattern: string;
   description?: string;
+  playbook_ref?: string;
   match?: WorkflowMatch;
   phases: WorkflowPhase[];
 };
@@ -116,14 +115,11 @@ const WORKFLOW_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
 const WORKFLOW_CATALOG_PATH = pathResolver.knowledge(
   'product/governance/mission-workflow-catalog.json'
 );
-
-let workflowCatalogValidateFn: ValidateFunction | null = null;
-
-function ensureWorkflowCatalogValidator(): ValidateFunction {
-  if (workflowCatalogValidateFn) return workflowCatalogValidateFn;
-  workflowCatalogValidateFn = compileSchema(WORKFLOW_CATALOG_SCHEMA_PATH);
-  return workflowCatalogValidateFn;
-}
+const workflowCatalog = defineCatalog<WorkflowCatalogFile>({
+  id: 'mission-workflow-catalog',
+  path: WORKFLOW_CATALOG_PATH,
+  schema: WORKFLOW_CATALOG_SCHEMA_PATH,
+});
 
 function normalize(value?: string): string | undefined {
   if (!value) return undefined;
@@ -196,15 +192,11 @@ export function normalizeWorkflowPhases(phases: WorkflowPhase[]): {
 }
 
 function loadWorkflowCatalog(): WorkflowCatalogFile {
-  const parsed = readJson<WorkflowCatalogFile>(WORKFLOW_CATALOG_PATH);
-  const validate = ensureWorkflowCatalogValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid mission-workflow-catalog: ${errors}`);
-  }
-  return parsed;
+  return workflowCatalog.load();
+}
+
+export function loadMissionWorkflowCatalog(): WorkflowCatalogFile {
+  return loadWorkflowCatalog();
 }
 
 export function resolveMissionWorkflowDesign(

@@ -225,6 +225,12 @@ describe('mission-team-binding', () => {
     expect(safeExistsSync(paths.teamBlueprintPath)).toBe(true);
     expect(safeExistsSync(paths.staffingAssignmentsPath)).toBe(true);
     expect(safeExistsSync(paths.executionLedgerPath)).toBe(true);
+    const receiptPath = `${TEST_MISSION_DIR}/coordination/provisioned-entries.jsonl`;
+    const receipts = String(safeReadFile(receiptPath, { encoding: 'utf8' }) || '');
+    expect(receipts).toContain('"phase":"verified"');
+    expect(receipts).toContain('"target_path":"team-blueprint.json"');
+    expect(receipts).toContain('"target_path":"staffing-assignments.json"');
+    expect(receipts).toContain('"target_path":"execution-ledger.jsonl"');
 
     appendMissionExecutionLedgerEntry({
       mission_id: MISSION_ID,
@@ -290,6 +296,19 @@ describe('mission-team-binding', () => {
     // predate organization stamping).
     expect(loaded?.assignments[0]?.resource.runtime_identity).toMatch(
       /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/legacy-agent$/
+    );
+  });
+
+  it('rejects schema-invalid staffing artifacts before normalization', () => {
+    const paths = initializeMissionTeamBindings(TEST_MISSION_DIR, SAMPLE_PLAN);
+    const persisted = JSON.parse(
+      String(safeReadFile(paths.staffingAssignmentsPath, { encoding: 'utf8' }))
+    ) as Record<string, unknown>;
+    persisted.unexpected = true;
+    safeWriteFile(paths.staffingAssignmentsPath, JSON.stringify(persisted));
+
+    expect(() => loadMissionStaffingAssignments(MISSION_ID, TEST_MISSION_DIR)).toThrow(
+      'Invalid catalog mission-staffing-assignments'
     );
   });
 });

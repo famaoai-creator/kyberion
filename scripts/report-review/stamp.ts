@@ -16,37 +16,86 @@ import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
-export function main(argv: string[] = []): void {
-  const target = argv[0];
+export interface ReportReviewStampPlan {
+  action: 'add' | 'remove' | 'noop';
+  changed: boolean;
+  content: string;
+}
+
+export interface ReportReviewStampResult {
+  ok: boolean;
+  mode: 'apply' | 'dry-run' | 'check';
+  target: string;
+  action: ReportReviewStampPlan['action'];
+  changed: boolean;
+}
+
+export function planReportReviewStamp(html: string, remove: boolean): ReportReviewStampPlan {
+  const re = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  if (remove) {
+    const content = html.replace(
+      new RegExp(re(RV_LAYER_OPEN) + '[\\s\\S]*?' + re(RV_LAYER_CLOSE), 'g'),
+      ''
+    );
+    return { action: content === html ? 'noop' : 'remove', changed: content !== html, content };
+  }
+
+  if (html.includes(RV_LAYER_OPEN) || /id="rv-bar"/.test(html))
+    return { action: 'noop', changed: false, content: html };
+
+  const layer = reviewLayerMarkup();
+  const content = html.includes('</body>')
+    ? html.replace('</body>', `${layer}\n</body>`)
+    : html + layer;
+  return { action: 'add', changed: true, content };
+}
+
+export function main(
+  argv: string[] = [],
+  options: {
+    dryRun?: boolean;
+    check?: boolean;
+    json?: boolean;
+    print?: (value: unknown) => void;
+  } = {}
+): ReportReviewStampResult {
+  const target = argv.find((arg) => !arg.startsWith('--'));
   const remove = argv.includes('--remove');
   if (!target) throw new ScriptExitError(1, 'usage: stamp <report.html> [--remove]');
   if (!safeExistsSync(target)) throw new ScriptExitError(1, `report not found: ${target}`);
 
-  const re = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  let html = safeReadFile(target, { encoding: 'utf8' }) as string;
+  const plan = planReportReviewStamp(safeReadFile(target, { encoding: 'utf8' }) as string, remove);
+  const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
+  if (!options.check && !options.dryRun && plan.changed)
+    safeWriteFile(target, plan.content, { mkdir: false, encoding: 'utf8' });
 
-  if (remove) {
-    const before = html.length;
-    html = html.replace(new RegExp(re(RV_LAYER_OPEN) + '[\\s\\S]*?' + re(RV_LAYER_CLOSE), 'g'), '');
-    safeWriteFile(target, html, { mkdir: false, encoding: 'utf8' });
-    console.log(
-      before === html.length
-        ? 'no review layer found (nothing removed)'
-        : `removed review layer from ${target}`
+  const result: ReportReviewStampResult = {
+    ok: !options.check || !plan.changed,
+    mode,
+    target,
+    action: plan.action,
+    changed: plan.changed,
+  };
+  const print = options.print ?? (() => undefined);
+  if (options.json || options.dryRun || options.check) print(result);
+  else if (plan.action === 'remove') print(`removed review layer from ${target}`);
+  else if (plan.action === 'add')
+    print(
+      `stamped review layer into ${target} (open with file:// for offline review; use --remove to strip)`
     );
-  } else {
-    if (html.includes(RV_LAYER_OPEN) || /id="rv-bar"/.test(html)) {
-      console.log('review layer already present — nothing to do');
-    } else {
-      const layer = reviewLayerMarkup();
-      html = html.includes('</body>') ? html.replace('</body>', `${layer}\n</body>`) : html + layer;
-      safeWriteFile(target, html, { mkdir: false, encoding: 'utf8' });
-      console.log(
-        `stamped review layer into ${target} (open with file:// for offline review; use --remove to strip)`
-      );
-    }
-  }
+  else if (remove) print('no review layer found (nothing removed)');
+  else print('review layer already present — nothing to do');
+
+  if (options.check && plan.changed) throw new ScriptExitError(1, '', true);
+  return result;
 }
 
+export const runReportReviewStamp = defineScript({
+  name: 'report-review:stamp',
+  flags: ['json', 'dry-run', 'check', 'quiet'],
+  run: ({ argv, dryRun, check, json, print }) => main(argv, { dryRun, check, json, print }),
+});
+
 if (isDirectScript(import.meta.url, 'stamp.ts') || isDirectScript(import.meta.url, 'stamp.js'))
-  void defineScript({ name: 'report-review:stamp', flags: [], run: ({ argv }) => main(argv) })();
+  void runReportReviewStamp();

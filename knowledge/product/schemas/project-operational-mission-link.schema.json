@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/project-operational-mission-link.schema.json",
+  "title": "Project Operational Mission Link",
+  "type": "object",
+  "required": [
+    "project_id",
+    "tier",
+    "mission_id",
+    "relationship_type",
+    "summary",
+    "status",
+    "updated_at"
+  ],
+  "properties": {
+    "project_id": { "type": "string", "minLength": 1 },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "relationship_type": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "minLength": 1 },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "updated_at": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

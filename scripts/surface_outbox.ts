@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { isSurfaceAsyncChannel } from '@agent/core/channel-surface-types';
 import {
-  createStandardYargs,
-  isSurfaceAsyncChannel,
   listSurfaceDeadLetters,
   replaySurfaceDeadLetter,
-} from '@agent/core';
+} from '@agent/core/surface-coordination-store';
 import { defineScript, isDirectScript } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 type SurfaceOutboxCommand = 'list' | 'replay';
 
-export function runSurfaceOutbox(args: string[] = []): number {
+export function runSurfaceOutbox(args: string[] = [], print: Print = () => undefined): number {
   const commandToken = args[0] && !args[0].startsWith('-') ? args[0] : undefined;
   const command = (commandToken || 'list') as SurfaceOutboxCommand;
   if (command !== 'list' && command !== 'replay') {
@@ -49,13 +51,13 @@ export function runSurfaceOutbox(args: string[] = []): number {
   if (command === 'list') {
     const records = listSurfaceDeadLetters(surface);
     if (argv.json) {
-      process.stdout.write(`${JSON.stringify({ surface, dead_letters: records }, null, 2)}\n`);
+      print(JSON.stringify({ surface, dead_letters: records }, null, 2));
     } else if (records.length === 0) {
-      process.stdout.write(`No surface dead-letters for ${surface}.\n`);
+      print(`No surface dead-letters for ${surface}.`);
     } else {
       for (const record of records) {
-        process.stdout.write(
-          `${record.dead_letter_id} | ${record.channel} | ${record.failure.kind} | replays=${record.replay_count || 0}\n`
+        print(
+          `${record.dead_letter_id} | ${record.channel} | ${record.failure.kind} | replays=${record.replay_count || 0}`
         );
       }
     }
@@ -72,8 +74,8 @@ export function runSurfaceOutbox(args: string[] = []): number {
     deduplicationKey: argv['dedup-key'] ? String(argv['dedup-key']) : undefined,
   });
   const result = { surface, dead_letter_id: deadLetterId, replayed_message_path: messagePath };
-  if (argv.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  else process.stdout.write(`Requeued ${deadLetterId}: ${messagePath}\n`);
+  if (argv.json) print(JSON.stringify(result, null, 2));
+  else print(`Requeued ${deadLetterId}: ${messagePath}`);
   return 0;
 }
 
@@ -81,7 +83,7 @@ export const main = defineScript({
   name: 'surface-outbox',
   flags: [],
   run(context) {
-    const status = runSurfaceOutbox(context.argv);
+    const status = runSurfaceOutbox(context.argv, context.print);
     if (status !== 0) throw new Error(`surface-outbox failed with exit code ${status}`);
   },
 });

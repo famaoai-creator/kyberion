@@ -1,7 +1,15 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
 import { z } from 'zod';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   assertNotDuringRestore,
   CURRENT_JOURNAL_VERSION,
@@ -100,6 +108,33 @@ describe('KD-03 AC1: restore from journal replay after a simulated process kill'
     const a = new WorkerStateJournal({ journalPath, now: fixedClock() }).restore();
     const b = new WorkerStateJournal({ journalPath, now: fixedClock() }).restore();
     expect(JSON.stringify(a)).toEqual(JSON.stringify(b));
+  });
+
+  it('rejects a journal path that traverses an existing symlink', () => {
+    const journalPath = pathResolver.rootResolve(`${TMP_DIR}/linked/journal.jsonl`);
+    const target = pathResolver.rootResolve(`${TMP_DIR}/linked-target`);
+    safeMkdir(path.dirname(path.dirname(journalPath)), { recursive: true });
+    safeMkdir(target, { recursive: true });
+    safeSymlinkSync(target, path.dirname(journalPath), 'dir');
+
+    try {
+      expect(() => new WorkerStateJournal({ journalPath })).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(path.dirname(journalPath), { force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
+  });
+
+  it('revalidates a journal leaf before restoring after construction', () => {
+    const journalPath = nextJournalPath();
+    const resolvedJournalPath = pathResolver.rootResolve(journalPath);
+    const targetPath = pathResolver.rootResolve(`${TMP_DIR}/journal-target.jsonl`);
+    const journal = new WorkerStateJournal({ journalPath });
+    safeMkdir(path.dirname(targetPath), { recursive: true });
+    safeWriteFile(targetPath, '');
+    safeSymlinkSync(targetPath, resolvedJournalPath);
+
+    expect(() => journal.restore()).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 });
 
@@ -278,6 +313,15 @@ describe('KD-03 AC4: derived index (CQRS) self-heals from the journal', () => {
     // The index file is valid JSON again after healing.
     const raw = String(safeReadFile(indexPath, { encoding: 'utf-8' }));
     expect(() => JSON.parse(raw)).not.toThrow();
+    expect(JSON.parse(raw)).toMatchObject({
+      goalId: 'goal-kd03',
+      goalState: 'active',
+      delegationCount: 2,
+      activeDelegationCount: 1,
+      pendingApprovalCount: 0,
+      hasPendingReminder: false,
+      projectedThroughSeq: 2,
+    });
   });
 
   it('the journal remains the source of truth when the index is absent', () => {

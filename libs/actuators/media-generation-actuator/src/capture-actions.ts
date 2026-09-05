@@ -1,4 +1,4 @@
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { handleAction as handleSystemAction } from '@actuator/system';
 
 export type CaptureAction = 'capture_screen' | 'capture_focused_window' | 'record_screen';

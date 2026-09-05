@@ -42,7 +42,7 @@ import {
   loadKnowledgeUsageAggregate,
 } from './src/knowledge-feedback-loop.js';
 import {
-  resetProviderEgressPolicyCache,
+  _resetProviderEgressPolicyCacheForTests,
   type ProviderEgressPolicyFile,
 } from './provider-egress-gate.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
@@ -345,14 +345,14 @@ describe('provisionTaskKnowledge', () => {
           personal: { mode: 'local-only-or-approved', approved_providers: [] },
         },
       });
-      resetProviderEgressPolicyCache();
+      _resetProviderEgressPolicyCacheForTests();
     });
 
     afterEach(() => {
       safeRmSync(policyDir, { recursive: true, force: true });
       if (originalPolicyPath === undefined) delete process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH;
       else process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = originalPolicyPath;
-      resetProviderEgressPolicyCache();
+      _resetProviderEgressPolicyCacheForTests();
     });
 
     it('returns a typed refusal (not a silent empty pack) when the resolved provider is not approved for the mission tier', async () => {

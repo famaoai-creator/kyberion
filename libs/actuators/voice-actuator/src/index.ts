@@ -1,53 +1,70 @@
+import { collectVoiceSamples } from '@agent/core/voice-sample-collection';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import {
-  collectVoiceSamples,
   getVoiceSampleIngestionPolicy,
+  validateVoiceProfileRegistration,
+} from '@agent/core/voice-sample-ingestion-policy';
+import {
   getSpeechToTextBridges,
   getSpeechToTextCapabilities,
   normalizeSpeechToTextResult,
+} from '@agent/core/speech-to-text-bridge';
+import {
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
+  resolveVoiceEngineForPlatform,
+} from '@agent/core/voice-engine-registry';
+import {
   getVoiceProfileRecord,
   getWritableVoiceProfileRegistryForTier,
   materializeVoiceProfileSampleRefs,
-  getVoiceRuntimePolicy,
-  getVoiceTtsLanguageConfig,
-  logger,
-  loadJson,
-  pathResolver,
-  recordInteraction,
-  listToolRuntimeInventory,
-  recordVoiceSample,
+  writeVoiceProfileRegistry,
+} from '@agent/core/voice-profile-registry';
+import { getVoiceRuntimePolicy } from '@agent/core/voice-runtime-policy';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
+import { logger } from '@agent/core/core';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import {
   safeExec,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
   safeWriteFile,
   safeUnlink,
-  validateVoiceProfileRegistration,
-  verifyVoiceTranscript,
-  resolveVoicePath,
-  VoiceGenerationRuntime,
-  writeVoiceProfileRegistry,
-  splitVoiceTextIntoChunks,
-  createActuatorTrace,
-  finalizeActuatorTrace,
-  resolveVoiceEngineForPlatform,
-  resolveVoiceBackend,
-  createVoiceCapabilityBridge,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { recordInteraction } from '@agent/core/relationship-graph-store';
+import { listToolRuntimeInventory } from '@agent/core/tool-runtime-registry';
+import { recordVoiceSample } from '@agent/core/voice-sample-recorder';
+import { verifyVoiceTranscript } from '@agent/core/voice-transcript-alignment';
+import { resolveVoicePath } from '@agent/core/voice-path-policy';
+import { VoiceGenerationRuntime } from '@agent/core/voice-generation-runtime';
+import { splitVoiceTextIntoChunks } from '@agent/core/voice-text-chunking';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
+import { resolveVoiceBackend } from '@agent/core/media-backend-registry';
+import { createVoiceCapabilityBridge } from '@agent/core/voice-capability-bridge';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   performPlayback,
+  parseVoiceSttBridgeResponse,
   renderNativeArtifact,
   resolvePythonBin,
   waitForVoiceJob,
   type VoiceArtifactFormat,
 } from './voice-runtime-helpers.js';
-import { runActuatorCli } from '@agent/core';
+import {
+  loadVoiceRepairSessionAtPath,
+  validateVoiceRepairSessionAtPath,
+} from './voice-repair-session.js';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { extractActionParams } from './voice-loopback-helpers.js';
 import {
   listAudioRoutes,
@@ -117,23 +134,7 @@ type VoiceAction =
     }
   | Record<string, any>;
 
-export async function handleSingleAction(input: VoiceAction) {
-  ensureDefaultOpPreflight();
-  const preflight = await runOpPreflight({
-    op: `voice:${String((input as any).action || '')}`,
-    params: input as unknown as Record<string, unknown>,
-    source: 'actuator',
-  });
-  if (preflight.decision !== 'allow') {
-    throw new Error(
-      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation voice:${String((input as any).action || '')} was not admitted.`}`
-    );
-  }
-  input = {
-    ...(input as Record<string, unknown>),
-    ...preflight.input,
-    action: (input as any).action,
-  } as VoiceAction;
+async function executeSingleAction(input: VoiceAction) {
   if (input.action === 'health') {
     return voiceHealth(input as any);
   }
@@ -226,7 +227,7 @@ export async function handleSingleAction(input: VoiceAction) {
       org: p.org,
       source: 'voice-actuator',
       interaction: {
-        at: new Date().toISOString(),
+        at: nowIso(),
         summary: p.summary,
         channel: p.channel ?? 'voice',
         ...(p.tone_shifts ? { tone_shifts: p.tone_shifts } : {}),
@@ -243,6 +244,25 @@ export async function handleSingleAction(input: VoiceAction) {
     };
   }
   throw new Error(`Unsupported voice action: ${String((input as any)?.action)}`);
+}
+
+export async function handleSingleAction(input: VoiceAction) {
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `voice:${String((input as any).action || '')}`,
+    params: input as unknown as Record<string, unknown>,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation voice:${String((input as any).action || '')} was not admitted.`}`
+    );
+  }
+  return executeSingleAction({
+    ...(input as Record<string, unknown>),
+    ...preflight.input,
+    action: (input as any).action,
+  } as VoiceAction);
 }
 
 export const actuator = defineCatalogBackedActuator({
@@ -375,9 +395,11 @@ async function recordVerifyRepairVoiceSample(input: {
   }> = [];
 
   if (input.resume_session_path) {
-    let session: any;
+    let session: NonNullable<ReturnType<typeof loadVoiceRepairSessionAtPath>>;
     try {
-      session = loadJson<unknown>(sessionPath);
+      const parsedSession = loadVoiceRepairSessionAtPath(sessionPath);
+      if (!parsedSession) throw new Error('voice repair session has an invalid shape');
+      session = parsedSession;
     } catch (error: any) {
       throw new Error(
         `voice repair session could not be resumed: ${error?.message || String(error)}`
@@ -501,29 +523,27 @@ async function recordVerifyRepairVoiceSample(input: {
   }
 
   safeMkdir(path.dirname(sessionPath), { recursive: true });
-  const persistRepairSession = (): void =>
-    safeWriteFile(
-      sessionPath,
-      JSON.stringify(
-        {
-          version: 1,
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          request_id: requestId,
-          sample_id: sampleId,
-          prompt_text: promptText,
-          initial_recording: initial,
-          initial_transcript: initialTranscript,
-          verification: initialVerification,
-          repair_attempts: repairAttempts,
-          replacements,
-          next_action:
-            'record only the listed mismatched segments, then rerun with resume_session_path',
-        },
-        null,
-        2
-      )
+  const persistRepairSession = (): void => {
+    const session = validateVoiceRepairSessionAtPath(
+      {
+        version: 1,
+        created_at: nowIso(),
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        request_id: requestId,
+        sample_id: sampleId,
+        prompt_text: promptText,
+        initial_recording: initial,
+        initial_transcript: initialTranscript,
+        verification: initialVerification,
+        repair_attempts: repairAttempts,
+        replacements,
+        next_action:
+          'record only the listed mismatched segments, then rerun with resume_session_path',
+      },
+      sessionPath
     );
+    safeWriteFile(sessionPath, JSON.stringify(session, null, 2));
+  };
   persistRepairSession();
 
   for (const [mismatchIndex, mismatch] of initialVerification.mismatches.entries()) {
@@ -861,7 +881,28 @@ export async function handleAction(input: VoiceAction) {
         validateVoiceAction(step);
         traceCtx.startSpan(`voice:${String(step.action || 'step')}`);
         try {
-          results.push(await handleSingleAction(step));
+          const pipeline = await runActuatorPipeline({
+            actuatorId: 'voice',
+            steps: [
+              {
+                type: 'voice',
+                op: String(step.action || ''),
+                // Voice steps may use either the params envelope or the
+                // action-specific top-level contract. Preserve the whole
+                // validated step as the preflight input in both cases.
+                params: step as Record<string, unknown>,
+              },
+            ],
+            context: { result: undefined as unknown },
+            execute: async (op, params, context) => ({
+              ...context,
+              result: await executeSingleAction({
+                ...(params as Record<string, unknown>),
+                action: op,
+              } as VoiceAction),
+            }),
+          });
+          results.push(pipeline.result);
           traceCtx.endSpan('ok');
         } catch (err: any) {
           traceCtx.endSpan('error', err?.message ?? String(err));
@@ -1177,7 +1218,7 @@ async function registerVoiceProfile(input: {
     JSON.stringify(
       {
         kind: 'voice_profile_registration_receipt',
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
         status: 'validated_pending_promotion',
         request_id: input.request_id,
         profile: input.profile,
@@ -1274,15 +1315,17 @@ async function transcribeVoiceSample(input: {
       return null;
     }
 
-    let parsed: any;
+    let parsed: ReturnType<typeof parseVoiceSttBridgeResponse>;
     try {
-      parsed = JSON.parse(commandResult.stdout);
+      parsed = parseVoiceSttBridgeResponse(
+        parseSafeJsonInput(commandResult.stdout, 'mlx_audio_stt_bridge response')
+      );
     } catch {
       mlxError = new Error(`mlx_audio_stt_bridge returned non-JSON: ${commandResult.stdout}`);
       return null;
     }
-    if (parsed.status !== 'success') {
-      mlxError = new Error(`mlx_audio_stt_bridge error: ${parsed.error}`);
+    if (!parsed || parsed.status !== 'success') {
+      mlxError = new Error(`mlx_audio_stt_bridge error: ${parsed?.error || 'invalid response'}`);
       return null;
     }
     const segments = Array.isArray(parsed.segments) ? parsed.segments : [];
@@ -1398,18 +1441,13 @@ async function transcribeVoiceSample(input: {
 const main = async () => {
   await runActuatorCli({
     name: 'voice-actuator',
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+if (isDirectEntry(import.meta.url, 'libs/actuators/voice-actuator/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, 'voice-actuator');
 }
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

@@ -7,15 +7,14 @@
  * state(tenant_slug)。純関数 compose + impure build の2層。
  */
 
-import * as path from 'node:path';
 import { listWorkItems, type WorkItem } from './work-coordination.js';
 import {
   buildWorkVisibilityProjection,
   resolveWorkItemContext,
   type WorkVisibilityViewer,
 } from './work-visibility.js';
-import { findMissionPath } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { loadState } from './mission-state.js';
+import { nowIso } from './foundation/time.js';
 
 export interface AgentActivityBlocker {
   kind: 'blocked' | 'dependency' | 'review_wait' | 'unassigned';
@@ -152,24 +151,17 @@ export function composeAgentActivityBoard(input: {
   }
 
   return {
-    generated_at: input.now || new Date().toISOString(),
+    generated_at: input.now || nowIso(),
     tenant: input.tenantFilter,
     entries,
     agents: [...byAgent.values()].sort((a, b) => b.active + b.blocked - (a.active + a.blocked)),
   };
 }
 
-function readTenantSlug(missionId: string): string | undefined {
-  const missionDir = findMissionPath(missionId);
-  if (!missionDir) return undefined;
-  const statePath = path.join(missionDir, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return undefined;
+export function readMissionTenantSlug(missionId: string): string | undefined {
   try {
-    const state = loadJson<{
-      tenant_slug?: string;
-      tenant_id?: string;
-    }>(statePath);
-    return state.tenant_slug || state.tenant_id || undefined;
+    const state = loadState(missionId);
+    return state?.tenant_slug || state?.tenant_id || undefined;
   } catch {
     return undefined;
   }
@@ -185,7 +177,7 @@ export function buildAgentActivityBoard(
   for (const item of items) {
     const missionId = resolveWorkItemContext(item).mission_id;
     if (missionId && !(missionId in tenantByMission)) {
-      tenantByMission[missionId] = readTenantSlug(missionId);
+      tenantByMission[missionId] = readMissionTenantSlug(missionId);
     }
   }
   return composeAgentActivityBoard({

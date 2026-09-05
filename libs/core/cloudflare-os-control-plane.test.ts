@@ -7,7 +7,9 @@ import {
   assertAuthConfigMutationSource,
   AUTH_CONFIG_BOUNDARY_INVENTORY,
   isConstantTimeEqual,
+  normalizeGovernedCodeEnvelope,
 } from './cloudflare-os-control-plane.js';
+import { validatePersistedControlPlaneStateAtPath } from './cloudflare-os-control-plane-state.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 
@@ -67,6 +69,34 @@ const gadgetReadOperation = {
 };
 
 describe('Cloudflare OS adoption control plane', () => {
+  it('rejects unknown persisted state fields before publication', () => {
+    const statePath = pathResolver.sharedTmp('cloudflare-os-invalid-state-write-test.json');
+    expect(() =>
+      validatePersistedControlPlaneStateAtPath(statePath, {
+        version: 1,
+        held: [],
+        introductions: [],
+        observations: [],
+        autoRules: [],
+        capabilities: [],
+        threadCapabilities: {},
+        blueprints: [],
+        network: [],
+        gadgets: [],
+        unexpected: true,
+      })
+    ).toThrow(/additional properties|contains unknown fields/);
+  });
+
+  it('accepts only an object envelope with an explicit value field', () => {
+    expect(normalizeGovernedCodeEnvelope([])).toBeUndefined();
+    expect(normalizeGovernedCodeEnvelope({})).toBeUndefined();
+    expect(normalizeGovernedCodeEnvelope({ value: null, value_undefined: true })).toEqual({
+      value: undefined,
+    });
+    expect(normalizeGovernedCodeEnvelope({ value: 3 })).toEqual({ value: 3 });
+  });
+
   it('OS-01 submits, approves, applies exactly once and requires attribution', async () => {
     const plane = createPlane();
     let applications = 0;
@@ -127,6 +157,44 @@ describe('Cloudflare OS adoption control plane', () => {
       expect(recordSpy).not.toHaveBeenCalled();
     } finally {
       recordSpy.mockRestore();
+      safeUnlinkSync(statePath);
+    }
+  });
+
+  it('rejects malformed persisted authority records without partial restore', () => {
+    const statePath = pathResolver.sharedTmp('cloudflare-os-malformed-state-test.json');
+    try {
+      safeWriteFile(
+        statePath,
+        JSON.stringify({
+          version: 1,
+          held: [{ id: 'malformed-held', status: 'approved' }],
+          introductions: [],
+          observations: [
+            {
+              id: 'observation-that-must-not-restore',
+              missionId: 'mission-malformed',
+              service: 'knowledge',
+              resourceRef: 'secret',
+              tier: 'personal',
+              purpose: 'test',
+              summary: 'test',
+              observedAt: new Date().toISOString(),
+            },
+          ],
+          autoRules: [],
+          capabilities: [],
+          threadCapabilities: {},
+          blueprints: [],
+          network: [],
+          gadgets: [],
+        })
+      );
+      const plane = new CloudflareOsControlPlane({ statePath, auditRestoreFailures: false });
+
+      expect(plane.getHeldAction('malformed-held')).toBeUndefined();
+      expect(plane.listObservations()).toEqual([]);
+    } finally {
       safeUnlinkSync(statePath);
     }
   });
@@ -534,6 +602,12 @@ describe('Cloudflare OS adoption control plane', () => {
     } finally {
       safeUnlinkSync(statePath);
     }
+  });
+
+  it('rejects a persisted state path outside the repository root', () => {
+    expect(
+      () => new CloudflareOsControlPlane({ statePath: '../outside-control-plane.json' })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('persists and restores gadget contracts with tenant and observation boundaries', async () => {

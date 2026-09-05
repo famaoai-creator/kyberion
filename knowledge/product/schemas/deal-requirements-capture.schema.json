@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "knowledge/product/schemas/deal-requirements-capture.schema.json",
+  "title": "Customer deal requirements capture",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "deal_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$" },
+    "tenant_slug": { "type": "string", "minLength": 2, "maxLength": 31 },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "turns_captured": { "type": "integer", "minimum": 1 },
+    "requirements": { "$ref": "#/$defs/requirements" }
+  },
+  "required": ["deal_id", "tenant_slug", "updated_at", "turns_captured", "requirements"],
+  "$defs": {
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "functional_requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/functionalRequirement" }
+        },
+        "non_functional_requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonFunctionalRequirement" }
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/constraint" }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assumption" }
+        },
+        "open_questions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/openQuestion" }
+        },
+        "scope": { "$ref": "#/$defs/scope" }
+      },
+      "required": [
+        "functional_requirements",
+        "non_functional_requirements",
+        "constraints",
+        "assumptions",
+        "open_questions"
+      ]
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": { "type": "string" },
+        "quote": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "functionalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "priority": { "enum": ["must", "should", "could", "wont"] },
+        "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/sourceRef" } },
+        "depends_on": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "description", "priority"]
+    },
+    "nonFunctionalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "category": {
+          "enum": [
+            "performance",
+            "security",
+            "availability",
+            "usability",
+            "compatibility",
+            "maintainability",
+            "compliance",
+            "cost",
+            "other"
+          ]
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "target": { "type": "string" },
+        "priority": { "enum": ["must", "should", "could", "wont"] },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/sourceRef" } }
+      },
+      "required": ["id", "category", "description"]
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": ["budget", "timeline", "technical", "legal", "organizational", "other"]
+        },
+        "description": { "type": "string" },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/sourceRef" } }
+      },
+      "required": ["category", "description"]
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string" },
+        "confidence": { "enum": ["low", "medium", "high"] },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/sourceRef" } }
+      },
+      "required": ["description"]
+    },
+    "openQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "question": { "type": "string" },
+        "raised_by": { "type": "string" },
+        "status": { "enum": ["open", "answered", "deferred"] },
+        "blocking": { "type": "boolean" },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/sourceRef" } }
+      },
+      "required": ["question"]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in_scope": { "type": "array", "items": { "type": "string" } },
+        "out_of_scope": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

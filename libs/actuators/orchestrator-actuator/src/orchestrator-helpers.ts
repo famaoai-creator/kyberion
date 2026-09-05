@@ -1,28 +1,38 @@
+import { logger } from '@agent/core/core';
 import {
-  buildCostReportFromHistory,
-  summarizeSemanticDegradations,
-  listPromotionCandidates,
-  logger,
-  loadJson,
+  isRecord,
+  nowIso,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+  getRegisteredEnvText,
+} from '@agent/core/foundation';
+import {
   safeReadFile,
   safeWriteFile,
   safeExec,
   safeMkdir,
   safeExistsSync,
+  safeLstat,
   safeUnlinkSync,
   safeSymlinkSync,
-  resolveVars,
-  evaluateCondition,
-  retry,
-  buildGovernedRetryOptions,
-  derivePipelineStatus,
-  pathResolver,
-  buildUnknownActuatorOpError,
-  registerTaskPlanCoordinator,
-  evaluateTaskPlanReadyGate,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+  assertSafeRepositoryPath,
+} from '@agent/core/secure-io';
+import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
+import { retry } from '@agent/core/async-utils';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { pathResolver } from '@agent/core/path-resolver';
+import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
+import { registerTaskPlanCoordinator } from '@agent/core/task-plan-coordinator-port';
+import { evaluateTaskPlanReadyGate } from '@agent/core/sdlc-artifact-store';
+import { buildCostReportFromHistory } from '@agent/core/cost-report';
+import { summarizeSemanticDegradations } from '@agent/core/semantic-degradation-log';
+import { listPromotionCandidates } from '@agent/core/promotion-candidates';
+import { runAdfActuatorPipeline } from '../../../core/actuator-sdk.js';
+import type { AdfEngineContext, AdfRunResult, AdfStep } from '../../../core/adf-engine.js';
+import {
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { executeTaskPlanFromOrchestrator, taskPlanCoordinator } from './task-plan-coordinator.js';
@@ -44,6 +54,7 @@ import {
   collectMissionStatusSnapshot,
   collectProjectStatusSnapshot,
 } from './orchestrator-execution-brief-helpers.js';
+import { parseIntentMapping } from './orchestrator-intent-mapping.js';
 
 // Legacy core callers are still supported, but the coordinator is owned and
 // registered by the orchestrator actuator rather than by Wisdom or core.
@@ -112,13 +123,32 @@ function buildUnknownOrchestratorOpError(op: string): Error {
   return buildUnknownActuatorOpError('orchestrator', op);
 }
 
-export function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: ORCHESTRATOR_MANIFEST_PATH,
-    defaults: DEFAULT_ORCHESTRATOR_RETRY,
-    override: override,
-    fallbackCategories: ['resource_unavailable', 'timeout'],
+export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: ORCHESTRATOR_MANIFEST_PATH,
+  defaults: DEFAULT_ORCHESTRATOR_RETRY,
+  fallbackCategories: ['resource_unavailable', 'timeout'],
+});
+
+function resolveOrchestratorRepositoryPath(rootDir: string, value: unknown): string {
+  return assertSafeRepositoryPath(path.resolve(rootDir, String(value || '').trim()), {
+    allowMissingLeaf: true,
   });
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readOrchestratorJson(filePath: string, label: string): unknown {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
 }
 
 /**
@@ -126,99 +156,104 @@ export function buildRetryOptions(override?: Record<string, any>) {
  */
 export async function executePipeline(
   steps: PipelineStep[],
-  initialCtx: any = {},
-  options: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() }
+  initialCtx: AdfEngineContext = {},
+  options: { max_steps?: number; timeout_ms?: number } = {}
 ) {
   const rootDir = pathResolver.rootDir();
-  const MAX_STEPS = options.max_steps || 1000;
-  const TIMEOUT = options.timeout_ms || 60000;
+  const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
+  const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, root: rootDir, HOME: process.env.HOME || '/Users' };
+  let ctx: AdfEngineContext = {
+    ...initialCtx,
+    root: rootDir,
+    HOME: getRegisteredEnvText('HOME') || '/Users',
+  };
 
-  if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path));
+  const contextPath =
+    typeof initialCtx.context_path === 'string' && initialCtx.context_path
+      ? resolveOrchestratorRepositoryPath(rootDir, initialCtx.context_path)
+      : undefined;
+  if (contextPath && safeExistsSync(contextPath)) {
+    const saved = parseSafeJsonObjectValue(
+      readOrchestratorJson(contextPath, 'orchestrator context'),
+      'orchestrator context'
+    );
     ctx = { ...ctx, ...saved };
   }
 
-  const results = [];
-  for (const step of steps) {
-    state.stepCount++;
-    if (state.stepCount > MAX_STEPS)
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT)
-      throw new Error(`[SAFETY_LIMIT] Execution timed out (${TIMEOUT}ms)`);
-
-    try {
-      logger.info(`  [ORCH_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-
-      ensureDefaultOpPreflight();
-      const preflight = await runOpPreflight({
-        op: `orchestrator:${step.op}`,
-        params: step.params || {},
-        context: ctx,
-        source: 'actuator',
-      });
-      if (preflight.decision !== 'allow') {
-        throw new Error(
-          `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation orchestrator:${step.op} was not admitted.`}`
-        );
-      }
-      const params = preflight.input;
-
-      if (step.type === 'control') {
-        ctx = await opControl(step.op, params, ctx, options, state);
-      } else {
-        switch (step.type) {
-          case 'capture':
-            ctx = await opCapture(step.op, params, ctx);
-            break;
-          case 'transform':
-            ctx = await opTransform(step.op, params, ctx);
-            break;
-          case 'apply':
-            ctx = await opApply(step.op, params, ctx);
-            break;
-        }
-      }
-      results.push({ op: step.op, status: 'success' });
-    } catch (err: any) {
-      logger.error(`  [ORCH_PIPELINE] Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
-      break;
-    }
-  }
-
-  if (initialCtx.context_path) {
-    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
-  }
-
-  return {
-    status: derivePipelineStatus(results),
-    results,
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'orchestrator',
+    steps,
     context: ctx,
-    total_steps: state.stepCount,
-  };
+    options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+    handlers: {
+      capture: (op, params, currentCtx) => opCapture(op, params, currentCtx),
+      transform: (op, params, currentCtx) => opTransform(op, params, currentCtx),
+      apply: (op, params, currentCtx) => opApply(op, params, currentCtx),
+      control: opControl,
+    },
+    hooks: {
+      beforeStep: (step, stepNumber) =>
+        logger.info(`  [ORCH_PIPELINE] [Step ${stepNumber}] ${step.type}:${step.op}...`),
+      afterStep: (step, _stepNumber, _context, outcome) => {
+        if (outcome.status === 'failed') {
+          logger.error(
+            `  [ORCH_PIPELINE] Step failed (${step.op}): ${outcome.error || 'unknown error'}`
+          );
+        }
+      },
+    },
+  });
+
+  ctx = result.context;
+
+  if (contextPath) {
+    safeWriteFile(contextPath, JSON.stringify(ctx, null, 2));
+  }
+
+  return result;
 }
 
-async function opControl(op: string, params: any, ctx: any, options: any, state: any) {
+async function opControl(
+  op: string,
+  params: unknown,
+  ctx: AdfEngineContext,
+  runSteps: (
+    steps: AdfStep[],
+    seedCtx?: AdfEngineContext
+  ) => Promise<AdfRunResult<AdfEngineContext>>,
+  _resolve: (value: unknown) => unknown
+): Promise<AdfEngineContext> {
+  if (!isRecord(params)) {
+    throw new Error(`[INVALID_PARAMS] ${op} control params must be an object`);
+  }
+  const runNested = async (steps: unknown, seedCtx: AdfEngineContext) => {
+    const result = await runSteps(asAdfSteps(steps, op), seedCtx);
+    if (result.status === 'failed') {
+      throw new Error(
+        result.results.find((entry) => entry.status === 'failed')?.error || 'nested pipeline failed'
+      );
+    }
+    return result.context;
+  };
+
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipeline(params.then, ctx, options, state);
-        return res.context;
+        return runNested(params.then, ctx);
       } else if (params.else) {
-        const res = await executePipeline(params.else, ctx, options, state);
-        return res.context;
+        return runNested(params.else, ctx);
       }
       return ctx;
 
     case 'while':
       let iterations = 0;
-      const maxIter = params.max_iterations || 100;
+      const maxIter =
+        typeof params.max_iterations === 'number' && params.max_iterations >= 0
+          ? params.max_iterations
+          : 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipeline(params.pipeline, ctx, options, state);
-        ctx = res.context;
+        ctx = await runNested(params.pipeline, ctx);
         iterations++;
       }
       return ctx;
@@ -228,21 +263,41 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
   }
 }
 
+function asAdfSteps(value: unknown, op: string): AdfStep[] {
+  if (
+    !Array.isArray(value) ||
+    !value.every(
+      (step): step is AdfStep =>
+        isRecord(step) &&
+        typeof step.op === 'string' &&
+        (step.type === 'capture' ||
+          step.type === 'transform' ||
+          step.type === 'apply' ||
+          step.type === 'control')
+    )
+  ) {
+    throw new Error(`[INVALID_PARAMS] ${op} control requires an array of ADF steps`);
+  }
+  return value;
+}
+
 async function opCapture(op: string, params: any, ctx: any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json':
+      const inputPath = resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx));
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: loadJson<unknown>(
-          path.resolve(rootDir, resolveVars(params.path, ctx))
+        [params.export_as || 'last_capture_data']: readOrchestratorJson(
+          inputPath,
+          'orchestrator read_json'
         ),
       };
     case 'read_file':
       return {
         ...ctx,
         [params.export_as || 'last_capture']: safeReadFile(
-          path.resolve(rootDir, resolveVars(params.path, ctx)),
+          resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx)),
           { encoding: 'utf8' }
         ),
       };
@@ -251,14 +306,20 @@ async function opCapture(op: string, params: any, ctx: any) {
       const shellResult = await retry(async () => safeExec(cmd), buildRetryOptions(params.retry));
       return { ...ctx, [params.export_as || 'last_capture']: shellResult.trim() };
     case 'intent_detect':
-      const mapping = yaml.load(
-        safeReadFile(path.resolve(rootDir, resolveVars(params.mapping_path, ctx)), {
-          encoding: 'utf8',
-        }) as string
-      ) as any;
+      const mapping = parseIntentMapping(
+        yaml.load(
+          safeReadFile(
+            resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.mapping_path, ctx)),
+            {
+              encoding: 'utf8',
+            }
+          ) as string
+        )
+      );
+      if (!mapping) throw new Error('intent_detect mapping has an invalid shape');
       const query = resolveVars(params.query, ctx).toLowerCase();
-      const detected = mapping.intents.find((i: any) =>
-        i.trigger_phrases.some((p: string) => query.includes(p.toLowerCase()))
+      const detected = mapping.intents.find((intent) =>
+        intent.trigger_phrases.some((phrase) => query.includes(phrase.toLowerCase()))
       );
       return { ...ctx, [params.export_as || 'detected_intent']: detected };
     default:
@@ -280,7 +341,9 @@ async function opTransform(op: string, params: any, ctx: any) {
       const hydrated = resolveVars(input, ctx);
       return {
         ...ctx,
-        [params.export_as || 'last_transform']: params.is_json ? JSON.parse(hydrated) : hydrated,
+        [params.export_as || 'last_transform']: params.is_json
+          ? parseSafeJsonInput(hydrated, 'variable_hydrate JSON')
+          : hydrated,
       };
     case 'request_to_execution_brief': {
       const catalog = loadActuatorRequestArchetypes();
@@ -428,8 +491,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           target_project_id: targetProjectId,
           recommended_sources: [
             'dist/scripts/surface_runtime.js --action status',
-            'pnpm run check:esm',
-            'pnpm run check:catalogs',
+            'pnpm run check -- --scope pr --only esm',
+            'pnpm run check -- --scope full --only catalogs',
           ],
         },
       };
@@ -504,7 +567,7 @@ async function opTransform(op: string, params: any, ctx: any) {
         [params.export_as || 'system_status_snapshot']: {
           kind: 'system-status-snapshot',
           scope: brief.scope,
-          captured_at: new Date().toISOString(),
+          captured_at: nowIso(),
           surface_status: surfaceStatus,
           esm_integrity: esmIntegrity,
           catalog_integrity: catalogIntegrity,
@@ -692,8 +755,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           },
           sources: [
             'dist/scripts/surface_runtime.js --action status',
-            'pnpm run check:esm',
-            'pnpm run check:catalogs',
+            'pnpm run check -- --scope pr --only esm',
+            'pnpm run check -- --scope full --only catalogs',
           ],
         },
       };
@@ -799,7 +862,7 @@ async function opTransform(op: string, params: any, ctx: any) {
           priority: 'now',
           action: `Review main artifact ${String(mainArtifact.id || 'artifact')}`,
           reason: 'Primary deliverable is ready for review.',
-          suggested_command: `node dist/scripts/cli.js artifact ${mainArtifactPath}`,
+          suggested_command: `pnpm kyberion artifact ${mainArtifactPath}`,
           suggested_followup_request: `Please review the main deliverable ${String(mainArtifact.id || 'artifact')}.`,
         });
         if (isLikelyBinaryArtifact) {
@@ -809,7 +872,7 @@ async function opTransform(op: string, params: any, ctx: any) {
             action: `Open main artifact ${String(mainArtifact.id || 'artifact')}`,
             reason:
               'The primary deliverable is a binary artifact and may be easier to review in a local viewer.',
-            suggested_command: `node dist/scripts/cli.js open-artifact ${mainArtifactPath}`,
+            suggested_command: `pnpm kyberion open-artifact ${mainArtifactPath}`,
             suggested_followup_request: `Please open the main deliverable ${String(mainArtifact.id || 'artifact')} in a local viewer.`,
           });
         }
@@ -828,7 +891,7 @@ async function opTransform(op: string, params: any, ctx: any) {
           reason: 'Evidence artifacts are available in the delivery pack.',
           ...(evidenceArtifact?.path
             ? {
-                suggested_command: `node dist/scripts/cli.js artifact ${String(evidenceArtifact.path)}`,
+                suggested_command: `pnpm kyberion artifact ${String(evidenceArtifact.path)}`,
               }
             : {}),
           suggested_followup_request: 'Please review the evidence and validation artifacts.',
@@ -974,7 +1037,7 @@ async function opApply(op: string, params: any, ctx: any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'write_file':
-      const out = path.resolve(rootDir, resolveVars(params.path, ctx));
+      const out = resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx));
       const content = params.from ? ctx[params.from] : (ctx.last_transform ?? ctx.last_capture);
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
       await retry(async () => {
@@ -985,11 +1048,13 @@ async function opApply(op: string, params: any, ctx: any) {
       }, buildRetryOptions(params.retry));
       break;
     case 'mkdir':
-      safeMkdir(path.resolve(rootDir, resolveVars(params.path, ctx)), { recursive: true });
+      safeMkdir(resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx)), {
+        recursive: true,
+      });
       break;
     case 'symlink':
-      const target = path.resolve(rootDir, resolveVars(params.target, ctx));
-      const source = path.resolve(rootDir, resolveVars(params.source, ctx));
+      const target = resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.target, ctx));
+      const source = resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.source, ctx));
       if (safeExistsSync(target)) safeUnlinkSync(target);
       if (!safeExistsSync(path.dirname(target)))
         safeMkdir(path.dirname(target), { recursive: true });
@@ -1049,10 +1114,11 @@ async function opApply(op: string, params: any, ctx: any) {
       }
       for (const job of Array.isArray(validatedPlanSet.jobs) ? validatedPlanSet.jobs : []) {
         if (!job?.output_path || !job?.rendered_pipeline || job.skipped_reason) continue;
-        const logicalOutputPath = String(job.output_path);
-        const logicalOutputDir = path.dirname(logicalOutputPath);
+        const requestedOutputPath = String(job.output_path);
+        const guardedOutputPath = resolveOrchestratorRepositoryPath(rootDir, requestedOutputPath);
+        const logicalOutputDir = path.dirname(guardedOutputPath);
         if (!safeExistsSync(logicalOutputDir)) safeMkdir(logicalOutputDir, { recursive: true });
-        safeWriteFile(logicalOutputPath, JSON.stringify(job.rendered_pipeline, null, 2));
+        safeWriteFile(requestedOutputPath, JSON.stringify(job.rendered_pipeline, null, 2));
       }
       break;
     }

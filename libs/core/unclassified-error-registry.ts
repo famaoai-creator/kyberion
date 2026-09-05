@@ -1,5 +1,7 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { nowIso } from './foundation/time.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import * as nodePath from 'node:path';
 import { createLogger } from './logger.js';
 const logger = createLogger('unclassified-error-registry');
@@ -35,11 +37,23 @@ function registryPath(): string {
   return nodePath.join(pathResolver.rootDir(), REGISTRY_RELATIVE);
 }
 
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/unclassified-error-registry.schema.json'
+);
+
+function registryCatalogAtPath(filePath: string) {
+  return defineCatalog<UnclassifiedErrorRegistry>({
+    id: 'unclassified-error-registry',
+    path: filePath,
+    schema: REGISTRY_SCHEMA_PATH,
+    fallback: { version: '1.0.0', entries: [] },
+    fallbackOnInvalid: true,
+  });
+}
+
 function readRegistry(): UnclassifiedErrorRegistry {
   try {
-    const p = registryPath();
-    if (!safeExistsSync(p)) return { version: '1.0.0', entries: [] };
-    return loadJson<UnclassifiedErrorRegistry>(p);
+    return registryCatalogAtPath(registryPath()).load();
   } catch {
     return { version: '1.0.0', entries: [] };
   }
@@ -47,10 +61,22 @@ function readRegistry(): UnclassifiedErrorRegistry {
 
 function writeRegistry(registry: UnclassifiedErrorRegistry): void {
   try {
-    safeWriteFile(registryPath(), JSON.stringify(registry, null, 2));
+    writeUnclassifiedErrorRegistryAtPath(registryPath(), registry);
   } catch {
     /* observability must never break the caller */
   }
+}
+
+export function writeUnclassifiedErrorRegistryAtPath(
+  filePath: string,
+  registry: UnclassifiedErrorRegistry
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = registryCatalogAtPath(safePath).validate(registry, safePath);
+  const dir = nodePath.dirname(safePath);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2));
+  return safePath;
 }
 
 /**
@@ -104,7 +130,7 @@ export function markReconciled(excerpts: string[]): void {
   try {
     const set = new Set(excerpts);
     const registry = readRegistry();
-    const now = new Date().toISOString();
+    const now = nowIso();
     for (const entry of registry.entries) {
       if (set.has(entry.message_excerpt)) {
         entry.reconciled = true;

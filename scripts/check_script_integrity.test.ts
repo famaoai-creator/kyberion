@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
-import { checkScriptIntegrity, findDirectScriptGuardViolations } from './check_script_integrity.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  checkScriptIntegrity,
+  findDirectScriptGuardViolations,
+  findScriptHarnessViolations,
+} from './check_script_integrity.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('check-script-integrity');
 
@@ -35,6 +40,26 @@ describe('check_script_integrity', () => {
         "if (isDirectScript(import.meta.url, 'example.ts') || isDirectScript(import.meta.url, 'example.js')) void main();"
       )
     ).toEqual([]);
+  });
+
+  it('requires package TypeScript entrypoints to use the shared harness', () => {
+    const sources = new Map([
+      ['scripts/unsafe.ts', 'export function main() {}'],
+      ['scripts/safe.ts', 'const run = defineScript({ name: "safe", run() {} });'],
+    ]);
+
+    expect(
+      findScriptHarnessViolations(
+        {
+          unsafe: 'node --import ./scripts/ts-loader.mjs scripts/unsafe.ts',
+          safe: 'node --import ./scripts/ts-loader.mjs scripts/safe.ts',
+          bootstrap: 'node --import ./scripts/ts-loader.mjs scripts/clean_entrypoint.ts',
+        },
+        (repoRelativePath) => sources.get(repoRelativePath)
+      )
+    ).toEqual([
+      'package.json scripts.unsafe: scripts/unsafe.ts must execute through scripts/lib/harness.ts',
+    ]);
   });
 
   it('flags dist script references without TypeScript sources', () => {

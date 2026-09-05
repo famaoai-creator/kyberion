@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 import { registerPluginFacet, resolveFacets, validateFacetPurity } from './facet-registry.js';
 
 describe('facet-registry', () => {
@@ -42,7 +42,9 @@ describe('facet-registry', () => {
           pluginId: 'pack-one',
           trust: 'official',
           trustReason: 'test',
-          resolvedSourcePath: pluginRoot,
+          // KD-06: trust is re-derived from resolvedSourcePath on every read, so
+          // this must resolve inside the repo's own plugins/ tree to stay 'official'.
+          resolvedSourcePath: path.join(pathResolver.rootDir(), 'plugins', 'pack-one'),
           managedPath: pluginRoot,
           manifest: {
             pluginId: 'pack-one',
@@ -63,6 +65,45 @@ describe('facet-registry', () => {
       );
       expect(resolved.persona?.source).toBe('managed');
       expect(resolved.persona?.content).toContain('Managed pack');
+    } finally {
+      safeRmSync(root);
+    }
+  });
+
+  it('rejects a managed facet that resolves through a symlink', () => {
+    const root = pathResolver.rootResolve(`active/shared/tmp/facet-symlink-test-${Date.now()}`);
+    const pluginRoot = path.join(root, 'pack-one');
+    const targetPath = path.join(root, 'outside.md');
+    const linkPath = path.join(pluginRoot, 'facets', 'personas', 'linked-persona.md');
+    try {
+      safeMkdir(path.dirname(linkPath), { recursive: true });
+      safeWriteFile(targetPath, 'Outside managed facet content.');
+      safeWriteFile(
+        path.join(pluginRoot, 'plugin.json'),
+        JSON.stringify({ plugin_id: 'pack-one', facets: { persona: ['linked-persona'] } })
+      );
+      safeWriteFile(
+        path.join(pluginRoot, '.kyberion-managed-plugin.json'),
+        JSON.stringify({
+          pluginId: 'pack-one',
+          trust: 'official',
+          trustReason: 'test',
+          resolvedSourcePath: path.join(pathResolver.rootDir(), 'plugins', 'pack-one'),
+          managedPath: pluginRoot,
+          manifest: {
+            pluginId: 'pack-one',
+            raw: { plugin_id: 'pack-one', facets: { persona: ['linked-persona'] } },
+          },
+          diagnostics: [],
+          activationStatus: 'activatable',
+          installedAt: new Date().toISOString(),
+        })
+      );
+      safeSymlinkSync(targetPath, linkPath);
+
+      expect(() =>
+        resolveFacets({ persona: 'linked-persona' }, { tier: 'public', managedRoot: root })
+      ).toThrow(/RESOURCE_PATH_SYMLINK|symlink/i);
     } finally {
       safeRmSync(root);
     }

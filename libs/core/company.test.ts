@@ -222,4 +222,35 @@ describe('company', () => {
     expect(company.decision_rights_ref.data?.source_kind).toBe('public');
     expect(company.decision_rights_ref.data?.decisions).toHaveLength(0);
   });
+
+  it('does not project primitive or array company components', () => {
+    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/vision`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/product/governance`, { recursive: true });
+    safeWriteFile(`${tmpRoot}/customer/acme/customer.json`, JSON.stringify(['invalid']));
+    safeWriteFile(`${tmpRoot}/customer/acme/identity.json`, JSON.stringify('invalid'));
+    safeWriteFile(`${tmpRoot}/vision/_default.md`, '# Default Vision');
+    safeWriteFile(
+      `${tmpRoot}/knowledge/product/governance/decision-rights.json`,
+      JSON.stringify({
+        version: '1.0.0',
+        company_id: 'default',
+        tenant_slug: null,
+        source_kind: 'public',
+        source_path: 'knowledge/product/governance/decision-rights.json',
+        decisions: [],
+      })
+    );
+
+    const company = resolveCompany('acme', tmpRoot);
+
+    expect(company.customer_ref).toMatchObject({ exists: true, data: null });
+    expect(company.identity_ref).toMatchObject({ exists: true, data: null });
+  });
+
+  it('rejects tenant values that could escape the customer scope', () => {
+    expect(() => resolveCompany('../outside', tmpRoot)).toThrow('[COMPANY_TENANT_SCOPE]');
+    expect(() => resolveCompany('acme/other', tmpRoot)).toThrow('[COMPANY_TENANT_SCOPE]');
+    expect(() => resolveCompany('public', tmpRoot)).toThrow('[COMPANY_TENANT_SCOPE]');
+  });
 });

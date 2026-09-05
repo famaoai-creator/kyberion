@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "data-vault-entry.schema.json",
+  "title": "Data vault entry",
+  "description": "Validated cache entry stored in the governed data-vault tier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sourceType", "key", "projectId", "tier", "data", "contentHash", "createdAt"],
+  "properties": {
+    "sourceType": { "type": "string", "minLength": 1 },
+    "key": { "type": "string", "minLength": 1 },
+    "projectId": { "type": "string", "minLength": 1 },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "data": {},
+    "contentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,35 +1,52 @@
 import * as path from 'node:path';
 import {
   evaluatePublicationVerification,
-  escapeHtml,
-  loadApprovalRequest,
-  logger,
+  loadPublicationApprovalAtPath,
   loadMarketingRiskPolicy,
-  pathResolver,
   requiredMarketingControls,
+  scanMarketingTextForSensitiveData,
+  sha256,
+  validatePublicationVerification,
+  validatePublicationApproval,
+  validateSharedPublicationApproval,
+  type ArtifactBinding,
+} from '@agent/core/marketing-workload';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
-  scanMarketingTextForSensitiveData,
-  sha256,
-  validatePublicationApproval,
-  validateSharedPublicationApproval,
-  type ApprovalRequestRecord,
-  type ArtifactBinding,
-  type PublicationApproval,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { loadApprovalRequest, type ApprovalRequestRecord } from '@agent/core/approval-store';
+import { escapeHtml } from '@agent/core/text-escaping';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
+
+function resolveMarketingPath(value: unknown, label: string, allowMissingLeaf = false): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`${label} is required`);
+  return assertSafeRepositoryPath(pathResolver.resolve(requested), { allowMissingLeaf });
+}
+
+function requireRegularMarketingInput(filePath: string, label: string): string {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file: ${filePath}`);
+  }
+  return filePath;
+}
 
 function currentArtifactBindings(
   approved: Record<string, ArtifactBinding>
 ): Record<string, ArtifactBinding> {
   return Object.fromEntries(
     Object.entries(approved).map(([name, artifact]) => {
-      const artifactPath = pathResolver.rootResolve(artifact.path);
+      const artifactPath = resolveMarketingPath(artifact.path, `approved artifact ${name}`);
       if (!safeExistsSync(artifactPath)) throw new Error(`Approved artifact is missing: ${name}`);
+      requireRegularMarketingInput(artifactPath, `approved artifact ${name}`);
       return [
         name,
         {
@@ -52,7 +69,11 @@ export function runMarketingPublishDryRun(input: {
   preview: string;
   verification: string;
 } {
-  const approval = readJson<PublicationApproval>(pathResolver.rootResolve(input.approvalPath));
+  const approvalPath = requireRegularMarketingInput(
+    resolveMarketingPath(input.approvalPath, 'approvalPath'),
+    'approvalPath'
+  );
+  const approval = loadPublicationApprovalAtPath(approvalPath);
   const sharedApprovalRequest =
     input.sharedApprovalRequest ||
     loadApprovalRequest(
@@ -64,9 +85,13 @@ export function runMarketingPublishDryRun(input: {
     .filter(([, artifact]) => /\.(?:md|txt|vtt|html?|json)$/i.test(artifact.path))
     .map(([name, artifact]) => ({
       location: name,
-      content: safeReadFile(pathResolver.rootResolve(artifact.path), {
-        encoding: 'utf8',
-      }) as string,
+      content: safeReadFile(
+        requireRegularMarketingInput(
+          resolveMarketingPath(artifact.path, `approved artifact ${name}`),
+          `approved artifact ${name}`
+        ),
+        { encoding: 'utf8' }
+      ) as string,
     }));
   const sensitiveDataScan = scanMarketingTextForSensitiveData([
     { location: 'publication.title', content: approval.title },
@@ -100,7 +125,7 @@ export function runMarketingPublishDryRun(input: {
     throw new Error(`Shared publication approval denied: ${sharedApprovalGate.reasons.join('; ')}`);
   }
 
-  const outputRoot = pathResolver.rootResolve(input.outputRoot);
+  const outputRoot = resolveMarketingPath(input.outputRoot, 'outputRoot', true);
   const runId = sha256(
     JSON.stringify({
       approval_id: approval.approval_id,
@@ -108,10 +133,17 @@ export function runMarketingPublishDryRun(input: {
       destination: approval.destination,
     })
   ).slice(0, 16);
-  const runDir = path.join(outputRoot, 'runs', runId);
+  const runDir = assertSafeRepositoryPath(path.join(outputRoot, 'runs', runId), {
+    allowMissingLeaf: true,
+  });
   safeMkdir(runDir, { recursive: true });
-  const previewPath = path.join(runDir, 'publication-preview.html');
-  const verificationPath = path.join(runDir, 'publication-verification.json');
+  const previewPath = assertSafeRepositoryPath(path.join(runDir, 'publication-preview.html'), {
+    allowMissingLeaf: true,
+  });
+  const verificationPath = assertSafeRepositoryPath(
+    path.join(runDir, 'publication-verification.json'),
+    { allowMissingLeaf: true }
+  );
   const artifactRows = Object.entries(artifacts)
     .map(
       ([name, artifact]) =>
@@ -143,23 +175,20 @@ export function runMarketingPublishDryRun(input: {
     thumbnail_set: Boolean(artifacts.thumbnail),
     dry_run: true,
   });
-  safeWriteFile(
-    verificationPath,
-    JSON.stringify(
-      {
-        ...verification,
-        approval_id: approval.approval_id,
-        shared_approval_request_id: sharedApprovalRequest.id,
-        artifact_hashes: artifacts,
-        sensitive_data_scan: sensitiveDataScan,
-        rendered_artifact: previewPath,
-        network_access: false,
-        counts_as_publication: false,
-      },
-      null,
-      2
-    )
+  const verificationArtifact = validatePublicationVerification(
+    {
+      ...verification,
+      approval_id: approval.approval_id,
+      shared_approval_request_id: sharedApprovalRequest.id,
+      artifact_hashes: artifacts,
+      sensitive_data_scan: sensitiveDataScan,
+      rendered_artifact: previewPath,
+      network_access: false,
+      counts_as_publication: false,
+    },
+    verificationPath
   );
+  safeWriteFile(verificationPath, JSON.stringify(verificationArtifact, null, 2));
   if (verification.status !== 'passed') {
     throw new Error(`Publication verification failed: ${verification.reasons.join('; ')}`);
   }
@@ -171,8 +200,8 @@ export function runMarketingPublishDryRun(input: {
   };
 }
 
-async function main(): Promise<void> {
-  const argv = createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = createStandardYargs(['node', 'marketing_publish_dry_run', ...args])
     .option('approval', { type: 'string', demandOption: true })
     .option('output-root', { type: 'string', demandOption: true })
     .parseSync();
@@ -186,12 +215,14 @@ async function main(): Promise<void> {
   );
 }
 
+export const runMarketingPublishDryRunScript = defineScript({
+  name: 'marketing:publish-dry-run',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
 if (
   isDirectScript(import.meta.url, 'marketing_publish_dry_run.ts') ||
   isDirectScript(import.meta.url, 'marketing_publish_dry_run.js')
-) {
-  main().catch((error) => {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
-}
+)
+  void runMarketingPublishDryRunScript();

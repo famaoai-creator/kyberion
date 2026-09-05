@@ -1,10 +1,60 @@
 import { describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { MissionCoordinationBus, missionCoordinationBus } from './mission-coordination-bus.js';
+import {
+  MissionCoordinationBus,
+  missionCoordinationBus,
+  parseMissionCoordinationEvent,
+  parseMissionCoordinationMessage,
+} from './mission-coordination-bus.js';
 
 describe('mission-coordination-bus', () => {
+  it('normalizes message and acknowledgement event shapes', () => {
+    const message = {
+      message_id: 'MCB-1',
+      mission_id: 'MSN-1',
+      channel: 'handoff',
+      from_agent: 'planner',
+      content: 'Review this.',
+      created_at: '2026-09-01T00:00:00.000Z',
+      acknowledged_by: [],
+    };
+    expect(parseMissionCoordinationMessage(message)).toEqual(message);
+    expect(parseMissionCoordinationEvent({ kind: 'message', message })).toEqual(message);
+    expect(
+      parseMissionCoordinationEvent({
+        kind: 'ack',
+        message_id: 'MCB-1',
+        agent_id: 'reviewer',
+        created_at: '2026-09-01T00:01:00.000Z',
+      })
+    ).toMatchObject({ kind: 'ack', message_id: 'MCB-1' });
+  });
+
+  it('rejects malformed coordination records before reconstruction', () => {
+    expect(parseMissionCoordinationMessage([])).toBeUndefined();
+    expect(
+      parseMissionCoordinationMessage({
+        message_id: 'MCB-1',
+        mission_id: 'MSN-1',
+        channel: 'unknown',
+        from_agent: 'planner',
+        content: 'Review this.',
+        created_at: '2026-09-01T00:00:00.000Z',
+        acknowledged_by: [],
+      })
+    ).toBeUndefined();
+    expect(parseMissionCoordinationEvent({ kind: 'ack', message_id: 'MCB-1' })).toBeUndefined();
+  });
+
   it('exposes a process-wide singleton so callers share the loaded cache', () => {
     expect(missionCoordinationBus).toBeInstanceOf(MissionCoordinationBus);
   });
@@ -93,6 +143,32 @@ describe('mission-coordination-bus', () => {
     expect(reloaded.listMissionMessages(missionId)).toHaveLength(1);
   });
 
+  it('persists messages under an existing confidential mission root', () => {
+    const missionId = 'MSN-BUS-CONFIDENTIAL';
+    const missionPath = pathResolver.missionDir(missionId, 'confidential');
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      safeMkdir(missionPath, { recursive: true });
+    });
+
+    try {
+      const bus = new MissionCoordinationBus();
+      bus.send({
+        mission_id: missionId,
+        channel: 'handoff',
+        from_agent: 'planner',
+        from_role: 'planner',
+        to_role: 'reviewer',
+        content: 'Confidential message.',
+      });
+      expect(safeExistsSync(`${missionPath}/coordination/bus.jsonl`)).toBe(true);
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
+  });
+
   it('rotates archived bus segments and reloads all segments on restart', () => {
     const missionId = 'MSN-BUS-ROTATE';
     const missionPath = withExecutionContext(
@@ -137,5 +213,58 @@ describe('mission-coordination-bus', () => {
     expect(
       reloaded.getInbox({ missionId, role: 'reviewer', unreadOnly: true, agentId: 'reviewer-a' })
     ).toHaveLength(1);
+  });
+
+  it('rejects a symlinked coordination directory before bus access', () => {
+    const missionId = 'MSN-BUS-SYMLINK';
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const coordinationPath = `${missionPath}/coordination`;
+    const externalPath = pathResolver.sharedTmp('coordination-bus-external');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(missionPath, { recursive: true });
+      safeMkdir(externalPath, { recursive: true });
+      safeRmSync(coordinationPath, { recursive: true, force: true });
+      safeSymlinkSync(externalPath, coordinationPath, 'dir');
+    });
+    try {
+      expect(() => new MissionCoordinationBus().listMissionMessages(missionId)).toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(coordinationPath, { recursive: true, force: true });
+        safeRmSync(missionPath, { recursive: true, force: true });
+        safeRmSync(externalPath, { recursive: true, force: true });
+      });
+    }
+  });
+
+  it('rejects a symlinked archived bus segment before loading history', () => {
+    const missionId = 'MSN-BUS-ARCHIVE-SYMLINK';
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const coordinationPath = `${missionPath}/coordination`;
+    const externalPath = pathResolver.sharedTmp('coordination-bus-archive-external');
+    const externalArchive = `${externalPath}/bus.jsonl.1`;
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(`${missionPath}/coordination`, { recursive: true });
+      safeMkdir(externalPath, { recursive: true });
+      safeWriteFile(externalArchive, '{"kind":"message"}\n');
+      safeSymlinkSync(externalArchive, `${coordinationPath}/bus.jsonl.1`);
+    });
+    try {
+      expect(() =>
+        new MissionCoordinationBus({ maxArchiveCount: 1 }).listMissionMessages(missionId)
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(coordinationPath, { recursive: true, force: true });
+        safeRmSync(missionPath, { recursive: true, force: true });
+        safeRmSync(externalPath, { recursive: true, force: true });
+      });
+    }
   });
 });

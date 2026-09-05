@@ -2,6 +2,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
+import { clamp } from './foundation/text.js';
 
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-clarification-policy.schema.json'
@@ -9,6 +10,11 @@ const POLICY_SCHEMA_PATH = pathResolver.knowledge(
 const POLICY_PATH = pathResolver.knowledge(
   'product/governance/contextual-intent-clarification-policy.json'
 );
+
+function clampConfidence(value: unknown, fallback = 0.5): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return clamp(value, 0, 1);
+}
 
 export type ContextualClarificationExecutionShape =
   'direct_reply' | 'task_session' | 'pipeline' | 'mission' | 'project_bootstrap';
@@ -74,11 +80,6 @@ function matchesRule(
     !rule.shapes?.length ||
     (input.executionShape ? rule.shapes.includes(input.executionShape) : false);
   return intentMatch && shapeMatch;
-}
-
-function clampConfidence(value: unknown, fallback = 0.5): number {
-  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
-  return Math.min(1, Math.max(0, value));
 }
 
 export function assessContextualClarification(

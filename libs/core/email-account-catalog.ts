@@ -1,5 +1,6 @@
 import { safeExec } from './secure-io.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
 /** Provider IDs are open-ended so a new account connector does not require a core type change. */
 export type EmailAccountId = string;
@@ -25,11 +26,9 @@ const EMAIL_CAPABILITIES: EmailAccountOperation[] = [
   'archive',
 ];
 
-function gmailReady(): boolean {
+export function isGmailAuthStatusReady(raw: string): boolean {
   try {
-    const parsed = JSON.parse(
-      safeExec('gws', ['auth', 'status'], { timeoutMs: 5_000, maxOutputMB: 1 }) || '{}'
-    );
+    const parsed = parseSafeJsonObjectInput(raw, 'Gmail auth status');
     return Boolean(
       (parsed?.auth_method && parsed.auth_method !== 'none') ||
       parsed?.token_cache_exists ||
@@ -37,6 +36,18 @@ function gmailReady(): boolean {
       parsed?.plain_credentials_exists
     );
   } catch {
+    return false;
+  }
+}
+
+function gmailReady(): boolean {
+  try {
+    return isGmailAuthStatusReady(
+      safeExec('gws', ['auth', 'status'], { timeoutMs: 5_000, maxOutputMB: 1 }) || '{}'
+    );
+  } catch {
+    // An optional provider CLI must not make the adapter registry unusable.
+    // The account remains needs_setup until a later readiness probe succeeds.
     return false;
   }
 }

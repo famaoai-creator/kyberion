@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { isValidTenantSlug } from './entity-scope.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import type { FinancialModel } from './financial-model.js';
 
 export interface OkrKeyResult {
@@ -55,8 +57,27 @@ function resolveBaseDir(rootDir?: string): string {
   return rootDir ? path.resolve(rootDir) : pathResolver.rootDir();
 }
 
-function loadJsonIfPresent<T>(filePath: string): T | null {
-  return loadOptionalJson<T>(filePath);
+const OKR_SCHEMA_PATH = pathResolver.knowledge('product/schemas/okr.schema.json');
+const okrCatalogs = new Map<string, GovernedCatalog<OkrTracker>>();
+
+function loadOkrCatalog(filePath: string): OkrTracker | null {
+  if (!safeExistsSync(filePath)) return null;
+  let catalog = okrCatalogs.get(filePath);
+  if (!catalog) {
+    catalog = defineCatalog<OkrTracker>({
+      id: `okr-tracker:${filePath}`,
+      path: filePath,
+      schema: OKR_SCHEMA_PATH,
+    });
+    okrCatalogs.set(filePath, catalog);
+  }
+  try {
+    return catalog.load();
+  } catch {
+    // A malformed higher-priority overlay must not prevent resolution of the
+    // next candidate (or the derived empty tracker).
+    return null;
+  }
 }
 
 function toNumber(value: unknown): number | null {
@@ -68,14 +89,16 @@ function toNumber(value: unknown): number | null {
 }
 
 function resolveOkrPaths(baseDir: string, tenantSlug: string | null): string[] {
-  if (!tenantSlug) {
-    return [path.join(baseDir, 'knowledge', 'product', 'governance', 'okr.json')];
-  }
-  return [
-    path.join(baseDir, 'customer', tenantSlug, 'okr.json'),
-    path.join(baseDir, 'knowledge', 'confidential', tenantSlug, 'okr.json'),
-    path.join(baseDir, 'knowledge', 'product', 'governance', 'okr.json'),
-  ];
+  const candidates = tenantSlug
+    ? [
+        path.join(baseDir, 'customer', tenantSlug, 'okr.json'),
+        path.join(baseDir, 'knowledge', 'confidential', tenantSlug, 'okr.json'),
+        path.join(baseDir, 'knowledge', 'product', 'governance', 'okr.json'),
+      ]
+    : [path.join(baseDir, 'knowledge', 'product', 'governance', 'okr.json')];
+  return candidates.map((candidate) =>
+    assertSafeRepositoryPath(candidate, { allowMissingLeaf: true, rootDir: baseDir })
+  );
 }
 
 function normalizeObjective(objective: OkrObjective): OkrObjective {
@@ -116,10 +139,19 @@ function buildDerivedOkrTracker(
 
 export function resolveOkrTracker(tenantSlug?: string | null, rootDir?: string): OkrTracker {
   const baseDir = resolveBaseDir(rootDir);
-  const resolvedTenantSlug = tenantSlug?.trim() || null;
+  const requestedTenantSlug = tenantSlug?.trim() || null;
+  if (requestedTenantSlug && !isValidTenantSlug(requestedTenantSlug)) {
+    return buildDerivedOkrTracker(
+      'default',
+      null,
+      path.join(baseDir, 'knowledge', 'product', 'governance', 'okr.json'),
+      'derived'
+    );
+  }
+  const resolvedTenantSlug = requestedTenantSlug;
   const companyId = resolvedTenantSlug || 'default';
   for (const candidate of resolveOkrPaths(baseDir, resolvedTenantSlug)) {
-    const parsed = loadJsonIfPresent<OkrTracker>(candidate);
+    const parsed = loadOkrCatalog(candidate);
     if (!parsed || !Array.isArray(parsed.objectives)) continue;
     return {
       ...parsed,

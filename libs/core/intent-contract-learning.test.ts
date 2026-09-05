@@ -63,9 +63,14 @@ describe('intent-contract-learning memory snapshot', () => {
           last_seen: new Date().toISOString(),
         },
       ],
+      $schema: 'https://example.test/schema.json',
     };
 
     saveIntentContractMemory(nextMemory);
+
+    expect(JSON.parse(String(safeReadFile(runtimePath, { encoding: 'utf8' })))).not.toHaveProperty(
+      '$schema'
+    );
 
     const stale = loadIntentContractMemorySnapshot();
     expect(stale).toBe(baseline);
@@ -113,5 +118,25 @@ describe('intent-contract-learning memory snapshot', () => {
     expect(stored?.correlation_id).toBe('corr-learn-001');
     expect(stored?.mission_id).toBe('MSN-LEARN-001');
     expect(stored?.completion_summary?.satisfied).toBe(true);
+  });
+
+  it('rejects a schema-invalid persisted memory file', () => {
+    safeWriteFile(runtimePath, JSON.stringify({ version: '1.0.0', entries: [{ intent_id: 42 }] }));
+
+    expect(() => refreshIntentContractMemorySnapshot()).toThrow(
+      /Invalid catalog intent-contract-memory/u
+    );
+  });
+
+  it('rejects an external runtime memory path', () => {
+    const original = process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH;
+    process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH =
+      '/tmp/kyberion-intent-contract-memory.json';
+    try {
+      expect(() => resolveIntentContractMemoryPaths()).toThrow('[RESOURCE_PATH_SCOPE]');
+    } finally {
+      if (original === undefined) delete process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH;
+      else process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH = original;
+    }
   });
 });

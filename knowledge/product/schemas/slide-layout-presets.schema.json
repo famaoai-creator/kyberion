@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media Slide Layout Presets Catalog",
+  "type": "object",
+  "required": ["version", "defaults", "presets"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "defaults": { "type": "object", "additionalProperties": true },
+    "presets": { "type": "object", "additionalProperties": true },
+    "grid": { "type": "object", "additionalProperties": true },
+    "chrome": { "type": "object", "additionalProperties": true },
+    "hero": { "type": "object", "additionalProperties": true },
+    "body_zones": { "type": "object", "additionalProperties": true },
+    "default": { "type": "string", "minLength": 1 },
+    "templates": { "type": "object", "additionalProperties": true },
+    "_meta": { "type": "string" }
+  },
+  "additionalProperties": false
+}

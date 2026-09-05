@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { nowIso } from './foundation/time.js';
 import {
   buildChronosSurfaceIngressEnvelope,
   buildPresenceSurfaceIngressEnvelope,
@@ -571,7 +572,7 @@ export function createIMessageSurfaceMessage(input: {
     threadTs: input.threadTs,
     correlationId: input.correlationId || randomUUID(),
     text: input.text,
-    receivedAt: input.receivedAt || new Date().toISOString(),
+    receivedAt: input.receivedAt || nowIso(),
     actorId: input.actorId,
     attachments: input.attachments,
   });
@@ -593,7 +594,7 @@ export function createDiscordSurfaceMessage(input: {
     threadTs: input.threadTs,
     correlationId: input.correlationId || randomUUID(),
     text: input.text,
-    receivedAt: input.receivedAt || new Date().toISOString(),
+    receivedAt: input.receivedAt || nowIso(),
     actorId: input.actorId,
   });
 }
@@ -659,10 +660,10 @@ export function createSurfaceMessageFromConversationInput(
   input: SurfaceConversationMessageInput
 ): SurfaceMessage {
   const channel = input.channel?.trim() || 'unknown';
-  const threadTs = input.threadTs?.trim() || input.receivedAt || new Date().toISOString();
+  const receivedAt = input.receivedAt || nowIso();
+  const threadTs = input.threadTs?.trim() || receivedAt;
   const correlationId = input.correlationId || randomUUID();
   const messageId = input.messageId || randomUUID();
-  const receivedAt = input.receivedAt || new Date().toISOString();
   const ingressScope = resolveSurfaceIngressScope({
     surface: input.surface,
     channel,

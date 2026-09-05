@@ -4,41 +4,9 @@ import * as React from 'react';
 import { AlertTriangle, CheckCircle2, FileCheck2, ShieldAlert, XCircle } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import { formatChronosDateTime, uxText } from '../lib/ux-vocabulary';
+import { parseApprovalsResponse, type ClientApproval } from '../lib/approvals-response';
 
-type Approval = {
-  id: string;
-  channel: string;
-  storageChannel: string;
-  title: string;
-  summary: string;
-  details?: string;
-  sourceText?: string;
-  target?: {
-    serviceId: string;
-    secretKey: string;
-    mutation: string;
-    existingValuePresent?: boolean;
-  };
-  justification?: {
-    reason: string;
-    impactSummary?: string;
-    evidence?: string[];
-    requestedEffects?: string[];
-  };
-  risk?: { level: string; restartScope: string; requiresStrongAuth: boolean; policyId?: string };
-  workLoop?: {
-    project_id?: string;
-    project_name?: string;
-    track_id?: string;
-    track_name?: string;
-    context?: Record<string, unknown>;
-  };
-  requestedAt: string;
-  requestedBy: string;
-  missionId?: string;
-  tenantSlug?: string;
-  status: string;
-};
+type Approval = ClientApproval;
 
 function approvalRiskLabel(value: string | undefined, locale: string): string {
   const labels: Record<string, string> = {
@@ -75,13 +43,14 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
       const query = new URLSearchParams({ status: 'pending', limit: '50' });
       if (tenant) query.set('tenant', tenant);
       const response = await fetch(`/api/approvals?${query.toString()}`, { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to load the approval queue');
-      const nextItems = Array.isArray(payload.approvals) ? payload.approvals : [];
-      setAccessRole(payload.accessRole === 'localadmin' ? 'localadmin' : 'readonly');
-      setItems(nextItems);
+      const payload = parseApprovalsResponse(await response.json().catch(() => null));
+      if (!response.ok || !payload) throw new Error('Invalid approval queue response');
+      setAccessRole(payload.accessRole);
+      setItems(payload.approvals);
       setSelectedId((current) =>
-        nextItems.some((item: Approval) => item.id === current) ? current : nextItems[0]?.id || null
+        payload.approvals.some((item) => item.id === current)
+          ? current
+          : payload.approvals[0]?.id || null
       );
       setError(null);
     } catch (err) {
@@ -111,8 +80,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
           tenant,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to record the approval decision');
+      if (!response.ok) throw new Error('Failed to record the approval decision');
       setNote('');
       await refresh();
     } catch (err) {

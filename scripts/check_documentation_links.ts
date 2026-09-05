@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DOCUMENT_ROOTS = ['docs', 'knowledge'] as const;
 const MARKDOWN_LINK = /\]\((<[^>]+>|[^)\s]+)(?:\s+['"][^'"]*['"])?\)/gu;
@@ -107,10 +108,14 @@ export const runCheckDocumentationLinks = defineScript({
   run(context) {
     const failures = checkDocumentationLinks();
     if (failures.length > 0) {
-      for (const failure of failures) console.error(`- ${failure}`);
-      throw new Error(`${failures.length} documentation link violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...failures.map((failure) => `- ${failure}`)].join('\n')
+      );
     }
-    context.print(`[check:documentation-links] OK (${markdownFiles().length} documents)`);
+    const result = `[check:documentation-links] OK (${markdownFiles().length} documents)`;
+    context.print(result);
+    return { failures };
   },
 });
 

@@ -1,5 +1,5 @@
-import { appendJsonLine } from './foundation/json.js';
-import { safeReadFile, safeMkdir, safeExistsSync } from './secure-io.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeReadFile, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -19,6 +19,8 @@ import {
   type EventScopeFilter,
 } from './event-scope.js';
 import { resolveScopeForRecord } from './scope-migration.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 
 /**
  * Ecosystem Hybrid Ledger v2.0 [STANDARDIZED]
@@ -29,8 +31,57 @@ import { resolveScopeForRecord } from './scope-migration.js';
 
 export const GLOBAL_LEDGER_PATH = pathResolver.resolve('active/audit/system-ledger.jsonl');
 
+type LedgerRecord = Record<string, unknown>;
+
+const LEDGER_STRING_FIELDS = [
+  'id',
+  'timestamp',
+  'type',
+  'role',
+  'mission_id',
+  'detail_hash',
+  'note',
+  'parent_hash',
+  'chain_alg',
+  'chain_key_id',
+  'hash',
+] as const;
+
+/**
+ * Normalize a persisted ledger line before it reaches projections or hash
+ * verification. Optional fields preserve old ledger formats, while known
+ * envelope fields never silently change type.
+ */
+export function normalizeLedgerRecord(value: unknown): LedgerRecord | undefined {
+  if (!isRecord(value)) return undefined;
+  for (const field of LEDGER_STRING_FIELDS) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return undefined;
+  }
+  if (
+    value.chain_alg !== undefined &&
+    value.chain_alg !== 'sha256' &&
+    value.chain_alg !== 'hmac-sha256'
+  ) {
+    return undefined;
+  }
+  for (const field of ['scope', 'scope_context', 'payload'] as const) {
+    if (
+      value[field] !== undefined &&
+      value[field] !== null &&
+      (typeof value[field] !== 'object' || Array.isArray(value[field]))
+    ) {
+      return undefined;
+    }
+  }
+  return value;
+}
+
+function safeLedgerPath(ledgerPath: string): string {
+  return assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
+}
+
 export const record = (type: string, data: any) => {
-  const timestamp = new Date().toISOString();
+  const timestamp = nowIso();
   const missionId = data.mission_id;
   const scope = resolveLedgerScope(data);
 
@@ -41,7 +92,7 @@ export const record = (type: string, data: any) => {
   if (missionId && missionId !== 'None') {
     const missionPath = (pathResolver as any).findMissionPath(missionId);
     if (missionPath) {
-      targetPath = path.join(missionPath, 'evidence/ledger.jsonl');
+      targetPath = safeLedgerPath(path.join(missionPath, 'evidence/ledger.jsonl'));
       isMissionSpecific = true;
     }
   }
@@ -76,6 +127,7 @@ export const record = (type: string, data: any) => {
  * Internal helper to write an entry with hash chaining to a specific file.
  */
 function _writeToLedger(ledgerPath: string, entryData: any): string {
+  ledgerPath = safeLedgerPath(ledgerPath);
   const lockId = `ledger-${createHash('sha256').update(ledgerPath).digest('hex')}`;
   return withLockSync(lockId, () => {
     const lastHash = _getLastHash(ledgerPath);
@@ -102,14 +154,17 @@ function _writeToLedger(ledgerPath: string, entryData: any): string {
 }
 
 function _getLastHash(ledgerPath: string) {
+  ledgerPath = safeLedgerPath(ledgerPath);
   if (!safeExistsSync(ledgerPath)) return GENESIS_HASH;
   try {
     const content = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
     const trimmed = content.trim();
     if (!trimmed) return GENESIS_HASH;
     const lines = trimmed.split('\n');
-    const lastEntry = JSON.parse(lines[lines.length - 1]);
-    return lastEntry.hash || GENESIS_HASH;
+    const lastEntry = normalizeLedgerRecord(
+      parseSafeJsonInput(lines[lines.length - 1], 'ledger tail entry')
+    );
+    return lastEntry?.hash || GENESIS_HASH;
   } catch (_e) {
     return GENESIS_HASH;
   }
@@ -132,11 +187,12 @@ export const verifyIntegrity = (ledgerPath: string = GLOBAL_LEDGER_PATH): boolea
 export const verifyLedgerIntegrityDetailed = (
   ledgerPath: string = GLOBAL_LEDGER_PATH
 ): LedgerIntegrityReport => {
-  if (!safeExistsSync(ledgerPath)) {
+  const safePath = safeLedgerPath(ledgerPath);
+  if (!safeExistsSync(safePath)) {
     return { ok: true, total: 0, corrupted: [], missingKey: false };
   }
 
-  const content = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
+  const content = safeReadFile(safePath, { encoding: 'utf8' }) as string;
   const lines = content.trim().split('\n');
   let expectedParentHash = GENESIS_HASH;
   const corrupted: string[] = [];
@@ -147,7 +203,11 @@ export const verifyLedgerIntegrityDetailed = (
     if (!line) continue;
     total++;
     try {
-      const entry = JSON.parse(line);
+      const entry = normalizeLedgerRecord(parseSafeJsonInput(line, 'ledger entry'));
+      if (!entry) {
+        corrupted.push(`line:${index + 1}:invalid_record`);
+        continue;
+      }
       const chainAlg = (entry.chain_alg ?? 'sha256') as ChainAlg;
       const chainKey =
         chainAlg === 'hmac-sha256' ? resolveAuditChainKey({ createIfMissing: false }) : null;
@@ -179,15 +239,17 @@ export const loadForScope = (
   filter: EventScopeFilter,
   ledgerPath: string = GLOBAL_LEDGER_PATH
 ): Record<string, unknown>[] => {
-  if (!safeExistsSync(ledgerPath)) return [];
-  const content = String(safeReadFile(ledgerPath, { encoding: 'utf8' }) || '');
+  const safePath = safeLedgerPath(ledgerPath);
+  if (!safeExistsSync(safePath)) return [];
+  const content = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
   return content
     .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter(Boolean)
     .flatMap((line) => {
       try {
-        const entry = JSON.parse(line) as Record<string, unknown>;
+        const entry = normalizeLedgerRecord(parseSafeJsonInput(line, 'ledger entry'));
+        if (!entry) return [];
         const scopeResult = resolveScopeForRecord(entry);
         if (scopeResult.disposition === 'invalid') return [];
         const scope = scopeResult.scope;

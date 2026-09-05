@@ -6,11 +6,12 @@
 import * as path from 'node:path';
 import { createActuatorTrace } from './actuator-trace.js';
 import * as customerResolver from './customer-resolver.js';
-import { readJson } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
+  assertSafeRepositoryPath,
   safeAppendFileSync,
   safeCopyFileSync,
   safeExistsSync,
@@ -19,8 +20,12 @@ import {
   safeReadFile,
   safeStat,
   safeWriteFile,
-  loadJson,
 } from './secure-io.js';
+import {
+  loadVolatileSidecarAtPath,
+  saveVolatileSidecarAtPath,
+  volatileSidecarPath,
+} from './volatile-knowledge.js';
 import {
   evaluateArtifactReviews,
   hashArtifactForReview,
@@ -28,14 +33,60 @@ import {
   receiptToArtifactReviewDecision,
 } from './artifact-review.js';
 import { loadState } from './mission-state.js';
+import { nowIso } from './foundation/time.js';
 import type { IntentReconciliationInput } from './intent-reconciliation.js';
+import {
+  loadMissionNextTaskObjectsAtPath,
+  validateMissionNextTaskObjects,
+} from './mission-next-task-reader.js';
+
+const DELIVERY_PACK_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/delivery-pack.schema.json'
+);
+const deliveryPackCatalog = defineCatalog<Record<string, unknown>>({
+  id: 'delivery-pack',
+  path: DELIVERY_PACK_SCHEMA_PATH,
+  schema: DELIVERY_PACK_SCHEMA_PATH,
+});
+
+function safeMissionDir(missionDir: string, allowMissingLeaf = false): string {
+  return assertSafeRepositoryPath(missionDir, { allowMissingLeaf });
+}
+
+function safeMissionPath(
+  missionDir: string,
+  relativePath: string,
+  allowMissingLeaf = false
+): string {
+  const safeDir = safeMissionDir(missionDir, allowMissingLeaf);
+  if (path.isAbsolute(relativePath)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] mission-relative path must not be absolute: ${relativePath}`
+    );
+  }
+  const resolved = path.resolve(safeDir, relativePath);
+  if (resolved !== safeDir && !resolved.startsWith(`${safeDir}${path.sep}`)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] mission path escapes mission directory: ${relativePath}`
+    );
+  }
+  return assertSafeRepositoryPath(resolved, { allowMissingLeaf });
+}
+
+function requireSafeMissionId(missionId: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/.test(missionId)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] invalid mission id: ${missionId}`);
+  }
+  return missionId;
+}
 
 export function collectMissionEvidence(missionDir: string): Array<{ ref: string; text?: string }> {
-  const evidenceDir = path.join(missionDir, 'evidence');
+  const safeDir = safeMissionDir(missionDir, true);
+  const evidenceDir = safeMissionPath(safeDir, 'evidence', true);
   if (!safeExistsSync(evidenceDir)) return [];
   return safeReaddir(evidenceDir)
     .filter((entry) => entry !== '.gitkeep')
-    .map((entry) => path.join(missionDir, 'evidence', entry))
+    .map((entry) => safeMissionPath(safeDir, path.join('evidence', entry)))
     .filter((ref) => {
       try {
         return safeStat(ref).isFile();
@@ -147,21 +198,32 @@ export function publishMeetingDeliverablesIfNeeded(input: {
     return;
   }
 
-  const evidenceDir = path.join(input.missionDir, 'evidence');
-  const deliverablesRoot = path.join(customerRoot, 'deliverables');
-  const missionDeliverablesDir = path.join(deliverablesRoot, input.missionId);
+  const safeMissionPathRoot = safeMissionDir(input.missionDir);
+  const safeCustomerRoot = assertSafeRepositoryPath(customerRoot);
+  const safeMissionId = requireSafeMissionId(input.missionId);
+  const evidenceDir = safeMissionPath(safeMissionPathRoot, 'evidence');
+  const deliverablesRoot = assertSafeRepositoryPath(path.join(safeCustomerRoot, 'deliverables'), {
+    allowMissingLeaf: true,
+  });
+  const missionDeliverablesDir = assertSafeRepositoryPath(
+    path.join(deliverablesRoot, safeMissionId),
+    { allowMissingLeaf: true }
+  );
   safeMkdir(missionDeliverablesDir, { recursive: true });
 
   const copiedArtifacts: Array<{ kind: string; path: string; description: string }> = [];
   const copyArtifact = (relativeName: string, kind: string, description: string): void => {
-    const sourcePath = path.join(evidenceDir, relativeName);
+    const sourcePath = assertSafeRepositoryPath(path.join(evidenceDir, relativeName));
     if (!safeExistsSync(sourcePath)) return;
-    const destinationPath = path.join(missionDeliverablesDir, relativeName);
+    const destinationPath = assertSafeRepositoryPath(
+      path.join(missionDeliverablesDir, relativeName),
+      { allowMissingLeaf: true }
+    );
     safeMkdir(path.dirname(destinationPath), { recursive: true });
     safeCopyFileSync(sourcePath, destinationPath);
     copiedArtifacts.push({
       kind,
-      path: path.relative(customerRoot, destinationPath),
+      path: path.relative(safeCustomerRoot, destinationPath),
       description,
     });
   };
@@ -189,7 +251,7 @@ export function publishMeetingDeliverablesIfNeeded(input: {
   }
 
   let minutesExcerpt = '';
-  const minutesPath = path.join(missionDeliverablesDir, 'minutes.md');
+  const minutesPath = assertSafeRepositoryPath(path.join(missionDeliverablesDir, 'minutes.md'));
   if (safeExistsSync(minutesPath)) {
     const minutes = String(safeReadFile(minutesPath, { encoding: 'utf8' }));
     minutesExcerpt = minutes.split(/\r?\n/u).slice(0, 8).join('\n').trim();
@@ -211,7 +273,7 @@ export function publishMeetingDeliverablesIfNeeded(input: {
     recommended_next_action: input.completionNextAction?.next_step,
     artifacts_by_role: {
       primary: [
-        path.relative(customerRoot, path.join(missionDeliverablesDir, 'delivery-summary.md')),
+        path.relative(safeCustomerRoot, path.join(missionDeliverablesDir, 'delivery-summary.md')),
       ],
       evidence: copiedArtifacts.map((artifact) => artifact.path),
     },
@@ -224,7 +286,9 @@ export function publishMeetingDeliverablesIfNeeded(input: {
   };
 
   safeWriteFile(
-    path.join(missionDeliverablesDir, 'delivery-summary.md'),
+    assertSafeRepositoryPath(path.join(missionDeliverablesDir, 'delivery-summary.md'), {
+      allowMissingLeaf: true,
+    }),
     [
       `# Meeting Delivery Summary`,
       ``,
@@ -235,18 +299,25 @@ export function publishMeetingDeliverablesIfNeeded(input: {
       ...copiedArtifacts.map((artifact) => `  - ${artifact.path} (${artifact.kind})`),
     ].join('\n')
   );
-  safeWriteFile(
+  const deliveryPackPath = assertSafeRepositoryPath(
     path.join(missionDeliverablesDir, 'delivery-pack.json'),
-    JSON.stringify(pack, null, 2)
+    { allowMissingLeaf: true }
   );
+  const validatedPack = deliveryPackCatalog.validate(pack, deliveryPackPath);
+  safeWriteFile(deliveryPackPath, JSON.stringify(validatedPack, null, 2));
 
-  const deliveryLogPath = path.join(deliverablesRoot, 'delivery-log.jsonl');
+  const deliveryLogPath = assertSafeRepositoryPath(
+    path.join(deliverablesRoot, 'delivery-log.jsonl'),
+    {
+      allowMissingLeaf: true,
+    }
+  );
   safeAppendFileSync(
     deliveryLogPath,
     `${JSON.stringify({
       mission_id: input.missionId,
       tenant_slug: tenantSlug,
-      delivered_at: new Date().toISOString(),
+      delivered_at: nowIso(),
       deliverable_dir: path.relative(pathResolver.rootDir(), missionDeliverablesDir),
       artifacts: copiedArtifacts.map((artifact) => artifact.path),
       summary,
@@ -262,12 +333,6 @@ export function publishMeetingDeliverablesIfNeeded(input: {
       missionDeliverablesDir
     )}.`
   );
-}
-
-function sidecarPathForMarkdown(mdPath: string): string {
-  return mdPath.endsWith('.md')
-    ? mdPath.slice(0, -3) + '.volatile.json'
-    : `${mdPath}.volatile.json`;
 }
 
 export function extractPromotableMissionMemory(raw: string): string | null {
@@ -293,34 +358,32 @@ export function extractPromotableMissionMemory(raw: string): string | null {
 }
 
 export function updateMissionMemorySidecar(mdPath: string, candidateId: string): void {
-  const sidecarPath = sidecarPathForMarkdown(mdPath);
+  const safeMarkdownPath = assertSafeRepositoryPath(mdPath, { allowMissingLeaf: true });
+  const sidecarPath = volatileSidecarPath(safeMarkdownPath);
   if (!safeExistsSync(sidecarPath)) return;
-  const sidecar = loadJson<Record<string, unknown>>(sidecarPath);
-  safeWriteFile(
-    sidecarPath,
-    JSON.stringify(
-      {
-        ...sidecar,
-        promotion_candidate_id: candidateId,
-        status: 'promoted',
-        updated_at: new Date().toISOString(),
-      },
-      null,
-      2
-    )
-  );
+  if (!safeStat(sidecarPath).isFile()) {
+    throw new Error(`Volatile knowledge sidecar must be a regular file: ${sidecarPath}`);
+  }
+  const sidecar = loadVolatileSidecarAtPath(sidecarPath);
+  if (!sidecar) throw new Error(`Invalid volatile knowledge sidecar at ${sidecarPath}`);
+  saveVolatileSidecarAtPath(sidecarPath, {
+    ...sidecar,
+    promotion_candidate_id: candidateId,
+    status: 'promoted',
+    updated_at: nowIso(),
+  });
 }
 
 export function readMissionNextTasks(missionDir: string): Array<Record<string, unknown>> {
-  const nextTasksPath = path.join(missionDir, 'NEXT_TASKS.json');
+  const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
   if (!safeExistsSync(nextTasksPath)) return [];
   try {
-    const parsed = readJson<unknown>(nextTasksPath);
-    return Array.isArray(parsed)
-      ? (parsed.filter((entry) => entry && typeof entry === 'object') as Array<
-          Record<string, unknown>
-        >)
-      : [];
+    return (
+      loadMissionNextTaskObjectsAtPath(
+        nextTasksPath,
+        path.basename(safeMissionDir(missionDir, true))
+      ) || []
+    );
   } catch {
     return [];
   }
@@ -330,8 +393,9 @@ export function writeMissionNextTasks(
   missionDir: string,
   tasks: Array<Record<string, unknown>>
 ): void {
-  const nextTasksPath = path.join(missionDir, 'NEXT_TASKS.json');
-  safeWriteFile(nextTasksPath, JSON.stringify(tasks, null, 2));
+  const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
+  const validated = validateMissionNextTaskObjects(tasks, nextTasksPath);
+  safeWriteFile(nextTasksPath, JSON.stringify(validated, null, 2));
 }
 
 export const MISSION_TASK_COMPLETED_STATUSES = new Set([
@@ -375,9 +439,12 @@ function isReviewKindTask(task: Record<string, unknown>): boolean {
 function isReviewTaskSatisfied(missionDir: string, task: Record<string, unknown>): boolean {
   const receiptRef = String(task.artifact_review_receipt || '').trim();
   if (!receiptRef) return false;
-  const receiptPath = path.resolve(missionDir, receiptRef);
-  const relativeReceiptPath = path.relative(missionDir, receiptPath);
-  if (relativeReceiptPath.startsWith('..') || path.isAbsolute(relativeReceiptPath)) return false;
+  let receiptPath: string;
+  try {
+    receiptPath = safeMissionPath(missionDir, receiptRef);
+  } catch {
+    return false;
+  }
   if (!safeExistsSync(receiptPath)) return false;
 
   try {
@@ -388,7 +455,7 @@ function isReviewTaskSatisfied(missionDir: string, task: Record<string, unknown>
     // receipt.artifact.path is repo-root-relative (matches
     // validateMissionArtifactReviewGate's pathResolver.rootResolve and
     // mission-governance.test.ts's convention), not mission-relative.
-    const artifactPath = pathResolver.rootResolve(receipt.artifact.path);
+    const artifactPath = assertSafeRepositoryPath(pathResolver.rootResolve(receipt.artifact.path));
     if (!safeExistsSync(artifactPath)) return false;
     const currentSha256 = hashArtifactForReview(artifactPath);
 
@@ -443,8 +510,15 @@ export function isTaskDeliverableSatisfied(
   const dependenciesComplete = dependencies.every((dependency) =>
     MISSION_TASK_COMPLETED_STATUSES.has(statusByTaskId.get(dependency) || 'planned')
   );
-  const deliverableExists =
-    deliverable.length > 0 && safeExistsSync(path.resolve(missionDir, deliverable));
+  let deliverablePath: string | null = null;
+  if (deliverable.length > 0) {
+    try {
+      deliverablePath = safeMissionPath(missionDir, deliverable);
+    } catch {
+      deliverablePath = null;
+    }
+  }
+  const deliverableExists = Boolean(deliverablePath && safeExistsSync(deliverablePath));
   if (!dependenciesComplete || !deliverableExists) return false;
   if (isReviewKindTask(task)) return isReviewTaskSatisfied(missionDir, task);
   return true;

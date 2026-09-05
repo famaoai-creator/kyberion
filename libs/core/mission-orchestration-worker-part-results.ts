@@ -3,13 +3,22 @@ import { type DelegationChain } from './delegation-chain.js';
 import { type PlanningPacket } from './channel-surface.js';
 import { draftRefine } from './draft-refine.js';
 import { logger } from './core.js';
-import { missionDir, missionEvidenceDir } from './path-resolver.js';
+import { missionEvidenceDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { type DeliveredKnowledgeRef } from './src/knowledge-feedback-loop.js';
 import { TraceContext, persistTrace } from './src/trace.js';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExec, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+} from './secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import {
   emitMissionOrchestrationObservation,
@@ -35,6 +44,7 @@ import {
   handleMissionDistillationRequested,
   handleMissionCompletionRequested,
   handleMissionControlRequested,
+  handleMissionWorkerRecoveryRequested,
   handleSurfaceControlRequested,
   notifyRequestingSurface,
   type MissionLifecycleHandlerDeps,
@@ -58,6 +68,7 @@ import { type MissionGraphRunJournalHandle } from './mission-graph-run-journal.j
 import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import {
   type MissionControlPayload,
+  type MissionWorkerRecoveryPayload,
   type PlannedNextTask,
   type SlackPayload,
   type SurfaceControlPayload,
@@ -77,6 +88,7 @@ import {
   buildTaskResultRetryPrompt,
   parseTaskResultResponse,
   recordMissionVisiblePrompt,
+  resolvedMissionDir,
 } from './mission-orchestration-worker-part-context.js';
 import {
   resolveTaskDispatchTimeoutMs,
@@ -85,6 +97,7 @@ import {
   missionTaskTraceDirOverride,
   warnMissionTaskTraceFailureOnce,
   dispatchPlannedMissionTask,
+  isGoalDrivenTaskResumable,
 } from './mission-orchestration-worker-part-dispatch.js';
 
 /**
@@ -177,10 +190,22 @@ export async function applyDraftRefineToDeliverable(input: {
 }): Promise<void> {
   const deliverable = String(input.task.deliverable || '');
   if (!deliverable) return;
-  const deliverablePath = deliverable.startsWith('/')
+  const missionPath = resolvedMissionDir(input.missionId);
+  const candidatePath = deliverable.startsWith('/')
     ? deliverable
-    : `${missionDir(input.missionId, 'public')}/${deliverable}`;
+    : path.join(missionPath, deliverable);
   try {
+    const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
+    const deliverablePath = assertSafeRepositoryPath(candidatePath, { allowMissingLeaf: true });
+    const relativeDeliverablePath = path.relative(safeMissionPath, deliverablePath);
+    if (
+      !relativeDeliverablePath ||
+      relativeDeliverablePath === '..' ||
+      relativeDeliverablePath.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relativeDeliverablePath)
+    ) {
+      throw new Error('[DRAFT_REFINE] deliverable must be inside the mission path');
+    }
     if (!safeExistsSync(deliverablePath)) return;
     const original = String(safeReadFile(deliverablePath, { encoding: 'utf8' }) || '');
     if (!original.trim()) return;
@@ -191,7 +216,14 @@ export async function applyDraftRefineToDeliverable(input: {
       maxPasses: 1,
     });
     if (outcome.passes > 0 && outcome.improved) {
-      safeWriteFile(deliverablePath, outcome.content);
+      const targetPath = relativeDeliverablePath.split(path.sep).join('/');
+      writeProvisionedText({
+        missionId: input.missionId,
+        filePath: deliverablePath,
+        targetPath,
+        missionPathHint: safeMissionPath,
+        provisioned: provisionMissionEntry(outcome.content),
+      });
       emitMissionTaskEvent({
         event_type: 'task_reviewed',
         mission_id: input.missionId,
@@ -241,14 +273,19 @@ export function parseBestOfJudgeVerdict(
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
+  if (text.slice(0, start).trimEnd().endsWith('[')) return null;
   try {
-    const parsed = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
-    const winner = String(parsed.winner || '').toUpperCase();
+    const parsed = parseSafeJsonObjectInput(text.slice(start, end + 1), 'best-of judge verdict');
+    if (!parsed || !isRecord(parsed)) return null;
+    const winner = typeof parsed.winner === 'string' ? parsed.winner.toUpperCase() : '';
     if (winner !== 'A' && winner !== 'B') return null;
+    const mergeHints = Array.isArray(parsed.merge_hints)
+      ? parsed.merge_hints.filter((hint): hint is string => typeof hint === 'string')
+      : undefined;
     return {
       winner,
       rationale: typeof parsed.rationale === 'string' ? parsed.rationale : undefined,
-      merge_hints: Array.isArray(parsed.merge_hints) ? parsed.merge_hints.map(String) : undefined,
+      ...(mergeHints?.length ? { merge_hints: mergeHints } : {}),
     };
   } catch {
     return null;
@@ -323,7 +360,7 @@ export async function obtainBestOfTaskResultResponse(input: {
         sender: 'kyberion:mission-orchestrator',
         receiver: input.agentId,
         performative: 'request',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       payload: {
         intent: 'mission_task_execution',
@@ -359,6 +396,7 @@ export async function obtainBestOfTaskResultResponse(input: {
         missionId: input.missionId,
         filePath: path.join(alternativesDir, `${input.task.task_id}-candidate-${loser.key}.json`),
         targetPath: `evidence/alternatives/${input.task.task_id}-candidate-${loser.key}.json`,
+        missionPathHint: resolvedMissionDir(input.missionId),
         provisioned: provisionMissionEntry({
           task_id: input.task.task_id,
           candidate: loser.key,
@@ -415,7 +453,7 @@ export function publishTaskPrArtifacts(input: {
   const role = String(input.teamRole || '').toLowerCase();
   if (role === 'reviewer' || role === 'qa' || role === 'planner') return undefined;
   if (missionClassOf(input.missionId) !== 'code_change') return undefined;
-  const missionPath = missionDir(input.missionId, 'public');
+  const missionPath = resolvedMissionDir(input.missionId);
   try {
     safeExec('git', ['rev-parse', '--git-dir'], { cwd: missionPath });
   } catch {
@@ -468,6 +506,7 @@ export function publishTaskPrArtifacts(input: {
     missionId: input.missionId,
     filePath: path.join(prDir, 'diff.patch'),
     targetPath: `evidence/prs/${input.task.task_id}/diff.patch`,
+    missionPathHint: missionPath,
     provisioned: provisionMissionEntry(
       diff || `(no committed changes for task ${input.task.task_id})\n`
     ),
@@ -476,6 +515,7 @@ export function publishTaskPrArtifacts(input: {
     missionId: input.missionId,
     filePath: path.join(prDir, 'PR.md'),
     targetPath: `evidence/prs/${input.task.task_id}/PR.md`,
+    missionPathHint: missionPath,
     provisioned: provisionMissionEntry(
       [
         `# ${summary}`,
@@ -566,6 +606,7 @@ export const dispatchCoreDeps: DispatchCoreDeps = {
   resolveTaskDispatchTimeoutMs,
   withTaskDispatchTimeout,
   dispatchPlannedMissionTask,
+  isGoalDrivenTaskResumable,
   loadPlannedNextTasks,
   buildUnassignedRoleSummary,
   cascadeBlockedDependents,
@@ -575,13 +616,27 @@ export const dispatchCoreDeps: DispatchCoreDeps = {
 export async function dispatchMissionNextTasksCore(
   missionId: string,
   missionRunTrace?: TraceContext,
-  graphRunId?: string
+  graphRunId?: string,
+  options: { resumeGoalDriven?: boolean } = {}
 ): Promise<Array<{ task_id: string; team_role: string; agent_id: string }>> {
-  return dispatchMissionNextTasksCoreImpl(dispatchCoreDeps, missionId, missionRunTrace, graphRunId);
+  return dispatchMissionNextTasksCoreImpl(
+    dispatchCoreDeps,
+    missionId,
+    missionRunTrace,
+    graphRunId,
+    options
+  );
 }
+
+export interface MissionDispatchOptions {
+  /** Only resume persisted paused goal-driven tasks during mission recovery. */
+  resumeGoalDriven?: boolean;
+}
+
 export async function dispatchMissionNextTasks(
   missionId: string,
-  graphRunId?: string
+  graphRunId?: string,
+  options: MissionDispatchOptions = {}
 ): Promise<Array<{ task_id: string; team_role: string; agent_id: string }>> {
   const traceCtx = new TraceContext('mission_run', {
     missionId,
@@ -590,7 +645,7 @@ export async function dispatchMissionNextTasks(
   let dispatched: Array<{ task_id: string; team_role: string; agent_id: string }> = [];
   try {
     traceCtx.addEvent('mission_run_started', { mission_id: missionId });
-    dispatched = await dispatchMissionNextTasksCore(missionId, traceCtx, graphRunId);
+    dispatched = await dispatchMissionNextTasksCore(missionId, traceCtx, graphRunId, options);
     traceCtx.setAttributes({
       mission_id: missionId,
       dispatched_task_count: dispatched.length,
@@ -691,6 +746,12 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
       case 'mission_control_requested':
         await handleMissionControlRequested(
           event as unknown as MissionOrchestrationEvent<MissionControlPayload>,
+          missionLifecycleHandlerDeps
+        );
+        break;
+      case 'mission_worker_recovery_requested':
+        await handleMissionWorkerRecoveryRequested(
+          event as unknown as MissionOrchestrationEvent<MissionWorkerRecoveryPayload>,
           missionLifecycleHandlerDeps
         );
         break;

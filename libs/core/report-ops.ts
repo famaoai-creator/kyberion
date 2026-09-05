@@ -8,12 +8,20 @@
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { GLOBAL_LEDGER_PATH, verifyLedgerIntegrityDetailed } from './ledger.js';
 import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-promotion-queue.js';
 import { summarizeHeuristics, type HeuristicReport } from './heuristic-feedback.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
+import { isRecord } from './foundation/text.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import type { TaskModelEffort, TaskModelHint, TaskModelTier } from './reasoning-model-routing.js';
 
 // ─── audit verify (SA-01) ───────────────────────────────────
@@ -219,7 +227,9 @@ export function runMemoryPromotionQueueSummary(
   const markdown = formatMemoryPromotionQueueMarkdown(rows);
   let outputPath: string | undefined;
   if (input.output_path) {
-    outputPath = pathResolver.resolve(input.output_path);
+    outputPath = assertSafeRepositoryPath(pathResolver.resolve(input.output_path), {
+      allowMissingLeaf: true,
+    });
     safeWriteFile(outputPath, `${markdown}\n`);
   }
   return { rows, markdown, ...(outputPath ? { output_path: outputPath } : {}) };
@@ -309,7 +319,7 @@ export function runKnowledgeValidationSweep(
   const queued = visible.filter((candidate) => candidate.status === 'queued');
   const errors = findings.some((finding) => finding.severity === 'error');
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(scope ? { scope } : {}),
     status: errors ? 'attention' : 'ok',
     heuristics: summarizeHeuristics(10),
@@ -336,6 +346,10 @@ interface TaskIssueEvent {
   payload?: {
     task_model_hint?: TaskModelHint;
   };
+  scope?: {
+    tenant_slug?: string;
+    tenant_id?: string;
+  };
 }
 
 interface SupervisorAskCompletedEvent {
@@ -346,6 +360,126 @@ interface SupervisorAskCompletedEvent {
   input_tokens?: number;
   output_tokens?: number;
   total_tokens?: number;
+  scope?: {
+    tenant_slug?: string;
+    tenant_id?: string;
+  };
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function optionalFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeScope(value: unknown): { tenant_slug?: string; tenant_id?: string } | undefined {
+  if (!isRecord(value)) return undefined;
+  const tenantSlug = optionalString(value.tenant_slug);
+  const tenantId = optionalString(value.tenant_id);
+  if (tenantSlug === undefined && tenantId === undefined) return undefined;
+  return {
+    ...(tenantSlug !== undefined ? { tenant_slug: tenantSlug } : {}),
+    ...(tenantId !== undefined ? { tenant_id: tenantId } : {}),
+  };
+}
+
+function normalizeTaskModelHint(value: unknown): TaskModelHint | null {
+  if (!isRecord(value)) return null;
+  const tier = value.tier;
+  const effort = value.effort;
+  const modelId = optionalString(value.model_id);
+  if (
+    (tier !== 'small' && tier !== 'standard' && tier !== 'large') ||
+    (effort !== 'low' && effort !== 'medium' && effort !== 'high') ||
+    !modelId
+  ) {
+    return null;
+  }
+  const executionTier = value.execution_tier;
+  return {
+    tier,
+    effort,
+    model_id: modelId,
+    route_reason: optionalString(value.route_reason) ?? '',
+    ...(executionTier === 'fast' || executionTier === 'standard' || executionTier === 'deep'
+      ? { execution_tier: executionTier }
+      : {}),
+  };
+}
+
+function normalizeTaskIssueEvent(value: unknown): TaskIssueEvent | null {
+  if (!isRecord(value)) return null;
+  const payload = isRecord(value.payload)
+    ? (() => {
+        const taskModelHint = normalizeTaskModelHint(value.payload.task_model_hint);
+        return taskModelHint ? { task_model_hint: taskModelHint } : undefined;
+      })()
+    : undefined;
+  const scope = normalizeScope(value.scope);
+  return {
+    ...(optionalString(value.event_type) !== undefined
+      ? { event_type: optionalString(value.event_type) }
+      : {}),
+    ...(optionalString(value.mission_id) !== undefined
+      ? { mission_id: optionalString(value.mission_id) }
+      : {}),
+    ...(optionalString(value.task_id) !== undefined
+      ? { task_id: optionalString(value.task_id) }
+      : {}),
+    ...(optionalString(value.agent_id) !== undefined
+      ? { agent_id: optionalString(value.agent_id) }
+      : {}),
+    ...(optionalString(value.team_role) !== undefined
+      ? { team_role: optionalString(value.team_role) }
+      : {}),
+    ...(payload !== undefined ? { payload } : {}),
+    ...(scope !== undefined ? { scope } : {}),
+  };
+}
+
+function normalizeSupervisorAskCompletedEvent(value: unknown): SupervisorAskCompletedEvent | null {
+  if (!isRecord(value)) return null;
+  const scope = normalizeScope(value.scope);
+  return {
+    ...(optionalString(value.decision) !== undefined
+      ? { decision: optionalString(value.decision) }
+      : {}),
+    ...(optionalString(value.agent_id) !== undefined
+      ? { agent_id: optionalString(value.agent_id) }
+      : {}),
+    ...(optionalString(value.model_id) !== undefined
+      ? { model_id: optionalString(value.model_id) }
+      : {}),
+    ...(optionalFiniteNumber(value.duration_ms) !== undefined
+      ? { duration_ms: optionalFiniteNumber(value.duration_ms) }
+      : {}),
+    ...(optionalFiniteNumber(value.input_tokens) !== undefined
+      ? { input_tokens: optionalFiniteNumber(value.input_tokens) }
+      : {}),
+    ...(optionalFiniteNumber(value.output_tokens) !== undefined
+      ? { output_tokens: optionalFiniteNumber(value.output_tokens) }
+      : {}),
+    ...(optionalFiniteNumber(value.total_tokens) !== undefined
+      ? { total_tokens: optionalFiniteNumber(value.total_tokens) }
+      : {}),
+    ...(scope !== undefined ? { scope } : {}),
+  };
+}
+
+/**
+ * Shared observability is intentionally cross-mission, so a tenant-scoped
+ * report must filter both streams before correlating them. Missing scope is
+ * legacy data and is not safe to expose to a tenant-scoped caller.
+ */
+function eventVisibleToScope(
+  event: { scope?: { tenant_slug?: string; tenant_id?: string }; tenant_slug?: string },
+  scope: ScopeContext
+): boolean {
+  if (!scope.tenant_slug) return true;
+  const eventTenant = event.scope?.tenant_slug || event.scope?.tenant_id || event.tenant_slug;
+  return eventTenant === scope.tenant_slug;
 }
 
 export interface TaskRoutingSample {
@@ -375,14 +509,14 @@ export interface TaskRoutingSummaryRow {
   actual_models: string[];
 }
 
-function parseJsonl<T>(raw: string): T[] {
+function parseJsonl(raw: string): unknown[] {
   return raw
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
     .flatMap((line) => {
       try {
-        return [JSON.parse(line) as T];
+        return [parseSafeJsonInput(line, 'report JSONL entry')];
       } catch {
         return [];
       }
@@ -500,8 +634,9 @@ export function writeTaskRoutingSummary(input: {
   rows: TaskRoutingSummaryRow[];
   outputPath: string;
 }): void {
+  const outputPath = assertSafeRepositoryPath(input.outputPath, { allowMissingLeaf: true });
   safeWriteFile(
-    input.outputPath,
+    outputPath,
     JSON.stringify(
       {
         samples: input.samples,
@@ -521,8 +656,9 @@ export interface TaskModelRoutingSummaryResult {
 }
 
 function readJsonlEvents(filePath: string): unknown[] {
-  if (!safeExistsSync(filePath)) return [];
-  return parseJsonl(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return [];
+  return parseJsonl(safeReadFile(safePath, { encoding: 'utf8' }) as string);
 }
 
 /** Op-shaped entry: collect samples from the observability JSONL streams. */
@@ -533,6 +669,7 @@ export function runTaskModelRoutingSummary(
     output_path?: string;
   } = {}
 ): TaskModelRoutingSummaryResult {
+  const scope = currentScope();
   const taskEventsPath =
     input.task_events_path ||
     pathResolver.shared(path.join('observability', 'mission-control', 'task-events.jsonl'));
@@ -543,13 +680,21 @@ export function runTaskModelRoutingSummary(
     );
 
   const samples = buildTaskRoutingSamples(
-    readJsonlEvents(taskEventsPath) as TaskIssueEvent[],
-    readJsonlEvents(supervisorEventsPath) as SupervisorAskCompletedEvent[]
+    readJsonlEvents(taskEventsPath)
+      .map(normalizeTaskIssueEvent)
+      .filter((event): event is TaskIssueEvent => event !== null)
+      .filter((event) => eventVisibleToScope(event, scope)),
+    readJsonlEvents(supervisorEventsPath)
+      .map(normalizeSupervisorAskCompletedEvent)
+      .filter((event): event is SupervisorAskCompletedEvent => event !== null)
+      .filter((event) => eventVisibleToScope(event, scope))
   );
   const rows = summarizeTaskRouting(samples);
   let outputPath: string | undefined;
   if (input.output_path) {
-    outputPath = pathResolver.resolve(input.output_path);
+    outputPath = assertSafeRepositoryPath(pathResolver.resolve(input.output_path), {
+      allowMissingLeaf: true,
+    });
     writeTaskRoutingSummary({ samples, rows, outputPath });
   }
   return { samples, rows, ...(outputPath ? { output_path: outputPath } : {}) };

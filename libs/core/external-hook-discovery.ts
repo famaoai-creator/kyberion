@@ -8,13 +8,16 @@
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
+import { assertProjectTrustApproval } from './project-trust.js';
 import {
   registerExternalLifecycleHooks,
   type ExternalHookSource,
   type ExternalHookBridgeResult,
 } from './external-hook-bridge.js';
-import { LifecycleHookEngine } from './lifecycle-hook-engine.js';
+import { getDefaultLifecycleHookEngine, LifecycleHookEngine } from './lifecycle-hook-engine.js';
 
 export interface ExternalHookConfigCandidate {
   source: ExternalHookSource;
@@ -31,6 +34,8 @@ export interface ExternalHookDiscoveryOptions {
   /** Test/host override for the user config root; defaults to HOME. */
   globalHomeDir?: string;
   trustResolved: boolean;
+  /** Hash-bound approval IDs keyed by absolute or repository-relative project config path. */
+  projectTrustApprovalIds?: Readonly<Record<string, string>>;
   /** Separate trust decision required before registering global configs. */
   globalTrustResolved?: boolean;
 }
@@ -59,6 +64,33 @@ function isBelowRoot(filePath: string, rootDir: string): boolean {
   return target === root || target.startsWith(`${root}${path.sep}`);
 }
 
+function isSafeConfigPath(filePath: string, rootDir: string): boolean {
+  if (!isBelowRoot(filePath, rootDir)) return false;
+  const root = path.resolve(rootDir);
+  if (!safeExistsSync(root) || safeLstat(root).isSymbolicLink()) return false;
+  const relative = path.relative(root, path.resolve(filePath)).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    return false;
+  }
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    if (!safeExistsSync(current)) return false;
+    if (safeLstat(current).isSymbolicLink()) return false;
+  }
+  return true;
+}
+
+function projectTrustApprovalId(
+  candidate: ExternalHookConfigCandidate,
+  options: ExternalHookDiscoveryOptions
+): string | undefined {
+  if (candidate.scope !== 'project' || !options.projectTrustApprovalIds) return undefined;
+  const absolute = path.resolve(candidate.path);
+  const relative = path.relative(pathResolver.rootDir(), absolute).replaceAll('\\', '/');
+  return options.projectTrustApprovalIds[absolute] || options.projectTrustApprovalIds[relative];
+}
+
 export function discoverExternalHookConfigs(
   options: Omit<ExternalHookDiscoveryOptions, 'trustResolved'> & { trustResolved?: boolean } = {}
 ): ExternalHookConfigCandidate[] {
@@ -74,16 +106,18 @@ export function discoverExternalHookConfigs(
       ...candidate,
       path: path.resolve(rootDir, candidate.path),
     }))
-    .filter((candidate) => isBelowRoot(candidate.path, rootDir) && safeExistsSync(candidate.path));
+    .filter(
+      (candidate) => isSafeConfigPath(candidate.path, rootDir) && safeExistsSync(candidate.path)
+    );
   if (options.includeGlobal !== true) return project;
 
-  const rawHomeDir = options.globalHomeDir || process.env.HOME;
+  const rawHomeDir = options.globalHomeDir || getRegisteredEnvText('HOME');
   if (!rawHomeDir?.trim()) return project;
   const homeDir = path.resolve(rawHomeDir);
   const global = GLOBAL_CANDIDATES.filter((candidate) => sources.has(candidate.source)).map(
     (candidate) => ({ ...candidate, path: path.resolve(homeDir, candidate.path) })
   );
-  return [...project, ...global.filter((candidate) => safeExistsSync(candidate.path))];
+  return [...project, ...global.filter((candidate) => isSafeConfigPath(candidate.path, homeDir))];
 }
 
 /**
@@ -112,14 +146,20 @@ export function registerDiscoveredExternalLifecycleHooks(
   const skipped: Array<{ path: string; reason: string }> = [];
   for (const candidate of candidates) {
     try {
-      const raw = String(safeReadFile(candidate.path, { encoding: 'utf8' }) || '');
-      const parsed: unknown = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('config root must be an object');
+      if (candidate.scope === 'project') {
+        const approvalId = projectTrustApprovalId(candidate, options);
+        if (!approvalId) {
+          throw new Error(
+            `[EXTERNAL_HOOK_APPROVAL_REQUIRED] project hook config requires a hash-bound approval: ${candidate.path}`
+          );
+        }
+        assertProjectTrustApproval(approvalId, candidate.path);
       }
-      bridges.push(
-        registerExternalLifecycleHooks(engine, parsed as Record<string, unknown>, candidate.source)
+      const parsed = parseSafeJsonObjectValue(
+        readJson<unknown>(candidate.path),
+        `external hook config ${candidate.path}`
       );
+      bridges.push(registerExternalLifecycleHooks(engine, parsed, candidate.source));
     } catch (error) {
       skipped.push({
         path: candidate.path,
@@ -135,4 +175,16 @@ export function registerDiscoveredExternalLifecycleHooks(
       for (const bridge of bridges.reverse()) await bridge.dispose();
     },
   };
+}
+
+/**
+ * Register trusted external hooks on the process-wide lifecycle engine. The
+ * trust and hash-bound approval requirements remain identical to the explicit
+ * engine variant; only the engine selection is centralized for real runtime
+ * bootstrap callers.
+ */
+export function registerDiscoveredExternalLifecycleHooksOnDefaultEngine(
+  options: ExternalHookDiscoveryOptions
+): ExternalHookDiscoveryResult {
+  return registerDiscoveredExternalLifecycleHooks(getDefaultLifecycleHookEngine(), options);
 }

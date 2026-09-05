@@ -1,14 +1,14 @@
 import type { ValidateFunction } from 'ajv';
-import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
-import { resolveActiveProfileRoot } from './profile-root.js';
+import { loadLlmSelectionPreferences } from './llm-selection-state.js';
 import {
   BACKEND_CAPABILITY_PROFILES,
   backendRouteCapabilities,
@@ -157,38 +157,38 @@ export interface ResolvedReasoningRoute {
   failover: ReasoningRoutePolicy['fallback'];
 }
 
-let validatePolicyFn: ValidateFunction | null = null;
 let validateUserConfigFn: ValidateFunction | null = null;
-let cachedPolicy: ReasoningRoutePolicy | null = null;
-
-function validator(): ValidateFunction {
-  if (!validatePolicyFn) validatePolicyFn = compileSchema(SCHEMA_PATH);
-  return validatePolicyFn;
-}
-
-function validatePolicy(value: unknown, label: string): ReasoningRoutePolicy {
-  if (!validator()(value)) {
-    const errors = (validator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'invalid'}`
-    );
-    throw new Error(`Invalid reasoning route policy at ${label}: ${errors.join('; ')}`);
-  }
-  return value as ReasoningRoutePolicy;
-}
+const reasoningRoutePolicyCatalog = defineCatalog<ReasoningRoutePolicy>({
+  id: 'reasoning-route-policy',
+  path: POLICY_PATH,
+  schema: SCHEMA_PATH,
+});
+const reasoningRouteUserConfigCatalog = defineCatalog<ReasoningRouteUserConfig>({
+  id: 'reasoning-route-user-config',
+  path: USER_CONFIG_PATH,
+  schema: USER_SCHEMA_PATH,
+  fallback: {},
+});
 
 export function loadReasoningRoutePolicy(): ReasoningRoutePolicy {
-  if (cachedPolicy) return cachedPolicy;
-  if (!safeExistsSync(POLICY_PATH))
-    throw new Error(`Missing reasoning route policy: ${POLICY_PATH}`);
-  cachedPolicy = validatePolicy(loadJson(POLICY_PATH), POLICY_PATH);
-  return cachedPolicy;
+  return reasoningRoutePolicyCatalog.load();
 }
 
 export function loadReasoningRouteUserConfig(): ReasoningRouteUserConfig {
-  if (!safeExistsSync(USER_CONFIG_PATH)) return {};
-  const value = readJson<ReasoningRouteUserConfig>(USER_CONFIG_PATH);
-  validateReasoningRouteUserConfig(value, USER_CONFIG_PATH);
-  return value;
+  return reasoningRouteUserConfigCatalog.load();
+}
+
+/** Load a persisted user-config snapshot through the same schema/path boundary. */
+export function loadReasoningRouteUserConfigAtPath(filePath: string): ReasoningRouteUserConfig {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`Reasoning route user config must be a regular file: ${safePath}`);
+  }
+  return defineCatalog<ReasoningRouteUserConfig>({
+    id: 'reasoning-route-user-config',
+    path: safePath,
+    schema: USER_SCHEMA_PATH,
+  }).load();
 }
 
 export function validateReasoningRouteUserConfig(
@@ -240,6 +240,10 @@ export function normalizeReasoningRole(
   throw new Error(`Unknown reasoning role "${value}". Allowed roles: ${roles.join(', ')}`);
 }
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 function mergeSampling(...values: Array<SamplingParams | undefined>): SamplingParams {
   const result: SamplingParams = {};
   for (const value of values) if (value) Object.assign(result, value);
@@ -252,28 +256,16 @@ function mergeSampling(...values: Array<SamplingParams | undefined>): SamplingPa
 
 function requestedBinding(role: ReasoningRole, env: NodeJS.ProcessEnv): string | undefined {
   const key = `KYBERION_REASONING_ROLE_${role.toUpperCase()}`;
-  return env[key]?.trim() || env.KYBERION_REASONING_PROFILE?.trim();
+  return envText(env, key)?.trim() || envText(env, 'KYBERION_REASONING_PROFILE')?.trim();
 }
 
 function loadOperatorLlmSelection(): { provider: string; model_id?: string } | null {
-  const filePath = path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json');
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    const value = loadJson<{
-      provider?: unknown;
-      model_id?: unknown;
-    }>(filePath);
-    if (typeof value.provider !== 'string' || !value.provider.trim()) return null;
-    return {
-      provider: value.provider.trim(),
-      model_id:
-        typeof value.model_id === 'string' && value.model_id.trim()
-          ? value.model_id.trim()
-          : undefined,
-    };
-  } catch {
-    return null;
-  }
+  const value = loadLlmSelectionPreferences();
+  if (!value) return null;
+  return {
+    provider: value.provider,
+    model_id: value.model_id,
+  };
 }
 
 function parseBinding(binding: string): { profile?: string; mode?: string; model?: string } {
@@ -290,6 +282,7 @@ function modelFromRuntimeEnv(mode: string, env: NodeJS.ProcessEnv): string | und
     'gemini-api': ['KYBERION_GEMINI_MODEL'],
     'grok-api': ['KYBERION_GROK_API_MODEL'],
     'grok-cli': ['KYBERION_GROK_CLI_MODEL'],
+    'cursor-cli': ['KYBERION_CURSOR_CLI_MODEL'],
     openrouter: ['KYBERION_OPENROUTER_MODEL'],
     'nemotron-api': ['KYBERION_NEMOTRON_MODEL'],
     ollama: ['KYBERION_OLLAMA_MODEL', 'OLLAMA_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
@@ -301,7 +294,7 @@ function modelFromRuntimeEnv(mode: string, env: NodeJS.ProcessEnv): string | und
     local: ['KYBERION_LOCAL_LLM_MODEL'],
   };
   return [...(keys[mode] || []), 'KYBERION_REASONING_MODEL']
-    .map((key) => env[key]?.trim())
+    .map((key) => envText(env, key)?.trim())
     .find(Boolean);
 }
 
@@ -465,7 +458,10 @@ export function resolveReasoningRoute(
     }
     const toolsEnabled = overlay?.tools_enabled ?? base.tools_enabled ?? false;
     const allowedTools = toolsEnabled ? (overlay?.allowed_tools ?? base.allowed_tools ?? []) : [];
-    if (allowedTools.includes('shell_exec') && env.KYBERION_REASONING_ALLOW_SHELL_TOOL !== 'true') {
+    if (
+      allowedTools.includes('shell_exec') &&
+      envText(env, 'KYBERION_REASONING_ALLOW_SHELL_TOOL') !== 'true'
+    ) {
       rejectedCandidates.push({
         profile: profileRef,
         reason: 'shell_exec requires KYBERION_REASONING_ALLOW_SHELL_TOOL=true',
@@ -706,7 +702,8 @@ export function resolveStepReasoningRoute(input: {
   let binding: ReasoningRouteBinding | undefined;
   let source: ResolvedStepReasoningRoute['source'] = 'policy';
 
-  const envBinding = env.KYBERION_REASONING_PROFILE || env.KYBERION_REASONING_BACKEND;
+  const envBinding =
+    envText(env, 'KYBERION_REASONING_PROFILE') || envText(env, 'KYBERION_REASONING_BACKEND');
   if (envBinding) {
     binding = envBinding.startsWith('profile:')
       ? { profile: envBinding.slice('profile:'.length) }
@@ -803,8 +800,8 @@ export function resolveStepReasoningRoute(input: {
   };
 }
 
-export function resetReasoningRoutePolicyCache(): void {
-  cachedPolicy = null;
-  validatePolicyFn = null;
+export function _resetReasoningRoutePolicyCacheForTests(): void {
+  reasoningRoutePolicyCatalog.reset();
+  reasoningRouteUserConfigCatalog.reset();
   validateUserConfigFn = null;
 }

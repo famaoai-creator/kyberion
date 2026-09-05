@@ -3,14 +3,14 @@
 import * as React from 'react';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import type { ConciergeMessageKey } from '../../lib/i18n';
+import { parseSetupResponse, type Setup as SetupPayload } from '../../lib/setup-response';
+import { parseConciergeMutationResponse } from '../../lib/mutation-response';
+import {
+  parseConfigMissionsResponse,
+  parseNotificationPreferencesResponse,
+  parsePluginListResponse,
+} from '../../lib/setup-auxiliary-response';
 
-type Service = { id: string; label: string; auth: string; configured: boolean };
-type Diagnostic = {
-  id: string;
-  status: 'ok' | 'incomplete' | 'error';
-  action?: { type: 'navigate'; target: string };
-  command?: string;
-};
 type NotificationChannelOption = { surface: string; display_name: string; status: string };
 type NotificationTarget = { surface: string; target: string };
 type PluginEntry = {
@@ -43,73 +43,7 @@ type ConfigMissionItem = {
   status: string;
   created_at: string;
 };
-type Setup = {
-  surface_roles: Array<{
-    id: string;
-    role_ja: string;
-    tagline_ja: string;
-    port: number;
-    enabled: boolean;
-  }>;
-  active_surfaces: Array<{ id: string; port?: number; enabled: boolean }>;
-  reasoning_mode: string;
-  model_tiers: Record<string, string>;
-  providers?: { priority?: string[]; default_models?: Record<string, string> };
-  profile: {
-    name: string;
-    language: string;
-    interaction_style: string;
-    primary_domain: string;
-    vision: string;
-    agent_id: string;
-    tenant_slug: string;
-    onboarding_complete: boolean;
-    avatar_registered: boolean;
-    avatar_source?: string;
-    voice_profiles: Array<{
-      profile_id: string;
-      display_name: string;
-      sample_count: number;
-      sample_refs?: string[];
-    }>;
-  };
-  service_catalog: Service[];
-  diagnostics: Diagnostic[];
-  capabilities: Array<{
-    id: string;
-    label: string;
-    status: string;
-    href?: string;
-  }>;
-  tenant: {
-    active_slug: string;
-    runtime_bound: boolean;
-    catalog: Array<{
-      tenant_slug: string;
-      tenant_id: string;
-      display_name: string;
-      status: string;
-      assigned_role: string;
-    }>;
-  };
-  agent_management: {
-    configured: {
-      agent_id?: string;
-      display_name?: string;
-      provider?: string;
-      model_id?: string;
-    } | null;
-    durable_identities: Array<{
-      nhi_id: string;
-      kind: string;
-      display_name: string;
-      lifecycle_status: string;
-      organization_id: string;
-      provider_hint: string;
-      model_hint: string;
-    }>;
-  };
-};
+type Setup = SetupPayload;
 
 type Notice = { text: string; error?: boolean } | null;
 
@@ -201,9 +135,8 @@ export default function SetupPage() {
   const refresh = React.useCallback(async () => {
     try {
       const response = await fetch('/api/setup', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'setup failed');
-      const next = payload.setup as Setup;
+      const next = parseSetupResponse(await response.json().catch(() => null));
+      if (!response.ok || !next) throw new Error('Invalid setup response');
       setSetup(next);
       setProfile({
         name: next.profile.name,
@@ -248,17 +181,16 @@ export default function SetupPage() {
   const refreshNotifications = React.useCallback(async () => {
     try {
       const response = await fetch('/api/notification-preferences', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'notification failed');
-      const channels = Array.isArray(payload.channels)
-        ? (payload.channels as NotificationChannelOption[])
-        : [];
-      const current = (payload.preferences?.default_channel || null) as NotificationTarget | null;
-      setNotifChannels(channels);
-      setNotifCurrent(current);
+      const parsed = parseNotificationPreferencesResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid notification preferences response');
+      setNotifChannels(parsed.channels);
+      setNotifCurrent(parsed.preferences.default_channel);
       setNotif(
-        current
-          ? { surface: current.surface, target: current.target }
+        parsed.preferences.default_channel
+          ? {
+              surface: parsed.preferences.default_channel.surface,
+              target: parsed.preferences.default_channel.target,
+            }
           : { surface: 'none', target: '' }
       );
     } catch {
@@ -270,9 +202,9 @@ export default function SetupPage() {
   const refreshPlugins = React.useCallback(async () => {
     try {
       const response = await fetch('/api/plugins', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'plugins failed');
-      setPlugins(Array.isArray(payload.plugins) ? (payload.plugins as PluginEntry[]) : []);
+      const parsed = parsePluginListResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid plugin list response');
+      setPlugins(parsed);
     } catch {
       // The plugin pane keeps its last known state; approval decisions always
       // re-read the registry server-side, so stale display never grants more.
@@ -282,13 +214,12 @@ export default function SetupPage() {
   const refreshConfigMissions = React.useCallback(async () => {
     try {
       const response = await fetch('/api/config-missions', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'config missions failed');
-      const tenants = Array.isArray(payload.tenants) ? (payload.tenants as string[]) : [];
-      setConfigPresets(Array.isArray(payload.presets) ? (payload.presets as ConfigPreset[]) : []);
-      setConfigTenants(tenants);
-      setConfigTenant((current) => current || tenants[0] || '');
-      setConfigRecent(Array.isArray(payload.recent) ? (payload.recent as ConfigMissionItem[]) : []);
+      const parsed = parseConfigMissionsResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid config missions response');
+      setConfigPresets(parsed.presets);
+      setConfigTenants(parsed.tenants);
+      setConfigTenant((current) => current || parsed.tenants[0] || '');
+      setConfigRecent(parsed.recent);
     } catch {
       // Same posture as the plugin pane: display-only degradation.
     }
@@ -305,9 +236,9 @@ export default function SetupPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ decision }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'plugin failed');
-        setNotice({ text: payload.message });
+        const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+        if (!response.ok || !parsed?.message) throw new Error('Plugin action failed');
+        setNotice({ text: parsed.message });
         setPluginConfirm(null);
         await refreshPlugins();
       } catch (err) {
@@ -333,9 +264,9 @@ export default function SetupPage() {
           inputs: configInputs,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'config mission failed');
-      setNotice({ text: payload.message });
+      const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed?.message) throw new Error('Config mission failed');
+      setNotice({ text: parsed.message });
       setConfigConfirm(false);
       setConfigPresetId('');
       setConfigInputs({});
@@ -374,8 +305,7 @@ export default function SetupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ surface: notif.surface, channel: notif.target.trim() }),
       });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'notification save failed');
+      if (!response.ok) throw new Error('Notification save failed');
       setNotice({ text: t('setup.notification_saved') });
       await Promise.all([refreshNotifications(), refresh()]);
     } catch (err) {
@@ -439,8 +369,7 @@ export default function SetupPage() {
             },
           }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'onboarding failed');
+        if (!response.ok) throw new Error('Onboarding failed');
         setNotice({
           text: includeVoice ? t('setup.voice_registered') : t('setup.onboarding_saved'),
         });
@@ -478,8 +407,7 @@ export default function SetupPage() {
           },
         }),
       });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'management save failed');
+      if (!response.ok) throw new Error('Management save failed');
       setNotice({ text: t('setup.management_saved') });
       await refresh();
     } catch (err) {
@@ -499,10 +427,12 @@ export default function SetupPage() {
         form.set('source', source);
         form.set('file', file);
         const response = await fetch('/api/setup', { method: 'POST', body: form });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'upload failed');
+        const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+        if (!response.ok || !parsed) throw new Error('Upload failed');
         if (action === 'voice_sample') {
-          setVoiceSampleRefs((current) => [...current, payload.sample.sample_ref].slice(-3));
+          const sampleRef = parsed.sample?.sample_ref;
+          if (!sampleRef) throw new Error('Invalid voice upload response');
+          setVoiceSampleRefs((current) => [...current, sampleRef].slice(-3));
         }
         setNotice({ text: action === 'avatar' ? t('setup.avatar_saved') : t('setup.voice_saved') });
         await refresh();

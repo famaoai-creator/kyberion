@@ -58,7 +58,7 @@
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "✅ Tenant '{{input.tenant}}' ({{input.display_name}}) bootstrapped. Run `pnpm surfaces:reconcile` to surface in operator dashboard."
+        "message": "✅ Tenant '{{input.tenant}}' ({{input.display_name}}) bootstrapped. Run `pnpm surfaces reconcile` to surface in operator dashboard."
       }
     }
   ]

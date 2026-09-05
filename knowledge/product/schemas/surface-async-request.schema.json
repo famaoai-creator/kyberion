@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "surface-async-request.schema.json",
+  "title": "Persisted surface asynchronous request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "request_id": { "type": "string", "minLength": 1 },
+    "surface": {
+      "type": "string",
+      "enum": [
+        "slack",
+        "chronos",
+        "presence",
+        "imessage",
+        "discord",
+        "telegram",
+        "cowork",
+        "cli",
+        "terminal"
+      ]
+    },
+    "channel": { "type": "string" },
+    "thread_ts": { "type": "string" },
+    "sender_agent_id": { "type": "string" },
+    "surface_agent_id": { "type": "string" },
+    "receiver_agent_id": { "type": "string" },
+    "query": { "type": "string" },
+    "accepted_text": { "type": "string" },
+    "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+    "result_text": { "type": "string" },
+    "error": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "scope": { "$ref": "#/definitions/scope" }
+  },
+  "required": [
+    "request_id",
+    "surface",
+    "channel",
+    "thread_ts",
+    "sender_agent_id",
+    "surface_agent_id",
+    "receiver_agent_id",
+    "query",
+    "accepted_text",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  "definitions": {
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope_kind": {
+          "type": "string",
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string" },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "work_shape": { "type": "string" },
+        "customer_stance": { "type": "string" },
+        "viewer_principal": { "type": "string" },
+        "nhi_id": { "type": "string" }
+      },
+      "required": ["scope_kind", "tier"]
+    }
+  }
+}

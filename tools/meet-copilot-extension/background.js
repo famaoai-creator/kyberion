@@ -46,6 +46,68 @@ const AI_EVENTS = { summary: 'ai_summary', insights: 'ai_insights', suggestions:
 let transcript = [];
 let persistTimer = null;
 
+const CONTROL_COMMANDS = new Set([
+  'session',
+  'join',
+  'set_mic',
+  'set_camera',
+  'chat',
+  'screen_context',
+  'leave',
+]);
+const DANGEROUS_JSON_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isPlainRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasSafeJsonKeys(value) {
+  if (Array.isArray(value)) return value.every(hasSafeJsonKeys);
+  if (!isPlainRecord(value)) return true;
+  return Object.entries(value).every(
+    ([key, nested]) => !DANGEROUS_JSON_KEYS.has(key) && hasSafeJsonKeys(nested)
+  );
+}
+
+function isOptionalString(value) {
+  return value === undefined || typeof value === 'string';
+}
+
+function isOptionalBoolean(value) {
+  return value === undefined || typeof value === 'boolean';
+}
+
+function parseControlMessage(raw) {
+  let value;
+  try {
+    value = JSON.parse(String(raw));
+  } catch {
+    return null;
+  }
+  if (!isPlainRecord(value) || !hasSafeJsonKeys(value) || typeof value.cmd !== 'string')
+    return null;
+  if (!CONTROL_COMMANDS.has(value.cmd) || !isOptionalString(value.control_token)) return null;
+
+  if (value.cmd === 'session') return value;
+  if (value.cmd === 'join') {
+    return isOptionalString(value.url) &&
+      isOptionalString(value.display_name) &&
+      isOptionalBoolean(value.mic) &&
+      isOptionalBoolean(value.camera) &&
+      isOptionalBoolean(value.captions)
+      ? value
+      : null;
+  }
+  if (value.cmd === 'set_mic' || value.cmd === 'set_camera') {
+    return typeof value.on === 'boolean' ? value : null;
+  }
+  if (value.cmd === 'chat') return typeof value.text === 'string' ? value : null;
+  if (value.cmd === 'screen_context') {
+    return typeof value.text === 'string' && isOptionalString(value.provider) ? value : null;
+  }
+  return value;
+}
+
 function sessionStore() {
   // chrome.storage.session is unavailable on older Chrome and in tests.
   return chrome.storage && chrome.storage.session ? chrome.storage.session : null;
@@ -307,13 +369,8 @@ async function connect() {
     keepaliveTimer = setInterval(() => sendEvent({ event: 'ping', t: Date.now() }), 20000);
   };
   ws.onmessage = (e) => {
-    let msg;
-    try {
-      msg = JSON.parse(e.data);
-    } catch {
-      return;
-    }
-    if (msg && msg.cmd) handleCommand(msg);
+    const msg = parseControlMessage(e.data);
+    if (msg) void handleCommand(msg);
   };
   ws.onclose = () => {
     uiState.wsConnected = false;

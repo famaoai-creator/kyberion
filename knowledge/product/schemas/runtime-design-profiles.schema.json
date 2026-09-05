@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "runtime-design-profiles.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "profiles"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "profiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/profile" }
+    }
+  },
+  "$defs": {
+    "coordination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bus", "channels"],
+      "properties": {
+        "bus": { "type": "string", "enum": ["none", "mission_coordination_bus"] },
+        "channels": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["store", "scope", "purpose"],
+      "properties": {
+        "store": { "type": "string", "enum": ["none", "mission_working_memory"] },
+        "scope": { "type": "string", "enum": ["none", "mission_local"] },
+        "purpose": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_model", "assignment_policy", "coordination", "memory"],
+      "properties": {
+        "owner_model": {
+          "type": "string",
+          "enum": ["single_actor", "single_owner_multi_worker"]
+        },
+        "assignment_policy": {
+          "type": "string",
+          "enum": ["direct_specialist", "lease_aware_capability", "dependency_first"]
+        },
+        "coordination": { "$ref": "#/$defs/coordination" },
+        "memory": { "$ref": "#/$defs/memory" }
+      }
+    }
+  }
+}

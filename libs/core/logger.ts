@@ -2,19 +2,37 @@
  * Structured Logger - provides leveled, structured logging for skills.
  */
 
-export const LOG_LEVELS: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3, silent: 4 };
+import { nowIso } from './foundation/time.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+
+export const LOG_LEVELS: Record<string, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+  silent: 4,
+};
 
 export interface LoggerOptions {
   level?: string;
   json?: boolean;
 }
 
+function isQuietProcess(): boolean {
+  return (
+    getRegisteredEnvText('LOG_LEVEL') === 'silent' ||
+    process.argv.includes('--quiet') ||
+    process.argv.includes('--json')
+  );
+}
+
 export function createLogger(name: string, options: LoggerOptions = {}) {
-  const level = LOG_LEVELS[options.level || process.env.LOG_LEVEL || 'info'] ?? LOG_LEVELS.info;
-  const json = options.json || process.env.LOG_FORMAT === 'json';
+  const level =
+    LOG_LEVELS[options.level || getRegisteredEnvText('LOG_LEVEL') || 'info'] ?? LOG_LEVELS.info;
+  const json = options.json || getRegisteredEnvText('LOG_FORMAT') === 'json';
 
   function _format(lvl: string, msg: string, data: any) {
-    const ts = new Date().toISOString();
+    const ts = nowIso();
     if (json) {
       return JSON.stringify({ ts, level: lvl, skill: name, msg, ...data });
     }
@@ -26,6 +44,7 @@ export function createLogger(name: string, options: LoggerOptions = {}) {
   }
 
   function _log(lvl: string, msg: string, data: any) {
+    if (isQuietProcess() && lvl !== 'error') return;
     if (LOG_LEVELS[lvl] < level) return;
     const line = _format(lvl, msg, data);
     process.stderr.write(line + '\n');

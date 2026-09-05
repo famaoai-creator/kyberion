@@ -65,6 +65,18 @@ function seedPolicyFile(root: string): void {
   const target = path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'), target);
+  const schemaTarget = path.join(
+    root,
+    'knowledge',
+    'product',
+    'schemas',
+    'mission-management.schema.json'
+  );
+  fs.mkdirSync(path.dirname(schemaTarget), { recursive: true });
+  fs.copyFileSync(
+    path.join(REPO_ROOT, 'knowledge/product/schemas/mission-management.schema.json'),
+    schemaTarget
+  );
 }
 
 describe('sealMission (AL-02)', () => {
@@ -152,12 +164,16 @@ describe('sealMission (AL-02)', () => {
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(
       configPath,
-      JSON.stringify({ directories: { archive: 'custom/archive/root' } })
+      JSON.stringify({ version: '1.1.0', directories: { archive: 'custom/archive/root' } })
     );
     expect(mod.missionSealArchiveDir('M-X')).toBe(
       path.join(tmpRoot, 'custom', 'archive', 'root', 'M-X', 'seal')
     );
     fs.rmSync(configPath);
+  });
+
+  it('rejects a mission id that could create a nested archive path', () => {
+    expect(() => mod.missionSealArchiveDir('../outside')).toThrow('[MISSION_SEAL_SCOPE]');
   });
 
   it('returns undefined when the mission does not exist', async () => {

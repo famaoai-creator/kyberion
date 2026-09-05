@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { dispatchA2UI, type A2UIMessage } from './a2ui.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export interface ComputerSurfacePatch {
   sessionId: string;
@@ -20,7 +21,18 @@ const COMPUTER_SURFACE_ID = 'computer-surface';
 const COMPUTER_SESSION_DIR = pathResolver.shared('runtime/computer/sessions');
 let computerSurfaceCreated = false;
 
+function computerSessionPath(sessionId: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(sessionId)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] invalid computer session id: ${sessionId}`);
+  }
+  return assertSafeRepositoryPath(path.join(COMPUTER_SESSION_DIR, `${sessionId}.json`), {
+    allowMissingLeaf: true,
+  });
+}
+
 export function buildComputerSurfaceMessages(patch: ComputerSurfacePatch): A2UIMessage[] {
+  computerSessionPath(patch.sessionId);
+  const updatedAt = patch.updatedAt || nowIso();
   const messages: A2UIMessage[] = [];
   if (!computerSurfaceCreated) {
     messages.push({
@@ -46,7 +58,7 @@ export function buildComputerSurfaceMessages(patch: ComputerSurfacePatch): A2UIM
         metadata: patch.metadata || {},
         screenshotPath: patch.screenshotPath || '',
         actionCount: patch.actionCount || 0,
-        updatedAt: patch.updatedAt || new Date().toISOString(),
+        updatedAt,
       },
     },
   });
@@ -66,7 +78,8 @@ function persistComputerSession(patch: ComputerSurfacePatch): void {
     safeMkdir(COMPUTER_SESSION_DIR, { recursive: true });
   }
 
-  const sessionPath = path.join(COMPUTER_SESSION_DIR, `${patch.sessionId}.json`);
+  const sessionPath = computerSessionPath(patch.sessionId);
+  const updatedAt = patch.updatedAt || nowIso();
   safeWriteFile(
     sessionPath,
     JSON.stringify(
@@ -80,10 +93,10 @@ function persistComputerSession(patch: ComputerSurfacePatch): void {
         metadata: patch.metadata || {},
         screenshotPath: patch.screenshotPath || '',
         actionCount: patch.actionCount || 0,
-        updatedAt: patch.updatedAt || new Date().toISOString(),
+        updatedAt,
       },
       null,
-      2,
-    ),
+      2
+    )
   );
 }

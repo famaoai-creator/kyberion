@@ -17,6 +17,8 @@ import { ACTUATOR_SERVE_RESULT_PREFIX } from './cli-utils.js';
 import { logger } from './core.js';
 import { rootResolve } from './path-resolver.js';
 import { buildSafeExecEnv } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export interface ActuatorServeClientOptions {
   /** Full argv of the serve-mode actuator, e.g. ['node', 'dist/.../index.js', '--serve']. */
@@ -31,6 +33,37 @@ interface PendingRequest {
   reject: (error: Error) => void;
   timer: NodeJS.Timeout;
   abortCleanup?: () => void;
+}
+
+interface ActuatorServeResponse {
+  id: string;
+  ok: boolean;
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
+export function normalizeActuatorServeResponse(value: unknown): ActuatorServeResponse {
+  if (!isRecord(value)) {
+    throw new Error('actuator serve response must be a JSON object');
+  }
+  if (typeof value.id !== 'string' || !value.id.trim()) {
+    throw new Error('actuator serve response.id must be a non-empty string');
+  }
+  if (typeof value.ok !== 'boolean') {
+    throw new Error('actuator serve response.ok must be boolean');
+  }
+  if (value.result !== undefined && value.result !== null && !isRecord(value.result)) {
+    throw new Error('actuator serve response.result must be a JSON object');
+  }
+  if (value.error !== undefined && typeof value.error !== 'string') {
+    throw new Error('actuator serve response.error must be a string');
+  }
+  return {
+    id: value.id,
+    ok: value.ok,
+    ...(isRecord(value.result) ? { result: value.result } : {}),
+    ...(typeof value.error === 'string' ? { error: value.error } : {}),
+  };
 }
 
 export class ActuatorServeClient {
@@ -148,24 +181,23 @@ export class ActuatorServeClient {
   }
 
   private handleResponseLine(json: string): void {
-    let parsed: { id?: unknown; ok?: boolean; result?: unknown; error?: unknown };
+    let parsed: ActuatorServeResponse;
     try {
-      parsed = JSON.parse(json);
+      const value: unknown = parseSafeJsonInput(json, `${this.label || 'actuator'} response`);
+      parsed = normalizeActuatorServeResponse(value);
     } catch (err) {
       logger.warn(
         `[actuator-serve-client:${this.label}] unparsable response frame: ${err instanceof Error ? err.message : err}`
       );
       return;
     }
-    const id = typeof parsed.id === 'string' ? parsed.id : null;
-    if (!id) return;
-    const entry = this.pending.get(id);
+    const entry = this.pending.get(parsed.id);
     if (!entry) return;
     clearTimeout(entry.timer);
-    this.pending.delete(id);
+    this.pending.delete(parsed.id);
     if (parsed.ok) {
       entry.abortCleanup?.();
-      entry.resolve((parsed.result ?? {}) as Record<string, unknown>);
+      entry.resolve(parsed.result ?? {});
     } else {
       entry.abortCleanup?.();
       entry.reject(

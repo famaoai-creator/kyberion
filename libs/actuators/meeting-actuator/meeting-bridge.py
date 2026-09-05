@@ -40,6 +40,10 @@ from urllib.parse import urlparse
 _SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = _SCRIPT_DIR.parents[2]
 
+_VOICE_SCRIPT_DIR = ROOT / "libs/actuators/voice-actuator/scripts"
+sys.path.insert(0, str(_VOICE_SCRIPT_DIR))
+from json_boundary import JsonInputError, parse_json_object
+
 PLAYWRIGHT_JOIN = ROOT / "libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs"
 MEETING_JOIN_BACKEND = "meeting-browser-driver"
 VOICE_BRIDGE    = ROOT / "libs/actuators/voice-actuator/scripts/voice_learning_bridge.py"
@@ -139,7 +143,13 @@ def _err(message, **extra):
     return payload
 
 
+def _host_matches(host, allowed):
+    return host == allowed or host.endswith(f".{allowed}")
+
+
 def _validate_url(platform, url):
+    if platform not in ALLOWED_HOSTS:
+        return False, f"unsupported meeting platform: {platform}"
     if not url:
         return False, "url is required"
     try:
@@ -148,8 +158,14 @@ def _validate_url(platform, url):
         return False, f"invalid url: {exc}"
     if parsed.scheme not in ("http", "https"):
         return False, f"url scheme must be http(s); got '{parsed.scheme}'"
+    if parsed.username or parsed.password:
+        return False, "url userinfo is not allowed"
+    try:
+        host = (parsed.hostname or "").rstrip(".").lower()
+    except ValueError as exc:
+        return False, f"invalid url host: {exc}"
     allow = ALLOWED_HOSTS.get(platform, ())
-    if allow and not any(parsed.netloc.endswith(h) for h in allow):
+    if allow and not any(_host_matches(host, allowed) for allowed in allow):
         return False, f"url host '{parsed.netloc}' not in allow-list for {platform}"
     return True, None
 
@@ -157,15 +173,15 @@ def _validate_url(platform, url):
 def _detect_platform(url):
     try:
         parsed = urlparse(url)
-        host = parsed.netloc
+        host = (parsed.hostname or "").rstrip(".").lower()
         pathname = parsed.path.lower()
     except Exception:
         return "meet"
-    if host.endswith("zoom.us") or host.endswith("zoom.com"):
+    if _host_matches(host, "zoom.us") or _host_matches(host, "zoom.com"):
         return "zoom"
-    if host.endswith("teams.microsoft.com") or host.endswith("teams.live.com"):
+    if _host_matches(host, "teams.microsoft.com") or _host_matches(host, "teams.live.com"):
         return "teams"
-    if host.endswith("microsoft.com") and "/microsoft-teams/join-a-meeting" in pathname:
+    if _host_matches(host, "microsoft.com") and "/microsoft-teams/join-a-meeting" in pathname:
         return "teams"
     return "meet"
 
@@ -257,7 +273,7 @@ class MeetingBridge:
         lines = [l for l in result.stdout.strip().splitlines() if l.strip()]
         for line in reversed(lines):
             try:
-                payload = json.loads(line)
+                payload = parse_json_object(line, "meeting join result")
                 if "status" in payload:
                     sys.stderr.write(f"[bridge] join result: {payload}\n")
                     payload.setdefault("join_backend", self._join_backend_label())
@@ -276,7 +292,7 @@ class MeetingBridge:
                     if url_policy:
                         payload.setdefault("url_policy", url_policy)
                     return payload
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, JsonInputError):
                 continue
 
         stderr_snippet = (result.stderr or "")[-400:]
@@ -321,9 +337,9 @@ class MeetingBridge:
                 gen_result = {}
                 for line in reversed(r.stdout.strip().splitlines()):
                     try:
-                        gen_result = json.loads(line)
+                        gen_result = parse_json_object(line, "meeting TTS result")
                         break
-                    except json.JSONDecodeError:
+                    except (json.JSONDecodeError, JsonInputError):
                         continue
                 if gen_result.get("status") not in ("success", "ok"):
                     return _err(f"TTS generation failed: {gen_result.get('message', r.stderr[-200:])}")
@@ -438,8 +454,8 @@ def main():
         sys.exit(1)
 
     try:
-        payload = json.loads(raw_payload)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw_payload, "meeting input")
+    except (json.JSONDecodeError, JsonInputError) as exc:
         print(json.dumps(_err(f"invalid JSON input: {exc}")))
         sys.exit(1)
 

@@ -34,7 +34,7 @@ This instruction set is deliberately split into small, deterministic patches for
 - Discovery, heartbeat expiry, routing, delivery retry, deduplication, dead-lettering, and topic authorization have focused tests.
 - A same-host two-peer end-to-end scenario passes without a live LLM or external network dependency.
 - A recipient can convert an accepted request into a proposed WorkItem or A2A task contract, but no inbound message can start a mission or mutate mission state directly.
-- `pnpm build`, focused tests, `pnpm run check:contract-schemas`, and `pnpm run validate` pass at the release gate.
+- `pnpm build`, focused tests, `pnpm run check -- --scope full --only contract-schemas`, and `pnpm run validate` pass at the release gate.
 - A security review records no unresolved high-severity finding.
 
 ## 3. Non-Goals and Invariants
@@ -391,7 +391,7 @@ Use two same-host test peers with fake clocks and local signed transport:
 Run every command from the repository root (`/Users/famao/kyberion`), where the root `package.json` and workspace configuration are present. Run focused tests after each task. At the release gate run:
 
 ```bash
-pnpm run check:contract-schemas
+pnpm run check -- --scope full --only contract-schemas
 pnpm exec vitest run libs/core/mesh-*.test.ts libs/core/peer-messaging.test.ts libs/core/a2a-bridge.test.ts libs/core/work-coordination*.test.ts
 pnpm build
 pnpm run validate

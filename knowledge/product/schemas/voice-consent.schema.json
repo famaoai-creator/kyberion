@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mission voice consent",
+  "description": "Mission-scoped operator consent for recording and synthesized speech.",
+  "type": "object",
+  "required": [],
+  "properties": {
+    "consent": { "type": "string" },
+    "mission_id": { "type": "string" },
+    "operator_handle": { "type": "string" },
+    "scope": { "type": "string" },
+    "note": { "type": "string" },
+    "tenant_slug": { "type": "string" },
+    "granted_at": { "type": "string" },
+    "revoked_at": { "type": "string" },
+    "expires_at": { "type": "string" },
+    "audit_event_id": { "type": "string" }
+  },
+  "additionalProperties": false
+}

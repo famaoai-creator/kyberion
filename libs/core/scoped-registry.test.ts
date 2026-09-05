@@ -43,7 +43,13 @@ describe('ScopedRegistry', () => {
 
   it('canonicalizes scope keys and rejects empty identifiers', () => {
     expect(canonicalizeScopedRegistryScope({ tenant: ' acme ', mission: ' M-1 ' })).toBe(
-      'tenant=acme|organization=|project=|mission=M-1|task=|session='
+      'tenant_slug=acme|organization_id=|project_id=|mission_id=M-1|task_id=|session='
+    );
+    expect(canonicalizeScopedRegistryScope({ tenant_slug: 'acme', mission_id: 'M-1' })).toBe(
+      'tenant_slug=acme|organization_id=|project_id=|mission_id=M-1|task_id=|session='
+    );
+    expect(() => canonicalizeScopedRegistryScope({ tenant: 'acme', tenant_slug: 'other' })).toThrow(
+      '[SCOPED_REGISTRY_SCOPE] conflicting values'
     );
     const registry = new ScopedRegistry<string>();
     expect(() => registry.register({ tenant: 'acme' }, ' ', 'value')).toThrow(

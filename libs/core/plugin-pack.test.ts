@@ -7,10 +7,18 @@ import {
   importPluginPack,
   listPackImportRecords,
   loadPluginPackRegistry,
+  loadPluginPackRegistryAtPath,
+  normalizePackImportRecord,
   packIdFromUrl,
 } from './plugin-pack.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 describe('plugin packs (QM-07)', () => {
   describe('assertSafePackUrl', () => {
@@ -41,6 +49,32 @@ describe('plugin packs (QM-07)', () => {
     );
   });
 
+  it('normalizes persisted import records and rejects malformed shapes', () => {
+    expect(normalizePackImportRecord([])).toBeUndefined();
+    expect(
+      normalizePackImportRecord({
+        pack_id: 'pack',
+        at: 'now',
+        ok: true,
+        url: 'https://github.com/acme/pack',
+        installed: ['plugin-a'],
+        archived: [],
+        skipped: [{ plugin_id: 'plugin-b', reason: 'collision' }],
+      })
+    ).toMatchObject({ pack_id: 'pack', installed: ['plugin-a'] });
+    expect(
+      normalizePackImportRecord({
+        pack_id: 'pack',
+        at: 'now',
+        ok: 'true',
+        url: 'https://github.com/acme/pack',
+        installed: [],
+        archived: [],
+        skipped: [],
+      })
+    ).toBeUndefined();
+  });
+
   describe('import lifecycle against a local fixture', () => {
     let fixtureDir: string;
     let registryDir: string;
@@ -63,6 +97,30 @@ describe('plugin packs (QM-07)', () => {
       safeMkdir(fixtureDir, { recursive: true });
       writePlugin('pack-plugin-a');
       writePlugin('pack-plugin-b');
+    });
+
+    it('validates the persisted registry and rejects unknown fields', () => {
+      const filePath = path.join(registryDir, 'packs.json');
+      safeMkdir(registryDir, { recursive: true });
+      safeWriteFile(filePath, JSON.stringify({ version: '1', packs: [], unexpected: true }));
+      try {
+        expect(() => loadPluginPackRegistryAtPath(filePath)).toThrow(/Invalid catalog/);
+        expect(loadPluginPackRegistry(registryDir)).toEqual({ version: '1', packs: [] });
+      } finally {
+        safeRmSync(registryDir, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects a directory at the persisted registry path', () => {
+      const filePath = path.join(registryDir, 'packs.json');
+      safeMkdir(filePath, { recursive: true });
+      try {
+        expect(() => loadPluginPackRegistryAtPath(filePath)).toThrow(
+          'registry must be a regular file'
+        );
+      } finally {
+        safeRmSync(registryDir, { recursive: true, force: true });
+      }
     });
 
     afterEach(() => {
@@ -188,6 +246,18 @@ describe('plugin packs (QM-07)', () => {
       }
     });
 
+    it('skips malformed persisted import lines when listing history', () => {
+      doImport();
+      const importLog = path.join(registryDir, 'pack-imports.jsonl');
+      const current = String(safeReadFile(importLog, { encoding: 'utf8' }));
+      safeWriteFile(
+        importLog,
+        `${current}${JSON.stringify([])}\n${JSON.stringify({ ok: true })}\n{"meta":{"__proto__":{}}}\n`
+      );
+
+      expect(listPackImportRecords(10, registryDir)).toHaveLength(1);
+    });
+
     it('discovers plugins at root, subdirs and plugins/ layouts', () => {
       const nested = pathResolver.sharedTmp(`qm07-nested-${randomUUID()}`);
       safeMkdir(path.join(nested, 'plugins', 'inner-plugin'), { recursive: true });
@@ -222,6 +292,20 @@ describe('plugin packs (QM-07)', () => {
       }
     });
 
+    it('does not use a symlinked manifest during pack discovery', () => {
+      const root = pathResolver.sharedTmp(`qm07-symlink-manifest-${randomUUID()}`);
+      const target = pathResolver.sharedTmp(`qm07-symlink-manifest-target-${randomUUID()}.json`);
+      safeMkdir(root, { recursive: true });
+      safeWriteFile(target, JSON.stringify({ name: 'outside-manifest' }));
+      safeSymlinkSync(target, path.join(root, 'plugin.json'));
+      try {
+        expect(discoverPackPluginDirs(root)).toEqual([]);
+      } finally {
+        safeRmSync(root, { recursive: true, force: true });
+        safeRmSync(target, { force: true });
+      }
+    });
+
     it('imports a local portable root package using its manifest name', () => {
       const portable = pathResolver.sharedTmp(`qm07-portable-import-${randomUUID()}`);
       const localRegistry = pathResolver.sharedTmp(`qm07-portable-registry-${randomUUID()}`);
@@ -249,5 +333,26 @@ describe('plugin packs (QM-07)', () => {
         safeRmSync(localManagedRoot, { recursive: true, force: true });
       }
     });
+  });
+
+  it('rejects a registry directory that traverses a symbolic link', () => {
+    const target = pathResolver.sharedTmp(`qm07-registry-target-${randomUUID()}`);
+    const linked = pathResolver.sharedTmp(`qm07-registry-link-${randomUUID()}`);
+    const fileTarget = pathResolver.sharedTmp(`qm07-registry-file-target-${randomUUID()}.json`);
+    const fileLinkDir = pathResolver.sharedTmp(`qm07-registry-file-link-${randomUUID()}`);
+    safeMkdir(target, { recursive: true });
+    safeSymlinkSync(target, linked, 'dir');
+    safeMkdir(fileLinkDir, { recursive: true });
+    safeWriteFile(fileTarget, JSON.stringify({ version: '1', packs: [] }));
+    safeSymlinkSync(fileTarget, path.join(fileLinkDir, 'packs.json'));
+    try {
+      expect(() => loadPluginPackRegistry(linked)).toThrow(/RESOURCE_PATH_SYMLINK/);
+      expect(() => loadPluginPackRegistry(fileLinkDir)).toThrow(/RESOURCE_PATH_SYMLINK/);
+    } finally {
+      safeRmSync(linked, { recursive: true, force: true });
+      safeRmSync(target, { recursive: true, force: true });
+      safeRmSync(fileLinkDir, { recursive: true, force: true });
+      safeRmSync(fileTarget, { recursive: true, force: true });
+    }
   });
 });

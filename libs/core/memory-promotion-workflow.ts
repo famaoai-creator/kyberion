@@ -21,6 +21,7 @@ import {
   updateMemoryPromotionCandidateStatus,
 } from './memory-promotion-queue.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import type { MemoryScopeEnvelope } from './memory-scope.js';
 import { normalizeMemoryFact } from './memory-notebook.js';
 import {
@@ -99,7 +100,7 @@ function formatKnowledgeMatch(match: PromotionKnowledgeMatch, index: number): st
 }
 
 async function inspectPromotionReview(candidate: MemoryCandidate): Promise<PromotionReview> {
-  const reviewedAt = new Date().toISOString();
+  const reviewedAt = nowIso();
   try {
     const index = await buildScopedIndex(promotionKnowledgeScope(candidate));
     const similar = await queryKnowledgeHybrid(index, candidate.summary, {
@@ -327,7 +328,7 @@ function buildDistillCandidateFromMemoryCandidate(
 
 function defaultPromotionReview(): PromotionReview {
   return {
-    reviewed_at: new Date().toISOString(),
+    reviewed_at: nowIso(),
     backend: getReasoningBackend().name,
     similar_knowledge: [],
   };

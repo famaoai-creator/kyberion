@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { TraceContext } from '@agent/core';
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   createPipelineRunJournal,
@@ -10,6 +10,7 @@ import {
   loadPipelineRunJournal,
   approvalRequestLogicalPath,
   safeRmSync,
+  safeWriteFile,
   withExecutionContext,
   getDefaultLifecycleHookEngine,
   resetDefaultLifecycleHookEngine,
@@ -35,7 +36,26 @@ const {
   buildReasoningPolicyNote,
   isReasoningBudgetExceeded,
   findStepByIdRecursive,
+  resolvePipelinePresetArgs,
 } = await import(new URL('./run_pipeline.js', import.meta.url).href);
+
+describe('pipeline preset routing', () => {
+  it('expands governed preset names into the existing input contract', () => {
+    expect(resolvePipelinePresetArgs(['vital-check', '--json'])).toEqual([
+      '--input',
+      'pipelines/vital-check.json',
+      '--json',
+    ]);
+  });
+
+  it('preserves explicit input and unknown arguments', () => {
+    expect(resolvePipelinePresetArgs(['--input', 'pipelines/custom.json'])).toEqual([
+      '--input',
+      'pipelines/custom.json',
+    ]);
+    expect(resolvePipelinePresetArgs(['unknown-preset'])).toEqual(['unknown-preset']);
+  });
+});
 
 describe('findStepByIdRecursive', () => {
   it('finds a step nested inside core:if/core:foreach/on_error.fallback by id', () => {
@@ -118,6 +138,7 @@ describe('run_pipeline compatibility', () => {
       {
         context: { greeting: 'hello' },
         quiet: true,
+        trustResolved: true,
         trace: new TraceContext('pipeline:library-entry', { pipelineId: 'library-entry' }),
       }
     );
@@ -125,6 +146,41 @@ describe('run_pipeline compatibility', () => {
     expect(result.status).toBe('succeeded');
     expect(result.context.fragment_result).toBe('hello from fragment');
     expect(result.context.trace_persisted_path).toContain('active/shared/logs/traces/');
+  });
+
+  it('propagates an unresolved trust decision before importing workflow modules', async () => {
+    await expect(
+      executePipelineFile('scripts/demos/workflow-as-code-example.ts', {
+        quiet: true,
+        trustResolved: false,
+      })
+    ).rejects.toThrow('[TRUST_REQUIRED] project-local pipeline/template');
+  });
+
+  it('does not let a nested pipeline widen an unresolved parent trust decision', async () => {
+    const parentPath = pathResolver.sharedTmp(`run-pipeline-trust-propagation-${process.pid}.json`);
+    safeWriteFile(
+      parentPath,
+      JSON.stringify({
+        pipeline_id: 'trust-propagation-parent',
+        steps: [
+          {
+            op: 'core:run_pipeline',
+            params: { input: 'pipelines/vital-check.json', export_as: 'nested_result' },
+          },
+        ],
+      })
+    );
+    try {
+      await expect(
+        executePipelineFile(parentPath, {
+          quiet: true,
+          trustResolved: false,
+        })
+      ).rejects.toThrow('[TRUST_REQUIRED] project-local pipeline/template');
+    } finally {
+      safeRmSync(parentPath);
+    }
   });
 
   it('persists a recovered fallback as one successful causal trace', () => {
@@ -280,6 +336,11 @@ describe('run_pipeline compatibility', () => {
     journal.append('run_resumed', { resumed_at: new Date().toISOString() });
     const approval = loadApprovalRequest('pipeline-approval', suspension.approval_request_id);
     expect(approval?.status).toBe('pending');
+    expect(approval?.requestedByContext).toMatchObject({
+      actorId: `pipeline:${runId}`,
+      pipelineRunId: runId,
+      stepId: 'approval',
+    });
     decideApprovalRequest('mission_controller', {
       channel: 'pipeline-approval',
       requestId: suspension.approval_request_id,
@@ -510,6 +571,21 @@ describe('run_pipeline compatibility', () => {
     expect(result.context.reconcile_result).toEqual({
       summary_line: '[UNHANDLED-INTENT] unreconciled=3 top=hello (2)',
     });
+  });
+
+  it('preserves shell output as text when JSON contains a dangerous key', async () => {
+    const result = await runSteps([
+      {
+        op: 'shell',
+        params: {
+          cmd: 'printf %s \'{"constructor":{}}\'',
+          export_as: 'shell_result',
+        },
+      },
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.shell_result).toBe('{"constructor":{}}');
   });
 
   it('resolves shell env values from context before execution', async () => {
@@ -1355,7 +1431,7 @@ describe('Typed Flow role resolution', () => {
       pathResolver.rootDir(),
       'scripts/demos/workflow-as-code-example.ts'
     );
-    const workflow = await readValidatedWorkflowAdf(workflowPath);
+    const workflow = await readValidatedWorkflowAdf(workflowPath, { trustResolved: true });
     const result = await runSteps(workflow.steps, workflow.context ?? {});
 
     expect(result.status).toBe('succeeded');

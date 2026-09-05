@@ -6,7 +6,7 @@
  * remains for direct CLI use (`--task-events/--supervisor-events/--output/--json`).
  */
 
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   buildTaskRoutingSamples,
   runTaskModelRoutingSummary,
@@ -14,7 +14,7 @@ import {
   writeTaskRoutingSummary,
   type TaskRoutingSample,
   type TaskRoutingSummaryRow,
-} from '@agent/core';
+} from '@agent/core/report-ops';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export {
@@ -44,7 +44,12 @@ function argValue(argv: string[], name: string): string | undefined {
   return argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined;
 }
 
-export function main(argv: string[] = []): void {
+export const TASK_MODEL_ROUTING_USAGE =
+  'Usage: pnpm task:summarize-model-routing [--task-events <path>] [--supervisor-events <path>] [--output <path>] [--json]';
+
+export function main(argv: string[] = []): { output?: unknown; help?: string } {
+  if (argv.includes('--help') || argv.includes('-h')) return { help: TASK_MODEL_ROUTING_USAGE };
+
   const jsonOnly = argv.includes('--json');
   const outputPathArg = argValue(argv, '--output');
 
@@ -57,34 +62,33 @@ export function main(argv: string[] = []): void {
 
   if (jsonOnly) {
     if (!outputPathArg) {
-      console.log(JSON.stringify({ samples, rows }, null, 2));
+      return { output: { samples, rows } };
     } else {
-      console.log(outputPath);
+      return { output: outputPath };
     }
-    return;
   }
 
   if (outputPathArg) {
-    console.log(`Task model routing summary written to ${outputPath}`);
+    return { output: `Task model routing summary written to ${outputPath}` };
   } else {
-    console.log(
-      'team_role           tier       samp  dur(ms)  in_tok  out_tok  tot_tok  rework  actual_models'
-    );
-    console.log(
-      '----------------------------------------------------------------------------------------------'
-    );
-    for (const row of rows) {
-      console.log(formatRow(row));
-    }
-    console.log('');
-    console.log(`samples=${samples.length} groups=${rows.length}`);
+    const lines = [
+      'team_role           tier       samp  dur(ms)  in_tok  out_tok  tot_tok  rework  actual_models',
+      '----------------------------------------------------------------------------------------------',
+    ];
+    lines.push(...rows.map(formatRow), '', `samples=${samples.length} groups=${rows.length}`);
+    return { output: lines.join('\n') };
   }
 }
 
 export const runSummarizeTaskModelRouting = defineScript({
   name: 'task:summarize-model-routing',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json'],
+  run: ({ argv, json, print }) => {
+    const result = main(argv);
+    if (result.help) print(json ? result : result.help);
+    else if (result.output !== undefined) print(result.output);
+    return result;
+  },
 });
 
 if (

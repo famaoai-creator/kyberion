@@ -28,6 +28,11 @@ export interface MissionControlPayload {
   requested_by_surface?: 'chronos';
 }
 
+/** Internal payload for the explicit post-restart goal-worker recovery event. */
+export interface MissionWorkerRecoveryPayload {
+  operation: 'resume_goal_driven';
+}
+
 export interface SurfaceControlPayload {
   operation: 'reconcile' | 'status' | 'start' | 'stop';
   surfaceId?: string;
@@ -89,6 +94,8 @@ export interface PlannedNextTask {
   };
   /** Opt-in autonomous goal-driven execution. */
   goal_driven?: boolean;
+  /** PI-14: explicit execution mode for a goal-driven worker. */
+  drive?: 'automatic' | 'manual';
   /** Opt-in multi-turn goal budgets, honored only when goal_driven is enabled. */
   goal_budget?: {
     tokenBudget?: number;

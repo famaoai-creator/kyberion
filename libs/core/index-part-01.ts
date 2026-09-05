@@ -26,6 +26,8 @@ export * from './wire-error.js';
 
 export * from './trust-requiring-resources.js';
 
+export * from './project-trust.js';
+
 export * from './resource-provenance.js';
 
 export * from './skill-resource-loader.js';
@@ -164,9 +166,19 @@ export {
 
 export { resolveTenantDesign } from './tenant-design-resolver.js';
 
+export * from './channel-registry.js';
+
 export * from './creative-design-resolver.js';
 
+export * from './brand-tokens.js';
+
+export * from './golden-output.js';
+
+export * from './documentation-source-map.js';
+
 export * from './campaign-suite.js';
+
+export * from './config-mission.js';
 
 export * from './marketing-workload.js';
 
@@ -295,6 +307,7 @@ export * from './adf-lifecycle.js';
 export * from './channel-adapter.js';
 
 export * from './actuator-sdk.js';
+export * from './actuator-op-discovery.js';
 export * from './pipeline-input-contract.js';
 export * from './super-nerve-execution-port.js';
 

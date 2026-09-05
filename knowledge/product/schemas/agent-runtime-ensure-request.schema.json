@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/agent-runtime-ensure-request.schema.json",
+  "title": "Agent Runtime Ensure Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "mission_id", "scope", "requested_by", "created_at"],
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "scope": { "$ref": "#/definitions/agent_runtime_scope" },
+    "team_roles": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "requested_by": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string" },
+    "created_at": { "type": "string", "minLength": 1 }
+  },
+  "definitions": {
+    "agent_runtime_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope_kind": {
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "organization_id": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string", "minLength": 1 },
+        "session_id": { "type": "string", "minLength": 1 },
+        "work_shape": { "type": "string", "minLength": 1 },
+        "customer_stance": { "type": "string", "minLength": 1 },
+        "viewer_principal": { "type": "string", "minLength": 1 },
+        "nhi_id": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

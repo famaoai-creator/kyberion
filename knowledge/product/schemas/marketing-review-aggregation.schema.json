@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "marketing-review-aggregation.schema.json",
+  "title": "Marketing review aggregation result",
+  "description": "Persisted, hash-bound result of the independent marketing review aggregation step.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "risk_level",
+    "gate",
+    "reviews",
+    "blocking_findings",
+    "ready_for_approval",
+    "evidence"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "risk_level": { "type": "integer", "minimum": 0, "maximum": 4 },
+    "gate": { "$ref": "#/$defs/gate_result" },
+    "reviews": {
+      "type": "array",
+      "items": { "$ref": "./marketing-review.schema.json" }
+    },
+    "blocking_findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/blocking_finding" }
+    },
+    "ready_for_approval": { "type": "boolean" },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "gate_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "status", "reasons", "evidence"],
+      "properties": {
+        "gate_id": { "type": "string", "enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"] },
+        "status": { "type": "string", "enum": ["passed", "failed"] },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "evidence": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "blocking_finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["review_id", "severity", "category", "description"],
+      "properties": {
+        "review_id": { "type": "string", "minLength": 1 },
+        "severity": { "const": "blocking" },
+        "category": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "required_action": { "type": "string" },
+        "location": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    }
+  }
+}

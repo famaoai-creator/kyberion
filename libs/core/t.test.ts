@@ -41,7 +41,7 @@ describe('t() (I18N-02 type-safe rendering entry point)', () => {
       'There are 3 more clarification items.'
     );
     expect(t('cli_error_unknown_command', { command: 'frobnicate' }, 'en')).toBe(
-      'Unknown command "frobnicate". Try `npm run cli -- help`.'
+      'Unknown command "frobnicate". Try `pnpm kyberion help`.'
     );
   });
 

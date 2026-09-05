@@ -1,10 +1,11 @@
-import { withCatalogInputContract } from '@agent/core';
+import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
 
 // AR-02: self-described op catalog — the single source the registry and
 // discovery index are generated from. Keep in sync with the dispatch
 // switches in the pipeline helpers; check:op-registry fails on drift.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 const NETWORK_CONTROL_SCHEMA: InputSchema = {
@@ -162,7 +163,7 @@ export const NETWORK_ACTUATOR_APPLY_OPS = [
 
 export const NETWORK_ACTUATOR_CONTROL_OPS = ['if', 'while'] as const;
 
-const toSpec = (op: string, kind: OpSpecKind) => {
+const toSpec = (op: string, kind: PipelineStepType) => {
   const schema = NETWORK_CONTRACTS[op];
   const description = schema
     ? { op, kind, input_schema: schema, examples: NETWORK_EXAMPLES[op] || [{}] }
@@ -170,7 +171,7 @@ const toSpec = (op: string, kind: OpSpecKind) => {
   return withCatalogInputContract('network', op, kind, description);
 };
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...NETWORK_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...NETWORK_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

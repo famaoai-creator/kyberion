@@ -14,6 +14,11 @@
       "description": "Intent-loop stage at snapshot time: receive | clarify | preserve | execute | verify | learn. Kyberion mission stages (intake / classification / ... / retrospective) map onto these.",
       "minLength": 1
     },
+    "kind": {
+      "type": "string",
+      "enum": ["origin", "current"],
+      "description": "Whether this snapshot establishes the intent baseline or records the current intent."
+    },
     "created_at": { "type": "string", "format": "date-time" },
     "source": {
       "type": "string",

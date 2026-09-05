@@ -1,24 +1,32 @@
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual-audio-output-playback-bridge';
+import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
 import {
-  buildGovernedRetryOptions,
-  createVirtualAudioOutputPlaybackBridge,
-  createVirtualDeviceInventoryBridge,
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
-  logger,
-  pathResolver,
   resolveVoiceEngineForPlatform,
-  resolveManagedToolPythonBin,
+} from '@agent/core/voice-engine-registry';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveManagedToolPythonBin } from '@agent/core/tool-runtime-registry';
+import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeLstat,
   safeStat,
-  retry,
-  VoiceGenerationRuntime,
-  waitForJob,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { retry } from '@agent/core/async-utils';
+import { VoiceGenerationRuntime } from '@agent/core/voice-generation-runtime';
+import { waitForJob } from '@agent/core/job-lifecycle';
+import { getRegisteredEnvText, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
+import type {
+  SpeechToTextCapabilities,
+  TranscriptSegment,
+} from '@agent/core/speech-to-text-bridge';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
@@ -30,16 +38,78 @@ const DEFAULT_VOICE_RETRY = {
   factor: 2,
   jitter: true,
 };
-export function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: VOICE_MANIFEST_PATH,
-    defaults: DEFAULT_VOICE_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: VOICE_MANIFEST_PATH,
+  defaults: DEFAULT_VOICE_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 type VoicePythonTool = 'mlx_audio' | 'mlx_whisper' | 'faster_whisper' | 'kokoro_tts' | 'pocket_tts';
+
+export interface VoiceSttBridgeResponse {
+  status: 'success' | 'error';
+  text?: string;
+  language?: string;
+  model?: string;
+  capabilities?: SpeechToTextCapabilities;
+  segments?: TranscriptSegment[];
+  error?: string;
+}
+
+export function parseVoiceSttBridgeResponse(value: unknown): VoiceSttBridgeResponse | undefined {
+  if (!isRecord(value) || (value.status !== 'success' && value.status !== 'error')) {
+    return undefined;
+  }
+  if (value.text !== undefined && typeof value.text !== 'string') return undefined;
+  if (value.language !== undefined && typeof value.language !== 'string') return undefined;
+  if (value.model !== undefined && typeof value.model !== 'string') return undefined;
+  if (value.error !== undefined && typeof value.error !== 'string') return undefined;
+
+  let capabilities: SpeechToTextCapabilities | undefined;
+  if (value.capabilities !== undefined) {
+    const candidate = value.capabilities;
+    if (!isRecord(candidate) || typeof candidate.timestamps !== 'boolean') return undefined;
+    const granularity = candidate.granularity;
+    if (granularity !== 'none' && granularity !== 'segment' && granularity !== 'word') {
+      return undefined;
+    }
+    capabilities = {
+      timestamps: candidate.timestamps,
+      granularity,
+      ...(typeof candidate.local_only === 'boolean' ? { local_only: candidate.local_only } : {}),
+      ...(typeof candidate.confidence === 'boolean' ? { confidence: candidate.confidence } : {}),
+    };
+  }
+
+  let segments: TranscriptSegment[] | undefined;
+  if (value.segments !== undefined) {
+    if (!Array.isArray(value.segments)) return undefined;
+    segments = value.segments.flatMap((candidate): TranscriptSegment[] => {
+      if (!isRecord(candidate)) return [];
+      if (
+        typeof candidate.start_sec !== 'number' ||
+        !Number.isFinite(candidate.start_sec) ||
+        typeof candidate.end_sec !== 'number' ||
+        !Number.isFinite(candidate.end_sec) ||
+        typeof candidate.text !== 'string'
+      ) {
+        return [];
+      }
+      return [{ start_sec: candidate.start_sec, end_sec: candidate.end_sec, text: candidate.text }];
+    });
+  }
+
+  if (value.status === 'success' && typeof value.text !== 'string') return undefined;
+  return {
+    status: value.status,
+    ...(typeof value.text === 'string' ? { text: value.text } : {}),
+    ...(typeof value.language === 'string' ? { language: value.language } : {}),
+    ...(typeof value.model === 'string' ? { model: value.model } : {}),
+    ...(capabilities ? { capabilities } : {}),
+    ...(segments ? { segments } : {}),
+    ...(typeof value.error === 'string' ? { error: value.error } : {}),
+  };
+}
 
 function resolvePythonBin(preferredTool: VoicePythonTool = 'mlx_audio'): string {
   const configuredPythonBin = getRegisteredEnvText('KYBERION_PYTHON_BIN');
@@ -85,12 +155,20 @@ function resolveProfileRefAudio(profile?: any): string | undefined {
   if (!profile) return undefined;
   const samples: string[] = profile.sample_refs || [];
   if (samples.length === 0) return undefined;
-  const absPath = pathResolver.rootResolve(samples[0]);
-  return absPath;
+  const candidate = assertSafeRepositoryPath(pathResolver.rootResolve(samples[0]), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(candidate) || !safeLstat(candidate).isFile()) {
+    throw new Error(`Voice reference audio must be an existing regular file: ${candidate}`);
+  }
+  return candidate;
 }
 
 function resolveRefTranscript(refAudioPath: string): string | undefined {
-  const sidecarPath = `${refAudioPath}.transcript.txt`;
+  const sidecarPath = assertSafeRepositoryPath(`${refAudioPath}.transcript.txt`, {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(sidecarPath) || !safeLstat(sidecarPath).isFile()) return undefined;
   try {
     const content = safeReadFile(sidecarPath, { encoding: 'utf8' });
     return typeof content === 'string' ? content.trim() : undefined;
@@ -106,8 +184,15 @@ function resolveArtifactPath(
 ): string {
   const requestedPath =
     typeof outputPath === 'string' && outputPath.trim() ? outputPath.trim() : null;
-  if (requestedPath) return pathResolver.rootResolve(requestedPath);
-  return pathResolver.sharedTmp(`voice-generation/${requestId}.${format}`);
+  if (requestedPath) {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(requestedPath), {
+      allowMissingLeaf: true,
+    });
+  }
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`voice-generation/${requestId}.${format}`),
+    { allowMissingLeaf: true }
+  );
 }
 
 function parseTrailingJson(raw: string): any {
@@ -115,7 +200,7 @@ function parseTrailingJson(raw: string): any {
     const trimmed = line.trim();
     if (!trimmed.startsWith('{')) continue;
     try {
-      return JSON.parse(trimmed);
+      return parseSafeJsonInput(trimmed, 'voice bridge response');
     } catch {
       continue;
     }
@@ -132,7 +217,13 @@ async function runPythonTtsBridge(
   runtimeId: VoicePythonTool = 'mlx_audio',
   voice?: string
 ): Promise<void> {
-  const bridgeScript = pathResolver.rootResolve(bridgeScriptPath);
+  const bridgeScript = assertSafeRepositoryPath(pathResolver.rootResolve(bridgeScriptPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(bridgeScript) || !safeLstat(bridgeScript).isFile()) {
+    throw new Error(`Voice bridge script must be an existing regular file: ${bridgeScript}`);
+  }
+  const safeOutputPath = assertSafeRepositoryPath(outputPath, { allowMissingLeaf: true });
 
   const refAudio = resolveProfileRefAudio(profile);
   const refText = refAudio ? resolveRefTranscript(refAudio) : undefined;
@@ -141,7 +232,7 @@ async function runPythonTtsBridge(
     action: 'generate',
     params: {
       text,
-      output_path: outputPath,
+      output_path: safeOutputPath,
       lang_code: language.trim().toLowerCase().startsWith('ja') ? 'ja' : 'en',
       ...(voice ? { voice } : {}),
       ...(refAudio ? { ref_audio: refAudio } : {}),
@@ -170,7 +261,7 @@ async function runPythonTtsBridge(
   }
 
   // Auto-trim output based on text duration from end (remove reference audio context)
-  if (refAudio && safeExistsSync(outputPath)) {
+  if (refAudio && safeExistsSync(safeOutputPath) && safeLstat(safeOutputPath).isFile()) {
     try {
       const probeTotal = safeExec('ffprobe', [
         '-v',
@@ -179,25 +270,27 @@ async function runPythonTtsBridge(
         'format=duration',
         '-of',
         'default=noprint_wrappers=1:nokey=1',
-        outputPath,
+        safeOutputPath,
       ]).trim();
       const totalDuration = parseFloat(probeTotal);
       const estimatedDuration = Math.min(totalDuration, text.length / 5.5 + 0.6);
 
       if (Number.isFinite(totalDuration) && totalDuration > estimatedDuration) {
-        const tempPath = `${outputPath}.tmp.wav`;
+        const tempPath = assertSafeRepositoryPath(`${safeOutputPath}.tmp.wav`, {
+          allowMissingLeaf: true,
+        });
         safeExec('ffmpeg', [
           '-y',
           '-sseof',
           `-${estimatedDuration.toFixed(2)}`,
           '-i',
-          outputPath,
+          safeOutputPath,
           '-c',
           'copy',
           tempPath,
         ]);
-        if (safeExistsSync(tempPath)) {
-          safeExec('mv', [tempPath, outputPath]);
+        if (safeExistsSync(tempPath) && safeLstat(tempPath).isFile()) {
+          safeExec('mv', [tempPath, safeOutputPath]);
           logger.info(
             `[VOICE_CLONE] Trimmed context reference speech, kept target text speech of ${estimatedDuration.toFixed(2)}s from end.`
           );
@@ -342,7 +435,11 @@ function resolveVoicePlaybackAdapter(platform: NodeJS.Platform): VoicePlaybackPl
 }
 
 function openPlaybackArtifact(artifactPath: string): void {
-  resolveVoicePlaybackAdapter(process.platform).openArtifact(artifactPath);
+  const safeArtifactPath = assertSafeRepositoryPath(artifactPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeArtifactPath) || !safeLstat(safeArtifactPath).isFile()) {
+    throw new Error(`Voice playback artifact must be an existing regular file: ${artifactPath}`);
+  }
+  resolveVoicePlaybackAdapter(process.platform).openArtifact(safeArtifactPath);
 }
 
 async function renderWithEspeakNg(
@@ -413,7 +510,7 @@ async function isRenderableAudioArtifact(artifactPath: string): Promise<boolean>
   }
 
   try {
-    if (safeStat(artifactPath).size < 1024) {
+    if (!safeLstat(artifactPath).isFile() || safeStat(artifactPath).size < 1024) {
       return false;
     }
   } catch {
@@ -600,8 +697,11 @@ async function performPlayback(
   }
 
   if (engine.bridge_script && process.platform !== 'darwin') {
-    const tmpPath =
-      playbackSourcePath || pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
+    const tmpPath = playbackSourcePath
+      ? assertSafeRepositoryPath(playbackSourcePath, { allowMissingLeaf: true })
+      : assertSafeRepositoryPath(pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`), {
+          allowMissingLeaf: true,
+        });
     await retry(async () => {
       if (!playbackSourcePath) {
         await runPythonTtsBridge(
@@ -623,7 +723,9 @@ async function performPlayback(
   }
 
   if (process.platform === 'darwin') {
-    const playbackSource = playbackSourcePath || (await renderVoicePlaybackSource(text, options));
+    const playbackSource = playbackSourcePath
+      ? assertSafeRepositoryPath(playbackSourcePath, { allowMissingLeaf: true })
+      : await renderVoicePlaybackSource(text, options);
     const bridge = createVirtualAudioOutputPlaybackBridge({
       inventory_bridge: createVirtualDeviceInventoryBridge(),
     });

@@ -6,9 +6,17 @@
  * triggered the run.
  */
 
-import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 interface Args {
   ref: string;
@@ -44,14 +52,30 @@ function parseArgs(argv: string[]): Args {
   return { ref, input, output };
 }
 
-function printUsage(): void {
-  console.log(
+function printUsage(print: Print): void {
+  print(
     'Usage: pnpm extract-changelog-section --ref <tag-or-version> [--input CHANGELOG.md] [--output <file>]'
   );
 }
 
 function normalizeRef(ref: string): string {
   return ref.trim().replace(/^v/i, '');
+}
+
+function resolveInputPath(filePath: string): string {
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(filePath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
+    throw new Error(`CHANGELOG must be an existing regular file: ${filePath}`);
+  }
+  return resolved;
+}
+
+function resolveOutputPath(filePath: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(filePath), {
+    allowMissingLeaf: true,
+  });
 }
 
 function extractReleaseSection(changelog: string, ref: string): string {
@@ -86,27 +110,26 @@ function extractReleaseSection(changelog: string, ref: string): string {
   return lines.slice(startIndex, endIndex).join('\n').trimEnd() + '\n';
 }
 
-function main(argv: string[]): void {
+function main(argv: string[], print: Print = () => undefined): void {
   const args = parseArgs(argv);
   if (args.help) {
-    printUsage();
+    printUsage(print);
     return;
   }
-  const changelogPath = pathResolver.rootResolve(args.input);
-  if (!safeExistsSync(changelogPath)) {
-    throw new Error(`CHANGELOG not found: ${path.relative(pathResolver.rootDir(), changelogPath)}`);
-  }
+  const changelogPath = resolveInputPath(args.input);
 
   const changelog = safeReadFile(changelogPath, { encoding: 'utf8' }) as string;
   const section = extractReleaseSection(changelog, args.ref);
 
   if (args.output) {
-    safeWriteFile(args.output, section, { encoding: 'utf8' });
-    console.log(`✅ wrote release notes to ${args.output}`);
+    safeWriteFile(resolveOutputPath(args.output), section, { encoding: 'utf8' });
+    print(`✅ wrote release notes to ${args.output}`);
     return;
   }
 
-  process.stdout.write(section);
+  // defineScript's printer appends one line ending, so avoid duplicating the
+  // extractor's canonical trailing line ending in the rendered CLI output.
+  print(section.trimEnd());
 }
 
 if (
@@ -117,8 +140,8 @@ if (
     name: 'extract:changelog-section',
     flags: [],
     run(context) {
-      return main(context.argv);
+      return main(context.argv, context.print);
     },
   })();
 
-export { extractReleaseSection, normalizeRef };
+export { extractReleaseSection, normalizeRef, resolveInputPath, resolveOutputPath };

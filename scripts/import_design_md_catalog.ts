@@ -1,13 +1,15 @@
-import {
-  createStandardYargs,
-  pathResolver,
-  safeLstat,
-  safeMkdir,
-  safeReaddir,
-  safeWriteFile,
-} from '@agent/core';
-import { readTextFile } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { pathResolver } from '@agent/core/path-resolver';
+import { nowIso, parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
 import * as path from 'node:path';
+import {
+  defineGenerator,
+  isDirectScript,
+  stripSharedScriptFlags,
+  type GeneratedFile,
+  type ScriptContext,
+} from './lib/harness.js';
 
 type CollectionEntry = {
   slug: string;
@@ -44,12 +46,15 @@ type ImportedDesign = {
 const SOURCE_REPO = 'https://github.com/VoltAgent/awesome-design-md';
 const DEFAULT_SOURCE_DIR = 'active/shared/tmp/awesome-design-md/design-md';
 const README_PATH = 'active/shared/tmp/awesome-design-md/README.md';
-const THEMES_OUTPUT =
+const THEMES_OUTPUT_REL =
   'knowledge/public/design-patterns/media-templates/themes/design-md-imports.json';
-const SYSTEMS_OUTPUT =
+const SYSTEMS_OUTPUT_REL =
   'knowledge/public/design-patterns/media-templates/media-design-systems/design-md-imports.json';
-const INDEX_OUTPUT =
+const INDEX_OUTPUT_REL =
   'knowledge/public/design-patterns/media-templates/design-md-catalog/index.json';
+const THEMES_OUTPUT = pathResolver.rootResolve(THEMES_OUTPUT_REL);
+const SYSTEMS_OUTPUT = pathResolver.rootResolve(SYSTEMS_OUTPUT_REL);
+const INDEX_OUTPUT = pathResolver.rootResolve(INDEX_OUTPUT_REL);
 
 function walkDesignMdDirs(rootDir: string): string[] {
   const result: string[] = [];
@@ -382,8 +387,30 @@ function importDesignMd(
   };
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+function resolveInputPath(input: string, label: string): string {
+  const resolved = assertSafeRepositoryPath(pathResolver.resolve(input), {
+    allowMissingLeaf: true,
+  });
+  if (!safeLstatSafe(resolved)) throw new Error(`${label} does not exist: ${resolved}`);
+  return resolved;
+}
+
+function normalizeGeneratedContent(content: string): string {
+  try {
+    const value = parseSafeJsonObjectInput(content, 'design catalog generated output') || {};
+    delete value.generated_at;
+    return JSON.stringify(value);
+  } catch {
+    return content;
+  }
+}
+
+async function renderImportDesignMdCatalog(context: ScriptContext): Promise<GeneratedFile[]> {
+  const argv = await createStandardYargs([
+    'node',
+    'import_design_md_catalog',
+    ...stripSharedScriptFlags(context.argv),
+  ])
     .option('source', {
       type: 'string',
       default: DEFAULT_SOURCE_DIR,
@@ -396,8 +423,13 @@ async function main(): Promise<void> {
     })
     .parse();
 
-  const sourceDir = path.resolve(pathResolver.rootDir(), String(argv.source));
-  const readmePath = path.resolve(pathResolver.rootDir(), String(argv.readme));
+  const sourceDir = resolveInputPath(String(argv.source), 'DESIGN_SOURCE');
+  if (!safeLstatSafe(sourceDir)?.isDirectory()) {
+    throw new Error(`DESIGN_SOURCE is not a directory: ${sourceDir}`);
+  }
+  const readmePath = assertSafeRepositoryPath(pathResolver.resolve(String(argv.readme)), {
+    allowMissingLeaf: true,
+  });
   const collectionMeta = safeLstatSafe(readmePath)?.isFile()
     ? parseCollectionMetadata(readTextFile(readmePath))
     : new Map<string, CollectionEntry>();
@@ -411,7 +443,7 @@ async function main(): Promise<void> {
     imported.map((entry) => [entry.design_system_id, buildDesignSystem(entry)])
   );
   const index = {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     source_repo: SOURCE_REPO,
     source_dir: path.relative(pathResolver.rootDir(), sourceDir),
     count: imported.length,
@@ -427,27 +459,23 @@ async function main(): Promise<void> {
     })),
   };
 
-  for (const outputPath of [THEMES_OUTPUT, SYSTEMS_OUTPUT, INDEX_OUTPUT]) {
-    safeMkdir(path.dirname(path.resolve(pathResolver.rootDir(), outputPath)));
-  }
-
-  safeWriteFile(
-    path.resolve(pathResolver.rootDir(), THEMES_OUTPUT),
-    JSON.stringify({ themes }, null, 2)
-  );
-  safeWriteFile(
-    path.resolve(pathResolver.rootDir(), SYSTEMS_OUTPUT),
-    JSON.stringify({ systems }, null, 2)
-  );
-  safeWriteFile(path.resolve(pathResolver.rootDir(), INDEX_OUTPUT), JSON.stringify(index, null, 2));
-
-  process.stdout.write(
-    `${JSON.stringify({ imported: imported.length, themes_output: THEMES_OUTPUT, systems_output: SYSTEMS_OUTPUT, index_output: INDEX_OUTPUT }, null, 2)}\n`
-  );
+  return [
+    { path: THEMES_OUTPUT, content: JSON.stringify({ themes }, null, 2) },
+    { path: SYSTEMS_OUTPUT, content: JSON.stringify({ systems }, null, 2) },
+    { path: INDEX_OUTPUT, content: JSON.stringify(index, null, 2) },
+  ];
 }
 
-main().catch((error) => {
-  const detail = error instanceof Error ? error.stack || error.message : String(error);
-  process.stderr.write(`${detail}\n`);
-  process.exitCode = 1;
+export const runImportDesignMdCatalog = defineGenerator({
+  id: 'design-md-catalog',
+  outputs: [THEMES_OUTPUT, SYSTEMS_OUTPUT, INDEX_OUTPUT],
+  normalize: normalizeGeneratedContent,
+  render: renderImportDesignMdCatalog,
 });
+
+if (
+  isDirectScript(import.meta.url, 'import_design_md_catalog.ts') ||
+  isDirectScript(import.meta.url, 'import_design_md_catalog.js')
+) {
+  void runImportDesignMdCatalog();
+}

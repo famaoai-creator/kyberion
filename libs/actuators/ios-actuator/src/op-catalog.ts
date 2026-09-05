@@ -5,7 +5,8 @@
 // step-type inference is unchanged; all other ops were previously
 // unclassifiable (determineActuatorStepType threw unknown-op).
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 
@@ -124,14 +125,14 @@ export const IOS_ACTUATOR_APPLY_OPS = [
   'uninstall_app',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const schema = IOS_CONTRACTS[op];
   return schema
     ? { op, kind, input_schema: schema, examples: IOS_EXAMPLES[op] || [{}] }
     : { op, kind };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...IOS_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...IOS_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

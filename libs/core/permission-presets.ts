@@ -94,6 +94,6 @@ export function derivePermissionPreset(input: {
   return buildResolved('custom', input, true);
 }
 
-export function resetPermissionPresetRegistryCache(): void {
+export function _resetPermissionPresetRegistryCacheForTests(): void {
   registryCatalog.reset();
 }

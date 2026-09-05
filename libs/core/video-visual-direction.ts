@@ -1,8 +1,12 @@
 import { createLogger } from './logger.js';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import type { GovernedCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
+import { clamp } from './foundation/text.js';
 
 // DS-04 / agy short-video quality: scene layout and visual composition used
 // to be a single hardcoded dark-navy dashboard skin baked into
@@ -54,10 +58,6 @@ export const DEFAULT_VISUAL_DIRECTION: VideoVisualDirection = {
   typography: { headline_px: 68, body_px: 23 },
 };
 
-function clampVideoDirectionValue(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 /**
  * Validate an LLM-drafted direction. Anything malformed degrades to the
  * historical default (never fails a render); typography is clamped to
@@ -100,10 +100,10 @@ export function normalizeVideoVisualDirection(
     palette: colors as VideoVisualDirection['palette'],
     typography: {
       headline_px: Number.isFinite(headline)
-        ? clampVideoDirectionValue(headline, headlineRange[0], headlineRange[1])
+        ? clamp(headline, headlineRange[0], headlineRange[1])
         : fallback.typography.headline_px,
       body_px: Number.isFinite(body)
-        ? clampVideoDirectionValue(body, bodyRange[0], bodyRange[1])
+        ? clamp(body, bodyRange[0], bodyRange[1])
         : fallback.typography.body_px,
     },
     ...(perScene && perScene.length > 0 ? { per_scene: perScene } : {}),
@@ -147,7 +147,42 @@ export interface VideoVisualPattern {
   };
 }
 
-let cachedPatternCatalog: Record<string, VideoVisualPattern> | null = null;
+interface VideoVisualPatternCatalog {
+  version: string;
+  description: string;
+  patterns: Record<string, VideoVisualPattern>;
+}
+
+const VIDEO_VISUAL_PATTERN_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/video-visual-patterns.schema.json'
+);
+
+const videoVisualPatternCatalogs = new Map<string, GovernedCatalog<VideoVisualPatternCatalog>>();
+
+function getVideoVisualPatternCatalog(
+  rootDir?: string
+): GovernedCatalog<VideoVisualPatternCatalog> {
+  const catalogPath = rootDir
+    ? path.join(
+        rootDir,
+        'knowledge',
+        'public',
+        'design-patterns',
+        'media-templates',
+        'video-visual-patterns.json'
+      )
+    : pathResolver.knowledge('public/design-patterns/media-templates/video-visual-patterns.json');
+  let catalog = videoVisualPatternCatalogs.get(catalogPath);
+  if (!catalog) {
+    catalog = defineCatalog<VideoVisualPatternCatalog>({
+      id: 'video-visual-patterns',
+      path: catalogPath,
+      schema: VIDEO_VISUAL_PATTERN_SCHEMA_PATH,
+    });
+    videoVisualPatternCatalogs.set(catalogPath, catalog);
+  }
+  return catalog;
+}
 
 /**
  * Curated pattern pack (pptx themes.json counterpart for video). The LLM
@@ -155,38 +190,10 @@ let cachedPatternCatalog: Record<string, VideoVisualPattern> | null = null;
  * so a bad model reply can only ever land on another curated pattern or the
  * default, not on an ungoverned palette.
  */
-export function loadVideoVisualPatternCatalog(): Record<string, VideoVisualPattern> {
-  if (cachedPatternCatalog) return cachedPatternCatalog;
-  try {
-    const catalogPath = pathResolver.knowledge(
-      'public/design-patterns/media-templates/video-visual-patterns.json'
-    );
-    if (safeExistsSync(catalogPath)) {
-      const parsed = loadJson<{ patterns?: unknown }>(catalogPath);
-      if (parsed?.patterns && typeof parsed.patterns === 'object') {
-        cachedPatternCatalog = parsed.patterns as Record<string, VideoVisualPattern>;
-        return cachedPatternCatalog;
-      }
-    }
-  } catch (error: any) {
-    logger.warn(`pattern catalog unreadable, using built-in default: ${error?.message || error}`);
-  }
-  cachedPatternCatalog = {
-    'calm-tech': {
-      name: 'Calm Tech',
-      mood: DEFAULT_VISUAL_DIRECTION.mood,
-      palette: DEFAULT_VISUAL_DIRECTION.palette,
-      typography: {
-        portrait: { headline_px: 96, body_px: 34 },
-        landscape: { headline_px: 68, body_px: 23 },
-      },
-    },
-  };
-  return cachedPatternCatalog;
-}
-
-export function resetVideoVisualPatternCatalogCache(): void {
-  cachedPatternCatalog = null;
+export function loadVideoVisualPatternCatalog(
+  rootDir?: string
+): Record<string, VideoVisualPattern> {
+  return getVideoVisualPatternCatalog(rootDir).load().patterns;
 }
 
 /** Resolve a curated pattern into a concrete direction for the given frame. */
@@ -265,7 +272,7 @@ export async function generateVideoVisualDirection(
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
     let parsed: any;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'video visual direction response');
     } catch {
       parsed = tryRepairJson(jsonText);
     }

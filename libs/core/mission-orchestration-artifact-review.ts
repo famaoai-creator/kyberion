@@ -8,8 +8,9 @@ import { missionDir, pathResolver } from './path-resolver.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { resolveArtifactReviewerProfile } from './mission-review-gates.js';
 import { missionClassOf, missionRiskProfileOf } from './mission-orchestration-phase-gates.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
 import type { PlannedNextTask } from './mission-orchestration-worker-contracts.js';
+import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 
 export function resolveReviewTargetForTask(task: PlannedNextTask): string | undefined {
   if (typeof task.review_target === 'string' && task.review_target.trim()) {
@@ -172,8 +173,10 @@ export function persistArtifactReviewReceipt(input: {
       ? input.reviewTask.acceptance_criteria
       : [input.reviewTask.description || `Review ${input.artifact.targetTask.task_id}`],
   });
-  safeMkdir(nodePath.dirname(receiptPath), { recursive: true });
-  safeWriteFile(receiptPath, JSON.stringify(receipt, null, 2));
+  writeDispatchArtifact(receiptPath, receipt, {
+    missionId: input.missionId,
+    missionPath,
+  });
   input.reviewTask.artifact_review_receipt = relativePath;
   return relativePath;
 }

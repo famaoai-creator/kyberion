@@ -1,19 +1,19 @@
-import {
-  logger,
-  safeReadFile,
-  safeMkdir,
-  safeExistsSync,
-  pathResolver,
-  buildGovernedRetryOptions,
-  retry,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+import { logger } from '@agent/core/core';
+import { safeReadFile, safeMkdir, safeExistsSync } from '@agent/core/secure-io';
+import * as pathResolver from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import * as path from 'node:path';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
-import { runActuatorCli } from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
+import { appendJsonLine, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 
 /**
  * Blockchain-Actuator v1.0.0 [IMMUTABLE ANCHOR]
@@ -33,6 +33,19 @@ const DEFAULT_BLOCKCHAIN_RETRY = {
   jitter: true,
 };
 
+interface BlockchainTransaction {
+  block_number: number;
+  tx_id: string;
+  timestamp: string;
+  type: 'MISSION_ANCHOR' | 'TRUST_SCORE_ANCHOR';
+  mission_id?: string;
+  data_hash?: string;
+  agent_id?: string;
+  new_score?: number;
+  contract_address: string;
+  [key: string]: unknown;
+}
+
 interface BlockchainAction {
   action: 'anchor_mission' | 'anchor_trust' | 'verify_anchor';
   params: {
@@ -40,18 +53,15 @@ interface BlockchainAction {
     agent_id?: string;
     hash?: string;
     score?: number;
-    tx_metadata?: any;
+    tx_metadata?: Record<string, unknown>;
   };
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: BLOCKCHAIN_MANIFEST_PATH,
-    defaults: DEFAULT_BLOCKCHAIN_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: BLOCKCHAIN_MANIFEST_PATH,
+  defaults: DEFAULT_BLOCKCHAIN_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 async function handleAction(input: BlockchainAction) {
   ensureDefaultOpPreflight();
@@ -78,20 +88,34 @@ async function handleAction(input: BlockchainAction) {
   }
 }
 
-function readMockChainEntries(): any[] {
+function parseMockChainEntry(value: unknown): BlockchainTransaction {
+  if (
+    !isRecord(value) ||
+    typeof value.block_number !== 'number' ||
+    typeof value.tx_id !== 'string' ||
+    typeof value.timestamp !== 'string' ||
+    (value.type !== 'MISSION_ANCHOR' && value.type !== 'TRUST_SCORE_ANCHOR') ||
+    typeof value.contract_address !== 'string'
+  ) {
+    throw new Error('invalid mock blockchain transaction');
+  }
+  return value as BlockchainTransaction;
+}
+
+function readMockChainEntries(): BlockchainTransaction[] {
   if (!safeExistsSync(MOCK_CHAIN_PATH)) return [];
   try {
     return String(safeReadFile(MOCK_CHAIN_PATH, { encoding: 'utf8' }) || '')
       .trim()
       .split('\n')
       .filter(Boolean)
-      .map((line) => JSON.parse(line));
+      .map((line) => parseMockChainEntry(parseSafeJsonInput(line, 'mock blockchain entry')));
   } catch {
     return [];
   }
 }
 
-async function anchorMission(params: any) {
+async function anchorMission(params: BlockchainAction['params']) {
   const { mission_id, hash } = params;
   if (!mission_id || !hash) throw new Error('mission_id and hash are required for anchoring.');
 
@@ -99,10 +123,10 @@ async function anchorMission(params: any) {
     `🔗 [Blockchain] Anchoring mission ${mission_id} (Hash: ${hash.substring(0, 10)}...)`
   );
 
-  const tx = {
+  const tx: BlockchainTransaction = {
     block_number: Math.floor(Date.now() / 10000),
     tx_id: createHash('sha256').update(`tx-${Date.now()}-${mission_id}`).digest('hex'),
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     type: 'MISSION_ANCHOR',
     mission_id,
     data_hash: hash,
@@ -115,16 +139,16 @@ async function anchorMission(params: any) {
   return { status: 'success', simulated: true, tx_id: tx.tx_id, block: tx.block_number };
 }
 
-async function anchorTrust(params: any) {
+async function anchorTrust(params: BlockchainAction['params']) {
   const { agent_id, score } = params;
   if (!agent_id || score === undefined) throw new Error('agent_id and score are required.');
 
   logger.info(`🔗 [Blockchain] Anchoring trust score for ${agent_id} (Score: ${score})`);
 
-  const tx = {
+  const tx: BlockchainTransaction = {
     block_number: Math.floor(Date.now() / 10000),
     tx_id: createHash('sha256').update(`tx-trust-${Date.now()}-${agent_id}`).digest('hex'),
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     type: 'TRUST_SCORE_ANCHOR',
     agent_id,
     new_score: score,
@@ -137,7 +161,7 @@ async function anchorTrust(params: any) {
   return { status: 'success', simulated: true, tx_id: tx.tx_id, block: tx.block_number };
 }
 
-async function verifyAnchor(params: any) {
+async function verifyAnchor(params: BlockchainAction['params']) {
   const { mission_id, agent_id, hash } = params;
   if (!mission_id && !agent_id) throw new Error('mission_id or agent_id is required.');
 
@@ -161,7 +185,7 @@ async function verifyAnchor(params: any) {
   };
 }
 
-function _writeToMockChain(tx: any) {
+function _writeToMockChain(tx: BlockchainTransaction) {
   const dir = path.dirname(MOCK_CHAIN_PATH);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   appendJsonLine(MOCK_CHAIN_PATH, tx);
@@ -170,18 +194,13 @@ function _writeToMockChain(tx: any) {
 const main = async () => {
   await runActuatorCli({
     name: 'blockchain-actuator',
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+if (isDirectEntry(import.meta.url, 'libs/actuators/blockchain-actuator/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, 'blockchain-actuator');
 }
 
 export { handleAction };

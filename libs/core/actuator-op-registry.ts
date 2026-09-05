@@ -1,8 +1,8 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
 import { suggestClosestStrings } from './op-suggestions.js';
-import { loadActuatorManifestCatalog } from './src/actuator-manifest-index.js';
+import { isSafeActuatorId, loadActuatorManifestCatalog } from './src/actuator-manifest-index.js';
+import { assertCapabilityAllowed } from './capability-restriction-policy.js';
 
 export type PipelineStepType = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -36,7 +36,9 @@ interface DomainOpRegistry {
   control?: string[];
 }
 
-interface ActuatorOpRegistryFile {
+export interface ActuatorOpRegistryFile {
+  version?: string;
+  description?: string;
   shared_capture_ops: string[];
   shared_transform_ops: string[];
   shared_apply_ops: string[];
@@ -62,26 +64,10 @@ const DEFAULT_CONTROL_OPS = [
 
 const pluginOperations = new Map<string, ResolvedActuatorOperation>();
 
-const DEFAULT_ACTUATOR_OP_REGISTRY: ActuatorOpRegistryFile = {
-  shared_capture_ops: [],
-  shared_transform_ops: [],
-  shared_apply_ops: [],
-  operation_timeouts_ms: {},
-  domains: {},
-};
-
 const actuatorOpCatalog = defineCatalog<ActuatorOpRegistryFile>({
   id: 'actuator-op-registry',
   path: pathResolver.knowledge('product/governance/actuator-op-registry.json'),
   schema: pathResolver.knowledge('product/schemas/actuator-op-registry.schema.json'),
-  fallback: DEFAULT_ACTUATOR_OP_REGISTRY,
-  onFallback: (error) => {
-    recordConfigFallback({
-      knowledgePath: 'product/governance/actuator-op-registry.json',
-      error,
-      defaults: DEFAULT_ACTUATOR_OP_REGISTRY,
-    });
-  },
 });
 
 export function registerPluginActuatorOperation(input: {
@@ -168,7 +154,7 @@ function collectKnownOps(domain: string, registry: ActuatorOpRegistryFile): stri
   ]);
 }
 
-function loadActuatorOpRegistry(): ActuatorOpRegistryFile {
+export function loadActuatorOpRegistry(): ActuatorOpRegistryFile {
   if (_cachedOpRegistry) return _cachedOpRegistry;
   _cachedOpRegistry = actuatorOpCatalog.load();
   return _cachedOpRegistry;
@@ -228,9 +214,13 @@ export function resolveActuatorOperation(
 ): ResolvedActuatorOperation | null {
   const stepType = determineActuatorStepType(domain, action);
   const plugin = pluginOperations.get(`${domain}:${action}`);
-  if (plugin) return plugin;
+  if (plugin) {
+    assertCapabilityAllowed([`${domain}:${action}`, plugin.actuatorId, domain]);
+    return plugin;
+  }
   const expectedIds = new Set([`${domain}-actuator`, domain]);
   const manifest = loadActuatorManifestCatalog().find((entry) => expectedIds.has(entry.n));
+  assertCapabilityAllowed([`${domain}:${action}`, manifest?.n || `${domain}-actuator`, domain]);
   if (!manifest) return null;
   const modulePath = resolveActuatorModulePath(manifest.n, manifest.entrypoint || 'src/index.js');
   return {
@@ -259,6 +249,7 @@ export function resolveActuatorModulePath(actuatorId: string, entrypoint: string
   const segments = normalized.split('/');
   if (
     !id ||
+    !isSafeActuatorId(id) ||
     !normalized ||
     normalized.startsWith('/') ||
     segments.some((segment) => segment === '..' || segment === '.')

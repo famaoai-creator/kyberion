@@ -1,20 +1,26 @@
+import { distillTextObservation } from '@agent/core/observation-distill';
+import { executeLlmDecideOp } from '@agent/core/semantic-decide';
+import { logger } from '@agent/core/core';
 import {
-  distillTextObservation,
-  executeLlmDecideOp,
-  logger,
-  loadJson,
+  assertSafeRepositoryPath,
+  safeReadFile,
   safeWriteFile,
   safeExec,
   safeExistsSync,
-  executeAdfSteps,
-  pathResolver,
-  resolveDesktopLaunchAdapter,
-  getPathValue,
-  createVoiceCapabilityBridge,
-  retry,
+  safeLstat,
+} from '@agent/core/secure-io';
+import { nowIso, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import type { AdfEngineContext } from '@agent/core/adf-engine';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveDesktopLaunchAdapter } from '@agent/core/desktop-launch-adapter';
+import { getPathValue } from '@agent/core/logic-utils';
+import { createVoiceCapabilityBridge } from '@agent/core/voice-capability-bridge';
+import { retry } from '@agent/core/async-utils';
+import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core';
+} from '@agent/core/execution-bounds';
 import {
   activateApplication,
   keystrokeText,
@@ -95,7 +101,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       return { ...ctx, [params.export_as]: result };
     }
     case 'sre_analyze': {
-      const { sre } = await import('@agent/core');
+      const { sre } = await import('@agent/core/core');
       return {
         ...ctx,
         [params.export_as || 'root_cause']: sre.analyzeRootCause(
@@ -188,7 +194,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       );
       break;
     case 'voice':
-      const { say } = await import('@agent/core');
+      const { say } = await import('@agent/core/voice-synth');
       await say(resolve(params.text || '{{last_capture}}'));
       break;
     case 'native_tts_speak': {
@@ -322,11 +328,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'open_file': {
       const filePath = String(resolve(params.path || ''));
       if (!filePath) throw new Error('open_file requires "path" param');
-      const absPath = pathResolver.rootResolve(filePath);
-      const rel = path.relative(rootDir, absPath);
-      if (rel.startsWith('..') || path.isAbsolute(rel)) {
-        throw new Error(`open_file: path must be within repo root: ${filePath}`);
-      }
+      const absPath = assertSafeRepositoryPath(pathResolver.rootResolve(filePath));
       const launcher = resolveDesktopLaunchAdapter();
       await retry(async () => launcher.open(absPath, rootDir), buildRetryOptions(params.retry));
       break;
@@ -370,35 +372,55 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
 }
 
 // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
-// (executeAdfSteps). Nested control failures now propagate instead of being
+// (runAdfActuatorPipeline). Nested control failures now propagate instead of being
 // silently absorbed (AR-06 no-silent-failure).
-async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}) {
+async function executePipeline(
+  steps: PipelineStep[],
+  initialCtx: AdfEngineContext = {},
+  options: { max_steps?: number; timeout_ms?: number } = {}
+) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  let ctx: AdfEngineContext = { ...initialCtx, timestamp: nowIso() };
 
-  if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path));
+  const contextPath =
+    typeof initialCtx.context_path === 'string' && initialCtx.context_path
+      ? assertSafeRepositoryPath(path.resolve(rootDir, initialCtx.context_path), {
+          allowMissingLeaf: true,
+        })
+      : undefined;
+  if (contextPath && safeExistsSync(contextPath)) {
+    if (!safeLstat(contextPath).isFile()) {
+      throw new Error(`system context must be an existing regular file: ${contextPath}`);
+    }
+    const saved = parseSafeJsonObjectValue(
+      parseSafeJsonInput(
+        String(safeReadFile(contextPath, { encoding: 'utf8' }) || ''),
+        'system context'
+      ),
+      'system context'
+    );
     ctx = { ...ctx, ...saved };
   }
 
-  const result = await executeAdfSteps(
-    steps as Parameters<typeof executeAdfSteps>[0],
-    ctx,
-    { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
-    {
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'system',
+    steps,
+    context: ctx,
+    options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+    handlers: {
       capture: opCapture,
       transform: opTransform,
       apply: opApply,
       control: opControl,
-    }
-  );
+    },
+  });
   ctx = result.context;
 
-  if (initialCtx.context_path) {
-    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+  if (contextPath) {
+    safeWriteFile(contextPath, JSON.stringify(ctx, null, 2));
   }
 
   return result;

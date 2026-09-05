@@ -101,14 +101,18 @@ const mocks = vi.hoisted(() => ({
     rate: 180,
   })),
   safeExec: vi.fn(() => ''),
+  safeExecResult: vi.fn(() => ({ status: 0, stdout: '', stderr: '', error: null })),
   safeExistsSync: vi.fn(
     (path: string) =>
       String(path).includes('espeak-ng') || String(path).includes('/tmp/voice-generation/')
   ),
   safeStat: vi.fn(() => ({ size: 4096 })),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
   safeReadFile: vi.fn(),
+  safeUnlink: vi.fn(),
+  safeRmSync: vi.fn(),
   getWritableVoiceProfileRegistryForTier: vi.fn(() => ({
     registryPath: '/tmp/personal-voice-profile-registry.json',
     registry: {
@@ -340,99 +344,150 @@ const mocks = vi.hoisted(() => ({
   randomUUID: vi.fn(() => 'job-123'),
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
+// The actuator now imports core capabilities through their canonical modules.
+// Keep the unit-test doubles at the same boundaries so tests do not touch the
+// repository filesystem or platform-specific voice runtimes.
+vi.mock('@agent/core/core', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+}));
+vi.mock('@agent/core/secure-io', () => ({
+  assertSafeRepositoryPath: vi.fn((candidate: string) => String(candidate)),
+  loadJson: vi.fn(() => null),
+  safeExec: mocks.safeExec,
+  safeExecResult: mocks.safeExecResult,
+  safeExistsSync: mocks.safeExistsSync,
+  safeMkdir: mocks.safeMkdir,
+  safeReadFile: mocks.safeReadFile,
+  safeStat: mocks.safeStat,
+  safeLstat: mocks.safeLstat,
+  safeUnlink: mocks.safeUnlink,
+  safeWriteFile: mocks.safeWriteFile,
+  safeRmSync: mocks.safeRmSync,
+}));
+vi.mock('@agent/core/path-resolver', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/path-resolver')>(
+    '@agent/core/path-resolver'
+  );
   return {
     ...actual,
-    compileSchemaFromPath: mocks.compileSchemaFromPath,
-    getVoiceProfileRecord: mocks.getVoiceProfileRecord,
-    getVoiceRuntimePolicy: mocks.getVoiceRuntimePolicy,
-    getVoiceEngineRecord: mocks.getVoiceEngineRecord,
-    getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
-    resolveVoiceEngineForPlatform: mocks.resolveVoiceEngineForPlatform,
-    getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
-    safeExec: mocks.safeExec,
-    safeExistsSync: mocks.safeExistsSync,
-    safeStat: mocks.safeStat,
-    safeMkdir: mocks.safeMkdir,
-    safeWriteFile: mocks.safeWriteFile,
-    safeReadFile: mocks.safeReadFile,
-    getWritableVoiceProfileRegistryForTier: mocks.getWritableVoiceProfileRegistryForTier,
-    materializeVoiceProfileSampleRefs: mocks.materializeVoiceProfileSampleRefs,
-    writeVoiceProfileRegistry: mocks.writeVoiceProfileRegistry,
-    retry: mocks.retry,
-    getVoiceSampleIngestionPolicy: mocks.getVoiceSampleIngestionPolicy,
-    validateVoiceProfileRegistration: mocks.validateVoiceProfileRegistration,
-    splitVoiceTextIntoChunks: mocks.splitVoiceTextIntoChunks,
-    createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
-    createVirtualAudioOutputPlaybackBridge: mocks.createVirtualAudioOutputPlaybackBridge,
-    listToolRuntimeInventory: mocks.listToolRuntimeInventory,
-    collectVoiceSamples: mocks.collectVoiceSamples,
-    recordVoiceSample: mocks.recordVoiceSample,
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      success: vi.fn(),
-    },
-    recordInteraction: vi.fn(() => ({ history: [] })),
-    VoiceGenerationRuntime: class {
-      private packet: any = null;
-      private listeners = new Set<(packet: any) => void>();
-
-      subscribe(listener: (packet: any) => void) {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
-      }
-
-      enqueue(spec: any) {
-        this.packet = {
-          kind: 'voice_progress_packet',
-          job_id: spec.jobId,
-          status: 'queued',
-          progress: { current: 0, total: 1, percent: 0, unit: 'steps' },
-          updated_at: new Date().toISOString(),
-        };
-        const api = {
-          report: (update: any) => {
-            this.packet = {
-              kind: 'voice_progress_packet',
-              job_id: spec.jobId,
-              status: update.status,
-              progress: update.progress,
-              message: update.message,
-              artifact_refs: update.artifact_refs,
-              updated_at: new Date().toISOString(),
-            };
-            for (const listener of this.listeners) listener(this.packet);
-            return this.packet;
-          },
-          isCancelled: () => false,
-        };
-        Promise.resolve(spec.run(api)).then((result: any) => {
-          this.packet = {
-            kind: 'voice_progress_packet',
-            job_id: spec.jobId,
-            status: 'completed',
-            progress: { current: 1, total: 1, percent: 100, unit: 'steps' },
-            artifact_refs: result?.artifactRefs || [],
-            updated_at: new Date().toISOString(),
-          };
-          for (const listener of this.listeners) listener(this.packet);
-        });
-        return this.packet;
-      }
-
-      getPacket() {
-        return this.packet;
-      }
-    },
     pathResolver: {
+      ...actual.pathResolver,
       sharedTmp: vi.fn((value: string) => `/tmp/${value}`),
       rootResolve: vi.fn((value: string) => value),
     },
   };
 });
+vi.mock('@agent/core/async-utils', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/async-utils')>('@agent/core/async-utils');
+  return { ...actual, retry: mocks.retry, sleep: vi.fn(async () => undefined) };
+});
+vi.mock('@agent/core/virtual-audio-output-playback-bridge', () => ({
+  createVirtualAudioOutputPlaybackBridge: mocks.createVirtualAudioOutputPlaybackBridge,
+}));
+vi.mock('@agent/core/virtual-device-inventory-bridge', () => ({
+  createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
+}));
+vi.mock('@agent/core/voice-path-policy', () => ({
+  resolveVoicePath: vi.fn((value: string) => value),
+}));
+vi.mock('@agent/core/voice-engine-registry', () => ({
+  getVoiceEngineRecord: mocks.getVoiceEngineRecord,
+  getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
+  resolveVoiceEngineForPlatform: mocks.resolveVoiceEngineForPlatform,
+}));
+vi.mock('@agent/core/voice-profile-registry', () => ({
+  getVoiceProfileRecord: mocks.getVoiceProfileRecord,
+  getWritableVoiceProfileRegistryForTier: mocks.getWritableVoiceProfileRegistryForTier,
+  materializeVoiceProfileSampleRefs: mocks.materializeVoiceProfileSampleRefs,
+  writeVoiceProfileRegistry: mocks.writeVoiceProfileRegistry,
+}));
+vi.mock('@agent/core/voice-runtime-policy', () => ({
+  getVoiceRuntimePolicy: mocks.getVoiceRuntimePolicy,
+}));
+vi.mock('@agent/core/voice-tts-config', () => ({
+  getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
+}));
+vi.mock('@agent/core/voice-sample-ingestion-policy', () => ({
+  getVoiceSampleIngestionPolicy: mocks.getVoiceSampleIngestionPolicy,
+  validateVoiceProfileRegistration: mocks.validateVoiceProfileRegistration,
+}));
+vi.mock('@agent/core/voice-sample-collection', () => ({
+  collectVoiceSamples: mocks.collectVoiceSamples,
+}));
+vi.mock('@agent/core/voice-sample-recorder', () => ({
+  recordVoiceSample: mocks.recordVoiceSample,
+}));
+vi.mock('@agent/core/voice-text-chunking', () => ({
+  splitVoiceTextIntoChunks: mocks.splitVoiceTextIntoChunks,
+}));
+vi.mock('@agent/core/tool-runtime-registry', () => ({
+  listToolRuntimeInventory: mocks.listToolRuntimeInventory,
+}));
+vi.mock('@agent/core/voice-capability-bridge', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/voice-capability-bridge')>(
+    '@agent/core/voice-capability-bridge'
+  );
+  return actual;
+});
+vi.mock('@agent/core/voice-generation-runtime', () => ({
+  VoiceGenerationRuntime: class {
+    private packet: any = null;
+    private listeners = new Set<(packet: any) => void>();
+
+    constructor(_policy?: unknown) {}
+
+    subscribe(listener: (packet: any) => void) {
+      this.listeners.add(listener);
+      return () => this.listeners.delete(listener);
+    }
+
+    enqueue(spec: any) {
+      this.packet = {
+        kind: 'voice_progress_packet',
+        job_id: spec.jobId,
+        status: 'queued',
+        progress: { current: 0, total: 1, percent: 0, unit: 'steps' },
+        updated_at: new Date().toISOString(),
+      };
+      const api = {
+        report: (update: any) => {
+          this.packet = {
+            kind: 'voice_progress_packet',
+            job_id: spec.jobId,
+            status: update.status,
+            progress: update.progress,
+            message: update.message,
+            artifact_refs: update.artifact_refs,
+            updated_at: new Date().toISOString(),
+          };
+          for (const listener of this.listeners) listener(this.packet);
+          return this.packet;
+        },
+        isCancelled: () => false,
+      };
+      Promise.resolve(spec.run(api)).then((result: any) => {
+        this.packet = {
+          kind: 'voice_progress_packet',
+          job_id: spec.jobId,
+          status: 'completed',
+          progress: { current: 1, total: 1, percent: 100, unit: 'steps' },
+          artifact_refs: result?.artifactRefs || [],
+          updated_at: new Date().toISOString(),
+        };
+        for (const listener of this.listeners) listener(this.packet);
+      });
+      return this.packet;
+    }
+
+    getPacket() {
+      return this.packet;
+    }
+  },
+}));
+vi.mock('@agent/core/relationship-graph-store', () => ({
+  recordInteraction: vi.fn(() => ({ history: [] })),
+}));
 
 vi.mock('node:crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:crypto')>();
@@ -442,9 +497,11 @@ vi.mock('node:crypto', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/foundation', () => ({
+vi.mock('@agent/core/foundation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
   compileSchema: mocks.compileSchemaFromPath,
   getRegisteredEnvText: (name: string) => process.env[name],
+  nowIso: vi.fn(() => '2026-01-01T00:00:00.000Z'),
 }));
 
 describe('voice actuator', () => {
@@ -533,6 +590,30 @@ describe('voice actuator', () => {
       })
     );
     expect(mocks.listToolRuntimeInventory).toHaveBeenCalledWith('trial');
+  });
+
+  it('runs pipeline steps through the shared preflight boundary', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        { action: 'health', params: { requested_mode: 'trial' } },
+        { action: 'list_voices', params: {} },
+      ],
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        results: [
+          expect.objectContaining({ action: 'health', status: 'succeeded' }),
+          expect.objectContaining({ engine_id: 'local_say', status: 'succeeded' }),
+        ],
+      })
+    );
+    expect(result.results).toHaveLength(2);
   });
 
   it('runs generate_voice through native artifact and playback flow', async () => {

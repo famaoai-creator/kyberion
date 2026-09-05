@@ -1,8 +1,12 @@
 import chalk from 'chalk';
 // chalk imported dynamically
-import { pathResolver, safeExistsSync, safeWriteFile } from '@agent/core';
-import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseSafeJsonObjectInput } from './lib/json-input.js';
+
+type Print = (value: unknown) => void;
 
 const inboxPath = pathResolver.shared('portal/inbox.json');
 const outboxPath = pathResolver.shared('portal/outbox.json');
@@ -10,17 +14,46 @@ const outboxPath = pathResolver.shared('portal/outbox.json');
 interface PortalRequest {
   intent: string;
   status: 'pending' | 'thinking' | 'complete' | 'processed';
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-async function processInbox(): Promise<void> {
+const PORTAL_STATUSES = new Set<PortalRequest['status']>([
+  'pending',
+  'thinking',
+  'complete',
+  'processed',
+]);
+
+function isPortalStatus(value: unknown): value is PortalRequest['status'] {
+  return typeof value === 'string' && PORTAL_STATUSES.has(value as PortalRequest['status']);
+}
+
+export function parsePortalRequest(raw: string): PortalRequest | null {
+  try {
+    const parsed = parseSafeJsonObjectInput(raw, 'portal request');
+    if (!parsed || typeof parsed.intent !== 'string' || !isPortalStatus(parsed.status)) {
+      return null;
+    }
+    const intent = parsed.intent.trim();
+    if (!intent) return null;
+    return { ...parsed, intent, status: parsed.status };
+  } catch {
+    return null;
+  }
+}
+
+async function processInbox(print: Print = () => undefined): Promise<void> {
   if (!safeExistsSync(inboxPath)) return;
 
   const raw = readTextFile(inboxPath);
-  const request: PortalRequest = JSON.parse(raw);
+  const request = parsePortalRequest(raw);
+  if (!request) {
+    print('[portal] ignored malformed inbox request');
+    return;
+  }
   if (request.status !== 'pending') return;
 
-  console.log(chalk.bold.cyan(`\n📩 Processing Portal Request: "${request.intent}"`));
+  print(chalk.bold.cyan(`\n📩 Processing Portal Request: "${request.intent}"`));
 
   const thought = `Lord（上様）より「${request.intent}」との命を授かった。\n現在のロール（Architect）に基づき、単なるコマンド実行に留まらず、広範な影響調査を実施する。`;
 
@@ -31,7 +64,7 @@ async function processInbox(): Promise<void> {
       {
         status: 'thinking',
         thought,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       null,
       2
@@ -61,7 +94,7 @@ async function processInbox(): Promise<void> {
         status: 'complete',
         thought: '任務完了。分析結果をポータルへ投影した。',
         result,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       null,
       2
@@ -72,14 +105,14 @@ async function processInbox(): Promise<void> {
   request.status = 'processed';
   safeWriteFile(inboxPath, JSON.stringify(request, null, 2));
 
-  console.log(chalk.green('✔ Agent has responded to the portal.'));
+  print(chalk.green('✔ Agent has responded to the portal.'));
 }
 
 export const runProcessPortalInbox = defineScript({
   name: 'process-portal-inbox',
   flags: [],
-  run() {
-    return processInbox();
+  run({ print }) {
+    return processInbox(print);
   },
 });
 

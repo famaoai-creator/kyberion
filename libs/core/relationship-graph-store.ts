@@ -12,13 +12,19 @@
  */
 
 import * as path from 'node:path';
-import { rootResolve } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { pathResolver, rootResolve } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 
 const RELATIONSHIPS_ROOT = 'knowledge/confidential/relationships';
+const RELATIONSHIP_NODE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/relationship-node.schema.json'
+);
 const HISTORY_MAX = 20;
 const ALLOWED_SOURCES = ['presence-actuator', 'voice-actuator', 'manual'] as const;
-export type RelationshipSource = typeof ALLOWED_SOURCES[number];
+export type RelationshipSource = (typeof ALLOWED_SOURCES)[number];
 
 export interface RelationshipIdentity {
   name: string;
@@ -77,7 +83,10 @@ export interface SuggestFieldUpdateParams {
 function nodePath(org: string, personSlug: string): string {
   const safeOrg = sanitizeSegment(org);
   const safeSlug = sanitizeSegment(personSlug);
-  return rootResolve(path.join(RELATIONSHIPS_ROOT, safeOrg, `${safeSlug}.json`));
+  return assertSafeRepositoryPath(
+    rootResolve(path.join(RELATIONSHIPS_ROOT, safeOrg, `${safeSlug}.json`)),
+    { allowMissingLeaf: true }
+  );
 }
 
 function sanitizeSegment(value: string): string {
@@ -92,25 +101,379 @@ function sanitizeSegment(value: string): string {
 function assertSource(source: string): asserts source is RelationshipSource {
   if (!ALLOWED_SOURCES.includes(source as RelationshipSource)) {
     throw new Error(
-      `[relationship-graph] unsupported source "${source}"; allowed: ${ALLOWED_SOURCES.join(', ')}`,
+      `[relationship-graph] unsupported source "${source}"; allowed: ${ALLOWED_SOURCES.join(', ')}`
     );
   }
+}
+
+const NODE_FIELDS = [
+  'identity',
+  'trust_level',
+  'communication_style',
+  'known_interests',
+  'history',
+  'long_term_summary',
+  'outstanding_asks',
+  'ng_topics',
+  'pending_suggestions',
+  'updated_at',
+] as const;
+
+function relationshipNodeCatalog(filePath: string) {
+  return defineCatalog<RelationshipNode>({
+    id: 'relationship-node',
+    path: filePath,
+    schema: RELATIONSHIP_NODE_SCHEMA_PATH,
+  });
+}
+
+function recordFields(record: Record<string, unknown>, fields: readonly string[], label: string) {
+  const allowed = new Set(fields);
+  if (Object.keys(record).some((key) => !allowed.has(key))) {
+    throw new Error(`${label} contains unknown fields`);
+  }
+}
+
+function requiredString(record: Record<string, unknown>, field: string, label: string): string {
+  const value = record[field];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${label}.${field} must be a non-empty string`);
+  }
+  return value;
+}
+
+function optionalString(
+  record: Record<string, unknown>,
+  field: string,
+  label: string
+): string | undefined {
+  const value = record[field];
+  if (value === undefined) return undefined;
+  return requiredString(record, field, label);
+}
+
+function timestamp(record: Record<string, unknown>, field: string, label: string): string {
+  const value = requiredString(record, field, label);
+  if (!Number.isFinite(Date.parse(value))) {
+    throw new Error(`${label}.${field} must be a valid timestamp`);
+  }
+  return value;
+}
+
+function stringArray(value: unknown, label: string): string[] {
+  if (
+    !Array.isArray(value) ||
+    value.some((entry) => typeof entry !== 'string' || entry.trim() === '')
+  ) {
+    throw new Error(`${label} must be an array of non-empty strings`);
+  }
+  return [...value];
+}
+
+function optionalObject(
+  record: Record<string, unknown>,
+  field: string,
+  label: string
+): Record<string, unknown> | undefined {
+  if (record[field] === undefined) return undefined;
+  return parseSafeJsonObjectValue(record[field], `${label}.${field}`);
+}
+
+function parseRelationshipNode(value: unknown, org: string, personSlug: string): RelationshipNode {
+  const root = parseSafeJsonObjectValue(value, '[relationship-graph] node');
+  recordFields(root, NODE_FIELDS, '[relationship-graph] node');
+
+  const identity = parseSafeJsonObjectValue(root.identity, '[relationship-graph] identity');
+  recordFields(
+    identity,
+    ['name', 'role', 'org', 'person_slug', 'contact'],
+    '[relationship-graph] identity'
+  );
+  const identityOrg = requiredString(identity, 'org', '[relationship-graph] identity');
+  if (identityOrg !== org) throw new Error('[relationship-graph] identity org does not match path');
+  const identityPersonSlug = optionalString(
+    identity,
+    'person_slug',
+    '[relationship-graph] identity'
+  );
+  if (identityPersonSlug !== undefined && identityPersonSlug !== personSlug) {
+    throw new Error('[relationship-graph] identity person_slug does not match path');
+  }
+  const contact = optionalObject(identity, 'contact', '[relationship-graph] identity');
+  if (contact) {
+    recordFields(contact, ['email', 'phone', 'preferred_channel'], '[relationship-graph] contact');
+    optionalString(contact, 'email', '[relationship-graph] contact');
+    optionalString(contact, 'phone', '[relationship-graph] contact');
+    const preferredChannel = optionalString(
+      contact,
+      'preferred_channel',
+      '[relationship-graph] contact'
+    );
+    if (
+      preferredChannel !== undefined &&
+      !['email', 'phone', 'slack', 'in_person', 'other'].includes(preferredChannel)
+    ) {
+      throw new Error('[relationship-graph] contact.preferred_channel is invalid');
+    }
+  }
+
+  const trust = parseSafeJsonObjectValue(root.trust_level, '[relationship-graph] trust_level');
+  recordFields(trust, ['current', 'updated_at', 'history'], '[relationship-graph] trust_level');
+  if (
+    typeof trust.current !== 'number' ||
+    !Number.isInteger(trust.current) ||
+    trust.current < 1 ||
+    trust.current > 5
+  ) {
+    throw new Error('[relationship-graph] trust_level.current must be an integer from 1 to 5');
+  }
+  const trustHistory = trust.history;
+  let parsedTrustHistory: Array<{ value: number; at: string; note?: string }> | undefined;
+  if (trustHistory !== undefined) {
+    if (!Array.isArray(trustHistory))
+      throw new Error('[relationship-graph] trust_level.history must be an array');
+    parsedTrustHistory = trustHistory.map((entry, index) => {
+      const item = parseSafeJsonObjectValue(
+        entry,
+        `[relationship-graph] trust_level.history[${index}]`
+      );
+      recordFields(
+        item,
+        ['value', 'at', 'note'],
+        `[relationship-graph] trust_level.history[${index}]`
+      );
+      if (
+        typeof item.value !== 'number' ||
+        !Number.isInteger(item.value) ||
+        item.value < 1 ||
+        item.value > 5
+      ) {
+        throw new Error(`[relationship-graph] trust_level.history[${index}].value is invalid`);
+      }
+      return {
+        value: item.value,
+        at: timestamp(item, 'at', `[relationship-graph] trust_level.history[${index}]`),
+        ...(optionalString(item, 'note', `[relationship-graph] trust_level.history[${index}]`)
+          ? {
+              note: optionalString(
+                item,
+                'note',
+                `[relationship-graph] trust_level.history[${index}]`
+              ),
+            }
+          : {}),
+      };
+    });
+  }
+
+  const communicationStyle = optionalObject(
+    root,
+    'communication_style',
+    '[relationship-graph] node'
+  );
+  if (communicationStyle) {
+    recordFields(
+      communicationStyle,
+      ['honne_tatemae_tendency', 'preferred_medium', 'disliked_topics', 'tempo'],
+      '[relationship-graph] communication_style'
+    );
+    const tendency = optionalString(
+      communicationStyle,
+      'honne_tatemae_tendency',
+      '[relationship-graph] communication_style'
+    );
+    if (tendency !== undefined && !['direct', 'mixed', 'highly_implicit'].includes(tendency)) {
+      throw new Error('[relationship-graph] communication_style.honne_tatemae_tendency is invalid');
+    }
+    optionalString(
+      communicationStyle,
+      'preferred_medium',
+      '[relationship-graph] communication_style'
+    );
+    if (communicationStyle.disliked_topics !== undefined) {
+      stringArray(
+        communicationStyle.disliked_topics,
+        '[relationship-graph] communication_style.disliked_topics'
+      );
+    }
+    const tempo = optionalString(
+      communicationStyle,
+      'tempo',
+      '[relationship-graph] communication_style'
+    );
+    if (tempo !== undefined && !['slow', 'balanced', 'fast'].includes(tempo)) {
+      throw new Error('[relationship-graph] communication_style.tempo is invalid');
+    }
+  }
+
+  const knownInterests = optionalObject(root, 'known_interests', '[relationship-graph] node');
+  if (knownInterests) {
+    recordFields(
+      knownInterests,
+      ['public', 'estimated_private'],
+      '[relationship-graph] known_interests'
+    );
+    if (knownInterests.public !== undefined)
+      stringArray(knownInterests.public, '[relationship-graph] known_interests.public');
+    if (knownInterests.estimated_private !== undefined) {
+      stringArray(
+        knownInterests.estimated_private,
+        '[relationship-graph] known_interests.estimated_private'
+      );
+    }
+  }
+
+  if (!Array.isArray(root.history) || root.history.length > HISTORY_MAX) {
+    throw new Error(`[relationship-graph] history must contain at most ${HISTORY_MAX} entries`);
+  }
+  const history = root.history.map((entry, index) => {
+    const item = parseSafeJsonObjectValue(entry, `[relationship-graph] history[${index}]`);
+    recordFields(
+      item,
+      ['at', 'summary', 'channel', 'tone_shifts'],
+      `[relationship-graph] history[${index}]`
+    );
+    return {
+      at: timestamp(item, 'at', `[relationship-graph] history[${index}]`),
+      summary: requiredString(item, 'summary', `[relationship-graph] history[${index}]`),
+      ...(optionalString(item, 'channel', `[relationship-graph] history[${index}]`)
+        ? { channel: optionalString(item, 'channel', `[relationship-graph] history[${index}]`) }
+        : {}),
+      ...(item.tone_shifts === undefined
+        ? {}
+        : {
+            tone_shifts: stringArray(
+              item.tone_shifts,
+              `[relationship-graph] history[${index}].tone_shifts`
+            ),
+          }),
+    };
+  });
+
+  const outstandingAsks = root.outstanding_asks;
+  let parsedOutstandingAsks:
+    Array<{ raised_at: string; content: string; status?: string }> | undefined;
+  if (outstandingAsks !== undefined) {
+    if (!Array.isArray(outstandingAsks))
+      throw new Error('[relationship-graph] outstanding_asks must be an array');
+    parsedOutstandingAsks = outstandingAsks.map((entry, index) => {
+      const item = parseSafeJsonObjectValue(
+        entry,
+        `[relationship-graph] outstanding_asks[${index}]`
+      );
+      recordFields(
+        item,
+        ['raised_at', 'content', 'status'],
+        `[relationship-graph] outstanding_asks[${index}]`
+      );
+      const status = optionalString(
+        item,
+        'status',
+        `[relationship-graph] outstanding_asks[${index}]`
+      );
+      if (status !== undefined && !['open', 'addressed', 'declined'].includes(status)) {
+        throw new Error(`[relationship-graph] outstanding_asks[${index}].status is invalid`);
+      }
+      return {
+        raised_at: timestamp(item, 'raised_at', `[relationship-graph] outstanding_asks[${index}]`),
+        content: requiredString(item, 'content', `[relationship-graph] outstanding_asks[${index}]`),
+        ...(status ? { status } : {}),
+      };
+    });
+  }
+
+  const pendingSuggestions = root.pending_suggestions;
+  let parsedPendingSuggestions: PendingSuggestion[] | undefined;
+  if (pendingSuggestions !== undefined) {
+    if (!Array.isArray(pendingSuggestions))
+      throw new Error('[relationship-graph] pending_suggestions must be an array');
+    parsedPendingSuggestions = pendingSuggestions.map((entry, index) => {
+      const item = parseSafeJsonObjectValue(
+        entry,
+        `[relationship-graph] pending_suggestions[${index}]`
+      );
+      recordFields(
+        item,
+        ['source', 'field_path', 'proposed_value', 'detected_at'],
+        `[relationship-graph] pending_suggestions[${index}]`
+      );
+      const source = requiredString(
+        item,
+        'source',
+        `[relationship-graph] pending_suggestions[${index}]`
+      );
+      assertSource(source);
+      return {
+        source,
+        field_path: requiredString(
+          item,
+          'field_path',
+          `[relationship-graph] pending_suggestions[${index}]`
+        ),
+        proposed_value: item.proposed_value,
+        detected_at: timestamp(
+          item,
+          'detected_at',
+          `[relationship-graph] pending_suggestions[${index}]`
+        ),
+      };
+    });
+  }
+
+  return {
+    identity: {
+      name: requiredString(identity, 'name', '[relationship-graph] identity'),
+      ...(optionalString(identity, 'role', '[relationship-graph] identity')
+        ? { role: optionalString(identity, 'role', '[relationship-graph] identity') }
+        : {}),
+      org: identityOrg,
+      ...(identityPersonSlug ? { person_slug: identityPersonSlug } : {}),
+      ...(contact ? { contact } : {}),
+    },
+    trust_level: {
+      current: trust.current,
+      updated_at: timestamp(trust, 'updated_at', '[relationship-graph] trust_level'),
+      ...(parsedTrustHistory ? { history: parsedTrustHistory } : {}),
+    },
+    ...(communicationStyle ? { communication_style: communicationStyle } : {}),
+    ...(knownInterests ? { known_interests: knownInterests } : {}),
+    history,
+    ...(optionalString(root, 'long_term_summary', '[relationship-graph] node')
+      ? {
+          long_term_summary: optionalString(root, 'long_term_summary', '[relationship-graph] node'),
+        }
+      : {}),
+    ...(parsedOutstandingAsks ? { outstanding_asks: parsedOutstandingAsks } : {}),
+    ...(root.ng_topics === undefined
+      ? {}
+      : { ng_topics: stringArray(root.ng_topics, '[relationship-graph] ng_topics') }),
+    ...(parsedPendingSuggestions ? { pending_suggestions: parsedPendingSuggestions } : {}),
+    updated_at: timestamp(root, 'updated_at', '[relationship-graph] node'),
+  };
 }
 
 export function readNode(org: string, personSlug: string): RelationshipNode | null {
   const file = nodePath(org, personSlug);
   if (!safeExistsSync(file)) return null;
-  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as RelationshipNode;
+  const safeFile = assertSafeRepositoryPath(file, { allowMissingLeaf: false });
+  if (!safeLstat(safeFile).isFile()) {
+    throw new Error('[relationship-graph] relationship node must be a regular file');
+  }
+  return parseRelationshipNode(relationshipNodeCatalog(safeFile).load(), org, personSlug);
 }
 
 function writeNode(org: string, personSlug: string, node: RelationshipNode): void {
   const file = nodePath(org, personSlug);
-  safeWriteFile(file, `${JSON.stringify(node, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
+  const schemaValidated = relationshipNodeCatalog(file).validate(node, file);
+  const validated = parseRelationshipNode(schemaValidated, org, personSlug);
+  safeWriteFile(file, `${JSON.stringify(validated, null, 2)}\n`, {
+    encoding: 'utf8',
+    mkdir: true,
+  });
 }
 
 function initialNode(identity: RelationshipIdentity): RelationshipNode {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     identity,
     trust_level: { current: 3, updated_at: now, history: [] },
@@ -138,7 +501,7 @@ export function recordInteraction(params: RecordInteractionParams): Relationship
     });
 
   node.history = [...node.history, params.interaction].slice(-HISTORY_MAX);
-  node.updated_at = new Date().toISOString();
+  node.updated_at = nowIso();
   writeNode(params.org, params.personSlug, node);
   return node;
 }
@@ -153,17 +516,17 @@ export function suggestFieldUpdate(params: SuggestFieldUpdateParams): Relationsh
   const existing = readNode(params.org, params.personSlug);
   if (!existing) {
     throw new Error(
-      `[relationship-graph] cannot suggest update — node missing for ${params.org}/${params.personSlug}`,
+      `[relationship-graph] cannot suggest update — node missing for ${params.org}/${params.personSlug}`
     );
   }
   const suggestion: PendingSuggestion = {
     source: params.source,
     field_path: params.fieldPath,
     proposed_value: params.proposedValue,
-    detected_at: new Date().toISOString(),
+    detected_at: nowIso(),
   };
   existing.pending_suggestions = [...(existing.pending_suggestions ?? []), suggestion];
-  existing.updated_at = new Date().toISOString();
+  existing.updated_at = nowIso();
   writeNode(params.org, params.personSlug, existing);
   return existing;
 }

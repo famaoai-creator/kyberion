@@ -1,9 +1,8 @@
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReaddir, safeWriteFile } from '@agent/core';
-import { createAjv, readJson } from '@agent/core/foundation';
-import { withExecutionContext } from '@agent/core/governance';
-
-const ajv = createAjv();
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
+import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 const SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/specialist-catalog.schema.json'
@@ -18,76 +17,81 @@ type SpecialistCatalogPayload = {
   specialists: Record<string, Record<string, unknown>>;
 };
 
-function validate(value: unknown): asserts value is SpecialistCatalogPayload {
-  const schema = readJson<Record<string, unknown>>(SCHEMA_PATH);
-  const check = ajv.compile(schema);
-  if (!check(value)) {
-    const errors = (check.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`specialist-catalog schema violation: ${errors}`);
+function loadSpecialistCatalog(filePath: string): SpecialistCatalogPayload {
+  return defineCatalog<SpecialistCatalogPayload>({
+    id: 'specialist-catalog',
+    path: filePath,
+    schema: SCHEMA_PATH,
+  }).load();
+}
+
+function validate(value: unknown, sourcePath: string): SpecialistCatalogPayload {
+  return defineCatalog<SpecialistCatalogPayload>({
+    id: 'specialist-catalog',
+    path: sourcePath,
+    schema: SCHEMA_PATH,
+  }).validate(value, sourcePath);
+}
+
+function render(): GeneratedFile[] {
+  if (!safeExistsSync(DIRECTORY)) {
+    throw new Error(`Specialist catalog directory not found: ${DIRECTORY}`);
   }
+
+  const files = safeReaddir(DIRECTORY)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
+  if (!files.length) {
+    throw new Error(`Specialist catalog directory is empty: ${DIRECTORY}`);
+  }
+
+  const merged: SpecialistCatalogPayload = {
+    version: '1.0.0',
+    specialists: {},
+  };
+
+  for (const file of files) {
+    const filePath = path.join(DIRECTORY, file);
+    const payload = loadSpecialistCatalog(filePath);
+
+    const specialistIds = Object.keys(payload.specialists || {});
+    if (specialistIds.length !== 1) {
+      throw new Error(`Specialist catalog file ${file} must contain exactly one specialist`);
+    }
+
+    const specialistId = specialistIds[0];
+    if (file.replace(/\.json$/i, '') !== specialistId) {
+      throw new Error(`Specialist catalog file ${file} must match specialist id ${specialistId}`);
+    }
+
+    if (payload.version) {
+      merged.version = merged.version || payload.version;
+    }
+    merged.specialists[specialistId] = payload.specialists[specialistId];
+  }
+
+  const snapshot: SpecialistCatalogPayload = {
+    version: merged.version,
+    specialists: Object.keys(merged.specialists)
+      .sort()
+      .reduce<Record<string, Record<string, unknown>>>((acc, specialistId) => {
+        acc[specialistId] = merged.specialists[specialistId];
+        return acc;
+      }, {}),
+  };
+
+  validate(snapshot, SNAPSHOT_PATH);
+  return [{ path: SNAPSHOT_PATH, content: `${JSON.stringify(snapshot, null, 2)}\n` }];
 }
 
-function main(): void {
-  withExecutionContext(
-    'ecosystem_architect',
-    () => {
-      if (!safeExistsSync(DIRECTORY)) {
-        throw new Error(`Specialist catalog directory not found: ${DIRECTORY}`);
-      }
+export const runSyncSpecialistCatalog = defineGenerator({
+  id: 'specialist-catalog',
+  outputs: [SNAPSHOT_PATH],
+  render,
+});
 
-      const files = safeReaddir(DIRECTORY)
-        .filter((entry) => entry.endsWith('.json'))
-        .sort();
-      if (!files.length) {
-        throw new Error(`Specialist catalog directory is empty: ${DIRECTORY}`);
-      }
-
-      const merged: SpecialistCatalogPayload = {
-        version: '1.0.0',
-        specialists: {},
-      };
-
-      for (const file of files) {
-        const filePath = path.join(DIRECTORY, file);
-        const payload = readJson<SpecialistCatalogPayload>(filePath);
-        validate(payload);
-
-        const specialistIds = Object.keys(payload.specialists || {});
-        if (specialistIds.length !== 1) {
-          throw new Error(`Specialist catalog file ${file} must contain exactly one specialist`);
-        }
-
-        const specialistId = specialistIds[0];
-        if (file.replace(/\.json$/i, '') !== specialistId) {
-          throw new Error(
-            `Specialist catalog file ${file} must match specialist id ${specialistId}`
-          );
-        }
-
-        if (payload.version) {
-          merged.version = merged.version || payload.version;
-        }
-        merged.specialists[specialistId] = payload.specialists[specialistId];
-      }
-
-      const snapshot: SpecialistCatalogPayload = {
-        version: merged.version,
-        specialists: Object.keys(merged.specialists)
-          .sort()
-          .reduce<Record<string, Record<string, unknown>>>((acc, specialistId) => {
-            acc[specialistId] = merged.specialists[specialistId];
-            return acc;
-          }, {}),
-      };
-
-      validate(snapshot);
-      safeWriteFile(SNAPSHOT_PATH, JSON.stringify(snapshot, null, 2) + '\n');
-      console.log(`[sync:specialist-catalog] wrote ${SNAPSHOT_PATH}`);
-    },
-    'ecosystem_architect'
-  );
-}
-
-main();
+if (
+  isDirectScript(import.meta.url, 'sync_specialist_catalog.ts') ||
+  isDirectScript(import.meta.url, 'sync_specialist_catalog.js')
+)
+  void runSyncSpecialistCatalog();

@@ -1,8 +1,9 @@
 import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/cognitive-routing-decision.schema.json'
@@ -323,19 +324,18 @@ export function formatCognitiveRouteDecision(
 }
 
 export function loadCognitiveRoutingSchema(): unknown {
-  if (!safeExistsSync(SCHEMA_PATH)) {
+  const safeSchemaPath = assertSafeRepositoryPath(SCHEMA_PATH, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeSchemaPath)) {
     throw new Error(`Cognitive routing schema not found at ${SCHEMA_PATH}`);
   }
-  const raw = safeReadFile(SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  if (cachedSchemaRaw === raw && cachedSchemaPath === SCHEMA_PATH) {
-    return JSON.parse(raw);
+  if (!safeLstat(safeSchemaPath).isFile()) {
+    throw new Error(`Cognitive routing schema must be a regular file at ${SCHEMA_PATH}`);
+  }
+  const raw = safeReadFile(safeSchemaPath, { encoding: 'utf8' }) as string;
+  if (cachedSchemaRaw === raw && cachedSchemaPath === safeSchemaPath) {
+    return parseSafeJsonInput(raw, 'cognitive routing schema');
   }
   cachedSchemaRaw = raw;
-  return JSON.parse(raw);
-}
-
-export function resetCognitiveRoutingCache(): void {
-  validateFn = null;
-  cachedSchemaPath = null;
-  cachedSchemaRaw = null;
+  cachedSchemaPath = safeSchemaPath;
+  return parseSafeJsonInput(raw, 'cognitive routing schema');
 }

@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/operator-learning-promotion-record.schema.json",
+  "title": "Operator Learning Promotion Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "promotion_id",
+    "proposal_id",
+    "profile_id",
+    "approved_by",
+    "approved_at",
+    "target_tier",
+    "target_path",
+    "summary",
+    "evidence_request_ids",
+    "promotion_decision",
+    "candidate_updates"
+  ],
+  "properties": {
+    "kind": { "const": "operator-learning-promotion-record" },
+    "promotion_id": { "type": "string", "minLength": 1 },
+    "proposal_id": { "type": "string", "minLength": 1 },
+    "profile_id": { "type": "string", "minLength": 1 },
+    "approved_by": { "type": "string", "minLength": 1 },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "target_tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "target_path": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "evidence_request_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "promotion_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eligible", "sample_count", "required_samples", "reason"],
+      "properties": {
+        "eligible": { "type": "boolean" },
+        "sample_count": { "type": "integer", "minimum": 0 },
+        "required_samples": { "type": "integer", "minimum": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "candidate_updates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "communication": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "question_budget_default": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          }
+        },
+        "decision_style": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["observed_styles"],
+          "properties": {
+            "observed_styles": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "terminology": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["observed_terms"],
+          "properties": {
+            "observed_terms": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "recurring_tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["family", "sample_count"],
+            "properties": {
+              "family": { "type": "string", "minLength": 1 },
+              "sample_count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "approval_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["observed_triggers"],
+          "properties": {
+            "observed_triggers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

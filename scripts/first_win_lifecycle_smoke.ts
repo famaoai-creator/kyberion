@@ -1,17 +1,27 @@
 #!/usr/bin/env node
+import { extractHintsFromTrace } from '@agent/core/feedback-loop';
+import { matchesCron } from '@agent/core/cron-utils';
+import type { Trace, TraceSpan } from '@agent/core/trace';
+import { loadOrganizationOperationalState } from '@agent/core/organization-operating-model';
+import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
 import {
-  extractHintsFromTrace,
-  loadOrganizationOperationalState,
-  loadProjectRecord,
-  matchesCron,
-  pathResolver,
+  loadOnboardingApplyInputAtPath,
+  type OnboardingApplyInput,
+} from '@agent/core/onboarding-apply-input';
+import { loadProjectRecord } from '@agent/core/project-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
-  safeReadFile,
-} from '@agent/core';
+  safeLstat,
+} from '@agent/core/secure-io';
 import { loadState } from '@agent/core/mission-state';
-import type { Trace, TraceSpan } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const FIRST_WIN_LIFECYCLE_STAGES = [
@@ -50,6 +60,18 @@ const PROJECT_PATH = 'active/shared/tmp/first-win-lifecycle';
 const LIFECYCLE_PIPELINE = 'pipelines/first-win-lifecycle-weekly.json';
 const LIVE_CONFIRMATION = 'FIRST-WIN-LIFECYCLE-LIVE';
 
+export function resolveFirstWinResourcePath(filePath: string, allowMissingLeaf = true): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(filePath), { allowMissingLeaf });
+}
+
+function isRegularFile(filePath: string): boolean {
+  try {
+    return safeExistsSync(filePath) && safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 export interface FirstWinLifecycleLiveOptions {
   identityFile: string;
   runId: string;
@@ -80,9 +102,21 @@ const DEFAULT_LIVE_READERS: FirstWinLifecycleLiveReaders = {
   project: loadProjectRecord,
   mission: loadState,
   missionState: loadState,
-  projectPath: (projectPath) => safeExistsSync(pathResolver.rootResolve(projectPath)),
+  projectPath: (projectPath) => {
+    try {
+      return safeExistsSync(resolveFirstWinResourcePath(projectPath));
+    } catch {
+      return false;
+    }
+  },
   archiveMission: (missionId) =>
-    safeExistsSync(pathResolver.rootResolve(`active/archive/missions/${missionId}`)),
+    (() => {
+      try {
+        return safeExistsSync(resolveFirstWinResourcePath(`active/archive/missions/${missionId}`));
+      } catch {
+        return false;
+      }
+    })(),
 };
 
 function resolveLiveReaders(
@@ -97,8 +131,17 @@ export function validateFirstWinLifecycleLiveOptions(
   const violations: string[] = [];
   if (!options.identityFile.trim()) {
     violations.push('--identity is required for live acceptance; the fixture is dry-run only');
-  } else if (!safeExistsSync(pathResolver.rootResolve(options.identityFile))) {
-    violations.push(`--identity file not found: ${options.identityFile}`);
+  } else {
+    try {
+      const identityPath = resolveFirstWinResourcePath(options.identityFile);
+      if (!isRegularFile(identityPath)) {
+        violations.push(`--identity file not found: ${options.identityFile}`);
+      }
+    } catch (error) {
+      violations.push(
+        `--identity path rejected: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u.test(options.runId)) {
     violations.push("--run-id must contain 3-64 letters, numbers, '.', '_' or '-'");
@@ -152,10 +195,10 @@ function parseJsonPayload(raw: string): Record<string, unknown> | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   try {
-    const parsed = JSON.parse(trimmed);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
+    return parseSafeJsonObjectValue(
+      parseSafeJsonInput(trimmed, 'first-win lifecycle JSON output'),
+      'first-win lifecycle JSON output'
+    );
   } catch {
     // Some governed CLIs write logger lines around machine-readable output.
     // Recover a complete top-level object without accepting arbitrary text.
@@ -182,10 +225,10 @@ function parseJsonPayload(raw: string): Record<string, unknown> | null {
         depth -= 1;
         if (depth === 0 && start >= 0) {
           try {
-            const parsed = JSON.parse(raw.slice(start, index + 1));
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              return parsed as Record<string, unknown>;
-            }
+            return parseSafeJsonObjectValue(
+              parseSafeJsonInput(raw.slice(start, index + 1), 'first-win lifecycle JSON output'),
+              'first-win lifecycle JSON output'
+            );
           } catch {
             start = -1;
           }
@@ -280,9 +323,7 @@ function validateMissionLiveOutput(action: string, missionId: string, raw: strin
 }
 
 function runScheduleStage(): StageObservation {
-  const pipeline = JSON.parse(
-    String(safeReadFile(pathResolver.rootResolve(LIFECYCLE_PIPELINE), { encoding: 'utf8' }))
-  ) as { schedule?: { cron?: string; timezone?: string; enabled?: boolean } };
+  const pipeline = loadPipelineAdfAtPath(resolveFirstWinResourcePath(LIFECYCLE_PIPELINE, false));
   const schedule = pipeline.schedule;
   const cron = schedule?.cron || '';
   const timezone = schedule?.timezone || '';
@@ -357,10 +398,10 @@ function runHintsStage(stages: StageObservation[]): StageObservation {
 }
 
 export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
-  const identity = JSON.parse(
-    String(safeReadFile(pathResolver.rootResolve(IDENTITY_FIXTURE), { encoding: 'utf8' }))
-  ) as { identity?: { agent_id?: string } };
-  const expectedAgentId = identity.identity?.agent_id || '';
+  const identity = loadOnboardingApplyInputAtPath(
+    resolveFirstWinResourcePath(IDENTITY_FIXTURE, false)
+  );
+  const expectedAgentId = identity.identity.agent_id;
   const stages: StageObservation[] = [
     runCommand(
       'onboard',
@@ -509,11 +550,13 @@ export function runFirstWinLifecycleLive(
       ],
     };
   }
-  let identity: { identity?: { agent_id?: string } };
+  let identity: OnboardingApplyInput;
+  let safeIdentityFile: string;
   try {
-    identity = JSON.parse(
-      String(safeReadFile(pathResolver.rootResolve(plan.identityFile), { encoding: 'utf8' }))
-    ) as { identity?: { agent_id?: string } };
+    safeIdentityFile = resolveFirstWinResourcePath(plan.identityFile, false);
+    if (!isRegularFile(safeIdentityFile))
+      throw new Error('identity resource is not a regular file');
+    identity = loadOnboardingApplyInputAtPath(safeIdentityFile);
   } catch (error) {
     return {
       mode: 'live',
@@ -528,7 +571,7 @@ export function runFirstWinLifecycleLive(
       ],
     };
   }
-  const expectedAgentId = identity.identity?.agent_id || '';
+  const expectedAgentId = identity.identity.agent_id;
   const stages: StageObservation[] = [];
   const appendStage = (stage: StageObservation): boolean => {
     stages.push(stage);
@@ -546,7 +589,7 @@ export function runFirstWinLifecycleLive(
       runLiveCommand(
         'onboard',
         'node',
-        ['dist/scripts/onboarding_apply.js', '--identity', plan.identityFile, '--json'],
+        ['dist/scripts/onboarding_apply.js', '--identity', safeIdentityFile, '--json'],
         (payload) =>
           payload?.status === 'complete' &&
           (!expectedAgentId || payload.agent_id === expectedAgentId),

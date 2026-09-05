@@ -252,6 +252,12 @@ describe('agent-identity — accountable ownership and uniqueness', () => {
 // ---------------------------------------------------------------------------
 
 describe('agent-identity — lifecycle and restart replay', () => {
+  it('rejects an external journal path before reading or writing it', () => {
+    expect(
+      () => new AgentIdentityJournal({ journalPath: '/tmp/agent-identity-external.jsonl' })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
   it('issue -> activate -> suspend -> retire, with fresh replay seeing the same state at every step', () => {
     const issued = issueTestIdentity('lifecycle-agent', {
       displayName: 'Lifecycle Agent',

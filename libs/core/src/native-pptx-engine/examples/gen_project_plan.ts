@@ -2,7 +2,7 @@
  * Devin 評価プロジェクト 計画書 (PowerPoint)
  * Native PPTX Engine を使用
  */
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir } from '../../../secure-io.js';
 import { generateNativePptx } from '../engine.js';
 import type { PptxDesignProtocol, PptxElement, PptxSlide } from '../../types/pptx-protocol.js';

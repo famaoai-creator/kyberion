@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "evidence-chain-registry.schema.json",
+  "title": "Evidence Chain Registry",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "$schema": { "type": "string" },
+        "chain": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/entry" }
+        },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/entry" }
+        }
+      },
+      "anyOf": [{ "required": ["chain"] }, { "required": ["entries"] }]
+    },
+    {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  ],
+  "$defs": {
+    "entry": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "id": { "type": "string" },
+            "evidenceId": { "type": "string" },
+            "hash": { "type": "string" },
+            "path": { "type": "string" },
+            "agentId": { "type": "string" },
+            "missionId": { "type": "string" },
+            "parentId": { "type": ["string", "null"] },
+            "registeredAt": { "type": "string" },
+            "timestamp": { "type": "string" },
+            "metadata": { "type": "object" },
+            "context": { "type": "string" }
+          }
+        },
+        { "type": "array" },
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" }
+      ]
+    }
+  }
+}

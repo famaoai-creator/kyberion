@@ -1,4 +1,6 @@
 import { appendJsonLine } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * NI-04: task-scoped short-lived grants — audience-bound authority.
  *
@@ -56,7 +58,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { isVitestProcess } from './foundation/env.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
@@ -147,9 +150,9 @@ export const TASK_GRANTS_STORE_PATH = pathResolver.shared(
 );
 
 export function resolveTaskGrantsStorePath(): string {
-  const override = process.env[TASK_GRANTS_PATH_ENV]?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return TASK_GRANTS_STORE_PATH;
+  const override = getRegisteredEnvText(TASK_GRANTS_PATH_ENV)?.trim();
+  const configured = override ? pathResolver.rootResolve(override) : TASK_GRANTS_STORE_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +233,7 @@ function recordGrantAudit(event: TaskGrantAuditEvent): void {
       auditSinkOverride(event);
       return;
     }
-    if (process.env.VITEST) return; // hermetic guard — see setTaskGrantAuditSinkForTests
+    if (isVitestProcess()) return; // hermetic guard — see setTaskGrantAuditSinkForTests
     auditChain.record({
       agentId: event.grantee_nhi_id,
       action: event.action,
@@ -267,7 +270,7 @@ function readGrantRecords(): Map<string, TaskScopedGrant> {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const parsed = taskScopedGrantSchema.parse(JSON.parse(trimmed));
+      const parsed = taskScopedGrantSchema.parse(parseSafeJsonInput(trimmed, 'task-scoped grant'));
       latest.set(parsed.grant_id, parsed);
     } catch {
       // A torn/corrupt line must not poison replay of the rest.
@@ -277,7 +280,7 @@ function readGrantRecords(): Map<string, TaskScopedGrant> {
 }
 
 function appendGrantRecord(record: TaskScopedGrant): void {
-  if (process.env.VITEST && !process.env[TASK_GRANTS_PATH_ENV]?.trim()) {
+  if (isVitestProcess() && !getRegisteredEnvText(TASK_GRANTS_PATH_ENV)?.trim()) {
     throw new Error(
       '[task-scoped-grants] refusing to write the governed default store under vitest — ' +
         `set process.env.${TASK_GRANTS_PATH_ENV} to an active/shared/tmp/... path in your ` +
@@ -364,7 +367,7 @@ export function issueTaskGrant(params: IssueTaskGrantParams): TaskScopedGrant {
   );
   if (effective <= now) {
     throw new TaskGrantValidationError(
-      `effective expiry ${new Date(effective).toISOString()} is not in the future`
+      `effective expiry ${nowIso(new Date(effective))} is not in the future`
     );
   }
 
@@ -374,9 +377,9 @@ export function issueTaskGrant(params: IssueTaskGrantParams): TaskScopedGrant {
     grantee_nhi_id: granteeNhiId,
     scope: { ...(params.scope ?? {}), tenant_slug: tenantSlug },
     audience: { mission_id: missionId, ...(taskId ? { task_id: taskId } : {}) },
-    expires_at: new Date(effective).toISOString(),
+    expires_at: nowIso(new Date(effective)),
     issued_by: params.issuedBy?.trim() || resolveRole() || 'unknown',
-    issued_at: new Date(now).toISOString(),
+    issued_at: nowIso(new Date(now)),
   };
   appendGrantRecord(grant);
   recordGrantAudit({
@@ -405,7 +408,7 @@ export function revokeTaskGrant(grantId: string, reason: string): TaskScopedGran
   if (existing.revoked_at) return existing;
   const revoked: TaskScopedGrant = {
     ...existing,
-    revoked_at: new Date().toISOString(),
+    revoked_at: nowIso(),
     revoke_reason: reason,
   };
   appendGrantRecord(revoked);
@@ -434,13 +437,14 @@ export function revokeGrantsForTask(
 ): TaskScopedGrant[] {
   assertTaskGrantGovernedContext('revokeGrantsForTask');
   const revoked: TaskScopedGrant[] = [];
+  const revokedAt = nowIso();
   for (const grant of readGrantRecords().values()) {
     if (grant.revoked_at) continue;
     if (grant.audience.mission_id !== missionId) continue;
     if (grant.audience.task_id !== taskId) continue;
     const record: TaskScopedGrant = {
       ...grant,
-      revoked_at: new Date().toISOString(),
+      revoked_at: revokedAt,
       revoke_reason: reason,
     };
     appendGrantRecord(record);

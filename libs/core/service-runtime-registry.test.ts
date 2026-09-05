@@ -1,11 +1,21 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   getServiceRuntimeRecord,
   getServiceRuntimeRegistry,
+  getServiceRuntimeState,
+  loadServiceRuntimeStateAtPath,
   listServiceRuntimeInventory,
   probeServiceRuntime,
-  resetServiceRuntimeRegistryCache,
+  _resetServiceRuntimeRegistryCacheForTests,
 } from './service-runtime-registry.js';
+
+const STATE_TEST_REGISTRY_PATH = pathResolver.sharedTmp(
+  `service-runtime-state-registry-${process.pid}.json`
+);
+const STATE_TEST_MANAGED_PATH = pathResolver.rootResolve('active/shared/runtime/state-test');
+const STATE_TEST_PATH = pathResolver.rootResolve('active/shared/runtime/state-test/state.json');
 
 const mocks = vi.hoisted(() => {
   const secureFetch = vi.fn();
@@ -19,8 +29,15 @@ vi.mock('./network.js', () => ({
 describe('service-runtime-registry', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetServiceRuntimeRegistryCache();
+    _resetServiceRuntimeRegistryCacheForTests();
     mocks.secureFetch.mockResolvedValue({ ok: true });
+  });
+
+  afterEach(() => {
+    safeRmSync(STATE_TEST_REGISTRY_PATH, { force: true });
+    safeRmSync(STATE_TEST_MANAGED_PATH, { recursive: true, force: true });
+    delete process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH;
+    _resetServiceRuntimeRegistryCacheForTests();
   });
 
   it('loads the canonical comfyui registry entry', () => {
@@ -34,15 +51,32 @@ describe('service-runtime-registry', () => {
     });
   });
 
+  it('fails closed when a registry override fails schema validation', () => {
+    safeWriteFile(STATE_TEST_REGISTRY_PATH, JSON.stringify({ version: 'invalid' }));
+    process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH = STATE_TEST_REGISTRY_PATH;
+    _resetServiceRuntimeRegistryCacheForTests();
+
+    expect(() => getServiceRuntimeRegistry()).toThrow(/Invalid catalog service-runtime-registry/);
+  });
+
+  it('fails closed when a registry override is outside the repository', () => {
+    process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH = '/tmp/service-runtime-registry.json';
+    _resetServiceRuntimeRegistryCacheForTests();
+
+    expect(() => getServiceRuntimeRegistry()).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('probes comfyui through the service runtime layer', async () => {
     const resolution = await probeServiceRuntime('comfyui', 'trial', 'darwin');
     expect(resolution.available).toBe(true);
     expect(resolution.probe_url).toBe('http://127.0.0.1:8188/system_stats');
-    expect(mocks.secureFetch).toHaveBeenCalledWith(expect.objectContaining({
-      method: 'GET',
-      url: 'http://127.0.0.1:8188/system_stats',
-      kyberion_allow_local_network: true,
-    }));
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        url: 'http://127.0.0.1:8188/system_stats',
+        kyberion_allow_local_network: true,
+      })
+    );
   });
 
   it('lists service runtime inventory with lifecycle metadata', async () => {
@@ -55,5 +89,130 @@ describe('service-runtime-registry', () => {
       available: true,
       selected_action: 'probe',
     });
+  });
+
+  it('rejects a managed service subpath that escapes the governed runtime root', async () => {
+    const registryPath = pathResolver.sharedTmp(
+      `service-runtime-registry-escape-${process.pid}.json`
+    );
+    process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH = registryPath;
+    safeWriteFile(
+      registryPath,
+      JSON.stringify({
+        version: 'test',
+        default_service_id: 'escape-test',
+        services: [
+          {
+            service_id: 'escape-test',
+            display_name: 'Escape test',
+            kind: 'local_service',
+            status: 'active',
+            platforms: ['any'],
+            supported_modes: ['trial'],
+            trial_probe: { kind: 'http', method: 'GET', path: 'health' },
+            managed_service_subpath: '../outside',
+          },
+        ],
+      })
+    );
+    _resetServiceRuntimeRegistryCacheForTests();
+    await expect(probeServiceRuntime('escape-test', 'trial', 'darwin')).rejects.toThrow(
+      /escapes its root/
+    );
+    safeRmSync(registryPath, { force: true });
+    delete process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH;
+    _resetServiceRuntimeRegistryCacheForTests();
+  });
+
+  it('rejects a malformed persisted service runtime state before inventory use', () => {
+    process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH = STATE_TEST_REGISTRY_PATH;
+    safeWriteFile(
+      STATE_TEST_REGISTRY_PATH,
+      JSON.stringify({
+        version: 'test',
+        default_service_id: 'state-test',
+        services: [
+          {
+            service_id: 'state-test',
+            display_name: 'State test',
+            kind: 'local_service',
+            status: 'active',
+            platforms: ['any'],
+            supported_modes: ['trial', 'installed', 'pinned'],
+            trial_probe: { kind: 'http', method: 'GET', path: 'health' },
+            managed_service_subpath: 'state-test',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      STATE_TEST_PATH,
+      JSON.stringify({
+        version: '1.0.0',
+        service_id: 'other-service',
+        status: 'pinned',
+        managed_service_path: STATE_TEST_MANAGED_PATH,
+        provenance: { action: 'pin', args: [{ unexpected: true }] },
+      }),
+      { mkdir: true }
+    );
+    _resetServiceRuntimeRegistryCacheForTests();
+
+    expect(getServiceRuntimeState('state-test')).toBeNull();
+  });
+
+  it('loads a valid persisted service runtime state with its canonical scope', () => {
+    process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH = STATE_TEST_REGISTRY_PATH;
+    safeWriteFile(
+      STATE_TEST_REGISTRY_PATH,
+      JSON.stringify({
+        version: 'test',
+        default_service_id: 'state-test',
+        services: [
+          {
+            service_id: 'state-test',
+            display_name: 'State test',
+            kind: 'local_service',
+            status: 'active',
+            platforms: ['any'],
+            supported_modes: ['trial', 'installed', 'pinned'],
+            trial_probe: { kind: 'http', method: 'GET', path: 'health' },
+            managed_service_subpath: 'state-test',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      STATE_TEST_PATH,
+      JSON.stringify({
+        version: '1.0.0',
+        service_id: 'state-test',
+        status: 'installed',
+        base_url: 'http://127.0.0.1:8188',
+        managed_service_path: STATE_TEST_MANAGED_PATH,
+        installed_at: new Date().toISOString(),
+        provenance: { action: 'install', notes: 'test' },
+      }),
+      { mkdir: true }
+    );
+    _resetServiceRuntimeRegistryCacheForTests();
+
+    expect(getServiceRuntimeState('state-test')).toMatchObject({
+      service_id: 'state-test',
+      status: 'installed',
+      managed_service_path: STATE_TEST_MANAGED_PATH,
+    });
+  });
+
+  it('rejects a directory at the persisted service runtime state path', () => {
+    const directoryPath = `${STATE_TEST_MANAGED_PATH}/directory-state.json`;
+    safeMkdir(directoryPath, { recursive: true });
+    try {
+      expect(() => loadServiceRuntimeStateAtPath(directoryPath, 'state-test')).toThrow(
+        'state must be a regular file'
+      );
+    } finally {
+      safeRmSync(directoryPath, { recursive: true, force: true });
+    }
   });
 });

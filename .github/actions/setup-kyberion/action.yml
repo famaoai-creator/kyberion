@@ -1,0 +1,33 @@
+name: Setup Kyberion
+description: Install the pinned Kyberion toolchain and workspace dependencies after checkout.
+inputs:
+  node-version:
+    description: Node.js version used by the job.
+    required: false
+    default: '24'
+  install-playwright:
+    description: Install the Chromium runtime required by browser-backed checks.
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 11.15.1
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: pnpm install --frozen-lockfile
+
+    - name: Install Playwright Chromium
+      if: inputs.install-playwright == 'true'
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: pnpm exec playwright install --with-deps chromium

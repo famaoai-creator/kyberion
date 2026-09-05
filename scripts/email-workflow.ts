@@ -6,13 +6,18 @@ import {
   readEmailDraftArtifact,
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
-import { safeExistsSync, safeReadFile } from '@agent/core';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;
 
+const SHARED_FLAGS = new Set(['--json', '--dry-run', '--check', '--quiet']);
+
 function parseArgs(argv: string[]): { command: string; args: ArgMap } {
-  const [command = 'status', ...rest] = argv;
+  if (argv.includes('--help') || argv.includes('-h')) return { command: 'help', args: {} };
+  const filtered = argv.filter((arg) => !SHARED_FLAGS.has(arg));
+  if (filtered[0] === '--') filtered.shift();
+  const [command = 'status', ...rest] = filtered;
   const args: ArgMap = {};
   for (let index = 0; index < rest.length; index += 1) {
     const current = rest[index];
@@ -28,17 +33,17 @@ function parseArgs(argv: string[]): { command: string; args: ArgMap } {
   return { command, args };
 }
 
-function printHelp(): void {
-  console.log(
-    'Usage: npm run email:workflow -- <status|draft|latest-draft|deliver|archive-inbox> [options]'
-  );
-  console.log('');
-  console.log('Commands:');
-  console.log('  status        Check email auth readiness');
-  console.log('  draft         Generate an email draft from triage text');
-  console.log('  latest-draft  Show the latest email draft artifact');
-  console.log('  deliver       Deliver or draft an email (--account auto|gmail|outlook)');
-  console.log('  archive-inbox Organize the inbox (--account auto|gmail|outlook)');
+function helpText(): string {
+  return [
+    'Usage: npm run email:workflow -- <status|draft|latest-draft|deliver|archive-inbox> [options]',
+    '',
+    'Commands:',
+    '  status        Check email auth readiness',
+    '  draft         Generate an email draft from triage text',
+    '  latest-draft  Show the latest email draft artifact',
+    '  deliver       Deliver or draft an email (--account auto|gmail|outlook)',
+    '  archive-inbox Organize the inbox (--account auto|gmail|outlook)',
+  ].join('\n');
 }
 
 function getString(args: ArgMap, key: string, fallback = ''): string {
@@ -55,22 +60,17 @@ function readTextFileIfExists(filePath: string): string {
   return String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
 }
 
-async function main(argv: string[]) {
+async function main(argv: string[], dryRun = false) {
   const { command, args } = parseArgs(argv);
 
-  if (command === 'help' || command === '--help' || command === '-h') {
-    printHelp();
-    return;
-  }
+  if (command === 'help') return helpText();
 
   if (command === 'status') {
-    console.log(JSON.stringify({ accounts: listEmailAccountProviders() }, null, 2));
-    return;
+    return { accounts: listEmailAccountProviders() };
   }
 
   if (command === 'latest-draft') {
-    console.log(JSON.stringify(readEmailDraftArtifact(), null, 2));
-    return;
+    return readEmailDraftArtifact();
   }
 
   if (command === 'draft') {
@@ -79,7 +79,18 @@ async function main(argv: string[]) {
     if (!triageText) {
       throw new Error(`triage text not found at ${triageFile}`);
     }
-    const { getReasoningBackend } = await import('@agent/core');
+    if (dryRun) {
+      return {
+        ok: true,
+        dry_run: true,
+        action: 'draft',
+        triage_path: triageFile,
+        to: getString(args, '--to'),
+        subject: getString(args, '--subject'),
+        tone: getString(args, '--tone', 'clear and concise'),
+      };
+    }
+    const { getReasoningBackend } = await import('@agent/core/reasoning-backend');
     const backend = getReasoningBackend();
     const result = await generateEmailReplyDraft({
       requestId: getString(args, '--request-id'),
@@ -90,8 +101,7 @@ async function main(argv: string[]) {
       delegateTask: backend.delegateTask.bind(backend),
       backendName: (backend as any)?.name || 'unknown',
     });
-    console.log(JSON.stringify(result, null, 2));
-    return;
+    return result;
   }
 
   if (command === 'deliver') {
@@ -107,6 +117,19 @@ async function main(argv: string[]) {
         'approval is required before sending an email; add --approved or use --draft-mode'
       );
     }
+    if (dryRun) {
+      return {
+        ok: true,
+        dry_run: true,
+        action: 'deliver',
+        draft_mode: draftMode,
+        approved,
+        account: getString(args, '--account') || getString(args, '--provider') || 'auto',
+        to: getString(args, '--to'),
+        subject: getString(args, '--subject'),
+        body_chars: bodyMarkdown.length,
+      };
+    }
     const replyModeValue = getString(args, '--reply-mode');
     const result = await executeEmailDelivery({
       approved,
@@ -119,8 +142,7 @@ async function main(argv: string[]) {
       message_id: getString(args, '--message-id'),
       account: getString(args, '--account') || getString(args, '--provider') || 'auto',
     });
-    console.log(JSON.stringify(result, null, 2));
-    return;
+    return result;
   }
 
   if (command === 'archive-inbox') {
@@ -128,14 +150,13 @@ async function main(argv: string[]) {
       account: getString(args, '--account') || getString(args, '--provider') || 'auto',
       max_messages: Number(getString(args, '--max-messages', '50') || '50'),
       min_count: Number(getString(args, '--min-count', '2') || '2'),
-      apply: getBoolean(args, '--apply'),
+      apply: dryRun ? false : getBoolean(args, '--apply'),
       message_ids: getString(args, '--message-ids')
         .split(',')
         .map((id) => id.trim())
         .filter(Boolean),
     });
-    console.log(JSON.stringify(result, null, 2));
-    return;
+    return dryRun ? { ...result, dry_run: true } : result;
   }
 
   throw new Error(`Unknown email workflow command: ${command}`);
@@ -143,8 +164,11 @@ async function main(argv: string[]) {
 
 const script = defineScript({
   name: 'email:workflow',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, dryRun, check, print }) =>
+    main(argv, dryRun || check).then((result) => {
+      if (result !== undefined) print(result);
+      return result;
+    }),
 });
 if (
   isDirectScript(import.meta.url, 'email-workflow.ts') ||

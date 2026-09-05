@@ -1,16 +1,15 @@
-import {
-  logger,
-  recordInteraction,
-  resolveServiceBinding,
-  validatePresenceTimeline,
-  pathResolver,
-  buildGovernedRetryOptions,
-  retry,
-  secureFetch,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import { recordInteraction } from '@agent/core/relationship-graph-store';
+import { resolveServiceBinding } from '@agent/core/service-binding';
+import { validatePresenceTimeline } from '@agent/core/presence-surface';
+import * as pathResolver from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { secureFetch } from '@agent/core/network';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { isRecord } from '@agent/core/foundation/text';
 import { WebClient } from '@slack/web-api';
 
 const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve(
@@ -62,13 +61,17 @@ interface PresenceAction {
   };
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: PRESENCE_MANIFEST_PATH,
-    defaults: DEFAULT_PRESENCE_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: PRESENCE_MANIFEST_PATH,
+  defaults: DEFAULT_PRESENCE_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
+
+export function normalizeTimelineDispatchResponse(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new Error('[PRESENCE] timeline dispatch response must be a JSON object');
+  }
+  return value;
 }
 
 export async function handleAction(input: PresenceAction) {
@@ -168,7 +171,7 @@ export async function handleAction(input: PresenceAction) {
     case 'dispatch_timeline': {
       const timeline = validatePresenceTimeline(params.payload.timeline);
       const bridgeUrl = getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') || 'http://127.0.0.1:3031';
-      const body = await retry(
+      const body: unknown = await retry(
         async () =>
           secureFetch({
             method: 'POST',
@@ -179,7 +182,7 @@ export async function handleAction(input: PresenceAction) {
           }),
         buildRetryOptions()
       );
-      return { status: 'timeline_dispatched', ...body };
+      return { status: 'timeline_dispatched', ...normalizeTimelineDispatchResponse(body) };
     }
 
     case 'record_interaction': {
@@ -192,7 +195,7 @@ export async function handleAction(input: PresenceAction) {
         org,
         source: 'presence-actuator',
         interaction: {
-          at: new Date().toISOString(),
+          at: nowIso(),
           summary,
           channel: params.channel,
           ...(tone_shifts ? { tone_shifts } : {}),

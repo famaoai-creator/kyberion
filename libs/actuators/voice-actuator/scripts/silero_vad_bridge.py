@@ -20,6 +20,7 @@ import base64
 import json
 import os
 import sys
+from json_boundary import JsonInputError, parse_json_object
 
 WINDOW = 512  # silero v5 expects 512-sample windows at 16 kHz
 
@@ -75,8 +76,8 @@ def main() -> None:
         if not line:
             continue
         try:
-            request = json.loads(line)
-        except json.JSONDecodeError:
+            request = parse_json_object(line, "Silero VAD input")
+        except JsonInputError:
             continue
 
         if request.get("reset"):

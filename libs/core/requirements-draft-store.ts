@@ -9,8 +9,10 @@
  */
 
 import * as path from 'node:path';
-import { missionEvidenceDir } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { missionEvidenceDir, pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import type {
   ExtractedRequirements,
   FunctionalRequirement,
@@ -21,6 +23,7 @@ import type {
 } from './reasoning-backend.js';
 
 const DRAFT_FILE = 'requirements-draft.json';
+const DRAFT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/requirements-draft.schema.json');
 
 export type SignoffChannel = 'in_meeting' | 'email' | 'docusign' | 'slack' | 'other';
 
@@ -61,13 +64,40 @@ export interface RequirementsDraft {
 function draftPath(missionId: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
-  return path.join(dir, DRAFT_FILE);
+  return assertSafeRepositoryPath(path.join(dir, DRAFT_FILE), { allowMissingLeaf: true });
+}
+
+function requirementsDraftCatalog(filePath: string) {
+  return defineCatalog<RequirementsDraft>({
+    id: 'requirements-draft',
+    path: filePath,
+    schema: DRAFT_SCHEMA_PATH,
+  });
+}
+
+export function writeRequirementsDraftAtPath(
+  filePath: string,
+  draft: RequirementsDraft
+): RequirementsDraft {
+  const safeFile = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = requirementsDraftCatalog(safeFile).validate(draft, safeFile);
+  safeWriteFile(safeFile, `${JSON.stringify(validated, null, 2)}\n`, {
+    encoding: 'utf8',
+    mkdir: true,
+  });
+  return validated;
 }
 
 export function readRequirementsDraft(missionId: string): RequirementsDraft | null {
   const file = draftPath(missionId);
-  if (!file || !safeExistsSync(file)) return null;
-  return loadJson<RequirementsDraft>(file);
+  return file ? readRequirementsDraftAtPath(file) : null;
+}
+
+/** Load an explicitly supplied draft through the same schema boundary as the mission artifact. */
+export function readRequirementsDraftAtPath(filePath: string): RequirementsDraft | null {
+  const safeFile = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFile)) return null;
+  return requirementsDraftCatalog(safeFile).load();
 }
 
 export interface SaveRequirementsDraftParams {
@@ -100,7 +130,7 @@ export function saveRequirementsDraft(params: SaveRequirementsDraftParams): Requ
     assumptions: params.extracted.assumptions,
     open_questions: params.extracted.open_questions,
     ...(params.extracted.scope ? { scope: params.extracted.scope } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(params.generatedBy ? { generated_by: params.generatedBy } : {}),
   };
   const file = draftPath(params.missionId);
@@ -109,8 +139,7 @@ export function saveRequirementsDraft(params: SaveRequirementsDraftParams): Requ
       `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`
     );
   }
-  safeWriteFile(file, `${JSON.stringify(draft, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
-  return draft;
+  return writeRequirementsDraftAtPath(file, draft);
 }
 
 function bumpVersion(previous?: string): string {
@@ -137,7 +166,7 @@ export function recordCustomerSignoff(params: RecordSignoffParams): Requirements
   }
   existing.stakeholder_signoff = {
     customer_signed_off: true,
-    signed_at: new Date().toISOString(),
+    signed_at: nowIso(),
     signed_by: params.signedBy,
     channel: params.channel,
     ...(params.notes ? { notes: params.notes } : {}),
@@ -148,8 +177,7 @@ export function recordCustomerSignoff(params: RecordSignoffParams): Requirements
       `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`
     );
   }
-  safeWriteFile(file, `${JSON.stringify(existing, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
-  return existing;
+  return writeRequirementsDraftAtPath(file, existing);
 }
 
 // ----- Gate evaluators --------------------------------------------------

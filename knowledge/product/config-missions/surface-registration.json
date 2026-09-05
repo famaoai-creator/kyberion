@@ -2,7 +2,7 @@
   "preset_id": "surface-registration",
   "type": "config_mission",
   "category": "surface",
-  "description": "Register a new runtime surface in the surface manifest. The surface becomes available to pnpm surfaces:start after applying.",
+  "description": "Register a new runtime surface in the surface manifest. The surface becomes available to pnpm surfaces start after applying.",
   "inputs": {
     "surface_id": {
       "type": "string",
@@ -46,5 +46,5 @@
   "target_kind": "system",
   "scope_kind": "system",
   "tier": "public",
-  "notes": "After applying, run `pnpm surfaces:reconcile` to start the newly registered surface."
+  "notes": "After applying, run `pnpm surfaces reconcile` to start the newly registered surface."
 }

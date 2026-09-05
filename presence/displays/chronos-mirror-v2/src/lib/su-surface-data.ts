@@ -1,19 +1,26 @@
 import { MetricsCollector } from '@agent/core/metrics';
+import { eventScopeMatches, type EventScopeFilter } from '@agent/core/event-scope';
 import {
-  eventScopeMatches,
   listGenerationCostSettlements,
-  resolveScopeForRecord,
-  type EventScopeFilter,
   type GenerationCostSettlement,
-} from '@agent/core';
+} from '@agent/core/generation-cost-settlement';
+import { resolveScopeForRecord } from '@agent/core/scope-migration';
 import { listApprovalRequests } from '@agent/core/approval-store';
 import { listArtifactRecords } from '@agent/core/artifact-record';
+import { loadMissionManagementConfig } from '@agent/core/mission-management-config';
+import { loadState, loadStateAtPath } from '@agent/core/mission-state';
 import type { ApprovalRequestRecord } from '@agent/core/approval-store';
 import type { ArtifactRecord } from '@agent/core/artifact-record';
 import * as pathResolver from '@agent/core/path-resolver';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { loadJson, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core/secure-io';
 import { type MissionState } from '../../../../../scripts/refactor/mission-types.js';
+import { recordField, stringField } from './json-record';
 
 export interface MissionHistoryEntry {
   missionId: string;
@@ -115,11 +122,9 @@ export function resolveApprovalTenant(record: ApprovalRequestRecord): string | u
   if (!missionId) return undefined;
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return undefined;
-  const statePath = `${missionPath}/mission-state.json`;
-  if (!safeExistsSync(statePath)) return undefined;
   try {
-    const state = loadJson<{ tenant_slug?: string; tenant_id?: string }>(statePath);
-    return state.tenant_slug || state.tenant_id;
+    const state = loadState(missionId);
+    return state?.tenant_slug || state?.tenant_id;
   } catch {
     return undefined;
   }
@@ -137,18 +142,12 @@ export interface ApprovalQueueQuery {
 }
 
 function readMissionManagementDirs(): string[] {
-  const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
-  if (safeExistsSync(configPath)) {
-    try {
-      const raw = loadJson<{ directories?: Record<string, string> }>(configPath);
-      const dirs = raw.directories || {};
-      return ['personal', 'confidential', 'public']
-        .map((tier) => dirs[tier])
-        .filter((value): value is string => Boolean(value))
-        .map((value) => pathResolver.rootResolve(value));
-    } catch {
-      // fall back to the default directory layout below.
-    }
+  const config = loadMissionManagementConfig();
+  if (config) {
+    return ['personal', 'confidential', 'public']
+      .map((tier) => config.directories[tier])
+      .filter((value): value is string => Boolean(value))
+      .map((value) => pathResolver.rootResolve(value));
   }
 
   return [
@@ -163,13 +162,16 @@ function collectMissionStates(): MissionState[] {
   const states: MissionState[] = [];
   for (const root of readMissionManagementDirs()) {
     try {
-      if (!safeExistsSync(root)) continue;
-      for (const entry of safeReaddir(root)) {
-        const statePath = `${root}/${entry}/mission-state.json`;
-        if (!safeExistsSync(statePath)) continue;
+      const safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+      if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) continue;
+      for (const entry of safeReaddir(safeRoot)) {
+        const statePath = assertSafeRepositoryPath(`${safeRoot}/${entry}/mission-state.json`, {
+          allowMissingLeaf: true,
+        });
+        if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) continue;
         try {
-          const state = loadJson<MissionState>(statePath);
-          if (state?.mission_id) states.push(state);
+          const state = loadStateAtPath(statePath);
+          if (state) states.push(state);
         } catch {
           // Ignore malformed mission state files.
         }
@@ -314,25 +316,34 @@ export function buildMissionHistoryItems(query: MissionHistoryQuery = {}): Missi
   return projectMissionHistoryItems(collectMissionStates(), listArtifactRecords(), query);
 }
 
-function getMetricTokens(entry: Record<string, any>): number {
-  const usage = entry.usage || {};
-  const promptTokens = Number(entry.prompt_tokens ?? usage.prompt_tokens ?? 0);
-  const completionTokens = Number(entry.completion_tokens ?? usage.completion_tokens ?? 0);
+function numericMetricValue(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function timestampForMetricEntry(entry: Record<string, unknown>): string {
+  return stringField(entry, 'timestamp') || stringField(entry, 'ts');
+}
+
+function getMetricTokens(entry: Record<string, unknown>): number {
+  const usage = recordField(entry.usage);
+  const promptTokens = numericMetricValue(entry.prompt_tokens ?? usage.prompt_tokens);
+  const completionTokens = numericMetricValue(entry.completion_tokens ?? usage.completion_tokens);
   return Math.max(0, promptTokens + completionTokens);
 }
 
-function getMetricCost(entry: Record<string, any>): number {
-  const directCost = Number(
-    entry.cost_usd ?? entry.sdk_cost_usd ?? entry.total_cost_usd ?? entry.estimated_cost_usd ?? 0
+function getMetricCost(entry: Record<string, unknown>): number {
+  const directCost = numericMetricValue(
+    entry.cost_usd ?? entry.sdk_cost_usd ?? entry.total_cost_usd ?? entry.estimated_cost_usd
   );
   if (Number.isFinite(directCost) && directCost > 0) return directCost;
   const tokens = getMetricTokens(entry);
   if (tokens <= 0) return 0;
-  return Number(entry.estimated_cost_usd ?? 0);
+  return numericMetricValue(entry.estimated_cost_usd);
 }
 
 export function buildCostSummary(input: {
-  history: Record<string, any>[];
+  history: Array<Record<string, unknown>>;
   generationSettlements?: GenerationCostSettlement[];
   missionId?: string;
   missionIds?: string[];
@@ -346,10 +357,13 @@ export function buildCostSummary(input: {
     (input.missionIds || []).map((missionId) => missionId.trim().toUpperCase()).filter(Boolean)
   );
   const entries = input.history.filter((entry) => {
-    const entryMissionId = String(entry.mission_id || entry.missionId || '').toUpperCase();
+    const entryMissionId = (
+      stringField(entry, 'mission_id') || stringField(entry, 'missionId')
+    ).toUpperCase();
     if (missionFilter && entryMissionId !== missionFilter) return false;
     if (input.missionIds !== undefined && !missionFilters.has(entryMissionId)) return false;
-    if (sinceIso && String(entry.timestamp || entry.ts || '') < sinceIso) return false;
+    const timestamp = timestampForMetricEntry(entry);
+    if (sinceIso && timestamp < sinceIso) return false;
     if (
       input.scopeFilter &&
       !eventScopeMatches(
@@ -370,7 +384,9 @@ export function buildCostSummary(input: {
   let totalTokens = 0;
   let totalUsd = 0;
   for (const entry of entries) {
-    const missionId = String(entry.mission_id || entry.missionId || 'unassigned').toUpperCase();
+    const missionId = (
+      stringField(entry, 'mission_id') || stringField(entry, 'missionId', 'unassigned')
+    ).toUpperCase();
     const tokens = getMetricTokens(entry);
     const usd = getMetricCost(entry);
     const record = byMission.get(missionId) || {
@@ -383,7 +399,7 @@ export function buildCostSummary(input: {
     record.tokens += tokens;
     record.usd += usd;
     record.entryCount += 1;
-    record.lastSeen = String(entry.timestamp || entry.ts || record.lastSeen || '');
+    record.lastSeen = timestampForMetricEntry(entry) || record.lastSeen || '';
     byMission.set(missionId, record);
     totalTokens += tokens;
     totalUsd += usd;

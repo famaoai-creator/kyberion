@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { resolveRuntimeModelId } from '@agent/core/reasoning-model-routing';
 import { safeExistsSync } from '@agent/core/secure-io';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { toWireError } from '@agent/core/wire-error';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
-import type { AgentRoutingDecision } from '@agent/core/intent-contract';
-import { guardRequest } from '../../../lib/api-guard';
-import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
+import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
+import { resolveViewerContextForRequest, type ViewerContext } from '../../../lib/viewer-context';
 import { buildUserFacingError } from '../../../lib/user-facing-error';
 import {
-  buildSurfaceMissionId,
+  chronosConversationScope,
   intentResolutionA2ui,
-  sanitizeMissionSlug,
+  readChronosAgentBody,
+  resolveChronosPipelineInputPath,
   withMissionRole,
 } from './agent-route-helpers';
 import {
@@ -21,6 +21,18 @@ import {
   uxTextOr,
   type SupportedLocale,
 } from '../../../lib/ux-vocabulary';
+import {
+  collectActiveMissions,
+  runCommandQuickAction,
+  runScheduleQuickAction,
+} from './chronos-quick-action-helpers';
+import {
+  parseChronosAuditEvent,
+  parseChronosMissionProposalState,
+  parseChronosSurfaceRequestArtifact,
+  type ChronosMissionProposalState,
+  type MissionProposal,
+} from './chronos-persisted-parsers';
 
 async function loadChronosCore() {
   const [
@@ -36,7 +48,7 @@ async function loadChronosCore() {
     orchestrationEvents,
     toolRuntimeRegistry,
     coreLogger,
-    foundation,
+    missionState,
   ] = await Promise.all([
     import('@agent/core/presence-bridge'),
     import('@agent/core/path-resolver'),
@@ -50,15 +62,18 @@ async function loadChronosCore() {
     import('@agent/core/mission-orchestration-events'),
     import('@agent/core/tool-runtime-registry'),
     import('@agent/core/core'),
-    import('@agent/core/foundation'),
+    import('@agent/core/mission-state'),
   ]);
 
   return {
     logger: coreLogger.logger,
     pathResolver: pathResolverModule.pathResolver,
-    readJson: foundation.readJson,
+    assertSafeRepositoryPath: secureIo.assertSafeRepositoryPath,
+    loadStateAtPath: missionState.loadStateAtPath,
+    loadMissionNextTaskRecordsAtPath: missionState.loadMissionNextTaskRecordsAtPath,
     safeExistsSync: secureIo.safeExistsSync,
     safeMkdir: secureIo.safeMkdir,
+    safeLstat: secureIo.safeLstat,
     safeReadFile: secureIo.safeReadFile,
     safeReaddir: secureIo.safeReaddir,
     safeRmSync: secureIo.safeRmSync,
@@ -67,6 +82,8 @@ async function loadChronosCore() {
     recordChronosSurfaceRequest: channelSurface.recordChronosSurfaceRequest,
     runSurfaceConversation: channelSurface.runSurfaceConversation,
     runSurfaceMessageConversation: channelSurface.runSurfaceMessageConversation,
+    buildMissionIssuanceReply: channelSurface.buildMissionIssuanceReply,
+    issueChronosMissionFromProposal: channelSurface.issueChronosMissionFromProposal,
     reflectPresenceAgentReply: presenceBridge.reflectPresenceAgentReply,
     dispatchPresenceFrame: presenceBridge.dispatchPresenceFrame,
     listSurfaceOutboxMessages: channelSurface.listSurfaceOutboxMessages,
@@ -101,6 +118,18 @@ const RUN_PIPELINE_PATTERN = /^node\s+dist\/scripts\/run_pipeline\.js\s+--input\
 const QUICK_ACTION_PATTERN = /^chronos:\/\/quick-action\/([a-z-]+)$/;
 
 const g = globalThis as any;
+
+type ChronosCore = Awaited<ReturnType<typeof loadChronosCore>>;
+
+function readSafeChronosFile(core: ChronosCore, filePath: string): string | null {
+  try {
+    const safePath = core.assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!core.safeExistsSync(safePath) || !core.safeLstat(safePath).isFile()) return null;
+    return core.safeReadFile(safePath, { encoding: 'utf8' }) as string;
+  } catch {
+    return null;
+  }
+}
 
 function clearChronosCache() {
   if (g.__kyberionChronosIdleTimer) {
@@ -195,26 +224,6 @@ async function ensureChronosAgent(context?: {
   return g.__kyberionChronosHandle;
 }
 
-type MissionProposal = {
-  intent: 'create_mission';
-  mission_type?: string;
-  summary?: string;
-  assigned_persona?: string;
-  tier?: 'personal' | 'confidential' | 'public';
-  vision_ref?: string;
-  why?: string;
-};
-
-type ChronosMissionProposalState = {
-  surface: 'chronos';
-  channel: 'chronos';
-  threadTs: string;
-  proposal: MissionProposal;
-  sourceText?: string;
-  routingDecision?: AgentRoutingDecision;
-  createdAt: string;
-};
-
 function chronosMissionProposalStatePath(
   sessionId: string,
   pathResolver: Awaited<ReturnType<typeof loadChronosCore>>['pathResolver']
@@ -231,10 +240,13 @@ function getChronosMissionProposalState(
 ): ChronosMissionProposalState | null {
   const statePath = chronosMissionProposalStatePath(sessionId, core.pathResolver);
   return withMissionRole('chronos_gateway', () => {
-    if (!core.safeExistsSync(statePath)) return null;
-    return JSON.parse(
-      core.safeReadFile(statePath, { encoding: 'utf8' }) as string
-    ) as ChronosMissionProposalState;
+    const raw = readSafeChronosFile(core, statePath);
+    if (raw === null) return null;
+    try {
+      return parseChronosMissionProposalState(parseSafeJsonInput(raw, 'mission proposal state'));
+    } catch {
+      return null;
+    }
   });
 }
 
@@ -260,7 +272,7 @@ function saveChronosMissionProposalState(
           proposal: params.proposal,
           sourceText: params.sourceText,
           routingDecision: params.routingDecision,
-          createdAt: new Date().toISOString(),
+          createdAt: nowIso(),
         } satisfies ChronosMissionProposalState,
         null,
         2
@@ -276,111 +288,18 @@ function clearChronosMissionProposalState(
 ): void {
   const statePath = chronosMissionProposalStatePath(sessionId, core.pathResolver);
   withMissionRole('chronos_gateway', () => {
-    if (!core.safeExistsSync(statePath)) return;
+    if (!core.safeExistsSync(statePath) || !core.safeLstat(statePath).isFile()) return;
     core.safeRmSync(statePath, { force: true });
   });
-}
-
-async function issueChronosMissionFromProposal(
-  params: {
-    sessionId: string;
-    proposal: MissionProposal;
-    sourceText?: string;
-    routingDecision?: AgentRoutingDecision;
-  },
-  core: Awaited<ReturnType<typeof loadChronosCore>>
-) {
-  const missionId = buildSurfaceMissionId(
-    'CHRONOS',
-    params.sessionId,
-    params.proposal,
-    params.sourceText
-  );
-  const tier = params.proposal.tier || 'public';
-  const missionType = params.proposal.mission_type || 'development';
-  const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
-  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
-
-  const startOutput = core.safeExec(
-    'node',
-    [
-      'dist/scripts/mission_controller.js',
-      'start',
-      missionId,
-      tier,
-      persona,
-      'default',
-      missionType,
-      ...(params.routingDecision
-        ? ['--routing-decision', JSON.stringify(params.routingDecision)]
-        : []),
-    ],
-    { env, cwd: PROJECT_ROOT }
-  );
-
-  let orchestrationStatus: 'queued' | 'failed' = 'queued';
-  let orchestrationJobPath: string | undefined;
-  let orchestrationError: string | undefined;
-  try {
-    const event = withMissionRole('chronos_gateway', () =>
-      core.enqueueMissionOrchestrationEvent({
-        eventType: 'mission_issue_requested',
-        missionId,
-        requestedBy: 'chronos_gateway',
-        correlationId: randomUUID(),
-        payload: {
-          sessionId: params.sessionId,
-          proposal: params.proposal,
-          sourceText: params.sourceText,
-          tier,
-          persona,
-          missionType,
-          channel: 'chronos',
-          threadTs: params.sessionId,
-        },
-      })
-    );
-    orchestrationJobPath = withMissionRole('chronos_gateway', () =>
-      core.startMissionOrchestrationWorker(event)
-    );
-  } catch (error) {
-    orchestrationStatus = 'failed';
-    orchestrationError = error instanceof Error ? error.message : String(error);
-  }
-
-  withMissionRole('chronos_gateway', () => {
-    core.emitMissionOrchestrationObservation({
-      decision: 'mission_issued',
-      source: 'chronos',
-      mission_id: missionId,
-      session_id: params.sessionId,
-      mission_type: missionType,
-      tier,
-      requested_by: 'chronos_gateway',
-      orchestration_status: orchestrationStatus,
-      orchestration_job_path: orchestrationJobPath,
-    });
-  });
-
-  return {
-    missionId,
-    tier,
-    missionType,
-    persona,
-    startOutput,
-    orchestrationStatus,
-    orchestrationJobPath,
-    orchestrationError,
-    routingDecision: params.routingDecision,
-  };
 }
 
 async function tryHandleDeterministicPipelineQuery(query: string, locale: SupportedLocale) {
   const match = query.match(RUN_PIPELINE_PATTERN);
   if (!match) return null;
 
-  const { pathResolver, safeExec, logger } = await loadChronosCore();
-  const inputPath = pathResolver.rootResolve(match[1]);
+  const { safeExec, logger } = await loadChronosCore();
+  const inputPath = resolveChronosPipelineInputPath(PROJECT_ROOT, match[1]);
+  if (!inputPath) return null;
   const output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', inputPath], {
     cwd: PROJECT_ROOT,
   });
@@ -418,227 +337,97 @@ async function tryHandleDeterministicPipelineQuery(query: string, locale: Suppor
       status: 'completed',
     },
     delegations: undefined,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   };
 }
 
-async function tryHandleChronosQuickAction(query: string, locale: SupportedLocale) {
+async function tryHandleChronosQuickAction(
+  query: string,
+  locale: SupportedLocale,
+  viewer: ViewerContext
+) {
   const match = query.match(QUICK_ACTION_PATTERN);
   if (!match) return null;
+
+  // Quick actions intentionally execute repository-wide operator commands and
+  // several of them read global mission/audit/runtime state. They are not yet
+  // tenant-aware projections, so never expose them to a scoped viewer. The
+  // route performs the localadmin check before entering this helper as well.
+  if (viewer.tenantSlugs !== 'all') return null;
 
   const action = match[1];
   const core = await loadChronosCore();
 
-  const collectActiveMissions = () => {
-    const roots = [
-      { dir: core.pathResolver.active('missions/public'), tier: 'public' },
-      { dir: core.pathResolver.active('missions/confidential'), tier: 'confidential' },
-    ];
-
-    const missions: Array<{
-      missionId: string;
-      status: string;
-      tier: string;
-      missionType?: string;
-      checkpoints: number;
-      nextTaskCount: number;
-      planReady: boolean;
-    }> = [];
-
-    for (const root of roots) {
-      if (!core.safeExistsSync(root.dir)) continue;
-      for (const item of core.safeReaddir(root.dir)) {
-        const missionDir = path.join(root.dir, item);
-        const statePath = path.join(missionDir, 'mission-state.json');
-        if (!core.safeExistsSync(statePath)) continue;
-        const state = core.loadJson<Record<string, any>>(statePath);
-        missions.push({
-          missionId: state.mission_id || item,
-          status: state.status,
-          tier: state.tier || root.tier,
-          missionType: state.mission_type,
-          checkpoints: state.git?.checkpoints?.length || 0,
-          nextTaskCount: core.safeExistsSync(path.join(missionDir, 'NEXT_TASKS.json'))
-            ? core.loadJson<any[]>(path.join(missionDir, 'NEXT_TASKS.json'))?.length || 0
-            : 0,
-          planReady: core.safeExistsSync(path.join(missionDir, 'PLAN.md')),
-        });
-      }
-    }
-
-    return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
-  };
-
-  const readJson = <T = unknown>(filePath: string) => core.loadJson<T>(filePath);
-
-  const runCommandQuickAction = (title: string, command: string[], description: string) => {
-    const result = core.safeExecResult('pnpm', command, { cwd: PROJECT_ROOT, maxOutputMB: 4 });
-    const output = [result.stdout, result.stderr]
-      .map((part) => String(part || '').trim())
-      .filter(Boolean)
-      .join('\n');
-    const ok = result.status === 0;
-    return {
-      status: ok ? 'ok' : 'warning',
-      // Two keys rather than one with an embedded conditional: the original
-      // spliced '（警告あり）' into the template with a ternary, which cannot
-      // be expressed in the catalog without putting Japanese back into code.
-      response: uxMessage(
-        ok ? 'chronos_command_completed' : 'chronos_command_completed_with_warnings',
-        { title },
-        `${title} completed${ok ? '' : ' with warnings'}.`,
-        locale
-      ),
-      a2ui: [
-        {
-          type: 'display:hero',
-          props: {
-            eyebrow: 'Readiness',
-            title,
-            description,
-            status: ok ? 'ready' : 'attention',
-          },
-        },
-        {
-          type: 'display:metrics-row',
-          props: {
-            metrics: [
-              { label: 'exit', value: result.status ?? -1, trend: ok ? 'flat' : 'down' },
-              { label: 'stdout', value: output ? output.split('\n').length : 0, trend: 'flat' },
-              { label: 'status', value: ok ? 'ok' : 'warning', trend: ok ? 'flat' : 'down' },
-            ],
-          },
-        },
-        {
-          type: 'display:log',
-          props: {
-            title: `${title} Output`,
-            lines: output ? output.split('\n').slice(-30) : ['(no output)'],
-          },
-        },
-      ],
-      timestamp: new Date().toISOString(),
-    };
-  };
-
-  const runScheduleQuickAction = async (action: 'list' | 'tick') => {
-    try {
-      const { runGenerationScheduleAction } = await import('@agent/core/generation-scheduler');
-      const result = await runGenerationScheduleAction({ action });
-      const serialized = JSON.stringify(result, null, 2);
-      return {
-        status: 'ok',
-        response: uxMessage(
-          'chronos_schedule_completed',
-          { action },
-          `Schedule ${action} completed.`,
-          locale
-        ),
-        a2ui: [
-          {
-            type: 'display:hero',
-            props: {
-              eyebrow: 'Schedule',
-              title: action === 'tick' ? 'Schedule Tick' : 'Schedule List',
-              description:
-                action === 'tick'
-                  ? 'Tick due generation schedules and submit any ready jobs.'
-                  : 'Inspect the current generation schedule registry.',
-              status: action === 'tick' ? 'ticked' : 'listed',
-            },
-          },
-          {
-            type: 'display:log',
-            props: {
-              title: action === 'tick' ? 'Tick Result' : 'Schedule Registry',
-              lines: serialized.split('\n'),
-            },
-          },
-        ],
-        timestamp: new Date().toISOString(),
-      };
-    } catch (err: any) {
-      const message = String(err?.message || err || 'schedule action failed');
-      return {
-        status: 'warning',
-        response: uxMessage(
-          'chronos_schedule_failed',
-          { action },
-          `Schedule ${action} failed.`,
-          locale
-        ),
-        a2ui: [
-          {
-            type: 'display:hero',
-            props: {
-              eyebrow: 'Schedule',
-              title: action === 'tick' ? 'Schedule Tick' : 'Schedule List',
-              description: 'The schedule registry is reachable, but the action returned an error.',
-              status: 'attention',
-            },
-          },
-          {
-            type: 'display:log',
-            props: {
-              title: 'Schedule Error',
-              lines: message.split('\n').slice(-20),
-            },
-          },
-        ],
-        timestamp: new Date().toISOString(),
-      };
-    }
-  };
+  const readJson = <T = unknown>(filePath: string) =>
+    core.readJson<T>(core.assertSafeRepositoryPath(filePath));
 
   switch (action) {
     case 'prereq-check': {
       return runCommandQuickAction(
+        core,
+        PROJECT_ROOT,
         'Kyberion Toolchain Preflight',
-        ['prereq:check'],
-        'Confirm the local Node, pnpm, git, and source-workflow tooling before you build from source.'
+        ['env:bootstrap', '--manifest', 'kyberion-toolchain'],
+        'Confirm the local Node, pnpm, git, and source-workflow tooling before you build from source.',
+        locale
       );
     }
     case 'setup-report': {
       return runCommandQuickAction(
+        core,
+        PROJECT_ROOT,
         'Kyberion Setup Report',
         ['setup:report'],
-        'Inspect surfaces, services, reasoning, and doctor readiness together before you start work.'
+        'Inspect surfaces, services, reasoning, and doctor readiness together before you start work.',
+        locale
       );
     }
     case 'doctor': {
       return runCommandQuickAction(
+        core,
+        PROJECT_ROOT,
         'Kyberion Doctor',
         ['run', 'doctor'],
-        'Run the consolidated readiness check for must / should / nice signals.'
+        'Run the consolidated readiness check for must / should / nice signals.',
+        locale
       );
     }
     case 'surfaces-setup': {
       return runCommandQuickAction(
+        core,
+        PROJECT_ROOT,
         'Surface Setup',
-        ['surfaces:setup'],
-        'Inspect surface auth readiness and host-managed bridge prerequisites.'
+        ['surfaces', 'setup'],
+        'Inspect surface auth readiness and host-managed bridge prerequisites.',
+        locale
       );
     }
     case 'services-setup': {
       return runCommandQuickAction(
+        core,
+        PROJECT_ROOT,
         'Service Setup',
         ['services:setup'],
-        'Inspect external service presets, auth strategies, and connection files.'
+        'Inspect external service presets, auth strategies, and connection files.',
+        locale
       );
     }
     case 'reasoning-setup': {
       return runCommandQuickAction(
+        core,
+        PROJECT_ROOT,
         'Reasoning Setup',
         ['reasoning:setup'],
-        'Inspect reasoning backend readiness before routing missions through a provider.'
+        'Inspect reasoning backend readiness before routing missions through a provider.',
+        locale
       );
     }
     case 'schedule-tick':
-      return runScheduleQuickAction('tick');
+      return runScheduleQuickAction('tick', locale);
     case 'schedule-list':
-      return runScheduleQuickAction('list');
+      return runScheduleQuickAction('list', locale);
     case 'dashboard': {
-      const missions = collectActiveMissions();
+      const missions = collectActiveMissions(core);
       const runtime = core.listAgentRuntimeSnapshots();
       const pendingOutbox = [
         ...core.listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true }),
@@ -701,11 +490,11 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'missions': {
-      const missions = collectActiveMissions();
+      const missions = collectActiveMissions(core);
       return {
         status: 'ok',
         response: uxMessage(
@@ -741,7 +530,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'agents': {
@@ -785,11 +574,11 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'vital-check': {
-      const missions = collectActiveMissions();
+      const missions = collectActiveMissions(core);
       const runtimes = core.listAgentRuntimeSnapshots();
       const readyCount = runtimes.filter((entry: any) => entry.agent.status === 'ready').length;
       const pendingOutbox =
@@ -834,7 +623,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'diagnostics': {
@@ -850,12 +639,9 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
       ];
       const recentLines = recentFiles
         .flatMap((file) => {
-          if (!core.safeExistsSync(file)) return [];
-          return (core.safeReadFile(file, { encoding: 'utf8' }) as string)
-            .trim()
-            .split('\n')
-            .filter(Boolean)
-            .slice(-5);
+          const raw = readSafeChronosFile(core, file);
+          if (raw === null) return [];
+          return raw.trim().split('\n').filter(Boolean).slice(-5);
         })
         .slice(-10);
       return {
@@ -922,7 +708,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'capability-audit': {
@@ -964,7 +750,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'provider-check': {
@@ -996,12 +782,12 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'audit-log': {
       const auditChainPath = core.pathResolver.rootResolve(
-        `active/audit/audit-${new Date().toISOString().slice(0, 10)}.jsonl`
+        `active/audit/audit-${nowIso().slice(0, 10)}.jsonl`
       );
       const eventFiles = [
         auditChainPath,
@@ -1010,15 +796,19 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
       ];
       const events: Array<{ time: string; label: string; detail?: string; status?: string }> = [];
       for (const file of eventFiles) {
-        if (!core.safeExistsSync(file)) continue;
-        const lines = (core.safeReadFile(file, { encoding: 'utf8' }) as string)
-          .trim()
-          .split('\n')
-          .filter(Boolean);
+        const raw = readSafeChronosFile(core, file);
+        if (raw === null) continue;
+        const lines = raw.trim().split('\n').filter(Boolean);
         for (const line of lines.slice(-12)) {
-          const event = JSON.parse(line);
-          const routingDecision = event.metadata?.routing_decision as
-            { mode?: string; owner?: string; fanout?: string } | undefined;
+          let parsed: unknown;
+          try {
+            parsed = parseSafeJsonInput(line, 'Chronos audit event');
+          } catch {
+            continue;
+          }
+          const event = parseChronosAuditEvent(parsed);
+          if (!event) continue;
+          const routingDecision = event.metadata?.routing_decision;
           const routingSummary = routingDecision
             ? [
                 routingDecision.mode,
@@ -1031,7 +821,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
                 .join(', ')
             : undefined;
           events.push({
-            time: String(event.ts || new Date().toISOString()).slice(11, 19),
+            time: String(event.ts || nowIso()).slice(11, 19),
             label: String(event.decision || event.action || event.event_type || 'event'),
             detail: routingSummary
               ? `${String(event.mission_id || event.resource_id || event.agentId || 'system')} · ${routingSummary}`
@@ -1060,7 +850,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'policies': {
@@ -1093,7 +883,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'knowledge': {
@@ -1105,8 +895,24 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
       const files = roots
         .flatMap((root) => {
           const dir = core.pathResolver.rootResolve(root);
-          if (!core.safeExistsSync(dir)) return [];
-          return core.safeReaddir(dir).map((name) => `${root}/${name}`);
+          try {
+            const safeDir = core.assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+            if (!core.safeExistsSync(safeDir) || !core.safeLstat(safeDir).isDirectory()) return [];
+            return core.safeReaddir(safeDir).flatMap((name) => {
+              try {
+                const safeFile = core.assertSafeRepositoryPath(path.join(safeDir, name), {
+                  allowMissingLeaf: true,
+                });
+                return core.safeExistsSync(safeFile) && core.safeLstat(safeFile).isFile()
+                  ? [`${root}/${name}`]
+                  : [];
+              } catch {
+                return [];
+              }
+            });
+          } catch {
+            return [];
+          }
         })
         .slice(0, 24);
       return {
@@ -1125,7 +931,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'build-test': {
@@ -1153,7 +959,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     default:
@@ -1167,7 +973,9 @@ export async function POST(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
   try {
-    process.env.MISSION_ROLE = 'chronos_localadmin';
+    const parsedBody = await readChronosAgentBody(req);
+    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    const { body, query: rawQuery, requesterId } = parsedBody;
     const core = await loadChronosCore();
     const {
       isSlackMissionConfirmation,
@@ -1198,14 +1006,14 @@ export async function POST(req: NextRequest) {
         );
       }
     };
-    const body = await req.json();
+    const conversationScope = chronosConversationScope(resolvedViewer.context);
     const locale = normalizeChronosLocale(body.locale);
     const action =
       body.action === 'approve_mission' || body.action === 'reject_mission'
         ? (body.action as 'approve_mission' | 'reject_mission')
         : undefined;
     const query =
-      (body.query || body.intent || '').trim() ||
+      (rawQuery || '').trim() ||
       (action === 'approve_mission' ? '1' : action === 'reject_mission' ? '2' : '');
     const sessionId =
       typeof body.sessionId === 'string' && body.sessionId.trim()
@@ -1222,7 +1030,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Mission proposal confirmation/rejection mutates durable proposal state
+    // or starts a mission. The proposal record predates tenant-bound scope,
+    // so a scoped viewer cannot safely identify its owner; fail closed until
+    // the stored state carries an authenticated tenant binding.
+    if (action) {
+      const proposalAccessDenied = requireChronosAccess(req, 'localadmin');
+      if (proposalAccessDenied) return proposalAccessDenied;
+      if (resolvedViewer.context.tenantSlugs !== 'all') {
+        return NextResponse.json(
+          {
+            error: 'Chronos mission proposal actions require an all-tenant localadmin viewer.',
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (QUICK_ACTION_PATTERN.test(query)) {
+      const quickActionAccessDenied = requireChronosAccess(req, 'localadmin');
+      if (quickActionAccessDenied) return quickActionAccessDenied;
+      if (resolvedViewer.context.tenantSlugs !== 'all') {
+        return NextResponse.json(
+          {
+            error:
+              'Chronos quick actions require an all-tenant localadmin viewer; use a scoped surface operation instead.',
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     if (pendingMissionProposal && core.isSlackMissionRejection?.(query)) {
+      const proposalAccessDenied = requireChronosAccess(req, 'localadmin');
+      if (proposalAccessDenied) return proposalAccessDenied;
+      if (resolvedViewer.context.tenantSlugs !== 'all') {
+        return NextResponse.json(
+          {
+            error: 'Chronos mission proposal actions require an all-tenant localadmin viewer.',
+          },
+          { status: 403 }
+        );
+      }
       clearChronosMissionProposalState(sessionId, core);
       return NextResponse.json({
         status: 'ok',
@@ -1231,12 +1080,22 @@ export async function POST(req: NextRequest) {
           'Understood — the mission proposal has been discarded. Nothing was created.',
           locale
         ),
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       });
     }
 
     if (pendingMissionProposal && isSlackMissionConfirmation(query)) {
-      const issued = await issueChronosMissionFromProposal(
+      const proposalAccessDenied = requireChronosAccess(req, 'localadmin');
+      if (proposalAccessDenied) return proposalAccessDenied;
+      if (resolvedViewer.context.tenantSlugs !== 'all') {
+        return NextResponse.json(
+          {
+            error: 'Chronos mission proposal actions require an all-tenant localadmin viewer.',
+          },
+          { status: 403 }
+        );
+      }
+      const issued = await core.issueChronosMissionFromProposal(
         {
           sessionId,
           proposal: pendingMissionProposal.proposal,
@@ -1248,20 +1107,10 @@ export async function POST(req: NextRequest) {
       clearChronosMissionProposalState(sessionId, core);
       return NextResponse.json({
         status: 'ok',
-        response: [
-          `Mission ${issued.missionId} started.`,
-          `Type: ${issued.missionType}`,
-          `Tier: ${issued.tier}`,
-          `Persona: ${issued.persona}`,
-          issued.routingDecision
-            ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`
-            : undefined,
-          issued.orchestrationStatus === 'queued'
-            ? 'Background orchestration has been queued.'
-            : 'Background orchestration could not be queued.',
-        ]
-          .filter(Boolean)
-          .join('\n'),
+        response: core.buildMissionIssuanceReply(issued, {
+          locale: 'en',
+          includeDetails: true,
+        }),
         a2ui: [
           {
             type: 'display:hero',
@@ -1287,21 +1136,47 @@ export async function POST(req: NextRequest) {
           },
         ],
         mission: issued,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       });
     }
 
-    const quickActionResponse = await tryHandleChronosQuickAction(query, locale);
+    const quickActionResponse = await tryHandleChronosQuickAction(
+      query,
+      locale,
+      resolvedViewer.context
+    );
     if (quickActionResponse) {
       return NextResponse.json(quickActionResponse);
+    }
+
+    if (RUN_PIPELINE_PATTERN.test(query)) {
+      const pipelineAccessDenied = requireChronosAccess(req, 'localadmin');
+      if (pipelineAccessDenied) return pipelineAccessDenied;
+      // The explicit pipeline shortcut executes repository-wide ADF and has
+      // no tenant-aware projection. A scoped localadmin must not use it to
+      // run a pipeline whose inputs or effects belong to another tenant.
+      if (resolvedViewer.context.tenantSlugs !== 'all') {
+        return NextResponse.json(
+          {
+            error:
+              'Chronos pipeline shortcuts require an all-tenant localadmin viewer; use a scoped operation instead.',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const requestArtifactPath = recordChronosSurfaceRequest({
       query,
       sessionId,
-      requesterId: body.requesterId || 'chronos-ui',
+      requesterId,
     });
-    const requestArtifact = core.readJson<{ correlation_id: string }>(requestArtifactPath);
+    const requestArtifact = parseChronosSurfaceRequestArtifact(
+      readJson<unknown>(requestArtifactPath)
+    );
+    if (!requestArtifact) {
+      throw new Error('Chronos surface request artifact is invalid');
+    }
 
     const deterministicPipelineResponse = await tryHandleDeterministicPipelineQuery(query, locale);
     if (deterministicPipelineResponse) {
@@ -1311,7 +1186,7 @@ export async function POST(req: NextRequest) {
     await ensureChronosAgent({
       missionId,
       teamRole,
-      requesterId: body.requesterId || 'chronos-ui',
+      requesterId,
     });
     await dispatchPresenceFrameBestEffort({
       agentId: CHRONOS_AGENT_ID,
@@ -1326,12 +1201,13 @@ export async function POST(req: NextRequest) {
       text: query,
       threadTs: sessionId,
       correlationId: requestArtifact.correlation_id,
-      actorId: body.requesterId || 'chronos-ui',
+      actorId: requesterId,
       senderAgentId: CHRONOS_AGENT_ID,
       agentId: CHRONOS_AGENT_ID,
       cwd: PROJECT_ROOT,
       missionId,
       teamRole,
+      scope: conversationScope,
       // I18N-06: English instruction text — the output-language contract
       // itself is injected once, centrally, by
       // `runSurfaceConversation`/`buildOutputLanguageInstruction` in
@@ -1434,11 +1310,11 @@ export async function POST(req: NextRequest) {
             },
           },
           ...(conversation.intentResolution
-            ? intentResolutionA2ui(conversation.intentResolution)
+            ? intentResolutionA2ui(conversation.intentResolution, locale)
             : []),
         ],
         delegations: delegationResults.length > 0 ? delegationResults : undefined,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       });
     }
 
@@ -1456,25 +1332,26 @@ export async function POST(req: NextRequest) {
       intentResolution: conversation.intentResolution,
       a2ui: [
         ...(conversation.intentResolution
-          ? intentResolutionA2ui(conversation.intentResolution)
+          ? intentResolutionA2ui(conversation.intentResolution, locale)
           : []),
         ...(conversation.a2uiMessages || []),
       ],
       delegations: delegationResults.length > 0 ? delegationResults : undefined,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     });
   } catch (err: any) {
     clearChronosCache();
     console.error('[CHRONOS_API_AGENT] Error in POST:', err);
-    const envelope = buildUserFacingError(err, { surface: 'chronos' });
+    const wireError = toWireError(err);
+    const envelope = buildUserFacingError(err, {
+      surface: 'chronos',
+      traceId: wireError.correlation_id,
+    });
     return NextResponse.json(
       {
-        // SovereignChat re-derives its own envelope from `error` (falling
-        // back to a generic "No response" message when it's absent) - give
-        // it the already-sanitized category text, never the raw err.message.
         error: envelope.body,
-        debugError: err.message,
-        debugStack: err.stack,
+        errorCode: wireError.code,
+        correlationId: wireError.correlation_id,
         ...envelope,
       },
       { status: 500 }

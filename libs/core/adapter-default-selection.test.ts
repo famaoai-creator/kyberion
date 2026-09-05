@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetAdapterDefaultPreferences } from './adapter-default-preferences.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { AdapterDefaultPreferences } from './adapter-default-preferences.js';
 
 const PROFILE_ROOT = pathResolver.sharedTmp('adapter-default-selection-tests/profile');
 const PORTABLE_EMAIL_BACKEND = process.platform === 'darwin' ? 'mac_mailapp' : 'smtp';
@@ -99,5 +100,48 @@ describe('adapter default selection', () => {
     expect(getServiceRuntimeRecord()?.service_id).toBe('comfyui');
     expect(getToolRuntimeRecord().tool_id).toBe('playwright');
     expect(resolveVadBackend().backend.backend_id).toBe('energy');
+  });
+
+  it('fails closed when persisted defaults violate the preferences schema', async () => {
+    const { getAdapterDefaultSelectionSnapshot } = await import('./adapter-default-selection.js');
+    const preferencesPath = path.join(PROFILE_ROOT, 'onboarding', 'adapter-defaults.json');
+    safeWriteFile(
+      preferencesPath,
+      JSON.stringify({ version: '1.0.0', defaults: { 'unknown.category': 'value' } }),
+      { mkdir: true, encoding: 'utf8' }
+    );
+
+    expect(getAdapterDefaultSelectionSnapshot().preferences.defaults).toEqual({});
+
+    safeRmSync(preferencesPath, { recursive: true, force: true });
+    safeMkdir(preferencesPath, { recursive: true });
+    expect(getAdapterDefaultSelectionSnapshot().preferences.defaults).toEqual({});
+  });
+
+  it('writes preferences through the schema-bound catalog', async () => {
+    const { getAdapterDefaultSelectionSnapshot, writeAdapterDefaultPreferencesAtPath } =
+      await import('./adapter-default-selection.js');
+    const preferencesPath = path.join(PROFILE_ROOT, 'onboarding', 'adapter-defaults.json');
+    expect(
+      writeAdapterDefaultPreferencesAtPath(preferencesPath, {
+        version: '1.0.0',
+        defaults: { 'media.image': 'media-generation.comfyui' },
+      })
+    ).toBe(preferencesPath);
+    expect(getAdapterDefaultSelectionSnapshot().preferences.defaults).toEqual({
+      'media.image': 'media-generation.comfyui',
+    });
+  });
+
+  it('rejects an invalid preference record before persisting it', async () => {
+    const { writeAdapterDefaultPreferencesAtPath } = await import('./adapter-default-selection.js');
+    const preferencesPath = path.join(PROFILE_ROOT, 'onboarding', 'invalid.json');
+
+    expect(() =>
+      writeAdapterDefaultPreferencesAtPath(preferencesPath, {
+        version: '1.0.0',
+        defaults: { 'unknown.category': 'value' },
+      } as unknown as AdapterDefaultPreferences)
+    ).toThrow(/Invalid catalog adapter-default-preferences/);
   });
 });

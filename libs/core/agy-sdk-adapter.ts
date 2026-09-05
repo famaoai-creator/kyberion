@@ -5,6 +5,8 @@ import { buildProviderChildEnv } from './provider-permission-profiles.js';
 import * as pathResolver from './path-resolver.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 
 interface BridgeResponse {
   id?: string;
@@ -14,6 +16,77 @@ interface BridgeResponse {
   stopReason?: string;
   metadata?: Record<string, unknown>;
   error?: string;
+}
+
+type AgySdkBridgeMessage = BridgeResponse & {
+  event?: 'ready' | 'error';
+  pid?: number;
+  sdk?: string;
+};
+
+/** Normalize one boot/request response emitted by the AGY SDK bridge. */
+export function normalizeAgySdkBridgeMessage(value: unknown): AgySdkBridgeMessage | null {
+  if (!isRecord(value)) return null;
+
+  const id = optionalString(value.id);
+  if (id === null) return null;
+  const event = optionalEvent(value.event);
+  if (event === null) return null;
+  const ok = optionalBoolean(value.ok);
+  if (ok === null) return null;
+  const text = optionalString(value.text);
+  if (text === null) return null;
+  const thought = optionalString(value.thought);
+  if (thought === null) return null;
+  const stopReason = optionalString(value.stopReason);
+  if (stopReason === null) return null;
+  const error = optionalString(value.error);
+  if (error === null) return null;
+  const sdk = optionalString(value.sdk);
+  if (sdk === null) return null;
+
+  const pid = value.pid;
+  if (
+    pid !== undefined &&
+    (typeof pid !== 'number' || !Number.isInteger(pid) || !Number.isFinite(pid) || pid <= 0)
+  ) {
+    return null;
+  }
+  const normalizedPid: number | undefined = typeof pid === 'number' ? pid : undefined;
+
+  const metadata = value.metadata;
+  const normalizedMetadata =
+    metadata === undefined ? undefined : isRecord(metadata) ? metadata : null;
+  if (normalizedMetadata === null) return null;
+  if (event === undefined && id === undefined) return null;
+
+  return {
+    ...(id !== undefined ? { id } : {}),
+    ...(ok !== undefined ? { ok } : {}),
+    ...(text !== undefined ? { text } : {}),
+    ...(thought !== undefined ? { thought } : {}),
+    ...(stopReason !== undefined ? { stopReason } : {}),
+    ...(normalizedMetadata !== undefined ? { metadata: normalizedMetadata } : {}),
+    ...(error !== undefined ? { error } : {}),
+    ...(event !== undefined ? { event } : {}),
+    ...(normalizedPid !== undefined ? { pid: normalizedPid } : {}),
+    ...(sdk !== undefined ? { sdk } : {}),
+  };
+}
+
+function optionalString(value: unknown): string | undefined | null {
+  if (value === undefined) return undefined;
+  return typeof value === 'string' ? value : null;
+}
+
+function optionalBoolean(value: unknown): boolean | undefined | null {
+  if (value === undefined) return undefined;
+  return typeof value === 'boolean' ? value : null;
+}
+
+function optionalEvent(value: unknown): 'ready' | 'error' | undefined | null {
+  if (value === undefined) return undefined;
+  return value === 'ready' || value === 'error' ? value : null;
 }
 
 interface PendingRequest {
@@ -76,7 +149,8 @@ export class AgySdkAdapter {
         resolveManagedToolPythonBin('agy_sdk') ??
         'python3';
       const script = this.options.scriptPath ?? pathResolver.scripts('agy_sdk_subagent_bridge.py');
-      const sdkApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+      const sdkApiKey =
+        getRegisteredEnvText('GEMINI_API_KEY') ?? getRegisteredEnvText('GOOGLE_API_KEY');
       child = (this.options.spawnProcess ?? spawn)(python, [script], {
         cwd: this.options.cwd,
         env: {
@@ -310,11 +384,15 @@ export class AgySdkAdapter {
     resolveBoot: () => void,
     rejectBoot: (error: Error) => void
   ): void {
-    let message: BridgeResponse & { event?: string; pid?: number; sdk?: string };
+    let message: AgySdkBridgeMessage | null;
     try {
-      message = JSON.parse(line) as typeof message;
+      message = normalizeAgySdkBridgeMessage(parseSafeJsonInput(line, 'AGY SDK bridge message'));
     } catch {
       rejectBoot(this.unavailable('AGY SDK bridge emitted invalid JSON.'));
+      return;
+    }
+    if (!message) {
+      rejectBoot(this.unavailable('AGY SDK bridge emitted an invalid response shape.'));
       return;
     }
     if (message.event === 'ready') {

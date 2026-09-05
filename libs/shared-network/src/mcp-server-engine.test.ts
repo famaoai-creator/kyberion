@@ -10,6 +10,7 @@ const {
   mockSafeReadFile,
   mockSafeReaddir,
   mockSafeExistsSync,
+  mockSafeLstat,
   mockSafeExec,
   mockSpawnManagedProcess,
   mockStopManagedProcess,
@@ -31,12 +32,17 @@ const {
 } = vi.hoisted(() => {
   const registeredTools = new Map<
     string,
-    { description: string; handler: (...args: any[]) => any }
+    {
+      description: string;
+      handler: (...args: any[]) => any;
+      outputSchema?: Record<string, unknown>;
+    }
   >();
   return {
     mockSafeReadFile: vi.fn(),
     mockSafeReaddir: vi.fn(),
     mockSafeExistsSync: vi.fn(),
+    mockSafeLstat: vi.fn(),
     mockSafeExec: vi.fn(),
     mockSpawnManagedProcess: vi.fn(),
     mockStopManagedProcess: vi.fn(),
@@ -58,23 +64,62 @@ const {
   };
 });
 
-// ── Mock @agent/core ──────────────────────────────────────────────────────────
-vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
+// ── Mock the canonical core subpaths used by the engine ───────────────────────
+vi.mock('@agent/core/secure-io', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
   return {
     ...actual,
     safeReadFile: mockSafeReadFile,
     safeReaddir: mockSafeReaddir,
     safeExistsSync: mockSafeExistsSync,
+    safeLstat: mockSafeLstat,
     safeExec: mockSafeExec,
+  };
+});
+
+vi.mock('@agent/core/managed-process', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/managed-process')>(
+    '@agent/core/managed-process'
+  );
+  return {
+    ...actual,
     spawnManagedProcess: mockSpawnManagedProcess,
     stopManagedProcess: mockStopManagedProcess,
+  };
+});
+
+vi.mock('@agent/core/knowledge-index', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/knowledge-index')>(
+    '@agent/core/knowledge-index'
+  );
+  return {
+    ...actual,
     buildKnowledgeIndex: mockBuildKnowledgeIndex,
     queryKnowledge: mockQueryKnowledge,
+  };
+});
+
+vi.mock('@agent/core/approval-store', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/approval-store')>(
+    '@agent/core/approval-store'
+  );
+  return {
+    ...actual,
     createApprovalRequest: mockCreateApprovalRequest,
     listApprovalRequests: mockListApprovalRequests,
     loadApprovalRequest: mockLoadApprovalRequest,
     computeApprovalPayloadHash: mockComputeApprovalPayloadHash,
+  };
+});
+
+vi.mock('@agent/core/protocol-service-registry', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/protocol-service-registry')>(
+    '@agent/core/protocol-service-registry'
+  );
+  return {
+    ...actual,
+    assertProtocolServiceRegistered: vi.fn(),
   };
 });
 
@@ -104,6 +149,19 @@ vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
       const description: string = typeof args[1] === 'string' ? args[1] : '';
       registeredTools.set(name, { description, handler });
     });
+    this.registerTool = vi.fn(
+      (
+        name: string,
+        config: { description?: string; outputSchema?: Record<string, unknown> },
+        handler: (...args: never[]) => unknown
+      ) => {
+        registeredTools.set(name, {
+          description: config.description || '',
+          handler,
+          outputSchema: config.outputSchema,
+        });
+      }
+    );
   });
   return { McpServer };
 });
@@ -116,7 +174,33 @@ vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => {
 });
 
 // ── Import after mocks ────────────────────────────────────────────────────────
+import { registerFoundationIo, type FoundationIo } from '@agent/core/foundation';
+import { getFoundationIo } from '@agent/core/foundation/io';
 import { createKyberionMcpServer } from './mcp-server-engine.js';
+
+const originalFoundationIo = getFoundationIo();
+let foundationStatVersion = 0;
+const testFoundationIo: FoundationIo = {
+  loadJson: <T>(filePath: string) =>
+    filePath.endsWith('knowledge/product/governance/mcp-tool-catalog.json')
+      ? (JSON.parse(String(mockSafeReadFile(filePath))) as T)
+      : originalFoundationIo.loadJson<T>(filePath),
+  loadJsonIfPresent: <T>(filePath: string) =>
+    filePath.endsWith('knowledge/product/governance/mcp-tool-catalog.json')
+      ? (JSON.parse(String(mockSafeReadFile(filePath))) as T)
+      : originalFoundationIo.loadJsonIfPresent<T>(filePath),
+  appendFile: (...args) => originalFoundationIo.appendFile(...args),
+  exists: (filePath: string) =>
+    filePath.endsWith('knowledge/product/governance/mcp-tool-catalog.json')
+      ? mockSafeExistsSync(filePath)
+      : originalFoundationIo.exists(filePath),
+  readFile: (filePath: string) => originalFoundationIo.readFile(filePath),
+  stat: (filePath: string) =>
+    filePath.endsWith('knowledge/product/governance/mcp-tool-catalog.json')
+      ? { mtimeMs: ++foundationStatVersion, size: 1 }
+      : originalFoundationIo.stat(filePath),
+  writeFile: (...args) => originalFoundationIo.writeFile(...args),
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const governedToolNames = [
@@ -153,6 +237,10 @@ const FAKE_CATALOG = JSON.stringify({
 
 function setupCommonMocks() {
   mockSafeExistsSync.mockReturnValue(true);
+  mockSafeLstat.mockReturnValue({
+    isFile: () => true,
+    isDirectory: () => true,
+  });
   mockSafeReadFile.mockReturnValue(FAKE_CATALOG);
 }
 
@@ -161,6 +249,7 @@ describe('createKyberionMcpServer()', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     registeredTools.clear();
+    registerFoundationIo(testFoundationIo);
     setupCommonMocks();
     vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'cowork');
     mockCreateApprovalRequest.mockReturnValue({ id: 'approval-001' });
@@ -168,6 +257,7 @@ describe('createKyberionMcpServer()', () => {
   });
 
   afterEach(() => {
+    registerFoundationIo(originalFoundationIo);
     vi.unstubAllEnvs();
   });
 
@@ -181,6 +271,41 @@ describe('createKyberionMcpServer()', () => {
     expect(registeredTools.has('kyberion.mission.create')).toBe(true);
     expect(registeredTools.has('kyberion.mission.status')).toBe(true);
     expect(registeredTools.has('kyberion.mission.journal')).toBe(true);
+    expect(registeredTools.get('kyberion.pipeline.list')?.outputSchema).toEqual(
+      expect.objectContaining({ ok: expect.anything() })
+    );
+  });
+
+  it('Cowork delivery accepts a validated structured intent resolution', async () => {
+    createKyberionMcpServer();
+    const handler = registeredTools.get('kyberion.surface.cowork.deliver')!.handler;
+    const result = await handler({
+      title: 'Approval plan',
+      summary: 'A plan is waiting for approval.',
+      content: 'Review the plan.',
+      intent_resolution: {
+        request_id: 'req-001',
+        normalized_intent: 'send_message',
+        missing_inputs: [],
+        resolution_shape: 'task_session',
+        outcome_kind: 'service_change',
+        authority_level: 'approval_required',
+        next_action: {
+          kind: 'request_approval',
+          label: 'Approve this plan to continue.',
+          consequence: 'The action waits for approval.',
+        },
+        rationale: 'resolved from intent',
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockDeliverToCowork).toHaveBeenCalledWith(
+      [{ content: 'Review the plan.', content_type: 'text/plain', description: 'Approval plan' }],
+      expect.objectContaining({
+        intentResolution: expect.objectContaining({ authority_level: 'approval_required' }),
+      })
+    );
   });
 
   it('サーバー側 caller role が未確定ならツール実行を拒否する', async () => {
@@ -212,6 +337,22 @@ describe('createKyberionMcpServer()', () => {
     expect(mockDecideApproval).not.toHaveBeenCalled();
   });
 
+  it('不正な MCP カタログは空の allowlist へフォールバックする', async () => {
+    mockSafeReadFile.mockReturnValue(
+      JSON.stringify({
+        pipeline_run_allowlist: ['pipelines/vital-check.json'],
+        tools: [{ name: 'kyberion.pipeline.list', allowed_tiers: ['public'] }],
+      })
+    );
+
+    createKyberionMcpServer();
+    const handler = registeredTools.get('kyberion.pipeline.list')!.handler;
+    const result = await handler({});
+
+    expect(result.isError).toBe(true);
+    expect(mockSafeReaddir).not.toHaveBeenCalled();
+  });
+
   describe('kyberion.pipeline.list', () => {
     it('pipelines/ ディレクトリを読み込んでリストを返す', async () => {
       mockSafeReaddir.mockReturnValue(['vital-check.json', 'list-capabilities.json', 'README.md']);
@@ -231,6 +372,7 @@ describe('createKyberionMcpServer()', () => {
       expect(result.content[0].type).toBe('text');
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed).toHaveLength(2);
+      expect(result.structuredContent).toEqual({ ok: true, data: parsed });
       expect(parsed[0].name).toBe('vital-check');
       // list must expose the same allowlist predicate that pipeline.run enforces
       expect(parsed[0].runnable_via_mcp).toBe(true);
@@ -248,6 +390,59 @@ describe('createKyberionMcpServer()', () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed).toHaveLength(0);
     });
+
+    it('symlink または非 regular file の pipeline は内容を読み込まない', async () => {
+      mockSafeReaddir.mockReturnValue(['vital-check.json']);
+      mockSafeLstat.mockImplementation((filePath: string) => ({
+        isFile: () => !filePath.includes('vital-check.json'),
+        isDirectory: () => false,
+      }));
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.pipeline.list')!.handler;
+      const result = await handler({});
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toEqual([
+        {
+          name: 'vital-check',
+          path: 'pipelines/vital-check.json',
+          description: '',
+          runnable_via_mcp: true,
+        },
+      ]);
+      expect(mockSafeReadFile).toHaveBeenCalledOnce();
+      expect(mockSafeReadFile.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining('mcp-tool-catalog.json')
+      );
+    });
+
+    it('不正な metadata root または prototype key を実行候補へ投影しない', async () => {
+      mockSafeReaddir.mockReturnValue(['array.json', 'unsafe.json']);
+      mockSafeReadFile
+        .mockReturnValueOnce(FAKE_CATALOG)
+        .mockReturnValueOnce('[]')
+        .mockReturnValueOnce('{"__proto__":{"polluted":true}}');
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.pipeline.list')!.handler;
+      const result = await handler({});
+
+      expect(JSON.parse(result.content[0].text)).toEqual([
+        {
+          name: 'array',
+          path: 'pipelines/array.json',
+          description: '',
+          runnable_via_mcp: false,
+        },
+        {
+          name: 'unsafe',
+          path: 'pipelines/unsafe.json',
+          description: '',
+          runnable_via_mcp: false,
+        },
+      ]);
+    });
   });
 
   describe('kyberion.pipeline.run', () => {
@@ -260,6 +455,7 @@ describe('createKyberionMcpServer()', () => {
 
       expect(result.isError).toBeFalsy();
       expect(result.content[0].text).toBe('Pipeline output');
+      expect(result.structuredContent).toEqual({ ok: true, data: 'Pipeline output' });
       expect(mockSafeExec).toHaveBeenCalledOnce();
     });
 
@@ -270,6 +466,8 @@ describe('createKyberionMcpServer()', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('not on the MCP allowlist');
+      expect(result.structuredContent.ok).toBe(false);
+      expect(result.structuredContent.error.message).toContain('not on the MCP allowlist');
       expect(mockSafeExec).not.toHaveBeenCalled();
     });
 
@@ -284,6 +482,20 @@ describe('createKyberionMcpServer()', () => {
       const result = await handler({ input: 'pipelines/vital-check.json' });
 
       expect(result.isError).toBe(true);
+    });
+
+    it('symlink または非 regular file の pipeline は実行しない', async () => {
+      mockSafeLstat.mockImplementation((filePath: string) => ({
+        isFile: () => !filePath.includes('vital-check.json'),
+        isDirectory: () => false,
+      }));
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.pipeline.run')!.handler;
+      const result = await handler({ input: 'pipelines/vital-check.json' });
+
+      expect(result.isError).toBe(true);
+      expect(mockSafeExec).not.toHaveBeenCalled();
     });
   });
 
@@ -437,6 +649,46 @@ describe('createKyberionMcpServer()', () => {
       expect(parsed).toHaveLength(2);
       expect(parsed[0].actuator).toBe('meeting-actuator');
       expect(parsed[0].ops).toEqual(['join', 'leave']);
+    });
+
+    it('symlink または非 regular file のマニフェストは内容を読み込まない', async () => {
+      mockSafeReaddir.mockReturnValue(['meeting-actuator']);
+      mockSafeLstat.mockImplementation((filePath: string) => ({
+        isFile: () => !filePath.endsWith('manifest.json'),
+        isDirectory: () => false,
+      }));
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.capability.list')!.handler;
+      const result = await handler({});
+
+      expect(result.isError).toBeFalsy();
+      expect(JSON.parse(result.content[0].text)).toEqual([
+        { actuator: 'meeting-actuator', ops: [] },
+      ]);
+      expect(mockSafeReadFile).toHaveBeenCalledOnce();
+    });
+
+    it('不正な manifest root と capability shape を projection へ流さない', async () => {
+      mockSafeReaddir.mockReturnValue(['unsafe-actuator', 'mixed-actuator']);
+      mockSafeReadFile
+        .mockReturnValueOnce(FAKE_CATALOG)
+        .mockReturnValueOnce('{"__proto__":{"polluted":true}}')
+        .mockReturnValueOnce(
+          JSON.stringify({
+            actuator_id: 'mixed-actuator',
+            capabilities: [{ op: 'read' }, { op: 42 }, 'write'],
+          })
+        );
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.capability.list')!.handler;
+      const result = await handler({});
+
+      expect(JSON.parse(result.content[0].text)).toEqual([
+        { actuator: 'unsafe-actuator', ops: [] },
+        { actuator: 'mixed-actuator', ops: ['read'] },
+      ]);
     });
   });
 
@@ -673,6 +925,20 @@ describe('createKyberionMcpServer()', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('not built');
+    });
+
+    it('symlink または非 regular file の export script は実行しない', async () => {
+      mockSafeLstat.mockImplementation((filePath: string) => ({
+        isFile: () => !filePath.includes('export_audit'),
+        isDirectory: () => false,
+      }));
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.audit.export')!.handler;
+      const result = await handler({ requested_by: 'op' });
+
+      expect(result.isError).toBe(true);
+      expect(mockSafeExec).not.toHaveBeenCalled();
     });
   });
 

@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
-  resetVoiceEngineRegistryCache,
+  _resetVoiceEngineRegistryCacheForTests,
   resolveVoiceEngineForPlatform,
 } from './voice-engine-registry.js';
 
@@ -16,7 +17,7 @@ describe('voice engine registry', () => {
   beforeEach(() => {
     delete process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH;
     delete process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR;
-    resetVoiceEngineRegistryCache();
+    _resetVoiceEngineRegistryCacheForTests();
   });
 
   afterEach(() => {
@@ -33,7 +34,7 @@ describe('voice engine registry', () => {
     if (safeExistsSync(tmpDir)) {
       safeRmSync(tmpDir, { recursive: true, force: true });
     }
-    resetVoiceEngineRegistryCache();
+    _resetVoiceEngineRegistryCacheForTests();
   });
 
   it('loads the governed registry and resolves default engine', () => {
@@ -129,7 +130,7 @@ describe('voice engine registry', () => {
     );
 
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR = dir;
-    resetVoiceEngineRegistryCache();
+    _resetVoiceEngineRegistryCacheForTests();
 
     const registry = getVoiceEngineRegistry();
     expect(registry.default_engine_id).toBe('local_say');
@@ -189,7 +190,7 @@ describe('voice engine registry', () => {
     expect(registry.engines.map((engine) => engine.engine_id)).toEqual(['snapshot_engine']);
   });
 
-  it('uses the governed fallback when a configured snapshot violates its schema', () => {
+  it('fails closed when a configured snapshot violates its schema', () => {
     safeMkdir(tmpDir, { recursive: true });
     const snapshotPath = path.join(tmpDir, 'invalid-snapshot.json');
     safeWriteFile(
@@ -198,9 +199,18 @@ describe('voice engine registry', () => {
     );
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = snapshotPath;
 
-    const registry = getVoiceEngineRegistry();
-    expect(registry.version).toBe('fallback');
-    expect(registry.default_engine_id).toBe('local_say');
-    expect(registry.engines).toHaveLength(1);
+    expect(() => getVoiceEngineRegistry()).toThrow(/Invalid catalog voice-engine-registry/);
+  });
+
+  it('rejects a configured snapshot outside the repository', () => {
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = '/tmp/voice-engine-external.json';
+
+    expect(() => getVoiceEngineRegistry()).toThrow(/outside the repository root/);
+  });
+
+  it('rejects a configured registry directory outside the repository', () => {
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR = '/tmp/voice-engines-external';
+
+    expect(() => getVoiceEngineRegistry()).toThrow(/outside the repository root/);
   });
 });

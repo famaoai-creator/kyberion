@@ -10,6 +10,8 @@ import { MissionIntelligenceAgentTrafficPanel } from './MissionIntelligenceAgent
 import { MissionIntelligenceSurfaceOverview } from './MissionIntelligenceSurfaceOverview';
 import { MissionIntelligenceDangerousActionDialog } from './MissionIntelligenceDangerousActionDialog';
 import { MissionIntelligenceStatusGate } from './MissionIntelligenceStatusGate';
+import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
+import { parseMissionIntelligenceResponse } from '../lib/mission-intelligence-response';
 import {
   buildMissionThread,
   missionActionLabel,
@@ -25,15 +27,11 @@ import {
   providerResolutionSummary,
 } from './MissionIntelligencePrimitives';
 import type {
-  A2AHandoffSummary,
-  AgentMessageSummary,
   ArtifactRecordSummary,
-  BrowserSessionSummary,
   CompanySnapshot,
   ControlActionAvailability,
   ControlActionCatalog,
   ControlActionDefinition,
-  ControlActionDetail,
   ControlActionSummary,
   DistillCandidateSummary,
   IntelligencePayload,
@@ -42,7 +40,6 @@ import type {
   MissionSeedRecordSummary,
   MissionSummary,
   MissionThreadEntry,
-  OrchestrationEvent,
   OwnerSummary,
   PendingApprovalSummary,
   ProjectManagementSummary,
@@ -213,38 +210,49 @@ export function MissionIntelligence({
 
   const refreshData = async () => {
     const refreshed = await fetch(intelligenceUrl, { cache: 'no-store' });
-    const refreshedBody = await refreshed.json();
-    if (!refreshed.ok) {
-      throw new Error(refreshedBody.error || 'Failed to refresh mission intelligence');
-    }
-    setData(refreshedBody);
+    const payload = parseMissionIntelligenceResponse(await refreshed.json().catch(() => null));
+    if (!refreshed.ok || !payload) throw new Error('Invalid mission intelligence response');
+    setData(payload);
     setError(null);
   };
 
   useEffect(() => {
     let alive = true;
-    const load = async () => {
-      try {
+    const scheduler = new LiveSyncScheduler<IntelligencePayload>({
+      fetchSnapshot: async () => {
         const res = await fetch(intelligenceUrl, { cache: 'no-store' });
-        const body = await res.json();
+        const payload = parseMissionIntelligenceResponse(await res.json().catch(() => null));
+        if (!res.ok || !payload) throw new Error('Invalid mission intelligence response');
+        return payload;
+      },
+      onSnapshot: (snapshot) => {
         if (!alive) return;
-        if (!res.ok) {
-          setError(body.error || 'Failed to load mission intelligence');
-          return;
-        }
-        setData(body);
-      } catch (err: any) {
-        if (alive) setError(err.message || 'Failed to load mission intelligence');
-      }
-    };
-
-    load();
-    const timer = setInterval(load, 10000);
+        setData(snapshot);
+        setError(null);
+      },
+      onError: (err) => {
+        if (alive) setError(err instanceof Error ? err.message : String(err));
+      },
+      revisionOf: (snapshot) => snapshot.revision,
+      isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
+    });
+    void scheduler.refresh().catch(() => undefined);
+    const source = new EventSource(
+      tenant
+        ? `/api/intelligence/stream?tenant=${encodeURIComponent(tenant)}`
+        : '/api/intelligence/stream'
+    );
+    source.onmessage = () => scheduler.invalidate();
+    source.onerror = () => scheduler.invalidate();
+    const unbindVisibility = bindVisibilityToLiveSync(scheduler);
+    scheduler.start();
     return () => {
       alive = false;
-      clearInterval(timer);
+      source.close();
+      unbindVisibility();
+      scheduler.stop();
     };
-  }, [intelligenceUrl]);
+  }, [intelligenceUrl, tenant]);
 
   const focusMissionThread = (missionId: string) => {
     setSelectedMissionId(missionId);
@@ -270,73 +278,6 @@ export function MissionIntelligence({
   };
 
   useEffect(() => {
-    const source = new EventSource(
-      tenant
-        ? `/api/intelligence/stream?tenant=${encodeURIComponent(tenant)}`
-        : '/api/intelligence/stream'
-    );
-
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as {
-          recentEvents?: OrchestrationEvent[];
-          agentMessages?: AgentMessageSummary[];
-          a2aHandoffs?: A2AHandoffSummary[];
-          controlActions?: ControlActionSummary[];
-          controlActionDetails?: Record<string, ControlActionDetail[]>;
-          ownerSummaries?: OwnerSummary[];
-          browserSessions?: BrowserSessionSummary[];
-          runtime?: {
-            total: number;
-            ready: number;
-            busy: number;
-            error: number;
-          };
-          runtimeTopology?: IntelligencePayload['runtimeTopology'];
-        };
-        setData((current) =>
-          current
-            ? {
-                ...current,
-                recentEvents: Array.isArray(payload.recentEvents)
-                  ? payload.recentEvents
-                  : current.recentEvents,
-                agentMessages: Array.isArray(payload.agentMessages)
-                  ? payload.agentMessages
-                  : current.agentMessages,
-                a2aHandoffs: Array.isArray(payload.a2aHandoffs)
-                  ? payload.a2aHandoffs
-                  : current.a2aHandoffs,
-                controlActions: Array.isArray(payload.controlActions)
-                  ? payload.controlActions
-                  : current.controlActions,
-                controlActionDetails: payload.controlActionDetails || current.controlActionDetails,
-                ownerSummaries: Array.isArray(payload.ownerSummaries)
-                  ? payload.ownerSummaries
-                  : current.ownerSummaries,
-                browserSessions: Array.isArray(payload.browserSessions)
-                  ? payload.browserSessions
-                  : current.browserSessions,
-                runtime: payload.runtime || current.runtime,
-                runtimeTopology: payload.runtimeTopology || current.runtimeTopology,
-              }
-            : current
-        );
-      } catch {
-        // Ignore malformed SSE payloads and keep polling fallback.
-      }
-    };
-
-    source.onerror = () => {
-      source.close();
-    };
-
-    return () => {
-      source.close();
-    };
-  }, [tenant]);
-
-  useEffect(() => {
     if (!focusedView) return;
     window.requestAnimationFrame(() => {
       document.getElementById(focusedView)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -359,10 +300,7 @@ export function MissionIntelligence({
           agentId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) {
-        throw new Error(body.error || 'Failed to remediate runtime lease');
-      }
+      if (!res.ok) throw new Error('Failed to remediate runtime lease');
       await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to remediate runtime lease');
@@ -385,10 +323,7 @@ export function MissionIntelligence({
           messageId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) {
-        throw new Error(body.error || 'Failed to clear outbox message');
-      }
+      if (!res.ok) throw new Error('Failed to clear outbox message');
       await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to clear outbox message');
@@ -409,8 +344,7 @@ export function MissionIntelligence({
           operation,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Mission control action failed');
+      if (!res.ok) throw new Error('Mission control action failed');
       setActionResult(`${missionId}: ${operation}`);
       await refreshData();
     } catch (err: any) {
@@ -431,8 +365,7 @@ export function MissionIntelligence({
           seedId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Mission seed promotion failed');
+      if (!res.ok) throw new Error('Mission seed promotion failed');
       setActionResult(`${seedId}: promoted`);
       await refreshData();
     } catch (err: any) {
@@ -454,8 +387,7 @@ export function MissionIntelligence({
           artifactId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Track seed creation failed');
+      if (!res.ok) throw new Error('Track seed creation failed');
       setActionResult(`${trackId}: seed ready`);
       await refreshData();
     } catch (err: any) {
@@ -602,8 +534,7 @@ export function MissionIntelligence({
           decision,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Approval decision failed');
+      if (!res.ok) throw new Error('Approval decision failed');
       setActionResult(`${approval.id}: ${decision}`);
       await refreshData();
     } catch (err: any) {
@@ -628,8 +559,7 @@ export function MissionIntelligence({
           decision,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Distill candidate decision failed');
+      if (!res.ok) throw new Error('Distill candidate decision failed');
       setActionResult(`${candidate.candidate_id}: ${decision}`);
       await refreshData();
     } catch (err: any) {
@@ -651,8 +581,7 @@ export function MissionIntelligence({
           operation,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Surface control action failed');
+      if (!res.ok) throw new Error('Surface control action failed');
       setActionResult(`${surfaceId || 'surfaces'}: ${operation}`);
       await refreshData();
     } catch (err: any) {
@@ -673,8 +602,7 @@ export function MissionIntelligence({
           dryRun,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Memory promotion action failed');
+      if (!res.ok) throw new Error('Memory promotion action failed');
       if (dryRun) {
         const pending = Array.isArray(body.pending) ? body.pending.length : 0;
         setActionResult(`memory promotion dry-run: ${pending} candidate(s)`);
@@ -860,8 +788,7 @@ export function MissionIntelligence({
           sessionId,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Browser session control action failed');
+      if (!res.ok) throw new Error('Browser session control action failed');
       setActionResult(`${sessionId}: ${action}`);
       await refreshData();
     } catch (err: any) {

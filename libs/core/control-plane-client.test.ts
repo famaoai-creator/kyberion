@@ -14,13 +14,19 @@ describe('control-plane-client', () => {
   });
 
   it('lists presence projects through the typed client wrapper', async () => {
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
-      ok: true,
-      items: [{ project_id: 'PRJ-123', name: 'Demo', status: 'active' }],
-    }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })) as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            items: [{ project_id: 'PRJ-123', name: 'Demo', status: 'active' }],
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    ) as typeof fetch;
 
     const client = createControlPlaneClient('presence', { baseUrl: 'http://127.0.0.1:3031' });
     const projects = await client.listProjects();
@@ -28,15 +34,40 @@ describe('control-plane-client', () => {
     expect(projects[0]?.name).toBe('Demo');
   });
 
+  it('drops malformed project records before surface projection', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            items: [
+              { project_id: 'PRJ-123', name: 'Demo' },
+              { project_id: 42, name: 'Invalid' },
+              'not-a-project',
+            ],
+          }),
+          { status: 200 }
+        )
+    ) as typeof fetch;
+
+    const client = createControlPlaneClient('presence', { baseUrl: 'http://127.0.0.1:3031' });
+    await expect(client.listProjects()).resolves.toEqual([{ project_id: 'PRJ-123', name: 'Demo' }]);
+  });
+
   it('maps chronos overview into typed approval and mission seed wrappers', async () => {
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
-      accessRole: 'readonly',
-      pendingApprovals: [{ id: 'APR-1', title: 'Approve deploy' }],
-      missionSeeds: [{ seed_id: 'MSD-1', title: 'Architecture seed' }],
-    }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })) as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            accessRole: 'readonly',
+            pendingApprovals: [{ id: 'APR-1', title: 'Approve deploy' }],
+            missionSeeds: [{ seed_id: 'MSD-1', title: 'Architecture seed' }],
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    ) as typeof fetch;
 
     const client = createControlPlaneClient('chronos', { baseUrl: 'http://127.0.0.1:3000' });
     const approvals = await client.listApprovals();
@@ -45,54 +76,113 @@ describe('control-plane-client', () => {
     expect(seeds[0]?.seed_id).toBe('MSD-1');
   });
 
+  it('drops malformed approvals and mission seeds from chronos projections', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            pendingApprovals: [{ id: 'APR-1', title: 'Approve deploy' }, { id: 7 }],
+            missionSeeds: [{ seed_id: 'MSD-1', title: 'Seed' }, { seed_id: null }],
+          }),
+          { status: 200 }
+        )
+    ) as typeof fetch;
+
+    const client = createControlPlaneClient('chronos', { baseUrl: 'http://127.0.0.1:3000' });
+    await expect(client.listApprovals()).resolves.toEqual([
+      { id: 'APR-1', title: 'Approve deploy' },
+    ]);
+    await expect(client.listMissionSeeds()).resolves.toEqual([{ seed_id: 'MSD-1', title: 'Seed' }]);
+  });
+
   it('maps project tracks and gate readiness through the typed wrapper', async () => {
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
-      accessRole: 'readonly',
-      projectTracks: [{ track_id: 'TRK-1', project_id: 'PRJ-1', name: 'Release 1' }],
-      gateReadiness: [{
-        track_id: 'TRK-1',
-        ready_gate_count: 1,
-        total_gate_count: 4,
-        current_gate_id: 'requirements_review',
-        next_required_artifacts: [{ artifact_id: 'requirements-definition', template_ref: 'knowledge/public/templates/blueprints/requirements-traceability-matrix.md' }],
-      }],
-    }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })) as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            accessRole: 'readonly',
+            projectTracks: [{ track_id: 'TRK-1', project_id: 'PRJ-1', name: 'Release 1' }],
+            gateReadiness: [
+              {
+                track_id: 'TRK-1',
+                ready_gate_count: 1,
+                total_gate_count: 4,
+                current_gate_id: 'requirements_review',
+                next_required_artifacts: [
+                  {
+                    artifact_id: 'requirements-definition',
+                    template_ref:
+                      'knowledge/public/templates/blueprints/requirements-traceability-matrix.md',
+                  },
+                ],
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    ) as typeof fetch;
 
     const client = createControlPlaneClient('chronos', { baseUrl: 'http://127.0.0.1:3000' });
     const tracks = await client.listProjectTracks();
     expect(tracks[0]?.track_id).toBe('TRK-1');
     expect(tracks[0]?.gate_readiness?.current_gate_id).toBe('requirements_review');
-    expect(tracks[0]?.gate_readiness?.next_required_artifacts?.[0]?.artifact_id).toBe('requirements-definition');
+    expect(tracks[0]?.gate_readiness?.next_required_artifacts?.[0]?.artifact_id).toBe(
+      'requirements-definition'
+    );
+  });
+
+  it('drops malformed project tracks before gate readiness mapping', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            projectTracks: [{ track_id: 'TRK-1', name: 'Release 1' }, { track_id: [] }],
+            gateReadiness: [{ track_id: 'TRK-1', ready: true }],
+          }),
+          { status: 200 }
+        )
+    ) as typeof fetch;
+
+    const client = createControlPlaneClient('chronos', { baseUrl: 'http://127.0.0.1:3000' });
+    await expect(client.listProjectTracks()).resolves.toEqual([
+      { track_id: 'TRK-1', name: 'Release 1', gate_readiness: { ready: true } },
+    ]);
   });
 
   it('filters invalid next actions from chronos overview responses', async () => {
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
-      accessRole: 'readonly',
-      nextActions: [
-        {
-          action_id: 'act-1',
-          next_action_type: 'approve',
-          reason: 'Approval is pending',
-          risk: 'medium',
-          suggested_surface_action: 'approvals',
-          approval_required: false,
-        },
-        {
-          action_id: 'act-2',
-          next_action_type: 'unknown-action',
-          reason: 'Invalid contract',
-          risk: 'low',
-          suggested_surface_action: 'approvals',
-          approval_required: false,
-        },
-      ],
-    }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })) as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            accessRole: 'readonly',
+            nextActions: [
+              {
+                action_id: 'act-1',
+                next_action_type: 'approve',
+                reason: 'Approval is pending',
+                risk: 'medium',
+                suggested_surface_action: 'approvals',
+                approval_required: false,
+              },
+              {
+                action_id: 'act-2',
+                next_action_type: 'unknown-action',
+                reason: 'Invalid contract',
+                risk: 'low',
+                suggested_surface_action: 'approvals',
+                approval_required: false,
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    ) as typeof fetch;
 
     const client = createControlPlaneClient('chronos', { baseUrl: 'http://127.0.0.1:3000' });
     const overview = await client.getChronosOverview();
@@ -100,31 +190,150 @@ describe('control-plane-client', () => {
     expect(overview.nextActions?.[0]?.action_id).toBe('act-1');
   });
 
-  it('raises a stale surface error with a suggested command', async () => {
-    globalThis.fetch = vi.fn(async () => new Response(
-      '<html><body><pre>Cannot GET /api/projects</pre></body></html>',
-      { status: 404, headers: { 'content-type': 'text/html' } },
-    )) as typeof fetch;
+  it('normalizes all chronos overview collections before projection', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            accessRole: 'readonly',
+            projects: [{ project_id: 'PRJ-1', name: 'Project', leaked: 'drop' }, { project_id: 9 }],
+            projectTracks: [
+              { track_id: 'TRK-1', project_id: 'PRJ-1', name: 'Track' },
+              { track_id: [] },
+            ],
+            gateReadiness: [
+              {
+                track_id: 'TRK-1',
+                ready: true,
+                ready_gate_count: 2,
+                next_required_artifacts: [{ artifact_id: 'requirements' }, { artifact_id: 4 }],
+              },
+              { track_id: 8, ready: true },
+            ],
+            missionSeeds: [
+              {
+                seed_id: 'MSD-1',
+                metadata: {
+                  template_ref: 'template.md',
+                  mission_seed_assessment: { eligible: true, reason: 'ready', extra: 'drop' },
+                  execution_contract: { recommended_action: 'review', repository_id: 'repo-1' },
+                },
+              },
+              { seed_id: null },
+            ],
+            pendingApprovals: [{ id: 'APR-1', title: 'Approve', leaked: 'drop' }, 'invalid'],
+            distillCandidates: [
+              {
+                candidate_id: 'DSC-1',
+                source_type: 'mission',
+                title: 'Pattern',
+                summary: 'Reusable pattern',
+                status: 'proposed',
+                target_kind: 'knowledge_hint',
+                extra: 'drop',
+              },
+              { candidate_id: 'DSC-2', source_type: 'unknown' },
+            ],
+            memoryCandidates: [
+              {
+                candidate_id: 'MEM-1',
+                status: 'queued',
+                proposed_memory_kind: 'preference',
+                sensitivity_tier: 'personal',
+                source_ref: 'task:1',
+                evidence_refs: ['event:1'],
+                extra: 'drop',
+              },
+              { candidate_id: 'MEM-2', status: 'queued' },
+            ],
+            nextActions: [
+              {
+                action_id: 'act-1',
+                next_action_type: 'approve',
+                reason: 'Review',
+                risk: 'medium',
+                approval_required: false,
+              },
+            ],
+          }),
+          { status: 200 }
+        )
+    ) as typeof fetch;
 
-    await expect(requestControlPlaneJson('presence', '/api/projects'))
-      .rejects
-      .toMatchObject<Partial<ControlPlaneClientError>>({
-        name: 'ControlPlaneClientError',
-        suggestedCommand: 'pnpm surfaces:reconcile',
-      });
+    const client = createControlPlaneClient('chronos', { baseUrl: 'http://127.0.0.1:3000' });
+    const overview = await client.getChronosOverview();
+
+    expect(overview.projects).toEqual([{ project_id: 'PRJ-1', name: 'Project' }]);
+    expect(overview.projectTracks).toEqual([
+      { track_id: 'TRK-1', project_id: 'PRJ-1', name: 'Track' },
+    ]);
+    expect(overview.gateReadiness).toEqual([
+      {
+        track_id: 'TRK-1',
+        ready: true,
+        ready_gate_count: 2,
+        next_required_artifacts: [{ artifact_id: 'requirements' }],
+      },
+    ]);
+    expect(overview.missionSeeds?.[0]?.metadata).toEqual({
+      template_ref: 'template.md',
+      mission_seed_assessment: { eligible: true, reason: 'ready' },
+      execution_contract: { recommended_action: 'review', repository_id: 'repo-1' },
+    });
+    expect(overview.pendingApprovals).toEqual([{ id: 'APR-1', title: 'Approve' }]);
+    expect(overview.distillCandidates).toEqual([
+      {
+        candidate_id: 'DSC-1',
+        source_type: 'mission',
+        title: 'Pattern',
+        summary: 'Reusable pattern',
+        status: 'proposed',
+        target_kind: 'knowledge_hint',
+      },
+    ]);
+    expect(overview.memoryCandidates).toEqual([
+      {
+        candidate_id: 'MEM-1',
+        status: 'queued',
+        proposed_memory_kind: 'preference',
+        sensitivity_tier: 'personal',
+        source_ref: 'task:1',
+        evidence_refs: ['event:1'],
+      },
+    ]);
+  });
+
+  it('raises a stale surface error with a suggested command', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response('<html><body><pre>Cannot GET /api/projects</pre></body></html>', {
+          status: 404,
+          headers: { 'content-type': 'text/html' },
+        })
+    ) as typeof fetch;
+
+    await expect(requestControlPlaneJson('presence', '/api/projects')).rejects.toMatchObject<
+      Partial<ControlPlaneClientError>
+    >({
+      name: 'ControlPlaneClientError',
+      suggestedCommand: 'pnpm surfaces reconcile',
+    });
   });
 
   it('treats next not-found pages as stale surface mismatches', async () => {
-    globalThis.fetch = vi.fn(async () => new Response(
-      '<!DOCTYPE html><html><head><title>404: This page could not be found.</title></head><body>This page could not be found.</body></html>',
-      { status: 404, headers: { 'content-type': 'text/html' } },
-    )) as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          '<!DOCTYPE html><html><head><title>404: This page could not be found.</title></head><body>This page could not be found.</body></html>',
+          { status: 404, headers: { 'content-type': 'text/html' } }
+        )
+    ) as typeof fetch;
 
-    await expect(requestControlPlaneJson('chronos', '/api/knowledge-ref?path=test'))
-      .rejects
-      .toMatchObject<Partial<ControlPlaneClientError>>({
-        name: 'ControlPlaneClientError',
-        suggestedCommand: 'pnpm surfaces:reconcile',
-      });
+    await expect(
+      requestControlPlaneJson('chronos', '/api/knowledge-ref?path=test')
+    ).rejects.toMatchObject<Partial<ControlPlaneClientError>>({
+      name: 'ControlPlaneClientError',
+      suggestedCommand: 'pnpm surfaces reconcile',
+    });
   });
 });

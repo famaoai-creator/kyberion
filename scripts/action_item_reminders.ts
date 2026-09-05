@@ -11,7 +11,7 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const runActionItemReminderSweep = runActionItemReminderSweepOp;
 
-async function main(argv: string[]): Promise<void> {
+async function main(argv: string[]) {
   const getArgValue = (flag: string): string | undefined => {
     const index = argv.indexOf(flag);
     return index >= 0 ? argv[index + 1] : undefined;
@@ -26,17 +26,21 @@ async function main(argv: string[]): Promise<void> {
     max_items_per_mission: Number.isFinite(maxItemsValue) && maxItemsValue > 0 ? maxItemsValue : 20,
     ...(reportPathValue ? { report_path: reportPathValue } : {}),
   });
-  console.log(JSON.stringify(report, null, 2));
+  return report;
 }
+
+export const runActionItemReminderSweepScript = defineScript({
+  name: 'action-item-reminders',
+  flags: [],
+  async run(context) {
+    const report = await main(context.argv);
+    context.print(report);
+    return report;
+  },
+});
 
 if (
   isDirectScript(import.meta.url, 'action_item_reminders.ts') ||
   isDirectScript(import.meta.url, 'action_item_reminders.js')
 )
-  void defineScript({
-    name: 'action-item-reminders',
-    flags: [],
-    run(context) {
-      return main(context.argv);
-    },
-  })();
+  void runActionItemReminderSweepScript();

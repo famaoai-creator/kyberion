@@ -1,18 +1,12 @@
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { loadMaxFileLinesConfig, type MaxFileLinesConfig } from '@agent/core/max-file-lines-config';
 import { maskComments } from './check_module_boundaries.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
-
-type MaxFileLinesConfig = {
-  max_lines: number;
-  roots: string[];
-  exceptions: Array<{ file: string; reason: string; target: string }>;
-};
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
-const CONFIG_PATH = pathResolver.knowledge('product/governance/max-file-lines.json');
 
 function relative(filePath: string): string {
   return path.relative(ROOT, filePath).split(path.sep).join('/');
@@ -30,7 +24,7 @@ function isSource(filePath: string): boolean {
 }
 
 export function checkMaxFileLines(): { maxLines: number; violations: string[] } {
-  const config = readJson<MaxFileLinesConfig>(CONFIG_PATH);
+  const config: MaxFileLinesConfig = loadMaxFileLinesConfig();
   const exceptions = new Set(config.exceptions.map((entry) => entry.file));
   const violations: string[] = [];
   if (exceptions.size !== config.exceptions.length) {
@@ -67,12 +61,15 @@ export const runCheckMaxFileLines = defineScript({
   run(context) {
     const report = checkMaxFileLines();
     if (report.violations.length > 0) {
-      context.print('[check:max-file-lines] violations detected:');
-      for (const violation of report.violations) context.print(`- ${violation}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...report.violations.map((violation) => `- ${violation}`)].join(
+          '\n'
+        )
+      );
     }
     context.print(`[check:max-file-lines] OK (max ${report.maxLines} lines)`);
+    return report;
   },
 });
 

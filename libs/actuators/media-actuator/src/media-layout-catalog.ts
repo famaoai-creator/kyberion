@@ -1,19 +1,21 @@
 import {
-  loadJsonCatalog,
+  deepMergeCatalog,
+  readJsonFilesRecursively,
   loadMediaDesignSystemsCatalog,
   loadJsonValue,
   loadTenantEntries,
   resolveConfidentialTenantOverride,
 } from './media-catalog-loaders.js';
+import { assertSafeRepositoryPath, safeReadFile } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import {
-  safeReadFile,
-  pathResolver,
-  buildGovernedRetryOptions,
   fitTextToBox,
   measureTextBlock,
-  resolvePptxSurfaceDesign,
   type LayoutFitResult,
-} from '@agent/core';
+} from '@agent/core/native-pptx-engine/text-metrics';
+import { resolvePptxSurfaceDesign } from '@agent/core/native-pptx-engine/design-cascade';
 import * as path from 'node:path';
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
 const DEFAULT_MEDIA_RETRY = {
@@ -24,35 +26,233 @@ const DEFAULT_MEDIA_RETRY = {
   jitter: true,
 };
 
+export interface MediaLayoutPosition {
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  [key: string]: unknown;
+}
+
+export interface MediaLayoutChrome {
+  header_h?: number;
+  body_x?: number;
+  body_y?: number;
+  body_w?: number;
+  body_h?: number;
+  footer_y?: number;
+  footer_h?: number;
+  footer_font_size?: number;
+  logo_zone_x?: number;
+  logo_zone_y?: number;
+  logo_zone_w?: number;
+  logo_zone_h?: number;
+  logo_display_h?: number;
+  logo_display_max_w?: number;
+  title_w_logo?: number;
+  title_w_no_logo?: number;
+  title_font_size?: number;
+  title_x?: number;
+  accent_strip_x?: number;
+  accent_strip_w?: number;
+  separator_h?: number;
+  [key: string]: unknown;
+}
+
+export interface MediaLayoutHero {
+  white_panel_y?: number;
+  white_panel_h?: number;
+  separator_y?: number;
+  separator_h?: number;
+  logo_display_h?: number;
+  logo_display_max_w?: number;
+  logo_right_margin?: number;
+  logo_y?: number;
+  brand_name_x?: number;
+  brand_name_y?: number;
+  brand_name_w?: number;
+  brand_name_h?: number;
+  brand_name_font_size?: number;
+  title_x?: number;
+  title_y?: number;
+  title_w?: number;
+  title_h?: number;
+  title_font_size?: number;
+  subtitle_x?: number;
+  subtitle_y?: number;
+  subtitle_w?: number;
+  subtitle_h?: number;
+  subtitle_font_size?: number;
+  [key: string]: unknown;
+}
+
+export interface MediaLayoutShape {
+  type?: string;
+  shapeType?: string;
+  placeholderType?: string;
+  pos?: MediaLayoutPosition;
+  style?: Record<string, unknown>;
+  text?: string;
+  [key: string]: unknown;
+}
+
+export interface MediaSlideTemplateData {
+  title?: string;
+  subtitle?: string;
+  body?: string | string[];
+  visual?: string;
+  layout_key?: string;
+  media_kind?: string;
+  design_system_id?: string;
+  [key: string]: unknown;
+}
+
+export interface MediaLayoutSlideData extends MediaSlideTemplateData {
+  layout_template_id?: string;
+  tenant_slug?: string;
+  branding?: {
+    brand_name?: string;
+    tenant_slug?: string;
+    [key: string]: unknown;
+  };
+}
+
+export type MediaLayoutMargin = [number, number, number, number];
+
+export interface MediaLayoutVisualLabel {
+  h?: number;
+  y_from_bottom?: number;
+  font_size?: number;
+  margin?: MediaLayoutMargin;
+  fill?: string;
+  color?: string;
+}
+
+export interface MediaLayoutBodyZone {
+  left_w: number;
+  right_x: number;
+  right_w: number;
+  panel_h: number;
+  left_font_size: number;
+  left_line_spacing_pct: number;
+  left_margin: MediaLayoutMargin;
+  panel_header_font_size: number;
+  panel_body_font_size: number;
+  panel_body_line_spacing_pct: number;
+  panel_header_margin: MediaLayoutMargin;
+  panel_body_margin: MediaLayoutMargin;
+  desc_h: number;
+  panel_header_y_offset: number;
+  panel_header_h: number;
+  panel_body_y_offset: number;
+  desc_font_size: number;
+  desc_line_spacing_pct: number;
+  desc_margin: MediaLayoutMargin;
+  msg_y_offset: number;
+  msg_h: number;
+  cta_y_offset: number;
+  cta_x: number;
+  cta_w: number;
+  cta_h: number;
+  msg_font_size: number;
+  msg_line_spacing_pct: number;
+  msg_margin: MediaLayoutMargin;
+  cta_font_size: number;
+  font_size: number;
+  line_spacing_pct: number;
+  margin: MediaLayoutMargin;
+  panel_label?: string;
+  panel_header_fill?: string;
+  panel_body_fill?: string;
+  panel_body_color?: string;
+  semantic_labels?: Record<string, string>;
+  visual_label?: MediaLayoutVisualLabel;
+  regions?: ZoneRegionSpec[];
+  [key: string]: unknown;
+}
+
+export interface MediaLayoutTemplate {
+  chrome?: MediaLayoutChrome;
+  hero?: MediaLayoutHero;
+  body_zones?: Record<string, MediaLayoutBodyZone>;
+  title?: MediaLayoutShape;
+  body?: MediaLayoutShape;
+  visual?: MediaLayoutShape;
+  web?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface MediaSlideLayoutPresetCatalog {
+  version: string;
+  defaults: Record<string, MediaLayoutTemplate>;
+  presets: Record<string, MediaLayoutTemplate>;
+  grid?: Record<string, unknown>;
+  chrome?: MediaLayoutChrome;
+  hero?: MediaLayoutHero;
+  body_zones?: Record<string, MediaLayoutBodyZone>;
+  default?: string;
+  templates?: Record<string, MediaLayoutTemplate>;
+  _meta?: string;
+}
+
+export interface MediaLayoutTemplateCatalog {
+  version: string;
+  default: string;
+  templates: Record<string, MediaLayoutTemplate>;
+}
+
+export interface MediaLayoutThemeInput {
+  layout_template_id?: string;
+  layout_templates?: MediaLayoutTemplateCatalog;
+  pptx?: {
+    layout_templates?: MediaLayoutTemplateCatalog;
+    [key: string]: unknown;
+  };
+  web?: {
+    layout_templates?: MediaLayoutTemplateCatalog;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 function cloneJsonValue<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: MEDIA_MANIFEST_PATH,
-    defaults: DEFAULT_MEDIA_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: MEDIA_MANIFEST_PATH,
+  defaults: DEFAULT_MEDIA_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
+
+function asMediaLayoutShape(value: unknown): MediaLayoutShape {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as MediaLayoutShape)
+    : {};
 }
 
-function mergePptxShape(base: any, overrides: any): any {
+function mergePptxShape(base: MediaLayoutShape, overrides: unknown): MediaLayoutShape {
+  const baseShape = asMediaLayoutShape(base);
+  const overrideShape = asMediaLayoutShape(overrides);
   return {
-    ...base,
-    ...(overrides || {}),
+    ...baseShape,
+    ...overrideShape,
     pos: {
-      ...(base?.pos || {}),
-      ...(overrides?.pos || {}),
+      ...(baseShape.pos || {}),
+      ...(overrideShape.pos || {}),
     },
     style: {
-      ...(base?.style || {}),
-      ...(overrides?.style || {}),
+      ...(baseShape.style || {}),
+      ...(overrideShape.style || {}),
     },
   };
 }
 
-function resolveSlideTemplate(template: any, slideData: any, fallback = ''): string {
+function resolveSlideTemplate(
+  template: unknown,
+  slideData: MediaSlideTemplateData,
+  fallback = ''
+): string {
   if (typeof template !== 'string') return fallback;
   return template
     .replace(/{{\s*title\s*}}/g, slideData?.title || '')
@@ -64,15 +264,37 @@ function resolveSlideTemplate(template: any, slideData: any, fallback = ''): str
     .replace(/{{\s*visual\s*}}/g, slideData?.visual || '');
 }
 
-function loadSlideLayoutPresetCatalog(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/slide-layout-presets',
-    filePath: 'knowledge/public/design-patterns/media-templates/slide-layout-presets.json',
-    fallback: { defaults: {}, presets: {} },
+function loadSlideLayoutPresetCatalog(rootDir: string): MediaSlideLayoutPresetCatalog {
+  const aggregationSeed: MediaSlideLayoutPresetCatalog = {
+    version: '1.0.0',
+    defaults: {},
+    presets: {},
+  };
+  const catalog = defineCatalog<MediaSlideLayoutPresetCatalog>({
+    id: 'slide-layout-presets',
+    path: path.resolve(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/slide-layout-presets.json'
+    ),
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/slide-layout-presets.schema.json'),
   });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/slide-layout-presets'
+  );
+  const docs = readJsonFilesRecursively(directoryPath);
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce(
+    (acc, doc) => deepMergeCatalog(acc, doc),
+    cloneJsonValue(aggregationSeed)
+  );
+  return catalog.validate(merged, directoryPath);
 }
 
-function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
+function resolveRuntimeSlidePreset(
+  rootDir: string,
+  slideData: MediaSlideTemplateData
+): MediaLayoutTemplate | null {
   const layoutKey = String(slideData?.layout_key || '').trim();
   const mediaKind = String(slideData?.media_kind || '').trim();
   const presetKey = layoutKey || mediaKind;
@@ -91,14 +313,16 @@ function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
   return mergePptxShape(preset || {}, override || {});
 }
 
-let _cachedBzl: ReturnType<typeof loadJsonValue> | null = null;
-function loadBodyZoneLayouts(rootDir: string): any {
+let _cachedBzl: MediaLayoutTemplate | null = null;
+function loadBodyZoneLayouts(rootDir: string): MediaLayoutTemplate {
   if (_cachedBzl) return _cachedBzl;
-  const p = path.join(
-    rootDir,
-    'knowledge/public/design-patterns/media-templates/slide-layout-presets/body-zone-layouts.json'
-  );
-  _cachedBzl = loadJsonValue(p);
+  const catalog = loadSlideLayoutPresetCatalog(rootDir);
+  _cachedBzl = {
+    version: catalog.version,
+    chrome: catalog.chrome || {},
+    hero: catalog.hero || {},
+    body_zones: catalog.body_zones || {},
+  };
   return _cachedBzl;
 }
 
@@ -186,27 +410,35 @@ function resolveBodyZoneLayout(semanticType: string): string {
   }
 }
 
-let _cachedLayoutTemplates: any = null;
-function loadLayoutTemplateCatalog(rootDir: string): any {
+let _cachedLayoutTemplates: MediaLayoutTemplateCatalog | null = null;
+function loadLayoutTemplateCatalog(rootDir: string): MediaLayoutTemplateCatalog {
   if (_cachedLayoutTemplates) return _cachedLayoutTemplates;
-  try {
-    const p = path.join(
-      rootDir,
-      'knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json'
-    );
-    _cachedLayoutTemplates = loadJsonValue(p);
-  } catch {
-    _cachedLayoutTemplates = { default: 'corporate-standard', templates: {} };
-  }
+  const catalog = loadSlideLayoutPresetCatalog(rootDir);
+  _cachedLayoutTemplates = {
+    version: catalog.version,
+    default: catalog.default || 'corporate-standard',
+    templates: catalog.templates || {},
+  };
   return _cachedLayoutTemplates;
+}
+
+function loadLayoutTemplateCatalogFromPath(filePath: string): MediaLayoutTemplateCatalog {
+  const catalogPath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  return defineCatalog<MediaLayoutTemplateCatalog>({
+    id: 'layout-template-catalog',
+    path: catalogPath,
+    schema: pathResolver.rootResolve(
+      'knowledge/product/schemas/layout-template-catalog.schema.json'
+    ),
+  }).load();
 }
 
 function resolveLayoutTemplate(
   rootDir: string,
   designSystemId: string | undefined,
-  slideData?: any,
-  theme?: any
-): any {
+  slideData?: MediaLayoutSlideData,
+  theme?: MediaLayoutThemeInput
+): MediaLayoutTemplate {
   const themeTemplateCatalog =
     theme?.layout_templates ||
     theme?.pptx?.layout_templates ||
@@ -227,8 +459,9 @@ function resolveLayoutTemplate(
   // Priority 1: tenant override with an explicit confidential catalog path
   if (tenantOverride?.layout_template_catalog) {
     try {
-      const catalogPath = path.resolve(rootDir, tenantOverride.layout_template_catalog);
-      const catalog = loadJsonValue(catalogPath);
+      const catalog = loadLayoutTemplateCatalogFromPath(
+        path.resolve(rootDir, tenantOverride.layout_template_catalog)
+      );
       const templateId = tenantOverride.layout_template_id || catalog.default;
       const tpl = catalog.templates?.[templateId];
       if (tpl) return tpl;
@@ -494,6 +727,7 @@ export {
   getPngDisplaySize,
   resolveBodyZoneLayout,
   loadLayoutTemplateCatalog,
+  loadLayoutTemplateCatalogFromPath,
   loadTenantEntries,
   resolveConfidentialTenantOverride,
   resolveLayoutTemplate,

@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { safeReadFile } from './secure-io.js';
 
 vi.mock('./path-resolver.js', async () => {
   const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
@@ -21,12 +21,13 @@ vi.mock('./policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
-import { missionEvidenceDir } from './path-resolver.js';
+import { missionEvidenceDir, pathResolver } from './path-resolver.js';
 import {
   evaluateArchitectureReadyGate,
   evaluateQaReadyGate,
   evaluateTaskPlanReadyGate,
   readDesignSpec,
+  readDesignSpecAtPath,
   readTaskPlan,
   readTestPlan,
   saveDesignSpec,
@@ -90,7 +91,8 @@ describe('sdlc-artifact-store', () => {
   let tmpDir = '';
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-'));
+    tmpDir = pathResolver.sharedTmp(`sdlc-${process.pid}-${Date.now()}`);
+    fs.mkdirSync(tmpDir, { recursive: true });
     (missionEvidenceDir as unknown as ReturnType<typeof vi.fn>).mockReturnValue(tmpDir);
   });
 
@@ -154,6 +156,42 @@ describe('sdlc-artifact-store', () => {
       expect(evaluateArchitectureReadyGate('MSN-NONE').passed).toBe(false);
     });
 
+    it('rejects a schema-invalid persisted design spec', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, 'design-spec.json'),
+        JSON.stringify({
+          version: 'v1',
+          project_name: 'Broken',
+          generated_at: 'bad',
+          components: [],
+        })
+      );
+
+      expect(() => readDesignSpec('MSN-D-INVALID')).toThrow(/Invalid catalog sdlc-design-spec/);
+    });
+
+    it('loads an explicitly supplied design spec through the canonical schema boundary', () => {
+      const file = path.join(tmpDir, 'explicit-design-spec.json');
+      fs.writeFileSync(
+        file,
+        JSON.stringify({
+          ...designExtracted,
+          version: 'v1',
+          project_name: 'Explicit project',
+          generated_at: new Date().toISOString(),
+        })
+      );
+
+      expect(readDesignSpecAtPath(file)?.project_name).toBe('Explicit project');
+    });
+
+    it('rejects a schema-invalid explicitly supplied design spec', () => {
+      const file = path.join(tmpDir, 'explicit-invalid-design-spec.json');
+      fs.writeFileSync(file, JSON.stringify({ version: 'v1', project_name: 'Broken' }));
+
+      expect(() => readDesignSpecAtPath(file)).toThrow(/Invalid catalog sdlc-design-spec/);
+    });
+
     it('emits design specs that satisfy the schema', () => {
       const ajv = new Ajv({ allErrors: true });
       addFormats(ajv);
@@ -189,6 +227,24 @@ describe('sdlc-artifact-store', () => {
         })
       ).toBe(false);
     });
+
+    it('persists the canonical design payload returned by the catalog', () => {
+      const saved = saveDesignSpec({
+        missionId: 'MSN-D-CANONICAL',
+        projectName: 'Canonical Project',
+        extracted: {
+          ...designExtracted,
+          $schema: 'governance-metadata',
+        } as unknown as typeof designExtracted,
+      });
+
+      const persisted = JSON.parse(
+        String(safeReadFile(path.join(tmpDir, 'design-spec.json'), { encoding: 'utf8' }))
+      ) as Record<string, unknown>;
+      expect(saved).toHaveProperty('project_name', 'Canonical Project');
+      expect(persisted).not.toHaveProperty('$schema');
+      expect(persisted.project_name).toBe('Canonical Project');
+    });
   });
 
   describe('test plan', () => {
@@ -212,6 +268,24 @@ describe('sdlc-artifact-store', () => {
       const gate = evaluateQaReadyGate('MSN-T2', ['FR-1', 'FR-2']);
       expect(gate.passed).toBe(false);
       expect(gate.reasons[0]).toContain('FR-2');
+    });
+
+    it('persists and reads test plans through the governed schema', () => {
+      const saved = saveTestPlan({
+        missionId: 'MSN-T-CANONICAL',
+        projectName: 'Canonical Project',
+        extracted: {
+          ...testExtracted,
+          $schema: 'governance-metadata',
+        } as unknown as typeof testExtracted,
+      });
+
+      const persisted = JSON.parse(
+        String(safeReadFile(path.join(tmpDir, 'test-plan.json'), { encoding: 'utf8' }))
+      ) as Record<string, unknown>;
+      expect(saved).toHaveProperty('app_id', 'sample-app');
+      expect(persisted).not.toHaveProperty('$schema');
+      expect(readTestPlan('MSN-T-CANONICAL')?.cases).toHaveLength(1);
     });
   });
 
@@ -341,6 +415,24 @@ describe('sdlc-artifact-store', () => {
           tasks: [],
         })
       ).toBe(false);
+    });
+
+    it('persists the canonical task payload returned by the catalog', () => {
+      const saved = saveTaskPlan({
+        missionId: 'MSN-TP-CANONICAL',
+        projectName: 'Canonical Project',
+        decomposed: {
+          ...decomposed,
+          $schema: 'governance-metadata',
+        } as unknown as typeof decomposed,
+      });
+
+      const persisted = JSON.parse(
+        String(safeReadFile(path.join(tmpDir, 'task-plan.json'), { encoding: 'utf8' }))
+      ) as Record<string, unknown>;
+      expect(saved).toHaveProperty('project_name', 'Canonical Project');
+      expect(persisted).not.toHaveProperty('$schema');
+      expect(persisted.project_name).toBe('Canonical Project');
     });
   });
 });

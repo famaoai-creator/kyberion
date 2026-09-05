@@ -65,6 +65,7 @@ Examples:
 - `mission_kickoff_requested`
 - `mission_followup_requested`
 - `mission_reconciliation_requested`
+- `mission_worker_recovery_requested` (explicit resume後のpaused goal-driven worker recovery)
 - `runtime_lease_remediation_applied`
 
 Events are:

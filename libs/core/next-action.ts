@@ -1,5 +1,5 @@
 import type { ErrorClassification } from './error-classifier.js';
-import type { VocabularyKey } from './t.js';
+import { t, type VocabularyKey } from './t.js';
 
 export type NextActionType =
   | 'run_command'
@@ -112,15 +112,15 @@ export function buildCompletionNextAction(input: {
     )
   );
   return {
-    title: satisfied ? 'Completion confirmed' : 'Completion requires follow-up',
+    title: t(satisfied ? 'next_action:completion_confirmed' : 'next_action:completion_followup'),
     request: input.goal.success_condition,
     delivered,
     gaps,
     next_step: satisfied
-      ? 'Proceed with archival, promotion, or the next mission step.'
+      ? t('next_action:completion_next_step_proceed')
       : gaps.length > 0
-        ? 'Resolve the gaps and rerun completion reconciliation.'
-        : 'Review the delivered evidence and confirm whether the goal is satisfied.',
+        ? t('next_action:completion_next_step_resolve')
+        : t('next_action:completion_next_step_review'),
     satisfied,
     confidence: input.reconciliation.confidence,
     evidence_refs: evidenceRefs,
@@ -156,35 +156,39 @@ function buildPipelineFailureNextAction(
         reason: classification.remediation,
         next_action_type: context.surfaceId ? 'repair_surface' : 'inspect_artifact',
         suggested_command: context.surfaceId
-          ? `pnpm surfaces:repair -- --surface ${context.surfaceId}`
-          : 'pnpm surfaces:status',
+          ? `pnpm surfaces repair -- --surface ${context.surfaceId}`
+          : 'pnpm surfaces status',
       });
     case 'dep.missing-binary':
     case 'dep.missing-module':
     case 'kyberion.capability-missing':
       return buildNextAction({
-        title: 'Verify missing runtime prerequisites',
+        title: t('next_action:verify_missing_runtime_prerequisites'),
+        next_action_key: 'next_action:verify_missing_runtime_prerequisites',
         reason: classification.remediation,
         next_action_type: 'bootstrap_environment',
         suggested_command: 'pnpm doctor',
       });
     case 'auth.invalid-key':
       return buildNextAction({
-        title: 'Repair credentials and onboarding',
+        title: t('next_action:repair_credentials'),
+        next_action_key: 'next_action:repair_credentials',
         reason: classification.remediation,
         next_action_type: 'bootstrap_environment',
         suggested_command: 'pnpm onboard',
       });
     case 'secret.not-found':
       return buildNextAction({
-        title: 'Inspect configured secrets',
+        title: t('next_action:inspect_configured_secrets'),
+        next_action_key: 'next_action:inspect_configured_secrets',
         reason: classification.remediation,
         next_action_type: 'inspect_artifact',
-        suggested_command: 'pnpm cli secret list',
+        suggested_command: 'pnpm setup:report --persona first-time-user',
       });
     case 'kyberion.path-scope':
       return buildNextAction({
-        title: 'Fix the write path scope',
+        title: t('next_action:fix_write_path_scope'),
+        next_action_key: 'next_action:fix_write_path_scope',
         reason: classification.remediation,
         next_action_type: 'request_clarification',
         suggested_followup_request:
@@ -193,14 +197,16 @@ function buildPipelineFailureNextAction(
     case 'kyberion.governance-approval':
     case 'pipeline.hook-abort':
       return buildNextAction({
-        title: 'Request the required approval',
+        title: t('next_action:request_required_approval'),
+        next_action_key: 'next_action:request_required_approval',
         reason: classification.remediation,
         next_action_type: 'run_command',
-        suggested_command: 'pnpm cli approval',
+        suggested_command: 'pnpm kyberion approvals',
       });
     case 'mission.not-found':
       return buildNextAction({
-        title: 'Resolve the mission id',
+        title: t('next_action:resolve_mission_id'),
+        next_action_key: 'next_action:resolve_mission_id',
         reason: classification.remediation,
         next_action_type: 'inspect_artifact',
         suggested_command: 'pnpm mission list',
@@ -209,7 +215,8 @@ function buildPipelineFailureNextAction(
     case 'input.json-parse':
     case 'input.unsupported-op':
       return buildNextAction({
-        title: 'Fix the failing pipeline input',
+        title: t('next_action:fix_failing_pipeline_input'),
+        next_action_key: 'next_action:fix_failing_pipeline_input',
         reason: classification.remediation,
         next_action_type: 'inspect_artifact',
         ...(pipelinePath ? { suggested_pipeline_path: pipelinePath } : {}),
@@ -228,14 +235,15 @@ function buildPipelineFailureNextAction(
       reason: classification.remediation,
       next_action_type: context.surfaceId ? 'repair_surface' : 'inspect_artifact',
       suggested_command: context.surfaceId
-        ? `pnpm surfaces:repair -- --surface ${context.surfaceId}`
-        : 'pnpm surfaces:status',
+        ? `pnpm surfaces repair -- --surface ${context.surfaceId}`
+        : 'pnpm surfaces status',
     });
   }
 
   if (classification.category === 'missing_dependency') {
     return buildNextAction({
-      title: 'Verify runtime prerequisites',
+      title: t('next_action:verify_runtime_prerequisites'),
+      next_action_key: 'next_action:verify_runtime_prerequisites',
       reason: classification.remediation,
       next_action_type: 'bootstrap_environment',
       suggested_command: 'pnpm doctor',
@@ -244,7 +252,8 @@ function buildPipelineFailureNextAction(
 
   if (classification.category === 'auth') {
     return buildNextAction({
-      title: 'Repair credentials and onboarding',
+      title: t('next_action:repair_credentials'),
+      next_action_key: 'next_action:repair_credentials',
       reason: classification.remediation,
       next_action_type: 'bootstrap_environment',
       suggested_command: 'pnpm onboard',
@@ -253,10 +262,11 @@ function buildPipelineFailureNextAction(
 
   if (classification.category === 'missing_secret') {
     return buildNextAction({
-      title: 'Inspect configured secrets',
+      title: t('next_action:inspect_configured_secrets'),
+      next_action_key: 'next_action:inspect_configured_secrets',
       reason: classification.remediation,
       next_action_type: 'inspect_artifact',
-      suggested_command: 'pnpm cli secret list',
+      suggested_command: 'pnpm setup:report --persona first-time-user',
     });
   }
 
@@ -266,7 +276,8 @@ function buildPipelineFailureNextAction(
     classification.category === 'tier_violation'
   ) {
     return buildNextAction({
-      title: 'Resolve the policy block',
+      title: t('next_action:resolve_policy_block'),
+      next_action_key: 'next_action:resolve_policy_block',
       reason: classification.remediation,
       next_action_type: 'request_clarification',
       suggested_followup_request:
@@ -276,7 +287,8 @@ function buildPipelineFailureNextAction(
 
   if (classification.category === 'invalid_input') {
     return buildNextAction({
-      title: 'Fix the failing input',
+      title: t('next_action:fix_failing_input'),
+      next_action_key: 'next_action:fix_failing_input',
       reason: classification.remediation,
       next_action_type: 'inspect_artifact',
       ...(pipelinePath ? { suggested_pipeline_path: pipelinePath } : {}),
@@ -287,7 +299,8 @@ function buildPipelineFailureNextAction(
 
   if (classification.category === 'network' || classification.category === 'timeout') {
     return buildNextAction({
-      title: 'Check the remote dependency and retry',
+      title: t('next_action:check_remote_dependency_retry'),
+      next_action_key: 'next_action:check_remote_dependency_retry',
       reason: classification.remediation,
       next_action_type: 'retry_pipeline',
       ...(pipelinePath ? { suggested_pipeline_path: pipelinePath } : {}),
@@ -297,7 +310,8 @@ function buildPipelineFailureNextAction(
   }
 
   return buildNextAction({
-    title: 'Inspect the failure and rerun',
+    title: t('next_action:inspect_failure_rerun'),
+    next_action_key: 'next_action:inspect_failure_rerun',
     reason: classification.remediation,
     next_action_type: 'inspect_artifact',
     ...(pipelinePath ? { suggested_pipeline_path: pipelinePath } : {}),
@@ -323,8 +337,8 @@ export function buildNextActionFromError(
           : 'inspect_artifact',
       suggested_command:
         context.surfaceStateHealth && context.surfaceStateHealth !== 'healthy'
-          ? `pnpm surfaces:repair -- --surface ${context.surfaceId}`
-          : `pnpm surfaces:status -- --surface ${context.surfaceId}`,
+          ? `pnpm surfaces repair -- --surface ${context.surfaceId}`
+          : `pnpm surfaces status -- --surface ${context.surfaceId}`,
     });
   }
 
@@ -336,7 +350,8 @@ export function buildNextActionFromError(
       ? ` CLI fallback: ${context.serviceCliFallbacks.join(', ')}.`
       : '';
     return buildNextAction({
-      title: `Fix service setup for ${context.serviceId}`,
+      title: t('next_action:fix_service_setup', { service: context.serviceId }),
+      next_action_key: 'next_action:fix_service_setup',
       reason:
         context.serviceSetupHint || `${classification.remediation}${missingSecrets}${fallbackNote}`,
       next_action_type: 'bootstrap_environment',
@@ -346,7 +361,10 @@ export function buildNextActionFromError(
 
   if (context.source === 'doctor') {
     return buildNextAction({
-      title: `Bootstrap ${context.runtime || context.manifestId || 'runtime prerequisites'}`,
+      title: t('next_action:bootstrap_runtime', {
+        runtime: context.runtime || context.manifestId || 'runtime prerequisites',
+      }),
+      next_action_key: 'next_action:bootstrap_runtime',
       reason: classification.remediation,
       next_action_type: 'bootstrap_environment',
       suggested_command: context.manifestId

@@ -1,8 +1,9 @@
 /** KS-16: semantic static checks for knowledge scope choke points. */
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge-scope-check-policy';
+import { safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface KnowledgeScopeCheckConfig {
   max_direct_tenant_env_reads: number;
@@ -17,22 +18,14 @@ const DEFAULT_CONFIG: KnowledgeScopeCheckConfig = { max_direct_tenant_env_reads:
 const CONFIG_PATH = path.join(root, 'knowledge/product/governance/knowledge-scope-check.json');
 
 function loadConfig(): KnowledgeScopeCheckConfig {
-  if (!safeExistsSync(CONFIG_PATH)) return DEFAULT_CONFIG;
-  try {
-    const parsed = JSON.parse(
-      String(safeReadFile(CONFIG_PATH, { encoding: 'utf8' }))
-    ) as Partial<KnowledgeScopeCheckConfig>;
-    return {
-      ...DEFAULT_CONFIG,
-      ...parsed,
-      max_direct_tenant_env_reads:
-        typeof parsed.max_direct_tenant_env_reads === 'number'
-          ? parsed.max_direct_tenant_env_reads
-          : DEFAULT_CONFIG.max_direct_tenant_env_reads,
-    };
-  } catch {
-    return DEFAULT_CONFIG;
-  }
+  const parsed = loadKnowledgeScopeCheckPolicy(CONFIG_PATH);
+  if (!parsed) return DEFAULT_CONFIG;
+  return {
+    ...DEFAULT_CONFIG,
+    max_direct_tenant_env_reads: parsed.max_direct_tenant_env_reads,
+    confidential_scope_allowlist: parsed.confidential_scope_allowlist,
+    scoped_runtime_writer_files: parsed.scoped_runtime_writer_files,
+  };
 }
 
 function removeComments(source: string): string {
@@ -169,12 +162,13 @@ export const runCheckKnowledgeScopeBoundaries = defineScript({
   run(context) {
     const findings = scan();
     if (findings.length > 0) {
-      console.error('[check_knowledge_scope_boundaries] FAILED');
-      for (const finding of findings) console.error(`- ${finding}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...findings.map((finding) => `- ${finding}`)].join('\n')
+      );
     }
     context.print('[check_knowledge_scope_boundaries] OK');
+    return { findings };
   },
 });
 

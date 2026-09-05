@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/channel-registry.schema.json",
+  "title": "Presence Channel Registry",
+  "description": "The governed channel inventory used by the Presence controller and Nexus daemon.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["channels", "global_policy"],
+  "properties": {
+    "channels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "medium", "default_mode", "priority", "capabilities"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "medium": { "type": "string", "minLength": 1 },
+          "default_mode": { "type": "string", "minLength": 1 },
+          "priority": { "type": "integer", "minimum": 0 },
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "connector_skill": { "type": "string", "minLength": 1 },
+          "service_id": { "type": "string", "minLength": 1 },
+          "execution_mode": { "type": "string", "enum": ["API", "CLI", "SDK"] }
+        }
+      }
+    },
+    "global_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interruption_allowed", "default_response_latency_ms", "max_buffer_size"],
+      "properties": {
+        "interruption_allowed": { "type": "boolean" },
+        "default_response_latency_ms": { "type": "integer", "minimum": 0 },
+        "max_buffer_size": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

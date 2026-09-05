@@ -67,6 +67,24 @@ describe('decideFromObservation (AR-07)', () => {
     });
     expect(decision?.decision).toBe('disk-full');
   });
+
+  it('rejects non-string decision fields and ignores non-string reasons', async () => {
+    await expect(
+      decideFromObservation({
+        goal: 'g',
+        observation: 'o',
+        generate: async () => '{"decision": 7, "reason": "wrong type"}',
+      })
+    ).resolves.toBeNull();
+
+    await expect(
+      decideFromObservation({
+        goal: 'g',
+        observation: 'o',
+        generate: async () => '{"decision": "safe", "reason": 7}',
+      })
+    ).resolves.toEqual({ decision: 'safe' });
+  });
 });
 
 describe('semantic-decide degradation registry (LC-09)', () => {

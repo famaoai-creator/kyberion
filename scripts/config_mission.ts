@@ -15,23 +15,34 @@
 
 import * as nodePath from 'node:path';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeExec,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
-  auditChain,
+} from '@agent/core/secure-io';
+import { auditChain } from '@agent/core/audit-chain';
+import {
   assertConfigChangeApplyable,
   computeConfigChangeFingerprint,
   configChangeRequiresApproval,
   normalizeConfigChangeEnvelope,
+} from '@agent/core/config-change';
+import {
   createApprovalRequest,
   loadApprovalRequest,
   recordApprovalApplyResult,
-} from '@agent/core';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+} from '@agent/core/approval-store';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import {
+  loadConfigMissionBriefAtPath,
+  loadConfigMissionPresetAtPath,
+  type ConfigMissionBrief,
+  type ConfigMissionPreset,
+} from '@agent/core/config-mission';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import * as pathResolver from '@agent/core/path-resolver';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -39,39 +50,12 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 // Types
 // ---------------------------------------------------------------------------
 
-interface PresetInput {
-  type: 'string' | 'enum' | 'boolean' | 'secret';
-  description: string;
-  required?: boolean;
-  values?: string[];
-  default?: unknown;
-}
+type Print = (value: unknown) => void;
 
-interface ConfigMissionPreset {
-  preset_id: string;
-  type: 'config_mission';
-  category: string;
-  description: string;
-  inputs: Record<string, PresetInput>;
-  pipeline: string;
-  write_targets: string[];
-  authority_role: string;
-  target_kind?: import('@agent/core').ConfigChangeTargetKind;
-  scope_kind?: 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task';
-  tier?: 'public' | 'confidential' | 'personal';
-  notes?: string;
-}
+let activePrint: Print = () => undefined;
 
-interface ConfigMissionBrief {
-  instance_id: string;
-  preset_id: string;
-  tenant: string;
-  inputs: Record<string, string>;
-  status: 'draft' | 'applying' | 'applied' | 'failed';
-  created_at: string;
-  applied_at?: string;
-  error?: string;
-  change: import('@agent/core').ConfigChangeEnvelope;
+function printText(value: unknown = ''): void {
+  activePrint(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -80,12 +64,48 @@ interface ConfigMissionBrief {
 
 const PRESET_DIR = 'knowledge/product/config-missions';
 
-function instanceDir(tenant: string, instanceId: string): string {
-  return `knowledge/confidential/${tenant}/config-missions/${instanceId}`;
+function requirePathSegment(value: string, label: string): string {
+  const segment = String(value || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$/u.test(segment) || segment.startsWith('.')) {
+    throw new Error(`[config-mission] invalid ${label}: ${value}`);
+  }
+  return segment;
+}
+
+function configMissionRoot(tenant: string): string {
+  if (!isValidTenantSlug(tenant)) {
+    throw new Error(`[config-mission] invalid tenant slug: ${tenant}`);
+  }
+  return assertSafeRepositoryPath(
+    nodePath.join('knowledge', 'confidential', tenant, 'config-missions'),
+    { allowMissingLeaf: true }
+  );
+}
+
+export function resolveConfigMissionBriefPath(tenant: string, instanceId: string): string {
+  return assertSafeRepositoryPath(
+    nodePath.join(
+      configMissionRoot(tenant),
+      requirePathSegment(instanceId, 'instance id'),
+      'brief.json'
+    ),
+    {
+      allowMissingLeaf: true,
+    }
+  );
 }
 
 function briefPath(tenant: string, instanceId: string): string {
-  return nodePath.join(instanceDir(tenant, instanceId), 'brief.json');
+  return resolveConfigMissionBriefPath(tenant, instanceId);
+}
+
+function instanceDir(tenant: string, instanceId: string): string {
+  return assertSafeRepositoryPath(
+    nodePath.join(configMissionRoot(tenant), requirePathSegment(instanceId, 'instance id')),
+    {
+      allowMissingLeaf: true,
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -93,16 +113,34 @@ function briefPath(tenant: string, instanceId: string): string {
 // ---------------------------------------------------------------------------
 
 function loadPreset(presetId: string): ConfigMissionPreset {
-  const p = nodePath.join(PRESET_DIR, `${presetId}.json`);
-  const raw = safeReadFile(p, { encoding: 'utf8' });
-  if (!raw) throw new Error(`Preset not found: ${presetId}`);
-  return JSON.parse(raw as string) as ConfigMissionPreset;
+  const p = assertSafeRepositoryPath(
+    nodePath.join(PRESET_DIR, `${requirePathSegment(presetId, 'preset id')}.json`)
+  );
+  if (!safeLstat(p).isFile()) {
+    throw new Error(`[config-mission] preset must be a regular file: ${p}`);
+  }
+  return loadConfigMissionPresetAtPath(p);
+}
+
+function requireBriefFile(filePath: string): string {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[config-mission] brief must be a regular file: ${filePath}`);
+  }
+  return filePath;
 }
 
 function listPresets(): ConfigMissionPreset[] {
-  const entries = safeReaddir(PRESET_DIR) as string[];
+  const presetDir = assertSafeRepositoryPath(PRESET_DIR);
+  const entries = safeReaddir(presetDir) as string[];
   return entries
-    .filter((f) => f.endsWith('.json'))
+    .filter((f) => {
+      if (!f.endsWith('.json')) return false;
+      try {
+        return safeLstat(assertSafeRepositoryPath(nodePath.join(presetDir, f))).isFile();
+      } catch {
+        return false;
+      }
+    })
     .map((f) => {
       try {
         return loadPreset(f.replace('.json', ''));
@@ -149,7 +187,7 @@ function getMultiOption(argv: string[], flag: string): string[] {
 function targetKindFor(
   preset: ConfigMissionPreset,
   value: string | undefined
-): import('@agent/core').ConfigChangeTargetKind {
+): import('@agent/core/config-change').ConfigChangeTargetKind {
   const targetKind = value || preset.target_kind || 'tenant';
   const allowed = new Set([
     'system',
@@ -163,12 +201,12 @@ function targetKindFor(
     'personal',
   ]);
   if (!allowed.has(targetKind)) throw new Error(`Invalid --target-kind: ${targetKind}`);
-  return targetKind as import('@agent/core').ConfigChangeTargetKind;
+  return targetKind as import('@agent/core/config-change').ConfigChangeTargetKind;
 }
 
 function scopeKindFor(
   preset: ConfigMissionPreset,
-  targetKind: import('@agent/core').ConfigChangeTargetKind
+  targetKind: import('@agent/core/config-change').ConfigChangeTargetKind
 ): 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task' {
   if (preset.scope_kind) return preset.scope_kind;
   if (targetKind === 'system') return 'system';
@@ -190,7 +228,9 @@ function tierFor(
   return preset.tier || (scopeKind === 'system' ? 'public' : 'confidential');
 }
 
-function riskFor(preset: ConfigMissionPreset): import('@agent/core').ConfigChangeRisk {
+function riskFor(
+  preset: ConfigMissionPreset
+): import('@agent/core/config-change').ConfigChangeRisk {
   if (
     preset.category === 'security' ||
     preset.category === 'surface' ||
@@ -226,19 +266,19 @@ function validateInputs(preset: ConfigMissionPreset, inputs: Record<string, stri
 function cmdList(): void {
   const presets = listPresets();
   if (presets.length === 0) {
-    logger.info('No config mission presets found.');
+    printText('No config mission presets found.');
     return;
   }
-  console.log('\nAvailable config mission presets:\n');
-  console.log('  PRESET ID                        CATEGORY             DESCRIPTION');
-  console.log('  ' + '─'.repeat(80));
+  printText('\nAvailable config mission presets:\n');
+  printText('  PRESET ID                        CATEGORY             DESCRIPTION');
+  printText('  ' + '─'.repeat(80));
   for (const p of presets) {
     const id = p.preset_id.padEnd(32);
     const cat = p.category.padEnd(20);
-    console.log(`  ${id} ${cat} ${p.description}`);
+    printText(`  ${id} ${cat} ${p.description}`);
   }
-  console.log(`\nTotal: ${presets.length} preset(s)`);
-  console.log(
+  printText(`\nTotal: ${presets.length} preset(s)`);
+  printText(
     `\nTo create a mission: pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]`
   );
 }
@@ -262,8 +302,8 @@ function cmdCreate(argv: string[]): void {
 
   const errors = validateInputs(preset, inputs);
   if (errors.length > 0) {
-    console.error('\n❌ Input validation failed:\n');
-    for (const e of errors) console.error(`  • ${e}`);
+    printText('\n❌ Input validation failed:\n');
+    for (const e of errors) printText(`  • ${e}`);
     throw new ScriptExitError(1, 'Input validation failed');
   }
 
@@ -311,7 +351,7 @@ function cmdCreate(argv: string[]): void {
     tenant,
     inputs,
     status: 'draft',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     change: scope,
   };
 
@@ -327,21 +367,19 @@ function cmdCreate(argv: string[]): void {
     metadata: { preset_id: presetId, tenant, instance_id: instanceId },
   });
 
-  console.log(`\n✅ Config mission created: ${instanceId}`);
-  console.log(`   Preset:  ${presetId}`);
-  console.log(`   Tenant:  ${tenant}`);
-  console.log(`   Brief:   ${briefPath(tenant, instanceId)}`);
-  console.log(`   Scope:   ${scope.scope.scope_kind}/${scope.scope.tenant_slug}`);
-  console.log(
+  printText(`\n✅ Config mission created: ${instanceId}`);
+  printText(`   Preset:  ${presetId}`);
+  printText(`   Tenant:  ${tenant}`);
+  printText(`   Brief:   ${briefPath(tenant, instanceId)}`);
+  printText(`   Scope:   ${scope.scope.scope_kind}/${scope.scope.tenant_slug}`);
+  printText(
     `   Risk:    ${scope.risk} (approval required: ${configChangeRequiresApproval(scope)})`
   );
-  console.log(`   Desired: ${scope.desired_hash}`);
+  printText(`   Desired: ${scope.desired_hash}`);
   if (configChangeRequiresApproval(scope) && !scope.approval_ref) {
-    console.log(
-      `\nNext: pnpm config-mission request-approval --tenant ${tenant} --id ${instanceId}`
-    );
+    printText(`\nNext: pnpm config-mission request-approval --tenant ${tenant} --id ${instanceId}`);
   }
-  console.log(`\nTo apply: pnpm config-mission apply --tenant ${tenant} --id ${instanceId}`);
+  printText(`\nTo apply: pnpm config-mission apply --tenant ${tenant} --id ${instanceId}`);
 }
 
 function cmdRequestApproval(argv: string[]): void {
@@ -351,12 +389,12 @@ function cmdRequestApproval(argv: string[]): void {
   if (!id) throw new Error('--id is required');
   const bPath = briefPath(tenant, id);
   if (!safeExistsSync(bPath)) throw new Error(`Config mission not found: ${bPath}`);
-  const brief = readJson<ConfigMissionBrief>(bPath);
+  const brief = loadConfigMissionBriefAtPath(requireBriefFile(bPath));
   const existing = brief.change.approval_ref
     ? loadApprovalRequest('config-mission', brief.change.approval_ref)
     : null;
   if (existing) {
-    console.log(`Approval already requested: ${existing.id}`);
+    printText(`Approval already requested: ${existing.id}`);
     return;
   }
   const record = createApprovalRequest('mission_controller', {
@@ -382,8 +420,8 @@ function cmdRequestApproval(argv: string[]): void {
   });
   brief.change.approval_ref = record.id;
   safeWriteFile(bPath, JSON.stringify(brief, null, 2));
-  console.log(`Approval requested: ${record.id}`);
-  console.log('Approve it through an existing governed approval surface before apply.');
+  printText(`Approval requested: ${record.id}`);
+  printText('Approve it through an existing governed approval surface before apply.');
 }
 
 function cmdStatus(argv: string[]): void {
@@ -396,9 +434,9 @@ function cmdStatus(argv: string[]): void {
   const id = getOpt('--id');
   if (!tenant) throw new Error('--tenant is required');
 
-  const missionsDir = `knowledge/confidential/${tenant}/config-missions`;
+  const missionsDir = configMissionRoot(tenant);
   if (!safeExistsSync(missionsDir)) {
-    logger.info(`No config missions found for tenant: ${tenant}`);
+    printText(`No config missions found for tenant: ${tenant}`);
     return;
   }
 
@@ -406,7 +444,7 @@ function cmdStatus(argv: string[]): void {
   const targets = id ? entries.filter((e) => e === id) : entries;
 
   if (targets.length === 0) {
-    logger.info(
+    printText(
       id
         ? `Config mission ${id} not found for tenant ${tenant}`
         : `No config missions for tenant ${tenant}`
@@ -414,21 +452,20 @@ function cmdStatus(argv: string[]): void {
     return;
   }
 
-  console.log(`\nConfig missions for tenant '${tenant}':\n`);
-  console.log('  ID                         PRESET                           STATUS     CREATED');
-  console.log('  ' + '─'.repeat(85));
+  printText(`\nConfig missions for tenant '${tenant}':\n`);
+  printText('  ID                         PRESET                           STATUS     CREATED');
+  printText('  ' + '─'.repeat(85));
 
   for (const entry of targets) {
     try {
-      const raw = safeReadFile(briefPath(tenant, entry), { encoding: 'utf8' }) as string;
-      const brief = JSON.parse(raw) as ConfigMissionBrief;
+      const brief = loadConfigMissionBriefAtPath(requireBriefFile(briefPath(tenant, entry)));
       const instanceCol = brief.instance_id.padEnd(26);
       const presetCol = brief.preset_id.padEnd(32);
       const statusCol = brief.status.padEnd(10);
       const created = brief.created_at.slice(0, 10);
-      console.log(`  ${instanceCol} ${presetCol} ${statusCol} ${created}`);
+      printText(`  ${instanceCol} ${presetCol} ${statusCol} ${created}`);
     } catch {
-      console.log(`  ${entry.padEnd(26)} (unreadable brief)`);
+      printText(`  ${entry.padEnd(26)} (unreadable brief)`);
     }
   }
 }
@@ -442,8 +479,7 @@ async function cmdApply(argv: string[]): Promise<void> {
   const bPath = briefPath(tenant, id);
   if (!safeExistsSync(bPath)) throw new Error(`Config mission not found: ${bPath}`);
 
-  const raw = safeReadFile(bPath, { encoding: 'utf8' }) as string;
-  const brief = JSON.parse(raw) as ConfigMissionBrief;
+  const brief = loadConfigMissionBriefAtPath(requireBriefFile(bPath));
 
   const approval = brief.change.approval_ref
     ? loadApprovalRequest('config-mission', brief.change.approval_ref)
@@ -460,7 +496,7 @@ async function cmdApply(argv: string[]): Promise<void> {
   });
 
   if (brief.status === 'applied') {
-    logger.info(`Config mission ${id} is already applied.`);
+    printText(`Config mission ${id} is already applied.`);
     return;
   }
 
@@ -470,7 +506,7 @@ async function cmdApply(argv: string[]): Promise<void> {
   brief.status = 'applying';
   safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
-  logger.info(`[CONFIG_MISSION] Applying ${brief.preset_id} for tenant ${tenant}…`);
+  printText(`[CONFIG_MISSION] Applying ${brief.preset_id} for tenant ${tenant}…`);
 
   try {
     // Delegate execution directly to Node.  The previous implementation used
@@ -490,7 +526,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     });
 
     brief.status = 'applied';
-    brief.applied_at = new Date().toISOString();
+    brief.applied_at = nowIso();
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
@@ -514,8 +550,8 @@ async function cmdApply(argv: string[]): Promise<void> {
       });
     }
 
-    console.log(`\n✅ Config mission ${id} applied successfully.`);
-    if (preset.notes) console.log(`\n💡 ${preset.notes}`);
+    printText(`\n✅ Config mission ${id} applied successfully.`);
+    if (preset.notes) printText(`\n💡 ${preset.notes}`);
   } catch (err) {
     brief.status = 'failed';
     brief.error = String(err);
@@ -535,7 +571,7 @@ async function cmdApply(argv: string[]): Promise<void> {
         storageChannel: 'config-mission',
         requestId: approval.id,
         applyResult: {
-          appliedAt: new Date().toISOString(),
+          appliedAt: nowIso(),
           appliedBy: 'config_mission',
           result: 'failed',
           auditRef: String(err),
@@ -552,17 +588,15 @@ async function cmdApply(argv: string[]): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function printUsage(): void {
-  console.error('Usage: pnpm config-mission <list|create|status|request-approval|apply> [options]');
-  console.error('  pnpm config-mission help');
-  console.error(
-    '  pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]'
-  );
-  console.error('  pnpm config-mission status --tenant <slug> [--id <cfg-id>]');
-  console.error('  pnpm config-mission request-approval --tenant <slug> --id <cfg-id>');
-  console.error('  pnpm config-mission apply --tenant <slug> --id <cfg-id>');
+  printText('Usage: pnpm config-mission <list|create|status|request-approval|apply> [options]');
+  printText('  pnpm config-mission help');
+  printText('  pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]');
+  printText('  pnpm config-mission status --tenant <slug> [--id <cfg-id>]');
+  printText('  pnpm config-mission request-approval --tenant <slug> --id <cfg-id>');
+  printText('  pnpm config-mission apply --tenant <slug> --id <cfg-id>');
 }
 
-async function main(args: string[] = []): Promise<void> {
+async function mainImpl(args: string[] = []): Promise<void> {
   const [command, ...rest] = args;
 
   if (!command || command === 'help' || command === '--help' || command === '-h') {
@@ -588,16 +622,26 @@ async function main(args: string[] = []): Promise<void> {
       await cmdApply(rest);
       break;
     default:
-      console.error(`Unknown command: ${command ?? '(none)'}`);
+      printText(`Unknown command: ${command ?? '(none)'}`);
       printUsage();
       throw new ScriptExitError(1, `Unknown command: ${command ?? '(none)'}`);
+  }
+}
+
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
+  const previousPrint = activePrint;
+  activePrint = print;
+  try {
+    await mainImpl(args);
+  } finally {
+    activePrint = previousPrint;
   }
 }
 
 const script = defineScript({
   name: 'config:mission',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'config_mission.ts') ||

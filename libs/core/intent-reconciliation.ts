@@ -5,7 +5,9 @@ import {
 } from './reasoning-backend.js';
 import { logger } from './core.js';
 import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { clamp } from './foundation/text.js';
 import {
   buildCompletionNextAction,
   type CompletionGoal,
@@ -138,16 +140,21 @@ function segmentMatchesEvidence(segment: string, evidenceText: string): boolean 
 
 function readEvidenceText(ref: string): string {
   const normalizedRef = String(ref || '').trim();
-  if (!normalizedRef || !safeExistsSync(normalizedRef)) return '';
+  if (!normalizedRef) return '';
+  let safeRef: string;
+  try {
+    safeRef = assertSafeRepositoryPath(normalizedRef, { allowMissingLeaf: true });
+  } catch {
+    return '';
+  }
+  if (!safeExistsSync(safeRef)) return '';
   const dotIndex = normalizedRef.lastIndexOf('.');
   if (dotIndex >= 0) {
     const ext = normalizedRef.slice(dotIndex).toLowerCase();
     if (BINARY_EVIDENCE_EXTENSIONS.has(ext)) return '';
   }
   try {
-    return normalizeReconciliationText(
-      String(safeReadFile(normalizedRef, { encoding: 'utf8' }) || '')
-    );
+    return normalizeReconciliationText(String(safeReadFile(safeRef, { encoding: 'utf8' }) || ''));
   } catch {
     return '';
   }
@@ -285,10 +292,13 @@ export async function reconcileCompletion(
       prompt,
       options?.model_tier ? { model_tier: options.model_tier } : undefined
     );
-    const parsed = JSON.parse(raw) as Partial<CompletionReconciliation>;
+    const parsed = parseSafeJsonInput(
+      raw,
+      'completion reconciliation response'
+    ) as Partial<CompletionReconciliation>;
     const confidence =
       typeof parsed.confidence === 'number' && Number.isFinite(parsed.confidence)
-        ? Math.max(0, Math.min(1, parsed.confidence))
+        ? clamp(parsed.confidence, 0, 1)
         : structural.confidence;
     return {
       satisfied: structural.satisfied,

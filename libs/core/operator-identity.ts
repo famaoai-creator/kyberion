@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { isRecord } from './foundation/text.js';
 import { resolveLocale, type SupportedLocale } from './locale.js';
+import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
 
 /**
  * UX-04 acceptance 5: approval decisions should carry the onboarding
@@ -14,10 +14,11 @@ import { resolveLocale, type SupportedLocale } from './locale.js';
  */
 export function resolveOperatorDisplayName(fallback = 'sovereign-user'): string {
   try {
-    const identityPath = path.join(resolveActiveProfileRoot(), 'my-identity.json');
-    if (!safeExistsSync(identityPath)) return fallback;
-    const parsed = readJson<Record<string, unknown>>(identityPath);
-    const name = String(parsed?.name || '').trim();
+    const parsed = loadPersonalIdentityAtPath(
+      path.join(resolveActiveProfileRoot(), 'my-identity.json')
+    );
+    if (!isRecord(parsed)) return fallback;
+    const name = typeof parsed.name === 'string' ? parsed.name.trim() : '';
     return name || fallback;
   } catch {
     return fallback;

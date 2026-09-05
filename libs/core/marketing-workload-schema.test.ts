@@ -9,6 +9,11 @@ const schema = JSON.parse(
     encoding: 'utf8',
   }) as string
 );
+const publicationApprovalSchema = JSON.parse(
+  safeReadFile(pathResolver.knowledge('product/schemas/publication-approval.schema.json'), {
+    encoding: 'utf8',
+  }) as string
+);
 const example = JSON.parse(
   safeReadFile(pathResolver.knowledge('product/schemas/marketing-workload.example.json'), {
     encoding: 'utf8',
@@ -16,6 +21,7 @@ const example = JSON.parse(
 );
 const ajv = new Ajv2020({ allErrors: true });
 addFormats(ajv);
+ajv.addSchema(publicationApprovalSchema);
 const validate = ajv.compile(schema);
 
 describe('marketing workload schema', () => {

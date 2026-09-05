@@ -1,18 +1,15 @@
-import {
-  getAgentExecutionPort,
-  logger,
-  missionEvidenceDir,
-  readTaskPlan,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
-  type AgentExecutionPort,
-  type ExecuteTaskPlanParams,
-  type ExecuteTaskPlanResult,
-  type TaskExecutionRecord,
-  type TaskPlan,
-  type TaskPlanCoordinatorPort,
-} from '@agent/core';
+import { getAgentExecutionPort, type AgentExecutionPort } from '@agent/core/agent-execution-port';
+import { logger } from '@agent/core/core';
+import { nowIso } from '@agent/core/foundation';
+import { missionEvidenceDir } from '@agent/core/path-resolver';
+import { readTaskPlan, type TaskPlan } from '@agent/core/sdlc-artifact-store';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import type {
+  ExecuteTaskPlanParams,
+  ExecuteTaskPlanResult,
+  TaskExecutionRecord,
+  TaskPlanCoordinatorPort,
+} from '@agent/core/task-plan-coordinator-port';
 import * as path from 'node:path';
 
 const LOG_FILE = 'task-execution-log.jsonl';
@@ -95,7 +92,7 @@ async function executeOneTask(
   params: ExecuteTaskPlanParams,
   executionPort: AgentExecutionPort
 ): Promise<TaskExecutionRecord> {
-  const startedAt = new Date().toISOString();
+  const startedAt = nowIso();
   const record: TaskExecutionRecord = {
     task_id: task.task_id,
     status: 'running',
@@ -138,7 +135,7 @@ async function executeOneTask(
     record.status = 'failed';
     record.error = error instanceof Error ? error.message : String(error);
   }
-  record.ended_at = new Date().toISOString();
+  record.ended_at = nowIso();
   return record;
 }
 
@@ -186,7 +183,7 @@ export async function executeTaskPlanFromOrchestrator(
       return status === 'failed' || status === 'skipped_upstream_failed';
     });
     if (failedDependencies.length > 0) {
-      const now = new Date().toISOString();
+      const now = nowIso();
       const record: TaskExecutionRecord = {
         task_id: task.task_id,
         status: 'skipped_upstream_failed',

@@ -1,26 +1,26 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { buildNextAction, formatNextAction } from '@agent/core/next-action';
+import * as customerResolver from '@agent/core/customer-resolver';
+import { inspectServiceAuth } from '@agent/core/service-validator';
+import { loadServiceConnectionAtPath } from '@agent/core/service-engine-helpers';
 import {
-  customerResolver,
-  buildNextAction,
-  formatNextAction,
-  inspectServiceAuth,
   loadNotificationPreferences,
-  loadServiceEndpointsCatalog,
-  logger,
   resolveOperatorNotificationRoute,
-  resolveOpsAlertChannelStatus,
+} from '@agent/core/operator-notifications';
+import { resolveOpsAlertChannelStatus } from '@agent/core/ops-alert';
+import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
+import {
   isServiceConnectionReady,
   requiredServiceConnectionKeys,
-  safeExistsSync,
-  safeReadFile,
-} from '@agent/core';
+} from '@agent/core/service-connection-readiness';
+import { safeExistsSync } from '@agent/core/secure-io';
 import * as path from 'node:path';
-import { pathResolver } from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report-format.js';
 
-type ServiceSetupRow = {
+export type ServiceSetupRow = {
   service: string;
   auth: 'ready' | 'missing' | 'n/a';
   strategy: string;
@@ -35,7 +35,18 @@ type ServiceSetupRow = {
   nextAction?: ReturnType<typeof buildNextAction>;
 };
 
+type Print = (value: unknown) => void;
+
 type RankedServiceSetupRow = ServiceSetupRow & { priority: number };
+
+export type ServiceSetupSummary = {
+  total: number;
+  ready: number;
+  authMissing: number;
+  connectionMissing: number;
+  customerConnections: number;
+  personalConnections: number;
+};
 
 function setupRowPriority(row: Pick<ServiceSetupRow, 'auth' | 'connection' | 'service'>): number {
   if (row.auth === 'missing') return row.connection === 'missing' ? 0 : 1;
@@ -68,9 +79,7 @@ function inspectConnection(serviceId: string): {
     if (!safeExistsSync(filePath)) return false;
     if (requiredKeys.length === 0) return true;
     try {
-      const record = JSON.parse(
-        String(safeReadFile(filePath, { encoding: 'utf8' }) ?? '')
-      ) as Record<string, unknown>;
+      const record = loadServiceConnectionAtPath(filePath);
       return isServiceConnectionReady(serviceId, record);
     } catch {
       return false;
@@ -138,7 +147,61 @@ export function buildServiceAuthNextAction(
   });
 }
 
-export async function setupServices(options: { quiet?: boolean } = {}) {
+export function printServiceSetupReport(
+  rows: ServiceSetupRow[],
+  summary: ServiceSetupSummary,
+  opsAlertChannel: Pick<ReturnType<typeof resolveOpsAlertChannelStatus>, 'configured' | 'env_var'>,
+  print: Print
+): void {
+  print('');
+  print(
+    formatSetupSummaryLine([
+      ['auth missing', summary.authMissing],
+      ['connections missing', summary.connectionMissing],
+      ['auth ready', summary.ready],
+      ['total', summary.total],
+    ])
+  );
+  const header = `${'SERVICE'.padEnd(20)} ${'AUTH'.padEnd(10)} ${'CONNECTION'.padEnd(12)} ${'STRATEGY'.padEnd(12)} ${'SECRETS'.padEnd(36)} CLI`;
+  print(header);
+  print('-'.repeat(header.length + 8));
+  for (const row of rows) {
+    const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
+    const connectionSymbol =
+      row.connection === 'customer' ? '🟢' : row.connection === 'personal' ? '🟡' : '⚠️';
+    print(
+      `${row.service.padEnd(20)} ${authSymbol} ${row.auth.padEnd(8)} ${connectionSymbol} ${row.connection.padEnd(10)} ${row.strategy.padEnd(12)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`
+    );
+    if (row.auth === 'missing' || row.connection === 'missing' || !row.connectionReady) {
+      print(formatSetupHintLine(row.hint));
+      if (row.connection === 'missing' || !row.connectionReady) {
+        print(
+          formatSetupHintLine(
+            `Connection file: ${path.relative(pathResolver.rootDir(), row.connectionPath)}`
+          )
+        );
+      }
+      if (row.nextAction) {
+        for (const line of formatNextAction(row.nextAction)) {
+          print(line);
+        }
+      }
+    }
+  }
+  print('');
+  if (!opsAlertChannel.configured) {
+    print('⚠️  OPS ALERTS: no delivery channel configured — alerts and operator');
+    print('   notifications are recorded to active/shared/observability/ops-alerts.jsonl');
+    print('   but NEVER delivered to you.');
+    print(`   Fix: export ${opsAlertChannel.env_var}=<webhook url>`);
+    print('   (or configure knowledge/personal/notification-preferences.json), then');
+    print('   run `pnpm ops:alerts -- --redeliver` to flush the backlog.');
+    print('');
+  }
+}
+
+export async function setupServices(options: { quiet?: boolean; print?: Print } = {}) {
+  const print = options.print ?? (() => undefined);
   const catalog = loadServiceEndpointsCatalog();
   const rows = withSensitivePathMediation(() =>
     sortServiceSetupRows(
@@ -199,51 +262,7 @@ export async function setupServices(options: { quiet?: boolean } = {}) {
   const opsAlertChannel = inspectOpsAlertChannel();
 
   if (!options.quiet) {
-    console.log('');
-    console.log(
-      formatSetupSummaryLine([
-        ['auth missing', summary.authMissing],
-        ['connections missing', summary.connectionMissing],
-        ['auth ready', summary.ready],
-        ['total', summary.total],
-      ])
-    );
-    const header = `${'SERVICE'.padEnd(20)} ${'AUTH'.padEnd(10)} ${'CONNECTION'.padEnd(12)} ${'STRATEGY'.padEnd(12)} ${'SECRETS'.padEnd(36)} CLI`;
-    console.log(header);
-    console.log('-'.repeat(header.length + 8));
-    for (const row of rows) {
-      const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
-      const connectionSymbol =
-        row.connection === 'customer' ? '🟢' : row.connection === 'personal' ? '🟡' : '⚠️';
-      console.log(
-        `${row.service.padEnd(20)} ${authSymbol} ${row.auth.padEnd(8)} ${connectionSymbol} ${row.connection.padEnd(10)} ${row.strategy.padEnd(12)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`
-      );
-      if (row.auth === 'missing' || row.connection === 'missing' || !row.connectionReady) {
-        console.log(formatSetupHintLine(row.hint));
-        if (row.connection === 'missing' || !row.connectionReady) {
-          console.log(
-            formatSetupHintLine(
-              `Connection file: ${path.relative(pathResolver.rootDir(), row.connectionPath)}`
-            )
-          );
-        }
-        if (row.nextAction) {
-          for (const line of formatNextAction(row.nextAction)) {
-            console.log(line);
-          }
-        }
-      }
-    }
-    console.log('');
-    if (!opsAlertChannel.configured) {
-      console.log('⚠️  OPS ALERTS: no delivery channel configured — alerts and operator');
-      console.log('   notifications are recorded to active/shared/observability/ops-alerts.jsonl');
-      console.log('   but NEVER delivered to you.');
-      console.log(`   Fix: export ${opsAlertChannel.env_var}=<webhook url>`);
-      console.log('   (or configure knowledge/personal/notification-preferences.json), then');
-      console.log('   run `pnpm ops:alerts -- --redeliver` to flush the backlog.');
-      console.log('');
-    }
+    printServiceSetupReport(rows, summary, opsAlertChannel, print);
   }
 
   return {
@@ -255,27 +274,30 @@ export async function setupServices(options: { quiet?: boolean } = {}) {
   };
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
+  const argv = await createStandardYargs(['node', 'services_setup', ...args])
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
-  const result = await setupServices();
+  const result = await setupServices({ print });
   if (argv.json) {
-    logger.info(JSON.stringify(result, null, 2));
+    print(JSON.stringify(result, null, 2));
     return;
   }
-  logger.success('Service setup check completed.');
+  print('Service setup check completed.');
 }
+
+const runServiceSetupScript = defineScript({
+  name: 'service:setup',
+  flags: [],
+  run: ({ argv, print }) => main(argv, print),
+});
 
 if (
   isDirectScript(import.meta.url, 'services_setup.ts') ||
   isDirectScript(import.meta.url, 'services_setup.js')
 ) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exitCode = 1;
-  });
+  void runServiceSetupScript();
 }
 
 export { main as runServiceSetup };

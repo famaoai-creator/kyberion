@@ -1,8 +1,11 @@
 import * as path from 'node:path';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
-  loadJson,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
@@ -18,6 +21,81 @@ const logger = createLogger('terminal-bridge');
  */
 
 const RUNTIME_BASE = pathResolver.shared('runtime/terminal');
+const TERMINAL_SESSION_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/terminal-session-state.schema.json'
+);
+const TERMINAL_RESPONSE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/terminal-response.schema.json'
+);
+
+export interface TerminalSessionState {
+  pid: number;
+  status?: string;
+}
+
+interface TerminalResponse {
+  data?: {
+    message?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+function pathSegment(value: string, label: string): string {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[terminal-bridge] invalid ${label}`);
+  }
+  return normalized;
+}
+
+function runtimePath(sessionId: string, ...parts: string[]): string {
+  const session = pathSegment(sessionId, 'session id');
+  const candidate = path.join(
+    RUNTIME_BASE,
+    session,
+    ...parts.map((part) => pathSegment(part, 'path segment'))
+  );
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+}
+
+function terminalSessionStateCatalogAtPath(filePath: string) {
+  return defineCatalog<TerminalSessionState>({
+    id: 'terminal-session-state',
+    path: filePath,
+    schema: TERMINAL_SESSION_STATE_SCHEMA_PATH,
+  });
+}
+
+function terminalResponseCatalogAtPath(filePath: string) {
+  return defineCatalog<TerminalResponse>({
+    id: 'terminal-response',
+    path: filePath,
+    schema: TERMINAL_RESPONSE_SCHEMA_PATH,
+  });
+}
+
+/** Load a ReflexTerminal state only after repository and regular-file checks. */
+export function loadTerminalSessionStateAtPath(filePath: string): TerminalSessionState | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+    return terminalSessionStateCatalogAtPath(safePath).load();
+  } catch {
+    return null;
+  }
+}
+
+/** Load the latest ReflexTerminal response through the governed catalog. */
+function loadTerminalResponseAtPath(filePath: string): TerminalResponse | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+    return terminalResponseCatalogAtPath(safePath).load();
+  } catch {
+    return null;
+  }
+}
 
 function listReflexTerminalSessions() {
   if (!safeExistsSync(RUNTIME_BASE)) return [];
@@ -29,10 +107,15 @@ function listReflexTerminalSessions() {
     pid?: number;
   }> = [];
   for (const id of safeReaddir(RUNTIME_BASE)) {
-    const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
-    if (!safeExistsSync(stateFile)) continue;
+    let stateFile: string;
     try {
-      const state = loadJson<{ pid: number; status?: string }>(stateFile);
+      stateFile = runtimePath(id, 'state.json');
+    } catch {
+      continue;
+    }
+    if (!safeExistsSync(stateFile)) continue;
+    const state = loadTerminalSessionStateAtPath(stateFile);
+    if (state) {
       process.kill(state.pid, 0);
       sessions.push({
         winId: 'rt-main',
@@ -41,8 +124,6 @@ function listReflexTerminalSessions() {
         status: state.status || 'running',
         pid: state.pid,
       });
-    } catch (_) {
-      // ignore dead or malformed sessions
     }
   }
   return sessions;
@@ -55,15 +136,18 @@ const STRATEGIES: Record<string, any> = {
 
       const sessions = safeReaddir(RUNTIME_BASE);
       for (const id of sessions) {
-        const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
+        let stateFile: string;
+        try {
+          stateFile = runtimePath(id, 'state.json');
+        } catch {
+          continue;
+        }
         if (safeExistsSync(stateFile)) {
-          try {
-            const state = loadJson<{ pid: number; status?: string }>(stateFile);
+          const state = loadTerminalSessionStateAtPath(stateFile);
+          if (state) {
             // Simple check if the process is still alive
             process.kill(state.pid, 0);
             return { winId: 'rt-main', sessionId: id, type: 'ReflexTerminal' };
-          } catch (_) {
-            // Process dead, cleanup state if needed?
           }
         }
       }
@@ -71,7 +155,13 @@ const STRATEGIES: Record<string, any> = {
     },
     inject: async (winId: string, sessionId: string, text: string) => {
       const sid = sessionId || 'default';
-      const sessionInDir = path.join(RUNTIME_BASE, sid, 'in');
+      let sessionInDir: string;
+      try {
+        sessionInDir = runtimePath(sid, 'in');
+      } catch (err: any) {
+        logger.error(`file injection failed for ${sid}: ${err.message}`);
+        return false;
+      }
 
       try {
         if (!safeExistsSync(sessionInDir)) {
@@ -79,14 +169,16 @@ const STRATEGIES: Record<string, any> = {
         }
 
         const requestId = `req-${Date.now()}`;
-        const requestPath = path.join(sessionInDir, `${requestId}.json`);
+        const requestPath = assertSafeRepositoryPath(path.join(sessionInDir, `${requestId}.json`), {
+          allowMissingLeaf: true,
+        });
 
         safeWriteFile(
           requestPath,
           JSON.stringify(
             {
               id: requestId,
-              ts: new Date().toISOString(),
+              ts: nowIso(),
               text,
             },
             null,
@@ -216,14 +308,14 @@ export const terminalBridge = {
   },
   readLatestOutput: (winId: string, sessionId: string, terminalType = 'iTerm2'): string => {
     if (terminalType === 'ReflexTerminal') {
-      const latestPath = path.join(RUNTIME_BASE, sessionId, 'out', 'latest_response.json');
+      let latestPath: string;
+      try {
+        latestPath = runtimePath(sessionId, 'out', 'latest_response.json');
+      } catch {
+        return '';
+      }
       if (safeExistsSync(latestPath)) {
-        try {
-          const content = loadJson<{ data?: { message?: string } }>(latestPath);
-          return content.data.message || '';
-        } catch (_) {
-          return '';
-        }
+        return loadTerminalResponseAtPath(latestPath)?.data?.message || '';
       }
       return '';
     }

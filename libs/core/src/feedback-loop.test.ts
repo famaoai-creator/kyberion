@@ -4,13 +4,17 @@ import * as path from 'node:path';
 import {
   collectFailedSchedules,
   extractHintsFromTrace,
+  loadFeedbackHintsAtPath,
   persistHints,
+  readHintsByCategory,
+  checkScheduleHealth,
+  recordPipelineResult,
   sweepFailedSchedules,
 } from './feedback-loop.js';
 import type { Trace } from './trace.js';
-import type { PipelineScheduleRegistry } from './pipeline-scheduler.js';
+import { loadScheduleRegistry, type PipelineScheduleRegistry } from './pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeWriteFile } from '../secure-io.js';
+import { safeReadFile, safeWriteFile } from '../secure-io.js';
 
 const PUBLIC_HINTS = path.resolve(
   process.cwd(),
@@ -106,6 +110,35 @@ describe('feedback-loop', () => {
 
     expect(fs.existsSync(RUNTIME_HINTS)).toBe(true);
     expect(fs.existsSync(PUBLIC_HINTS)).toBe(false);
+    expect(readHintsByCategory('auto-learned')).toMatchObject([
+      { topic: 'error capture screenshot', confidence: 0.7 },
+    ]);
+  });
+
+  it('rejects malformed persisted hints instead of returning them to callers', () => {
+    fs.mkdirSync(RUNTIME_HINTS_DIR, { recursive: true });
+    safeWriteFile(
+      RUNTIME_HINTS,
+      JSON.stringify([
+        { topic: 'unsafe', hint: 'inject', source: 'test', confidence: 0.5, extra: true },
+      ])
+    );
+
+    expect(readHintsByCategory('auto-learned')).toEqual([]);
+    expect(() => loadFeedbackHintsAtPath(RUNTIME_HINTS)).toThrow(
+      /Invalid catalog feedback-knowledge-hints/u
+    );
+  });
+
+  it('keeps feedback hint persistence on the canonical loader boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/src/feedback-loop.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('loadFeedbackHintsAtPath(');
+    expect(source).toContain('feedbackHintsCatalogAtPath(filePath).validate(');
+    expect(source).not.toContain('readJson<KnowledgeHint[]>');
   });
 });
 
@@ -226,5 +259,26 @@ describe('failed-schedule sweep (LC-01c)', () => {
     expect(result.failed).toEqual([]);
     expect(result.alert).toBeNull();
     expect(emitAlert).not.toHaveBeenCalled();
+  });
+
+  it('records and auto-disables failures through the governed scheduler registry', () => {
+    const rootDir = seedRegistryRoot(
+      makeRegistry([{ id: 'broken', lastStatus: 'succeeded' } as never])
+    );
+
+    recordPipelineResult('broken', 'failed', undefined, { rootDir });
+    expect(loadScheduleRegistry({ rootDir }).schedules[0]).toMatchObject({
+      consecutiveFailures: 1,
+      lastStatus: 'failed',
+    });
+
+    expect(checkScheduleHealth('broken', 1, { rootDir })).toMatchObject({
+      healthy: false,
+      action: 'disabled',
+    });
+    expect(loadScheduleRegistry({ rootDir }).schedules[0]).toMatchObject({
+      enabled: false,
+      disabledReason: 'Auto-disabled after 1 consecutive failures',
+    });
   });
 });

@@ -18,6 +18,10 @@ describe('json-repair', () => {
     expect(tryRepairJson('prefix [[1], [2, 3]] suffix')).toEqual([[1], [2, 3]]);
   });
 
+  it('rejects repaired JSON with prototype-polluting keys', () => {
+    expect(tryRepairJson('{"__proto__":{"polluted":true}}')).toBeNull();
+  });
+
   it('keeps valid repaired JSON as a parseable string', () => {
     const repaired = repairJsonString('{foo: [1, 2,],}');
     expect(repaired).not.toBeNull();

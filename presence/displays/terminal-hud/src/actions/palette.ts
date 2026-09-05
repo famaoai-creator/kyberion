@@ -7,7 +7,7 @@ import {
   runScheduleNow,
   registerScheduleFromPalette,
 } from './schedule-actions.js';
-import { createWorkItem } from '@agent/core';
+import { createWorkItem } from '@agent/core/work-coordination';
 import { auditAction, toActionResult, type ActionResult } from './dispatch.js';
 import { isPanelId, type PanelId } from '../keymap.js';
 

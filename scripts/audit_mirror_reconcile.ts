@@ -8,31 +8,36 @@
  */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
+import { auditChain, normalizePersistedAuditEntry } from '@agent/core/audit-chain';
 import {
-  auditChain,
   computeApprovalPayloadHash,
   createApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
-  missionEvidenceDir,
-  pathResolver,
+  validateHumanFinalDecision,
+  type ApprovalRequestRecord,
+} from '@agent/core/approval-store';
+import { missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeMoveSync,
   safeReadFile,
   safeReaddir,
-  safeStat,
+  safeLstat,
   safeWriteFile,
-  validateHumanFinalDecision,
-  withExecutionContext,
-  type ApprovalRequestRecord,
-  type AuditEntry,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/governance';
+import type { AuditEntry } from '@agent/core/audit-chain';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const AUDIT_MIRROR_APPROVAL_CHANNEL = 'terminal';
 export const AUDIT_MIRROR_EFFECT_BINDING = 'sa-01:audit-mirror-reconcile';
 export const DEFAULT_AUDIT_MIRROR_MISSION = 'MSN-SA-01-20260816A';
+const AUDIT_MIRROR_USAGE =
+  'Usage: pnpm kyberion audit mirror-reconcile [--mission-id <id>] [--request-approval --requested-by <actor>] [--apply --approval-request-id <id>]';
 
 const AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
@@ -68,11 +73,17 @@ export interface OpenAuditMirrorApprovalResult {
   reason?: string;
 }
 
-function directories(root: string): string[] {
-  if (!safeExistsSync(root)) return [];
-  return safeReaddir(root).filter((entry) => {
+function directories(root: string, rootDir = pathResolver.rootDir()): string[] {
+  const safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true, rootDir });
+  if (!safeExistsSync(safeRoot)) return [];
+  return safeReaddir(safeRoot).filter((entry) => {
     try {
-      return safeStat(path.join(root, entry)).isDirectory();
+      return safeLstat(
+        assertSafeRepositoryPath(path.join(safeRoot, entry), {
+          allowMissingLeaf: true,
+          rootDir,
+        })
+      ).isDirectory();
     } catch {
       return false;
     }
@@ -87,39 +98,67 @@ function entryFingerprint(entries: AuditEntry[]): string {
   return fingerprint(entries.map((entry) => ({ id: entry.id, currentHash: entry.currentHash })));
 }
 
-function parseMirrorFile(filePath: string): AuditEntry[] {
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+function parseMirrorFile(filePath: string, rootDir = pathResolver.rootDir()): AuditEntry[] {
+  const safePath = assertSafeRepositoryPath(filePath, { rootDir });
+  const raw = safeReadFile(safePath, { encoding: 'utf8' }) as string;
   const entries: AuditEntry[] = [];
   for (const [index, line] of raw.split(/\r?\n/).entries()) {
     if (!line.trim()) continue;
     try {
-      entries.push(JSON.parse(line) as AuditEntry);
+      entries.push(
+        normalizePersistedAuditEntry(parseSafeJsonInput(line, `${safePath}:${index + 1}`))
+      );
     } catch (error) {
       throw new Error(
-        `[AUDIT_MIRROR_INVALID] ${filePath}:${index + 1} is not valid JSON: ${String(error)}`
+        `[AUDIT_MIRROR_INVALID] ${safePath}:${index + 1} is not valid JSON: ${String(error)}`
       );
     }
   }
   return entries;
 }
 
-function loadMirrorEntries(mirrorDir: string): AuditEntry[] {
-  return safeReaddir(mirrorDir)
+function loadMirrorEntries(mirrorDir: string, rootDir = pathResolver.rootDir()): AuditEntry[] {
+  const safeMirrorDir = assertSafeRepositoryPath(mirrorDir, { rootDir });
+  return safeReaddir(safeMirrorDir)
     .filter((fileName) => AUDIT_FILE_RE.test(fileName))
+    .filter((fileName) => {
+      try {
+        return safeLstat(
+          assertSafeRepositoryPath(path.join(safeMirrorDir, fileName), { rootDir })
+        ).isFile();
+      } catch {
+        return false;
+      }
+    })
     .sort((left, right) => left.localeCompare(right))
-    .flatMap((fileName) => parseMirrorFile(path.join(mirrorDir, fileName)));
+    .flatMap((fileName) => parseMirrorFile(path.join(safeMirrorDir, fileName), rootDir));
 }
 
 function loadMasterEntries(rootDir: string): AuditEntry[] {
   if (path.resolve(rootDir) === path.resolve(pathResolver.rootDir())) {
     return auditChain.loadAll();
   }
-  const auditDir = path.join(rootDir, 'active', 'shared', 'logs', 'audit');
+  const auditDir = assertSafeRepositoryPath(
+    path.join(rootDir, 'active', 'shared', 'logs', 'audit'),
+    {
+      allowMissingLeaf: true,
+      rootDir,
+    }
+  );
   if (!safeExistsSync(auditDir)) return [];
   return safeReaddir(auditDir)
     .filter((fileName) => AUDIT_FILE_RE.test(fileName))
+    .filter((fileName) => {
+      try {
+        return safeLstat(
+          assertSafeRepositoryPath(path.join(auditDir, fileName), { rootDir })
+        ).isFile();
+      } catch {
+        return false;
+      }
+    })
     .sort((left, right) => left.localeCompare(right))
-    .flatMap((fileName) => parseMirrorFile(path.join(auditDir, fileName)));
+    .flatMap((fileName) => parseMirrorFile(path.join(auditDir, fileName), rootDir));
 }
 
 function masterEntriesByTenant(rootDir = pathResolver.rootDir()): Map<string, AuditEntry[]> {
@@ -135,14 +174,20 @@ function masterEntriesByTenant(rootDir = pathResolver.rootDir()): Map<string, Au
 
 /** Collect only mismatched existing mirrors; missing overlays are not created. */
 export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): AuditMirrorFinding[] {
-  const customersRoot = path.join(rootDir, 'customer');
+  const customersRoot = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
   const masterByTenant = masterEntriesByTenant(rootDir);
   const findings: AuditMirrorFinding[] = [];
 
-  for (const slug of directories(customersRoot)) {
-    const mirrorDir = path.join(customersRoot, slug, 'logs', 'audit');
+  for (const slug of directories(customersRoot, rootDir)) {
+    const mirrorDir = assertSafeRepositoryPath(path.join(customersRoot, slug, 'logs', 'audit'), {
+      allowMissingLeaf: true,
+      rootDir,
+    });
     if (!safeExistsSync(mirrorDir)) continue;
-    const mirrorEntries = loadMirrorEntries(mirrorDir);
+    const mirrorEntries = loadMirrorEntries(mirrorDir, rootDir);
     const masterEntries = masterByTenant.get(slug) || [];
     const same =
       mirrorEntries.length === masterEntries.length &&
@@ -304,7 +349,15 @@ function assertAuditMirrorApproval(
   return approval;
 }
 
-function rebuildMirror(mirrorDir: string, entries: AuditEntry[]): void {
+function rebuildMirror(
+  mirrorDir: string,
+  entries: AuditEntry[],
+  rootDir = pathResolver.rootDir()
+): void {
+  const safeMirrorDir = assertSafeRepositoryPath(mirrorDir, {
+    allowMissingLeaf: true,
+    rootDir,
+  });
   const byDate = new Map<string, AuditEntry[]>();
   for (const entry of entries) {
     const date = entry.timestamp.slice(0, 10);
@@ -315,12 +368,15 @@ function rebuildMirror(mirrorDir: string, entries: AuditEntry[]): void {
     dateEntries.push(entry);
     byDate.set(date, dateEntries);
   }
-  safeMkdir(mirrorDir, { recursive: true });
+  safeMkdir(safeMirrorDir, { recursive: true });
   for (const [date, dateEntries] of [...byDate.entries()].sort(([left], [right]) =>
     left.localeCompare(right)
   )) {
     safeWriteFile(
-      path.join(mirrorDir, `audit-${date}.jsonl`),
+      assertSafeRepositoryPath(path.join(safeMirrorDir, `audit-${date}.jsonl`), {
+        allowMissingLeaf: true,
+        rootDir,
+      }),
       `${dateEntries.map((entry) => JSON.stringify(entry)).join('\n')}\n`,
       { encoding: 'utf8', mkdir: true }
     );
@@ -347,7 +403,7 @@ export function runAuditMirrorReconciliation(input: {
     mode: input.apply ? 'apply' : 'dry-run',
     ...(approval?.decidedBy ? { approved_by: approval.decidedBy } : {}),
     ...(approval ? { approval_request_id: approval.id } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     findings,
     archived: [],
     rebuilt: [],
@@ -355,19 +411,24 @@ export function runAuditMirrorReconciliation(input: {
 
   if (input.apply) {
     const masterByTenant = masterEntriesByTenant(rootDir);
-    const archiveRoot = path.join(
-      rootDir,
-      'active/archive/.trash',
-      `audit-mirror-${Date.now().toString(36)}`
+    const archiveRoot = assertSafeRepositoryPath(
+      path.join(rootDir, 'active/archive/.trash', `audit-mirror-${Date.now().toString(36)}`),
+      { allowMissingLeaf: true, rootDir }
     );
     withExecutionContext(
       'mission_controller',
       () => {
         safeMkdir(archiveRoot, { recursive: true });
         for (const finding of findings) {
-          const source = path.join(rootDir, finding.path);
+          const source = assertSafeRepositoryPath(path.join(rootDir, finding.path), {
+            allowMissingLeaf: true,
+            rootDir,
+          });
           if (!safeExistsSync(source)) continue;
-          const destination = path.join(archiveRoot, finding.path);
+          const destination = assertSafeRepositoryPath(path.join(archiveRoot, finding.path), {
+            allowMissingLeaf: true,
+            rootDir,
+          });
           safeMkdir(path.dirname(destination), { recursive: true });
           safeMoveSync(source, destination);
           receipt.archived.push({
@@ -376,9 +437,12 @@ export function runAuditMirrorReconciliation(input: {
           });
 
           if (finding.action === 'quarantine_and_rebuild') {
-            const mirrorDir = path.join(rootDir, finding.path);
+            const mirrorDir = assertSafeRepositoryPath(path.join(rootDir, finding.path), {
+              allowMissingLeaf: true,
+              rootDir,
+            });
             const entries = masterByTenant.get(finding.slug) || [];
-            rebuildMirror(mirrorDir, entries);
+            rebuildMirror(mirrorDir, entries, rootDir);
             receipt.rebuilt.push({
               slug: finding.slug,
               path: finding.path,
@@ -391,19 +455,29 @@ export function runAuditMirrorReconciliation(input: {
             ? missionEvidenceDir(input.missionId)
             : undefined) ||
           path.join(rootDir, 'active/missions/confidential', input.missionId, 'evidence');
-        safeMkdir(evidenceDir, { recursive: true });
-        const receiptPath = path.join(evidenceDir, 'audit-mirror-reconciliation-receipt.json');
+        const safeEvidenceDir = assertSafeRepositoryPath(evidenceDir, {
+          allowMissingLeaf: true,
+          rootDir,
+        });
+        safeMkdir(safeEvidenceDir, { recursive: true });
+        const receiptPath = assertSafeRepositoryPath(
+          path.join(safeEvidenceDir, 'audit-mirror-reconciliation-receipt.json'),
+          { allowMissingLeaf: true, rootDir }
+        );
         receipt.receipt_path = path.relative(rootDir, receiptPath).replaceAll(path.sep, '/');
         safeWriteFile(receiptPath, JSON.stringify(receipt, null, 2));
       },
       'sovereign'
     );
   } else {
-    const receiptPath = path.join(
-      rootDir,
-      'active/missions/confidential',
-      input.missionId,
-      'evidence/audit-mirror-reconciliation-dry-run.json'
+    const receiptPath = assertSafeRepositoryPath(
+      path.join(
+        rootDir,
+        'active/missions/confidential',
+        input.missionId,
+        'evidence/audit-mirror-reconciliation-dry-run.json'
+      ),
+      { allowMissingLeaf: true, rootDir }
     );
     safeMkdir(path.dirname(receiptPath), { recursive: true });
     receipt.receipt_path = path.relative(rootDir, receiptPath).replaceAll(path.sep, '/');
@@ -412,7 +486,10 @@ export function runAuditMirrorReconciliation(input: {
   return receipt;
 }
 
-export function main(argv: string[] = []): void {
+export function main(argv: string[] = []) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    return { result: { status: 'help', usage: AUDIT_MIRROR_USAGE }, failed: false };
+  }
   const missionIndex = argv.indexOf('--mission-id');
   const missionId = missionIndex >= 0 ? argv[missionIndex + 1] : DEFAULT_AUDIT_MIRROR_MISSION;
   const apply = argv.includes('--apply');
@@ -423,19 +500,23 @@ export function main(argv: string[] = []): void {
   const requestedBy = requestedByIndex >= 0 ? argv[requestedByIndex + 1] : undefined;
   if (requestApproval) {
     const result = openAuditMirrorApproval({ missionId, ...(requestedBy ? { requestedBy } : {}) });
-    console.log(JSON.stringify(result, null, 2));
-    if (result.reason) throw new ScriptExitError(1, result.reason);
-    return;
+    return { result, failed: Boolean(result.reason) };
   }
-  console.log(
-    JSON.stringify(runAuditMirrorReconciliation({ missionId, apply, approvalRequestId }), null, 2)
-  );
+  return {
+    result: runAuditMirrorReconciliation({ missionId, apply, approvalRequestId }),
+    failed: false,
+  };
 }
 
 export const runAuditMirrorReconcile = defineScript({
   name: 'audit:mirror-reconcile',
   flags: [],
-  run: (context) => main(context.argv),
+  run: (context) => {
+    const outcome = main(context.argv);
+    context.print(outcome.result);
+    if (outcome.failed) throw new ScriptExitError(1, '', true);
+    return outcome.result;
+  },
 });
 
 if (

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { nowIso } from './foundation/time.js';
 import {
   listGovernedArtifacts,
   readGovernedArtifactJson,
@@ -83,7 +84,7 @@ export function enqueueReviewReentryRequest(
     comment: input.comment?.trim() || undefined,
     reason_category: input.reasonCategory,
     reviewer: input.reviewer,
-    requested_at: new Date().toISOString(),
+    requested_at: nowIso(),
     status: 'pending',
   };
   writeGovernedArtifactJson(role, reentryPath(record.mission_id, record.request_id), record);
@@ -162,7 +163,7 @@ export function markReviewReentryProcessed(
   const updated: ReviewReentryRequest = {
     ...record,
     status: 'processed',
-    processed_at: new Date().toISOString(),
+    processed_at: nowIso(),
     gap_task_ids: gapTaskIds,
   };
   writeGovernedArtifactJson(role, logicalPath, updated);

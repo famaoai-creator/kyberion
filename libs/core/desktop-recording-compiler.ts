@@ -1,10 +1,14 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { readJson } from './foundation/json.js';
-import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
+import {
+  invalidateProcedureCache,
+  readProcedureCatalog,
+  resolveAllowlistedRecordingRef,
+  validateProcedureCatalog,
+} from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
 import {
-  loadJson,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -14,11 +18,12 @@ import {
 import type { ProcedureCatalog, ProcedureEntry, ProcedureRiskClass } from './procedure-types.js';
 import {
   computeDesktopRecordingHash,
+  loadDesktopRecordingAtPath,
   validateDesktopRecording,
   type DesktopRecording,
 } from './desktop-recording.js';
 import { validateDesktopPipeline, type DesktopPipeline } from './desktop-pipeline.js';
-import { intentDraftHash, validateDesktopIntentDraft } from './desktop-intent-reconstruction.js';
+import { intentDraftHash, loadDesktopIntentDraftAtPath } from './desktop-intent-reconstruction.js';
 import {
   assertNoPendingDesktopPromotion,
   acquireDesktopPromotionLock,
@@ -156,21 +161,38 @@ export function promoteDesktopProcedure(options: {
 } {
   const recordingAbs = resolveAllowlistedRecordingRef(options.recordingRef);
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
-  let raw: unknown;
+  let recording: DesktopRecording;
   try {
-    raw = loadJson<unknown>(recordingAbs);
+    recording = loadDesktopRecordingAtPath(recordingAbs);
   } catch (error) {
     throw new Error(
       `failed to read recording: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  const validation = validateDesktopRecording(raw);
-  if (!validation.value)
-    throw new Error(`recording failed validation: ${validation.errors.join('; ')}`);
-  if (validation.value.review.status !== 'approved') {
+  return promoteDesktopProcedureFromRecording(recording, recordingAbs, options);
+}
+
+function promoteDesktopProcedureFromRecording(
+  recording: DesktopRecording,
+  recordingAbs: string,
+  options: {
+    recordingRef: string;
+    procedureId: string;
+    intentPhrases: string[];
+    status?: ProcedureEntry['status'];
+    catalogPath?: string;
+    intentRef?: string;
+  }
+): {
+  procedureEntry: ProcedureEntry;
+  catalogPath: string;
+  pipelinePath: string;
+  warnings: string[];
+} {
+  if (recording.review.status !== 'approved') {
     throw new Error('recording review must be approved before promotion');
   }
-  if (!validation.value.intent_hash) {
+  if (!recording.intent_hash) {
     throw new Error(
       'intent review artifact is required before promotion; run recording review --approve-intent'
     );
@@ -184,37 +206,31 @@ export function promoteDesktopProcedure(options: {
         )
       );
   if (!intentCandidate) throw new Error('intent_ref is outside the allowlisted recording stores');
-  let intent: ReturnType<typeof validateDesktopIntentDraft>;
+  let intent: ReturnType<typeof loadDesktopIntentDraftAtPath>;
   try {
-    intent = validateDesktopIntentDraft(loadJson<unknown>(intentCandidate));
+    intent = loadDesktopIntentDraftAtPath(intentCandidate, recording.recording_id);
   } catch (error) {
     throw new Error(
       `failed to read intent review artifact: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  if (intent.source_recording_id !== validation.value.recording_id) {
-    throw new Error('intent review artifact does not belong to the recording');
-  }
   if (intent.review.status !== 'approved') {
     throw new Error('intent review must be approved before promotion');
   }
-  if (intentDraftHash(intent) !== validation.value.intent_hash) {
+  if (intentDraftHash(intent) !== recording.intent_hash) {
     throw new Error('intent review artifact does not match the recorded intent source');
   }
-  if (validation.value.steps.some((step) => step.needs_semantic_resolution)) {
+  if (recording.steps.some((step) => step.needs_semantic_resolution)) {
     throw new Error(
       'desktop recording contains unresolved semantic targets; resolve them before promotion'
     );
   }
 
   const recordingRef = pathResolver.toRepoRelative(recordingAbs);
-  if (
-    validation.value.capture?.event_source !== 'native-cg-event-tap' ||
-    validation.value.steps.length === 0
-  ) {
+  if (recording.capture?.event_source !== 'native-cg-event-tap' || recording.steps.length === 0) {
     throw new Error('desktop recording must contain native OS events before promotion');
   }
-  const screenArtifact = validation.value.artifacts?.screen_recording;
+  const screenArtifact = recording.artifacts?.screen_recording;
   if (screenArtifact?.status === 'succeeded' && screenArtifact.recording_ref) {
     const artifactAbs = resolveAllowlistedRecordingRef(screenArtifact.recording_ref);
     if (!artifactAbs)
@@ -224,13 +240,15 @@ export function promoteDesktopProcedure(options: {
     if (digest !== screenArtifact.sha256)
       throw new Error('screen recording artifact hash mismatch');
   }
-  const compiled = compileDesktopRecording(validation.value, {
+  const compiled = compileDesktopRecording(recording, {
     procedureId: options.procedureId,
     intentPhrases: options.intentPhrases,
     recordingRef,
     status: options.status ?? 'active',
   });
-  const catalogPath = options.catalogPath ?? PERSONAL_CATALOG_PATH;
+  const catalogPath = assertSafeRepositoryPath(options.catalogPath ?? PERSONAL_CATALOG_PATH, {
+    allowMissingLeaf: true,
+  });
   if (path.resolve(catalogPath) !== path.resolve(PERSONAL_CATALOG_PATH)) {
     throw new Error('desktop promotion catalog must be the governed personal procedures catalog');
   }
@@ -239,7 +257,7 @@ export function promoteDesktopProcedure(options: {
     assertNoPendingDesktopPromotion(options.procedureId, { lockHeld: true });
     let catalog: ProcedureCatalog = { schema_version: 'procedures.v1', procedures: [] };
     try {
-      catalog = readJson<ProcedureCatalog>(catalogPath);
+      catalog = readProcedureCatalog(catalogPath);
     } catch (error) {
       if (safeExistsSync(catalogPath)) {
         throw new Error(
@@ -253,7 +271,10 @@ export function promoteDesktopProcedure(options: {
         `procedure_id "${options.procedureId}" already exists in the selected catalog`
       );
     }
-    const pipelinePath = pathResolver.rootResolve(compiled.procedureEntry.pipeline_ref);
+    const pipelinePath = assertSafeRepositoryPath(
+      pathResolver.rootResolve(compiled.procedureEntry.pipeline_ref),
+      { allowMissingLeaf: true }
+    );
     const previousPipeline = safeExistsSync(pipelinePath)
       ? (safeReadFile(pipelinePath, { encoding: 'utf8' }) as string)
       : null;
@@ -261,6 +282,7 @@ export function promoteDesktopProcedure(options: {
       ? (safeReadFile(catalogPath, { encoding: 'utf8' }) as string)
       : null;
     catalog.procedures.push(compiled.procedureEntry);
+    validateProcedureCatalog(catalog, catalogPath);
     const nextPipelineText = `${JSON.stringify(compiled.pipeline, null, 2)}\n`;
     const nextCatalogText = `${JSON.stringify(catalog, null, 2)}\n`;
     const safeProcedureId = options.procedureId.replace(/[^a-zA-Z0-9._-]/g, '_');

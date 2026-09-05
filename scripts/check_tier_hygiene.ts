@@ -7,10 +7,11 @@
  * Invoke: pnpm check:tier-hygiene
  */
 
-import { pathResolver, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
 import * as path from 'node:path';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface DeniedPattern {
   name: string;
@@ -37,10 +38,14 @@ export interface Violation {
 }
 
 const POLICY_PATH = 'knowledge/product/governance/tier-hygiene-policy.json';
+const policyCatalog = defineCatalog<Policy>({
+  id: 'tier-hygiene-policy',
+  path: () => pathResolver.rootResolve(POLICY_PATH),
+  schema: pathResolver.knowledge('product/schemas/tier-hygiene-policy.schema.json'),
+});
 
 async function loadPolicy(): Promise<Policy> {
-  const absolute = pathResolver.rootResolve(POLICY_PATH);
-  return readJson<Policy>(absolute);
+  return policyCatalog.load();
 }
 
 function buildAllowlist(policy: Policy): RegExp[] {
@@ -373,19 +378,21 @@ export const runCheckTierHygiene = defineScript({
     const violations = await scan();
     if (violations.length === 0) {
       context.print('[check:tier-hygiene] OK');
-      return;
+      return { violations };
     }
-    console.error(`[check:tier-hygiene] ${violations.length} violation(s) detected:`);
-    for (const v of violations) {
-      console.error(`  ${v.file}:${v.line} [${v.pattern}] ${v.matched}`);
-      console.error(`    → ${v.rationale}`);
-    }
-    console.error('');
-    console.error(
-      'Fix by moving the value into knowledge/confidential/{org}/ and using a placeholder (${VAR} / <PLACEHOLDER>) in public. ' +
-        'Legitimate industry terms should be added to allowlist_patterns in the tier-hygiene-policy.'
+    throw new ScriptExitError(
+      1,
+      [
+        `[check:tier-hygiene] ${violations.length} violation(s) detected:`,
+        ...violations.flatMap((v) => [
+          `  ${v.file}:${v.line} [${v.pattern}] ${v.matched}`,
+          `    → ${v.rationale}`,
+        ]),
+        '',
+        'Fix by moving the value into knowledge/confidential/{org}/ and using a placeholder (${VAR} / <PLACEHOLDER>) in public. ' +
+          'Legitimate industry terms should be added to allowlist_patterns in the tier-hygiene-policy.',
+      ].join('\n')
     );
-    process.exitCode = 1;
   },
 });
 

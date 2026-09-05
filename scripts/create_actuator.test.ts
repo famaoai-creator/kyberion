@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeMkdir } from '@agent/core';
-import { createActuatorScaffold } from './create_actuator.js';
+import { createActuatorScaffold, previewActuatorScaffold } from './create_actuator.js';
 
 describe('create_actuator', () => {
   const tmpRoot = pathResolver.sharedTmp('create-actuator-tests');
@@ -37,12 +37,24 @@ describe('create_actuator', () => {
     expect(indexSource).not.toContain('TODO: implement');
     expect(indexSource).not.toContain('node:fs');
     expect(indexSource).toContain('received_params');
+    expect(indexSource).toContain("import { nowIso } from '@agent/core/foundation';");
     expect(indexSource).toContain('defineActuator');
     expect(indexSource).toContain('runActuatorCli');
+    expect(indexSource).toContain('runActuatorCliEntryPoint');
+    expect(indexSource).not.toContain('main().catch');
+    expect(indexSource).not.toContain('process.exitCode');
     expect(indexSource).toContain('export const actuator');
     expect(indexSource).not.toContain('dispatchDecisionOp');
     expect(schemaSource).toContain('"execute"');
     expect(manifestSource).toContain('knowledge/product/schemas/sample-feature-action.schema.json');
+  });
+
+  it('previews machine-mode output without creating files', () => {
+    safeMkdir(tmpRoot);
+    const preview = previewActuatorScaffold({ name: 'preview-feature', rootDir: tmpRoot });
+    expect(preview.name).toBe('preview-feature-actuator');
+    expect(preview.files_to_write).toHaveLength(5);
+    expect(safeExistsSync(preview.outDir)).toBe(false);
   });
 
   it('refuses to overwrite an existing actuator directory', () => {
@@ -56,5 +68,18 @@ describe('create_actuator', () => {
         rootDir: tmpRoot,
       })
     ).toThrow(`Directory already exists: ${existing}`);
+  });
+
+  it('routes scaffold guidance through the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/create_actuator.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('print?: Print');
+    expect(source).toContain('json, quiet, print }).then');
   });
 });

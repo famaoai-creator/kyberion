@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ingest-asset-record.schema.json",
+  "title": "Ingest Asset Ledger Record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "asset_id": { "type": "string", "pattern": "^ing-[a-f0-9]{16}$" },
+    "source_system": { "type": "string", "minLength": 1 },
+    "source_id": { "type": "string", "minLength": 1 },
+    "source_url": { "type": "string", "minLength": 1 },
+    "source_version": { "type": "string", "minLength": 1 },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "retrieved_at": { "type": "string", "format": "date-time" },
+    "ingested_at": { "type": "string", "format": "date-time" },
+    "ingested_by": { "type": "string", "minLength": 1 },
+    "approval_id": { "type": "string", "minLength": 1 },
+    "steward_approval_id": { "type": "string", "minLength": 1 },
+    "visible_to": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "transform_chain": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "target_path": { "type": "string", "minLength": 1 },
+    "version": { "type": "integer", "minimum": 1 },
+    "supersedes": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["active", "superseded"] }
+  },
+  "required": [
+    "asset_id",
+    "source_system",
+    "source_id",
+    "content_sha256",
+    "retrieved_at",
+    "ingested_at",
+    "ingested_by",
+    "visible_to",
+    "transform_chain",
+    "target_path",
+    "version",
+    "status"
+  ]
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { clearScopeEnv, resolveScopeResolution, writeScopeEnv } from '@agent/core';
-import type { ScopeContextInput } from '@agent/core';
+import { clearScopeEnv, resolveScopeResolution, writeScopeEnv } from '@agent/core/scope-context';
+import type { ScopeContextInput } from '@agent/core/scope-context';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function value(args: string[], flag: string): string | undefined {

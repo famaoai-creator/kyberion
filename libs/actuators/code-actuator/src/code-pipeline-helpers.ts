@@ -1,27 +1,39 @@
 import {
-  loadJson,
-  logger,
+  nowIso,
+  parsePersistedPipelineStrategy,
+  getRegisteredEnv,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
+import type { AdfEngineContext } from '@agent/core/adf-engine';
+import { logger } from '@agent/core/core';
+import {
   safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
   safeReaddir,
   safeLstat,
-  executeAdfSteps,
-  evaluateCondition,
-  resolveWriteArtifactSpec,
-  pathResolver,
+  assertSafeRepositoryPath,
+} from '@agent/core/secure-io';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import {
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
+import { evaluateCondition, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
+import * as pathResolver from '@agent/core/path-resolver';
+import {
   loadCapabilityRegistry,
   scanProviderCapabilities,
-  retry,
-  buildGovernedRetryOptions,
-  runGovernedCommand,
-  createActuatorTrace,
-  finalizeActuatorTrace,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
-import { getRegisteredEnv } from '@agent/core/foundation';
+} from '@agent/core/provider-capability-scanner';
+import { retry } from '@agent/core/async-utils';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { runGovernedCommand } from '@agent/core/command-runner';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import type { TraceContext } from '@agent/core/trace';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
@@ -35,13 +47,35 @@ const DEFAULT_CODE_RETRY = {
   jitter: true,
 };
 
-export function buildRetryOptions() {
-  return buildGovernedRetryOptions({
-    manifestPath: CODE_MANIFEST_PATH,
-    defaults: DEFAULT_CODE_RETRY,
-    fallbackCategories: ['resource_unavailable', 'timeout'],
+function resolveCodeRepositoryPath(rootDir: string, value: unknown, label: string): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`[${label}] path is required`);
+  return assertSafeRepositoryPath(path.resolve(rootDir, requested), {
+    allowMissingLeaf: true,
   });
 }
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readCodeJson(filePath: string, label: string): unknown {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
+}
+
+export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: CODE_MANIFEST_PATH,
+  defaults: DEFAULT_CODE_RETRY,
+  fallbackCategories: ['resource_unavailable', 'timeout'],
+});
 
 /**
  * Code-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
@@ -72,18 +106,14 @@ function assertUnsafeJsAllowed() {
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
-}
-
-interface StrategyConfig {
-  strategies: Array<{ pipeline: PipelineStep[]; params?: Record<string, unknown> }>;
+  params: Record<string, unknown>;
 }
 
 export interface CodeAction {
   action: 'pipeline' | 'reconcile';
   steps?: PipelineStep[];
   strategy_path?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   options?: {
     max_steps?: number;
     timeout_ms?: number;
@@ -133,6 +163,9 @@ export async function handleAction(input: CodeAction) {
         : input.options;
     return await performReconcile({ ...input, strategy_path: strategyPath, options });
   }
+  if (input.action !== 'pipeline') {
+    throw new Error(`Unsupported action: ${input.action}`);
+  }
   const traceCtx = createActuatorTrace('code-actuator', 'pipeline');
   traceCtx.startSpan('code:pipeline', {
     stepCount: Array.isArray(input.steps) ? input.steps.length : 0,
@@ -146,11 +179,12 @@ export async function handleAction(input: CodeAction) {
     );
     traceCtx.endSpan('ok');
     return { ...result, ...finalizeActuatorTrace(traceCtx) };
-  } catch (err: any) {
-    traceCtx.endSpan('error', err?.message ?? String(err));
+  } catch (err: unknown) {
+    const message = errorMessage(err);
+    traceCtx.endSpan('error', message);
     return {
       status: 'error',
-      message: err?.message ?? String(err),
+      message,
       ...finalizeActuatorTrace(traceCtx),
     };
   }
@@ -162,19 +196,26 @@ export async function handleAction(input: CodeAction) {
 // being silently absorbed (AR-06 no-silent-failure).
 export async function executePipeline(
   steps: PipelineStep[],
-  initialCtx: any = {},
-  options: any = {},
-  traceCtx?: any
+  initialCtx: AdfEngineContext = {},
+  options: CodeAction['options'] = {},
+  traceCtx?: TraceContext
 ) {
   const rootDir = pathResolver.rootDir();
-  const MAX_STEPS = options.max_steps || 1000;
-  const TIMEOUT = options.timeout_ms || 60000;
+  const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
+  const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, root: rootDir };
+  let ctx: AdfEngineContext = { ...initialCtx, root: rootDir };
+  const contextPath =
+    typeof initialCtx.context_path === 'string' && initialCtx.context_path
+      ? assertSafeRepositoryPath(path.resolve(rootDir, initialCtx.context_path), {
+          allowMissingLeaf: true,
+        })
+      : undefined;
 
-  if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
+  if (contextPath && safeExistsSync(contextPath)) {
     const saved = await retry(
-      async () => loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path)),
+      async () =>
+        parseSafeJsonObjectValue(readCodeJson(contextPath, 'code context'), 'code context'),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
@@ -188,17 +229,18 @@ export async function executePipeline(
       const value = await run();
       traceCtx?.endSpan?.('ok');
       return value;
-    } catch (err: any) {
-      traceCtx?.endSpan?.('error', err?.message ?? String(err));
+    } catch (err: unknown) {
+      traceCtx?.endSpan?.('error', errorMessage(err));
       throw err;
     }
   };
 
-  const result = await executeAdfSteps(
-    steps as Parameters<typeof executeAdfSteps>[0],
-    ctx,
-    { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
-    {
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'code',
+    steps,
+    context: ctx,
+    options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+    handlers: {
       capture: (op, params, currentCtx, resolve) =>
         traced('capture', op, () => opCapture(op, params, currentCtx, resolve)),
       transform: (op, params, currentCtx, resolve) =>
@@ -210,19 +252,23 @@ export async function executePipeline(
         }),
       control: (op, params, currentCtx, runSteps, resolve) =>
         traced('control', op, () => opControl(op, params, currentCtx, runSteps, resolve)),
-    }
-  );
+    },
+  });
 
   ctx = result.context;
 
-  if (initialCtx.context_path) {
+  if (contextPath) {
     await retry(async () => {
-      safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+      safeWriteFile(contextPath, JSON.stringify(ctx, null, 2));
       return undefined;
     }, buildRetryOptions());
   }
 
   return result;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function opControl(
@@ -275,7 +321,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ...ctx,
         [params.export_as || 'last_capture']: await retry(
           async () =>
-            safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
+            safeReadFile(resolveCodeRepositoryPath(rootDir, resolve(params.path), 'read_file'), {
+              encoding: 'utf8',
+            }),
           buildRetryOptions()
         ),
       };
@@ -284,7 +332,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ...ctx,
         [params.export_as || 'file_list']: await retry(
           async () =>
-            getAllFiles(path.resolve(rootDir, resolve(params.dir)))
+            getAllFiles(resolveCodeRepositoryPath(rootDir, resolve(params.dir), 'glob_files'))
               .filter((f) => !params.ext || f.endsWith(params.ext))
               .map((f) => path.relative(rootDir, f)),
           buildRetryOptions()
@@ -330,7 +378,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return {
         ...ctx,
         [params.export_as || 'semgrep_findings']: await retry(async () => {
-          const target = path.resolve(rootDir, resolve(params.target_dir));
+          const target = resolveCodeRepositoryPath(
+            rootDir,
+            resolve(params.target_dir),
+            'semgrep_scan'
+          );
           const config = String(resolve(params.config) || 'auto');
           const args = ['--config', config, target, '--json'];
           const result = runGovernedCommand('semgrep', args, { maxOutputMB: 10 });
@@ -344,13 +396,13 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
             );
           }
           try {
-            return JSON.parse(stdout);
+            return parseSafeJsonInput(stdout, 'semgrep response');
           } catch {
             if (result.status === 0) {
               throw new Error('[SEMGREP_ERROR] Scan succeeded but did not return valid JSON.');
             }
             try {
-              return JSON.parse(String(result.stderr || ''));
+              return parseSafeJsonInput(String(result.stderr || ''), 'semgrep error response');
             } catch {
               throw new Error(
                 `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
@@ -365,7 +417,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         .trim()
         .toLowerCase();
       if (!testPath) throw new Error('[run_tests] test_path is required');
-      const absoluteTestPath = path.resolve(rootDir, testPath);
+      const absoluteTestPath = resolveCodeRepositoryPath(rootDir, testPath, 'run_tests');
       const relativeTestPath = path.relative(rootDir, absoluteTestPath);
       if (
         relativeTestPath.startsWith(`..${path.sep}`) ||
@@ -426,14 +478,17 @@ function discoverProviderCliCapabilities(): any[] {
 }
 
 function discoverGovernedSkills(): any[] {
-  const skillIndexPath = pathResolver.knowledge('product/orchestration/global_skill_index.json');
+  const skillIndexPath = assertSafeRepositoryPath(
+    pathResolver.knowledge('product/orchestration/global_skill_index.json'),
+    { allowMissingLeaf: true }
+  );
   if (!safeExistsSync(skillIndexPath)) {
     return [];
   }
 
   try {
     const raw = safeReadFile(skillIndexPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as GlobalSkillIndex;
+    const parsed = parseSafeJsonInput(raw, 'global skill index') as GlobalSkillIndex;
     const entries = Array.isArray(parsed.s) ? parsed.s : [];
     return entries.map((entry) => ({
       name: entry.n,
@@ -461,7 +516,13 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         ).replace(new RegExp(params.pattern, 'g'), resolve(params.template)),
       };
     case 'json_update':
-      const json = JSON.parse(ctx[params.from || 'last_capture']);
+      const json = parseSafeJsonObjectValue(
+        parseSafeJsonInput(
+          String(ctx[params.from || 'last_capture'] ?? ''),
+          'code json_update input'
+        ),
+        'code json_update input'
+      );
       params.updates.forEach((u: any) => {
         json[u.key] = resolve(u.value);
       });
@@ -541,7 +602,7 @@ export async function impactAnalysisOp(input: {
   if (!input.repo_path) throw new Error('[impact_analysis] requires repo_path');
   if (!input.requirements) throw new Error('[impact_analysis] requires requirements');
   const rootDir = pathResolver.rootDir();
-  const repoPath = path.resolve(rootDir, input.repo_path);
+  const repoPath = resolveCodeRepositoryPath(rootDir, input.repo_path, 'impact_analysis');
   if (!safeExistsSync(repoPath)) throw new Error(`[impact_analysis] repo not found: ${repoPath}`);
   const files = getAllFiles(repoPath)
     .filter((file) => IMPACT_CODE_EXTENSIONS.has(path.extname(file)))
@@ -549,7 +610,7 @@ export async function impactAnalysisOp(input: {
     .slice(0, 400)
     .map((file) => path.relative(repoPath, file));
 
-  const { getReasoningBackend } = await import('@agent/core');
+  const { getReasoningBackend } = await import('@agent/core/reasoning-backend');
   const prompt = [
     'You are performing an impact analysis for a change request against an existing codebase.',
     'Return JSON only, exactly this shape:',
@@ -572,12 +633,15 @@ export async function impactAnalysisOp(input: {
   if (start < 0 || end <= start) {
     throw new Error('[impact_analysis] backend did not return JSON');
   }
-  const parsed = JSON.parse(raw.slice(start, end + 1)) as Partial<ImpactAnalysisResult>;
+  const parsed = parseSafeJsonObjectValue(
+    parseSafeJsonInput(raw.slice(start, end + 1), 'impact analysis response'),
+    'impact analysis response'
+  ) as Partial<ImpactAnalysisResult>;
   const size =
     parsed.size === 'S' || parsed.size === 'M' || parsed.size === 'L' ? parsed.size : 'M';
   const result: ImpactAnalysisResult = {
     kind: 'impact-analysis',
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     repo_path: input.repo_path,
     summary: String(parsed.summary || '').trim(),
     files: Array.isArray(parsed.files)
@@ -591,7 +655,7 @@ export async function impactAnalysisOp(input: {
     size,
   };
   if (input.output_path) {
-    const outPath = path.resolve(rootDir, input.output_path);
+    const outPath = resolveCodeRepositoryPath(rootDir, input.output_path, 'impact_analysis');
     if (!safeExistsSync(path.dirname(outPath)))
       safeMkdir(path.dirname(outPath), { recursive: true });
     safeWriteFile(outPath, JSON.stringify(result, null, 2));
@@ -605,7 +669,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'write_file':
     case 'write_artifact':
       const spec = resolveWriteArtifactSpec(params, ctx, resolve);
-      const out = path.resolve(rootDir, spec.path);
+      const out = resolveCodeRepositoryPath(rootDir, spec.path, 'write_file');
       const content =
         typeof spec.content === 'string'
           ? spec.content
@@ -625,13 +689,15 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
 }
 
 async function performReconcile(input: CodeAction) {
-  const strategyPath = path.resolve(
+  const strategyPath = resolveCodeRepositoryPath(
     pathResolver.rootDir(),
-    input.strategy_path || 'knowledge/product/governance/code-strategy.json'
+    input.strategy_path || 'knowledge/product/governance/code-strategy.json',
+    'reconcile'
   );
-  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
+  if (!isExistingRegularFile(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await retry(
-    async () => loadJson<StrategyConfig>(strategyPath),
+    async () =>
+      parsePersistedPipelineStrategy(readCodeJson(strategyPath, 'code strategy'), 'code strategy'),
     buildRetryOptions()
   );
   for (const strategy of config.strategies) {

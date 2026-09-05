@@ -12,24 +12,21 @@
 // not a regex fragment" signal.
 import * as path from 'node:path';
 import ts from 'typescript';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeStat, safeReaddir } from '@agent/core/secure-io';
+import { nowIso } from '@agent/core/foundation';
 import {
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeStat,
-  safeReaddir,
-  safeWriteFile,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+  loadI18nHardcodingBaselineAtPath,
+  writeI18nHardcodingBaselineAtPath,
+  type I18nHardcodingBaseline,
+} from '@agent/core/i18n-hardcoding-baseline';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
 const ROOT = pathResolver.rootDir();
-const DEFAULT_BASELINE_PATH = pathResolver.rootResolve(
-  'knowledge/product/governance/i18n-baseline.json'
-);
+const DEFAULT_BASELINE_PATH = resolveCiGateBaselinePath('i18n');
 
 // The Hiragana block (U+3040-U+309F) and Katakana block (U+30A0-U+30FF) are
 // contiguous, so a single range covers "Hiragana or Katakana". Written as a
@@ -69,14 +66,6 @@ export type I18nHardcodingReport = {
   violations: string[];
   stale_entries: string[];
   updated_baseline: boolean;
-};
-
-type I18nBaseline = {
-  version: 1;
-  $schema?: string;
-  generated_at: string;
-  scan_roots: string[];
-  files: Record<string, number>;
 };
 
 export function isTestFile(repoRelativePath: string): boolean {
@@ -210,30 +199,20 @@ function scanTree(scanRoots: string[]): {
   return { currentCounts, scannedFiles, checkedFiles, exemptionCount };
 }
 
-function loadBaseline(baselinePath: string): I18nBaseline | null {
-  if (!safeExistsSync(baselinePath)) return null;
-  return readJson<I18nBaseline>(baselinePath);
+function loadBaseline(baselinePath: string): I18nHardcodingBaseline | null {
+  return loadI18nHardcodingBaselineAtPath(baselinePath);
 }
 
 function writeBaselineFile(
   baselinePath: string,
-  baseline: I18nBaseline,
+  baseline: I18nHardcodingBaseline,
   relativeScanRootsForNote: string[]
 ): void {
   withExecutionContext('ecosystem_architect', () => {
-    safeMkdir(path.dirname(baselinePath), { recursive: true });
-    safeWriteFile(
-      baselinePath,
-      JSON.stringify(
-        {
-          $schema: baseline.$schema || '../schemas/governance-catalog.schema.json',
-          ...baseline,
-          scan_roots: relativeScanRootsForNote,
-        },
-        null,
-        2
-      )
-    );
+    writeI18nHardcodingBaselineAtPath(baselinePath, {
+      ...baseline,
+      scan_roots: relativeScanRootsForNote,
+    });
   });
 }
 
@@ -254,9 +233,9 @@ export function checkI18nHardcoding(
   const totalViolationsInTree = Object.values(currentCounts).reduce((sum, n) => sum + n, 0);
 
   if (options.updateBaseline) {
-    const nextBaseline: I18nBaseline = {
+    const nextBaseline: I18nHardcodingBaseline = {
       version: 1,
-      generated_at: new Date().toISOString(),
+      generated_at: nowIso(),
       scan_roots: relativeScanRoots,
       files: currentCounts,
     };
@@ -274,7 +253,7 @@ export function checkI18nHardcoding(
     };
   }
 
-  const checkedAt = new Date().toISOString();
+  const checkedAt = nowIso();
   const baseline = loadBaseline(baselinePath);
   if (!baseline) {
     return {
@@ -336,31 +315,23 @@ export function checkI18nHardcoding(
   };
 }
 
-function printHumanReport(report: I18nHardcodingReport): void {
+function formatHumanReport(report: I18nHardcodingReport): string {
   if (report.updated_baseline) {
-    console.log(
-      `[check:i18n] baseline updated: ${report.baseline_path} (${report.total_violations} violation(s) across ${report.checked_files} files scanned, ${report.exemption_count} exemption(s))`
-    );
-    return;
+    return `[check:i18n] baseline updated: ${report.baseline_path} (${report.total_violations} violation(s) across ${report.checked_files} files scanned, ${report.exemption_count} exemption(s))`;
   }
 
   if (report.status === 'pass') {
-    console.log(
-      `[check:i18n] OK (${report.checked_files} files scanned, ${report.total_violations} baseline-frozen violation(s), ${report.exemption_count} exemption(s))`
-    );
-    return;
+    return `[check:i18n] OK (${report.checked_files} files scanned, ${report.total_violations} baseline-frozen violation(s), ${report.exemption_count} exemption(s))`;
   }
 
-  console.error('[check:i18n] violations detected:');
-  for (const violation of report.violations) {
-    console.error(`- ${violation}`);
-  }
+  const lines = ['violations detected:', ...report.violations.map((violation) => `- ${violation}`)];
   if (report.stale_entries.length > 0) {
-    console.error('[check:i18n] baseline is stale, run --update-baseline:');
-    for (const entry of report.stale_entries) {
-      console.error(`- ${entry}`);
-    }
+    lines.push(
+      '[check:i18n] baseline is stale, run --update-baseline:',
+      ...report.stale_entries.map((entry) => `- ${entry}`)
+    );
   }
+  return lines.join('\n');
 }
 
 export const runCheckI18nHardcoding = defineScript({
@@ -374,12 +345,15 @@ export const runCheckI18nHardcoding = defineScript({
     if (asJson) {
       context.print(report);
     } else {
-      printHumanReport(report);
+      const output = formatHumanReport(report);
+      if (report.status === 'fail') throw new ScriptExitError(1, output);
+      context.print(output);
     }
 
     if (report.status === 'fail') {
-      process.exitCode = 1;
+      throw new ScriptExitError(1);
     }
+    return report;
   },
 });
 

@@ -19,18 +19,25 @@
  *   4. re-validate the result, write pipelines/<slug>.json, and append a
  *      catalog row to pipelines/README.md ("Promoted" section)
  */
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  logger,
-  pathResolver,
-  getReasoningBackend,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeWriteFile,
-  slugify,
-  tryRepairJson,
+} from '@agent/core/secure-io';
+import { isRecord, nowIso, parseSafeJsonInput, slugify } from '@agent/core/foundation';
+import { tryRepairJson } from '@agent/core/json-repair';
+import {
+  loadPipelineAdfAtPath,
   validatePipelineAdf,
-  validatePipelineGuardrails,
-} from '@agent/core';
+  type PipelineAdf,
+  type PipelineAdfStep,
+} from '@agent/core/pipeline-contract';
+import { validatePipelineGuardrails } from '@agent/core/adf-guardrails';
 import { withExecutionContext } from '@agent/core/governance';
 import * as nodePath from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -43,9 +50,65 @@ interface PromotionAdvice {
   rationale?: string;
 }
 
+type PromotablePipeline = PipelineAdf & {
+  promotion?: Record<string, unknown>;
+};
+
+type PromotableStep = PipelineAdfStep & { _semantic?: boolean };
+
+export function normalizePromotionAdvice(value: unknown): PromotionAdvice | null {
+  if (!isRecord(value)) return null;
+  const placeholders = Array.isArray(value.placeholders)
+    ? value.placeholders.flatMap((entry): PromotionAdvice['placeholders'] => {
+        if (!isRecord(entry)) return [];
+        if (
+          typeof entry.step_index !== 'number' ||
+          !Number.isSafeInteger(entry.step_index) ||
+          entry.step_index < 0 ||
+          typeof entry.param_path !== 'string' ||
+          !entry.param_path.trim() ||
+          typeof entry.placeholder !== 'string' ||
+          !entry.placeholder.trim()
+        ) {
+          return [];
+        }
+        return [
+          {
+            step_index: entry.step_index,
+            param_path: entry.param_path.trim(),
+            placeholder: entry.placeholder.trim(),
+          },
+        ];
+      })
+    : undefined;
+  const semanticStepIndices = Array.isArray(value.semantic_step_indices)
+    ? value.semantic_step_indices.filter(
+        (entry): entry is number =>
+          typeof entry === 'number' && Number.isSafeInteger(entry) && entry >= 0
+      )
+    : undefined;
+  return {
+    ...(typeof value.name === 'string' ? { name: value.name } : {}),
+    ...(typeof value.description === 'string' ? { description: value.description } : {}),
+    ...(placeholders ? { placeholders } : {}),
+    ...(semanticStepIndices ? { semantic_step_indices: semanticStepIndices } : {}),
+    ...(typeof value.rationale === 'string' ? { rationale: value.rationale } : {}),
+  };
+}
+
 function getFlag(argv: string[], flag: string): string | undefined {
   const index = argv.indexOf(flag);
   return index >= 0 ? argv[index + 1] : undefined;
+}
+
+export function resolvePromotionInputPath(inputPath: string): string {
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(inputPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
+    throw new Error(`[promote] source ADF must be an existing regular file: ${inputPath}`);
+  }
+  return resolved;
 }
 
 /** Set a dotted path (e.g. "url" or "args.0") inside a params object. */
@@ -64,7 +127,7 @@ function setParamPath(params: Record<string, unknown>, paramPath: string, value:
   return true;
 }
 
-async function requestPromotionAdvice(pipeline: any): Promise<PromotionAdvice | null> {
+async function requestPromotionAdvice(pipeline: PipelineAdf): Promise<PromotionAdvice | null> {
   const backend = getReasoningBackend();
   if (backend.name === 'stub') {
     logger.warn('[promote] reasoning backend is stub — skipping advisory pass (verbatim copy).');
@@ -87,16 +150,21 @@ async function requestPromotionAdvice(pipeline: any): Promise<PromotionAdvice | 
   try {
     const raw = String(await backend.prompt(prompt));
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
-    let parsed: any;
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'pipeline promotion advice');
     } catch {
-      parsed = tryRepairJson(jsonText);
+      const repaired = tryRepairJson(jsonText);
+      parsed =
+        repaired === null
+          ? null
+          : parseSafeJsonInput(JSON.stringify(repaired), 'pipeline promotion advice');
     }
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed as PromotionAdvice;
-  } catch (err: any) {
-    logger.warn(`[promote] advisory pass failed (promoting verbatim): ${err?.message || err}`);
+    return normalizePromotionAdvice(parsed);
+  } catch (err: unknown) {
+    logger.warn(
+      `[promote] advisory pass failed (promoting verbatim): ${err instanceof Error ? err.message : String(err)}`
+    );
     return null;
   }
 }
@@ -166,15 +234,9 @@ async function main(args: string[] = []): Promise<void> {
   const force = argv.includes('--force');
   const traceId = getFlag(argv, '--trace');
 
-  const resolvedInput = pathResolver.rootResolve(inputPath);
-  if (!safeExistsSync(resolvedInput)) {
-    fail(`[promote] source ADF not found: ${resolvedInput}`);
-  }
-  const raw = String(safeReadFile(resolvedInput, { encoding: 'utf8' }));
-  const source = JSON.parse(raw);
-
+  const resolvedInput = resolvePromotionInputPath(inputPath);
   // 1. Preflight the source exactly like run_pipeline would.
-  const pipeline: any = validatePipelineAdf(source);
+  const pipeline: PromotablePipeline = { ...loadPipelineAdfAtPath(resolvedInput) };
   const sourceGuardrails = validatePipelineGuardrails(pipeline, inputPath);
   if (!sourceGuardrails.ok) {
     fail(
@@ -189,7 +251,7 @@ async function main(args: string[] = []): Promise<void> {
   const appliedPlaceholders: string[] = [];
   if (advice?.placeholders) {
     for (const entry of advice.placeholders) {
-      const step = pipeline.steps?.[entry.step_index];
+      const step = pipeline.steps[entry.step_index];
       if (!step || typeof step !== 'object') continue;
       const placeholder = `{{${String(entry.placeholder).replace(/[^\w.]/g, '_')}}}`;
       if (setParamPath(step.params ?? {}, entry.param_path, placeholder)) {
@@ -203,7 +265,7 @@ async function main(args: string[] = []): Promise<void> {
     for (const index of advice.semantic_step_indices) {
       const step = pipeline.steps?.[index];
       if (step && typeof step === 'object') {
-        step._semantic = true; // marker: this step needs fresh model judgment — do not hand-freeze its params
+        (step as PromotableStep)._semantic = true; // marker: this step needs fresh model judgment — do not hand-freeze its params
       }
     }
   }
@@ -221,7 +283,7 @@ async function main(args: string[] = []): Promise<void> {
   pipeline.description = description;
   pipeline.promotion = {
     promoted_from: inputPath,
-    promoted_at: new Date().toISOString(),
+    promoted_at: nowIso(),
     ...(traceId ? { trace_id: traceId } : {}),
     ...(advice?.rationale ? { rationale: String(advice.rationale).slice(0, 500) } : {}),
     ...(advice
@@ -235,7 +297,9 @@ async function main(args: string[] = []): Promise<void> {
   if (!promotedGuardrails.ok) {
     fail('[promote] transformed pipeline fails guardrails — aborting (source untouched).');
   }
-  const targetPath = pathResolver.rootResolve(`pipelines/${slug}.json`);
+  const targetPath = assertSafeRepositoryPath(pathResolver.rootResolve(`pipelines/${slug}.json`), {
+    allowMissingLeaf: true,
+  });
   if (safeExistsSync(targetPath) && !force) {
     fail(`[promote] pipelines/${slug}.json already exists — use --force to overwrite.`);
   }

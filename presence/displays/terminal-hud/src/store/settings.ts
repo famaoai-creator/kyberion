@@ -1,4 +1,6 @@
-import { getInstalledReasoningMode, resolveActiveProfileRoot, pathResolver } from '@agent/core';
+import { getInstalledReasoningMode } from '@agent/core/reasoning-bootstrap';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { pathResolver } from '@agent/core/path-resolver';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { I18n } from '../i18n.js';

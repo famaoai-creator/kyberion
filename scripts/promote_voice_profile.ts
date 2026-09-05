@@ -1,8 +1,9 @@
-import { createStandardYargs, promoteVoiceProfileFromReceipt } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { promoteVoiceProfileFromReceipt } from '@agent/core/voice-profile-promotion';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function main() {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []) {
+  const argv = await createStandardYargs(['node', 'promote_voice_profile', ...args])
     .option('receipt', { type: 'string', demandOption: true })
     .option('approved-by', { type: 'string', demandOption: true })
     .option('target-status', {
@@ -19,15 +20,16 @@ async function main() {
     targetStatus: argv['target-status'] as 'active' | 'shadow',
     setAsDefault: Boolean(argv['set-default']),
   });
-
-  console.log(JSON.stringify(result, null, 2));
+  return result;
 }
 
 export const runPromoteVoiceProfile = defineScript({
   name: 'voice:promote-profile',
   flags: [],
-  run() {
-    return main();
+  run: async ({ argv, print }) => {
+    const result = await main(argv);
+    print(result);
+    return result;
   },
 });
 

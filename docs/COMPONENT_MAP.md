@@ -161,7 +161,7 @@ If temporary artifacts are needed, prefer governed runtime storage under `active
 
 This path tells users what is available and lets them run an actuator.
 
-Runtime/package hygiene for this layer is enforced by `pnpm run check:esm`.
+Runtime/package hygiene for this layer is enforced by `pnpm run check -- --scope pr --only esm`.
 
 ### 4. Channel ingress and interactive control
 

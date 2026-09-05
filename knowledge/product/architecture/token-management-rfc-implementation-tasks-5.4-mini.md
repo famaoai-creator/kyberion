@@ -124,7 +124,7 @@ The thresholds and allowed shapes must live in the JSON policy, not as unexplain
 
 ```bash
 pnpm exec vitest run libs/core/reasoning-level-policy.test.ts libs/core/intent-contract.test.ts
-pnpm run check:contract-schemas
+pnpm run check -- --scope full --only contract-schemas
 pnpm check -- --only governance-rules
 pnpm build
 ```
@@ -239,7 +239,7 @@ Map reasoning levels to approved model IDs for measurement, but do not dispatch 
 
 ```bash
 pnpm exec vitest run libs/core/reasoning-model-routing.test.ts libs/core/intent-contract.test.ts
-pnpm run check:contract-schemas
+pnpm run check -- --scope full --only contract-schemas
 pnpm check -- --only governance-rules
 pnpm build
 ```
@@ -316,7 +316,7 @@ All read conditions must be true, plus:
 
 ```bash
 pnpm exec vitest run libs/core/intent-flow-cache.test.ts libs/core/intent-contract.test.ts
-pnpm run check:contract-schemas
+pnpm run check -- --scope full --only contract-schemas
 pnpm check -- --only governance-rules
 pnpm build
 ```

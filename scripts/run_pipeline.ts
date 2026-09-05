@@ -1,6 +1,4 @@
-import { logger } from '@agent/core';
-
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 import { recordFallbackOutcome } from './pipeline-execution-part-bootstrap.js';
 import { finalizePipelineTrace } from './pipeline-execution-part-bootstrap.js';
@@ -38,14 +36,34 @@ export {
   executePipelineFile,
   main,
 };
+
+/** Stable names for frequently used repository pipelines. */
+export const PIPELINE_PRESETS: Readonly<Record<string, string>> = Object.freeze({
+  'vital-check': 'pipelines/vital-check.json',
+  'system-diagnostics': 'pipelines/system-diagnostics.json',
+  'voice-health-check': 'pipelines/voice-health-check.json',
+  'speak-with-my-voice': 'knowledge/product/pipeline-templates/speak-with-my-voice.json',
+  'create-my-avatar': 'knowledge/product/pipeline-templates/create-my-avatar.json',
+  'clone-my-voice': 'knowledge/product/pipeline-templates/clone-my-voice.json',
+});
+
+/** Expand a governed preset without changing the existing --input contract. */
+export function resolvePipelinePresetArgs(args: readonly string[]): string[] {
+  const first = args[0];
+  const input = first ? PIPELINE_PRESETS[first] : undefined;
+  if (!input || first.startsWith('-')) return [...args];
+  return ['--input', input, ...args.slice(1)];
+}
+
 import { main as runPipelineMain } from './pipeline-execution-part-results.js';
 
 const isDirectRun =
   isDirectScript(import.meta.url, 'run_pipeline.ts') ||
   isDirectScript(import.meta.url, 'run_pipeline.js');
 if (isDirectRun) {
-  runPipelineMain().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void defineScript({
+    name: 'pipeline',
+    flags: [],
+    run: ({ argv, print }) => runPipelineMain(resolvePipelinePresetArgs(argv), print),
+  })();
 }

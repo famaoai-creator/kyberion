@@ -1,4 +1,6 @@
 import { a2aBridge } from './a2a-bridge.js';
+import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { readHintsByCategory } from './src/feedback-loop.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { resolveQuestionInteractionPacket } from './question-resolver.js';
@@ -9,7 +11,7 @@ import { evaluateMissionGate, writeMissionGateRecord } from './mission-gate-engi
 import { logger } from './core.js';
 import { type DynamicInjectionProvider } from './dynamic-injection.js';
 import { buildExecutionEnv } from './authority.js';
-import { missionDir, missionEvidenceDir } from './path-resolver.js';
+import { findMissionPath, missionDir, missionEvidenceDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { appendPromptVisibilityRecord } from './prompt-visibility-ledger.js';
@@ -20,7 +22,7 @@ import {
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
-import { safeExec, safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExec, safeExistsSync, safeReadFile } from './secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { createMissionProgressController } from './mission-orchestration-progress.js';
 import {
@@ -66,6 +68,20 @@ import {
   type TaskResultBlock,
 } from './mission-orchestration-worker-contracts.js';
 
+export function resolvedMissionDir(
+  missionId: string,
+  fallbackTier: 'personal' | 'confidential' | 'public' = 'public',
+  tenantSlug?: string
+): string {
+  const explicitTenant = tenantSlug?.trim();
+  return assertSafeRepositoryPath(
+    explicitTenant
+      ? missionDir(missionId, fallbackTier, explicitTenant)
+      : findMissionPath(missionId) || missionDir(missionId, fallbackTier),
+    { allowMissingLeaf: true }
+  );
+}
+
 export let workerBackendsInstalled = false;
 export function recordMissionVisiblePrompt(input: {
   missionId: string;
@@ -78,7 +94,11 @@ export function recordMissionVisiblePrompt(input: {
 }): void {
   const tier = input.securityScope?.write_tier || 'public';
   appendPromptVisibilityRecord({
-    missionPath: missionDir(input.missionId, tier),
+    missionPath: resolvedMissionDir(
+      input.missionId,
+      tier,
+      input.securityScope?.tenant_slug || input.securityScope?.tenant_id
+    ),
     missionId: input.missionId,
     source: 'mission-orchestration-worker',
     form: input.form,
@@ -97,7 +117,7 @@ export function buildReviewDiffLines(missionId: string, task: PlannedNextTask): 
   const target = resolveReviewTargetForTask(task);
   if (!target) return [];
   const diffPath = path.join(
-    missionDir(missionId, 'public'),
+    resolvedMissionDir(missionId),
     'evidence',
     'prs',
     target,
@@ -176,7 +196,7 @@ export function recordWorkerIntentDriftObservation(missionId: string, stage: str
     writeMissionGateRecord({
       missionId,
       gateId: 'INTENT_DRIFT',
-      evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+      evidenceDir: `${resolvedMissionDir(missionId)}/gates`,
       payload: {
         phase: stage,
         position: 'execution',
@@ -471,6 +491,30 @@ export async function maybeCompactDispatchSections(input: {
   force?: boolean;
   reason?: CompactionReason;
 }): Promise<{ upstreamResultLines: string[]; teamSnapshotLines: string[] }> {
+  const summaryProvider = getReasoningBackend().name;
+  const summaryReasoningScope = input.securityScope
+    ? {
+        tier: input.securityScope.write_tier,
+        ...(input.securityScope.tenant_slug || input.securityScope.tenant_id
+          ? { tenant_slug: input.securityScope.tenant_slug || input.securityScope.tenant_id }
+          : {}),
+        purpose: 'mission worker context compaction summary',
+      }
+    : undefined;
+  const summaryScope = input.securityScope
+    ? {
+        tier: input.securityScope.write_tier,
+        mission_id: input.securityScope.mission_id,
+        ...(input.securityScope.tenant_slug || input.securityScope.tenant_id
+          ? { tenant_slug: input.securityScope.tenant_slug || input.securityScope.tenant_id }
+          : {}),
+        ...(input.securityScope.organization_id
+          ? { organization_id: input.securityScope.organization_id }
+          : {}),
+        ...(input.securityScope.project_id ? { project_id: input.securityScope.project_id } : {}),
+        ...(input.task.task_id ? { task_id: input.task.task_id } : {}),
+      }
+    : undefined;
   let compactor = dispatchCompactors.get(input.missionId);
   if (!compactor) {
     compactor = new WorkerContextCompactor({
@@ -522,6 +566,9 @@ export async function maybeCompactDispatchSections(input: {
     ...(evidenceDir ? { summaryDir: path.join(evidenceDir, 'compaction') } : {}),
     ...(input.force ? { force: true } : {}),
     ...(input.reason ? { reason: input.reason } : {}),
+    ...(summaryScope ? { scope: summaryScope } : {}),
+    summaryProvider,
+    ...(summaryReasoningScope ? { summaryReasoningScope } : {}),
   });
   if (!result.compacted) {
     return {
@@ -615,11 +662,11 @@ export function recordMissionContextTask(
 }
 
 export function taskResultFilePath(missionId: string, taskId: string): string {
-  return `${missionDir(missionId, 'public')}/evidence/task-result-${taskId}.json`;
+  return `${resolvedMissionDir(missionId)}/evidence/task-result-${taskId}.json`;
 }
 
 export function taskClarificationFilePath(missionId: string, taskId: string): string {
-  return `${missionDir(missionId, 'public')}/evidence/task-clarification-${taskId}.json`;
+  return `${resolvedMissionDir(missionId)}/evidence/task-clarification-${taskId}.json`;
 }
 
 export function summarizeTaskResultObservability(input: {
@@ -729,6 +776,7 @@ export function buildAuthorityRoleProcedureInjectionProvider(
 
 export function buildTaskExecutionPrompt(input: {
   missionId: string;
+  tenantSlug?: string;
   task: PlannedNextTask;
   teamRole: string;
   agentId: string;
@@ -761,7 +809,7 @@ export function buildTaskExecutionPrompt(input: {
     // deliverable ('evidence/…') used to land at the repo root. Anchor all
     // artifact IO to the mission directory; the acceptance gate resolves
     // reported artifact paths against this same root.
-    `Artifact root: ${missionDir(input.missionId, 'public')}`,
+    `Artifact root: ${resolvedMissionDir(input.missionId, 'public', input.tenantSlug)}`,
     'Write every artifact under the artifact root; deliverable and target paths are relative to it. Report artifact paths relative to the artifact root. Never write to the repository root or outside the mission directory.',
     '',
     ...input.missionGoalLines,
@@ -943,7 +991,7 @@ export function buildTaskClarificationPacket(input: {
         required_input: need,
         impact: 'The work item remains blocked until the missing input is available.',
       })),
-      maxQuestions: Math.min(3, Math.max(1, needs.length)),
+      maxQuestions: clamp(needs.length, 1, 3),
     },
     `Clarification needed for task ${input.task.task_id}`,
     'The task result still has unresolved needs_input and cannot be marked complete yet.'
@@ -960,7 +1008,7 @@ export async function evaluateTaskAcceptanceGate(input: {
   taskResult?: TaskResultBlock;
   targetPath?: string;
 }): Promise<{ passed: boolean; reasons: string[]; recordPath?: string }> {
-  const missionPath = missionDir(input.missionId, 'public');
+  const missionPath = resolvedMissionDir(input.missionId);
   const evidencePaths = [
     ...(input.task.target_path ? [input.task.target_path] : []),
     ...(input.targetPath ? [input.targetPath] : []),
@@ -1028,7 +1076,7 @@ export async function evaluateTaskAcceptanceGate(input: {
         },
       ],
     },
-    evidenceDir: `${missionDir(input.missionId, 'public')}/gates`,
+    evidenceDir: `${missionPath}/gates`,
   });
 
   return {
@@ -1100,7 +1148,7 @@ export async function requestIndependentAcceptanceReview(input: {
         sender: 'kyberion:mission-orchestrator',
         receiver: reviewerAgentId,
         performative: 'request',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       payload: {
         intent: 'mission_task_execution',

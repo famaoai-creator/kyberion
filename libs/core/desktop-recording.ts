@@ -1,16 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
-import * as addFormatsModule from 'ajv-formats';
 import type { FocusedInputState } from './apple-event-bridge.js';
 import type { OsAutomationBridge } from './os-automation-bridge.js';
 import type { MacOSAutomationProbe } from './macos-automation-bridge.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { redactSensitiveString } from './network.js';
 import { scrubContent } from './pii-scrubber.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 let desktopRecordingValidator: ValidateFunction | null = null;
 
 export type DesktopObservationTier = 0 | 1 | 3;
@@ -138,10 +138,7 @@ export interface DesktopRecordingValidationResult {
 
 function getDesktopRecordingValidator(): ValidateFunction {
   if (!desktopRecordingValidator) {
-    const ajv = createAjv();
-    addFormats(ajv);
-    desktopRecordingValidator = compileSchemaFromPath(
-      ajv,
+    desktopRecordingValidator = compileSchema(
       pathResolver.knowledge('product/schemas/desktop-recording.schema.json')
     );
   }
@@ -265,6 +262,26 @@ export function validateDesktopRecording(input: unknown): DesktopRecordingValida
   return errors.length > 0
     ? { valid: false, errors }
     : { valid: true, errors: [], value: recording };
+}
+
+/** Load one persisted desktop recording through its regular-file and contract boundary. */
+export function loadDesktopRecordingAtPath(filePath: string): DesktopRecording {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[DESKTOP_RECORDING] recording must be a regular file: ${filePath}`);
+  }
+  const recording = defineCatalog<DesktopRecording>({
+    id: 'desktop-recording',
+    path: safeFilePath,
+    schema: pathResolver.knowledge('product/schemas/desktop-recording.schema.json'),
+  }).load();
+  const validation = validateDesktopRecording(recording);
+  if (!validation.value) {
+    throw new Error(
+      `[DESKTOP_RECORDING] invalid recording at ${filePath}: ${validation.errors.join('; ')}`
+    );
+  }
+  return validation.value;
 }
 
 export interface DesktopObservationSnapshot {
@@ -531,7 +548,7 @@ export function buildDesktopRecording(
     ...body,
     recording_id: options.recordingId || `DR-${randomUUID()}`,
     source: 'desktop-capture',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     // A recording is a human demonstration artifact even when every observed
     // step is read-only. Promotion and execution must still pass review.
     risk_summary: { requires_manual_review: true, approval_required_count: highRisk },
@@ -551,7 +568,7 @@ export function reviewDesktopRecording(
     ...recording,
     review: {
       status: decision,
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: nowIso(),
       reviewer,
       ...(note ? { note } : {}),
     },
@@ -661,7 +678,7 @@ export class DesktopDemonstrationRecorder {
   private lastBrowserHost = '';
 
   constructor(private readonly options: DesktopRecorderOptions) {
-    this.now = options.now || (() => new Date().toISOString());
+    this.now = options.now || nowIso;
     this.baseIntervalMs = options.baseIntervalMs || 1000;
     this.browserIntervalMs = options.browserIntervalMs || 1500;
     this.heartbeatMs = options.heartbeatMs || 5000;

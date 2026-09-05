@@ -1,8 +1,6 @@
-import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { compileSchema } from './foundation/ajv.js';
-import { loadJson, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { DEFAULT_SPECIALIST_ID } from './specialist-ids.js';
 import { listDistillCandidateRecords } from './distill-candidate-registry.js';
 import { loadStandardIntentCatalog, type StandardIntentDefinition } from './intent-resolution.js';
@@ -15,7 +13,7 @@ import {
   type WorkflowExecutionShape,
 } from './execution-shape.js';
 import { resolveWorkScopeDecision, type WorkScopeDecision } from './work-scope-decision.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 
 const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
 const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge(
@@ -23,6 +21,21 @@ const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge(
 );
 const DEFAULT_SPECIALIST_CATALOG_DIR = pathResolver.knowledge('product/orchestration/specialists');
 const OUTCOME_CATALOG_PATH = pathResolver.knowledge('product/governance/outcome-catalog.json');
+const SPECIALIST_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/specialist-catalog.schema.json'
+);
+const EXECUTION_BOUNDARY_PROFILES_PATH = pathResolver.knowledge(
+  'product/governance/execution-boundary-profiles.json'
+);
+const EXECUTION_BOUNDARY_PROFILES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/execution-boundary-profiles.schema.json'
+);
+const RUNTIME_DESIGN_PROFILES_PATH = pathResolver.knowledge(
+  'product/governance/runtime-design-profiles.json'
+);
+const RUNTIME_DESIGN_PROFILES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/runtime-design-profiles.schema.json'
+);
 
 export interface OutcomeDefinition {
   id: string;
@@ -119,13 +132,25 @@ interface WorkPolicyFile {
   design_rules: WorkDesignRulesFile;
 }
 
-let workPolicyValidateFn: ValidateFunction | null = null;
+const workPolicyCatalog = defineCatalog<WorkPolicyFile>({
+  id: 'work-policy',
+  path: () => pathResolver.knowledge('product/governance/work-policy.json'),
+  schema: WORK_POLICY_SCHEMA_PATH,
+});
 
-function ensureWorkPolicyValidator(): ValidateFunction {
-  if (workPolicyValidateFn) return workPolicyValidateFn;
-  workPolicyValidateFn = compileSchema(WORK_POLICY_SCHEMA_PATH);
-  return workPolicyValidateFn;
-}
+const specialistCatalogCache = new Map<string, GovernedCatalog<SpecialistCatalogFile>>();
+
+const executionBoundaryProfilesCatalog = defineCatalog<BoundaryProfileFile>({
+  id: 'execution-boundary-profiles',
+  path: EXECUTION_BOUNDARY_PROFILES_PATH,
+  schema: EXECUTION_BOUNDARY_PROFILES_SCHEMA_PATH,
+});
+
+const runtimeDesignProfilesCatalog = defineCatalog<RuntimeDesignProfileFile>({
+  id: 'runtime-design-profiles',
+  path: RUNTIME_DESIGN_PROFILES_PATH,
+  schema: RUNTIME_DESIGN_PROFILES_SCHEMA_PATH,
+});
 
 export interface WorkDesignSummary {
   primary_specialist: SpecialistDefinition | null;
@@ -257,11 +282,22 @@ function normalizeKnowledgeTier(value?: string): 'personal' | 'confidential' | '
 }
 
 function loadSpecialistCatalogFromPath(filePath: string): SpecialistCatalogFile {
-  return loadJson<SpecialistCatalogFile>(filePath);
+  const safePath = assertSafeRepositoryPath(filePath);
+  const cached = specialistCatalogCache.get(safePath);
+  if (cached) return cached.load();
+  const catalog = defineCatalog<SpecialistCatalogFile>({
+    id: 'specialist-catalog',
+    path: safePath,
+    schema: SPECIALIST_CATALOG_SCHEMA_PATH,
+  });
+  specialistCatalogCache.set(safePath, catalog);
+  return catalog.load();
 }
 
 function loadSpecialistCatalogDirectory(dirPath: string): SpecialistCatalogFile {
-  const dir = pathResolver.rootResolve(dirPath);
+  const dir = assertSafeRepositoryPath(pathResolver.rootResolve(dirPath), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(dir)) {
     throw new Error(`Specialist catalog directory not found: ${dir}`);
   }
@@ -277,7 +313,7 @@ function loadSpecialistCatalogDirectory(dirPath: string): SpecialistCatalogFile 
   let version = '';
 
   for (const file of files) {
-    const filePath = pathResolver.rootResolve(path.join(dir, file));
+    const filePath = assertSafeRepositoryPath(path.join(dir, file));
     if (!safeStat(filePath).isFile()) continue;
     const parsed = loadSpecialistCatalogFromPath(filePath);
     const entries = parsed.specialists || {};
@@ -316,8 +352,11 @@ const outcomeCatalog = defineCatalog<OutcomeCatalogFile>({
 });
 
 export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
-  const parsed = safeExistsSync(pathResolver.rootResolve(DEFAULT_SPECIALIST_CATALOG_DIR))
-    ? loadSpecialistCatalogDirectory(DEFAULT_SPECIALIST_CATALOG_DIR)
+  const directoryPath = assertSafeRepositoryPath(DEFAULT_SPECIALIST_CATALOG_DIR, {
+    allowMissingLeaf: true,
+  });
+  const parsed = safeExistsSync(directoryPath)
+    ? loadSpecialistCatalogDirectory(directoryPath)
     : loadSpecialistCatalogFromPath(DEFAULT_SPECIALIST_CATALOG_PATH);
   const entries = parsed.specialists || {};
   return Object.fromEntries(Object.entries(entries).map(([id, value]) => [id, { id, ...value }]));
@@ -327,9 +366,7 @@ function loadExecutionBoundaryProfiles(): Record<
   string,
   OrganizationWorkLoopSummary['execution_boundary']
 > {
-  const parsed = loadJson<BoundaryProfileFile>(
-    pathResolver.knowledge('product/governance/execution-boundary-profiles.json')
-  );
+  const parsed = executionBoundaryProfilesCatalog.load();
   return parsed.profiles || {};
 }
 
@@ -337,24 +374,12 @@ function loadRuntimeDesignProfiles(): Record<
   string,
   OrganizationWorkLoopSummary['runtime_design']
 > {
-  const parsed = loadJson<RuntimeDesignProfileFile>(
-    pathResolver.knowledge('product/governance/runtime-design-profiles.json')
-  );
+  const parsed = runtimeDesignProfilesCatalog.load();
   return parsed.profiles || {};
 }
 
 function loadWorkPolicy(): WorkPolicyFile {
-  const value = loadJson<WorkPolicyFile>(
-    pathResolver.knowledge('product/governance/work-policy.json')
-  );
-  const validate = ensureWorkPolicyValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid work-policy: ${errors}`);
-  }
-  return value;
+  return workPolicyCatalog.load();
 }
 
 function loadSpecialistRoutingPolicy(): SpecialistRoutingPolicyFile {

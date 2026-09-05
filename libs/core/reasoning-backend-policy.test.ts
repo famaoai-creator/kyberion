@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode,
+  resolveReasoningBackendSelectionFromContext,
   resolveReasoningBackendModeFromContext,
   resolveScopedBackendPolicy,
 } from './reasoning-backend-policy.js';
@@ -16,6 +19,7 @@ describe('reasoning-backend-policy', () => {
     expect(policy.allowed_modes).toContain('openrouter');
     expect(policy.allowed_modes).toContain('nemotron-api');
     expect(policy.allowed_modes).toContain('copilot');
+    expect(policy.allowed_modes).toContain('cursor-cli');
     expect(policy.allowed_modes).toContain('grok-cli');
     expect(policy.allowed_modes).toContain('grok-api');
     expect(policy.mode_aliases['gemini-api']).toBeUndefined();
@@ -25,6 +29,7 @@ describe('reasoning-backend-policy', () => {
     expect(policy.mode_aliases.xai).toBe('grok-api');
     expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('grok-cli');
     expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('claude-cli');
+    expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('cursor-cli');
     expect(policy.openrouter).toEqual({
       default_profile: 'free-router',
       default_cost_policy: 'free-only',
@@ -235,6 +240,37 @@ describe('reasoning-backend-policy', () => {
     ).toBe('copilot');
   });
 
+  it('returns safe provenance for each selection source without exposing env values', () => {
+    const policy = loadReasoningBackendPolicy();
+    const selection = resolveReasoningBackendSelectionFromContext({
+      policy,
+      env: { ANTHROPIC_API_KEY: 'secret-value' },
+      providers: [],
+    });
+    expect(selection.mode).toBe('anthropic');
+    expect(selection.reason).toContain('env=ANTHROPIC_API_KEY');
+    expect(selection.reason).not.toContain('secret-value');
+
+    const scoped = resolveReasoningBackendSelectionFromContext({
+      policy: {
+        ...policy,
+        default_mode: 'stub',
+        project_overrides: { project_a: { default_mode: 'stub' } },
+      },
+      env: {},
+      providers: [],
+      scope: {
+        tier: 'confidential',
+        tenant_slug: 'tenant_a',
+        project_id: 'project_a',
+      },
+    });
+    expect(scoped).toEqual({
+      mode: 'stub',
+      reason: 'policy default_mode=stub; scope overlays=project',
+    });
+  });
+
   it('prefers the in-session claude-agent when inside a Claude Code harness (CLAUDECODE)', () => {
     const policy = loadReasoningBackendPolicy();
 
@@ -267,5 +303,15 @@ describe('reasoning-backend-policy', () => {
     expect(resolveReasoningBackendModeFromContext({ policy, env: {}, providers: [] })).toBe(
       'claude-cli'
     );
+  });
+
+  it('routes runtime environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/reasoning-backend-policy.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 });

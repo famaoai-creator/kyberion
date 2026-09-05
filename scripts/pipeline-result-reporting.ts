@@ -1,10 +1,6 @@
-import {
-  buildNextActionFromError,
-  classifyError,
-  formatClassification,
-  formatNextAction,
-  logger,
-} from '@agent/core';
+import { logger } from '@agent/core/core';
+import { classifyError, formatClassification } from '@agent/core/error-classifier';
+import { buildNextActionFromError, formatNextAction } from '@agent/core/next-action';
 
 /** The normalized failure summary shared by CLI and library pipeline callers. */
 export type PipelineFailure = {

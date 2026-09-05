@@ -1,53 +1,116 @@
 /** WebAuthn virtual passkey runtime isolated from browser pipeline orchestration. */
 
-import { loadJson, logger, safeExistsSync, pathResolver } from '@agent/core';
+import { defineCatalog, isRecord, nowIso } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { type CDPSession, type Page } from '@playwright/test';
 import type { BrowserRuntime } from './browser-pipeline-helpers.js';
 
-function getPasskeyPreset(provider?: string) {
+export interface PasskeyProviderPreset {
+  baseUrl: string;
+  usernameSelector: string;
+  registerSelector: string;
+  authenticateSelector: string;
+  postAuthUrlIncludes?: string;
+}
+
+export interface PasskeyProviderCatalog {
+  default_provider?: string;
+  providers: Record<string, PasskeyProviderPreset>;
+}
+
+const PASSKEY_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
+  'product/orchestration/browser-passkey-providers.json'
+);
+const PASSKEY_PROVIDER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-passkey-providers.schema.json'
+);
+
+function isSafeProviderKey(key: string): boolean {
+  return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/** Validate provider catalog data before selectors or URLs reach Playwright. */
+export function parsePasskeyProviderCatalog(value: unknown): PasskeyProviderCatalog | undefined {
+  if (!isRecord(value) || !isRecord(value.providers)) return undefined;
+  const defaultProvider = isNonEmptyString(value.default_provider)
+    ? value.default_provider
+    : undefined;
+  if (value.default_provider !== undefined && !defaultProvider) {
+    return undefined;
+  }
+
+  const providers: Record<string, PasskeyProviderPreset> = {};
+  for (const [key, candidate] of Object.entries(value.providers)) {
+    if (!isSafeProviderKey(key) || !isRecord(candidate)) continue;
+    const baseUrl = isNonEmptyString(candidate.baseUrl) ? candidate.baseUrl : undefined;
+    const usernameSelector = isNonEmptyString(candidate.usernameSelector)
+      ? candidate.usernameSelector
+      : undefined;
+    const registerSelector = isNonEmptyString(candidate.registerSelector)
+      ? candidate.registerSelector
+      : undefined;
+    const authenticateSelector = isNonEmptyString(candidate.authenticateSelector)
+      ? candidate.authenticateSelector
+      : undefined;
+    const postAuthUrlIncludes =
+      candidate.postAuthUrlIncludes === undefined
+        ? undefined
+        : isNonEmptyString(candidate.postAuthUrlIncludes)
+          ? candidate.postAuthUrlIncludes
+          : null;
+    if (
+      !baseUrl ||
+      !usernameSelector ||
+      !registerSelector ||
+      !authenticateSelector ||
+      postAuthUrlIncludes === null
+    )
+      continue;
+    providers[key] = {
+      baseUrl,
+      usernameSelector,
+      registerSelector,
+      authenticateSelector,
+      ...(postAuthUrlIncludes ? { postAuthUrlIncludes } : {}),
+    };
+  }
+  if (Object.keys(providers).length === 0) return undefined;
+  return {
+    ...(defaultProvider ? { default_provider: defaultProvider } : {}),
+    providers,
+  };
+}
+
+const passkeyProviderCatalog = defineCatalog<PasskeyProviderCatalog>({
+  id: 'browser-passkey-providers',
+  path: PASSKEY_PROVIDER_CATALOG_PATH,
+  schema: PASSKEY_PROVIDER_SCHEMA_PATH,
+});
+
+function getPasskeyPreset(provider?: string): {
+  provider: string;
+  preset: PasskeyProviderPreset;
+} {
   const catalog = loadPasskeyProviderCatalog();
-  const presetKey = provider || catalog.default_provider || 'webauthn.io';
+  const presetKey = provider || catalog.default_provider;
   const preset = catalog.providers?.[presetKey];
   if (!preset) {
     throw new Error(`Unsupported passkey provider: ${presetKey}`);
   }
-  return preset;
+  return { provider: presetKey, preset };
 }
 
-function loadPasskeyProviderCatalog(): {
-  default_provider?: string;
-  providers: Record<string, any>;
-} {
-  const passkeyProviderCatalogPath = pathResolver.knowledge(
-    'product/orchestration/browser-passkey-providers.json'
-  );
-  if (safeExistsSync(passkeyProviderCatalogPath)) {
-    try {
-      const parsed = loadJson<{
-        default_provider?: string;
-        providers: Record<string, any>;
-      }>(passkeyProviderCatalogPath);
-      if (parsed && typeof parsed === 'object' && parsed.providers) return parsed;
-    } catch (err) {
-      logger.warn(
-        `[browser-pipeline-helpers] suppressed error in loadPasskeyProviderCatalog: ${err}`
-      );
-    }
+function loadPasskeyProviderCatalog(): PasskeyProviderCatalog {
+  const parsed = parsePasskeyProviderCatalog(passkeyProviderCatalog.load());
+  if (!parsed) {
+    throw new Error('Invalid browser passkey provider catalog after normalization');
   }
-
-  return {
-    default_provider: 'webauthn.io',
-    providers: {
-      'webauthn.io': {
-        baseUrl: 'https://webauthn.io/',
-        usernameSelector: '#input-email',
-        registerSelector: '#register-button',
-        authenticateSelector: '#login-button',
-        postAuthUrlIncludes: '/profile',
-      },
-    },
-  };
+  return parsed;
 }
 
 export async function getOrCreatePageCdpSession(
@@ -71,7 +134,7 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
     runtime.webAuthn!.events.push({
       type: 'credentialAdded',
       credential: event.credential,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.webAuthn!.credentials = upsertPasskeyCredential(
       runtime.webAuthn!.credentials,
@@ -82,7 +145,7 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
     runtime.webAuthn!.events.push({
       type: 'credentialAsserted',
       credential: event.credential,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.webAuthn!.credentials = upsertPasskeyCredential(
       runtime.webAuthn!.credentials,
@@ -93,7 +156,7 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
     runtime.webAuthn!.events.push({
       type: 'credentialDeleted',
       credentialId: event.credentialId,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.webAuthn!.credentials = runtime.webAuthn!.credentials.filter(
       (credential) => credential.credentialId !== event.credentialId
@@ -103,7 +166,7 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
     runtime.webAuthn!.events.push({
       type: 'credentialUpdated',
       credential: event.credential,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.webAuthn!.credentials = upsertPasskeyCredential(
       runtime.webAuthn!.credentials,
@@ -238,7 +301,7 @@ export async function registerPasskey(
   params: any,
   resolve: Function
 ) {
-  const preset = getPasskeyPreset(resolve(params.provider));
+  const { provider, preset } = getPasskeyPreset(resolve(params.provider));
   const username = String(resolve(params.username ?? ctx.username ?? 'kyberion_passkey_user'));
   const waitMs = Number(params.wait_ms || 1500);
   if (params.navigate !== false) {
@@ -270,7 +333,7 @@ export async function registerPasskey(
   await page.waitForTimeout(waitMs);
   const credentials = await getVirtualPasskeyCredentials(runtime, page);
   return {
-    provider: resolve(params.provider || 'webauthn.io'),
+    provider,
     username,
     credentials,
     url: page.url(),
@@ -284,7 +347,7 @@ export async function authenticatePasskey(
   params: any,
   resolve: Function
 ) {
-  const preset = getPasskeyPreset(resolve(params.provider));
+  const { provider, preset } = getPasskeyPreset(resolve(params.provider));
   const waitMs = Number(params.wait_ms || 1500);
   const username = params.username !== undefined ? String(resolve(params.username)) : undefined;
   let authPage = page;
@@ -304,7 +367,7 @@ export async function authenticatePasskey(
   if (preset.postAuthUrlIncludes && authPage.url().includes(preset.postAuthUrlIncludes)) {
     const credentials = await getVirtualPasskeyCredentials(runtime, authPage);
     return {
-      provider: resolve(params.provider || 'webauthn.io'),
+      provider,
       username,
       credentials,
       url: authPage.url(),
@@ -325,7 +388,7 @@ export async function authenticatePasskey(
     if (preset.postAuthUrlIncludes && authPage.url().includes(preset.postAuthUrlIncludes)) {
       const credentials = await getVirtualPasskeyCredentials(runtime, authPage);
       return {
-        provider: resolve(params.provider || 'webauthn.io'),
+        provider,
         username,
         credentials,
         url: authPage.url(),
@@ -338,7 +401,7 @@ export async function authenticatePasskey(
   await authPage.waitForTimeout(waitMs);
   const credentials = await getVirtualPasskeyCredentials(runtime, authPage);
   return {
-    provider: resolve(params.provider || 'webauthn.io'),
+    provider,
     username,
     credentials,
     url: authPage.url(),

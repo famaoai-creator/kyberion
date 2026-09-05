@@ -10,8 +10,7 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnv as getFoundationRegisteredEnv } from './foundation/env.js';
 
 export interface EnvRegistryValidationEntry {
@@ -20,6 +19,21 @@ export interface EnvRegistryValidationEntry {
   enum?: string[];
   required: boolean;
   documented?: boolean;
+}
+
+export interface EnvRegistryEntry extends EnvRegistryValidationEntry {
+  category: 'secret' | 'path' | 'flag' | 'tuning' | 'provider' | 'runtime';
+  default?: string | null;
+  subsystem?: string;
+  description: string;
+  documented: boolean;
+}
+
+export interface EnvRegistryFile {
+  $schema?: string;
+  version: string;
+  description: string;
+  entries: EnvRegistryEntry[];
 }
 
 export interface EnvValidationIssue {
@@ -48,13 +62,22 @@ export interface EnvValidationOptions {
 }
 
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/env-registry.schema.json');
 const BOOLEAN_VALUE_RE = /^(1|0|true|false|yes|no|on|off)$/i;
 
+const envRegistryCatalog = defineCatalog<EnvRegistryFile>({
+  id: 'env-registry',
+  path: REGISTRY_PATH,
+  schema: REGISTRY_SCHEMA_PATH,
+});
+
+export function loadEnvRegistryFile(): EnvRegistryFile {
+  return envRegistryCatalog.load();
+}
+
 export function loadEnvRegistryEntries(): EnvRegistryValidationEntry[] {
-  if (!safeExistsSync(REGISTRY_PATH)) return [];
   try {
-    const parsed = readJson<{ entries?: unknown }>(REGISTRY_PATH);
-    return Array.isArray(parsed.entries) ? (parsed.entries as EnvRegistryValidationEntry[]) : [];
+    return loadEnvRegistryFile().entries;
   } catch {
     return [];
   }

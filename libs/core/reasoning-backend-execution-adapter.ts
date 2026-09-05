@@ -4,6 +4,7 @@ import type {
   AgentTaskEnvelope,
 } from './agent-execution-port.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
+import { nowIso } from './foundation/time.js';
 import {
   delegateCoordinatedAgentTask,
   type CoordinatedAgentExecutionReceipt,
@@ -18,7 +19,7 @@ export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
   ) {}
 
   async delegate(request: AgentTaskEnvelope): Promise<AgentExecutionReceipt> {
-    const startedAt = new Date().toISOString();
+    const startedAt = nowIso();
     const nativeAdopter = this.backend.getNativeSubagentAdopter?.() || undefined;
     const initialNativeInfo = nativeAdopter?.getInfo?.() || undefined;
     const initialModelId =
@@ -49,7 +50,7 @@ export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
           : {}),
         status: 'succeeded',
         started_at: startedAt,
-        completed_at: new Date().toISOString(),
+        completed_at: nowIso(),
         output_ref: `${request.task_id}:result`,
         output,
       };
@@ -68,7 +69,7 @@ export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
           : {}),
         status: 'failed',
         started_at: startedAt,
-        completed_at: new Date().toISOString(),
+        completed_at: nowIso(),
         error: error instanceof Error ? error.message : String(error),
       };
     }

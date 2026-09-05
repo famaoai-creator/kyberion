@@ -3,6 +3,8 @@ import { homedir } from 'node:os';
 import { safeExec } from './secure-io.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { clamp, isRecord } from './foundation/text.js';
 
 export interface IMessageAttachment {
   id: string;
@@ -35,6 +37,11 @@ export interface IMessageStimulus {
   tapback?: IMessageTapback;
 }
 
+export interface IMessageChat {
+  id: string;
+  [key: string]: unknown;
+}
+
 const IMESSAGE_DATABASE_PATH = path.join(homedir(), 'Library', 'Messages', 'chat.db');
 const DEFAULT_DIFFERENTIAL_LIMIT = 200;
 
@@ -49,6 +56,86 @@ const IMESSAGE_TAPBACK_TYPES: Record<number, IMessageTapbackKind> = {
   2005: 'question',
   3000: 'remove',
 };
+
+function normalizeExternalId(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return undefined;
+}
+
+export function parseIMessageChat(value: unknown): IMessageChat | undefined {
+  if (!isRecord(value)) return undefined;
+  const id = normalizeExternalId(value.id);
+  return id ? { ...value, id } : undefined;
+}
+
+export function parseIMessageHistoryEntry(
+  value: unknown,
+  fallbackChatId = ''
+): IMessageStimulus | undefined {
+  if (!isRecord(value)) return undefined;
+  const id = normalizeExternalId(value.id);
+  const date = typeof value.created_at === 'string' ? value.created_at.trim() : '';
+  const chatId = normalizeExternalId(value.chat_identifier) || fallbackChatId.trim();
+  if (!id || !date || !chatId) return undefined;
+  if (value.text !== undefined && value.text !== null && typeof value.text !== 'string') {
+    return undefined;
+  }
+  if (
+    value.chat_guid !== undefined &&
+    value.chat_guid !== null &&
+    typeof value.chat_guid !== 'string'
+  ) {
+    return undefined;
+  }
+  const isFromMe =
+    parseBooleanFlag(value.is_from_me) ??
+    (typeof value.is_from_me === 'number' && Number.isFinite(value.is_from_me)
+      ? value.is_from_me !== 0
+      : false);
+  const attachmentSource = value.attachments ?? value.attachment;
+  const attachments =
+    typeof value.attachment_summary === 'string'
+      ? value.attachment_summary
+          .split(/\r?\n/u)
+          .flatMap((entry) => normalizeIMessageAttachments(entry))
+      : normalizeIMessageAttachments(attachmentSource);
+  const tapback = normalizeIMessageTapback(
+    value.associated_message_type,
+    value.associated_message_guid
+  );
+  const rawIsGroup = value.is_group ?? value.isGroup;
+  const isGroup =
+    parseBooleanFlag(rawIsGroup) ??
+    (typeof rawIsGroup === 'number' && Number.isFinite(rawIsGroup) ? rawIsGroup !== 0 : undefined);
+  return {
+    id,
+    sender: typeof value.sender === 'string' && value.sender.trim() ? value.sender : 'unknown',
+    text: typeof value.text === 'string' ? value.text : '',
+    date,
+    isFromMe,
+    chatId,
+    chatGuid: typeof value.chat_guid === 'string' ? value.chat_guid : '',
+    ...(isGroup !== undefined ? { isGroup } : {}),
+    ...(attachments.length > 0 ? { attachments } : {}),
+    ...(tapback ? { tapback } : {}),
+  };
+}
+
+function parseJsonObjectLines(output: unknown): Record<string, unknown>[] {
+  return String(output || '')
+    .trim()
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .flatMap((line) => {
+      try {
+        const value: unknown = parseSafeJsonInput(line, 'iMessage JSONL entry');
+        return isRecord(value) ? [value] : [];
+      } catch {
+        return [];
+      }
+    });
+}
 
 /** Normalize Messages.app associated-message reactions without payload bytes. */
 export function normalizeIMessageTapback(
@@ -78,7 +165,7 @@ export function normalizeIMessageAttachments(raw: unknown): IMessageAttachment[]
     if (!trimmed) return [];
     if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
       try {
-        return normalizeIMessageAttachments(JSON.parse(trimmed));
+        return normalizeIMessageAttachments(parseSafeJsonInput(trimmed, 'iMessage attachment'));
       } catch {
         // Treat a non-JSON string as a filename below.
       }
@@ -201,11 +288,12 @@ export function shouldProcessIMessage(
 /**
  * imsg chats --json を使用して、最近のチャット一覧を取得する
  */
-export function listIMessageChats(): any[] {
+export function listIMessageChats(): IMessageChat[] {
   try {
     const output = safeExec('imsg', ['chats', '--json'], {});
-    const lines = String(output).trim().split('\n');
-    return lines.filter((l) => l.trim() !== '').map((l) => JSON.parse(l));
+    return parseJsonObjectLines(output)
+      .map(parseIMessageChat)
+      .filter((chat): chat is IMessageChat => chat !== undefined);
   } catch (err) {
     logger.error(`Failed to list iMessage chats via imsg: ${err}`);
     return [];
@@ -222,28 +310,9 @@ export function getIMessageHistory(chatId: string, limit: number = 20): IMessage
       ['history', '--chat-id', chatId, '--limit', String(limit), '--attachments', '--json'],
       {}
     );
-    const lines = String(output).trim().split('\n');
-    return lines
-      .filter((l) => l.trim() !== '')
-      .map((l) => {
-        const msg = JSON.parse(l);
-        const attachments = normalizeIMessageAttachments(msg.attachments ?? msg.attachment);
-        const tapback = normalizeIMessageTapback(
-          msg.associated_message_type,
-          msg.associated_message_guid
-        );
-        return {
-          id: String(msg.id),
-          sender: msg.sender || 'unknown',
-          text: msg.text || '',
-          date: msg.created_at,
-          isFromMe: Boolean(msg.is_from_me),
-          chatId: msg.chat_identifier || chatId,
-          chatGuid: msg.chat_guid || '',
-          ...(attachments.length > 0 ? { attachments } : {}),
-          ...(tapback ? { tapback } : {}),
-        };
-      });
+    return parseJsonObjectLines(output)
+      .map((message) => parseIMessageHistoryEntry(message, chatId))
+      .filter((message): message is IMessageStimulus => message !== undefined);
   } catch (err) {
     logger.error(`Failed to get iMessage history for chat ${chatId} via imsg: ${err}`);
     return [];
@@ -263,7 +332,7 @@ export function buildIMessageDifferentialQuery(
   limit = DEFAULT_DIFFERENTIAL_LIMIT
 ): string {
   const cursor = Math.max(0, Math.floor(Number.isFinite(lastSeenId) ? lastSeenId : 0));
-  const rowLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
+  const rowLimit = clamp(Math.floor(limit), 1, 1000);
   return `SELECT
     m.ROWID AS id,
     COALESCE(m.text, '') AS text,
@@ -301,30 +370,6 @@ export function buildIMessageDifferentialQuery(
   LIMIT ${rowLimit};`;
 }
 
-function normalizeDifferentialMessage(raw: Record<string, unknown>): IMessageStimulus {
-  const isGroup = parseBooleanFlag(raw.is_group) ?? Number(raw.is_group || 0) > 0;
-  const attachmentSummary = String(raw.attachment_summary || '').trim();
-  const attachments = attachmentSummary
-    ? attachmentSummary.split(/\r?\n/u).flatMap((value) => normalizeIMessageAttachments(value))
-    : [];
-  const tapback = normalizeIMessageTapback(
-    raw.associated_message_type,
-    raw.associated_message_guid
-  );
-  return {
-    id: String(raw.id || ''),
-    sender: String(raw.sender || 'unknown'),
-    text: String(raw.text || ''),
-    date: String(raw.created_at || ''),
-    isFromMe: Boolean(Number(raw.is_from_me || 0)),
-    chatId: String(raw.chat_identifier || ''),
-    chatGuid: String(raw.chat_guid || ''),
-    isGroup,
-    ...(attachments.length > 0 ? { attachments } : {}),
-    ...(tapback ? { tapback } : {}),
-  };
-}
-
 /** Return null when the local DB schema/permission is unavailable. */
 function getRecentIMessagesFromDatabase(
   lastSeenId: number,
@@ -334,11 +379,11 @@ function getRecentIMessagesFromDatabase(
     const output = safeExec('sqlite3', ['-json', IMESSAGE_DATABASE_PATH], {
       input: buildIMessageDifferentialQuery(lastSeenId, limit),
     });
-    const parsed = JSON.parse(String(output || '[]')) as unknown;
+    const parsed = parseSafeJsonInput(String(output || '[]'), 'iMessage database response');
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .map((row) => normalizeDifferentialMessage(row as Record<string, unknown>))
-      .filter((message) => message.id && message.chatId)
+      .map((row) => parseIMessageHistoryEntry(row, ''))
+      .filter((message): message is IMessageStimulus => message !== undefined)
       .sort((a, b) => Number(a.id) - Number(b.id));
   } catch {
     return null;
@@ -379,12 +424,13 @@ export function getRecentIMessages(
 /**
  * 以前の直接SQLクエリ方式（互換性のために残すが imsg を優先的に使う）
  */
-export function queryIMessages(sql: string): any[] {
+export function queryIMessages(sql: string): Record<string, unknown>[] {
   try {
     const output = safeExec('sqlite3', ['-json', IMESSAGE_DATABASE_PATH], { input: sql });
     const trimmed = String(output).trim();
     if (!trimmed || trimmed === '') return [];
-    return JSON.parse(trimmed);
+    const parsed: unknown = parseSafeJsonInput(trimmed, 'iMessage query response');
+    return Array.isArray(parsed) ? parsed.filter(isRecord) : [];
   } catch (err) {
     return [];
   }

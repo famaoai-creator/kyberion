@@ -13,24 +13,10 @@ import {
 } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import { formatChronosDateTime, uxText } from '../lib/ux-vocabulary';
-
-type Deliverable = {
-  artifactId: string;
-  tenantSlug?: string;
-  organizationId?: string;
-  projectId?: string;
-  missionId?: string;
-  kind: string;
-  storageClass: string;
-  path?: string;
-  externalRef?: string;
-  previewText?: string;
-  updatedAt: string;
-  sizeBytes?: number;
-  missing?: boolean;
-  reviewVerdict?: string;
-  reviewComment?: string;
-};
+import {
+  parseDeliverablesResponse,
+  type ClientDeliverable as Deliverable,
+} from '../lib/deliverables-response';
 
 function assetUrl(item: Deliverable): string | null {
   if (item.externalRef && /^https?:\/\//i.test(item.externalRef)) return item.externalRef;
@@ -115,10 +101,11 @@ export function DeliverablesWorkspace({
       if (organizationId) query.set('organization_id', organizationId);
       if (projectId) query.set('project_id', projectId);
       const response = await fetch(`/api/deliverables?${query.toString()}`, { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to load deliverables');
-      const nextItems = Array.isArray(payload.deliverables) ? payload.deliverables : [];
-      setAccessRole(payload.accessRole === 'localadmin' ? 'localadmin' : 'readonly');
+      const payload = await response.json().catch(() => null);
+      const parsed = parseDeliverablesResponse(payload);
+      if (!response.ok || !parsed) throw new Error('Invalid deliverables response');
+      const nextItems = parsed.deliverables;
+      setAccessRole(parsed.accessRole);
       setItems(nextItems);
       setSelectedId((current) =>
         nextItems.some((item: Deliverable) => item.artifactId === current)
@@ -173,8 +160,7 @@ export function DeliverablesWorkspace({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ artifactId: selected.artifactId, verdict, comment, tenant }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to review the deliverable');
+      if (!response.ok) throw new Error('Failed to review the deliverable');
       setComment('');
       await refresh();
     } catch (err) {

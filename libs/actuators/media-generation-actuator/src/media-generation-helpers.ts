@@ -1,25 +1,30 @@
+import { safeWriteFile, safeCopyFileSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
+import { executeServicePreset } from '@agent/core/service-engine';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  safeWriteFile,
-  safeCopyFileSync,
-  safeExistsSync,
-  safeMkdir,
-  executeServicePreset,
-  pathResolver,
-  buildGovernedRetryOptions,
+  createGovernedRetryOptionsBuilder,
   loadRecoveryPolicy as loadCoreRecoveryPolicy,
-  retry,
-  compileMusicGenerationADF,
+} from '@agent/core/recovery-policy';
+import { retry, sleep } from '@agent/core/async-utils';
+import { compileMusicGenerationADF } from '@agent/core/music-workflow-compiler';
+import {
   compileImageGenerationADF,
   compileVideoGenerationADF,
-  resolveMediaBackendForPlatform,
-  sleep,
+} from '@agent/core/visual-workflow-compiler';
+import { resolveMediaBackendForPlatform } from '@agent/core/media-backend-registry';
+import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
-} from '@agent/core';
-import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
+} from '@agent/core/creative-design-resolver';
+import {
+  defineCatalog,
+  getRegisteredEnvText,
+  nowIso,
+  type GovernedCatalog,
+} from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { GenerationJob } from '@agent/core';
+import type { GenerationJob } from '@agent/core/types/generation-job';
 import {
   getGenerationHistoryAdapter,
   getGenerationHistoryAdapterForAction,
@@ -73,6 +78,22 @@ const DEFAULT_MEDIA_RETRY = {
   factor: 2,
   jitter: true,
 };
+const GENERATION_JOB_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/generation-job.schema.json'
+);
+const generationJobCatalogs = new Map<string, GovernedCatalog<GenerationJob>>();
+
+function generationJobCatalogAtPath(jobPath: string): GovernedCatalog<GenerationJob> {
+  const existing = generationJobCatalogs.get(jobPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<GenerationJob>({
+    id: 'generation-job',
+    path: jobPath,
+    schema: GENERATION_JOB_SCHEMA_PATH,
+  });
+  generationJobCatalogs.set(jobPath, catalog);
+  return catalog;
+}
 
 function resolveGenerationBackend(
   action: string,
@@ -118,14 +139,11 @@ function loadRecoveryPolicy(): Record<string, any> {
   return loadCoreRecoveryPolicy(MEDIA_GENERATION_MANIFEST_PATH);
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: MEDIA_GENERATION_MANIFEST_PATH,
-    defaults: DEFAULT_MEDIA_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: MEDIA_GENERATION_MANIFEST_PATH,
+  defaults: DEFAULT_MEDIA_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 function ensureGenerationJobDir(): void {
   if (!safeExistsSync(GENERATION_JOB_DIR)) {
@@ -176,24 +194,28 @@ function writeJob(job: GenerationJob): GenerationJob {
   if (!isGenerationJob(job)) {
     throw new Error('generation job schema mismatch');
   }
+  const jobPath = generationJobPath(job.job_id);
+  const validated = generationJobCatalogAtPath(jobPath).validate(job, jobPath);
   ensureGenerationJobDir();
-  safeWriteFile(generationJobPath(job.job_id), JSON.stringify(job, null, 2));
-  return job;
+  safeWriteFile(jobPath, JSON.stringify(validated, null, 2));
+  return validated;
 }
 
 function readJob(jobId: string): GenerationJob {
   const jobPath = generationJobPath(jobId);
-  let parsed: unknown;
   try {
-    parsed = readJson<unknown>(jobPath);
+    const parsed = generationJobCatalogAtPath(jobPath).load();
+    if (!isGenerationJob(parsed)) {
+      throw new Error(`generation job schema mismatch: ${jobId}`);
+    }
+    return parsed;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith('Invalid catalog')) {
+      throw new Error(`generation job schema mismatch: ${jobId}`);
+    }
     throw new Error(`generation job JSON parse failed: ${message}`);
   }
-  if (!isGenerationJob(parsed)) {
-    throw new Error(`generation job schema mismatch: ${jobId}`);
-  }
-  return parsed;
 }
 
 function resolveArtifactPath(item: Record<string, any>): string {

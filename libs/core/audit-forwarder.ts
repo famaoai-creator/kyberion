@@ -21,9 +21,11 @@
 
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { redactSensitiveObject } from './network.js';
-import type { AuditEntry } from './audit-chain.js';
+import { registerAuditForwarderPublisher, type AuditEntry } from './audit-chain.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
 export interface AuditForwarder {
   name: string;
@@ -36,6 +38,24 @@ const auditForwarderSeam = createSeam<AuditForwarder>({
   catalog: coreSeamCatalog,
 });
 let registeredDisposer: (() => void) | null = null;
+
+export function parseAuditForwarderHeaders(raw: string | undefined): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const parsed = parseSafeJsonObjectInput(raw, 'audit forwarder headers');
+    if (!parsed) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    );
+  } catch (err: any) {
+    logger.warn(
+      `[audit-forwarder] failed to parse KYBERION_AUDIT_FORWARDER_HEADERS: ${err?.message ?? err}`
+    );
+    return {};
+  }
+}
 
 export function registerAuditForwarder(forwarder: AuditForwarder): () => void {
   registeredDisposer = auditForwarderSeam.register(forwarder.name, forwarder, {
@@ -60,6 +80,15 @@ export const stubAuditForwarder: AuditForwarder = {
     // no-op
   },
 };
+
+// Keep the audit chain independent from this optional network-facing module.
+// The callback is installed only when the forwarder module is loaded, which
+// is the same optional-loading boundary used by the bootstrap path.
+registerAuditForwarderPublisher((entry) => {
+  const forwarder = getAuditForwarder();
+  if (forwarder.name === 'stub') return;
+  return forwarder.publish(entry);
+});
 
 export class ChainAuditForwarder implements AuditForwarder {
   readonly name: string;
@@ -133,7 +162,7 @@ export class ShellAuditForwarder implements AuditForwarder {
   publish(entry: AuditEntry): void {
     const json = JSON.stringify(redactSensitiveObject(entry));
     const cmd = this.options.command.replace(/\{\{entry\}\}/gu, shellEscape(json));
-    const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
+    const shell = this.options.shell ?? getRegisteredEnvText('SHELL') ?? '/bin/sh';
     try {
       execFileSync(shell, ['-c', cmd], {
         input: `${json}\n`,
@@ -204,37 +233,28 @@ export class HttpAuditForwarder implements AuditForwarder {
  *                                        as a JSON string of headers)
  */
 export function installAuditForwarderIfAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
-  const command = env.KYBERION_AUDIT_FORWARDER_COMMAND?.trim();
-  const url = env.KYBERION_AUDIT_FORWARDER_URL?.trim();
+  const command = getRegisteredEnvText('KYBERION_AUDIT_FORWARDER_COMMAND', { env })?.trim();
+  const url = getRegisteredEnvText('KYBERION_AUDIT_FORWARDER_URL', { env })?.trim();
+  const timeoutRaw = getRegisteredEnvText('KYBERION_AUDIT_FORWARDER_TIMEOUT_MS', { env })?.trim();
+  const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
   const forwarders: AuditForwarder[] = [];
   if (command) {
     forwarders.push(
       new ShellAuditForwarder({
         command,
-        ...(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS
-          ? { timeoutMs: parseInt(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS, 10) }
-          : {}),
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       })
     );
   }
   if (url) {
-    let headers: Record<string, string> = {};
-    try {
-      if (env.KYBERION_AUDIT_FORWARDER_HEADERS) {
-        headers = JSON.parse(env.KYBERION_AUDIT_FORWARDER_HEADERS);
-      }
-    } catch (err: any) {
-      logger.warn(
-        `[audit-forwarder] failed to parse KYBERION_AUDIT_FORWARDER_HEADERS: ${err?.message ?? err}`
-      );
-    }
+    const headers = parseAuditForwarderHeaders(
+      getRegisteredEnvText('KYBERION_AUDIT_FORWARDER_HEADERS', { env })
+    );
     forwarders.push(
       new HttpAuditForwarder({
         url,
         headers,
-        ...(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS
-          ? { timeoutMs: parseInt(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS, 10) }
-          : {}),
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       })
     );
   }

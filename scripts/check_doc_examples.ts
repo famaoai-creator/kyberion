@@ -29,8 +29,9 @@
 
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
 const DOCS_DIRS = [path.join(ROOT, 'docs'), path.join(ROOT, 'README.md')];
@@ -120,8 +121,8 @@ function evaluate(block: CodeBlock): BlockResult {
   return { block, status: 'not-tagged' };
 }
 
-function printUsage(): void {
-  console.log('Usage: pnpm check -- --scope full --only doc-examples [--list]');
+function printUsage(): string {
+  return 'Usage: pnpm check -- --scope full --only doc-examples [--list]';
 }
 
 export function runDocExamplesCheck(): {
@@ -154,8 +155,8 @@ export const runCheckDocExamples = defineScript({
     const args = context.argv;
     const listMode = args.includes('--list');
     if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
-      printUsage();
-      return;
+      context.print(printUsage());
+      return { help: true };
     }
     const files = listMarkdownFiles(DOCS_DIRS);
     const allBlocks = files.flatMap(parseCodeBlocks);
@@ -164,12 +165,12 @@ export const runCheckDocExamples = defineScript({
       for (const b of allBlocks) {
         const fence = b.fence || '<empty>';
         const tagged = /(bash|sh)\s+(check|check-syntax|skip)$/i.test(fence) ? '🏷' : '  ';
-        console.log(`${tagged}  ${path.relative(ROOT, b.file)}:${b.startLine}  [${fence}]`);
+        context.print(`${tagged}  ${path.relative(ROOT, b.file)}:${b.startLine}  [${fence}]`);
       }
-      console.log(
+      context.print(
         `\nTotal: ${allBlocks.length} code blocks across ${files.length} markdown files.`
       );
-      return;
+      return { listMode, files: files.length, code_blocks: allBlocks.length };
     }
 
     const results = allBlocks.map(evaluate);
@@ -178,23 +179,32 @@ export const runCheckDocExamples = defineScript({
     const skipped = results.filter((r) => r.status === 'skipped').length;
     const notTagged = results.filter((r) => r.status === 'not-tagged').length;
 
-    console.log(`📚 Doc example check`);
-    console.log(`   Files scanned: ${files.length}`);
-    console.log(
+    context.print(`📚 Doc example check`);
+    context.print(`   Files scanned: ${files.length}`);
+    context.print(
       `   Code blocks:   ${allBlocks.length} (${notTagged} untagged, ${ok} passed, ${skipped} skipped, ${failed.length} failed)`
     );
 
     if (failed.length > 0) {
-      console.error('\nFailures:');
-      for (const f of failed) {
-        console.error(
-          `  ❌ ${path.relative(ROOT, f.block.file)}:${f.block.startLine}  [${f.block.fence}]`
-        );
-        console.error(`     ${f.detail}`);
-      }
-      throw new Error(`${failed.length} documentation example(s) failed`);
+      throw new ScriptExitError(
+        1,
+        [
+          '\nFailures:',
+          ...failed.flatMap((f) => [
+            `  ❌ ${path.relative(ROOT, f.block.file)}:${f.block.startLine}  [${f.block.fence}]`,
+            `     ${f.detail}`,
+          ]),
+        ].join('\n')
+      );
     }
     context.print('\n✅ All tagged doc examples passed.');
+    return {
+      files_scanned: files.length,
+      code_blocks: allBlocks.length,
+      passed: ok,
+      skipped,
+      untagged: notTagged,
+    };
   },
 });
 

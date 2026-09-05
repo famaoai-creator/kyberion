@@ -2,23 +2,258 @@ import * as path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  compileSchemaFromPath,
-  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { handleAction } from './index.js';
+import { extractDesignSpec, extractRequirements, extractTestPlan } from './sdlc-ops.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 const ROOT = pathResolver.rootDir();
 
 describe('modeling-actuator terraform_to_architecture_adf', () => {
+  it('rejects an external requirements source path before backend execution', async () => {
+    await expect(
+      extractRequirements({
+        mission_id: 'MSN-MODELING-PATH',
+        project_name: 'path-boundary',
+        source_path: '/tmp/external-requirements.md',
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects an external requirements draft path before backend execution', async () => {
+    await expect(
+      extractDesignSpec({
+        mission_id: 'MSN-MODELING-PATH',
+        project_name: 'path-boundary',
+        requirements_draft_path: '/tmp/external-requirements.json',
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a malformed explicit requirements draft before design extraction', async () => {
+    const draftPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/malformed-requirements-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(draftPath), { recursive: true });
+    safeWriteFile(draftPath, JSON.stringify({ version: 'v1', project_name: 'Broken' }));
+
+    try {
+      await expect(
+        extractDesignSpec({
+          mission_id: 'MSN-MODELING-MALFORMED-DRAFT',
+          project_name: 'malformed-draft',
+          requirements_draft_path: path.relative(ROOT, draftPath),
+        })
+      ).rejects.toThrow(/Invalid catalog requirements-draft/);
+    } finally {
+      safeRmSync(draftPath, { force: true });
+    }
+  });
+
+  it('rejects a malformed explicit requirements draft before test-plan extraction', async () => {
+    const draftPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/malformed-test-plan-requirements-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(draftPath), { recursive: true });
+    safeWriteFile(draftPath, JSON.stringify({ version: 'v1', project_name: 'Broken' }));
+
+    try {
+      await expect(
+        extractTestPlan({
+          mission_id: 'MSN-MODELING-MALFORMED-TEST-PLAN',
+          project_name: 'malformed-draft',
+          requirements_draft_path: path.relative(ROOT, draftPath),
+        })
+      ).rejects.toThrow(/Invalid catalog requirements-draft/);
+    } finally {
+      safeRmSync(draftPath, { force: true });
+    }
+  });
+
+  it('rejects an unsupported action instead of running an empty pipeline', async () => {
+    await expect(
+      handleAction({ action: 'invalid', steps: [] } as unknown as Parameters<
+        typeof handleAction
+      >[0])
+    ).rejects.toThrow('Unsupported action: invalid');
+  });
+
+  it('rejects a malformed persisted reconcile strategy before executing a step', async () => {
+    const strategyPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/malformed-strategy-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(strategyPath), { recursive: true });
+    safeWriteFile(
+      strategyPath,
+      JSON.stringify({ strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }] })
+    );
+
+    try {
+      const { performReconcile } = await import('./modeling-pipeline-helpers.js');
+      await expect(
+        performReconcile({
+          action: 'reconcile',
+          strategy_path: path.relative(ROOT, strategyPath),
+        })
+      ).rejects.toThrow('modeling strategy.strategies[0].pipeline[0].params must be a JSON object');
+    } finally {
+      safeRmSync(strategyPath, { force: true });
+    }
+  });
+
+  it('rejects a dangerous persisted context before merging it', async () => {
+    const contextPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/dangerous-context-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(contextPath), { recursive: true });
+    safeWriteFile(contextPath, '{"constructor":{"polluted":true}}');
+
+    try {
+      await expect(
+        handleAction({
+          action: 'pipeline',
+          context: { context_path: path.relative(ROOT, contextPath) },
+          steps: [],
+        } as Parameters<typeof handleAction>[0])
+      ).rejects.toThrow('dangerous JSON key');
+    } finally {
+      safeRmSync(contextPath, { force: true });
+    }
+  });
+
+  it('rejects a directory masquerading as persisted context', async () => {
+    const contextPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/directory-context-${process.pid}`
+    );
+    safeMkdir(contextPath, { recursive: true });
+
+    try {
+      await expect(
+        handleAction({
+          action: 'pipeline',
+          context: { context_path: path.relative(ROOT, contextPath) },
+          steps: [],
+        } as Parameters<typeof handleAction>[0])
+      ).rejects.toThrow('existing regular file');
+    } finally {
+      safeRmSync(contextPath, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects dangerous read_json input before returning persisted data', async () => {
+    const inputPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/dangerous-input-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(inputPath), { recursive: true });
+    safeWriteFile(inputPath, '{"prototype":{"polluted":true}}');
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'read_json',
+            params: { path: path.relative(ROOT, inputPath) },
+          },
+        ],
+      } as Parameters<typeof handleAction>[0]);
+      expect(result.status).toBe('failed');
+      expect(result.results[0]?.error).toContain('dangerous JSON key');
+    } finally {
+      safeRmSync(inputPath, { force: true });
+    }
+  });
+
+  it('rejects a malformed quality contract before deriving a test inventory', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        quality_contract: {
+          version: '1.0.0',
+          project_id: 'project-1',
+          accountable_human_id: 'human:owner',
+          dor: [{ check_id: 'DOR-1', description: 'Ready', status: 'passed' }],
+          acceptance_criteria: [
+            {
+              criterion_id: 'AC-1',
+              description: 'Returns 200',
+              requirement_refs: ['REQ-1'],
+              expected_result: '200',
+              status: 'passed',
+            },
+          ],
+          dod: [{ check_id: 'DOD-1', description: 'Done', status: 'passed' }],
+          unexpected: true,
+        },
+      },
+      steps: [
+        {
+          type: 'apply',
+          op: 'derive_test_inventory',
+          params: { contract_from: 'quality_contract' },
+        },
+      ],
+    });
+    expect(result.status).toBe('failed');
+    expect(result.results[0]?.error).toContain(
+      '[derive_test_inventory] quality contract is invalid'
+    );
+  });
+
+  it('validates an explicitly supplied quality contract through the canonical loader', async () => {
+    const contractPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/malformed-quality-contract-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(contractPath), { recursive: true });
+    safeWriteFile(contractPath, JSON.stringify({ version: '1.0.0', project_id: 'project-1' }));
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        context: {},
+        steps: [
+          {
+            type: 'apply',
+            op: 'derive_test_inventory',
+            params: { contract_path: path.relative(ROOT, contractPath) },
+          },
+        ],
+      });
+      expect(result.status).toBe('failed');
+      expect(result.results[0]?.error).toContain('Invalid catalog software-quality-contract');
+    } finally {
+      safeRmSync(contractPath, { force: true });
+    }
+  });
+
+  it('rejects a context path outside the repository root', async () => {
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        context: { context_path: '../../outside-context.json' },
+        steps: [],
+      } as unknown as Parameters<typeof handleAction>[0])
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('loads and persists pipeline context via context_path', async () => {
     const fixtureRoot = path.join(
       ROOT,

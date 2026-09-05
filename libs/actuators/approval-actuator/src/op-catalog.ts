@@ -7,7 +7,8 @@
 // change; every other op previously made determineActuatorStepType throw, so
 // those entries are strictly additive.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const APPROVAL_PROPERTIES = {
   channel: { type: 'string' },
@@ -91,7 +92,7 @@ export const APPROVAL_ACTUATOR_APPLY_OPS = [
   'request_review',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const required =
     op === 'load'
       ? ['channel', 'requestId']
@@ -112,7 +113,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...APPROVAL_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...APPROVAL_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

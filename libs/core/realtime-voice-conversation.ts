@@ -11,9 +11,16 @@ import { getVoiceRuntimePolicy } from './voice-runtime-policy.js';
 import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { createVoiceActuatorServeClient } from './actuator-serve-client.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
+import { nowIso } from './foundation/time.js';
 import {
   resolveVoiceEngineForPlatform,
   type VoiceEngineArtifactFormat,
@@ -83,6 +90,9 @@ export interface RealtimeVoiceConversationTurnResult {
 }
 
 const SESSION_DIR = pathResolver.shared('runtime/realtime-voice-conversations');
+const SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/realtime-voice-conversation-session.schema.json'
+);
 
 /** Keep spoken replies short enough to start TTS quickly and sound natural. */
 export const REALTIME_VOICE_REPLY_MAX_CHARS = 160;
@@ -92,13 +102,26 @@ export const REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS = 120;
 export type RealtimeVoiceReplySegmentHandler = (segment: string) => void | Promise<void>;
 
 function sessionPath(sessionId: string): string {
-  return path.join(SESSION_DIR, `${sessionId}.json`);
+  return assertSafeRepositoryPath(path.join(SESSION_DIR, `${normalizeSessionId(sessionId)}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function normalizeSessionId(sessionId: string): string {
   const normalized = sessionId.trim();
-  if (!normalized) {
-    throw new Error('Realtime voice conversation requires sessionId');
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(
+      'Realtime voice conversation requires a sessionId that is a single path segment'
+    );
+  }
+  return normalized;
+}
+
+function normalizeRequestTag(requestTag: string | undefined): string | undefined {
+  if (!requestTag) return undefined;
+  const normalized = requestTag.trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('Realtime voice conversation requestTag must be a single path segment');
   }
   return normalized;
 }
@@ -133,7 +156,30 @@ function loadRealtimeVoiceConversationSession(
 ): RealtimeVoiceConversationSession | null {
   const targetPath = sessionPath(sessionId);
   if (!safeExistsSync(targetPath)) return null;
-  return readJson<RealtimeVoiceConversationSession>(targetPath);
+  return loadRealtimeVoiceConversationSessionAtPath(targetPath, sessionId);
+}
+
+/** Load a persisted voice session through schema and filename/session binding. */
+export function loadRealtimeVoiceConversationSessionAtPath(
+  filePath: string,
+  sessionId: string
+): RealtimeVoiceConversationSession {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[realtime-voice-session] session must be a regular file: ${filePath}`);
+  }
+  const session = defineCatalog<RealtimeVoiceConversationSession>({
+    id: 'realtime-voice-conversation-session',
+    path: safeFilePath,
+    schema: SESSION_SCHEMA_PATH,
+  }).load();
+  const expectedSessionId = normalizeSessionId(sessionId);
+  if (session.session_id !== expectedSessionId) {
+    throw new Error(
+      `[REALTIME_VOICE_SESSION_SCOPE_MISMATCH] session belongs to ${session.session_id}, expected ${expectedSessionId}`
+    );
+  }
+  return session;
 }
 
 function writeRealtimeVoiceConversationSession(session: RealtimeVoiceConversationSession): string {
@@ -159,7 +205,7 @@ export function ensureRealtimeVoiceConversationSession(input: {
     input.profileId,
     input.personalVoiceMode || 'require_personal_voice'
   );
-  const now = new Date().toISOString();
+  const now = nowIso();
   const session: RealtimeVoiceConversationSession = {
     session_id: sessionId,
     created_at: now,
@@ -290,9 +336,11 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
   payload: Record<string, unknown>;
   artifactPath: string;
 } {
+  const sessionId = normalizeSessionId(input.sessionId);
+  const requestTag = normalizeRequestTag(input.requestTag);
   const requestId = [
-    input.sessionId,
-    ...(input.requestTag ? [input.requestTag] : []),
+    sessionId,
+    ...(requestTag ? [requestTag] : []),
     Date.now().toString(36),
     randomUUID().slice(0, 8),
   ].join('-');
@@ -303,8 +351,9 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
     engine.supports.artifact_formats,
     policy.delivery.default_format
   );
-  const resolvedArtifactPath = pathResolver.sharedTmp(
-    `realtime-voice-conversation/${requestId}.${format}`
+  const resolvedArtifactPath = assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`realtime-voice-conversation/${requestId}.${format}`),
+    { allowMissingLeaf: true }
   );
 
   return {
@@ -471,7 +520,7 @@ export function recordRealtimeVoiceConversationExchange(input: {
   if (!session) {
     throw new Error(`Realtime voice conversation session not found: ${input.sessionId}`);
   }
-  const now = new Date().toISOString();
+  const now = nowIso();
   session.transcript.push(
     {
       speaker: 'user',
@@ -482,11 +531,11 @@ export function recordRealtimeVoiceConversationExchange(input: {
     {
       speaker: 'assistant',
       text: input.assistantText,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       ...(input.assistantAudioRef ? { audio_ref: input.assistantAudioRef } : {}),
     }
   );
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   return writeRealtimeVoiceConversationSession(session);
 }
 
@@ -521,7 +570,7 @@ export async function runRealtimeVoiceConversationTurn(
     );
   }
 
-  const now = new Date().toISOString();
+  const now = nowIso();
   const inputTimeline = buildPresenceVoiceIngressTimeline({
     surfaceId: input.surfaceId,
     text: userText,
@@ -564,11 +613,11 @@ export async function runRealtimeVoiceConversationTurn(
     {
       speaker: 'assistant',
       text: assistantText,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       ...(audioArtifactPath ? { audio_ref: audioArtifactPath } : {}),
     }
   );
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   const transcriptPath = writeRealtimeVoiceConversationSession(session);
 
   return {

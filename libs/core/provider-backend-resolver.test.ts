@@ -4,6 +4,7 @@
  * CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-07.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from './index.js';
 import {
   resolveProviderBackend,
   resetProviderBackendResolverCacheForTests,
@@ -37,6 +38,16 @@ beforeEach(() => {
 });
 
 describe('resolveProviderBackend', () => {
+  it('routes Codex environment reads through the governed accessor', () => {
+    const sources = ['libs/core/provider-backend-resolver.ts', 'libs/core/codex-cli-query.ts'].map(
+      (file) => String(safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' }))
+    );
+    for (const source of sources) {
+      expect(source).not.toMatch(/env\.KYBERION_/u);
+      expect(source).toContain('getRegisteredEnvText');
+    }
+  });
+
   it('resolves each known provider to an object satisfying the structural interface, via injected (unmocked-config) constructors', () => {
     const constructCalls: string[] = [];
     for (const provider of ['claude', 'codex', 'agy', 'grok'] as const) {

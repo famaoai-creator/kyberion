@@ -1,4 +1,5 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
@@ -12,8 +13,11 @@ import {
   safeFsyncFile,
   safeMkdir,
   safeReadFile,
+  assertSafeRepositoryPath,
 } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 import {
   assertProvenanceShareAllowed,
   combineProvenanceTaint,
@@ -159,6 +163,108 @@ interface ReachableAccess {
   audienceFloor: ShareGrantTaint;
 }
 
+function persistedString(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`share-grant ledger ${key} must be a non-empty string`);
+  }
+  return value;
+}
+
+function persistedOptionalString(record: Record<string, unknown>, key: string): void {
+  if (record[key] !== undefined) persistedString(record, key);
+}
+
+function persistedRole(record: Record<string, unknown>, key: string): void {
+  const value = persistedString(record, key);
+  if (!(SHARE_GRANT_ROLES as readonly string[]).includes(value)) {
+    throw new Error(`share-grant ledger ${key} is invalid`);
+  }
+}
+
+function persistedTaint(record: Record<string, unknown>, key: string): void {
+  const value = persistedString(record, key);
+  if (!(SHARE_GRANT_TAINTS as readonly string[]).includes(value)) {
+    throw new Error(`share-grant ledger ${key} is invalid`);
+  }
+}
+
+function validatePersistedResource(value: unknown): void {
+  if (!isRecord(value)) throw new Error('invalid share-grant resource');
+  persistedString(value, 'resourceRef');
+  persistedString(value, 'tenantSlug');
+  persistedString(value, 'ownerPrincipal');
+  persistedTaint(value, 'taint');
+  persistedString(value, 'registeredAt');
+  persistedOptionalString(value, 'provenanceMissionId');
+}
+
+function validatePersistedEdge(value: unknown): void {
+  if (!isRecord(value)) throw new Error('invalid share-grant edge');
+  persistedString(value, 'edgeId');
+  persistedString(value, 'resourceRef');
+  persistedString(value, 'grantor');
+  persistedString(value, 'grantee');
+  persistedString(value, 'granteeTenantSlug');
+  persistedRole(value, 'role');
+  persistedTaint(value, 'audienceFloor');
+  persistedString(value, 'grantedBy');
+  persistedString(value, 'grantedAt');
+  persistedOptionalString(value, 'revokedAt');
+}
+
+function validatePersistedLink(value: unknown): void {
+  if (!isRecord(value)) throw new Error('invalid share-grant link');
+  persistedString(value, 'linkId');
+  persistedString(value, 'resourceRef');
+  persistedRole(value, 'role');
+  persistedTaint(value, 'audienceFloor');
+  persistedString(value, 'grantedBy');
+  persistedString(value, 'createdAt');
+  persistedString(value, 'expiresAt');
+  persistedString(value, 'tokenHash');
+  persistedOptionalString(value, 'revokedAt');
+}
+
+function validatePersistedEvent(value: unknown): void {
+  if (!isRecord(value) || typeof value.type !== 'string') {
+    throw new Error('invalid share-grant ledger event');
+  }
+  switch (value.type) {
+    case 'resource_registered':
+      validatePersistedResource(value.resource);
+      return;
+    case 'edge_granted':
+      validatePersistedEdge(value.edge);
+      return;
+    case 'edge_revoked':
+      persistedString(value, 'edgeId');
+      persistedString(value, 'revokedAt');
+      return;
+    case 'link_issued':
+      validatePersistedLink(value.link);
+      validatePersistedEdge(value.edge);
+      return;
+    case 'link_revoked':
+      persistedString(value, 'linkId');
+      persistedString(value, 'revokedAt');
+      return;
+    default:
+      throw new Error('unknown share-grant ledger event');
+  }
+}
+
+/** Validate a persisted ledger envelope without changing its JSON property order. */
+export function parsePersistedEnvelope(value: unknown): PersistedEnvelope {
+  if (!isRecord(value) || value.version !== 1) {
+    throw new Error('invalid share-grant ledger envelope');
+  }
+  persistedString(value, 'previousHash');
+  persistedString(value, 'hash');
+  validatePersistedEvent(value.event);
+  return value as unknown as PersistedEnvelope;
+}
+
 export class ShareGrantValidationError extends Error {
   constructor(message: string) {
     super(`[share-grant-graph] ${message}`);
@@ -245,13 +351,15 @@ function isRoleAtLeast(actual: ShareGrantRole, required: ShareGrantRole): boolea
 }
 
 function resolveStorePath(): string {
-  return process.env[SHARE_GRANTS_PATH_ENV]?.trim()
-    ? pathResolver.rootResolve(process.env[SHARE_GRANTS_PATH_ENV]!.trim())
+  const configuredPath = getRegisteredEnvText(SHARE_GRANTS_PATH_ENV)?.trim();
+  const configured = configuredPath
+    ? pathResolver.rootResolve(configuredPath)
     : SHARE_GRANTS_STORE_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 function resolveDefaultHmacKey(): string {
-  const fromEnv = process.env[SHARE_GRANTS_HMAC_KEY_ENV]?.trim();
+  const fromEnv = getRegisteredEnvText(SHARE_GRANTS_HMAC_KEY_ENV)?.trim();
   if (fromEnv) {
     if (fromEnv.length < 32) {
       throw new ShareGrantValidationError(
@@ -332,7 +440,9 @@ export class ShareGrantGraph {
   readonly #links = new Map<string, StoredShareLink>();
 
   constructor(options: ShareGrantGraphOptions = {}) {
-    this.#storePath = options.storePath ?? resolveStorePath();
+    this.#storePath = assertSafeRepositoryPath(options.storePath ?? resolveStorePath(), {
+      allowMissingLeaf: true,
+    });
     this.#persist = options.persist ?? true;
     this.#now = options.now ?? Date.now;
     this.#hmacKey = options.hmacKey ? assertHmacKey(options.hmacKey, 'hmacKey') : undefined;
@@ -853,7 +963,7 @@ export class ShareGrantGraph {
     try {
       if (this.#auditSink) {
         this.#auditSink(event);
-      } else if (!process.env.VITEST) {
+      } else if (!isVitestProcess()) {
         auditChain.record({
           agentId: event.actor,
           action: `share_grant_${event.action}`,
@@ -905,7 +1015,9 @@ export class ShareGrantGraph {
       const trimmed = line.trim();
       if (!trimmed) continue;
       try {
-        const envelope = JSON.parse(trimmed) as PersistedEnvelope;
+        const envelope = parsePersistedEnvelope(
+          parseSafeJsonInput(trimmed, 'share-grant ledger entry')
+        );
         this.#verifyEnvelope(envelope, previousHash);
         this.#apply(envelope.event);
         previousHash = envelope.hash;
@@ -927,7 +1039,9 @@ export class ShareGrantGraph {
     for (const line of raw.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      const envelope = JSON.parse(trimmed) as PersistedEnvelope;
+      const envelope = parsePersistedEnvelope(
+        parseSafeJsonInput(trimmed, 'share-grant ledger entry')
+      );
       this.#verifyEnvelope(envelope, previousHash);
       previousHash = envelope.hash;
     }

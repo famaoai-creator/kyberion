@@ -1,15 +1,23 @@
 import { createHash } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
+import { clamp } from './foundation/text.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { auditChain } from './audit-chain.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   loadKnowledgeUsageAggregate,
   type KnowledgeUsageAggregateEntry,
 } from './src/knowledge-feedback-loop.js';
 import {
   loadKnowledgeRankingWeights,
+  loadKnowledgeRankingWeightConfig,
   type KnowledgeRankingWeightConfig,
   type KnowledgeRankingWeights,
 } from './ranking-signals.js';
@@ -53,7 +61,7 @@ export interface KnowledgeRankingWeightApplyResult {
 }
 
 function bounded(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, Math.round(value * 100) / 100));
+  return clamp(Math.round(value * 100) / 100, min, max);
 }
 
 function proposalPath(scope: ScopeContext): string {
@@ -68,6 +76,29 @@ function proposalPath(scope: ScopeContext): string {
       'latest.json'
     )
   );
+}
+
+const KNOWLEDGE_WEIGHT_PROPOSAL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-ranking-weight-proposal.schema.json'
+);
+
+function knowledgeWeightProposalCatalog(filePath: string) {
+  return defineCatalog<KnowledgeRankingWeightProposal>({
+    id: 'knowledge-ranking-weight-proposal',
+    path: filePath,
+    schema: KNOWLEDGE_WEIGHT_PROPOSAL_SCHEMA_PATH,
+  });
+}
+
+/** Load a persisted proposal through the shared schema/path boundary. */
+export function loadKnowledgeRankingWeightProposal(
+  filePath: string
+): KnowledgeRankingWeightProposal {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`Knowledge weight proposal must be a regular file: ${safePath}`);
+  }
+  return knowledgeWeightProposalCatalog(safePath).load();
 }
 
 function summarizeUsage(entries: KnowledgeUsageAggregateEntry[]) {
@@ -135,7 +166,8 @@ export function proposeKnowledgeRankingWeightRecalculation(
   };
   if (options.persist !== false) {
     const outputPath = proposalPath(tenantScope);
-    safeWriteFile(outputPath, `${JSON.stringify(proposal, null, 2)}\n`, { mkdir: true });
+    const persisted = knowledgeWeightProposalCatalog(outputPath).validate(proposal, outputPath);
+    safeWriteFile(outputPath, `${JSON.stringify(persisted, null, 2)}\n`, { mkdir: true });
     proposal.output_path = outputPath;
   }
   return proposal;
@@ -216,9 +248,7 @@ export function applyKnowledgeRankingWeightProposal(input: {
   };
   if (input.dry_run) return result;
 
-  const raw = safeExistsSync(governancePath)
-    ? readJson<KnowledgeRankingWeightConfig>(governancePath)
-    : { version: '1.0.0', defaults: { proximity: 1, usage_yield: 4 } };
+  const raw = loadKnowledgeRankingWeightConfig(governancePath, false);
   const nextConfig: KnowledgeRankingWeightConfig = {
     ...raw,
     version: raw.version || '1.0.0',

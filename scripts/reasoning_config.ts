@@ -1,5 +1,6 @@
 import {
   loadReasoningRoutePolicy,
+  loadReasoningRouteUserConfigAtPath,
   loadReasoningRouteUserConfig,
   normalizeReasoningRole,
   reasoningRouteUserConfigPath,
@@ -7,17 +8,13 @@ import {
   saveReasoningRouteUserConfig,
   validateReasoningRouteUserConfig,
   type ReasoningRouteUserConfig,
-  inspectReasoningRoutes,
-} from '@agent/core';
+} from '@agent/core/reasoning-route-resolver';
+import { inspectReasoningRoutes } from '@agent/core/reasoning-route-doctor';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { readJson } from '@agent/core/foundation';
-import {
-  getRegisteredEnv,
-  recordGovernanceAction,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core';
+import { nowIso } from '@agent/core/foundation';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 
 const HELP = `Usage:
   pnpm reasoning:config list [--json]
@@ -37,16 +34,17 @@ function option(argv: string[], name: string): string | undefined {
   return index >= 0 ? argv[index + 1] : undefined;
 }
 
-function jsonOutput(value: unknown): void {
-  console.log(JSON.stringify(value, null, 2));
-}
-
 function validateConfigResolves(config: ReasoningRouteUserConfig): void {
   const policy = loadReasoningRoutePolicy();
   for (const role of Object.keys(policy.roles)) resolveReasoningRoute({ role, userConfig: config });
 }
 
-function saveWithBackup(config: ReasoningRouteUserConfig, dryRun: boolean, change: string): void {
+function saveWithBackup(
+  config: ReasoningRouteUserConfig,
+  dryRun: boolean,
+  change: string,
+  print: (value: unknown) => void
+): void {
   const path = reasoningRouteUserConfigPath();
   const backup = `${path}.previous`;
   const historyPath = `${path}.history/reasoning-route-user-config-${Date.now()}.json`;
@@ -54,13 +52,13 @@ function saveWithBackup(config: ReasoningRouteUserConfig, dryRun: boolean, chang
     ...config,
     version: config.version || '1.0.0',
     revision: (config.revision || 0) + 1,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     last_change: change,
   };
   validateReasoningRouteUserConfig(nextConfig);
   validateConfigResolves(nextConfig);
   if (dryRun) {
-    jsonOutput({ dry_run: true, path, config: nextConfig });
+    print({ dry_run: true, path, config: nextConfig });
     return;
   }
   if (safeExistsSync(path)) {
@@ -74,10 +72,10 @@ function saveWithBackup(config: ReasoningRouteUserConfig, dryRun: boolean, chang
     'reasoning_route_config_update',
     change
   );
-  console.log(`Updated ${path}`);
+  print(`Updated ${path}`);
 }
 
-function listRoutes(asJson: boolean): void {
+function listRoutes(asJson: boolean, print: (value: unknown) => void): void {
   const routes = Object.keys(loadReasoningRoutePolicy().roles).map((role) => {
     try {
       return resolveReasoningRoute({ role });
@@ -85,36 +83,38 @@ function listRoutes(asJson: boolean): void {
       return { role, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  if (asJson) return jsonOutput({ routes, config_path: reasoningRouteUserConfigPath() });
-  for (const route of routes) {
-    if ('error' in route) console.log(`${route.role}: ERROR ${route.error}`);
-    else
-      console.log(
-        `${route.role}: ${route.profileRef} (${route.mode}${route.model ? `:${route.model}` : ''}) candidates=${route.candidates.join(' -> ')}`
-      );
-  }
+  if (asJson) return print({ routes, config_path: reasoningRouteUserConfigPath() });
+  print(
+    routes
+      .map((route) =>
+        'error' in route
+          ? `${route.role}: ERROR ${route.error}`
+          : `${route.role}: ${route.profileRef} (${route.mode}${route.model ? `:${route.model}` : ''}) candidates=${route.candidates.join(' -> ')}`
+      )
+      .join('\n')
+  );
 }
 
-function explainRoute(argv: string[], asJson: boolean): void {
+function explainRoute(argv: string[], asJson: boolean, print: (value: unknown) => void): void {
   const role = normalizeReasoningRole(option(argv, '--role'));
   const route = resolveReasoningRoute({ role });
-  if (asJson) return jsonOutput(route);
-  console.log(`role=${route.role}`);
-  console.log(
-    `selected=${route.profileRef} adapter=${route.adapter} mode=${route.mode} model=${route.model || '(provider default)'}`
-  );
-  console.log(`capabilities=${route.capabilities.join(',')}`);
-  console.log(`candidates=${route.candidates.join(' -> ')}`);
-  console.log(
-    `provenance=${route.provenance.map((entry) => `${entry.source}:${entry.field}`).join(', ')}`
-  );
-  if (route.rejectedCandidates.length)
-    console.log(
+  if (asJson) return print(route);
+  const lines = [
+    `role=${route.role}`,
+    `selected=${route.profileRef} adapter=${route.adapter} mode=${route.mode} model=${route.model || '(provider default)'}`,
+    `capabilities=${route.capabilities.join(',')}`,
+    `candidates=${route.candidates.join(' -> ')}`,
+    `provenance=${route.provenance.map((entry) => `${entry.source}:${entry.field}`).join(', ')}`,
+  ];
+  if (route.rejectedCandidates.length) {
+    lines.push(
       `rejected=${route.rejectedCandidates.map((entry) => `${entry.profile}:${entry.reason}`).join('; ')}`
     );
+  }
+  print(lines.join('\n'));
 }
 
-function validateRoutes(asJson: boolean): void {
+function validateRoutes(asJson: boolean, print: (value: unknown) => void): void {
   const policy = loadReasoningRoutePolicy();
   const results = Object.keys(policy.roles).map((role) => {
     try {
@@ -125,16 +125,20 @@ function validateRoutes(asJson: boolean): void {
     }
   });
   const result = { valid: results.every((entry) => entry.valid), results };
-  if (asJson) jsonOutput(result);
+  if (asJson) print(result);
   else
-    for (const entry of results)
-      console.log(
-        `${entry.role}: ${entry.valid ? `ok (${entry.selected})` : `ERROR ${entry.error}`}`
-      );
+    print(
+      results
+        .map(
+          (entry) =>
+            `${entry.role}: ${entry.valid ? `ok (${entry.selected})` : `ERROR ${entry.error}`}`
+        )
+        .join('\n')
+    );
   if (!result.valid) throw new ScriptExitError(1, '', true);
 }
 
-function bindRole(argv: string[]): void {
+function bindRole(argv: string[], dryRun: boolean, print: (value: unknown) => void): void {
   const role = normalizeReasoningRole(argv[1]);
   const binding = argv[2]?.trim();
   if (!binding) throw new Error('bind-role requires <profile|mode:model>');
@@ -151,10 +155,10 @@ function bindRole(argv: string[]): void {
     };
   }
   config.roles = { ...(config.roles || {}), [role]: { ...(config.roles?.[role] || {}), profile } };
-  saveWithBackup(config, hasFlag(argv, '--dry-run'), `bind-role:${role}`);
+  saveWithBackup(config, dryRun, `bind-role:${role}`, print);
 }
 
-function setFallback(argv: string[]): void {
+function setFallback(argv: string[], dryRun: boolean, print: (value: unknown) => void): void {
   const role = normalizeReasoningRole(option(argv, '--role'));
   const raw = argv.find(
     (value, index) => index > 0 && value.includes(',') && !value.startsWith('--')
@@ -170,55 +174,57 @@ function setFallback(argv: string[]): void {
     ...(config.roles || {}),
     [role]: { ...(config.roles?.[role] || {}), candidates },
   };
-  saveWithBackup(config, hasFlag(argv, '--dry-run'), `set-fallback:${role}`);
+  saveWithBackup(config, dryRun, `set-fallback:${role}`, print);
 }
 
-function rollback(argv: string[]): void {
+function rollback(argv: string[], dryRun: boolean, print: (value: unknown) => void): void {
   const path = reasoningRouteUserConfigPath();
   const backup = `${path}.previous`;
   if (!safeExistsSync(backup)) throw new Error(`No rollback snapshot at ${backup}`);
-  const restored = readJson<ReasoningRouteUserConfig>(backup);
+  const restored = loadReasoningRouteUserConfigAtPath(backup);
   validateReasoningRouteUserConfig(restored, backup);
   validateConfigResolves(restored);
-  if (hasFlag(argv, '--dry-run'))
-    return jsonOutput({ dry_run: true, restore: backup, target: path, config: restored });
-  saveWithBackup(restored, false, 'rollback');
-  console.log(`Restored ${path}`);
+  if (dryRun) return print({ dry_run: true, restore: backup, target: path, config: restored });
+  saveWithBackup(restored, false, 'rollback', print);
+  print(`Restored ${path}`);
 }
 
-async function doctor(asJson: boolean): Promise<void> {
+async function doctor(asJson: boolean, print: (value: unknown) => void): Promise<void> {
   const report = await inspectReasoningRoutes();
-  if (asJson) return jsonOutput(report);
-  for (const entry of report.entries) {
-    console.log(
-      `${entry.role}: ${entry.status} ${entry.mode} ${entry.profileRef} — ${entry.reason}`
-    );
-  }
+  if (asJson) return print(report);
+  const lines = report.entries.map(
+    (entry) => `${entry.role}: ${entry.status} ${entry.mode} ${entry.profileRef} — ${entry.reason}`
+  );
   if (report.nextActions.length) {
-    console.log('Next actions:');
-    for (const action of report.nextActions) console.log(`- ${action}`);
+    lines.push('Next actions:', ...report.nextActions.map((action) => `- ${action}`));
   }
+  print(lines.join('\n'));
   if (!report.valid) throw new ScriptExitError(1, '', true);
 }
 
-export async function main(argv: string[] = []): Promise<void> {
+export async function main(
+  argv: string[] = [],
+  print: (value: unknown) => void = () => undefined,
+  options: { json?: boolean; dryRun?: boolean; check?: boolean } = {}
+): Promise<void> {
   const command = argv[0];
-  const asJson = hasFlag(argv, '--json');
-  if (!command || command === '--help' || command === 'help') return console.log(HELP);
-  if (command === 'list') return listRoutes(asJson);
-  if (command === 'explain') return explainRoute(argv, asJson);
-  if (command === 'validate') return validateRoutes(asJson);
-  if (command === 'doctor') return doctor(asJson);
-  if (command === 'bind-role') return bindRole(argv);
-  if (command === 'set-fallback') return setFallback(argv);
-  if (command === 'rollback') return rollback(argv);
+  const asJson = options.json ?? hasFlag(argv, '--json');
+  const dryRun = options.dryRun === true || options.check === true || hasFlag(argv, '--dry-run');
+  if (!command || command === '--help' || command === 'help') return print(HELP);
+  if (command === 'list') return listRoutes(asJson, print);
+  if (command === 'explain') return explainRoute(argv, asJson, print);
+  if (command === 'validate') return validateRoutes(asJson, print);
+  if (command === 'doctor') return doctor(asJson, print);
+  if (command === 'bind-role') return bindRole(argv, dryRun, print);
+  if (command === 'set-fallback') return setFallback(argv, dryRun, print);
+  if (command === 'rollback') return rollback(argv, dryRun, print);
   throw new Error(`Unknown command ${command}\n${HELP}`);
 }
 
 export const runReasoningConfig = defineScript({
   name: 'reasoning:config',
-  flags: [],
-  run: async ({ argv }) => main(argv),
+  flags: ['json', 'dry-run', 'check', 'quiet'],
+  run: async ({ argv, print, json, dryRun, check }) => main(argv, print, { json, dryRun, check }),
 });
 
 if (

@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { pathResolver, safeExistsSync, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 import {
   applyPeerTenantMigrationPlan,
   buildPeerTenantMigrationPlan,
+  parsePeerTenantMigrationPlan,
+  runPeerTenantMigration,
   type PeerTenantMigrationRoot,
 } from './migrate_peer_tenant_runtime.js';
 
@@ -24,6 +26,59 @@ afterEach(() => {
 });
 
 describe('peer tenant runtime migration', () => {
+  it('rejects malformed or unsafe persisted plans before apply', () => {
+    const unsafePlan = {
+      format: 'kyberion-peer-tenant-migration-v1',
+      migration_id: 'migration-test',
+      generated_at: '2026-09-01T00:00:00.000Z',
+      apply_requested: true,
+      migration_root: MIGRATION_ROOT,
+      sources: [
+        {
+          kind: 'peer-messaging',
+          source: `${LEGACY_ROOT}/peer-a/inbox.jsonl`,
+          source_quarantine: `${MIGRATION_ROOT}/quarantine/inbox.legacy`,
+          source_sha256: 'hash',
+          action: 'migrate',
+          unknown_record_count: 0,
+          records: 1,
+          destinations: [
+            {
+              tenant_id: 'tenant-acme',
+              destination: `${LEGACY_ROOT}/tenants/tenant-acme/inbox.jsonl`,
+              record_count: 1,
+              disposition: 'move',
+            },
+          ],
+          state: 'planned',
+        },
+      ],
+      status: 'planned',
+    } as Record<string, unknown>;
+    expect(parsePeerTenantMigrationPlan(unsafePlan)).not.toBeNull();
+
+    const malformedPlan = {
+      format: 'kyberion-peer-tenant-migration-v1',
+      migration_id: 'migration-test',
+      generated_at: '2026-09-01T00:00:00.000Z',
+      apply_requested: true,
+      migration_root: MIGRATION_ROOT,
+      sources: [],
+      status: 'planned',
+    } as Record<string, unknown>;
+    Object.defineProperty(malformedPlan, '__proto__', {
+      value: { source: '/tmp/unsafe' },
+      enumerable: true,
+    });
+    expect(parsePeerTenantMigrationPlan(malformedPlan)).toBeNull();
+  });
+
+  it('rejects an external plan path before reading it', () => {
+    expect(() =>
+      runPeerTenantMigration({ planPath: '/tmp/external-peer-migration-plan.json' })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('splits explicit tenant records and quarantines legacy sources', () => {
     safeWriteFile(
       `${LEGACY_ROOT}/peer-a/inbox.jsonl`,
@@ -71,7 +126,10 @@ describe('peer tenant runtime migration', () => {
   it('keeps records without a trustworthy tenant quarantined unless explicitly overridden', () => {
     safeWriteFile(
       `${LEGACY_ROOT}/peer-a/outbox.jsonl`,
-      JSON.stringify({ message_id: 'legacy-without-tenant' }) + '\n'
+      [
+        JSON.stringify({ message_id: 'legacy-without-tenant' }),
+        '{"__proto__":{"tenant_id":"tenant-acme"},"message_id":"unsafe"}',
+      ].join('\n') + '\n'
     );
     const plan = buildPeerTenantMigrationPlan({
       migrationId: 'migration-unknown',
@@ -79,6 +137,7 @@ describe('peer tenant runtime migration', () => {
       legacyRoots: [legacyRoots[0]],
     });
     expect(plan.sources[0].action).toBe('quarantine');
+    expect(plan.sources[0].unknown_record_count).toBe(2);
     applyPeerTenantMigrationPlan(plan);
     expect(safeExistsSync(`${LEGACY_ROOT}/peer-a/outbox.jsonl`)).toBe(false);
     expect(safeExistsSync(`${LEGACY_ROOT}/tenants`)).toBe(false);
@@ -98,5 +157,17 @@ describe('peer tenant runtime migration', () => {
     expect(safeExistsSync(`${LEGACY_ROOT}/tenants/tenant-acme/peers/peer-a/outbox.jsonl`)).toBe(
       true
     );
+  });
+
+  it('routes the migration plan through the shared script printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/migrate_peer_tenant_runtime.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).toContain('run: ({ argv, print }) =>');
   });
 });

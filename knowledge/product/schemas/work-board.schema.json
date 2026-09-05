@@ -5,8 +5,8 @@
   "type": "object",
   "required": ["board_id", "name", "type", "filters", "sort_by", "created_at", "updated_at"],
   "properties": {
-    "board_id": { "type": "string" },
-    "name": { "type": "string" },
+    "board_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
     "type": {
       "type": "string",
       "enum": ["project", "personal", "peer", "review", "external"]
@@ -15,28 +15,50 @@
     "filters": {
       "type": "object",
       "properties": {
-        "project_id": { "type": "string" },
+        "project_id": { "type": "string", "minLength": 1 },
+        "tenant_slugs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "organization_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "project_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "source": {
           "oneOf": [
-            { "type": "string" },
-            { "type": "array", "items": { "type": "string" } }
+            { "enum": ["local", "github", "jira", "peer"] },
+            {
+              "type": "array",
+              "items": { "enum": ["local", "github", "jira", "peer"] }
+            }
           ]
         },
         "status": {
           "oneOf": [
-            { "type": "string" },
-            { "type": "array", "items": { "type": "string" } }
+            {
+              "enum": ["backlog", "ready", "in_progress", "blocked", "review", "done", "archived"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "enum": ["backlog", "ready", "in_progress", "blocked", "review", "done", "archived"]
+              }
+            }
           ]
         },
-        "assignee_peer_id": { "type": "string" },
-        "assignee_user_id": { "type": "string" },
+        "assignee_peer_id": { "type": "string", "minLength": 1 },
+        "assignee_user_id": { "type": "string", "minLength": 1 },
         "labels": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string", "minLength": 1 }
         },
-        "text": { "type": "string" }
+        "text": { "type": "string", "minLength": 1 }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "sort_by": {
       "type": "string",
@@ -44,10 +66,10 @@
     },
     "lanes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": { "type": "string", "minLength": 1 }
     },
-    "created_at": { "type": "string" },
-    "updated_at": { "type": "string" }
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

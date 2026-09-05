@@ -1,13 +1,19 @@
 import { classifyTaskSessionIntent } from './task-session.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { pathResolver } from './path-resolver.js';
+
+const PRODUCTIVITY_TASK_PLAN_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/productivity-task-plan.schema.json'
+);
+
+const productivityTaskPlanCatalog = defineCatalog<ProductivityTaskPlan>({
+  id: 'productivity-task-plan',
+  path: PRODUCTIVITY_TASK_PLAN_SCHEMA_PATH,
+  schema: PRODUCTIVITY_TASK_PLAN_SCHEMA_PATH,
+});
 
 export type ProductivityTaskDomain =
-  | 'calendar'
-  | 'meeting'
-  | 'email'
-  | 'document'
-  | 'presentation'
-  | 'browser'
-  | 'connected_systems';
+  'calendar' | 'meeting' | 'email' | 'document' | 'presentation' | 'browser' | 'connected_systems';
 
 export type ProductivityEffectLevel = 'read' | 'draft' | 'external_write' | 'financial_commit';
 
@@ -41,6 +47,13 @@ export interface ProductivityTaskPlan {
     mode: 'dry_run';
     external_effects_executed: false;
   };
+}
+
+export function validateProductivityTaskPlan(
+  value: unknown,
+  sourcePath = PRODUCTIVITY_TASK_PLAN_SCHEMA_PATH
+): ProductivityTaskPlan {
+  return productivityTaskPlanCatalog.validate(value, sourcePath);
 }
 
 interface DomainDefinition {

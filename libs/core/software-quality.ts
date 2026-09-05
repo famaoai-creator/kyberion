@@ -1,3 +1,8 @@
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+
 export type QualityCheckStatus = 'pending' | 'passed' | 'failed' | 'waived';
 
 export interface QualityCheck {
@@ -46,9 +51,21 @@ export interface TestInventoryItem {
   requirement_refs?: string[];
   acceptance_criteria_refs?: string[];
   risk_refs?: string[];
+  preconditions?: string[];
+  steps?: string[];
   risk_level: 'low' | 'medium' | 'high' | 'critical';
   expected_result: string;
+  test_level?:
+    | 'unit'
+    | 'component'
+    | 'contract'
+    | 'integration'
+    | 'e2e'
+    | 'acceptance'
+    | 'exploratory'
+    | 'static';
   execution_mode: 'safe_auto' | 'approval_required' | 'manual_only' | 'prohibited';
+  automation_backend?: string;
   omission_reason?: string;
   automation?: {
     actuator: 'code' | 'system' | 'browser' | 'network';
@@ -73,12 +90,614 @@ export interface TestExecutionResult {
   status: 'passed' | 'failed' | 'error' | 'blocked' | 'skipped';
   evidence_refs: string[];
   observed_result?: string;
+  defect_refs?: string[];
+  retry_of?: string;
 }
 
 export interface TestExecutionRecord {
+  version?: string;
   run_id: string;
+  project_id?: string;
   subject_ref: string;
+  environment?: string;
+  executor?: {
+    resource_id: string;
+    resource_type: 'human' | 'ai_agent' | 'automation';
+  };
+  started_at?: string;
+  finished_at?: string;
   results: TestExecutionResult[];
+}
+
+const QUALITY_INPUT_SCHEMAS = {
+  contract: pathResolver.knowledge('product/schemas/software-quality-contract.schema.json'),
+  inventory: pathResolver.knowledge('product/schemas/test-inventory.schema.json'),
+  execution: pathResolver.knowledge('product/schemas/test-execution-record.schema.json'),
+} as const;
+
+function loadQualityInputAtPath<T>(
+  filePath: string,
+  kind: keyof typeof QUALITY_INPUT_SCHEMAS,
+  parse: (value: unknown) => T | null
+): T {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`Software quality ${kind} must be a regular file: ${safePath}`);
+  }
+  const value = defineCatalog<unknown>({
+    id: `software-quality-${kind}`,
+    path: safePath,
+    schema: QUALITY_INPUT_SCHEMAS[kind],
+  }).load();
+  const parsed = parse(value);
+  if (!parsed) {
+    throw new Error(`Invalid software quality ${kind}: ${safePath}`);
+  }
+  return parsed;
+}
+
+export function loadSoftwareQualityContractAtPath(filePath: string): SoftwareQualityContract {
+  return loadQualityInputAtPath(filePath, 'contract', parseSoftwareQualityContract);
+}
+
+export function loadTestInventoryAtPath(filePath: string): TestInventory {
+  return loadQualityInputAtPath(filePath, 'inventory', parseTestInventory);
+}
+
+export function loadTestExecutionRecordAtPath(filePath: string): TestExecutionRecord {
+  return loadQualityInputAtPath(filePath, 'execution', parseTestExecutionRecord);
+}
+
+const QUALITY_CHECK_STATUSES = new Set<QualityCheckStatus>([
+  'pending',
+  'passed',
+  'failed',
+  'waived',
+]);
+const TEST_RISK_LEVELS = new Set<TestInventoryItem['risk_level']>([
+  'low',
+  'medium',
+  'high',
+  'critical',
+]);
+const TEST_LEVELS = new Set<NonNullable<TestInventoryItem['test_level']>>([
+  'unit',
+  'component',
+  'contract',
+  'integration',
+  'e2e',
+  'acceptance',
+  'exploratory',
+  'static',
+]);
+const EXECUTION_MODES = new Set<TestInventoryItem['execution_mode']>([
+  'safe_auto',
+  'approval_required',
+  'manual_only',
+  'prohibited',
+]);
+const AUTOMATION_ACTUATORS = new Set<NonNullable<TestInventoryItem['automation']>['actuator']>([
+  'code',
+  'system',
+  'browser',
+  'network',
+]);
+const EXECUTION_RESULT_STATUSES = new Set<TestExecutionResult['status']>([
+  'passed',
+  'failed',
+  'error',
+  'blocked',
+  'skipped',
+]);
+const EXECUTOR_RESOURCE_TYPES = new Set<
+  NonNullable<TestExecutionRecord['executor']>['resource_type']
+>(['human', 'ai_agent', 'automation']);
+
+function hasOnlyKeys(record: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const allowedKeys = new Set(allowed);
+  return Object.keys(record).every((key) => allowedKeys.has(key));
+}
+
+function requiredText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function optionalText(value: unknown): string | undefined | null {
+  if (value === undefined) return undefined;
+  return requiredText(value);
+}
+
+function stringList(
+  value: unknown,
+  options: { minItems?: number; unique?: boolean } = {}
+): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const values = value.map((item) => requiredText(item));
+  if (values.some((item): item is null => item === null)) return null;
+  const result = values as string[];
+  if ((options.minItems ?? 0) > result.length) return null;
+  if (options.unique && new Set(result).size !== result.length) return null;
+  return result;
+}
+
+function isDateTime(value: string): boolean {
+  return (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(value) &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+function parseQualityCheck(value: unknown): QualityCheck | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'software quality check');
+    if (
+      !hasOnlyKeys(record, [
+        'check_id',
+        'description',
+        'status',
+        'evidence_refs',
+        'owner_id',
+        'blocking',
+      ])
+    ) {
+      return null;
+    }
+    const checkId = requiredText(record.check_id);
+    const description = requiredText(record.description);
+    if (
+      !checkId ||
+      !description ||
+      !QUALITY_CHECK_STATUSES.has(record.status as QualityCheckStatus)
+    ) {
+      return null;
+    }
+    const evidenceRefs =
+      record.evidence_refs === undefined
+        ? undefined
+        : stringList(record.evidence_refs, { unique: true });
+    if (record.evidence_refs !== undefined && !evidenceRefs) return null;
+    const ownerId = optionalText(record.owner_id);
+    if (record.owner_id !== undefined && !ownerId) return null;
+    if (record.blocking !== undefined && typeof record.blocking !== 'boolean') return null;
+    const blocking: boolean | undefined =
+      typeof record.blocking === 'boolean' ? record.blocking : undefined;
+    return {
+      check_id: checkId,
+      description,
+      status: record.status as QualityCheckStatus,
+      ...(evidenceRefs ? { evidence_refs: evidenceRefs } : {}),
+      ...(ownerId ? { owner_id: ownerId } : {}),
+      ...(blocking !== undefined ? { blocking } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseAcceptanceCriterion(value: unknown): AcceptanceCriterion | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'software quality acceptance criterion');
+    if (
+      !hasOnlyKeys(record, [
+        'criterion_id',
+        'description',
+        'requirement_refs',
+        'expected_result',
+        'status',
+        'evidence_refs',
+      ])
+    ) {
+      return null;
+    }
+    const criterionId = requiredText(record.criterion_id);
+    const description = requiredText(record.description);
+    const requirementRefs = stringList(record.requirement_refs, { minItems: 1, unique: true });
+    const expectedResult = requiredText(record.expected_result);
+    if (
+      !criterionId ||
+      !description ||
+      !requirementRefs ||
+      !expectedResult ||
+      !QUALITY_CHECK_STATUSES.has(record.status as QualityCheckStatus)
+    ) {
+      return null;
+    }
+    const evidenceRefs =
+      record.evidence_refs === undefined
+        ? undefined
+        : stringList(record.evidence_refs, { unique: true });
+    if (record.evidence_refs !== undefined && !evidenceRefs) return null;
+    return {
+      criterion_id: criterionId,
+      description,
+      requirement_refs: requirementRefs,
+      expected_result: expectedResult,
+      status: record.status as QualityCheckStatus,
+      ...(evidenceRefs ? { evidence_refs: evidenceRefs } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseQualityWaiver(value: unknown): QualityWaiver | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'software quality waiver');
+    if (
+      !hasOnlyKeys(record, [
+        'waiver_id',
+        'check_refs',
+        'reason',
+        'accountable_human_id',
+        'expires_at',
+        'compensating_controls',
+        'residual_risk',
+      ])
+    ) {
+      return null;
+    }
+    const waiverId = requiredText(record.waiver_id);
+    const checkRefs = stringList(record.check_refs, { minItems: 1, unique: true });
+    const reason = requiredText(record.reason);
+    const accountableHumanId = requiredText(record.accountable_human_id);
+    const expiresAt = requiredText(record.expires_at);
+    const compensatingControls = stringList(record.compensating_controls, { minItems: 1 });
+    const residualRisk = requiredText(record.residual_risk);
+    if (
+      !waiverId ||
+      !checkRefs ||
+      !reason ||
+      !accountableHumanId ||
+      !expiresAt ||
+      !isDateTime(expiresAt) ||
+      !compensatingControls ||
+      !residualRisk
+    ) {
+      return null;
+    }
+    return {
+      waiver_id: waiverId,
+      check_refs: checkRefs,
+      reason,
+      accountable_human_id: accountableHumanId,
+      expires_at: expiresAt,
+      compensating_controls: compensatingControls,
+      residual_risk: residualRisk,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Parse a quality contract before a gate or report evaluation can consume it. */
+export function parseSoftwareQualityContract(value: unknown): SoftwareQualityContract | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'software quality contract');
+    if (
+      !hasOnlyKeys(record, [
+        'version',
+        'project_id',
+        'accountable_human_id',
+        'must_have_requirement_ids',
+        'dor',
+        'acceptance_criteria',
+        'dod',
+        'waivers',
+      ])
+    ) {
+      return null;
+    }
+    const version = requiredText(record.version);
+    const projectId = requiredText(record.project_id);
+    const accountableHumanId = requiredText(record.accountable_human_id);
+    const dor = Array.isArray(record.dor) ? record.dor.map(parseQualityCheck) : null;
+    const acceptanceCriteria = Array.isArray(record.acceptance_criteria)
+      ? record.acceptance_criteria.map(parseAcceptanceCriterion)
+      : null;
+    const dod = Array.isArray(record.dod) ? record.dod.map(parseQualityCheck) : null;
+    if (
+      !version ||
+      !projectId ||
+      !accountableHumanId ||
+      !dor ||
+      dor.length === 0 ||
+      dor.some((item) => item === null) ||
+      !acceptanceCriteria ||
+      acceptanceCriteria.length === 0 ||
+      acceptanceCriteria.some((item) => item === null) ||
+      !dod ||
+      dod.length === 0 ||
+      dod.some((item) => item === null)
+    ) {
+      return null;
+    }
+    const mustHaveRequirementIds =
+      record.must_have_requirement_ids === undefined
+        ? undefined
+        : stringList(record.must_have_requirement_ids, { unique: true });
+    if (record.must_have_requirement_ids !== undefined && !mustHaveRequirementIds) return null;
+    const waivers =
+      record.waivers === undefined
+        ? undefined
+        : Array.isArray(record.waivers)
+          ? record.waivers.map(parseQualityWaiver)
+          : null;
+    if (record.waivers !== undefined && (!waivers || waivers.some((item) => item === null))) {
+      return null;
+    }
+    return {
+      version,
+      project_id: projectId,
+      accountable_human_id: accountableHumanId,
+      dor: dor as QualityCheck[],
+      acceptance_criteria: acceptanceCriteria as AcceptanceCriterion[],
+      dod: dod as QualityCheck[],
+      ...(mustHaveRequirementIds ? { must_have_requirement_ids: mustHaveRequirementIds } : {}),
+      ...(waivers ? { waivers: waivers as QualityWaiver[] } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function parseTestInventoryItem(value: unknown): TestInventoryItem | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'test inventory item');
+    if (
+      !hasOnlyKeys(record, [
+        'item_id',
+        'title',
+        'viewpoint_ids',
+        'requirement_refs',
+        'acceptance_criteria_refs',
+        'risk_refs',
+        'preconditions',
+        'steps',
+        'risk_level',
+        'expected_result',
+        'test_level',
+        'execution_mode',
+        'automation_backend',
+        'automation',
+        'omission_reason',
+      ])
+    ) {
+      return null;
+    }
+    const itemId = requiredText(record.item_id);
+    const title = requiredText(record.title);
+    const viewpointIds = stringList(record.viewpoint_ids, { minItems: 1, unique: true });
+    const expectedResult = requiredText(record.expected_result);
+    if (
+      !itemId ||
+      !title ||
+      !viewpointIds ||
+      !expectedResult ||
+      !TEST_RISK_LEVELS.has(record.risk_level as TestInventoryItem['risk_level']) ||
+      !EXECUTION_MODES.has(record.execution_mode as TestInventoryItem['execution_mode'])
+    ) {
+      return null;
+    }
+    const optionalRefs: Record<string, string[] | undefined | null> = {
+      requirement_refs:
+        record.requirement_refs === undefined
+          ? undefined
+          : stringList(record.requirement_refs, { unique: true }),
+      acceptance_criteria_refs:
+        record.acceptance_criteria_refs === undefined
+          ? undefined
+          : stringList(record.acceptance_criteria_refs, { unique: true }),
+      risk_refs:
+        record.risk_refs === undefined ? undefined : stringList(record.risk_refs, { unique: true }),
+      preconditions:
+        record.preconditions === undefined ? undefined : stringList(record.preconditions),
+      steps: record.steps === undefined ? undefined : stringList(record.steps),
+    };
+    if (Object.values(optionalRefs).some((item) => item === null)) return null;
+    const testLevel = record.test_level === undefined ? undefined : record.test_level;
+    if (
+      testLevel !== undefined &&
+      !TEST_LEVELS.has(testLevel as NonNullable<TestInventoryItem['test_level']>)
+    ) {
+      return null;
+    }
+    const automationBackend = optionalText(record.automation_backend);
+    if (record.automation_backend !== undefined && !automationBackend) return null;
+    const omissionReason = optionalText(record.omission_reason);
+    if (record.omission_reason !== undefined && !omissionReason) return null;
+    let automation: TestInventoryItem['automation'];
+    if (record.automation !== undefined) {
+      const automationRecord = parseSafeJsonObjectValue(
+        record.automation,
+        'test inventory automation'
+      );
+      if (!hasOnlyKeys(automationRecord, ['actuator', 'op', 'params'])) return null;
+      const op = requiredText(automationRecord.op);
+      const params = parseSafeJsonObjectValue(
+        automationRecord.params,
+        'test inventory automation.params'
+      );
+      if (
+        !AUTOMATION_ACTUATORS.has(
+          automationRecord.actuator as NonNullable<TestInventoryItem['automation']>['actuator']
+        ) ||
+        !op ||
+        !/^[a-z][a-z0-9_]*$/u.test(op)
+      ) {
+        return null;
+      }
+      automation = {
+        actuator: automationRecord.actuator as NonNullable<
+          TestInventoryItem['automation']
+        >['actuator'],
+        op,
+        params,
+      };
+    }
+    return {
+      item_id: itemId,
+      title,
+      viewpoint_ids: viewpointIds,
+      ...(optionalRefs.requirement_refs ? { requirement_refs: optionalRefs.requirement_refs } : {}),
+      ...(optionalRefs.acceptance_criteria_refs
+        ? { acceptance_criteria_refs: optionalRefs.acceptance_criteria_refs }
+        : {}),
+      ...(optionalRefs.risk_refs ? { risk_refs: optionalRefs.risk_refs } : {}),
+      ...(optionalRefs.preconditions ? { preconditions: optionalRefs.preconditions } : {}),
+      ...(optionalRefs.steps ? { steps: optionalRefs.steps } : {}),
+      risk_level: record.risk_level as TestInventoryItem['risk_level'],
+      expected_result: expectedResult,
+      ...(testLevel ? { test_level: testLevel as TestInventoryItem['test_level'] } : {}),
+      execution_mode: record.execution_mode as TestInventoryItem['execution_mode'],
+      ...(automationBackend ? { automation_backend: automationBackend } : {}),
+      ...(automation ? { automation } : {}),
+      ...(omissionReason ? { omission_reason: omissionReason } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Parse a test inventory before traceability or dispatch evaluation can consume it. */
+export function parseTestInventory(value: unknown): TestInventory | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'test inventory');
+    if (!hasOnlyKeys(record, ['version', 'project_id', 'items'])) return null;
+    const version = requiredText(record.version);
+    const projectId = requiredText(record.project_id);
+    const items = Array.isArray(record.items) ? record.items.map(parseTestInventoryItem) : null;
+    if (!version || !projectId || !items || items.some((item) => item === null)) return null;
+    return { version, project_id: projectId, items: items as TestInventoryItem[] };
+  } catch {
+    return null;
+  }
+}
+
+function parseTestExecutionResult(value: unknown): TestExecutionResult | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'test execution result');
+    if (
+      !hasOnlyKeys(record, [
+        'item_id',
+        'status',
+        'evidence_refs',
+        'observed_result',
+        'defect_refs',
+        'retry_of',
+      ])
+    ) {
+      return null;
+    }
+    const itemId = requiredText(record.item_id);
+    const evidenceRefs = stringList(record.evidence_refs);
+    const observedResult: string | undefined =
+      typeof record.observed_result === 'string' ? record.observed_result : undefined;
+    if (
+      !itemId ||
+      !evidenceRefs ||
+      !EXECUTION_RESULT_STATUSES.has(record.status as TestExecutionResult['status']) ||
+      (observedResult !== undefined && typeof observedResult !== 'string')
+    ) {
+      return null;
+    }
+    const defectRefs =
+      record.defect_refs === undefined ? undefined : stringList(record.defect_refs);
+    const retryOf = optionalText(record.retry_of);
+    if (
+      (record.defect_refs !== undefined && !defectRefs) ||
+      (record.retry_of !== undefined && !retryOf)
+    ) {
+      return null;
+    }
+    return {
+      item_id: itemId,
+      status: record.status as TestExecutionResult['status'],
+      evidence_refs: evidenceRefs,
+      ...(observedResult !== undefined ? { observed_result: observedResult } : {}),
+      ...(defectRefs ? { defect_refs: defectRefs } : {}),
+      ...(retryOf ? { retry_of: retryOf } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Parse a persisted test execution record before report generation consumes it. */
+export function parseTestExecutionRecord(value: unknown): TestExecutionRecord | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'test execution record');
+    if (
+      !hasOnlyKeys(record, [
+        'version',
+        'run_id',
+        'project_id',
+        'subject_ref',
+        'environment',
+        'executor',
+        'started_at',
+        'finished_at',
+        'results',
+      ])
+    ) {
+      return null;
+    }
+    const version = requiredText(record.version);
+    const runId = requiredText(record.run_id);
+    const projectId = requiredText(record.project_id);
+    const subjectRef = requiredText(record.subject_ref);
+    const environment = requiredText(record.environment);
+    const startedAt = requiredText(record.started_at);
+    const finishedAt = requiredText(record.finished_at);
+    const results = Array.isArray(record.results)
+      ? record.results.map(parseTestExecutionResult)
+      : null;
+    if (
+      !version ||
+      !runId ||
+      !projectId ||
+      !subjectRef ||
+      !environment ||
+      !startedAt ||
+      !isDateTime(startedAt) ||
+      !finishedAt ||
+      !isDateTime(finishedAt) ||
+      !results ||
+      results.some((item) => item === null)
+    ) {
+      return null;
+    }
+    const executorRecord = parseSafeJsonObjectValue(record.executor, 'test execution executor');
+    if (!hasOnlyKeys(executorRecord, ['resource_id', 'resource_type'])) return null;
+    const resourceId = requiredText(executorRecord.resource_id);
+    if (
+      !resourceId ||
+      !EXECUTOR_RESOURCE_TYPES.has(
+        executorRecord.resource_type as NonNullable<
+          TestExecutionRecord['executor']
+        >['resource_type']
+      )
+    ) {
+      return null;
+    }
+    return {
+      version,
+      run_id: runId,
+      project_id: projectId,
+      subject_ref: subjectRef,
+      environment,
+      executor: {
+        resource_id: resourceId,
+        resource_type: executorRecord.resource_type as NonNullable<
+          TestExecutionRecord['executor']
+        >['resource_type'],
+      },
+      started_at: startedAt,
+      finished_at: finishedAt,
+      results: results as TestExecutionResult[],
+    };
+  } catch {
+    return null;
+  }
 }
 
 export interface DefectCandidate {

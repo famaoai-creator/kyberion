@@ -4,23 +4,15 @@ import { useEffect, useState } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import { uxMessage, uxText } from '../lib/ux-vocabulary';
+import { parseAgentHealthResponse } from '../lib/agent-health-response';
+import { parseIdentityResponse } from '../lib/identity-response';
 
 const STORAGE_KEY = 'chronos.first-run.dismissed';
 
-interface IdentitySummary {
-  onboarded: boolean;
-  agent: { agent_id: string | null } | null;
-  sovereign: { name: string | null } | null;
-}
-
-interface AgentsSummary {
-  total: number;
-}
-
 export function FirstRunBanner() {
   const locale = useChronosLocale();
-  const [identity, setIdentity] = useState<IdentitySummary | null>(null);
-  const [agents, setAgents] = useState<AgentsSummary | null>(null);
+  const [identity, setIdentity] = useState<ReturnType<typeof parseIdentityResponse>>(undefined);
+  const [agentsTotal, setAgentsTotal] = useState<number | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -31,15 +23,15 @@ export function FirstRunBanner() {
     let cancelled = false;
     Promise.all([
       fetch('/api/identity')
-        .then((r) => r.json())
-        .catch(() => null),
+        .then((r) => r.json().catch(() => null))
+        .then(parseIdentityResponse),
       fetch('/api/agents')
-        .then((r) => r.json())
-        .catch(() => null),
+        .then((r) => r.json().catch(() => null))
+        .then(parseAgentHealthResponse),
     ]).then(([id, ag]) => {
       if (!cancelled) {
         setIdentity(id);
-        setAgents(ag);
+        setAgentsTotal(ag?.total ?? null);
       }
     });
     return () => {
@@ -47,9 +39,9 @@ export function FirstRunBanner() {
     };
   }, []);
 
-  if (dismissed || !identity || !agents) return null;
+  if (dismissed || !identity || agentsTotal === null) return null;
 
-  const isFreshOnboard = identity.onboarded && agents.total === 0;
+  const isFreshOnboard = identity.onboarded && agentsTotal === 0;
   if (!isFreshOnboard) return null;
 
   const dismiss = () => {

@@ -1,4 +1,4 @@
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 
 /**
  * Perspective Loader
@@ -20,8 +20,12 @@ export const personaLoader = {
 };
 
 export function loadPerspectives(matrixPath: string): Record<string, PerspectiveDefinition> {
-  if (!safeExistsSync(matrixPath)) return {};
-  const content = safeReadFile(matrixPath, { encoding: 'utf8' }) as string;
+  const safeMatrixPath = assertSafeRepositoryPath(matrixPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeMatrixPath)) return {};
+  if (!safeLstat(safeMatrixPath).isFile()) {
+    throw new Error(`[PERSONA_LOADER] perspective matrix must be a regular file: ${matrixPath}`);
+  }
+  const content = safeReadFile(safeMatrixPath, { encoding: 'utf8' }) as string;
   const perspectives: Record<string, PerspectiveDefinition> = {};
 
   const sections = content.split(/^## /m);

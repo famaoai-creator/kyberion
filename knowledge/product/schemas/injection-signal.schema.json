@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/injection-signal.schema.json",
+  "title": "Injection Signal",
+  "description": "Persisted prompt-injection suspicion signal scoped to a mission or global session.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "injection_suspected": { "type": "boolean" },
+    "scopes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "timestamp": { "type": "string" }
+  }
+}

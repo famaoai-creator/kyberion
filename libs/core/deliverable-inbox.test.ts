@@ -5,6 +5,27 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const secureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (filePath: string) => {
+    const root = path.resolve(process.env.KYBERION_ROOT || '');
+    const resolved = path.resolve(filePath);
+    const relative = path.relative(root, resolved);
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error(`[RESOURCE_PATH_SCOPE] ${filePath}`);
+    }
+    let current = root;
+    for (const segment of relative.split(path.sep).filter(Boolean)) {
+      current = path.join(current, segment);
+      try {
+        if (fs.lstatSync(current).isSymbolicLink()) {
+          throw new Error(`[RESOURCE_PATH_SYMLINK] ${filePath}`);
+        }
+      } catch (error: unknown) {
+        if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') break;
+        throw error;
+      }
+    }
+    return resolved;
+  },
   safeAppendFileSync: (filePath: string, data: string) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.appendFileSync(filePath, data, 'utf8');
@@ -14,6 +35,7 @@ const secureIo = vi.hoisted(() => ({
     fs.writeFileSync(filePath, data);
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
@@ -36,6 +58,18 @@ const secureIo = vi.hoisted(() => ({
 }));
 
 vi.mock('./secure-io.js', () => secureIo);
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: secureIo.loadJson,
+    loadJsonIfPresent: secureIo.loadJsonIfPresent,
+    appendFile: secureIo.safeAppendFileSync,
+    exists: secureIo.safeExistsSync,
+    readFile: (filePath: string) => String(secureIo.safeReadFile(filePath)),
+    stat: () => ({ mtimeMs: 0, size: 0 }),
+    writeFile: secureIo.safeWriteFile,
+  }),
+  registerFoundationIo: vi.fn(),
+}));
 
 describe('deliverable inbox', () => {
   let tmpRoot: string;
@@ -44,6 +78,12 @@ describe('deliverable inbox', () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-inbox-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    const schemaDir = path.join(tmpRoot, 'knowledge/product/schemas');
+    fs.mkdirSync(schemaDir, { recursive: true });
+    fs.copyFileSync(
+      path.resolve('knowledge/product/schemas/deliverable-inbox-entry.schema.json'),
+      path.join(schemaDir, 'deliverable-inbox-entry.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
   });
 
@@ -51,6 +91,14 @@ describe('deliverable inbox', () => {
     delete process.env.KYBERION_ROOT;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
     vi.resetModules();
+  });
+
+  it('rejects malformed inbox lock records', async () => {
+    const { normalizeInboxLockRecord } = await import('./deliverable-inbox.js');
+    expect(normalizeInboxLockRecord([])).toBeUndefined();
+    expect(normalizeInboxLockRecord({ pid: '123' })).toBeUndefined();
+    expect(normalizeInboxLockRecord({ pid: 1.5 })).toBeUndefined();
+    expect(normalizeInboxLockRecord({ pid: process.pid })).toEqual({ pid: process.pid });
   });
 
   it('adds, lists, and marks inbox entries', async () => {
@@ -156,5 +204,48 @@ describe('deliverable inbox', () => {
     expect(delivered?.delivery_receipt?.artifact_digest).toBe(
       delivered?.acceptance_receipt?.artifact_digest
     );
+  });
+
+  it('rejects a symlinked inbox file before reading or writing', async () => {
+    const { listInboxEntries } = await import('./deliverable-inbox.js');
+    const inboxDir = path.join(tmpRoot, 'active/shared/inbox');
+    const inboxPath = path.join(inboxDir, 'entries.jsonl');
+    const targetPath = path.join(tmpRoot, 'outside-inbox.jsonl');
+    fs.mkdirSync(inboxDir, { recursive: true });
+    fs.writeFileSync(targetPath, '{"entry_id":"outside"}\n');
+    fs.symlinkSync(targetPath, inboxPath);
+
+    try {
+      expect(() => listInboxEntries()).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(inboxPath, { force: true });
+      fs.rmSync(targetPath, { force: true });
+    }
+  });
+
+  it('rejects schema-invalid persisted entries before listing or updating', async () => {
+    const { listInboxEntries } = await import('./deliverable-inbox.js');
+    const inboxDir = path.join(tmpRoot, 'active/shared/inbox');
+    const inboxPath = path.join(inboxDir, 'entries.jsonl');
+    fs.mkdirSync(inboxDir, { recursive: true });
+    fs.writeFileSync(
+      inboxPath,
+      `${JSON.stringify({
+        entry_id: 'INBOX-INVALID',
+        title: 'Invalid entry',
+        artifact_paths: [],
+        summary: 'missing timestamps and status',
+      })}\n`
+    );
+
+    expect(() => listInboxEntries()).toThrow(/Invalid catalog deliverable-inbox-entry/);
+  });
+
+  it('rejects a directory at the inbox entries path', async () => {
+    const { listInboxEntries } = await import('./deliverable-inbox.js');
+    const inboxDir = path.join(tmpRoot, 'active/shared/inbox');
+    fs.mkdirSync(path.join(inboxDir, 'entries.jsonl'), { recursive: true });
+
+    expect(() => listInboxEntries()).toThrow(/entries must be a regular file/);
   });
 });

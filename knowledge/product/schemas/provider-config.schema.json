@@ -64,6 +64,10 @@
         "grok": {
           "type": "string",
           "minLength": 1
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false
@@ -105,6 +109,10 @@
           "minLength": 1
         },
         "copilot-default": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cursor-default": {
           "type": "string",
           "minLength": 1
         }

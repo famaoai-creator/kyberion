@@ -14,7 +14,10 @@ import {
   registerEnvironmentRegistryReader,
 } from './foundation/env.js';
 import { assertSensitivePathAllowed, assertSensitiveTextAllowed } from './sensitive-path-policy.js';
+import { assertSandboxNetworkAllowed } from './sandbox-policy.js';
 import { registerFoundationIo } from './foundation/io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { policyEngine } from './policy-engine.js';
 import * as auditChainModule from './audit-chain.js';
@@ -117,6 +120,49 @@ export interface SafeWriteOptions {
   __sudo?: string;
 }
 
+/**
+ * Validate a repository-relative resource path without allowing an existing
+ * path component to be a symbolic link. This is intentionally separate from
+ * the lexical permission checks in safeReadFile/safeWriteFile: model-facing
+ * tools need to reject a path that stays lexically inside the repository but
+ * resolves through a link into another scope.
+ */
+export function assertSafeRepositoryPath(
+  filePath: string,
+  options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
+): string {
+  if (!filePath) throw new Error('Missing required resource path');
+
+  const resolved = pathResolver.resolve(filePath);
+  const root = path.resolve(options.rootDir ?? pathResolver.rootDir());
+  const relative = path.relative(root, resolved).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+    );
+  }
+
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (fs.lstatSync(current).isSymbolicLink()) {
+        throw new Error(
+          `[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link: ${filePath}`
+        );
+      }
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') break;
+      throw error;
+    }
+  }
+
+  if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
+    throw new Error(`Resource path does not exist: ${resolved}`);
+  }
+  return resolved;
+}
+
 export function buildSafeExecEnv(
   extraEnv: Record<string, string | undefined> = {}
 ): NodeJS.ProcessEnv {
@@ -126,7 +172,7 @@ export function buildSafeExecEnv(
   // boundary instead of polluting every assignment with NODE_ENV.
   const safeEnv: Record<string, string | undefined> = {
     FORCE_COLOR: '0',
-    TERM: process.env.TERM || 'dumb',
+    TERM: getRegisteredEnvText('TERM') || 'dumb',
   };
 
   for (const key of SAFE_EXEC_ENV_ALLOWLIST) {
@@ -201,7 +247,9 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
  */
 function secureLoadJson<T>(filePath: string): T {
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as T;
+  return parseSafeJsonInput(raw, `JSON file ${path.basename(filePath)}`, {
+    preserveParseError: true,
+  }) as T;
 }
 
 /** Read and parse an optional JSON file, returning null for missing or invalid input. */
@@ -804,6 +852,8 @@ export function validateUrl(url: string, options?: { allowLocalNetwork?: boolean
     throw new Error('Missing or invalid URL');
   }
 
+  assertSandboxNetworkAllowed(url);
+
   try {
     const parsed = new URL(url);
 
@@ -878,7 +928,7 @@ export function writeArtifact(filePath: string, data: string | Buffer, format: s
     hash,
     format,
     size_bytes: data.length,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   };
 }
 
@@ -985,6 +1035,7 @@ registerOptionalAuditIo('registerAuditChainIo', {
   mkdir: (dirPath) => safeMkdir(dirPath, { recursive: true }),
   readdir: safeReaddir,
   append: (filePath, content) => safeAppendFileSync(filePath, content),
+  assertSafePath: (filePath, options) => assertSafeRepositoryPath(filePath, options),
 });
 registerOptionalAuditIo('registerChainIntegrityIo', {
   exists: safeExistsSync,

@@ -4,13 +4,15 @@ import { randomBytes } from 'node:crypto';
 import {
   isEncryptedConnectionEnvelope,
   overrideSecretEncryptionKeyForTests,
-  pathResolver,
+} from '@agent/core/secret-encryption';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
   safeExistsSync,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { migrateConnectionDocuments } from './encrypt_connection_documents.js';
 
 let dir: string;
@@ -56,5 +58,19 @@ describe('migrateConnectionDocuments (AC-05)', () => {
       safeReadFile(path.join(dir, 'github.json'), { encoding: 'utf8' }) as string
     );
     expect(plain).toEqual({ token: 'ghp_abc' });
+  });
+
+  it('skips persisted documents containing dangerous JSON keys', () => {
+    safeWriteFile(
+      path.join(dir, 'unsafe.json'),
+      '{"__proto__":{"token":"should-not-be-reencrypted"}}\n'
+    );
+
+    expect(migrateConnectionDocuments({ decrypt: false, connectionsDir: dir })).toEqual({
+      encrypted: 1,
+      decrypted: 0,
+      skipped: 1,
+    });
+    expect(safeExistsSync(path.join(dir, 'unsafe.json.bak'))).toBe(false);
   });
 });

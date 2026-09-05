@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import {
+  optionalRequestString,
+  readRequestObject,
+  RequestInputError,
+} from '../../../../lib/request-input';
 import { voiceHubUrl } from '../../../../lib/voice-hub';
+import { parseVoiceListenOnceResponse } from '../../../../lib/voice-types';
+import { conciergeErrorResponse } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,15 +27,23 @@ export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
 
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const backend =
-    typeof body.backend === 'string' && body.backend.trim() ? body.backend.trim() : undefined;
-  const device =
-    typeof body.device === 'string' && body.device.trim() ? body.device.trim() : undefined;
-  const locale =
-    typeof body.locale === 'string' && body.locale.trim() ? body.locale.trim() : 'ja-JP';
-
   try {
+    const parsedBody = await readRequestObject(req, 'request body', [
+      'backend',
+      'device',
+      'locale',
+    ]);
+    if (!parsedBody.ok) {
+      return NextResponse.json({ ok: false, error: 'invalid request body' }, { status: 400 });
+    }
+    const body = parsedBody.body;
+    const backendValue = optionalRequestString(body, 'backend');
+    const deviceValue = optionalRequestString(body, 'device');
+    const localeValue = optionalRequestString(body, 'locale');
+    const backend = backendValue?.trim() || undefined;
+    const device = deviceValue?.trim() || undefined;
+    const locale = localeValue?.trim() || 'ja-JP';
+
     const response = await fetch(`${voiceHubUrl()}/api/listen-once`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -45,20 +60,20 @@ export async function POST(req: NextRequest) {
       }),
       signal: AbortSignal.timeout(LISTEN_ONCE_TIMEOUT_MS),
     });
-    const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    const payload = parseVoiceListenOnceResponse(await response.json().catch(() => null));
     if (!payload) {
       return NextResponse.json(
-        { ok: false, error: `voice-hub responded ${response.status} without JSON` },
+        { ok: false, error: `voice-hub responded ${response.status} with an invalid response` },
         { status: 502 }
       );
     }
     return NextResponse.json(payload, { status: response.status });
   } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ ok: false, error: 'invalid request body' }, { status: 400 });
+    }
     // Daemon down or capture timed out — a clear machine-readable failure the
     // hook maps to a polite notice (never an unhandled exception).
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 503 }
-    );
+    return conciergeErrorResponse(error, 503);
   }
 }

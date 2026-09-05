@@ -1,10 +1,10 @@
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
-  buildGovernedRetryOptions,
+  createGovernedRetryOptionsBuilder,
   loadRecoveryPolicy as loadRecoveryPolicyFromManifest,
-  waitForJob,
-  VideoRenderRuntime,
-} from '@agent/core';
+} from '@agent/core/recovery-policy';
+import { waitForJob } from '@agent/core/job-lifecycle';
+import { VideoRenderRuntime } from '@agent/core/video-render-runtime';
 import { compileSchema } from '@agent/core/foundation';
 
 export const videoCompositionActionValidate = compileSchema(
@@ -56,13 +56,11 @@ export function loadRecoveryPolicy(): Record<string, any> {
   return loadRecoveryPolicyFromManifest(VIDEO_MANIFEST_PATH);
 }
 
-export function buildRetryOptions(defaultRetry: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: VIDEO_MANIFEST_PATH,
-    defaults: defaultRetry,
-    fallbackCategories: ['resource_unavailable', 'timeout'],
-  });
-}
+export const buildVideoRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: VIDEO_MANIFEST_PATH,
+  defaults: DEFAULT_VIDEO_RETRY,
+  fallbackCategories: ['resource_unavailable', 'timeout'],
+});
 
 export function deepResolve(val: any, ctx: any): any {
   if (typeof val === 'string') {

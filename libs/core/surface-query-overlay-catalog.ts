@@ -49,7 +49,3 @@ export function getSurfaceQueryOverlayCatalogEntry(
   if (!normalized) return null;
   return listSurfaceQueryOverlayCatalogEntries().find((entry) => entry.id === normalized) || null;
 }
-
-export function resetSurfaceQueryOverlayCatalogCache(): void {
-  catalog.reset();
-}

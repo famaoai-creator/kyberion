@@ -19,11 +19,22 @@ import { appendJsonLine } from './foundation/json.js';
  */
 
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeMoveSync, safeReadFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeMoveSync,
+} from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
 export type SecurityPosture = 'dangerous' | 'auto' | 'strict';
 
@@ -50,12 +61,15 @@ export function composeSecurityPosture(
 }
 
 const POSTURE_PATH = pathResolver.knowledge('product/governance/security-posture.json');
+const POSTURE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/security-posture.schema.json');
 const POSTURE_CACHE_TTL_MS = 15_000;
 let postureFileCache: { value: SecurityPosture; at: number } | null = null;
 
-export function resetConfiguredPostureCache(): void {
-  postureFileCache = null;
-}
+const postureCatalog = defineCatalog<{ version: string; posture: SecurityPosture }>({
+  id: 'security-posture',
+  path: POSTURE_PATH,
+  schema: POSTURE_SCHEMA_PATH,
+});
 
 export function resolveConfiguredPosture(): SecurityPosture {
   const envValue = getRegisteredEnvText('KYBERION_SECURITY_POSTURE')?.trim();
@@ -77,14 +91,14 @@ export function resolveConfiguredPosture(): SecurityPosture {
 function resolvePostureFromFile(): SecurityPosture {
   if (safeExistsSync(POSTURE_PATH)) {
     try {
-      const raw = safeReadFile(POSTURE_PATH, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(raw) as { posture?: unknown };
-      const fromFile = parsePosture(parsed.posture);
-      if (fromFile) return fromFile;
-      logger.warn(
-        `[QM-04] security-posture.json has no valid "posture" (dangerous|auto|strict); using auto.`
-      );
+      return postureCatalog.load().posture;
     } catch (error) {
+      if (error instanceof Error && error.message.startsWith('Invalid catalog security-posture')) {
+        logger.warn(
+          `[QM-04] security-posture.json has no valid "posture" (dangerous|auto|strict); using auto.`
+        );
+        return 'auto';
+      }
       logger.warn(`[QM-04] security-posture.json unreadable; failing toward strict: ${error}`);
       return 'strict';
     }
@@ -155,20 +169,25 @@ const INVALID_VERDICT: ScreenDecision = {
  * treated as strict. A screener may never return "dangerous".
  */
 export function parseScreenVerdict(raw: string): ScreenDecision {
-  const json = firstJsonObject(String(raw ?? ''));
+  const text = String(raw ?? '').trim();
+  const firstJsonToken = text.search(/[\[{]/u);
+  if (firstJsonToken >= 0 && text[firstJsonToken] === '[') return INVALID_VERDICT;
+  const json = firstJsonObject(text);
   if (!json) return INVALID_VERDICT;
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(json);
+    const parsed = parseSafeJsonObjectInput(json, 'security screen verdict');
+    if (!parsed) return INVALID_VERDICT;
+    const decision = parsed.decision;
+    if (decision === 'auto') return { decision: 'auto' };
+    if (decision === 'strict') {
+      const reason = parsed.reason;
+      return {
+        decision: 'strict',
+        reason: typeof reason === 'string' ? reason : 'screener verdict',
+      };
+    }
   } catch {
     return INVALID_VERDICT;
-  }
-  if (typeof parsed !== 'object' || parsed === null) return INVALID_VERDICT;
-  const decision = (parsed as { decision?: unknown }).decision;
-  if (decision === 'auto') return { decision: 'auto' };
-  if (decision === 'strict') {
-    const reason = (parsed as { reason?: unknown }).reason;
-    return { decision: 'strict', reason: typeof reason === 'string' ? reason : 'screener verdict' };
   }
   return INVALID_VERDICT;
 }
@@ -265,18 +284,39 @@ export interface QuarantineRecord {
   reason: string;
   indicators: string[];
   content: string;
+  content_truncated?: boolean;
   securityTainted: true;
 }
 
+const QUARANTINE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/quarantine-record.schema.json'
+);
+
 function quarantineDir(): string {
-  return (
+  const configured =
     getRegisteredEnvText('KYBERION_SECURITY_QUARANTINE_DIR')?.trim() ||
-    pathResolver.shared('runtime/security')
-  );
+    pathResolver.shared('runtime/security');
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 function quarantinePath(): string {
-  return `${quarantineDir()}/quarantine.jsonl`;
+  return assertSafeRepositoryPath(path.join(quarantineDir(), 'quarantine.jsonl'), {
+    allowMissingLeaf: true,
+  });
+}
+
+function quarantineCatalog(filePath: string) {
+  return defineCatalog<QuarantineRecord>({
+    id: 'quarantine-record',
+    path: filePath,
+    schema: QUARANTINE_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularQuarantineFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[QM-04] quarantine must be a regular file: ${filePath}`);
+  }
 }
 
 /**
@@ -296,9 +336,9 @@ function rotateQuarantineIfOversized(): void {
   const current = quarantinePath();
   if (!safeExistsSync(current)) return;
   try {
-    const raw = safeReadFile(current, { encoding: 'utf8' }) as string;
-    if (Buffer.byteLength(raw, 'utf8') < maxQuarantineFileBytes()) return;
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    ensureRegularQuarantineFile(current);
+    if (safeLstat(current).size < maxQuarantineFileBytes()) return;
+    const stamp = nowIso().replace(/[:.]/g, '-');
     safeMoveSync(current, `${quarantineDir()}/quarantine-${stamp}.jsonl`);
   } catch (error) {
     logger.warn(`[QM-04] quarantine rotation failed (ignored): ${error}`);
@@ -311,11 +351,11 @@ export function recordQuarantine(input: {
   reason: string;
   scope?: string;
   indicators?: string[];
-}): QuarantineRecord & { content_truncated?: boolean } {
+}): QuarantineRecord {
   const truncated = input.content.length > MAX_QUARANTINE_CONTENT_CHARS;
-  const record: QuarantineRecord & { content_truncated?: boolean } = {
+  const record: QuarantineRecord = {
     id: randomUUID(),
-    recorded_at: new Date().toISOString(),
+    recorded_at: nowIso(),
     source: input.source,
     ...(input.scope ? { scope: input.scope } : {}),
     reason: input.reason,
@@ -326,7 +366,9 @@ export function recordQuarantine(input: {
   };
   safeMkdir(quarantineDir());
   rotateQuarantineIfOversized();
-  appendJsonLine(quarantinePath(), record);
+  const filePath = quarantinePath();
+  ensureRegularQuarantineFile(filePath);
+  appendJsonLine(filePath, quarantineCatalog(filePath).validate(record, filePath));
   try {
     auditChain.record({
       agentId: 'security-screen',
@@ -349,18 +391,14 @@ export function recordQuarantine(input: {
 }
 
 export function listQuarantineRecords(limit = 100): QuarantineRecord[] {
-  if (!safeExistsSync(quarantinePath())) return [];
-  const raw = safeReadFile(quarantinePath(), { encoding: 'utf8' }) as string;
-  const records: QuarantineRecord[] = [];
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      records.push(JSON.parse(trimmed) as QuarantineRecord);
-    } catch {
-      logger.warn('[QM-04] skipping unparseable quarantine line');
-    }
-  }
+  const filePath = quarantinePath();
+  if (!safeExistsSync(filePath)) return [];
+  ensureRegularQuarantineFile(filePath);
+  const catalog = quarantineCatalog(filePath);
+  const records = readJsonLines<QuarantineRecord>(filePath, {
+    onMalformed: () => logger.warn('[QM-04] skipping unparseable quarantine line'),
+    map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
+  });
   return records.slice(-limit);
 }
 

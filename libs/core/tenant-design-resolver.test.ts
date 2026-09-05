@@ -1,14 +1,55 @@
 import path from 'node:path';
+import * as fs from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { resolveTenantDesign } from './tenant-design-resolver.js';
+import {
+  loadTenantDesignOverride,
+  loadTenantDesignOverrideIndex,
+  loadTenantDesignThemeOverlay,
+  resolveTenantDesign,
+} from './tenant-design-resolver.js';
 
 describe('tenant-design-resolver', () => {
   const rootDir = pathResolver.shared('tmp/tenant-design-resolver-fixture');
 
   afterEach(() => {
     safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it('loads the confidential design override index through its dedicated schema', () => {
+    const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
+    safeMkdir(path.dirname(indexPath), { recursive: true });
+    safeWriteFile(
+      indexPath,
+      JSON.stringify({
+        tenants: [
+          {
+            id: 'tenant-a',
+            override_path: 'knowledge/confidential/tenant-a/design/tenant-override.json',
+          },
+        ],
+      })
+    );
+
+    expect(loadTenantDesignOverrideIndex(rootDir)).toEqual({
+      tenants: [
+        {
+          id: 'tenant-a',
+          override_path: 'knowledge/confidential/tenant-a/design/tenant-override.json',
+        },
+      ],
+    });
+  });
+
+  it('rejects a present but schema-invalid confidential design index', () => {
+    const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
+    safeMkdir(path.dirname(indexPath), { recursive: true });
+    safeWriteFile(indexPath, JSON.stringify({ tenants: [{ id: 'tenant-a' }] }));
+
+    expect(() => loadTenantDesignOverrideIndex(rootDir)).toThrow(
+      'Invalid catalog tenant-design-override-index'
+    );
   });
 
   it('resolves tenant branding from confidential override files', () => {
@@ -106,6 +147,36 @@ describe('tenant-design-resolver', () => {
     expect(result.themePack).toEqual(expect.objectContaining({ theme_id: 'client-a' }));
   });
 
+  it('fails closed when a tenant override violates the shared shape contract', () => {
+    const designDir = path.join(rootDir, 'knowledge/confidential/client-a/design');
+    const overridePath = path.join(designDir, 'tenant-override.json');
+    safeMkdir(designDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ brand_name: 'Aster Bank', matchers: ['valid', 42] })
+    );
+
+    expect(loadTenantDesignOverride(rootDir, overridePath, designDir)).toBeNull();
+    expect(resolveTenantDesign({ rootDir, brandName: 'Aster Bank' }).source).toBe('default');
+  });
+
+  it('fails closed when a tenant theme overlay violates the shared shape contract', () => {
+    const designDir = path.join(rootDir, 'knowledge/confidential/client-a/design');
+    const themePath = path.join(designDir, 'theme.json');
+    safeMkdir(designDir, { recursive: true });
+    safeWriteFile(themePath, JSON.stringify({ theme: { colors: { primary: 42 } } }));
+
+    expect(loadTenantDesignThemeOverlay(rootDir, themePath, designDir)).toBeNull();
+  });
+
+  it('fails closed when a tenant design artifact is a directory', () => {
+    const designDir = path.join(rootDir, 'knowledge/confidential/client-a/design');
+    const overridePath = path.join(designDir, 'tenant-override.json');
+    safeMkdir(overridePath, { recursive: true });
+
+    expect(loadTenantDesignOverride(rootDir, overridePath, designDir)).toBeNull();
+  });
+
   it('falls back to default when no tenant override matches', () => {
     const result = resolveTenantDesign({
       rootDir,
@@ -117,6 +188,79 @@ describe('tenant-design-resolver', () => {
     expect(result.tokens).toEqual({});
     expect(result.layoutCatalog).toBeNull();
     expect(result.logoPath).toBeNull();
+  });
+
+  it('does not read a theme pack from another tenant directory', () => {
+    const tenantDir = path.join(rootDir, 'knowledge/confidential/tenant-a/design');
+    const otherDir = path.join(rootDir, 'knowledge/confidential/tenant-b/design');
+    safeMkdir(tenantDir, { recursive: true });
+    safeMkdir(otherDir, { recursive: true });
+    safeWriteFile(
+      path.join(otherDir, 'theme.json'),
+      JSON.stringify({ brand_name: 'Other Corp', theme: { colors: { primary: '#bad' } } })
+    );
+    safeWriteFile(
+      path.join(tenantDir, 'tenant-override.json'),
+      JSON.stringify({
+        brand_name: 'Tenant A',
+        matchers: ['tenant a'],
+        theme_pack_path: 'knowledge/confidential/tenant-b/design/theme.json',
+      })
+    );
+
+    const result = resolveTenantDesign({ rootDir, brandName: 'Tenant A' });
+    expect(result.source).toBe('tenant');
+    expect(result.themePack).toBeNull();
+    expect(JSON.stringify(result)).not.toContain('Other Corp');
+  });
+
+  it('keeps an explicit tenant context from resolving another tenant design', () => {
+    for (const [tenantId, brandName] of [
+      ['tenant-a', 'Tenant A'],
+      ['tenant-b', 'Tenant B'],
+    ]) {
+      const designDir = path.join(rootDir, 'knowledge/confidential', tenantId, 'design');
+      safeMkdir(designDir, { recursive: true });
+      safeWriteFile(
+        path.join(designDir, 'tenant-override.json'),
+        JSON.stringify({ brand_name: brandName, matchers: [brandName.toLowerCase()] })
+      );
+    }
+
+    const result = resolveTenantDesign({
+      rootDir,
+      customerId: 'tenant-a',
+      brandName: 'Tenant B',
+    });
+
+    expect(result.source).toBe('default');
+    expect(result.tenantOverride).toBeNull();
+  });
+
+  it('rejects a registry override that points into a lower tier', () => {
+    const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
+    const personalDesignDir = path.join(rootDir, 'knowledge/personal/secret/design');
+    safeMkdir(path.dirname(indexPath), { recursive: true });
+    safeMkdir(personalDesignDir, { recursive: true });
+    safeWriteFile(
+      indexPath,
+      JSON.stringify({
+        tenants: [
+          {
+            id: 'secret',
+            override_path: 'knowledge/personal/secret/design/tenant-override.json',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      path.join(personalDesignDir, 'tenant-override.json'),
+      JSON.stringify({ brand_name: 'Personal Leak', matchers: ['personal leak'] })
+    );
+
+    expect(() => resolveTenantDesign({ rootDir, brandName: 'Personal Leak' })).toThrow(
+      'Invalid catalog tenant-design-override-index'
+    );
   });
 });
 
@@ -167,6 +311,25 @@ describe('tenant-design-resolver tier isolation (DS-02)', () => {
     const resolution = resolveTenantDesign({ rootDir, brandName: 'Some Other Brand' });
     expect(resolution.source).toBe('default');
     expect(JSON.stringify(resolution)).not.toContain('Secret Corp');
+  });
+
+  it('does not resolve a tenant override through a symlinked tenant directory', () => {
+    const targetDir = path.join(rootDir, 'active/shared/escaped-design');
+    const linkedDir = path.join(rootDir, 'knowledge/confidential/linked-corp');
+    safeMkdir(targetDir, { recursive: true });
+    safeMkdir(path.dirname(linkedDir), { recursive: true });
+    safeWriteFile(
+      path.join(targetDir, 'design/tenant-override.json'),
+      JSON.stringify({ brand_name: 'Escaped Corp', matchers: ['escaped corp'] })
+    );
+    fs.symlinkSync(targetDir, linkedDir, 'dir');
+    try {
+      const resolution = resolveTenantDesign({ rootDir, brandName: 'Escaped Corp' });
+      expect(resolution.source).toBe('default');
+      expect(resolution.tenantOverride).toBeNull();
+    } finally {
+      fs.unlinkSync(linkedDir);
+    }
   });
 
   it('serves confidential branding only inside the matching tenant context', () => {

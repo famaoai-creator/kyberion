@@ -64,6 +64,10 @@ describe('concierge surface contract', () => {
     expect(setupRoute).toContain("action === 'save_management'");
     expect(setupRoute).toContain('saveBrowserOnboardingVoiceSample');
     expect(setupRoute).toContain("action === 'avatar'");
+    expect(setupRoute).toContain('loadSurfaceManifest()');
+    expect(setupRoute).not.toContain("active-surfaces.json')");
+    expect(setupRoute).toContain('loadSurfaceRoleCatalog()');
+    expect(setupRoute).not.toContain("surface-roles.json')");
   });
 
   it('keeps GET routes free of mutations (summary/theme are read-only)', () => {
@@ -83,6 +87,24 @@ describe('concierge surface contract', () => {
     }
   });
 
+  it('resolves a server-side viewer before exposing operator data', () => {
+    for (const route of [
+      'src/app/api/setup/route.ts',
+      'src/app/api/config-missions/route.ts',
+      'src/app/api/notification-preferences/route.ts',
+      'src/app/api/hygiene/route.ts',
+      'src/app/api/memory-queue/route.ts',
+      'src/app/api/plugins/route.ts',
+      'src/app/api/response-status/route.ts',
+      'src/app/api/outcomes/[id]/preview/route.ts',
+      'src/app/api/voice/status/route.ts',
+    ]) {
+      const source = fs.readFileSync(path.join(appDir, route), 'utf8');
+      expect(source, route).toContain('resolveConciergeViewer');
+      expect(source, route).toMatch(/resolved\.response/);
+    }
+  });
+
   it('implements the CS-01 conversation core with the two-path failover', () => {
     const route = fs.readFileSync(path.join(appDir, 'src/app/api/message/route.ts'), 'utf8');
     expect(route).toContain('requireConciergeMutationAccess');
@@ -92,11 +114,20 @@ describe('concierge surface contract', () => {
     // Fallback path: lazy orchestrator import (no second daemon required).
     expect(route).toContain("import('@agent/core/channel-surface')");
     expect(route).toContain('runSurfaceMessageConversation');
+    // Conversation execution receives a server-resolved, non-personal scope
+    // on both the rich bridge and the in-process fallback.
+    expect(route).toContain('resolveConciergeViewer');
+    expect(route).toContain('conciergeConversationScope');
+    expect(route).toContain('scope');
     // Both paths failing must produce a loud, actionable 503 — never silence.
     expect(route).toContain("mode: 'unavailable'");
     expect(route).toContain('503');
-    expect(route).toContain('replyText');
+    expect(route).toContain('reply');
     expect(route).toContain('intentResolution');
+    // The rich voice-hub path must pass through the same deterministic
+    // vocabulary/approval contract as the in-process fallback.
+    expect(route).toContain('checkAndRepairSurfaceUxContract');
+    expect(route).toContain('prepareReplyForDelivery');
     expect(route).toContain("shape: 'clarification'");
     expect(route).toContain("shape: 'execution_preview'");
   });
@@ -130,6 +161,8 @@ describe('concierge surface contract', () => {
     expect(dock).toContain('execution_preview');
     expect(dock).toContain('intentResolution: payload.intentResolution');
     expect(dock).toContain('buildIntentResolutionView');
+    expect(dock).toContain('OUTCOME_LABEL_KEYS');
+    expect(dock).toContain('t(OUTCOME_LABEL_KEYS[intentView.outcome])');
     expect(dock).toContain('dock-intent-resolution');
     expect(dock).toContain('dock.intent_resolution.waiting_approval');
     expect(messages).toContain('dock.shape.clarification');
@@ -140,6 +173,7 @@ describe('concierge surface contract', () => {
     expect(messages).toContain('dock.intent_resolution.missing');
     expect(messages).toContain('dock.intent_resolution.next');
     expect(messages).toContain('dock.intent_resolution.outcome');
+    expect(messages).toContain('dock.intent_resolution.outcome_service_change');
     // ceo-ux.md: no internal execution vocabulary in dock copy.
     expect(dock).not.toMatch(/actuator|pipeline|ADF/i);
   });

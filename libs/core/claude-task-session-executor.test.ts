@@ -5,6 +5,7 @@ const {
   runApprovedClaudeDocumentTask,
   updateTaskSession,
   recordTaskSessionHistory,
+  assertSafeRepositoryPath,
   safeWriteFile,
 } = vi.hoisted(() => {
   const runApprovedClaudeBrowserTask = vi.fn();
@@ -22,12 +23,14 @@ const {
     artifact: patch?.artifact,
   }));
   const recordTaskSessionHistory = vi.fn();
+  const assertSafeRepositoryPath = vi.fn((filePath: string) => filePath);
   const safeWriteFile = vi.fn();
   return {
     runApprovedClaudeBrowserTask,
     runApprovedClaudeDocumentTask,
     updateTaskSession,
     recordTaskSessionHistory,
+    assertSafeRepositoryPath,
     safeWriteFile,
   };
 });
@@ -43,6 +46,7 @@ vi.mock('./task-session.js', () => ({
 }));
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath,
   safeWriteFile,
 }));
 

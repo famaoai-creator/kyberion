@@ -1,4 +1,6 @@
 import { discoverProviders } from './provider-discovery.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import {
   probeLmStudioBackendAvailability,
   probeLlamaCppBackendAvailability,
@@ -49,6 +51,7 @@ function cliProviderForMode(mode: string): string | undefined {
       'claude-agent': 'claude',
       'gemini-cli': 'gemini',
       'grok-cli': 'grok',
+      'cursor-cli': 'cursor',
       copilot: 'copilot',
     } as Record<string, string>
   )[mode];
@@ -59,7 +62,7 @@ async function probeMode(
 ): Promise<{ status: ReasoningRouteDoctorStatus; reason: string }> {
   if (mode === 'stub') return { status: 'ready', reason: 'deterministic stub available' };
   if (mode === 'anthropic') {
-    return process.env.ANTHROPIC_API_KEY?.trim()
+    return getRegisteredEnvText('ANTHROPIC_API_KEY')?.trim()
       ? { status: 'ready', reason: 'ANTHROPIC_API_KEY configured; live call not consumed' }
       : { status: 'not_configured', reason: 'ANTHROPIC_API_KEY is not configured' };
   }
@@ -198,7 +201,7 @@ export async function inspectReasoningRoutes(): Promise<ReasoningRouteDoctorRepo
   );
   return {
     valid: entries.every((entry) => entry.status === 'ready' || entry.status === 'degraded'),
-    checkedAt: new Date().toISOString(),
+    checkedAt: nowIso(),
     entries,
     nextActions,
   };

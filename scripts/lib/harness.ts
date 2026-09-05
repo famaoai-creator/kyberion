@@ -1,7 +1,12 @@
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeReadFile,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
+import { isDirectEntry } from '@agent/core/direct-entry';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 
 export interface ScriptFlags {
   json: boolean;
@@ -25,7 +30,8 @@ export class ScriptExitError extends Error {
   constructor(
     public readonly code: number,
     message = '',
-    public readonly silent = message.length === 0
+    public readonly silent = message.length === 0,
+    public readonly returnValue?: unknown
   ) {
     super(message);
     this.name = 'ScriptExitError';
@@ -33,6 +39,7 @@ export class ScriptExitError extends Error {
 }
 
 const DEFAULT_SCRIPT_FLAGS: readonly ScriptFlag[] = ['json', 'dry-run', 'check', 'quiet'];
+const SHARED_SCRIPT_FLAG_VALUES = new Set(['--', '--json', '--dry-run', '--check', '--quiet']);
 
 /** Return the full process argv for legacy APIs whose parsers expect node/script prefixes. */
 export function currentProcessArgv(): string[] {
@@ -42,6 +49,22 @@ export function currentProcessArgv(): string[] {
 /** Terminate a CLI process through the single governed process boundary. */
 export function exitProcess(code: number): never {
   process.exit(code);
+}
+
+/** Set a final exit status for asynchronous processes without terminating them. */
+export function setProcessExitCode(code: number): void {
+  process.exitCode = code;
+}
+
+/** Read a nested script's pending exit status without exposing process globals to callers. */
+export function getProcessExitCode(): number | undefined {
+  const code = process.exitCode;
+  return code === undefined ? undefined : Number(code);
+}
+
+/** Clear a nested script's pending exit status before returning to its caller. */
+export function clearProcessExitCode(): void {
+  process.exitCode = undefined;
 }
 
 /** Replace process argv for legacy child-entry modules that inspect it directly. */
@@ -73,13 +96,21 @@ export function parseScriptFlags(
   return { json, dryRun, check, quiet, positional, unknownFlags };
 }
 
+/** Remove flags owned by the shared harness before delegating to a legacy parser. */
+export function stripSharedScriptFlags(args: readonly string[]): string[] {
+  return args.filter((arg) => !SHARED_SCRIPT_FLAG_VALUES.has(arg));
+}
+
 export function defineScript<T>(options: {
   name: string;
   flags?: readonly ScriptFlag[];
   run(context: ScriptContext): T | Promise<T>;
 }): (argv?: string[]) => Promise<T | undefined> {
   return async (argv = process.argv.slice(2)): Promise<T | undefined> => {
-    const flags = parseScriptFlags(argv, options.flags);
+    const flags = parseScriptFlags(argv, options.flags ?? DEFAULT_SCRIPT_FLAGS);
+    const previousLogLevel = getRegisteredEnvText('LOG_LEVEL');
+    const suppressLogs = flags.quiet || flags.json;
+    if (suppressLogs) setRegisteredEnv('LOG_LEVEL', 'silent');
     const output = (value: unknown): void => {
       if (!flags.quiet) {
         const rendered =
@@ -92,22 +123,29 @@ export function defineScript<T>(options: {
       }
     };
     try {
-      return await options.run({ ...flags, name: options.name, argv, print: output });
-    } catch (error) {
-      const exitCode = error instanceof ScriptExitError ? error.code : 1;
-      const silent = error instanceof ScriptExitError && error.silent;
-      if (!silent) {
-        const message =
-          error instanceof ScriptExitError
-            ? error.message
-            : error instanceof Error
-              ? error.stack || error.message
-              : String(error);
-        if (!flags.json) console.error(`[${options.name}] ${message}`);
-        else console.error(JSON.stringify({ ok: false, error: message }));
+      try {
+        return await options.run({ ...flags, name: options.name, argv, print: output });
+      } catch (error) {
+        const exitCode = error instanceof ScriptExitError ? error.code : 1;
+        const silent = error instanceof ScriptExitError && error.silent;
+        if (!silent) {
+          const message =
+            error instanceof ScriptExitError
+              ? error.message
+              : error instanceof Error
+                ? error.stack || error.message
+                : String(error);
+          if (!flags.json) console.error(`[${options.name}] ${message}`);
+          else console.error(JSON.stringify({ ok: false, error: message }));
+        }
+        process.exitCode = exitCode;
+        if (error instanceof ScriptExitError && error.returnValue !== undefined) {
+          return error.returnValue as T;
+        }
+        return undefined;
       }
-      process.exitCode = exitCode;
-      return undefined;
+    } finally {
+      setRegisteredEnv('LOG_LEVEL', previousLogLevel);
     }
   };
 }
@@ -117,9 +155,13 @@ export interface GeneratedFile {
   content: string;
 }
 
+type GeneratorOutputs =
+  | readonly string[]
+  | ((context: ScriptContext, files: readonly GeneratedFile[]) => readonly string[]);
+
 export function defineGenerator(options: {
   id: string;
-  outputs: string[];
+  outputs: GeneratorOutputs;
   executionContext?: string;
   normalize?: (content: string) => string;
   render(context: ScriptContext): GeneratedFile[] | Promise<GeneratedFile[]>;
@@ -129,20 +171,34 @@ export function defineGenerator(options: {
     async run(context) {
       const files = await options.render(context);
       const normalize = options.normalize ?? ((content: string) => content);
+      const declaredOutputs =
+        typeof options.outputs === 'function' ? options.outputs(context, files) : options.outputs;
+      const safeFiles = files.map((file) => ({
+        ...file,
+        safePath: assertSafeRepositoryPath(file.path, { allowMissingLeaf: true }),
+      }));
+      const safeDeclaredOutputs = declaredOutputs.map((filePath) =>
+        assertSafeRepositoryPath(filePath, { allowMissingLeaf: true })
+      );
       const changed = files
-        .filter((file) => {
-          if (!safeExistsSync(file.path)) return true;
-          return normalize(String(safeReadFile(file.path))) !== normalize(file.content);
+        .filter((file, index) => {
+          const safePath = safeFiles[index]?.safePath as string;
+          if (!safeExistsSync(safePath)) return true;
+          return normalize(String(safeReadFile(safePath))) !== normalize(file.content);
         })
         .map((file) => file.path);
       const unexpected = files
-        .map((file) => file.path)
-        .filter((file) => !options.outputs.includes(file));
+        .map((file, index) => ({ path: file.path, safePath: safeFiles[index]?.safePath as string }))
+        .filter((file) => !safeDeclaredOutputs.includes(file.safePath))
+        .map((file) => file.path);
       if (unexpected.length > 0)
-        throw new Error(`generator emitted undeclared outputs: ${unexpected.join(', ')}`);
+        throw new ScriptExitError(
+          1,
+          `generator emitted undeclared outputs: ${unexpected.join(', ')}`
+        );
       if (!context.check && !context.dryRun) {
         withExecutionContext(options.executionContext ?? 'ecosystem_architect', () => {
-          for (const file of files) safeWriteFile(file.path, file.content);
+          for (const file of safeFiles) safeWriteFile(file.safePath, file.content);
         });
       }
       const result = { changed, files };
@@ -152,7 +208,7 @@ export function defineGenerator(options: {
         files: files.map((file) => file.path),
       });
       if (context.check && changed.length > 0) {
-        process.exitCode = 1;
+        throw new ScriptExitError(1, '', true, result);
       }
       return result;
     },
@@ -160,9 +216,5 @@ export function defineGenerator(options: {
 }
 
 export function isDirectScript(importMetaUrl: string, expectedFile: string): boolean {
-  const actual = path.resolve(process.argv[1] || '');
-  const modulePath = path.resolve(fileURLToPath(importMetaUrl));
-  const expected = expectedFile.replaceAll('\\', '/').replace(/^\.\//u, '');
-  const candidates = [expected, expected.replace(/\.ts$/u, '.js')];
-  return actual === modulePath && candidates.some((candidate) => actual.endsWith(candidate));
+  return isDirectEntry(importMetaUrl, expectedFile);
 }

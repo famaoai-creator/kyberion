@@ -61,7 +61,7 @@ status: active
 | ---------------------------------------- | ------------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------- |
 | **初期セットアップ**                     |                                                  |        |                                                                                                                         |
 | 環境・前提チェック                       | `pnpm doctor` / `setup:report`                   | 状況+B | `scripts/setup_report.ts` の集約結果を API 化                                                                           |
-| アイデンティティ設定(自分・エージェント) | `pnpm onboard`(TTY 必須)/ `onboard:apply`        | **B**  | `onboard:apply` 相当の非対話パス+`writeTenantProfile`(pr653 実装を回収)                                                 |
+| アイデンティティ設定(自分・エージェント) | `pnpm onboard`(TTY 必須)/ `onboard apply`        | **B**  | `onboard apply` 相当の非対話パス+`writeTenantProfile`(pr653 実装を回収)                                                 |
 | アバター登録・音声プロファイル登録       | `onboard:avatar` / `onboard:voice`               | **B**  | pr653 の `getUserMedia`/`MediaRecorder` 実装、`saveBrowserOnboardingVoiceSample`                                        |
 | 顧客オーバーレイ作成・切替               | `customer:create/switch` + 手編集                | B      | `scripts/company_onboarding.ts` プリセット                                                                              |
 | **接続・設定**                           |                                                  |        |                                                                                                                         |
@@ -76,8 +76,8 @@ status: active
 | 依頼状況・例外の確認                     | 既存                                             | 状況   | `buildCeoSurfaceSummary`                                                                                                |
 | 停滞ミッションの判断(開始/中止)          | `mission-controller hygiene` → 手動判断          | **A**  | hygiene 分類結果を「伺い」カードとして提示。**判断は必ず人間のボタン/発話**                                             |
 | 会議参加・議事録                         | `meeting:participate` / `minutes:record`         | C      | meeting preflight+mission 起票を会話から                                                                                |
-| メール・カレンダー                       | `pnpm cli -- email/calendar …`                   | C      | email-workflow / calendar(送信は承認フロー必須を維持)                                                                   |
-| 定期実行の確認                           | `schedule:list`                                  | 状況   | schedule registry の読み取り表示                                                                                        |
+| メール・カレンダー                       | `pnpm kyberion email/calendar …`                 | C      | email-workflow / calendar(送信は承認フロー必須を維持)                                                                   |
+| 定期実行の確認                           | `generation:schedule --action list`              | 状況   | schedule registry の読み取り表示                                                                                        |
 | **ナレッジ・拡張**                       |                                                  |        |                                                                                                                         |
 | 文書の取込(ingest)                       | `pnpm ingest --tenant … --file …`                | **B**  | ドラッグ&ドロップ→`scripts/ingest.ts` 相当 API(`--ingested-by` は認証セッションから。自動監視取込はしない=現行思想維持) |
 | 記憶昇格キューの承認                     | `mission-controller memory-approve/reject`       | B      | memory-promotion-queue の一覧+判断                                                                                      |
@@ -94,7 +94,7 @@ status: active
 新機能の前に、壊れているものと消えそうなものを片付ける。
 
 1. **pr653 worktree の未コミット実装を回収**: `/setup` 書き込み化+i18n+応答状況パネル(+941/−147、untracked 5 件)を専用ブランチにコミットし、本計画のフェーズ(CS-03/CS-04)に割り当てて再レビュー。i18n はそのまま採用せず CS-04 で方式判断。
-2. **crash-loop 解消**: surface manifest に build ステップを保証(`surface_runtime` の `startupMode: workspace-app` に prestart build を追加するか、manifest args を `build && start` 相当に変更)。`pnpm surfaces:reconcile` 後に `/api/summary` が 200 を返すことを受け入れ条件とする。
+2. **crash-loop 解消**: surface manifest に build ステップを保証(`surface_runtime` の `startupMode: workspace-app` に prestart build を追加するか、manifest args を `build && start` 相当に変更)。`pnpm surfaces reconcile` 後に `/api/summary` が 200 を返すことを受け入れ条件とする。
 3. **二重実装の解消方針決定**: Next.js 版(3050)を唯一の Concierge とし、Express 版(3033)は CS-01/CS-02 で会話・音声を移植完了後に削除。`CONCIERGE_AND_DASHBOARD_DESIGN.ja.md` の port/health 記述を更新(P8)。
 4. `MSN-CONCIERGE-SECRETARY-20260802` の requirements blocking を本計画 §0 で解消し、ミッションを本計画の実行台帳とする。
 
@@ -121,7 +121,7 @@ status: active
 - **Tier 2(リアルタイム対話)**: 本計画のスコープ外。[REALTIME_VOICE_CONVERSATION_PLAN](../improvement-plans-archive/2026-07/REALTIME_VOICE_CONVERSATION_PLAN_2026-07-20.ja.md) に委譲し、`/api/message` の契約を再利用できる形だけ担保。
 - アバター: 旧 2.5D SVG アバター(5 状態)は**任意表示**として移植(設定でオン/オフ)。3D 化は既存設計文書 §4 に委譲し本計画では扱わない。
 
-**受け入れ条件**: `test:ui-voice-browser-smoke` 系のスモークが Concierge に対して通る/Tier 0↔1 の切替がユーザ操作なしに機能する/`prefers-reduced-motion` と字幕(発話テキスト常時表示)でアクセシビリティを担保。
+**受け入れ条件**: `pnpm test -- --suite ui-voice-browser-smoke` 系のスモークが Concierge に対して通る/Tier 0↔1 の切替がユーザ操作なしに機能する/`prefers-reduced-motion` と字幕(発話テキスト常時表示)でアクセシビリティを担保。
 
 ### CS-03: 秘書業務カタログの実装(P1〜P2)
 

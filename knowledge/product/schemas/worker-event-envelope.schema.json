@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "worker-event-envelope.schema.json",
+  "title": "Worker event envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "ts", "seq", "payload"],
+  "properties": {
+    "type": {
+      "enum": [
+        "turn_begin",
+        "turn_end",
+        "step_begin",
+        "step_end",
+        "compaction_begin",
+        "compaction_end",
+        "context_rewind",
+        "status_update",
+        "subagent_begin",
+        "subagent_end",
+        "subagent_unavailable",
+        "approval_request",
+        "approval_response",
+        "governance_action",
+        "notification",
+        "mission_event",
+        "phase_begin",
+        "phase_end",
+        "gate_evaluated"
+      ]
+    },
+    "ts": { "type": "string", "format": "date-time" },
+    "seq": { "type": "integer", "minimum": 0 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "agent_id": { "type": "string" },
+        "pipeline_id": { "type": "string" },
+        "trigger_delivery_id": { "type": "string" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

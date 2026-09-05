@@ -19,17 +19,36 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import {
-  assertProtocolServiceRegistered,
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycle,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+} from '@agent/core/protocol-service-lifecycle';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
-async function main(args: string[] = []): Promise<void> {
+export interface ReportReviewServerResult {
+  ok: boolean;
+  mode: 'apply' | 'dry-run' | 'check';
+  target: string;
+  port: number;
+  url: string;
+  artifact_ref: string;
+  scope: ReturnType<typeof createReportReviewContext>['scope'];
+  listening: boolean;
+}
+
+export async function main(
+  args: string[] = [],
+  options: {
+    dryRun?: boolean;
+    check?: boolean;
+    json?: boolean;
+    print?: (value: unknown) => void;
+  } = {}
+): Promise<ReportReviewServerResult | undefined> {
   const target = args[0];
   const positionalPort = args[1] && !args[1].startsWith('--') ? args[1] : undefined;
   const option = (flag: string): string | undefined => {
@@ -64,6 +83,27 @@ async function main(args: string[] = []): Promise<void> {
     project_id: option('--project-id'),
     mission_id: option('--mission-id'),
   });
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new ScriptExitError(1, `invalid port: ${port}`);
+
+  const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
+  const url = `http://127.0.0.1:${port}/`;
+  const preview: ReportReviewServerResult = {
+    ok: true,
+    mode,
+    target,
+    port,
+    url,
+    artifact_ref: reviewContext.artifact_ref,
+    scope: reviewContext.scope,
+    listening: false,
+  };
+  const print = options.print ?? (() => undefined);
+  if (options.dryRun || options.check) {
+    if (options.json || options.dryRun || options.check) print(preview);
+    else print(`${mode}: would serve ${target} at ${url}`);
+    return preview;
+  }
 
   const TOKEN = randomBytes(16).toString('hex');
   const CFG_OPEN = '<!--RV-SAVE-CONFIG-->';
@@ -88,7 +128,7 @@ async function main(args: string[] = []): Promise<void> {
     }
     return html;
   }
-  const ts = () => new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
+  const ts = () => nowIso().replace(/[:.]/g, '').slice(0, 15);
 
   const server = http.createServer((req, res) => {
     try {
@@ -149,7 +189,7 @@ async function main(args: string[] = []): Promise<void> {
                   artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref),
                   viewer_principal: reviewContext.viewer_principal,
                   scope: reviewContext.scope,
-                  saved_at: new Date().toISOString(),
+                  saved_at: nowIso(),
                   bytes: html.length,
                   backup: backup.split('/').pop(),
                   comment_count: (html.match(/class=["']rv-cmt["']/g) || []).length,
@@ -163,13 +203,13 @@ async function main(args: string[] = []): Promise<void> {
             res.end(
               `saved (backup: ${backup.split('/').pop()}, review_session: ${reviewContext.review_session_id})`
             );
-            console.log(
+            print(
               `[save] wrote ${target} (backup ${backup.split('/').pop()}, ${html.length} bytes)`
             );
           } catch (e: unknown) {
             res.writeHead(500);
             res.end(e instanceof Error ? e.message : String(e));
-            console.error('[save]', e);
+            print(`[save] ${e instanceof Error ? e.message : String(e)}`);
           }
         });
         return;
@@ -181,37 +221,48 @@ async function main(args: string[] = []): Promise<void> {
       res.end(e instanceof Error ? e.message : String(e));
     }
   });
-  server.listen(port, '127.0.0.1', () => {
-    try {
-      recordProtocolServiceLifecycle({
-        serviceId: 'report-review',
-        action: 'start',
-        status: 'started',
-        scope: reviewContext.scope,
-        actorRole: 'surface_runtime',
-        principal: { kind: 'human', id: reviewContext.viewer_principal },
-        requestedBy: reviewContext.viewer_principal,
-        correlationId: reviewContext.review_session_id,
-        metadata: {
-          port,
-          artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref),
-        },
-      });
-    } catch (error) {
-      console.error(`[report-review] start lifecycle receipt unavailable: ${error}`);
-      server.close(() => {
-        process.exitCode = 1;
-      });
-      return;
-    }
-    console.log(`Report review server → http://127.0.0.1:${port}/`);
-    console.log(`  target : ${target}`);
-    console.log(`  artifact: ${reviewContext.artifact_ref}`);
-    console.log(
-      `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
-    );
-    console.log(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
-    console.log('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error) =>
+      reject(new ScriptExitError(1, `[report-review] failed to listen: ${error.message}`));
+    server.once('error', onError);
+    server.listen(port, '127.0.0.1', () => {
+      server.off('error', onError);
+      try {
+        recordProtocolServiceLifecycle({
+          serviceId: 'report-review',
+          action: 'start',
+          status: 'started',
+          scope: reviewContext.scope,
+          actorRole: 'surface_runtime',
+          principal: { kind: 'human', id: reviewContext.viewer_principal },
+          requestedBy: reviewContext.viewer_principal,
+          correlationId: reviewContext.review_session_id,
+          metadata: {
+            port,
+            artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref),
+          },
+        });
+      } catch (error) {
+        server.close(() => undefined);
+        reject(
+          new ScriptExitError(1, `[report-review] start lifecycle receipt unavailable: ${error}`)
+        );
+        return;
+      }
+      if (options.json) {
+        print({ ...preview, listening: true });
+      } else {
+        print(`Report review server → ${url}`);
+        print(`  target : ${target}`);
+        print(`  artifact: ${reviewContext.artifact_ref}`);
+        print(
+          `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
+        );
+        print(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
+        print('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
+      }
+      resolve();
+    });
   });
 
   let stopping = false;
@@ -230,19 +281,20 @@ async function main(args: string[] = []): Promise<void> {
         correlationId: reviewContext.review_session_id,
       });
     } catch (error) {
-      console.error(`[report-review] stop lifecycle receipt unavailable: ${error}`);
+      print(`[report-review] stop lifecycle receipt unavailable: ${error}`);
     } finally {
       server.close();
     }
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
+  return { ...preview, listening: true };
 }
 
 export const runReportReviewServer = defineScript({
   name: 'report-review:server',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json', 'dry-run', 'check', 'quiet'],
+  run: ({ argv, dryRun, check, json, print }) => main(argv, { dryRun, check, json, print }),
 });
 
 if (isDirectScript(import.meta.url, 'server.ts') || isDirectScript(import.meta.url, 'server.js'))

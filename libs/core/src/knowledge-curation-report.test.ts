@@ -5,6 +5,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
 } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
@@ -12,7 +13,10 @@ import {
   computeCurationReport,
   generateKnowledgeCurationReport,
   knowledgeCurationArchiveHistoryPath,
+  knowledgeCurationReportPath,
+  loadKnowledgeCurationArchiveHistoryAtPath,
   loadCurationSloConfig,
+  knowledgeCurationSloConfigPath,
   renderCurationReportMarkdown,
   writeCurationReport,
 } from './knowledge-curation-report.js';
@@ -82,12 +86,73 @@ afterEach(() => {
 const NOW = new Date('2026-07-25T00:00:00.000Z');
 
 describe('computeCurationReport — low-yield hints', () => {
+  it('ignores corpus scan roots outside the repository', () => {
+    process.env.KYBERION_CURATION_SCAN_ROOTS = '/tmp/external-curation-corpus';
+
+    const report = computeCurationReport({ now: NOW });
+
+    expect(report.freshness_breaches).toEqual([]);
+  });
+
+  it('does not follow a symlinked corpus entry', () => {
+    const targetRoot = path.join(suiteRoot, 'outside-corpus');
+    safeMkdir(targetRoot, { recursive: true });
+    safeWriteFile(
+      path.join(targetRoot, 'stale.md'),
+      ['---', 'kind: governance', 'last_updated: 2026-01-01', '---'].join('\n')
+    );
+    safeMkdir(scanRootOverride, { recursive: true });
+    safeSymlinkSync(targetRoot, path.join(scanRootOverride, 'linked-corpus'), 'dir');
+
+    const report = computeCurationReport({ now: NOW });
+
+    expect(report.freshness_breaches).toEqual([]);
+  });
+
+  it('falls back to canonical curation paths for external overrides', () => {
+    process.env.KYBERION_CURATION_SLO_CONFIG_PATH = '/tmp/external-curation-slo.json';
+    process.env.KYBERION_CURATION_REPORT_PATH = '/tmp/external-CURATION_REPORT.md';
+    process.env.KYBERION_CURATION_ARCHIVE_HISTORY_PATH = '/tmp/external-curation-history.json';
+
+    expect(knowledgeCurationSloConfigPath()).toBe(
+      pathResolver.knowledge('product/governance/knowledge-curation-slo.json')
+    );
+    expect(knowledgeCurationReportPath()).toBe(
+      pathResolver.knowledge('product/governance/CURATION_REPORT.md')
+    );
+    expect(knowledgeCurationArchiveHistoryPath()).toBe(
+      pathResolver.shared('runtime/feedback-loop/curation-archive-history.json')
+    );
+  });
+
   it('keeps tenant archive history outside the global archive override', () => {
     const tenantPath = knowledgeCurationArchiveHistoryPath('tenant-a');
     expect(tenantPath).toContain(
       '/active/shared/runtime/feedback-loop/tenants/tenant-a/curation-archive-history.json'
     );
     expect(tenantPath).not.toBe(pathResolver.rootResolve(archiveHistoryPathOverride));
+  });
+
+  it('rejects malformed archive history through the canonical schema', () => {
+    const historyPath = pathResolver.rootResolve(archiveHistoryPathOverride);
+    safeMkdir(path.dirname(historyPath), { recursive: true });
+    safeWriteFile(
+      historyPath,
+      JSON.stringify([
+        {
+          key: 'unscoped:knowledge/foo.md',
+          document_path: 'knowledge/foo.md',
+          consecutive_weeks: 1,
+          first_observed_at: NOW.toISOString(),
+          last_observed_at: NOW.toISOString(),
+          last_week: '2026-07-20',
+          unexpected: true,
+        },
+      ])
+    );
+    expect(() => loadKnowledgeCurationArchiveHistoryAtPath(historyPath)).toThrow(
+      /Invalid catalog knowledge-curation-archive-history/u
+    );
   });
 
   it('flags a document delivered >= threshold times with zero recorded uses', () => {
@@ -224,6 +289,17 @@ describe('computeCurationReport — SLO thresholds come from config', () => {
       freshness_days_by_kind: { governance: 90, playbook: 60, knowledge_hint: 30 },
       default_freshness_days: 180,
     });
+  });
+
+  it('rejects a persisted config that violates its schema', () => {
+    writeSloConfigFixture({
+      version: '1.0.0',
+      low_yield_delivery_threshold: 0,
+      freshness_days_by_kind: { playbook: -1 },
+      default_freshness_days: 180,
+    });
+
+    expect(() => loadCurationSloConfig()).toThrow(/Invalid catalog knowledge-curation-slo/u);
   });
 });
 

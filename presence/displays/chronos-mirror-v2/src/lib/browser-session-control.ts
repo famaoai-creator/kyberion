@@ -1,4 +1,13 @@
-import { pathResolver, safeExistsSync, loadJson, safeWriteFile } from './intelligence-primitives';
+import {
+  assertSafeRepositoryPath,
+  readJson,
+  pathResolver,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+} from './intelligence-primitives';
+import { parseBrowserSessionSummary } from './intelligence-observations';
+import { nowIso } from '@agent/core/foundation';
 
 type BrowserSessionControlAction = 'close_browser_session' | 'restart_browser_session';
 
@@ -30,14 +39,28 @@ export function applyBrowserSessionControl(
   sessionId: string,
   action: BrowserSessionControlAction
 ): boolean {
-  const filePath = browserSessionPath(sessionId);
-  if (!safeExistsSync(filePath)) return false;
+  let filePath: string;
+  try {
+    filePath = assertSafeRepositoryPath(browserSessionPath(sessionId), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return false;
+  } catch {
+    return false;
+  }
 
-  const record = loadJson<BrowserSessionRecord>(filePath);
+  let rawRecord: unknown;
+  try {
+    rawRecord = readJson<unknown>(filePath);
+  } catch {
+    return false;
+  }
+  if (!parseBrowserSessionSummary(rawRecord)) return false;
+  const record = rawRecord as BrowserSessionRecord;
   const nextStatus = action === 'restart_browser_session' ? 'expired' : 'released';
   const nextRecord: BrowserSessionRecord = {
     ...record,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     lease_status: nextStatus,
     retained: false,
     lease_expires_at: undefined,

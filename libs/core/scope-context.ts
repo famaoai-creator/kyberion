@@ -1,6 +1,8 @@
 import type { TierLevel } from './types.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
   assertScopeContext,
   normalizeScopeContext,
@@ -16,12 +18,12 @@ export {
   type ScopeContextValidationOptions,
 } from './scope-context-validation.js';
 import {
-  loadJson,
   safeExistsSync,
   safeReadFile,
   safeExec,
   safeUnlinkSync,
   safeWriteFile,
+  assertSafeRepositoryPath,
 } from './secure-io.js';
 
 /**
@@ -51,6 +53,10 @@ function clean(value: unknown): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 /** Normalize aliases and remove empty optional values without widening scope. */
 
 /** Resolve runtime hints without ever treating customer stance as tenant scope. */
@@ -64,7 +70,10 @@ const SCOPE_ENV_KEYS = [
 ] as const;
 
 function scopeEnvPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.KYBERION_SCOPE_ENV_PATH?.trim() || pathResolver.shared('runtime/scope.env');
+  const configured = envText(env, 'KYBERION_SCOPE_ENV_PATH')?.trim();
+  return assertSafeRepositoryPath(configured || pathResolver.shared('runtime/scope.env'), {
+    allowMissingLeaf: true,
+  });
 }
 
 function readScopeEnv(env: NodeJS.ProcessEnv = process.env): ScopeContextInput {
@@ -95,27 +104,16 @@ function readMissionScope(missionId: string): ScopeContextInput {
   try {
     const missionPath = pathResolver.findMissionPath(missionId);
     if (!missionPath) return {};
-    const state = loadJson<{
-      tier?: unknown;
-      tenant_slug?: unknown;
-      tenant_id?: unknown;
-      organization_id?: unknown;
-      relationships?: { project?: { project_id?: unknown } };
-    }>(pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionPath)}/mission-state.json`));
+    const statePath = assertSafeRepositoryPath(
+      pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionPath)}/mission-state.json`)
+    );
+    const state = loadMissionStateAtPath(statePath);
+    if (!state) return {};
     return {
-      tier: state.tier as TierLevel | undefined,
-      tenant_slug:
-        typeof state.tenant_slug === 'string'
-          ? state.tenant_slug
-          : typeof state.tenant_id === 'string'
-            ? state.tenant_id
-            : undefined,
-      organization_id:
-        typeof state.organization_id === 'string' ? state.organization_id : undefined,
-      project_id:
-        typeof state.relationships?.project?.project_id === 'string'
-          ? state.relationships.project.project_id
-          : undefined,
+      tier: state.tier,
+      tenant_slug: state.tenant_slug || state.tenant_id,
+      organization_id: state.organization_id,
+      project_id: state.relationships?.project?.project_id,
     };
   } catch {
     return {};
@@ -183,12 +181,12 @@ function mergeScopeSources(
 ): { values: ScopeContextInput; provenance: ScopeResolution['provenance'] } {
   const persisted = options.includePersisted === false ? {} : readScopeEnv(env);
   const envValues: ScopeContextInput = {
-    tier: env.KYBERION_TIER as TierLevel | undefined,
-    tenant_slug: env.KYBERION_TENANT,
-    organization_id: env.KYBERION_ORGANIZATION_ID,
-    project_id: env.KYBERION_PROJECT_ID,
-    mission_id: env.MISSION_ID,
-    task_id: env.KYBERION_TASK_ID,
+    tier: envText(env, 'KYBERION_TIER') as TierLevel | undefined,
+    tenant_slug: envText(env, 'KYBERION_TENANT'),
+    organization_id: envText(env, 'KYBERION_ORGANIZATION_ID'),
+    project_id: envText(env, 'KYBERION_PROJECT_ID'),
+    mission_id: envText(env, 'MISSION_ID'),
+    task_id: envText(env, 'KYBERION_TASK_ID'),
   };
   const mission =
     options.inferFromMission === false
@@ -271,9 +269,9 @@ export function resolveScopeResolution(
   const { values, provenance } = mergeScopeSources(input, env, options);
   const scope = normalizeScopeContext({
     ...values,
-    customer_stance: input.customer_stance || env.KYBERION_CUSTOMER,
-    viewer_principal: input.viewer_principal || env.KYBERION_VIEWER_PRINCIPAL,
-    nhi_id: input.nhi_id || env.KYBERION_NHI_ACTOR,
+    customer_stance: input.customer_stance || envText(env, 'KYBERION_CUSTOMER'),
+    viewer_principal: input.viewer_principal || envText(env, 'KYBERION_VIEWER_PRINCIPAL'),
+    nhi_id: input.nhi_id || envText(env, 'KYBERION_NHI_ACTOR'),
   });
   return { scope, provenance, knowledge_roots: knowledgeRoots(scope) };
 }

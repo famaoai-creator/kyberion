@@ -3,14 +3,16 @@ import * as path from 'node:path';
 import {
   applyOnboardingContextBinding,
   applyOnboardingFirstWork,
-  customerResolver,
   loadOnboardingContextBinding,
   loadOnboardingFirstWorkRecord,
   resolveOnboardingContext,
   resolveOnboardingFirstWork,
-  type OrganizationTier,
-} from '@agent/core';
+} from '@agent/core/onboarding-context';
+import * as customerResolver from '@agent/core/customer-resolver';
+import type { OrganizationTier } from '@agent/core/organization-operating-model';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 type ParsedArgs = {
   command: string;
@@ -93,8 +95,8 @@ function customerRequired(args: ParsedArgs): string {
   return args.customerSlug;
 }
 
-function emit(valueToPrint: unknown): void {
-  console.log(JSON.stringify(valueToPrint, null, 2));
+function emit(valueToPrint: unknown, print: Print): void {
+  print(JSON.stringify(valueToPrint, null, 2));
 }
 
 function usage(): string {
@@ -109,20 +111,23 @@ function usage(): string {
   ].join('\n');
 }
 
-export function run(args: string[] = []): void {
+export function run(args: string[] = [], print: Print = () => undefined): void {
   const parsed = parseArgs(args);
   if (parsed.command === 'help') {
-    console.log(usage());
+    print(usage());
     return;
   }
   const customerSlug = customerRequired(parsed);
   if (parsed.command === 'show') {
-    emit({
-      kind: 'onboarding_context_status',
-      customer_slug: customerSlug,
-      binding: loadOnboardingContextBinding(customerSlug, parsed.rootDir),
-      first_work: loadOnboardingFirstWorkRecord(customerSlug, parsed.rootDir),
-    });
+    emit(
+      {
+        kind: 'onboarding_context_status',
+        customer_slug: customerSlug,
+        binding: loadOnboardingContextBinding(customerSlug, parsed.rootDir),
+        first_work: loadOnboardingFirstWorkRecord(customerSlug, parsed.rootDir),
+      },
+      print
+    );
     return;
   }
   if (parsed.command === 'bind') {
@@ -137,7 +142,10 @@ export function run(args: string[] = []): void {
       purpose: parsed.purpose,
       rootDir: parsed.rootDir,
     };
-    emit(parsed.apply ? applyOnboardingContextBinding(input) : resolveOnboardingContext(input));
+    emit(
+      parsed.apply ? applyOnboardingContextBinding(input) : resolveOnboardingContext(input),
+      print
+    );
     return;
   }
   if (!parsed.intent) throw new Error('--intent is required for first-work.');
@@ -148,7 +156,8 @@ export function run(args: string[] = []): void {
         intent: parsed.intent,
         rootDir: parsed.rootDir,
         ...(parsed.serviceId ? { contextRefs: { service_id: parsed.serviceId } } : {}),
-      })
+      }),
+      print
     );
     return;
   }
@@ -169,18 +178,19 @@ export function run(args: string[] = []): void {
             serviceBindings: parsed.serviceBindings,
           }
         : undefined,
-    })
+    }),
+    print
   );
 }
 
 export const runOnboardingContext = defineScript({
   name: 'onboarding:context',
   flags: [],
-  run: ({ argv }) => {
+  run: ({ argv, print }) => {
     try {
-      run(argv);
+      run(argv, print);
     } catch (error) {
-      console.error(
+      print(
         JSON.stringify(
           {
             error_code: 'ONBOARDING_CONTEXT_FAILED',

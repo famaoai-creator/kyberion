@@ -11,8 +11,10 @@ import {
   type TenantActivationCheck,
   type TenantActivationProbeCheck,
   type TenantActivationProbeRefs,
-} from '@agent/core';
+} from '@agent/core/tenant-activation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 function value(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -87,17 +89,15 @@ function usage(): string {
   ].join('\n');
 }
 
-export function main(argv: string[] = []): void {
+export function main(argv: string[] = [], print: Print = () => undefined): void {
   const command = argv.find((arg) => !arg.startsWith('--')) || 'help';
   if (command === 'help') {
-    console.log(usage());
+    print(usage());
     return;
   }
   if (command === 'show') {
     const activationInput = input(argv);
-    console.log(
-      JSON.stringify(loadTenantActivation(activationInput, activationInput.rootDir), null, 2)
-    );
+    print(JSON.stringify(loadTenantActivation(activationInput, activationInput.rootDir), null, 2));
     return;
   }
   const activationInput = input(argv);
@@ -121,13 +121,13 @@ export function main(argv: string[] = []): void {
                   accept: argv.includes('--accept'),
                 })
               : resolveTenantActivation(activationInput);
-  console.log(JSON.stringify(result, null, 2));
+  print(JSON.stringify(result, null, 2));
 }
 
 const script = defineScript({
   name: 'tenant:activation',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'tenant_activation.ts') ||

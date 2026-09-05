@@ -50,7 +50,7 @@ function isPseudoLocalized(text: string): boolean {
 }
 
 describe('I18N-07 proof-of-locale: qps-ploc end to end', () => {
-  describe('CLI surface: `pnpm cli -- help`', () => {
+  describe('CLI surface: `pnpm kyberion help`', () => {
     it('renders pseudo-localized text for the ~87 cli namespace keys', async () => {
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 

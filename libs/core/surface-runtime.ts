@@ -3,15 +3,16 @@ import * as path from 'node:path';
 import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('surface-runtime');
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
-  loadJson,
   safeReaddir,
   safeUnlinkSync,
   safeWriteFile,
@@ -20,6 +21,9 @@ import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-super
 
 const SURFACE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/runtime-surface-manifest.schema.json'
+);
+const SURFACE_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-runtime-state.schema.json'
 );
 
 export type SurfaceRuntimeKind = Extract<RuntimeResourceKind, 'gateway' | 'ui' | 'service'>;
@@ -37,6 +41,8 @@ export interface SurfaceRuntimeDefinition {
   ownerType?: string;
   port?: number;
   healthPath?: string;
+  service_id?: string;
+  preset_path?: string;
   enabled?: boolean;
 }
 
@@ -75,8 +81,9 @@ export interface SurfacePortStatus {
 }
 
 export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
-  if (!safeExistsSync(logPath)) return [];
-  const content = safeReadFile(logPath, { encoding: 'utf8' }) as string;
+  const safeLogPath = assertSafeRepositoryPath(logPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeLogPath)) return [];
+  const content = safeReadFile(safeLogPath, { encoding: 'utf8' }) as string;
   return content
     .split('\n')
     .map((line) => line.trimEnd())
@@ -90,6 +97,13 @@ const STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
 const LOG_DIR = pathResolver.shared('logs/surfaces');
 let surfaceManifestValidateFn: ValidateFunction | null = null;
 
+function assertSurfaceId(surfaceId: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(surfaceId)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] invalid surface id: ${surfaceId}`);
+  }
+  return surfaceId;
+}
+
 function ensureSurfaceManifestValidator(): ValidateFunction {
   if (surfaceManifestValidateFn) return surfaceManifestValidateFn;
   surfaceManifestValidateFn = compileSchema(SURFACE_MANIFEST_SCHEMA_PATH);
@@ -102,38 +116,166 @@ function ensureParentDir(filePath: string): void {
 }
 
 export function surfaceManifestPath(): string {
-  return pathResolver.resolve(DEFAULT_MANIFEST_PATH);
+  return assertSafeRepositoryPath(pathResolver.resolve(DEFAULT_MANIFEST_PATH), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function surfaceManifestDirectoryPath(): string {
-  return pathResolver.resolve(DEFAULT_MANIFEST_DIR);
+  return assertSafeRepositoryPath(pathResolver.resolve(DEFAULT_MANIFEST_DIR), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function surfaceManifestFilePath(surfaceId: string): string {
-  return path.join(surfaceManifestDirectoryPath(), `${surfaceId}.json`);
+  return assertSafeRepositoryPath(
+    path.join(surfaceManifestDirectoryPath(), `${assertSurfaceId(surfaceId)}.json`),
+    { allowMissingLeaf: true }
+  );
+}
+
+function surfaceManifestCatalog(filePath: string) {
+  return defineCatalog<SurfaceRuntimeManifest>({
+    id: 'surface-runtime-manifest',
+    path: filePath,
+    schema: SURFACE_MANIFEST_SCHEMA_PATH,
+  });
+}
+
+function surfaceStateCatalog(filePath: string) {
+  return defineCatalog<SurfaceRuntimeState>({
+    id: 'surface-runtime-state',
+    path: filePath,
+    schema: SURFACE_STATE_SCHEMA_PATH,
+  });
 }
 
 export function surfaceStatePath(): string {
-  return STATE_PATH;
+  return assertSafeRepositoryPath(STATE_PATH, { allowMissingLeaf: true });
 }
 
 export function surfaceLogPath(surfaceId: string): string {
-  if (!safeExistsSync(LOG_DIR)) safeMkdir(LOG_DIR, { recursive: true });
-  return path.join(LOG_DIR, `${surfaceId}.log`);
+  const safeLogDir = assertSafeRepositoryPath(LOG_DIR, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeLogDir)) safeMkdir(safeLogDir, { recursive: true });
+  return assertSafeRepositoryPath(path.join(safeLogDir, `${assertSurfaceId(surfaceId)}.log`), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function surfaceResourceId(surfaceId: string): string {
   return `surface:${surfaceId}`;
 }
 
+const SURFACE_STATE_FIELDS = ['version', 'surfaces'] as const;
+const SURFACE_STATE_RECORD_FIELDS = [
+  'id',
+  'pid',
+  'resourceId',
+  'kind',
+  'command',
+  'args',
+  'cwd',
+  'logPath',
+  'startedAt',
+  'shutdownPolicy',
+  'metadata',
+] as const;
+const SURFACE_STATE_RECORD_FIELD_SET = new Set<string>(SURFACE_STATE_RECORD_FIELDS);
+
+function stateString(record: Record<string, unknown>, field: string, label: string): string {
+  const value = record[field];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${label}.${field} must be a non-empty string`);
+  }
+  return value;
+}
+
+function parsePersistedSurfaceState(value: unknown): SurfaceRuntimeState {
+  const root = parseSafeJsonObjectValue(value, 'surface runtime state');
+  const allowedRootFields = new Set<string>(SURFACE_STATE_FIELDS);
+  if (Object.keys(root).some((key) => !allowedRootFields.has(key))) {
+    throw new Error('surface runtime state contains unknown fields');
+  }
+  if (root.version !== 1) throw new Error('surface runtime state version is invalid');
+  const surfaces = parseSafeJsonObjectValue(root.surfaces, 'surface runtime state.surfaces');
+  const normalized = Object.entries(surfaces).map(([surfaceKey, candidate]) => {
+    const label = `surface runtime state.surfaces.${surfaceKey}`;
+    const record = parseSafeJsonObjectValue(candidate, label);
+    if (Object.keys(record).some((key) => !SURFACE_STATE_RECORD_FIELD_SET.has(key))) {
+      throw new Error(`${label} contains unknown fields`);
+    }
+    const id = stateString(record, 'id', label);
+    assertSurfaceId(id);
+    if (surfaceKey !== id) throw new Error(`${label}.id does not match its map key`);
+    const pid = record.pid;
+    if (typeof pid !== 'number' || !Number.isSafeInteger(pid) || pid <= 0) {
+      throw new Error(`${label}.pid must be a positive integer`);
+    }
+    const resourceId = stateString(record, 'resourceId', label);
+    if (resourceId !== surfaceResourceId(id)) {
+      throw new Error(`${label}.resourceId does not match its surface id`);
+    }
+    const kind = stateString(record, 'kind', label) as SurfaceRuntimeKind;
+    if (!['gateway', 'ui', 'service'].includes(kind)) {
+      throw new Error(`${label}.kind is invalid`);
+    }
+    const command = stateString(record, 'command', label);
+    if (!Array.isArray(record.args)) {
+      throw new Error(`${label}.args must be an array of strings`);
+    }
+    const args = record.args.map((arg, index) => {
+      if (typeof arg !== 'string') {
+        throw new Error(`${label}.args[${index}] must be a string`);
+      }
+      return arg;
+    });
+    const cwd = stateString(record, 'cwd', label);
+    const logPath = stateString(record, 'logPath', label);
+    if (path.resolve(cwd) !== path.resolve(pathResolver.rootDir())) {
+      assertSafeRepositoryPath(cwd, { allowMissingLeaf: true });
+    }
+    assertSafeRepositoryPath(logPath, { allowMissingLeaf: true });
+    const startedAt = stateString(record, 'startedAt', label);
+    if (!Number.isFinite(Date.parse(startedAt))) {
+      throw new Error(`${label}.startedAt must be a valid timestamp`);
+    }
+    const shutdownPolicy = stateString(record, 'shutdownPolicy', label) as RuntimeShutdownPolicy;
+    if (!['manual', 'idle', 'detached'].includes(shutdownPolicy)) {
+      throw new Error(`${label}.shutdownPolicy is invalid`);
+    }
+    const metadata =
+      record.metadata === undefined
+        ? undefined
+        : parseSafeJsonObjectValue(record.metadata, `${label}.metadata`);
+    return [
+      surfaceKey,
+      {
+        id,
+        pid,
+        resourceId,
+        kind,
+        command,
+        args,
+        cwd,
+        logPath,
+        startedAt,
+        shutdownPolicy,
+        ...(metadata ? { metadata } : {}),
+      } satisfies SurfaceRuntimeStateRecord,
+    ];
+  });
+  return { version: 1, surfaces: Object.fromEntries(normalized) };
+}
+
 function readSurfaceManifestFile(filePath: string): SurfaceRuntimeManifest {
-  const value = readJson<SurfaceRuntimeManifest>(filePath);
-  const validate = ensureSurfaceManifestValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid surface manifest file "${filePath}": ${errors}`);
+  let value: SurfaceRuntimeManifest;
+  try {
+    value = surfaceManifestCatalog(filePath).load();
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    throw new Error(
+      `Invalid surface manifest file "${filePath}": ${error instanceof Error ? error.message : String(error)}`
+    );
   }
   if (value.surfaces.length !== 1) {
     throw new Error(`Surface manifest file "${filePath}" must contain exactly one surface.`);
@@ -154,7 +296,9 @@ function readSurfaceManifestDirectory(
 }
 
 export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): SurfaceRuntimeManifest {
-  const resolvedManifestPath = pathResolver.resolve(manifestPath);
+  const resolvedManifestPath = assertSafeRepositoryPath(pathResolver.resolve(manifestPath), {
+    allowMissingLeaf: true,
+  });
   if (
     resolvedManifestPath === surfaceManifestPath() &&
     safeExistsSync(surfaceManifestDirectoryPath())
@@ -163,15 +307,14 @@ export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): Surfa
     if (directoryManifest) return directoryManifest;
   }
   if (safeExistsSync(resolvedManifestPath)) {
-    const value = readJson<SurfaceRuntimeManifest>(resolvedManifestPath);
-    const validate = ensureSurfaceManifestValidator();
-    if (!validate(value)) {
-      const errors = (validate.errors || [])
-        .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-        .join('; ');
-      throw new Error(`Invalid surface manifest: ${errors}`);
+    try {
+      return surfaceManifestCatalog(resolvedManifestPath).load();
+    } catch (error) {
+      if (error instanceof SyntaxError) throw error;
+      throw new Error(
+        `Invalid surface manifest: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-    return value;
   }
   const directoryManifest = readSurfaceManifestDirectory(resolvedManifestPath);
   if (directoryManifest) return directoryManifest;
@@ -190,7 +333,9 @@ export function saveSurfaceManifest(
     throw new Error(`Invalid surface manifest for saving: ${errors}`);
   }
   const surfaces = [...manifest.surfaces].sort((left, right) => left.id.localeCompare(right.id));
-  const resolvedManifestPath = pathResolver.resolve(manifestPath);
+  const resolvedManifestPath = assertSafeRepositoryPath(pathResolver.resolve(manifestPath), {
+    allowMissingLeaf: true,
+  });
   const writeDirectoryManifests = resolvedManifestPath === surfaceManifestPath();
 
   if (writeDirectoryManifests) {
@@ -224,15 +369,23 @@ export function saveSurfaceManifest(
 }
 
 export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntimeState {
-  if (!safeExistsSync(statePath)) {
+  const safeStatePath = assertSafeRepositoryPath(pathResolver.resolve(statePath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(safeStatePath)) {
     return { version: 1, surfaces: {} };
   }
-  return loadJson<SurfaceRuntimeState>(statePath);
+  return parsePersistedSurfaceState(surfaceStateCatalog(safeStatePath).load());
 }
 
 export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surfaceStatePath()): void {
-  ensureParentDir(statePath);
-  safeWriteFile(statePath, JSON.stringify(state, null, 2));
+  const safeStatePath = assertSafeRepositoryPath(pathResolver.resolve(statePath), {
+    allowMissingLeaf: true,
+  });
+  ensureParentDir(safeStatePath);
+  const validated = parsePersistedSurfaceState(state);
+  const canonical = surfaceStateCatalog(safeStatePath).validate(validated, safeStatePath);
+  safeWriteFile(safeStatePath, JSON.stringify(canonical, null, 2));
 }
 
 export function resolveSurfaceCwd(definition: SurfaceRuntimeDefinition): string {

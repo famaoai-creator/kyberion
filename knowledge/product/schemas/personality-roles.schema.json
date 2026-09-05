@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/personality-roles.schema.json",
+  "title": "Personality Role Catalog",
+  "type": "object",
+  "required": ["domains"],
+  "properties": {
+    "domains": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/domain"
+      }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "domain": {
+      "type": "object",
+      "required": ["name", "roles"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

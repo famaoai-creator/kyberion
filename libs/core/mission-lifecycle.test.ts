@@ -17,6 +17,7 @@ import {
   hashArtifactForReview,
   inferArtifactReviewKind,
 } from './artifact-review.js';
+import { updateMissionMemorySidecar } from './mission-lifecycle-completion.js';
 import * as customerResolver from './customer-resolver.js';
 import { emitIntentSnapshot } from './intent-snapshot-store.js';
 import * as pathResolver from './path-resolver.js';
@@ -27,6 +28,7 @@ import {
   safeReaddir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
 } from './secure-io.js';
 import { transitionStatus } from './mission-status.js';
@@ -34,10 +36,12 @@ import {
   collectMissionEvidence,
   evaluateMissionFinishExitGate,
   finishMission,
+  readMissionNextTasks,
   repairLegacyMissionState,
   reconcileLifecycleClosureCriteria,
   tryAutoCompleteTaskFromEvidence,
   verifyMission,
+  writeMissionNextTasks,
 } from './mission-lifecycle.js';
 
 const missionId = 'MSN-LIFECYCLE-GATE-001';
@@ -179,6 +183,110 @@ describe('mission lifecycle finish gate', () => {
     expect(collectMissionEvidence(missionPath).map(({ ref }) => path.basename(ref))).toEqual([
       'report.md',
     ]);
+  });
+
+  it('promotes only schema-valid volatile memory sidecars', () => {
+    const markdownPath = `${missionPath}/MEMORY.md`;
+    safeWriteFile(markdownPath, '# Memory\n');
+    const sidecarPath = `${missionPath}/MEMORY.volatile.json`;
+    safeWriteFile(
+      sidecarPath,
+      JSON.stringify({
+        $schema: '../../../schemas/volatile-knowledge.schema.json',
+        scope: 'mission',
+        scope_ref: missionId,
+        cadence: 'resident',
+        period_key: null,
+        tier: 'public',
+        lifetime: 'mission',
+        expires_at: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        rollover_to: null,
+        rollup_to: null,
+        promote_target: null,
+        promotion_candidate_id: null,
+        status: 'active',
+        pinned: false,
+      })
+    );
+
+    updateMissionMemorySidecar(markdownPath, 'candidate-1');
+
+    const updated = JSON.parse(String(safeReadFile(sidecarPath, { encoding: 'utf8' }))) as Record<
+      string,
+      unknown
+    >;
+    expect(updated.promotion_candidate_id).toBe('candidate-1');
+    expect(updated.status).toBe('promoted');
+    expect(updated.updated_at).not.toBe('2026-01-01T00:00:00.000Z');
+    expect(() => {
+      safeWriteFile(sidecarPath, JSON.stringify({ ...updated, unexpected: true }));
+      updateMissionMemorySidecar(markdownPath, 'candidate-2');
+    }).toThrow(/Invalid volatile knowledge sidecar/);
+  });
+
+  it('rejects external and symlinked mission paths before reading lifecycle artifacts', () => {
+    expect(() => collectMissionEvidence('/tmp/kyberion-external-mission')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    expect(() => readMissionNextTasks('/tmp/kyberion-external-mission')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+
+    const target = pathResolver.sharedTmp('mission-lifecycle-symlink-target');
+    const linked = pathResolver.sharedTmp('mission-lifecycle-symlink');
+    safeMkdir(target, { recursive: true });
+    safeSymlinkSync(target, linked);
+    try {
+      expect(() => collectMissionEvidence(linked)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(linked, { force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects malformed task objects without dropping valid task fields', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([
+        {
+          task_id: 'task-1',
+          status: 'planned',
+          deliverable: 'evidence/task-1.md',
+        },
+        { task_id: 42 },
+      ])
+    );
+
+    expect(readMissionNextTasks(missionPath)).toEqual([]);
+
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([
+        {
+          task_id: 'task-1',
+          status: 'planned',
+          deliverable: 'evidence/task-1.md',
+        },
+      ])
+    );
+    expect(readMissionNextTasks(missionPath)).toEqual([
+      {
+        task_id: 'task-1',
+        status: 'planned',
+        deliverable: 'evidence/task-1.md',
+      },
+    ]);
+  });
+
+  it('validates task-board writes through the shared task schema', () => {
+    expect(() =>
+      writeMissionNextTasks(missionPath, [
+        { task_id: 'task-1', status: 'planned' },
+        42 as unknown as Record<string, unknown>,
+      ])
+    ).toThrow('Invalid catalog mission-next-tasks');
   });
 
   it('resolves circular lifecycle closure criteria from verify and distill history', () => {

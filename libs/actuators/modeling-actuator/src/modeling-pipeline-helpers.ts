@@ -1,28 +1,49 @@
 import {
-  loadJson,
-  logger,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
-  executeAdfSteps,
-  pathResolver,
-  evaluateCondition,
-  getPathValue,
-  resolveWriteArtifactSpec,
-  retry,
-  buildGovernedRetryOptions,
-  runGovernedCommand,
+  safeLstat,
+  assertSafeRepositoryPath,
+} from '@agent/core/secure-io';
+import { logger } from '@agent/core/core';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import type { AdfEngineContext } from '@agent/core/adf-engine';
+import {
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
+import { pathResolver } from '@agent/core/path-resolver';
+import { evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
+import { retry } from '@agent/core/async-utils';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { runGovernedCommand } from '@agent/core/command-runner';
+import {
   analyzeSourceTree,
-  buildAgenticSourceReviewParticipants,
   compileEngineeringArtifacts,
+  writeEngineeringArtifactBundle,
+} from '@agent/core/source-analysis';
+import {
+  buildAgenticSourceReviewParticipants,
   compileAgenticSourceReviewPlan,
   validateAgenticSourceReviewPlan,
+} from '@agent/core/agentic-source-review';
+import {
   compileAgenticSourceReviewVerification,
   validateAgenticSourceReviewVerification,
-  writeEngineeringArtifactBundle,
-} from '@agent/core';
-import { createAjv } from '@agent/core/foundation';
+} from '@agent/core/agentic-source-review-verification';
+import {
+  createAjv,
+  defineCatalog,
+  nowIso,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+  parsePersistedPipelineStrategy,
+} from '@agent/core/foundation';
+import {
+  loadSoftwareQualityContractAtPath,
+  parseSoftwareQualityContract,
+} from '@agent/core/software-quality';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as addFormatsModule from 'ajv-formats';
@@ -38,7 +59,6 @@ import {
   extractRequirements,
   extractTestPlan,
 } from './sdlc-ops.js';
-import type { SoftwareQualityContract } from '@agent/core';
 
 const MODEL_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/modeling-actuator/manifest.json'
@@ -51,13 +71,11 @@ const DEFAULT_MODEL_RETRY = {
   jitter: true,
 };
 
-export function buildRetryOptions() {
-  return buildGovernedRetryOptions({
-    manifestPath: MODEL_MANIFEST_PATH,
-    defaults: DEFAULT_MODEL_RETRY,
-    fallbackCategories: ['resource_unavailable', 'timeout'],
-  });
-}
+export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: MODEL_MANIFEST_PATH,
+  defaults: DEFAULT_MODEL_RETRY,
+  fallbackCategories: ['resource_unavailable', 'timeout'],
+});
 
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 const ajv = createAjv();
@@ -65,67 +83,116 @@ addFormats(ajv);
 const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge(
   'product/orchestration/browser-execution-presets.json'
 );
+const BROWSER_EXECUTION_PRESETS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-execution-presets.schema.json'
+);
+
+interface BrowserExecutionPresetCatalog {
+  default_preset: string;
+  presets: Record<string, Record<string, unknown>>;
+}
+
+const browserExecutionPresetCatalog = defineCatalog<BrowserExecutionPresetCatalog>({
+  id: 'browser-execution-presets',
+  path: BROWSER_EXECUTION_PRESETS_PATH,
+  schema: BROWSER_EXECUTION_PRESETS_SCHEMA_PATH,
+});
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
-}
-
-interface StrategyConfig {
-  strategies: Array<{ pipeline: PipelineStep[]; params?: Record<string, unknown> }>;
+  params: Record<string, unknown>;
 }
 
 export interface ModelingAction {
   action: 'pipeline' | 'reconcile';
   steps?: PipelineStep[];
   strategy_path?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   options?: {
     max_steps?: number;
     timeout_ms?: number;
   };
 }
 
+function resolveContextPath(rootDir: string, contextPath: string | undefined): string | undefined {
+  return contextPath
+    ? assertSafeRepositoryPath(path.resolve(rootDir, contextPath), { allowMissingLeaf: true })
+    : undefined;
+}
+
+function resolveModelingRepositoryPath(rootDir: string, value: unknown, label: string): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`[${label}] path is required`);
+  return assertSafeRepositoryPath(path.resolve(rootDir, requested), {
+    allowMissingLeaf: true,
+  });
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readModelingJson(filePath: string, label: string): unknown {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
+}
+
 // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
-// (executeAdfSteps). Nested control failures now propagate instead of being
+// (runAdfActuatorPipeline). Nested control failures now propagate instead of being
 // silently absorbed (AR-06 no-silent-failure).
 export async function executePipeline(
   steps: PipelineStep[],
-  initialCtx: any = {},
-  options: any = {}
+  initialCtx: AdfEngineContext = {},
+  options: ModelingAction['options'] = {}
 ) {
   const rootDir = pathResolver.rootDir();
-  const MAX_STEPS = options.max_steps || 1000;
-  const TIMEOUT = options.timeout_ms || 60000;
+  const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
+  const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  let ctx: AdfEngineContext = { ...initialCtx, timestamp: nowIso() };
+  const contextPath = resolveContextPath(
+    rootDir,
+    typeof initialCtx.context_path === 'string' ? initialCtx.context_path : undefined
+  );
 
-  if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
+  if (contextPath && safeExistsSync(contextPath)) {
     const saved = await retry(
-      async () => loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path)),
+      async () =>
+        parseSafeJsonObjectValue(
+          readModelingJson(contextPath, 'modeling context'),
+          'modeling context'
+        ),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
   }
 
-  const result = await executeAdfSteps(
-    steps as Parameters<typeof executeAdfSteps>[0],
-    ctx,
-    { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
-    {
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'modeling',
+    steps,
+    context: ctx,
+    options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+    handlers: {
       capture: opCapture,
       transform: opTransform,
       apply: async (op, params, currentCtx, resolve) =>
         await opApply(op, params, currentCtx, resolve),
       control: opControl,
-    }
-  );
+    },
+  });
   ctx = result.context;
 
-  if (initialCtx.context_path) {
+  if (contextPath) {
     await retry(async () => {
-      safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+      safeWriteFile(contextPath, JSON.stringify(ctx, null, 2));
       return undefined;
     }, buildRetryOptions());
   }
@@ -182,7 +249,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return {
         ...ctx,
         [params.export_as || 'last_capture_data']: await retry(
-          async () => loadJson<unknown>(path.resolve(rootDir, resolve(params.path))),
+          async () =>
+            readModelingJson(
+              resolveModelingRepositoryPath(rootDir, resolve(params.path), 'read_json'),
+              'modeling read_json input'
+            ),
           buildRetryOptions()
         ),
       };
@@ -191,7 +262,10 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ...ctx,
         [params.export_as || 'last_capture']: await retry(
           async () =>
-            safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
+            safeReadFile(
+              resolveModelingRepositoryPath(rootDir, resolve(params.path), 'read_file'),
+              { encoding: 'utf8' }
+            ),
           buildRetryOptions()
         ),
       };
@@ -200,7 +274,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ...ctx,
         [params.export_as || 'file_list']: await retry(
           async () =>
-            getAllFiles(path.resolve(rootDir, resolve(params.dir)))
+            getAllFiles(resolveModelingRepositoryPath(rootDir, resolve(params.dir), 'glob_files'))
               .filter((f) => !params.ext || f.endsWith(params.ext))
               .map((f) => path.relative(rootDir, f)),
           buildRetryOptions()
@@ -226,9 +300,15 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
 }
 
 async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'analyze_source_tree': {
-      const sourceRoot = String(resolve(params.source_root || params.dir || '.'));
+      const sourceRootPath = resolveModelingRepositoryPath(
+        rootDir,
+        resolve(params.source_root || params.dir || '.'),
+        'analyze_source_tree'
+      );
+      const sourceRoot = path.relative(rootDir, sourceRootPath).replaceAll(path.sep, '/') || '.';
       return {
         ...ctx,
         [params.export_as || 'source_analysis_ir']: analyzeSourceTree({
@@ -505,12 +585,12 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       }
       const presetCatalog = await loadBrowserExecutionPresetCatalog();
       const presetName = String(
-        profile.execution_preset ||
-          params.preset ||
-          presetCatalog.default_preset ||
-          'standard-web-auth'
-      );
-      const executionPreset = presetCatalog.presets?.[presetName] || {};
+        profile.execution_preset || params.preset || presetCatalog.default_preset
+      ).trim();
+      const executionPreset = presetCatalog.presets[presetName];
+      if (!executionPreset) {
+        throw new Error(`Unknown browser execution preset: ${presetName}`);
+      }
 
       const baseUrl = String(profile.base_url || '');
       const loginRoute = String(profile.login_route || '/login');
@@ -535,13 +615,21 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       ];
 
       if (loginSelectors.email && loginSelectors.password && loginSelectors.submit) {
+        const email = params.default_email || executionPreset.default_email;
+        const password = params.default_password || executionPreset.default_password;
+        if (typeof email !== 'string' || !email.trim()) {
+          throw new Error(`Browser execution preset ${presetName} requires default_email`);
+        }
+        if (typeof password !== 'string' || !password.trim()) {
+          throw new Error(`Browser execution preset ${presetName} requires default_password`);
+        }
         steps.push(
           {
             type: 'apply',
             op: 'fill',
             params: {
               selector: String(loginSelectors.email),
-              text: params.default_email || executionPreset.default_email || 'tester@example.com',
+              text: email,
             },
           },
           {
@@ -549,7 +637,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
             op: 'fill',
             params: {
               selector: String(loginSelectors.password),
-              text: params.default_password || executionPreset.default_password || 'debug-password',
+              text: password,
             },
           },
           {
@@ -688,9 +776,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
     }
     case 'terraform_to_architecture_adf': {
       const rootDir = pathResolver.rootDir();
-      const terraformRoot = path.resolve(
+      const terraformRoot = resolveModelingRepositoryPath(
         rootDir,
-        resolve(params.dir || params.path || ctx[params.from || 'terraform_root'])
+        resolve(params.dir || params.path || ctx[params.from || 'terraform_root']),
+        'terraform_to_architecture_adf'
       );
       const title = resolve(params.title) || path.basename(terraformRoot);
       return {
@@ -702,9 +791,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
     }
     case 'terraform_to_topology_ir': {
       const rootDir = pathResolver.rootDir();
-      const terraformRoot = path.resolve(
+      const terraformRoot = resolveModelingRepositoryPath(
         rootDir,
-        resolve(params.dir || params.path || ctx[params.from || 'terraform_root'])
+        resolve(params.dir || params.path || ctx[params.from || 'terraform_root']),
+        'terraform_to_topology_ir'
       );
       const title = resolve(params.title) || path.basename(terraformRoot);
       return {
@@ -717,40 +807,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
   }
 }
 
-async function loadBrowserExecutionPresetCatalog(): Promise<{
-  default_preset?: string;
-  presets: Record<string, any>;
-}> {
-  if (safeExistsSync(BROWSER_EXECUTION_PRESETS_PATH)) {
-    try {
-      const parsed = await retry(
-        async () =>
-          loadJson<{
-            default_preset?: string;
-            presets?: Record<string, unknown>;
-          }>(BROWSER_EXECUTION_PRESETS_PATH),
-        buildRetryOptions()
-      );
-      if (parsed.presets) {
-        return { default_preset: parsed.default_preset, presets: parsed.presets };
-      }
-    } catch (err) {
-      logger.warn(
-        `[modeling-pipeline-helpers] suppressed error in loadBrowserExecutionPresetCatalog: ${err}`
-      );
-    }
-  }
-
-  return {
-    default_preset: 'standard-web-auth',
-    presets: {
-      'standard-web-auth': {
-        default_email: 'tester@example.com',
-        default_password: 'debug-password',
-        handoff_output_path: 'active/shared/tmp/browser/generated-web-session-handoff.json',
-      },
-    },
-  };
+async function loadBrowserExecutionPresetCatalog(): Promise<BrowserExecutionPresetCatalog> {
+  return browserExecutionPresetCatalog.load();
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
@@ -770,7 +828,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       pathResolver.missionDir(missionId, 'confidential', tenantSlug),
       'evidence'
     );
-    const outputPath = path.resolve(rootDir, outputDir);
+    const outputPath = resolveModelingRepositoryPath(rootDir, outputDir, 'mission_evidence');
     const relativeToEvidence = path.relative(evidenceRoot, outputPath);
     if (relativeToEvidence.startsWith(`..${path.sep}`) || path.isAbsolute(relativeToEvidence)) {
       throw new Error(
@@ -788,15 +846,18 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const outputDir = String(
         resolve(params.output_dir || 'active/shared/tmp/source-engineering')
       );
-      const relative = path
-        .relative(rootDir, path.resolve(rootDir, outputDir))
-        .replaceAll(path.sep, '/');
+      const outputPath = resolveModelingRepositoryPath(
+        rootDir,
+        outputDir,
+        'write_engineering_artifacts'
+      );
+      const relative = path.relative(rootDir, outputPath).replaceAll(path.sep, '/');
       if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
         throw new Error(
           'write_engineering_artifacts output_dir must stay under active/shared/tmp or active/missions'
         );
       }
-      const outputs = writeEngineeringArtifactBundle(bundle, outputDir);
+      const outputs = writeEngineeringArtifactBundle(bundle, outputPath);
       Object.assign(ctx, { [params.export_as || 'engineering_outputs']: outputs });
       break;
     }
@@ -809,9 +870,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const outputDir = String(
         resolve(params.output_dir || 'active/shared/tmp/agentic-source-review')
       );
-      const relative = path
-        .relative(rootDir, path.resolve(rootDir, outputDir))
-        .replaceAll(path.sep, '/');
+      const outputDirPath = resolveModelingRepositoryPath(
+        rootDir,
+        outputDir,
+        'write_agentic_source_review_plan'
+      );
+      const relative = path.relative(rootDir, outputDirPath).replaceAll(path.sep, '/');
       if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
         throw new Error(
           'write_agentic_source_review_plan output_dir must stay under active/shared/tmp or active/missions'
@@ -822,9 +886,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         const tenantSlug = String(resolve(params.tenant_slug || ctx.tenant_slug || '')).trim();
         assertMissionEvidenceOutput(outputDir, missionId, tenantSlug);
       }
-      const outputPath = path.join(
-        path.resolve(rootDir, outputDir),
-        'agentic-source-review-plan.json'
+      const outputPath = assertSafeRepositoryPath(
+        path.join(outputDirPath, 'agentic-source-review-plan.json'),
+        { allowMissingLeaf: true }
       );
       if (!safeExistsSync(path.dirname(outputPath)))
         safeMkdir(path.dirname(outputPath), { recursive: true });
@@ -847,9 +911,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const outputDir = String(
         resolve(params.output_dir || 'active/shared/tmp/agentic-source-review')
       );
-      const relative = path
-        .relative(rootDir, path.resolve(rootDir, outputDir))
-        .replaceAll(path.sep, '/');
+      const outputDirPath = resolveModelingRepositoryPath(
+        rootDir,
+        outputDir,
+        'write_agentic_source_review_verification'
+      );
+      const relative = path.relative(rootDir, outputDirPath).replaceAll(path.sep, '/');
       if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
         throw new Error(
           'write_agentic_source_review_verification output_dir must stay under active/shared/tmp or active/missions'
@@ -861,9 +928,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         const tenantSlug = String(resolve(params.tenant_slug || ctx.tenant_slug || '')).trim();
         assertMissionEvidenceOutput(outputDir, missionId, tenantSlug);
       }
-      const outputPath = path.join(
-        path.resolve(rootDir, outputDir),
-        'agentic-source-review-verification.json'
+      const outputPath = assertSafeRepositoryPath(
+        path.join(outputDirPath, 'agentic-source-review-verification.json'),
+        { allowMissingLeaf: true }
       );
       if (!safeExistsSync(path.dirname(outputPath)))
         safeMkdir(path.dirname(outputPath), { recursive: true });
@@ -878,7 +945,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'write_file':
     case 'write_artifact':
       const spec = resolveWriteArtifactSpec(params, ctx, resolve);
-      const outPath = path.resolve(rootDir, spec.path);
+      const outPath = resolveModelingRepositoryPath(rootDir, spec.path, 'write_file');
       const content = spec.content;
       if (!safeExistsSync(path.dirname(outPath)))
         safeMkdir(path.dirname(outPath), { recursive: true });
@@ -929,17 +996,23 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     }
     case 'derive_test_inventory': {
       const contractPath = resolve(params.contract_path);
+      const contractFilePath = contractPath
+        ? assertSafeRepositoryPath(pathResolver.rootResolve(contractPath), {
+            allowMissingLeaf: true,
+          })
+        : undefined;
+      const contractValue = params.contract ?? ctx[params.contract_from || 'quality_contract'];
       const contract =
-        params.contract ??
-        ctx[params.contract_from || 'quality_contract'] ??
-        (contractPath && safeExistsSync(pathResolver.rootResolve(contractPath))
-          ? loadJson<SoftwareQualityContract>(pathResolver.rootResolve(contractPath))
-          : null);
-      if (!contract) throw new Error('[derive_test_inventory] quality contract not found');
+        contractValue !== undefined && contractValue !== null
+          ? parseSoftwareQualityContract(contractValue)
+          : contractFilePath && safeExistsSync(contractFilePath)
+            ? loadSoftwareQualityContractAtPath(contractFilePath)
+            : null;
+      if (!contract) throw new Error('[derive_test_inventory] quality contract is invalid');
       const systemTags = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
       const riskRefs = params.risk_refs ?? ctx[params.risk_refs_from || 'risk_refs'];
       const result = await deriveTestInventory({
-        contract: contract as SoftwareQualityContract,
+        contract,
         system_tags: Array.isArray(systemTags) ? systemTags.map(String) : [],
         risk_refs: Array.isArray(riskRefs) ? riskRefs.map(String) : [],
         additional_context: resolve(params.additional_context),
@@ -947,11 +1020,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       });
       const outputPath = resolve(params.output_path);
       if (outputPath) {
-        safeWriteFile(
-          pathResolver.rootResolve(outputPath),
-          `${JSON.stringify(result, null, 2)}\n`,
-          { encoding: 'utf8' }
-        );
+        const safeOutputPath = assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), {
+          allowMissingLeaf: true,
+        });
+        safeWriteFile(safeOutputPath, `${JSON.stringify(result, null, 2)}\n`, { encoding: 'utf8' });
       }
       return {
         ...ctx,
@@ -998,12 +1070,17 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
 }
 
 export async function performReconcile(input: ModelingAction) {
-  const strategyPath = pathResolver.rootResolve(
-    input.strategy_path || 'knowledge/product/governance/modeling-strategy.json'
+  const strategyPath = resolveModelingRepositoryPath(
+    pathResolver.rootDir(),
+    input.strategy_path || 'knowledge/product/governance/modeling-strategy.json',
+    'reconcile'
   );
-  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await retry(
-    async () => loadJson<StrategyConfig>(strategyPath),
+    async () =>
+      parsePersistedPipelineStrategy(
+        readModelingJson(strategyPath, 'modeling strategy'),
+        'modeling strategy'
+      ),
     buildRetryOptions()
   );
   for (const strategy of config.strategies) {

@@ -1,15 +1,98 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  pathResolver,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './index.js';
+
+const { resolveActiveProfileRootMock } = vi.hoisted(() => ({
+  resolveActiveProfileRootMock: vi.fn(),
+}));
+
+vi.mock('./profile-root.js', () => ({
+  resolveActiveProfileRoot: resolveActiveProfileRootMock,
+}));
+
 import {
   resolveReasoningRoute,
   resolveSamplingParams,
   normalizeReasoningRole,
   resolveStepReasoningRoute,
-  resetReasoningRoutePolicyCache,
+  _resetReasoningRoutePolicyCacheForTests,
 } from './reasoning-route-resolver.js';
 
+const TEST_PROFILE_ROOT = pathResolver.sharedTmp('reasoning-route-profile');
+
 describe('reasoning-route-resolver', () => {
+  beforeEach(() => {
+    resolveActiveProfileRootMock.mockReturnValue(TEST_PROFILE_ROOT);
+  });
+
   afterEach(() => {
-    resetReasoningRoutePolicyCache();
+    _resetReasoningRoutePolicyCacheForTests();
+    try {
+      safeRmSync(TEST_PROFILE_ROOT, { recursive: true, force: true });
+    } catch {
+      // The fixture may not have been created.
+    }
+  });
+
+  it('routes runtime environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/reasoning-route-resolver.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  it('ignores an operator selection that is reached through a symlink', () => {
+    const onboarding = path.join(TEST_PROFILE_ROOT, 'onboarding');
+    const outside = path.join(TEST_PROFILE_ROOT, 'outside');
+    const selection = path.join(onboarding, 'llm-selection.json');
+    const policy = {
+      version: 'test',
+      runtime_adapters: {
+        selected: {
+          adapter: 'test',
+          model_policy: 'local-unregistered' as const,
+          capabilities: ['text'],
+          supported_parameters: [],
+        },
+        fallback: {
+          adapter: 'test',
+          model_policy: 'local-unregistered' as const,
+          capabilities: ['text'],
+          supported_parameters: [],
+        },
+      },
+      profiles: {
+        selected: { mode: 'selected' },
+        fallback: { mode: 'fallback' },
+      },
+      roles: { default: { candidates: ['fallback'] } },
+      fallback: {
+        max_attempts: 1,
+        max_in_place_retries: 0,
+        on_unsupported_parameter: 'reject' as const,
+      },
+    };
+
+    safeMkdir(onboarding, { recursive: true });
+    safeMkdir(outside, { recursive: true });
+    safeWriteFile(
+      path.join(outside, 'llm-selection.json'),
+      JSON.stringify({ provider: 'selected' })
+    );
+    safeSymlinkSync(path.join(outside, 'llm-selection.json'), selection);
+
+    const route = resolveReasoningRoute({ role: 'default', policy, env: {} });
+    expect(route.profileRef).toBe('fallback');
   });
 
   it('resolves role, profile, model and provenance deterministically', () => {

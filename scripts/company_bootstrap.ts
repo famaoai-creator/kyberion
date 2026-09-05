@@ -10,23 +10,27 @@
  * 参照するためコピー不要。
  *
  * Usage:
- *   pnpm company:bootstrap --vertical saas-product-company --slug acme --name "ACME株式会社" [--root-dir <path>] [--force]
+ *   pnpm onboard company bootstrap --vertical saas-product-company --slug acme --name "ACME株式会社" [--root-dir <path>] [--force]
  */
 
 import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  logger,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeReadFile,
   safeWriteFile,
-} from '@agent/core';
-import { getRegisteredEnvText, readJson, setRegisteredEnv } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { loadOrganizationProfileAtPath } from '@agent/core/organization-profile';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
+const VERTICAL_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
 
 export interface BootstrapCompanyInput {
   vertical: string;
@@ -43,7 +47,11 @@ export interface BootstrapCompanyResult {
 }
 
 export function listCompanyVerticals(rootDir?: string): string[] {
-  const base = path.join(rootDir ?? pathResolver.rootDir(), 'templates', 'companies');
+  const resolvedRoot = rootDir ?? pathResolver.rootDir();
+  const base = assertSafeRepositoryPath(path.join(resolvedRoot, 'templates', 'companies'), {
+    allowMissingLeaf: true,
+    rootDir: resolvedRoot,
+  });
   if (!safeExistsSync(base)) return [];
   return (safeReaddir(base) as string[]).filter((entry) => !entry.includes('.')).sort();
 }
@@ -60,16 +68,35 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
       `[company-bootstrap] invalid slug '${slug}'; must match ${SLUG_PATTERN.source}`
     );
   }
+  if (!VERTICAL_PATTERN.test(vertical)) {
+    throw new Error(
+      `[company-bootstrap] invalid vertical '${vertical}'; must match ${VERTICAL_PATTERN.source}`
+    );
+  }
   const templateDir = path.join(templateRoot, 'templates', 'companies', vertical);
-  if (!safeExistsSync(templateDir)) {
+  const safeTemplateDir = assertSafeRepositoryPath(templateDir, {
+    allowMissingLeaf: true,
+    rootDir: templateRoot,
+  });
+  if (!safeExistsSync(safeTemplateDir)) {
     const known = listCompanyVerticals(templateRoot);
     throw new Error(
       `[company-bootstrap] unknown vertical '${vertical}'. Available: ${known.join(', ') || '(none)'}`
     );
   }
 
-  const customerDir = path.join(rootDir, 'customer', slug);
-  if (safeExistsSync(path.join(customerDir, 'organization-profile.json')) && !input.force) {
+  const customerDir = assertSafeRepositoryPath(path.join(rootDir, 'customer', slug), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
+  const profileTarget = assertSafeRepositoryPath(
+    path.join(customerDir, 'organization-profile.json'),
+    {
+      allowMissingLeaf: true,
+      rootDir,
+    }
+  );
+  if (safeExistsSync(profileTarget) && !input.force) {
     throw new Error(
       `[company-bootstrap] customer '${slug}' already has an organization profile. Re-run with --force to overwrite.`
     );
@@ -78,22 +105,32 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
   const companyName = input.companyName?.trim() || slug;
   safeMkdir(customerDir, { recursive: true });
   const writtenFiles: string[] = [];
-  for (const entry of safeReaddir(templateDir) as string[]) {
-    const sourcePath = path.join(templateDir, entry);
+  for (const entry of safeReaddir(safeTemplateDir) as string[]) {
+    const sourcePath = assertSafeRepositoryPath(path.join(safeTemplateDir, entry), {
+      rootDir: templateRoot,
+    });
+    if (!safeLstat(sourcePath).isFile()) continue;
     const raw = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
     const materialized = raw
       .replaceAll('{COMPANY_SLUG}', slug)
       .replaceAll('{COMPANY_NAME}', companyName);
-    const targetPath = path.join(customerDir, entry);
+    const targetPath = assertSafeRepositoryPath(path.join(customerDir, entry), {
+      allowMissingLeaf: true,
+      rootDir,
+    });
     safeWriteFile(targetPath, materialized);
     writtenFiles.push(targetPath);
   }
 
   // Fail fast on a broken template rather than at first mission creation.
-  const profile = readJson<{ team_defaults?: { team_template_catalog_id?: string } }>(
-    path.join(customerDir, 'organization-profile.json')
-  );
+  if (!safeLstat(profileTarget).isFile()) {
+    throw new Error('[company-bootstrap] materialized organization profile must be a regular file');
+  }
+  const profile = loadOrganizationProfileAtPath(profileTarget);
   const catalogId = profile.team_defaults?.team_template_catalog_id ?? 'default';
+  if (!/^[a-z][a-z0-9-]{1,63}$/.test(catalogId)) {
+    throw new Error(`[company-bootstrap] invalid team template catalog id '${catalogId}'`);
+  }
   const catalogRel = path.join(
     'knowledge',
     'product',
@@ -104,10 +141,20 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
   // Catalogs ship with the repository; when bootstrapping into an isolated
   // rootDir (tests), fall back to the repo's own knowledge tree.
   const catalogCandidates = [
-    path.join(rootDir, catalogRel),
-    path.join(pathResolver.rootDir(), catalogRel),
+    assertSafeRepositoryPath(path.join(rootDir, catalogRel), {
+      allowMissingLeaf: true,
+      rootDir,
+    }),
+    assertSafeRepositoryPath(path.join(pathResolver.rootDir(), catalogRel), {
+      allowMissingLeaf: true,
+      rootDir: pathResolver.rootDir(),
+    }),
   ];
-  if (!catalogCandidates.some((candidate) => safeExistsSync(candidate))) {
+  if (
+    !catalogCandidates.some(
+      (candidate) => safeExistsSync(candidate) && safeLstat(candidate).isFile()
+    )
+  ) {
     throw new Error(
       `[company-bootstrap] team template catalog '${catalogId}' not found at ${catalogCandidates[0]}`
     );
@@ -123,10 +170,12 @@ function getFlag(argv: string[], name: string): string | undefined {
   return value && !value.startsWith('--') ? value : undefined;
 }
 
-function main(argv: string[]): number {
+export function main(argv: string[], print: (value: unknown) => void = () => undefined): number {
   // Operator-run scaffolding CLI: same execution context as the onboarding
   // wizard, which also writes under customer/ (see scripts/onboarding_wizard.ts).
-  process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+  }
   setRegisteredEnv('KYBERION_PERSONA', getRegisteredEnvText('KYBERION_PERSONA') || 'sovereign');
   const vertical = getFlag(argv, '--vertical');
   const slug = getFlag(argv, '--slug');
@@ -136,16 +185,19 @@ function main(argv: string[]): number {
 
   if (argv.includes('--list') || (!vertical && !slug)) {
     const verticals = listCompanyVerticals();
-    console.log('Available company verticals:');
-    for (const entry of verticals) console.log(`  - ${entry}`);
-    console.log(
-      '\nUsage: pnpm company:bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]'
+    print(
+      [
+        'Available company verticals:',
+        ...verticals.map((entry) => `  - ${entry}`),
+        '',
+        '\nUsage: pnpm onboard company bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]',
+      ].join('\n')
     );
     return vertical || slug ? 1 : 0;
   }
   if (!vertical || !slug) {
     logger.error(
-      'Usage: pnpm company:bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]'
+      'Usage: pnpm onboard company bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]'
     );
     return 1;
   }
@@ -172,10 +224,10 @@ if (
   isDirectScript(import.meta.url, 'company_bootstrap.js')
 )
   void defineScript({
-    name: 'company:bootstrap',
-    flags: [],
+    name: 'onboard:company-bootstrap',
+    flags: ['json', 'quiet'],
     run(context) {
-      const status = main(context.argv);
+      const status = main(context.argv, context.print);
       if (status !== 0) throw new Error(`company bootstrap failed with exit code ${status}`);
     },
   })();

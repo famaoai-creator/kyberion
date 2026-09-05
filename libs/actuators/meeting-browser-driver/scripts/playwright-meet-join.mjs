@@ -1,48 +1,38 @@
 #!/usr/bin/env node
-import * as path from 'node:path';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { StubAudioBus, pathResolver, logger } from '@agent/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
+import { StubAudioBus } from '@agent/core/audio-bus';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import {
+  resolveMeetingPlatformFromUrl,
+  validateMeetingTarget,
+} from '@agent/core/meeting-join-driver';
 import { createBrowserMeetingJoinDriver } from '../../../../dist/libs/actuators/meeting-browser-driver/src/index.js';
 
-function readPayload() {
+async function readPayload() {
+  let raw = '';
   try {
-    const raw = readFileSync(0, 'utf8');
-    if (raw.trim()) return raw;
+    if (!process.stdin.isTTY) {
+      for await (const chunk of process.stdin) raw += String(chunk);
+    }
   } catch {
     // fall through to argv
   }
-  if (process.argv[2]) return process.argv[2];
-  return '';
+  return raw.trim() ? raw : process.argv[2] || '';
 }
 
-function parsePayload() {
-  const raw = readPayload();
+async function parsePayload() {
+  const raw = await readPayload();
   if (!raw.trim()) {
     throw new Error('missing input payload');
   }
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`invalid JSON input: ${message}`);
-  }
+  return parseSafeJsonObjectValue(parseSafeJsonInput(raw, 'meeting input'), 'meeting input');
 }
 
 function normalizePlatform(platform, url) {
   const value = String(platform || 'auto').trim();
   if (value && value !== 'auto') return value;
-  const host = (() => {
-    try {
-      return new URL(url).host;
-    } catch {
-      return '';
-    }
-  })();
-  if (host.includes('zoom.us') || host.includes('zoom.com')) return 'zoom';
-  if (host.includes('teams.microsoft.com') || host.includes('teams.live.com')) return 'teams';
-  if (host.includes('meet.google.com')) return 'meet';
-  return 'meet';
+  return resolveMeetingPlatformFromUrl(url) || 'meet';
 }
 
 async function runJoin(params = {}) {
@@ -52,6 +42,18 @@ async function runJoin(params = {}) {
   }
 
   const platform = normalizePlatform(params.platform, url);
+  try {
+    validateMeetingTarget({
+      url,
+      platform,
+      meeting_id: params.meeting_id,
+      passcode: params.passcode,
+      display_name: params.name || params.display_name,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { status: 'error', platform, message };
+  }
   const driver = createBrowserMeetingJoinDriver({
     account_slug: params.account_slug || params.profile_id || 'default',
     headed: Boolean(params.headed),
@@ -105,15 +107,20 @@ async function runJoin(params = {}) {
 
 async function main() {
   let payload;
+  let params;
   try {
-    payload = parsePayload();
+    payload = await parsePayload();
+    params = parseSafeJsonObjectValue(
+      payload.params === undefined ? {} : payload.params,
+      'meeting params'
+    );
   } catch (err) {
-    console.log(JSON.stringify({ status: 'error', message: err.message }));
+    const message = err instanceof Error ? err.message : String(err);
+    console.log(JSON.stringify({ status: 'error', message }));
     process.exit(1);
   }
 
-  const action = payload?.action || 'join';
-  const params = payload?.params || {};
+  const action = typeof payload.action === 'string' ? payload.action : 'join';
 
   try {
     let result;
@@ -150,8 +157,11 @@ async function main() {
   }
 }
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-if (entrypoint && modulePath === entrypoint) {
+if (
+  isDirectEntry(
+    import.meta.url,
+    'libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs'
+  )
+) {
   await main();
 }

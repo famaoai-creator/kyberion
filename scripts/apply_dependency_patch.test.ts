@@ -107,6 +107,34 @@ describe('bumpDependencySpec', () => {
 });
 
 describe('applyDependencyPatch', () => {
+  it('rejects dangerous package manifest JSON before planning a patch', () => {
+    safeWriteFile(path.join(testRoot, 'package.json'), '{"__proto__":{"polluted":true}}');
+
+    expect(() =>
+      applyDependencyPatch({
+        packageName: 'leftpad',
+        targetVersion: '1.0.1',
+        apply: false,
+        rootDir: testRoot,
+        ledgerPath,
+        backupRoot,
+        runner: new FakeRunner(() => ok),
+        gates: GATES,
+      })
+    ).toThrow(/dangerous JSON key/);
+  });
+
+  it('keeps command output behind the shared printer boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/apply_dependency_patch.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).toContain('print: Print');
+    expect(source).not.toContain('console.log');
+  });
+
   it('propose mode records the plan without touching files', () => {
     const runner = new FakeRunner(() => ok);
     const outcome = applyDependencyPatch({
