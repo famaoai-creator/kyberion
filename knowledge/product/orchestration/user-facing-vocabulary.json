@@ -9348,6 +9348,91 @@
         "ja": "設定",
         "qps-ploc": "⟦Şėŧŧïñɠş ŀőř⟧"
       },
+      "tui_tab_agents": {
+        "en": "Agents",
+        "ja": "連携",
+        "qps-ploc": "⟦Ȧɠėñŧş ŀőř⟧"
+      },
+      "tui_agents_col_node": {
+        "en": "Node",
+        "ja": "ノード",
+        "qps-ploc": "⟦Ñőḓė ŀőř⟧"
+      },
+      "tui_agents_col_state": {
+        "en": "State",
+        "ja": "状態",
+        "qps-ploc": "⟦Şŧȧŧė ŀőř⟧"
+      },
+      "tui_agents_col_waiting": {
+        "en": "Waiting",
+        "ja": "待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ŀőř⟧"
+      },
+      "tui_agents_col_elapsed": {
+        "en": "Elapsed",
+        "ja": "経過",
+        "qps-ploc": "⟦Ėŀȧṗşėḓ ŀőř⟧"
+      },
+      "tui_agents_col_provider": {
+        "en": "Provider",
+        "ja": "プロバイダ",
+        "qps-ploc": "⟦Ṗřőṽïḓėř ŀőř⟧"
+      },
+      "tui_agents_wait_approval_pending": {
+        "en": "Approval pending",
+        "ja": "承認待ち",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ṗėñḓïñɠ ŀőřėɱ⟧"
+      },
+      "tui_agents_wait_child_running": {
+        "en": "Waiting for child",
+        "ja": "子の完了待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ƈħïŀḓ ŀőřėɱ⟧"
+      },
+      "tui_agents_wait_claim_pending": {
+        "en": "Claim pending",
+        "ja": "クレーム待ち",
+        "qps-ploc": "⟦Ƈŀȧïɱ ṗėñḓïñɠ ŀőřė⟧"
+      },
+      "tui_agents_wait_blocked": {
+        "en": "Blocked",
+        "ja": "ブロック",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "tui_agents_wait_review_pending": {
+        "en": "Review pending",
+        "ja": "レビュー待ち",
+        "qps-ploc": "⟦Řėṽïėẇ ṗėñḓïñɠ ŀőřė⟧"
+      },
+      "tui_agents_wait_stale": {
+        "en": "Stale",
+        "ja": "停滞",
+        "qps-ploc": "⟦Şŧȧŀė ŀőř⟧"
+      },
+      "tui_agents_waiting": {
+        "en": "Waiting now",
+        "ja": "いま待っているもの",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ñőẇ ŀőř⟧"
+      },
+      "tui_agents_waiting_none": {
+        "en": "Nothing waiting",
+        "ja": "待ちはありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ ẇȧïŧïñɠ ŀőřė⟧"
+      },
+      "tui_agents_stats": {
+        "en": "running {running} · waiting {waiting} · done {done} · humans waited on {humans}",
+        "ja": "実行中 {running} · 待ち {waiting} · 完了 {done} · 人間待ち {humans}",
+        "qps-ploc": "⟦řůññïñɠ {running} · ẇȧïŧïñɠ {waiting} · ḓőñė {done} · ħůɱȧñş ẇȧïŧėḓ őñ {humans} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "tui_agents_bounded": {
+        "en": "Bounded read truncated: {sources}",
+        "ja": "有界読み込みで切り詰め: {sources}",
+        "qps-ploc": "⟦Ƀőůñḓėḓ řėȧḓ ŧřůñƈȧŧėḓ: {sources} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "tui_home_agents_waiting": {
+        "en": "{waiting} agents waiting · {humans} waiting on a human",
+        "ja": "エージェント待ち {waiting} 件 · 人間待ち {humans} 件",
+        "qps-ploc": "⟦{waiting} ȧɠėñŧş ẇȧïŧïñɠ · {humans} ẇȧïŧïñɠ őñ ȧ ħůɱȧñ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "tui_help_title": {
         "en": "Keyboard Shortcuts",
         "ja": "キーボードショートカット",
