@@ -218,7 +218,7 @@ function resolveIdentity(args: CliArgs): string {
   if (explicit) return explicit;
   const persona = String(getRegisteredEnvText('KYBERION_PERSONA') || '').trim();
   if (persona) return persona;
-  const role = String(process.env.MISSION_ROLE || '').trim();
+  const role = String(getRegisteredEnvText('MISSION_ROLE') || '').trim();
   if (role) return role;
   throw new Error(
     'no ingest identity — pass --ingested-by <who> or run with KYBERION_PERSONA / MISSION_ROLE set. ' +
