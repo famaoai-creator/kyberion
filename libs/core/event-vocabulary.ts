@@ -141,6 +141,21 @@ export function listKnownEventTypes(): string[] {
  * got wrong.
  */
 const INFERENCE_RULES: ReadonlyArray<{ pattern: RegExp; kind: CollaborationKind }> = Object.freeze([
+  // agent-runtime-events.jsonl (AC-02) emits these four literal `event`
+  // values and nothing else today. They are anchored exactly because the
+  // generic substring rules below would not classify them correctly on their
+  // own: 'paused' matches no wait/block token, 'cancelled' matches no fail
+  // token, and 'work_remains' / 'finish_refresh_recommended' would otherwise
+  // fall through to 'unknown'.
+  { pattern: /^mission_paused$/u, kind: 'waiting' },
+  { pattern: /^mission_cancelled$/u, kind: 'failure' },
+  { pattern: /^mission_work_remains$/u, kind: 'progress' },
+  { pattern: /^mission_finish_refresh_recommended$/u, kind: 'review' },
+  // a2a-bridge.ts emits this `decision` for every routed a2a message (AC-02).
+  // It contains no token any generic rule below would catch ('routed' matches
+  // nothing), so without this anchor every a2a event reads as 'unknown' and
+  // needlessly raises the projection's unknown_event status flag.
+  { pattern: /^a2a_message_routed$/u, kind: 'handoff' },
   // Outcome words before subject words. Decision names are built as
   // <subject>_<verb>_<outcome> (`agent_runtime_prewarm_timeout`), so testing the
   // subject first misclassifies every terminal event about that subject — this
