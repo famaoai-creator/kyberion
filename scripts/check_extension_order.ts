@@ -1,7 +1,7 @@
 /** PI-08: keep the public lifecycle graph and runtime hook vocabulary aligned. */
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { LIFECYCLE_HOOK_EVENTS } from '@agent/core/lifecycle-hook-engine';
-import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const extensionPointsPath = pathResolver.rootResolve('docs/developer/EXTENSION_POINTS.md');
@@ -24,7 +24,7 @@ const requiredRuntimeLabels = [
 ];
 
 export function checkExtensionOrder(): { runtimeEvents: number } {
-  const document = String(safeReadFile(extensionPointsPath, { encoding: 'utf8' }));
+  const document = readTextFile(extensionPointsPath);
   const contractStart = document.indexOf('## 2.11 Lifecycle order');
   const contractEnd = document.indexOf('\n## 3. Semver Rules', contractStart);
   if (contractStart < 0 || contractEnd < 0) {
