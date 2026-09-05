@@ -24,12 +24,11 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { nowIso } from '@agent/core/foundation';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
@@ -84,7 +83,7 @@ function detectLicenseFile(pkgDir: string): string | null {
   for (const c of candidates) {
     const licensePath = path.join(pkgDir, c);
     if (safeExistsSync(licensePath)) {
-      const content = (safeReadFile(licensePath, { encoding: 'utf8' }) as string).slice(0, 2000);
+      const content = readTextFile(licensePath).slice(0, 2000);
       if (/MIT License/i.test(content)) return 'MIT';
       if (/Apache License.*Version 2\.0/i.test(content)) return 'Apache-2.0';
       if (/BSD 3-Clause/i.test(content)) return 'BSD-3-Clause';

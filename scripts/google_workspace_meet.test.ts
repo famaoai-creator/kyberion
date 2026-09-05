@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core';
 import { readPayload } from './google_workspace_meet.js';
 
 describe('google workspace meet payload boundaries', () => {
@@ -22,16 +23,13 @@ describe('google workspace meet payload boundaries', () => {
   });
 
   it('routes usage and gws output through the shared printer', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/google_workspace_meet.ts'), {
-        encoding: 'utf8',
-      }) || ''
-    );
+    const source = readTextFile(pathResolver.rootResolve('scripts/google_workspace_meet.ts'));
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
     expect(source).not.toContain('process.env.CLOUDSDK_PYTHON');
     expect(source).toContain("getRegisteredEnvText('CLOUDSDK_PYTHON')");
     expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
   });
 });

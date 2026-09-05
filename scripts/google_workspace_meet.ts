@@ -5,9 +5,9 @@ import {
   safeExec,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { readTextFile } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
@@ -59,7 +59,7 @@ export function readPayload(args: ArgMap): Record<string, unknown> {
     if (!safeLstat(resolvedPayloadFile).isFile()) {
       throw new Error(`payload file must be a regular file: ${resolvedPayloadFile}`);
     }
-    const raw = String(safeReadFile(resolvedPayloadFile, { encoding: 'utf8' }) || '').trim();
+    const raw = readTextFile(resolvedPayloadFile).trim();
     if (!raw) {
       throw new Error(`payload file is empty: ${resolvedPayloadFile}`);
     }
