@@ -1,4 +1,11 @@
-import { clamp, defineCatalog, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  clamp,
+  defineCatalog,
+  isRecord,
+  isVitestProcess,
+  nowIso,
+  parseSafeJsonInput,
+} from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -380,7 +387,7 @@ async function waitForCdpEndpoint(
   userDataDir: string,
   timeoutMs = 5_000
 ): Promise<{ cdpUrl: string; cdpPort: number } | null> {
-  if (process.env.VITEST) return null;
+  if (isVitestProcess()) return null;
   const filePath = path.join(userDataDir, 'DevToolsActivePort');
   const safeFilePath = safeBrowserRuntimePath(filePath);
   const startedAt = Date.now();
