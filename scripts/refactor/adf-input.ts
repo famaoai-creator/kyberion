@@ -1,13 +1,8 @@
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { pathResolver, rootResolve } from '@agent/core/path-resolver';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-} from '@agent/core/secure-io';
-import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { parseSafeJsonInput, parseSafeJsonObjectValue, readTextFile } from '@agent/core/foundation';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import {
   validatePipelineGuardrails,
@@ -161,10 +156,7 @@ export function expandPipelineIncludesForGuardrails<T extends { steps?: unknown[
             `core:include: circular reference detected — ${ref} is already in the include chain`
           );
         }
-        const fragment = parsePipelineFragment(
-          String(safeReadFile(fragmentPath, { encoding: 'utf8' })),
-          ref
-        );
+        const fragment = parsePipelineFragment(readTextFile(fragmentPath), ref);
         if (!Array.isArray(fragment?.steps)) {
           throw new Error(`core:include: fragment ${ref} must contain a steps array`);
         }
