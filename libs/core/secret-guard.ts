@@ -274,8 +274,8 @@ export const checkAuthority = (missionId: string, authority: string): boolean =>
  * Retrieve a secret value, enforcing temporal and intent-based gates.
  */
 export const getSecret = (key: string, scope?: string, operation?: string): string | null => {
-  const currentMission = process.env.MISSION_ID;
-  const authorizedScope = process.env.AUTHORIZED_SCOPE;
+  const currentMission = getRegisteredEnvText('MISSION_ID');
+  const authorizedScope = getRegisteredEnvText('AUTHORIZED_SCOPE');
 
   if (scope) {
     // 1. Check Scoped Identity (For Daemons/Surfaces)
@@ -373,7 +373,7 @@ export const storeConnectionDocument = (
   _mapContentToSecrets(serviceName, next);
 
   ledger.record('CONFIG_CHANGE', {
-    mission_id: options.missionId || process.env.MISSION_ID || 'None',
+    mission_id: options.missionId || getRegisteredEnvText('MISSION_ID') || 'None',
     role: options.actor || getRegisteredEnvText('MISSION_ROLE') || 'secret_guard',
     config_target: path.relative(pathResolver.rootDir(), fullPath),
     config_scope: 'connection',
