@@ -21513,3 +21513,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `knowledge/product/governance/reasoning-backend-policy.json`、`libs/core/reasoning-backend-policy.test.ts`、`libs/core/reasoning-bootstrap.ts`
 - **変更**: Cursor CLIを明示指定だけでなく、既定のreasoning provider failover chainにも登録した。provider capability routingによるbinary／authentication判定、既存providerの順序、Cursorの明示routeは維持している。
 - **検証**: reasoning-backend-policy／reasoning-bootstrap **2 files / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1386
+
+- **対象**: `libs/core/provider-discovery.ts`、`libs/core/provider-discovery.test.ts`
+- **変更**: Cursor CLIのprovider discoveryが`KYBERION_CURSOR_CLI_BIN`を無視して`cursor-agent`を固定実行していた残存を修正し、backend probeと同じ登録済みbinary overrideを使うようにした。未指定時のPATH discovery、version health判定、capability cacheとfailover routingは維持している。
+- **検証**: provider-discovery **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。

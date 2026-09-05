@@ -575,8 +575,15 @@ function checkGrok(): ProviderInfo {
 }
 
 function checkCursor(): ProviderInfo {
-  const which = run('which', ['cursor-agent']);
-  if (!which.ok)
+  const configuredBinary = getRegisteredEnvText('KYBERION_CURSOR_CLI_BIN')?.trim();
+  const binary = configuredBinary || 'cursor-agent';
+  const version = configuredBinary
+    ? run(configuredBinary, ['--version'])
+    : (() => {
+        const which = run('which', [binary]);
+        return which.ok ? run(binary, ['--version']) : which;
+      })();
+  if (!version.ok)
     return {
       provider: 'cursor',
       installed: false,
@@ -586,17 +593,16 @@ function checkCursor(): ProviderInfo {
       healthy: false,
     };
 
-  const ver = run('cursor-agent', ['--version']);
   const entry = capabilityEntryFor('cursor');
   return {
     provider: 'cursor',
     installed: true,
-    version: ver.ok ? ver.stdout || null : null,
+    version: version.stdout || null,
     protocol: 'print-json',
     models: entry.models,
     capabilities: entry.capabilities,
     modelCapabilities: entry.modelCapabilities,
-    healthy: ver.ok,
+    healthy: version.ok,
   };
 }
 

@@ -104,4 +104,47 @@ describe('provider-discovery', () => {
       )
     ).toThrow('dangerous JSON key');
   });
+
+  it('uses the governed Cursor CLI binary override during discovery', async () => {
+    const previous = process.env.KYBERION_CURSOR_CLI_BIN;
+    process.env.KYBERION_CURSOR_CLI_BIN = 'cursor-agent-custom';
+    try {
+      mocks.spawnSync.mockImplementation((cmd: string, args: string[]) => {
+        if (cmd === 'cursor-agent-custom' && args[0] === '--version') {
+          return { status: 0, stdout: 'cursor-agent 1.0.0', stderr: '' };
+        }
+        return { status: 1, stdout: '', stderr: '' };
+      });
+      mocks.safeExistsSync.mockReturnValue(false);
+      mocks.safeMkdir.mockReturnValue(undefined);
+      mocks.safeWriteFile.mockReturnValue(undefined);
+      mocks.safeReadFile.mockImplementation((filePath: string) => {
+        if (filePath.includes('provider-discovery-cache.schema.json')) {
+          return fs.readFileSync(
+            'knowledge/product/schemas/provider-discovery-cache.schema.json',
+            'utf8'
+          );
+        }
+        throw new Error('ENOENT');
+      });
+
+      const { discoverProviders } = await import('./provider-discovery.js');
+      const cursor = discoverProviders(true).find((provider) => provider.provider === 'cursor');
+
+      expect(cursor).toMatchObject({
+        provider: 'cursor',
+        installed: true,
+        healthy: true,
+        version: 'cursor-agent 1.0.0',
+      });
+      expect(mocks.spawnSync).toHaveBeenCalledWith(
+        'cursor-agent-custom',
+        ['--version'],
+        expect.objectContaining({ shell: false })
+      );
+    } finally {
+      if (previous === undefined) delete process.env.KYBERION_CURSOR_CLI_BIN;
+      else process.env.KYBERION_CURSOR_CLI_BIN = previous;
+    }
+  });
 });
