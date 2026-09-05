@@ -326,6 +326,9 @@ function readPluginManifestProvides(resolvedPath: string): {
       .find((candidate) => safeExistsSync(candidate));
     if (manifestPath) {
       try {
+        if (!safeLstat(manifestPath).isFile()) {
+          throw new Error(`plugin manifest must be a regular file: ${manifestPath}`);
+        }
         const parsed = parseSafeJsonInput(
           String(safeReadFile(manifestPath, { encoding: 'utf8' })),
           `plugin manifest ${manifestPath}`
