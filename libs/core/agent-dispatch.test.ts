@@ -20,6 +20,8 @@ import {
   type WorkerEventEnvelope,
 } from './worker-event-stream.js';
 import { registerOpPreflightListener, resetOpPreflight } from './op-preflight.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 
 const a2aRoute = vi.hoisted(() =>
   vi.fn(async () => ({ payload: { content: 'sub-agent-result' } }))
@@ -69,6 +71,16 @@ function makeFakeBackend(opts: { withTools?: boolean } = {}): ReasoningBackend &
 }
 
 describe('agent-dispatch', () => {
+  it('routes dispatcher environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/agent-dispatch.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('ProcessSpawnDispatcher delegates via the backend native delegateTask', async () => {
     const backend = makeFakeBackend();
     const options = { profile: 'explorer', effort: 'medium' as const };
