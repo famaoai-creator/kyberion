@@ -22,7 +22,12 @@ import {
   safeExistsSync,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { defineCatalog, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  defineCatalog,
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonInput,
+} from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -528,13 +533,13 @@ async function runDoctor(input: {
   const surfaces: Array<{ surface: SurfaceKind; run: () => Promise<unknown>; baseUrl: string }> = [
     {
       surface: 'presence' as SurfaceKind,
-      baseUrl: String(process.env.PRESENCE_STUDIO_URL || 'http://127.0.0.1:3031'),
+      baseUrl: String(getRegisteredEnvText('PRESENCE_STUDIO_URL') || 'http://127.0.0.1:3031'),
       run: async () =>
         createControlPlaneClient('presence', { timeoutMs: 3000, retryCount: 0 }).listProjects(),
     },
     {
       surface: 'chronos' as SurfaceKind,
-      baseUrl: String(process.env.CHRONOS_URL || 'http://127.0.0.1:3000'),
+      baseUrl: String(getRegisteredEnvText('CHRONOS_URL') || 'http://127.0.0.1:3000'),
       run: async () =>
         createControlPlaneClient('chronos', {
           timeoutMs: 3000,

@@ -13,6 +13,10 @@ describe('control_plane_cli entrypoint', () => {
     expect(source).not.toContain('process.stderr.write(');
     expect(source).not.toContain('process.exitCode =');
     expect(source).not.toContain('console.warn(');
+    expect(source).not.toContain('process.env.PRESENCE_STUDIO_URL');
+    expect(source).not.toContain('process.env.CHRONOS_URL');
+    expect(source).toContain("getRegisteredEnvText('PRESENCE_STUDIO_URL')");
+    expect(source).toContain("getRegisteredEnvText('CHRONOS_URL')");
     expect(source).toContain('const defaultPrint: Print');
     expect(source).toContain('withOutputPrinter(print');
     expect(source).toContain("throw new ScriptExitError(1, '', true)");

@@ -20909,6 +20909,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: ingest CLIの実行者 fallbackに残っていた `MISSION_ROLE` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `--ingested-by`、`KYBERION_PERSONA` 優先、匿名 ingest 拒否、ledger記録の既存 semanticsは変更していない。
 - **検証**: ingest entrypoint **1 file / 2 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
+## 2026-09-05 再レビュー修正 1286
+
+- **対象**: `scripts/control_plane_cli.ts`、`scripts/control_plane_cli.entrypoint.test.ts`
+- **変更**: Control Plane CLIのPresence／Chronos health check URL fallbackに残っていた環境直読を、登録済み `getRegisteredEnvText` へ統一した。既定URL、surface filter、client retry、health resultの既存 semanticsは変更していない。
+- **検証**: Control Plane CLI **2 files / 13 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

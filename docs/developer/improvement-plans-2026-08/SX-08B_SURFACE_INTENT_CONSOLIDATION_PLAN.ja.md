@@ -1108,3 +1108,9 @@ traceのOTLP exporterに残っていた `OTEL_EXPORTER_OTLP_ENDPOINT`／`OTEL_EX
 ingest CLIの実行者 fallbackに残っていた `MISSION_ROLE` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `--ingested-by`、`KYBERION_PERSONA` 優先、匿名 ingest 拒否、ledger記録の既存 semanticsは変更していない。
 
 検証: ingest entrypoint **1 file / 2 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 116
+
+Control Plane CLIのPresence／Chronos health check URL fallbackに残っていた環境直読を、登録済み `getRegisteredEnvText` へ統一した。既定URL、surface filter、client retry、health resultの既存 semanticsは変更していない。
+
+検証: Control Plane CLI **2 files / 13 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
