@@ -58,4 +58,19 @@ describe('wire error boundary checker', () => {
       )
     ).toEqual([expect.stringContaining('raw exception message')]);
   });
+
+  it('rejects raw exception messages in Browser Bridge responses', () => {
+    expect(
+      findWireErrorBoundaryViolations(
+        'return { ok: false, error: `failed: ${err.message}` };',
+        'scripts/browser_bridge_host.ts'
+      )
+    ).toEqual([expect.stringContaining('browser bridge response')]);
+    expect(
+      findWireErrorBoundaryViolations(
+        'return { ok: false, error: formatWireError(err, "failed") };',
+        'scripts/browser_bridge_host.ts'
+      )
+    ).toEqual([]);
+  });
 });

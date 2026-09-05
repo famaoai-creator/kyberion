@@ -1798,3 +1798,7 @@ provider capability schemaのprovider内`provenance`参照を`#/definitions/prov
 ## 2026-09-06 再レビュー修正 234
 
 Presence StudioのExpress／runtime-data境界に残っていた内部例外のraw JSON responseを共通wire-safe projectionへ統一した。固定message／`error_code`／`correlation_id`を返し、監査ログの診断情報と明示的な入力・not-found応答は維持した。wire boundary checkerをPresence Studioの実ファイルへ拡張し、optional chainingを含むraw exception responseの回帰を追加した。関連 **4 files / 13 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettierで確認した。
+
+## 2026-09-06 再レビュー修正 235
+
+Browser Native Messaging hostの内部例外応答を`formatWireError`へ統一し、recording／delta／analysis／report／dispatch境界からprovider・filesystemのraw messageを返さないようにした。既存のvalidation／approval拒否 semanticsを維持し、wire checkerの実ファイル対象とtemplate interpolation検査を追加した。関連 **3 files / 16 tests passed**、実ファイルchecker `OK`、typecheck、対象lint、Prettier、`git diff --check`で確認した。
