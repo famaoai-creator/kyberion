@@ -21203,6 +21203,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: egress policyのunsafe path時にwarn／enforce設定を合成した `unsafe-path-fallback` を返す経路を削除し、policy path scope errorをfail-closedで返す境界へ統一した。正本policyのmode、tenant allowed domains、audience floor、provenance／tier制約と通常のwarn／enforce判定は変更していない。
 - **検証**: egress-policy **1 file / 6 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
+## 2026-09-05 再レビュー修正 1335
+
+- **対象**: `libs/core/dynamic-permission-guard.ts`、`libs/core/dynamic-permission-guard.test.ts`
+- **変更**: dynamic permission policyのschema不正時にcatalog fallbackを生成する経路を削除した。未配置時は動的grantなし、読み込み障害時は警告とgrantなしを維持し、時間制限・role／path scope検証を含む既存のpermission semanticsは変更していない。
+- **検証**: dynamic-permission-guard **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
