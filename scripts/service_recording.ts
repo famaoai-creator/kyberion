@@ -3,12 +3,7 @@ import { compileServiceRecording } from '@agent/core/service-recording-compiler'
 import { buildServiceProcedureCandidate } from '@agent/core/service-distill-candidate';
 import { promoteServiceProcedure } from '@agent/core/service-procedure-promotion';
 import { resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   loadServiceRecordingAtPath,
   serviceRecordingContentHash,
@@ -19,7 +14,7 @@ import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { validatePipelineGuardrails } from '@agent/core/adf-guardrails';
 import { startServiceRecordingSession } from '@agent/core/service-recording-session';
 import { withExecutionContext } from '@agent/core/authority';
-import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   defineScript,
@@ -56,9 +51,9 @@ function readJsonArgument(value: string, label: string): unknown {
   const candidate = value.startsWith('@') ? value.slice(1) : value;
   const resolved = pathResolver.resolve(candidate);
   const source = value.startsWith('@')
-    ? String(safeReadFile(resolveServicePath(candidate, `--${label} path`), { encoding: 'utf8' }))
+    ? readTextFile(resolveServicePath(candidate, `--${label} path`))
     : safeExistsSync(resolved)
-      ? String(safeReadFile(resolveServicePath(candidate, `--${label} path`), { encoding: 'utf8' }))
+      ? readTextFile(resolveServicePath(candidate, `--${label} path`))
       : value;
   try {
     return parseSafeJsonInput(source, `service recording ${label} input`);
