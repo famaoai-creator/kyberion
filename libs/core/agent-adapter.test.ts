@@ -212,6 +212,8 @@ describe('GeminiWisdomEnhancer path boundary', () => {
     );
     expect(source).toContain('assertSafeRepositoryPath(');
     expect(source).toContain('const wisdomFile = assertSafeRepositoryPath');
+    expect(source).toContain('safeLstat(wisdomFile).isFile()');
+    expect(source).toContain('[GEMINI_WISDOM_RESOURCE]');
   });
 });
 
