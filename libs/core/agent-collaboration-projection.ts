@@ -3,7 +3,7 @@ import { readJsonLines } from './foundation/json.js';
 import { clamp } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 import {
   collaborationKindFromEventType,
   createAgentCollaborationEvent,
@@ -114,6 +114,7 @@ function toRecordOrNull(value: unknown): JsonRecord | null {
 function readJsonl(filePath: string): JsonRecord[] {
   const safePath = safeOptionalRepositoryPath(filePath);
   if (!safePath || !safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) return [];
   try {
     return readJsonLines<JsonRecord | null>(safePath, {
       onMalformed: 'skip',

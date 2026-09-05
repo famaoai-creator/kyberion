@@ -316,4 +316,21 @@ describe('agent collaboration projection', () => {
       fs.unlinkSync(externalPath);
     }
   });
+
+  it('skips worker event paths that are directories', () => {
+    const suffix = `agent-collaboration-directory-${randomUUID()}`;
+    const workerEventsDir = pathResolver.shared('logs/worker-events');
+    const directoryPath = path.join(workerEventsDir, `${suffix}.jsonl`);
+    fs.mkdirSync(directoryPath, { recursive: true });
+
+    try {
+      const projection = buildAgentCollaborationProjection({
+        missionId: suffix,
+        now: '2026-08-31T00:00:00.000Z',
+      });
+      expect(projection.events).toEqual([]);
+    } finally {
+      fs.rmSync(directoryPath, { recursive: true, force: true });
+    }
+  });
 });
