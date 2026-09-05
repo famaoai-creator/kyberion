@@ -1438,3 +1438,9 @@ AWS icon rule catalogに残っていた正本JSONと重複する大規模な組�
 media semantic mapに残っていた正本JSONと重複するlayout／media／proposal rule fallbackを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。semantic typeの未一致時`content`、proposal evidence／keywordの未一致時空値という表示側の既存semanticsは変更していない。
 
 検証: media-semantic-map **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 171
+
+media drawio policyに残っていた正本JSONと重複するboundary palette／node size fallbackとfallback telemetryを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。boundary override、catalog内のboundary／type優先順位、未一致時の呼び出し側paletteおよびnode size空値という表示側の既存semanticsは変更していない。
+
+検証: media-drawio-policy **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
