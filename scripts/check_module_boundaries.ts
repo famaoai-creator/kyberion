@@ -1,8 +1,9 @@
 import path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { readTextFile } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 import { readSafeJsonFile } from './lib/json-input.js';
@@ -168,7 +169,7 @@ export function maskComments(source: string): string {
 }
 
 function importsFor(filePath: string, includeDynamic = false, includeTypeOnly = false): string[] {
-  const text = maskComments(String(safeReadFile(filePath, { encoding: 'utf8' })));
+  const text = maskComments(readTextFile(filePath));
   const imports: string[] = [];
   const staticPattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
   const dynamicPattern = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;

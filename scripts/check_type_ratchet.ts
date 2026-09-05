@@ -3,10 +3,10 @@ import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import ts from 'typescript';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
-import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readTextFile } from '@agent/core/foundation';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
@@ -79,7 +79,7 @@ function incrementBucket(target: RatchetBucket, source: RatchetBucket): void {
 
 function countFile(filePath: string, repoRelativePath: string): RatchetBucket {
   const bucket = emptyBucket();
-  const text = String(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  const text = readTextFile(filePath);
   bucket.max_lines = text.split(/\r?\n/u).length;
   const source = ts.createSourceFile(
     repoRelativePath,
