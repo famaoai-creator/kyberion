@@ -179,7 +179,7 @@ export async function executePipelineFile(
   const autoContext: Record<string, unknown> = {
     repo_root: pathResolver.rootDir(),
     platform_name: process.platform,
-    node_options: process.env.NODE_OPTIONS || '',
+    node_options: getRegisteredEnvText('NODE_OPTIONS') || '',
     run_utc_now: nowIso(),
     __pipeline_options: pipeline.options || {},
     trust_resolved: effectiveTrustResolved,
@@ -305,8 +305,8 @@ type Print = (value: unknown) => void;
 export async function main(args?: string[], print: Print = () => undefined) {
   // Propagate resolved identity to process.env so spawned subprocesses inherit them.
   const identity = resolveIdentityContext();
-  if (identity.role && !process.env.MISSION_ROLE) {
-    process.env.MISSION_ROLE = identity.role;
+  if (identity.role && !getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', identity.role);
   }
   if (identity.persona && !getRegisteredEnvText('KYBERION_PERSONA')) {
     setRegisteredEnv('KYBERION_PERSONA', identity.persona);
@@ -451,8 +451,8 @@ export async function main(args?: string[], print: Print = () => undefined) {
   );
   const autoContext: Record<string, unknown> = {};
   // Propagate missionId to env so tier-guard can resolve ${MISSION_ID} in default_allow paths.
-  if (missionId && !process.env.MISSION_ID) {
-    process.env.MISSION_ID = missionId;
+  if (missionId && !getRegisteredEnvText('MISSION_ID')) {
+    setRegisteredEnv('MISSION_ID', missionId);
   }
   if (missionId) {
     const missionPath = findMissionPath(missionId);
@@ -470,7 +470,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
   autoContext.browser_session_id = `${pipeline.pipeline_id || path.basename(String(argv.input), path.extname(String(argv.input)))}`;
   autoContext.repo_root = pathResolver.rootDir();
   autoContext.platform_name = process.platform;
-  autoContext.node_options = process.env.NODE_OPTIONS || '';
+  autoContext.node_options = getRegisteredEnvText('NODE_OPTIONS') || '';
   autoContext.run_utc_now = nowIso();
   autoContext.__pipeline_options = pipeline.options || {};
 
