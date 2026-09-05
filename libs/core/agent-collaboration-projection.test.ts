@@ -624,6 +624,48 @@ describe('agent collaboration projection', () => {
     }
   });
 
+  it('lifts payload.request_id and payload.channel of approval envelopes (AC-04)', () => {
+    const suffix = randomUUID();
+    const fixtureDir = collabFixtureDir(suffix);
+    const workerEventsDir = path.join(fixtureDir, 'logs', 'worker-events');
+    const missionId = `MSN-APPROVAL-${suffix}`.toUpperCase();
+    fs.mkdirSync(workerEventsDir, { recursive: true });
+    const lines = [
+      {
+        type: 'approval_request',
+        ts: '2026-09-06T00:00:00.000Z',
+        seq: 0,
+        source: { mission_id: missionId, agent_id: 'gatekeeper' },
+        payload: {
+          request_id: 'REQ-1',
+          correlation_id: 'COR-1',
+          requested_by: 'gatekeeper',
+          channel: 'slack',
+          status: 'pending',
+        },
+      },
+    ];
+    fs.writeFileSync(
+      path.join(workerEventsDir, 'worker-events-2026-09-06.jsonl'),
+      `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`
+    );
+    try {
+      const projection = buildAgentCollaborationProjection({
+        now: '2026-09-06T00:00:10.000Z',
+        missionId,
+        roots: { workerEventsDir },
+      });
+      expect(projection.events[0]).toMatchObject({
+        kind: 'approval',
+        request_id: 'REQ-1',
+        channel: 'slack',
+        state_after: 'pending',
+      });
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
   it('drops step_begin/step_end worker events by default and keeps them with includeStepEvents (AC-03)', () => {
     const suffix = randomUUID();
     const fixtureDir = collabFixtureDir(suffix);

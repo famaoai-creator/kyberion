@@ -328,6 +328,10 @@ function eventFromRecord(
   const teamRole = stringValue(record, 'team_role') || stringValue(payload, 'team_role');
   const instructionSummary =
     stringValue(record, 'instruction_summary') || stringValue(payload, 'instruction_summary');
+  // AC-04: approval correlation keys. Worker envelopes keep both inside
+  // `payload`, so the flat record read has to fall through to it.
+  const requestId = stringValue(record, 'request_id') || stringValue(payload, 'request_id');
+  const channel = stringValue(record, 'channel') || stringValue(payload, 'channel');
   const elapsedMsRaw = record.elapsed_ms ?? payload.elapsed_ms;
   const elapsedMs = typeof elapsedMsRaw === 'number' ? elapsedMsRaw : undefined;
   const evidence = stringArray(record, 'evidence');
@@ -391,6 +395,8 @@ function eventFromRecord(
     ...(stringValue(record, 'causation_id')
       ? { causation_id: stringValue(record, 'causation_id') }
       : {}),
+    ...(requestId ? { request_id: requestId } : {}),
+    ...(channel ? { channel } : {}),
     related_ids: relatedIds,
     evidence_refs: evidence,
     redaction: evidence.length > 0 ? 'reference_only' : 'summary',
