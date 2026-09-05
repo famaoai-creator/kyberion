@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeMlxEmbeddingResponse } from './mlx-embedding-backend.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
+import {
+  normalizeMlxEmbeddingResponse,
+  probeMlxEmbeddingBackend,
+} from './mlx-embedding-backend.js';
 
 describe('MLX embedding subprocess response', () => {
+  it('routes the model environment read through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/mlx-embedding-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  it('uses an injected model in the availability probe', () => {
+    expect(probeMlxEmbeddingBackend({ KYBERION_MLX_EMBED_MODEL: 'mlx-test-model' }).model).toBe(
+      'mlx-test-model'
+    );
+  });
+
   it('accepts finite numeric vectors and string errors', () => {
     expect(
       normalizeMlxEmbeddingResponse({
