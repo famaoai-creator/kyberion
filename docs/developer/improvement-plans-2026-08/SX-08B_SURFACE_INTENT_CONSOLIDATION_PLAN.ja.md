@@ -1210,3 +1210,9 @@ AGY／memory に続く実運用環境境界として、mission-work reconciliati
 Vitestの実行ガードに残っていた `VITEST` の直接環境参照を、テスト用マーカーとして副作用なく判定する共通 `isVitestProcess` へ統一した。テストfixtureがrepository rootを差し替える場合に環境registryを再帰的に読まない境界を明示し、NHI lifecycle fixtureには既存schemaをseedして実行条件を再現した。プロダクションの認証・権限・監査semanticsは変更していない。
 
 検証: 対象 **14 files / 179 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`、foundation adoption check。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 133
+
+baselineのprovider capability probe flagとbrowser actuatorのVitest実行ガードに残っていた環境直読を、登録済み環境値と共通 `isVitestProcess` へ統一した。probeの既定値、browserのCDP自動検出抑制、secret／network境界の既存semanticsは変更していない。browser resource boundaryに直接参照の再混入検出を追加した。
+
+検証: baseline／browser actuator **3 files / 71 tests passed**、browser actuator build、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
