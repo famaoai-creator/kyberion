@@ -29,6 +29,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -360,6 +361,8 @@ export function recordIngestUsage(
  * `KYBERION_INGEST_QUOTA_TEST=1`.
  */
 export function shouldEnforceIngestQuota(env: NodeJS.ProcessEnv = process.env): boolean {
-  if (env.VITEST && env.KYBERION_INGEST_QUOTA_TEST !== '1') return false;
+  if (env.VITEST && getRegisteredEnvText('KYBERION_INGEST_QUOTA_TEST', { env }) !== '1') {
+    return false;
+  }
   return true;
 }
