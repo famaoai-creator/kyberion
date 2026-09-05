@@ -22203,3 +22203,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/generate_knowledge_index.ts`、`scripts/generate_knowledge_index.test.ts`
 - **変更**: knowledge index generator の markdown metadata／既存index／manifest 本文読込を foundation の `readTextFile` へ統一した。frontmatter exclusion、tier isolation、manifest／index normalization、generator `--check` semanticsは変更せず、既存テストでcanonical readerと旧 `safeReadFile` 直読の不在を固定した。
 - **検証**: knowledge-index **既存テスト＋reader contract passed**、対象ESLint、Prettier、`git diff --check`。残るproduction loader／generatorの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1501
+
+- **対象**: `scripts/check_documentation_links.ts`、`scripts/check_documentation_links.entrypoint.test.ts`
+- **変更**: documentation links checker の markdown 本文読込を foundation の `readTextFile` へ移行した。docs／knowledge の走査範囲、外部・画像・root-relative linkの判定、broken-link報告、CLI exit semanticsは変更せず、entrypoint contract testで旧 `safeReadFile` 直読の再導入を検出するようにした。
+- **検証**: documentation-links **reader contract passed**、対象ESLint、Prettier、`git diff --check`。レビュー由来のリンク解決・文書修正残件と、残るproduction loaderの全件codemodは継続課題とする。
