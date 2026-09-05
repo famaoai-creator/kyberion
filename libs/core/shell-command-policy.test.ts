@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 import {
   evaluateShellCommandPolicy,
   shellCommandApprovalDescriptor,
@@ -18,6 +19,19 @@ afterAll(() => {
 });
 
 describe('shell-command-policy', () => {
+  it('fails closed when the canonical policy is missing', () => {
+    const original = process.env.KYBERION_SHELL_COMMAND_POLICY_PATH;
+    process.env.KYBERION_SHELL_COMMAND_POLICY_PATH = pathResolver.rootResolve(
+      'active/shared/tmp/missing-shell-command-policy.json'
+    );
+    try {
+      expect(() => evaluateShellCommandPolicy('git status')).toThrow(/missing/iu);
+    } finally {
+      if (original === undefined) delete process.env.KYBERION_SHELL_COMMAND_POLICY_PATH;
+      else process.env.KYBERION_SHELL_COMMAND_POLICY_PATH = original;
+    }
+  });
+
   it('rejects a policy override outside the repository before it can replace deny rules', () => {
     const original = process.env.KYBERION_SHELL_COMMAND_POLICY_PATH;
     process.env.KYBERION_SHELL_COMMAND_POLICY_PATH = '/tmp/kyberion-shell-policy-external.json';

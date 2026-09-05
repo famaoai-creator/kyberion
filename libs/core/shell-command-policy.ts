@@ -74,7 +74,6 @@ const policyCatalog = defineCatalog<ShellCommandPolicyFile>({
   id: 'shell-command-policy',
   path: getPolicyPath,
   schema: pathResolver.knowledge('product/schemas/shell-command-policy.schema.json'),
-  fallback: { version: 'missing-policy', allowlist: [], denylist: [] },
 });
 
 export function loadShellCommandPolicy(): ShellCommandPolicyFile {

@@ -1444,3 +1444,9 @@ media semantic mapに残っていた正本JSONと重複するlayout／media／pr
 media drawio policyに残っていた正本JSONと重複するboundary palette／node size fallbackとfallback telemetryを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。boundary override、catalog内のboundary／type優先順位、未一致時の呼び出し側paletteおよびnode size空値という表示側の既存semanticsは変更していない。
 
 検証: media-drawio-policy **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 172
+
+shell command policyの欠損時に空allow／deny policyへ落ちるfallbackを削除し、正本policyの読み込み障害をfail-closedで返す境界へ統一した。危険コマンドdeny、allowlist、wrapper／obfuscation検査、uncompilable deny ruleのapproval要求は変更していない。
+
+検証: shell-command-policy **1 file / 30 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
