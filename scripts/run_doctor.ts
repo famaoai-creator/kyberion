@@ -43,7 +43,7 @@ import {
   stripSharedScriptFlags,
   type ScriptContext,
 } from './lib/harness.js';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import {
   formatAppPreflightReport,
   runAppPreflight,
@@ -364,7 +364,7 @@ export async function collectDoctorReport(argv: {
   const missionId = argv.mission
     ? String(argv.mission)
     : getRegisteredEnvText('MISSION_ID') || undefined;
-  if (missionId) process.env.MISSION_ID = missionId;
+  if (missionId) setRegisteredEnv('MISSION_ID', missionId);
 
   const appPreflight =
     argv.runtime === 'app'

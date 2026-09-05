@@ -32,7 +32,7 @@ import {
   normalizeSupervisorResult,
 } from '@agent/core/agent-runtime-supervisor-client';
 import { parseSafeJsonInput } from '@agent/core/foundation';
-import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
 import { pathResolver, rootDir } from '@agent/core/path-resolver';
@@ -51,7 +51,7 @@ import { installProcessGuards } from '@agent/core/process-guards';
 installProcessGuards('agent-runtime-supervisor');
 
 function registeredEnv(name: string): string | undefined {
-  return getRegisteredEnv<string>(name) as string | undefined;
+  return getRegisteredEnvText(name);
 }
 
 // OP-04: hourly RSS/heap samples feed the degradation watch's trend
@@ -771,7 +771,9 @@ export async function startAgentRuntimeSupervisorDaemon(
 ): Promise<AgentRuntimeSupervisorDaemonInstance> {
   delegatedWorkerShutdown = false;
   delegatedWorkerRestartCounts.clear();
-  process.env.MISSION_ROLE ||= 'surface_runtime';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'surface_runtime');
+  }
   recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
     status: 'starting',
   });

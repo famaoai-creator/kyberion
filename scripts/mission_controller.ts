@@ -23,8 +23,7 @@ import {
   getInstalledReasoningMode,
   installReasoningBackends,
 } from '@agent/core/reasoning-bootstrap';
-import { getRegisteredEnv } from '@agent/core/foundation/env';
-import { nowIso } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, setRegisteredEnv } from '@agent/core/foundation';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
 import { logger } from '@agent/core/core';
 import { pathResolver, missionEvidenceDir } from '@agent/core/path-resolver';
@@ -47,7 +46,7 @@ import { createMissionWorkReconciliationApprovalRequest } from '@agent/core/miss
 type Print = (value: unknown) => void;
 
 function registeredEnv(name: string): string | undefined {
-  return getRegisteredEnv<string>(name) as string | undefined;
+  return getRegisteredEnvText(name);
 }
 
 let activeMissionControllerArgs: string[] = [];
@@ -1339,12 +1338,12 @@ async function mainImpl(
   const earlyPositionalArgs = extractMissionControllerPositionalArgs(args);
   assertMissionIdArgument(earlyPositionalArgs[0], earlyPositionalArgs[1]);
   if (earlyPositionalArgs[1]) {
-    process.env.MISSION_ID = earlyPositionalArgs[1].toUpperCase();
+    setRegisteredEnv('MISSION_ID', earlyPositionalArgs[1].toUpperCase());
   }
 
   // Self-identify as mission_controller role for tier-guard resolution.
-  if (!process.env.MISSION_ROLE) {
-    process.env.MISSION_ROLE = 'mission_controller';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
   }
   // Register reasoning backends so dispatch-workitems delegation reaches a
   // real backend (claude-cli/anthropic) instead of silently using the stub.

@@ -13,7 +13,7 @@ import {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
 import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -344,7 +344,7 @@ export async function runMeetingPreflight(
   installCoreEnvironmentProbes();
   const missionId =
     options.missionId?.trim() || getRegisteredEnvText('MISSION_ID')?.trim() || undefined;
-  if (missionId) process.env.MISSION_ID = missionId;
+  if (missionId) setRegisteredEnv('MISSION_ID', missionId);
   const platform = options.platform || process.platform;
 
   const items = [

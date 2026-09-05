@@ -28,6 +28,7 @@ import { logger } from '@agent/core/core';
 import { isDirectScript } from './lib/harness.js';
 import { defineScript, ScriptExitError } from './lib/harness.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
+import { setRegisteredEnv } from '@agent/core/foundation';
 
 // Register every probe so the manifest's `kind: 'probe'` entries
 // resolve. This import is for side effects only.
@@ -137,7 +138,7 @@ async function main(args: string[] = []): Promise<void> {
   }
 
   const missionId = argv.mission ? String(argv.mission) : undefined;
-  if (missionId) process.env.MISSION_ID = missionId;
+  if (missionId) setRegisteredEnv('MISSION_ID', missionId);
 
   const targetIds = argv.all
     ? listEnvironmentManifestIds()

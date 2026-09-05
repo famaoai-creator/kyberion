@@ -8,7 +8,12 @@
  * every other surface uses.
  */
 import { resolveOperatorDisplayName } from '@agent/core/operator-identity';
-import { getRegisteredEnvText, nowIso, parseSafeJsonObjectInput } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonObjectInput,
+  setRegisteredEnv,
+} from '@agent/core/foundation';
 import {
   acceptInboxEntryWithHumanReceipt,
   listInboxEntries,
@@ -1204,8 +1209,8 @@ function handleProcedureRepair(procedureId: string, json: boolean): void {
 async function mainImpl(args: string[] = []): Promise<void> {
   // The home CLI acts with the operator's own authority — same role the
   // mission controller CLI assumes (inbox/approvals live under active/shared).
-  if (!process.env.MISSION_ROLE) {
-    process.env.MISSION_ROLE = 'mission_controller';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
   }
   if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
     printCommands(ui, activePrint);

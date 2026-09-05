@@ -24,6 +24,7 @@ import { logger } from '@agent/core/core';
 import { probeMicCapture } from '@agent/core/mic-capture';
 import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
 import { t as catalogT } from '@agent/core/t';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import {
   defineScript,
   isDirectScript,
@@ -39,7 +40,9 @@ function getFlag(argv: string[], name: string): string | undefined {
 }
 
 async function main(argv: string[] = []): Promise<void> {
-  process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+  }
   const missionId = getFlag(argv, '--mission');
   if (!missionId) {
     logger.error(
