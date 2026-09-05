@@ -26,6 +26,11 @@ describe('media theme catalog boundary', () => {
     expect(source).toContain("id: 'media-themes'");
     expect(source).toContain('knowledge/product/schemas/media-themes.schema.json');
     expect(source).toContain("'media theme scope merge'");
+    const loaderSource = source.slice(
+      source.indexOf('function loadThemeCatalog'),
+      source.indexOf('function loadConfidentialThemePackEntries')
+    );
+    expect(loaderSource).not.toContain('fallbackOnInvalid: true');
 
     const catalog = loadThemeCatalog(pathResolver.rootDir());
     expect(catalog.default_theme).toBe('kyberion-standard');

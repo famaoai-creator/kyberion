@@ -1658,3 +1658,9 @@ semantic render tokenの組み込みtokenとschema不正時のfallbackを削除�
 artifact libraryとdocument composition presetの組み込み空catalogおよびschema不正時のfallbackを削除し、分割profile packを最小envelopeへ集約した上で正本schemaから検証する必須catalog境界へ統一した。任意のruntime／personal theme scope fallback、artifact profileとdocument profileの既存mergeは変更していない。
 
 検証: media-artifact-library-catalog／media-document-composition-catalog **2 files / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
+
+## 2026-09-06 再レビュー修正 207
+
+media theme catalogをscope別に整理し、public themeは正本必須、runtime／personal themeは未配置時のみ明示的な空scopeを許容する境界へ変更した。配置済みscopeのschema不正をfallbackへ収束させる設定を削除し、3 scopeのmergeとtheme role解決は維持している。
+
+検証: media-theme-catalog **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
