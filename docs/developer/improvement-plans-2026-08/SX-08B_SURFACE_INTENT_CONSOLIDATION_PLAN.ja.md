@@ -952,3 +952,9 @@ pipeline-run-journalの再開候補探索に残っていた `MISSION_ID` の環�
 nerve-bridgeのstimulus metadataとCLI usage meteringのmission telemetryに残っていた `MISSION_ID` 直読を、登録済み `getRegisteredEnvText` へ統一した。message routing、TTL／rotation、推定token cost、usage causeと既存のbest-effort semanticsは変更していない。
 
 検証: CLI metering／stimuli TTL **2 files / 7 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 90
+
+audit-chainのcurrent tenant解決でmission stateを探索する際に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。tenant mirror、scope解析、chain integrity、監査entryの既存 semanticsは変更していない。
+
+検証: tenant audit／parser／forwarder／approval **4 files / 36 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。残るcore／actuator／scriptの環境境界と外部provider実機確認は継続課題とする。

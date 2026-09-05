@@ -735,7 +735,7 @@ function resolveCurrentTenantSlug(): string | undefined {
   if (fromEnv && isValidTenantSlug(fromEnv)) {
     return fromEnv;
   }
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   if (!missionId) return undefined;
   // Walk up looking for a mission-state.json with tenant_slug.
   const candidates = [
