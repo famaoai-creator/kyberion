@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 
 import {
   forbiddenGitCoexecutionMutation,
@@ -7,6 +9,14 @@ import {
 } from './adf-guardrails.js';
 
 describe('validatePipelineGuardrails', () => {
+  it('uses the canonical execution policy without a fallback catalog', () => {
+    const source = safeReadFile(pathResolver.rootResolve('libs/core/adf-guardrails.ts'), {
+      encoding: 'utf8',
+    }) as string;
+    expect(source).not.toContain('fallback: {}');
+    expect(source).not.toContain('fallbackOnInvalid');
+  });
+
   it('blocks broad git mutations in ADF shell steps while allowing explicit-path push', () => {
     const report = validatePipelineGuardrails({
       steps: [
