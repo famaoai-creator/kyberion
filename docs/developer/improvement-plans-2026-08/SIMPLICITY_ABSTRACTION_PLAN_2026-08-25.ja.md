@@ -21687,3 +21687,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/artifact-store.ts`、`libs/core/artifact-store.test.ts`
 - **変更**: 共通 governed artifact の JSON／JSONL write／append／read 前に operation-time の regular-file 検査を追加した。artifact path governance、role authority、scope-local index、既存 symlink boundary、artifact payload semantics は維持し、共通 writer を利用する peer messaging 等もファイル置換時に fail-closed となる境界テストを追加した。
 - **検証**: artifact-store／peer messaging／mesh adapter **3 files / 42 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1415
+
+- **対象**: `libs/core/peer-messaging.ts`、`libs/core/peer-messaging.test.ts`
+- **変更**: peer network catalog、inbox／outbox／events JSONL reader、peer runtime state writer に operation-time の regular-file 検査を追加した。共通 artifact writer の role／path／tenant／signature検証、HTTP dispatch、runtime state semanticsは維持し、peer JSONL leaf のディレクトリ置換を拒否する回帰テストを追加した。
+- **検証**: peer-messaging **1 file / 22 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。

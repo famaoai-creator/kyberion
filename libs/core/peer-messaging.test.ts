@@ -18,7 +18,7 @@ import {
   signPeerHttpRequest,
   verifyPeerMessage,
 } from './peer-messaging.js';
-import { safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 
@@ -284,6 +284,23 @@ describe('peer messaging', () => {
 
     expect(listPeerInboxRecords(TENANT_ID, 'peer-b-test')).toHaveLength(1);
     expect(listPeerEvents(TENANT_ID, 'peer-b-test')).toHaveLength(1);
+  });
+
+  it('rejects a peer JSONL path that is a directory', () => {
+    const inboxPath = pathResolver.resolve(
+      `active/shared/runtime/peer-messaging/tenants/${TENANT_ID}/peers/peer-b-test/inbox.jsonl`
+    );
+    withExecutionContext('surface_runtime', () => safeMkdir(inboxPath, { recursive: true }));
+
+    try {
+      expect(() => listPeerInboxRecords(TENANT_ID, 'peer-b-test')).toThrow(
+        '[PEER_MESSAGING] peer storage must be a regular file'
+      );
+    } finally {
+      withExecutionContext('infrastructure_sentinel', () =>
+        safeRmSync(inboxPath, { recursive: true, force: true })
+      );
+    }
   });
 
   it('rejects non-object dispatch responses before recording a successful send', async () => {
