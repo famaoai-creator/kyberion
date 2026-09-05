@@ -1402,3 +1402,9 @@ restricted action policyの欠損・schema不正時に空ルールへ落ちる�
 egress policyのunsafe path時にwarn／enforce設定を合成した `unsafe-path-fallback` を返す経路を削除し、policy path scope errorをfail-closedで返す境界へ統一した。正本policyのmode、tenant allowed domains、audience floor、provenance／tier制約と通常のwarn／enforce判定は変更していない。
 
 検証: egress-policy **1 file / 6 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 165
+
+dynamic permission policyのschema不正時にcatalog fallbackを生成する経路を削除した。未配置時は動的grantなし、読み込み障害時は警告とgrantなしを維持し、時間制限・role／path scope検証を含む既存のpermission semanticsは変更していない。
+
+検証: dynamic-permission-guard **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
