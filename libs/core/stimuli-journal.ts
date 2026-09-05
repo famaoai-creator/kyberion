@@ -1,13 +1,7 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { isRecord, readTextFile } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeReadFile,
-  safeStat,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeStat, safeWriteFile } from './secure-io.js';
 import { createLogger } from './logger.js';
 import type { NerveMessage } from './nerve-bridge.js';
 
@@ -134,10 +128,9 @@ export function loadRecentStimuli(
   if (!safeExistsSync(stimuliPath)) return [];
   const { enforceTtl = true, nowMs = Date.now() } = options;
 
-  const content = safeReadFile(stimuliPath, {
-    encoding: 'utf8',
+  const content = readTextFile(stimuliPath, {
     maxSizeMB: Math.ceil(STIMULI_MAX_BYTES / (1024 * 1024)),
-  }) as string;
+  });
   const parsed = content
     .trim()
     .split('\n')
@@ -170,10 +163,9 @@ export function rotateStimuliJournalIfNeeded(maxBytes: number = STIMULI_MAX_BYTE
   }
   if (size <= maxBytes) return false;
 
-  const content = safeReadFile(stimuliPath, {
-    encoding: 'utf8',
+  const content = readTextFile(stimuliPath, {
     maxSizeMB: Math.ceil((maxBytes * 2) / (1024 * 1024)) + 1,
-  }) as string;
+  });
   // Cut on a record boundary so the retained head is never a partial line.
   const tail = content.slice(-STIMULI_RETAIN_BYTES);
   const firstNewline = tail.indexOf('\n');
