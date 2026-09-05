@@ -15,7 +15,7 @@ describe('voice-task-profile-catalog', () => {
       resolveVoiceTaskProfile({
         taskType: 'service_operation',
         operation: 'logs',
-      })?.id,
+      })?.id
     ).toBe('service-operation-logs');
   });
 });

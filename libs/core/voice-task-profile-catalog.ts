@@ -47,7 +47,6 @@ const catalog = defineCatalog<VoiceTaskProfileCatalog>({
   id: 'voice-task-profile-catalog',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: { version: '1.0.0', profiles: [] },
 });
 
 export function loadVoiceTaskProfileCatalog(): VoiceTaskProfileCatalog {
