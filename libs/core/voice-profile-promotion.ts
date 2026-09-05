@@ -117,15 +117,17 @@ function appendProfileToRegistry(input: {
 
 function loadRegistryForPromotion(targetPath: string): VoiceProfileRegistry {
   const safeTargetPath = assertSafeRepositoryPath(targetPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeTargetPath)) {
+    return {
+      version: '1.0.0',
+      default_profile_id: getVoiceProfileRegistry().default_profile_id,
+      profiles: [],
+    };
+  }
   return defineCatalog<VoiceProfileRegistry>({
     id: 'voice-profile-registry',
     path: safeTargetPath,
     schema: VOICE_PROFILE_REGISTRY_SCHEMA_PATH,
-    fallback: {
-      version: '1.0.0',
-      default_profile_id: getVoiceProfileRegistry().default_profile_id,
-      profiles: [],
-    },
   }).load();
 }
 
