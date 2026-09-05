@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeStat, safeUnlinkSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeStat,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   TriggerRunner,
   assertNoEscalation,
@@ -240,5 +247,22 @@ describe('QM-02 trigger runner', () => {
     expect(normalizeTriggerRecord({ ...valid, status: 'unknown' })).toBeNull();
     expect(normalizeTriggerRecord({ ...valid, createdBy: [] })).toBeNull();
     expect(normalizeTriggerRecord({ ...valid, recordedAt: 'not-a-date' })).toBeNull();
+  });
+
+  it('rejects a delivery store replaced by a directory', () => {
+    const store = pathResolver.sharedTmp('qm02-directory-' + randomUUID() + '.jsonl');
+    safeMkdir(store, { recursive: true });
+    try {
+      const triggerRunner = new TriggerRunner({
+        storePath: store,
+        authorityResolver: (snapshot) => snapshot,
+      });
+
+      expect(() => triggerRunner.records()).toThrow(
+        '[TRIGGER_STORE_INVALID] delivery store must be a regular file'
+      );
+    } finally {
+      safeRmSync(store, { recursive: true, force: true });
+    }
   });
 });

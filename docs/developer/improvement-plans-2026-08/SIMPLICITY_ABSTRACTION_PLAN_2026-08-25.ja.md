@@ -21783,3 +21783,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-process-planning.ts`、`libs/core/mission-process-planning.test.ts`
 - **変更**: process template 再計画時の `NEXT_TASKS.json` reader が schema／shape error を空配列へ隠して既存 task board を上書きする fail-open を削除した。既存の mission path／schema／planner-authored protection、force による明示的再計画、task progress carry-over semanticsは維持し、形状不正ファイルを保持したまま拒否する回帰テストを追加した。
 - **検証**: mission-process-planning **2 files / 20 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1431
+
+- **対象**: `libs/core/trigger-runner.ts`、`libs/core/trigger-runner.test.ts`
+- **変更**: trigger delivery store の record read／append 前に operation-time の regular-file 検査を追加した。既存の idempotency、delivery claim、retry、compaction、malformed record skip semanticsは維持し、store leaf がディレクトリへ置換された場合に read を拒否する回帰テストを追加した。
+- **検証**: trigger-runner **2 files / 11 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
