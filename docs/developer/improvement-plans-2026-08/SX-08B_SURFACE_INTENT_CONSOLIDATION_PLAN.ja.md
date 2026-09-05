@@ -1300,3 +1300,9 @@ voice runtime policyに残っていたコード内fallbackを削除し、正本�
 tool runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorをそのまま返すfail-closed境界へ統一した。profile overlayの選択、managed root、runtime mode、install／pin approvalの既存設定は変更していない。policy path cacheも読み込み成功後に明示的に固定した。
 
 検証: tool-runtime-policy **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 148
+
+tool-actuator routing policyの設定障害時fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合はfail-closedとした。未知toolに対する通常の `llm_reasoning`／`orchestrator-actuator` fallback routeは仕様として維持し、policy matchと設定障害の区別を明確化した。
+
+検証: tool-actuator-routing **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
