@@ -15,6 +15,7 @@ import {
   safeAppendFileSync,
   safeCopyFileSync,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeReadFile,
@@ -215,6 +216,9 @@ export function publishMeetingDeliverablesIfNeeded(input: {
   const copyArtifact = (relativeName: string, kind: string, description: string): void => {
     const sourcePath = assertSafeRepositoryPath(path.join(evidenceDir, relativeName));
     if (!safeExistsSync(sourcePath)) return;
+    if (!safeLstat(sourcePath).isFile()) {
+      throw new Error(`[DELIVERY_RESOURCE] evidence must be a regular file: ${sourcePath}`);
+    }
     const destinationPath = assertSafeRepositoryPath(
       path.join(missionDeliverablesDir, relativeName),
       { allowMissingLeaf: true }
@@ -253,6 +257,9 @@ export function publishMeetingDeliverablesIfNeeded(input: {
   let minutesExcerpt = '';
   const minutesPath = assertSafeRepositoryPath(path.join(missionDeliverablesDir, 'minutes.md'));
   if (safeExistsSync(minutesPath)) {
+    if (!safeLstat(minutesPath).isFile()) {
+      throw new Error(`[DELIVERY_RESOURCE] minutes must be a regular file: ${minutesPath}`);
+    }
     const minutes = String(safeReadFile(minutesPath, { encoding: 'utf8' }));
     minutesExcerpt = minutes.split(/\r?\n/u).slice(0, 8).join('\n').trim();
   }
