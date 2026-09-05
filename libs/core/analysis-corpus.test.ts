@@ -44,6 +44,23 @@ describe('analysis-corpus', () => {
     }
   });
 
+  it('ignores an allowed lexical ref that resolves to a directory', () => {
+    const directory = pathResolver.rootResolve(
+      `active/projects/analysis-corpus-directory-${process.pid}`
+    );
+    fs.mkdirSync(directory, { recursive: true });
+    try {
+      expect(
+        buildAnalysisCorpusSnippets([
+          pathResolver.toRepoRelative(directory),
+          'knowledge/product/incidents/post-mortem-20260228.md',
+        ])
+      ).toHaveLength(1);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('ranks refs toward active target and scope before broad knowledge', () => {
     const ranked = rankAnalysisRefs({
       refs: [
