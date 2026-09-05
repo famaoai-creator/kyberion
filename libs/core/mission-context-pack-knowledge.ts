@@ -91,6 +91,7 @@ function loadPinnedKnowledgeHint(repoRelativePath: string): MissionContextPackKn
     const abs = resolveSafePinnedKnowledgePath(repoRelativePath);
     if (!abs) return null;
     if (!safeExistsSync(abs)) return null;
+    if (!safeLstat(abs).isFile()) return null;
     const raw = safeReadFile(abs, { encoding: 'utf8' }) as string;
     const { title: frontmatterTitle, body } = pinnedFrontmatterTitle(raw);
     const bodyWithoutHeading = body.replace(/^#\s+.+\n/, '');
