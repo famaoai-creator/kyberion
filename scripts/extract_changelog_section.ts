@@ -7,11 +7,11 @@
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
+import { readTextFile } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -118,7 +118,7 @@ function main(argv: string[], print: Print = () => undefined): void {
   }
   const changelogPath = resolveInputPath(args.input);
 
-  const changelog = safeReadFile(changelogPath, { encoding: 'utf8' }) as string;
+  const changelog = readTextFile(changelogPath);
   const section = extractReleaseSection(changelog, args.ref);
 
   if (args.output) {

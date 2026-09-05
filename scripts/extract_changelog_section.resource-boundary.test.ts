@@ -55,6 +55,8 @@ describe('extract changelog section resource boundaries', () => {
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
     expect(source).not.toContain('process.stdout.write');
+    expect(source).toContain('readTextFile');
+    expect(source).not.toContain('safeReadFile(changelogPath');
     expect(source).toContain('return main(context.argv, context.print)');
   });
 });
