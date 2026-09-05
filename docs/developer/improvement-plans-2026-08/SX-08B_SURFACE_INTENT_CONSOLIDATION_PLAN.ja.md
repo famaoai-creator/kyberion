@@ -1288,3 +1288,9 @@ secret providerの環境-backed実装に残っていた動的な環境読み書�
 service runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorをそのまま返すfail-closed境界へ統一した。managed root、trial／installed mode、provision／pin approvalの既存設定とpath scope検証は変更していない。
 
 検証: service-runtime-policy **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
+
+## 2026-09-05 再レビュー修正 146
+
+voice runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorをそのまま返すfail-closed境界へ統一した。queue、chunking、progress、delivery、personal-tier routingの既存設定は変更していない。
+
+検証: voice-runtime-policy **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
