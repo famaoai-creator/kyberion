@@ -939,6 +939,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、portal inbox processorのinbox request本文readを`readPortalInboxTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをportal intent parsing／outbox transition判定へ到達させない回帰を追加した。既存のstatus validation、security guidance、processed transition semanticsは維持した。関連 **2 files／10 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、reasoning configのprevious route config本文readを`readReasoningConfigTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをbackup／history mutation判定へ到達させない回帰を追加した。既存のdry-run、revision、governance action semanticsは維持した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、report-review stampのtarget HTML本文readを`readReportReviewStampTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをreview layer add/remove判定へ到達させない回帰を追加した。既存のdry-run、check、offline file:// semanticsは維持した。関連 **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、pipeline promoteのcatalog README本文readを`readPipelinePromotionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpromoted catalog row判定へ到達させない回帰を追加した。既存のADF validation、provenance、dry-run catalog semanticsは維持した。関連 **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 

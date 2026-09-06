@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core';
-import { normalizePromotionAdvice, resolvePromotionInputPath } from './pipeline_promote.js';
+import {
+  normalizePromotionAdvice,
+  readPipelinePromotionTextFile,
+  resolvePromotionInputPath,
+} from './pipeline_promote.js';
 
 describe('pipeline promotion resource boundaries', () => {
   it('uses the governed parser for model promotion advice', () => {
@@ -11,6 +15,7 @@ describe('pipeline promotion resource boundaries', () => {
     expect(source).not.toContain('readJson<unknown>(resolvedInput)');
     expect(source).not.toContain('JSON.parse(jsonText)');
     expect(source).toContain('readTextFile');
+    expect(source).toContain('readPipelinePromotionTextFile(filePath: string)');
   });
 
   it('rejects external and non-file sources before promotion', () => {
@@ -41,5 +46,11 @@ describe('pipeline promotion resource boundaries', () => {
     expect(normalizePromotionAdvice(null)).toBeNull();
     expect(normalizePromotionAdvice([])).toBeNull();
     expect(normalizePromotionAdvice('invalid')).toBeNull();
+  });
+
+  it('rejects a directory before reading the pipeline catalog', () => {
+    expect(() => readPipelinePromotionTextFile(pathResolver.rootResolve('pipelines'))).toThrow(
+      'must be a regular file'
+    );
   });
 });

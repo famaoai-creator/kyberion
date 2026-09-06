@@ -23447,3 +23447,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/report-review/stamp.ts`、`scripts/report-review/stamp.test.ts`、PI-03
 - **変更**: report-review stampのtarget HTML本文readを`readReportReviewStampTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをreview layer add/remove判定へ到達させないようにした。既存のdry-run、check、offline file:// semanticsは維持した。
 - **検証**: report-review stamp **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1708
+
+- **対象**: `scripts/pipeline_promote.ts`、`scripts/pipeline_promote.resource-boundary.test.ts`、PI-03
+- **変更**: pipeline promoteのcatalog README本文readを`readPipelinePromotionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpromoted catalog row判定へ到達させないようにした。既存のADF validation、provenance、dry-run catalog semanticsは維持した。
+- **検証**: pipeline promote **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
