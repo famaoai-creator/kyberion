@@ -23297,3 +23297,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_improvement_plan_metadata.ts`、`scripts/check_improvement_plan_metadata.test.ts`、PI-03
 - **変更**: improvement plan metadata checkerのplan本文readを`readImprovementPlanTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfrontmatter／metadata判定へ到達させないようにした。既存のplan roots、frontmatter normalization、`--fix` semanticsは維持した。
 - **検証**: improvement plan metadata **2 files／4 tests passed**、対象ESLint、Prettier、checker direct実行（335 documents OK）、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1683
+
+- **対象**: `scripts/check_knowledge_scope_boundaries.ts`、`scripts/check_knowledge_scope_boundaries.test.ts`、PI-03
+- **変更**: knowledge scope boundaries checkerのworkspace source本文readを`readKnowledgeScopeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant scope／runtime writer判定へ到達させないようにした。既存のscope literal、tenant env ratchet、physical namespace semanticsは維持した。
+- **検証**: knowledge scope boundaries **2 files／6 tests passed**、対象ESLint、Prettier、checker direct実行（OK）、`git diff --check`で確認した。

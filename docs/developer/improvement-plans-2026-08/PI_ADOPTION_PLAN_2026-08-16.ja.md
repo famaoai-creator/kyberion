@@ -914,6 +914,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、foundation adoption checkerのproduction source本文readを`readFoundationAdoptionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfoundation adoption／ratchet判定へ到達させない回帰を追加した。関連 **2 files／5 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、i18n hardcoding checkerのworkspace source本文readを`readI18nHardcodingTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをkana／baseline判定へ到達させない回帰を追加した。関連 **2 files／21 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミットmeeting／voice変更に伴うbaseline差分（増加2件、stale 4件）を表示したため、baselineは変更せず継続課題とした。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、improvement plan metadata checkerのplan本文readを`readImprovementPlanTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfrontmatter／metadata判定へ到達させない回帰を追加した。関連 **2 files／4 tests passed**、対象ESLint、Prettier、checker direct実行（335 documents OK）、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、knowledge scope boundaries checkerのworkspace source本文readを`readKnowledgeScopeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant scope／runtime writer判定へ到達させない回帰を追加した。関連 **2 files／6 tests passed**、対象ESLint、Prettier、checker direct実行（OK）、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 
