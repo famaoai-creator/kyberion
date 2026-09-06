@@ -69,6 +69,25 @@ vi.mock('@agent/core/async-utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
   retry: iosTestDoubles.retry,
 }));
+vi.mock('@agent/core/foundation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
+  readJson: vi.fn((filePath: string) =>
+    JSON.parse(String(iosTestDoubles.safeReadFile(filePath, { encoding: 'utf8' })))
+  ),
+}));
+vi.mock('@agent/core/recovery-policy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/recovery-policy')>();
+  return {
+    ...actual,
+    createGovernedRetryOptionsBuilder:
+      (input: { defaults: Record<string, unknown> }) =>
+      (override: Record<string, unknown> = {}) => ({
+        ...input.defaults,
+        ...override,
+        shouldRetry: vi.fn(),
+      }),
+  };
+});
 
 describe('ios-actuator', () => {
   beforeEach(async () => {
