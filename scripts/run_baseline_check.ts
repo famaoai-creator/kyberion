@@ -7,7 +7,7 @@ import {
   getRegisteredEnvText,
   isVitestProcess,
   parseSafeJsonInput,
-  readTextFile,
+  readJsonLines,
 } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
@@ -125,22 +125,13 @@ export function readAuditLedgerFreshness(
         continue;
       }
       if (!safeExistsSync(safeFile) || !safeLstat(safeFile).isFile()) continue;
-      const raw = readTextFile(safeFile);
-      for (const line of raw.split(/\r?\n/u).reverse()) {
-        if (!line.trim()) continue;
-        try {
-          const timestamp = Date.parse(
-            String(
-              (parseSafeJsonInput(line, 'baseline audit entry') as { timestamp?: unknown })
-                .timestamp || ''
-            )
-          );
-          if (Number.isFinite(timestamp)) {
-            lastEntryMs = Math.max(lastEntryMs ?? 0, timestamp);
-            break;
-          }
-        } catch {
-          // audit:verify owns corruption classification; freshness remains observable.
+      for (const entry of readJsonLines<{ timestamp?: unknown }>(safeFile, {
+        onMalformed: 'skip',
+      }).reverse()) {
+        const timestamp = Date.parse(String(entry.timestamp || ''));
+        if (Number.isFinite(timestamp)) {
+          lastEntryMs = Math.max(lastEntryMs ?? 0, timestamp);
+          break;
         }
       }
     }
