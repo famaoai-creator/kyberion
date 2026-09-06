@@ -36,7 +36,6 @@ const allowedCoreFsImports = [
   'libs/core/fs-primitives.ts',
   'libs/core/heuristic-feedback.test.ts',
   'libs/core/intent-handoff.test.ts',
-  'libs/core/intent-snapshot-store.test.ts',
   'libs/core/jsonl-tail.test.ts',
   'libs/core/ledger.test.ts',
   'libs/core/meeting-participation-coordinator.test.ts',
@@ -91,6 +90,54 @@ const allowedCoreFsImports = [
   'libs/core/trust-engine.test.ts',
   'libs/core/validators.test.ts',
   'libs/core/worker-event-stream.test.ts',
+  // Symlink/directory boundary probe fixtures: raw fs (mkdir/symlink/unlink/rm) to
+  // construct a path that secure-io must reject as a traversal or type mismatch —
+  // the negative case can't be exercised through the safe* API it is asserting against.
+  'libs/core/agent-activity-board.test.ts',
+  'libs/core/agent-input-queue.test.ts',
+  'libs/core/agent-manifest.test.ts',
+  'libs/core/analysis-corpus.test.ts',
+  'libs/core/artifact-bundle.test.ts',
+  'libs/core/artifact-review.test.ts',
+  'libs/core/background-review-patch.test.ts',
+  'libs/core/browser-extension-bridge.observation-boundary.test.ts',
+  'libs/core/customer-channel-binding.test.ts',
+  'libs/core/history-search-index.test.ts',
+  'libs/core/intent-reconciliation.test.ts',
+  'libs/core/intent-track-resolver.test.ts',
+  'libs/core/knowledge-provider.test.ts',
+  'libs/core/mission-context-pack.test.ts',
+  'libs/core/mission-governance.test.ts',
+  'libs/core/mission-orchestration-events.test.ts',
+  'libs/core/mission-orchestration-progress.test.ts',
+  'libs/core/model-registry-directory.test.ts',
+  'libs/core/openai-compatible-backend.test.ts',
+  'libs/core/openrouter-backend.test.ts',
+  'libs/core/operator-learning-dispatch-registry.test.ts',
+  'libs/core/persona-loader.test.ts',
+  'libs/core/procedure-registry.test.ts',
+  'libs/core/runtime-health-history.test.ts',
+  'libs/core/tenant-design-resolver.test.ts',
+  'libs/core/virtual-audio-input-recording-bridge.test.ts',
+  'libs/core/virtual-audio-output-playback-bridge.test.ts',
+  'libs/core/voice-profile-registry.test.ts',
+  'libs/core/voice-sample-collection.test.ts',
+  'libs/core/voice-sample-ingestion-policy.test.ts',
+  'libs/core/work-graph-projection.test.ts',
+  // Module-mock fixtures: these tests vi.mock (or vi.spyOn) `./secure-io.js` /
+  // `node:fs` itself, or seed a real OS-tmpdir root outside the repo, so the
+  // fixture setup and real-schema reads inside the mock factory must use raw
+  // fs rather than the API under test / mock.
+  'libs/core/agent-collaboration-projection.test.ts',
+  'libs/core/baseline-check-cache.test.ts',
+  'libs/core/cowork-health-check.test.ts',
+  'libs/core/cowork-knowledge-bridge.test.ts',
+  'libs/core/knowledge-scope-health-history.test.ts',
+  'libs/core/model-performance-index.test.ts',
+  'libs/core/preference-adapter.persistence.test.ts',
+  'libs/core/procedure-self-repair.test.ts',
+  'libs/core/promotion-candidates.test.ts',
+  'libs/core/provider-discovery.test.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {
