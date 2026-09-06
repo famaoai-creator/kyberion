@@ -22,7 +22,7 @@ pnpm pipeline --input pipelines/verify-session.json
 ```
 
 ```bash
-pnpm setup:report --persona first-time-user
+pnpm kyberion setup report --persona first-time-user
 ```
 
 前提:
@@ -86,7 +86,7 @@ pnpm services:setup
 pnpm reasoning:setup
 
 # 7. 一括 readiness レポートを確認
-pnpm setup:report
+pnpm kyberion setup report
 
 # 8. バックグラウンド surface の整列
 pnpm surfaces reconcile
@@ -216,7 +216,7 @@ pnpm tenant:activation activate \
 
 ### Stage 7: Consolidated Readiness Report
 
-- **実行コマンド**: `pnpm setup:report`
+- **実行コマンド**: `pnpm kyberion setup report`
 - **目的**: `surface` / `service` / `reasoning` / `doctor` の readiness を一度に確認し、初期セットアップの抜けをまとめて潰します。
 - **物理的変化**:
   - まだ実体の変更は行いません。まとめた readiness summary が表示されます。

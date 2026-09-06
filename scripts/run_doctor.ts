@@ -542,7 +542,7 @@ export function formatDoctorReport(report: DoctorRunReport, argv: DoctorArgument
     lines.push('All required capabilities are satisfied.');
     if (!argv.manifest && !argv.runtime && !argv.all) {
       lines.push(
-        'Want the right surface next? Run `pnpm setup:report --persona first-time-user` for a recommended surface guide.'
+        'Want the right surface next? Run `pnpm kyberion setup report --persona first-time-user` for a recommended surface guide.'
       );
     }
     return lines.join('\n');
@@ -573,7 +573,7 @@ export function formatDoctorReport(report: DoctorRunReport, argv: DoctorArgument
         : nextStep.message
     );
     lines.push(
-      'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
+      'Need to decide which surface to use after bootstrap? Run `pnpm kyberion setup report --persona first-time-user`.'
     );
     if (onDemandActuator) {
       lines.push(
@@ -594,7 +594,7 @@ export function formatDoctorReport(report: DoctorRunReport, argv: DoctorArgument
   } else {
     lines.push('Next step: inspect doctor findings above and rerun the relevant setup command.');
     lines.push(
-      'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
+      'Need to decide which surface to use after bootstrap? Run `pnpm kyberion setup report --persona first-time-user`.'
     );
     if (onDemandActuator) {
       lines.push(

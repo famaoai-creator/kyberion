@@ -22,7 +22,7 @@ with environment prerequisites, and what still needs caution.
 | Customer overlay                                                  | Ready                 | `customer:create`, `customer:list`, `customer:switch`, and migration flows are wired end to end.                                    |
 | Onboarding / doctor                                               | Ready                 | `pnpm onboard` and `pnpm doctor` give actionable readiness checks.                                                                  |
 | Toolchain preflight                                               | Ready                 | `pnpm env:bootstrap --manifest kyberion-toolchain` confirms the local Node/pnpm/git/tooling baseline before you build from source.  |
-| Consolidated readiness                                            | Ready                 | `pnpm setup:report` shows surfaces, services, reasoning, and doctor in one pass.                                                    |
+| Consolidated readiness                                            | Ready                 | `pnpm kyberion setup report` shows surfaces, services, reasoning, and doctor in one pass.                                           |
 | Baseline / vital pipelines                                        | Ready                 | `pnpm kyberion vital --format=json` and `pnpm pipeline --input pipelines/baseline-check.json` are used as real gates.               |
 | Governance / contracts                                            | Ready                 | Registry splits, schema checks, and policy checks are enforced by tests and scripts.                                                |
 | Surface lifecycle management                                      | Ready                 | Individual surface enable/disable/status flows work and are managed per gateway.                                                    |
@@ -51,7 +51,7 @@ Recommended default flows:
 
 1. `pnpm pipeline --input pipelines/baseline-check.json`
 2. `pnpm env:bootstrap --manifest kyberion-toolchain`
-3. `pnpm setup:report`
+3. `pnpm kyberion setup report`
 4. `pnpm run doctor`
 5. `pnpm kyberion vital --format=json`
 6. `pnpm onboard`

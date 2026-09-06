@@ -109,7 +109,7 @@ describe('run_doctor', () => {
     expect(process.exitCode ?? 0).toBe(0);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('reasoning-backend'));
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('pnpm setup:report --persona first-time-user')
+      expect.stringContaining('pnpm kyberion setup report --persona first-time-user')
     );
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Maintenance: janitor'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Governance controls:'));
@@ -231,7 +231,7 @@ describe('run_doctor', () => {
       expect.stringContaining('pnpm env:bootstrap --manifest meeting-participation-runtime --apply')
     );
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('pnpm setup:report --persona first-time-user')
+      expect.stringContaining('pnpm kyberion setup report --persona first-time-user')
     );
     expect(process.exitCode).toBe(1);
   });

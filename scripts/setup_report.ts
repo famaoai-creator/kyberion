@@ -96,7 +96,7 @@ function buildFirstTimeUserNextActions(
         title: 'Re-run setup report after changes',
         reason: 'Everything looks ready right now.',
         next_action_type: 'inspect_artifact',
-        suggested_command: 'pnpm setup:report',
+        suggested_command: 'pnpm kyberion setup report',
       })
     );
   }

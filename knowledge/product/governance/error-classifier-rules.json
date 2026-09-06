@@ -102,7 +102,7 @@
       "id": "secret.not-found",
       "category": "missing_secret",
       "label": "Secret not found",
-      "remediation": "Run `pnpm setup:report --persona first-time-user` to review configured secrets and add the missing entry to your OS keychain.",
+      "remediation": "Run `pnpm kyberion setup report --persona first-time-user` to review configured secrets and add the missing entry to your OS keychain.",
       "patterns": ["secret[\\s_-]?(not[\\s_-]?found|missing)|keychain.*not[\\s_-]?found"]
     },
     {
