@@ -2,12 +2,19 @@ import * as path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { loadMaxFileLinesConfig, type MaxFileLinesConfig } from '@agent/core/max-file-lines-config';
 import { maskComments } from './check_module_boundaries.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
+
+export function readMaxFileLinesTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function relative(filePath: string): string {
   return path.relative(ROOT, filePath).split(path.sep).join('/');
@@ -45,7 +52,7 @@ export function checkMaxFileLines(): { maxLines: number; violations: string[] } 
     for (const file of getAllFiles(pathResolver.rootResolve(root))) {
       const repoPath = relative(file);
       if (!isSource(file) || exceptions.has(repoPath)) continue;
-      const lineCount = maskComments(readTextFile(file))
+      const lineCount = maskComments(readMaxFileLinesTextFile(file))
         .split(/\r?\n/u)
         .filter((line) => line.trim().length > 0).length;
       if (lineCount > config.max_lines) {
