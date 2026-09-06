@@ -2,7 +2,6 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
 import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
@@ -15,6 +14,7 @@ import {
   isRecord,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
+  readJson,
 } from '@agent/core/foundation';
 import * as path from 'node:path';
 
@@ -65,10 +65,7 @@ export function loadJsonValue(filePath: string): unknown {
   if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
     throw new Error(`Media JSON input must be an existing regular file: ${safePath}`);
   }
-  return parseSafeJsonInput(
-    String(safeReadFile(safePath, { encoding: 'utf8' }) || ''),
-    `Media JSON input ${safePath}`
-  );
+  return readJson(safePath);
 }
 
 export interface ConfidentialThemePack {
