@@ -67,6 +67,13 @@ type DashboardLog = (...values: unknown[]) => void;
 
 let dashboardLog: DashboardLog = () => undefined;
 
+export function readDashboardTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function resolveDashboardTenantSlug(): string | null {
   const onboardingState = readDashboardOnboardingState();
   const onboardingTenant = onboardingState?.tenants?.entries?.[0]?.tenant_slug?.trim();
@@ -801,7 +808,7 @@ function drawMissionOrchestration() {
   const events: Array<{ ts: string; decision: string; mission?: string; why?: string }> = [];
   for (const file of [eventsPath, slackMissionsPath]) {
     if (!safeExistsSync(file)) continue;
-    const raw = readTextFile(file);
+    const raw = readDashboardTextFile(file);
     for (const line of raw.trim().split('\n')) {
       if (!line.trim()) continue;
       const event = parseDashboardOrchestrationLine(line);
@@ -838,7 +845,7 @@ function drawOwnerSummaries() {
     return;
   }
 
-  const summaries = readTextFile(slackMissionsPath)
+  const summaries = readDashboardTextFile(slackMissionsPath)
     .split('\n')
     .filter(Boolean)
     .map(parseDashboardOwnerSummaryLine)
