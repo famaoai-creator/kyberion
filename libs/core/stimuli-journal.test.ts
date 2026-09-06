@@ -4,8 +4,9 @@ import {
   normalizeNerveMessage,
   parseNerveMessageLine,
   resolveStimuliJournalPath,
+  isRegularStimuliJournalPath,
 } from './stimuli-journal.js';
-import { safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 
 const validMessage = {
   id: 'msg-1',
@@ -60,6 +61,16 @@ describe('NerveMessage JSONL boundary', () => {
     } finally {
       safeRmSync(linkPath, { force: true });
       safeRmSync(targetPath, { force: true });
+    }
+  });
+
+  it('does not classify a directory as a readable stimuli journal', () => {
+    const directoryPath = pathResolver.sharedTmp(`stimuli-journal-directory-${process.pid}.jsonl`);
+    safeMkdir(directoryPath, { recursive: true });
+    try {
+      expect(isRegularStimuliJournalPath(directoryPath)).toBe(false);
+    } finally {
+      safeRmSync(directoryPath, { recursive: true, force: true });
     }
   });
 });

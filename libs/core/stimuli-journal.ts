@@ -1,7 +1,13 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { isRecord, readTextFile } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeStat, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeStat,
+  safeWriteFile,
+} from './secure-io.js';
 import { createLogger } from './logger.js';
 import type { NerveMessage } from './nerve-bridge.js';
 
@@ -15,6 +21,15 @@ export function resolveStimuliJournalPath(filePath: string = STIMULI_PATH): stri
 
 function safeStimuliPath(): string {
   return resolveStimuliJournalPath();
+}
+
+export function isRegularStimuliJournalPath(filePath: string = STIMULI_PATH): boolean {
+  try {
+    const safePath = resolveStimuliJournalPath(filePath);
+    return safeExistsSync(safePath) && safeLstat(safePath).isFile();
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -125,7 +140,7 @@ export function loadRecentStimuli(
   options: LoadRecentStimuliOptions = {}
 ): NerveMessage[] {
   const stimuliPath = safeStimuliPath();
-  if (!safeExistsSync(stimuliPath)) return [];
+  if (!isRegularStimuliJournalPath(stimuliPath)) return [];
   const { enforceTtl = true, nowMs = Date.now() } = options;
 
   const content = readTextFile(stimuliPath, {
@@ -154,7 +169,7 @@ export function loadRecentStimuli(
  */
 export function rotateStimuliJournalIfNeeded(maxBytes: number = STIMULI_MAX_BYTES): boolean {
   const stimuliPath = safeStimuliPath();
-  if (!safeExistsSync(stimuliPath)) return false;
+  if (!isRegularStimuliJournalPath(stimuliPath)) return false;
   let size = 0;
   try {
     size = safeStat(stimuliPath).size;

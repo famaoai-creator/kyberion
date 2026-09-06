@@ -22829,3 +22829,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-project-ledger.ts`、mission-project-reassignment test、PI-03
 - **変更**: project mission ledger の既存 markdown leaf を `ensureProjectMissionLedgerExists` で operation-time に regular-file 検証し、directory replacement を `readTextFile` 前に拒否するようにした。JSON ledger 側と同じ明示的な `PROJECT_MISSION_LEDGER` error semantics を維持した。
 - **検証**: mission-project-reassignment **2 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
+
+## 2026-09-06 再レビュー実装 1605
+
+- **対象**: `libs/core/stimuli-journal.ts`、stimuli-journal test、PI-03
+- **変更**: stimuli journal の reader／rotation 前に再利用可能な `isRegularStimuliJournalPath` を接続し、scope内でも directory replacement を sensory read／rotation に到達させないようにした。既存の append／TTL／rotation semantics は維持した。
+- **検証**: stimuli-journal **2 files／11 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
