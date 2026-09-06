@@ -1,5 +1,5 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { nowIso } from '@agent/core/foundation';
+import { isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
 import { validateBrowserConversationSession } from '@agent/core/browser-conversation-session';
 import path from 'node:path';
 import {
@@ -234,6 +234,20 @@ function safeObservationPath(filePath: string): string | null {
   }
 }
 
+function readObservationRecords(filePath: string): Record<string, unknown>[] {
+  const safeFile = safeObservationPath(filePath);
+  if (!safeFile) return [];
+  return readJsonLines<Record<string, unknown>>(safeFile, {
+    map: (value) => {
+      if (!isRecord(value)) {
+        throw new Error('observation JSONL entry must be an object');
+      }
+      return value;
+    },
+    onMalformed: 'skip',
+  });
+}
+
 export function collectRecentEvents(
   options: IntelligenceObservationCollectionOptions = {}
 ): OrchestrationEventSummary[] {
@@ -243,14 +257,8 @@ export function collectRecentEvents(
   ];
   const lines: OrchestrationEventSummary[] = [];
   for (const file of files) {
-    const safeFile = safeObservationPath(file);
-    if (!safeFile) continue;
-    const raw = safeReadFile(safeFile, { encoding: 'utf8' }) as string;
-    for (const line of raw.trim().split('\n')) {
-      if (!line.trim()) continue;
+    for (const event of readObservationRecords(file)) {
       try {
-        const event = parseJsonRecord(line);
-        if (!event) continue;
         lines.push({
           ts: stringField(event, 'ts', nowIso()),
           decision: stringField(event, 'decision', stringField(event, 'event_type', 'event')),
@@ -276,13 +284,9 @@ export function collectControlActions(
   if (!file) return [];
 
   const lifecycle = new Map<string, ControlActionSummary>();
-  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
 
-  for (const line of raw.trim().split('\n')) {
-    if (!line.trim()) continue;
+  for (const event of readObservationRecords(file)) {
     try {
-      const event = parseJsonRecord(line);
-      if (!event) continue;
       const payload = recordField(event.payload);
       const decision = stringField(event, 'decision', stringField(event, 'event_type'));
       const eventId = optionalStringField(event, 'event_id');
@@ -370,13 +374,9 @@ export function collectControlActionDetails(
   if (!file) return {};
 
   const details: Record<string, ControlActionDetail[]> = {};
-  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
 
-  for (const line of raw.trim().split('\n')) {
-    if (!line.trim()) continue;
+  for (const event of readObservationRecords(file)) {
     try {
-      const event = parseJsonRecord(line);
-      if (!event) continue;
       const eventId = optionalStringField(event, 'event_id');
       if (!eventId) continue;
       if (
@@ -426,14 +426,8 @@ export function collectOwnerSummaries(
   ];
 
   for (const file of files) {
-    const safeFile = safeObservationPath(file);
-    if (!safeFile) continue;
-    const raw = safeReadFile(safeFile, { encoding: 'utf8' }) as string;
-    for (const line of raw.trim().split('\n')) {
-      if (!line.trim()) continue;
+    for (const event of readObservationRecords(file)) {
       try {
-        const event = parseJsonRecord(line);
-        if (!event) continue;
         if (
           stringField(event, 'decision', stringField(event, 'event_type')) !==
           'mission_owner_notified'
