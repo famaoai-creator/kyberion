@@ -7,7 +7,7 @@
  */
 
 import { logger } from '../core.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { getRegisteredEnvBool, getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExec, safeExistsSync, assertSafeRepositoryPath } from '../secure-io.js';
@@ -87,6 +87,13 @@ function hasBinary(binary: string): boolean {
   }
 }
 
+function envRequirementMet(name: string): boolean {
+  const flag = getRegisteredEnvBool(name);
+  if (flag === true) return true;
+  if (flag === false) return false;
+  return Boolean(getRegisteredEnvText(name));
+}
+
 function prerequisiteInstallHints(capability: ManifestCapability): string[] {
   const install = capability.prerequisites?.install;
   if (Array.isArray(install)) return install;
@@ -130,8 +137,13 @@ function evaluateManifestCapability(capability: ManifestCapability): ActuatorCap
   for (const binary of binaryRequirements) {
     if (!hasBinary(binary)) missing.push(`missing binary: ${binary}`);
   }
-  for (const envName of envRequirements) {
-    if (!getRegisteredEnvText(envName)) missing.push(`missing env: ${envName}`);
+  const envPlatforms = capability.requirements?.env_platforms;
+  const envApplies =
+    !envPlatforms || envPlatforms.length === 0 || envPlatforms.includes(process.platform);
+  if (envApplies) {
+    for (const envName of envRequirements) {
+      if (!envRequirementMet(envName)) missing.push(`missing env: ${envName}`);
+    }
   }
   for (const service of serviceRequirements) {
     missing.push(`service prerequisite requires a dedicated probe: ${service}`);

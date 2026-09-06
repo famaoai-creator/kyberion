@@ -142,6 +142,166 @@
         "repo": { "required": true, "type": "string" },
         "pull_number": { "required": true, "type": "number" }
       }
+    },
+    "list_issues": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/issues",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "description": "Lists issues in a repository. GitHub also includes pull requests in this collection; use list_pulls for PR-only results.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "state": { "required": false, "type": "string", "description": "open, closed, or all" },
+        "labels": { "required": false, "type": "string" },
+        "assignee": { "required": false, "type": "string" },
+        "per_page": { "required": false, "type": "number", "default": 30 }
+      }
+    },
+    "get_issue": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/issues/{{issue_number}}",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "description": "Gets a single issue (or a pull request presented as an issue).",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "issue_number": { "required": true, "type": "number" }
+      },
+      "output_mapping": { "id": "number", "url": "html_url", "state": "state", "title": "title" }
+    },
+    "list_pulls": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "description": "Lists pull requests in a repository.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "state": { "required": false, "type": "string", "description": "open, closed, or all" },
+        "head": { "required": false, "type": "string" },
+        "base": { "required": false, "type": "string" },
+        "per_page": { "required": false, "type": "number", "default": 30 }
+      }
+    },
+    "get_pull": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls/{{pull_number}}",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "description": "Gets a single pull request, including mergeability metadata.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "pull_number": { "required": true, "type": "number" }
+      },
+      "output_mapping": {
+        "number": "number",
+        "url": "html_url",
+        "state": "state",
+        "title": "title",
+        "head_sha": "head.sha"
+      }
+    },
+    "list_reviews": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/reviews",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "description": "Lists submitted reviews on a pull request.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "pull_number": { "required": true, "type": "number" },
+        "per_page": { "required": false, "type": "number", "default": 30 }
+      }
+    },
+    "list_review_comments": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/comments",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "description": "Lists review comments (line comments) on a pull request.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "pull_number": { "required": true, "type": "number" },
+        "per_page": { "required": false, "type": "number", "default": 30 }
+      }
+    },
+    "list_pr_files": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/files",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "description": "Lists files changed in a pull request.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "pull_number": { "required": true, "type": "number" },
+        "per_page": { "required": false, "type": "number", "default": 30 }
+      }
+    },
+    "create_review": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/reviews",
+      "method": "POST",
+      "kind": "apply",
+      "risk": "write",
+      "description": "Submits a pull request review (COMMENT, APPROVE, or REQUEST_CHANGES). Write-gated; approval is required.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "pull_number": { "required": true, "type": "number" },
+        "event": {
+          "required": true,
+          "type": "string",
+          "description": "COMMENT, APPROVE, or REQUEST_CHANGES"
+        },
+        "body": { "required": false, "type": "string" },
+        "commit_id": { "required": false, "type": "string" }
+      },
+      "payload_template": {
+        "event": "{{event}}",
+        "body": "{{body}}",
+        "commit_id": "{{commit_id}}"
+      },
+      "output_mapping": { "id": "id", "url": "html_url", "state": "state" }
+    },
+    "create_review_comment": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/comments",
+      "method": "POST",
+      "kind": "apply",
+      "risk": "write",
+      "description": "Creates a line-level review comment on a pull request. Write-gated; approval is required.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "pull_number": { "required": true, "type": "number" },
+        "body": { "required": true, "type": "string" },
+        "commit_id": { "required": true, "type": "string" },
+        "path": { "required": true, "type": "string" },
+        "line": { "required": false, "type": "number" },
+        "side": { "required": false, "type": "string", "description": "LEFT or RIGHT" }
+      },
+      "payload_template": {
+        "body": "{{body}}",
+        "commit_id": "{{commit_id}}",
+        "path": "{{path}}",
+        "line": "{{line}}",
+        "side": "{{side}}"
+      },
+      "output_mapping": { "id": "id", "url": "html_url" }
     }
   }
 }

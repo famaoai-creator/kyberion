@@ -18,29 +18,31 @@ Computer Surface の `/api/identity`・`/api/state`・`/api/stream`・`/api/os/c
 
 ## 会話チャネル(UI以外)
 
-| 入口                                  | 役割                                                                                                                                                             | 備考                   |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| Slack / Telegram / Discord / iMessage | 会話・承認・通知(`runSurfaceMessageConversation` 経由)                                                                                                           | 深い履歴閲覧には不向き |
-| Voice(voice-hub / presence-studio)    | ハンズフリー会話・口述                                                                                                                                           | 一括レビューには不向き |
-| **`pnpm kyberion`**                   | **ターミナルの統合ホーム**: 状態ダイジェスト+次の一手。`ask "<依頼>"`(ブリッジと同じ脳)、`inbox`(既読/受領)、`approvals`(承認/却下)、`notify`(通知先設定) が同居 | 迷ったらまずこれ       |
-| **`pnpm tui`**(terminal-hud)          | **ターミナル常駐 HUD**(Ink TUI): ミッション・work item・ランタイムをパネルで監視/操作([README](../presence/displays/terminal-hud/README.md))                     | 常駐監視向け           |
-| `pnpm kyberion`                       | スクリプト向けCLI                                                                                                                                                | 統合ホームではない     |
-| MCP(mcp-server-cowork)                | Claude 連携のコンシェルジェ(persona: sovereign_concierge)                                                                                                        |                        |
+| 入口                                  | 役割                                                                                                                                                                                                      | 備考                                                                                                                                                                                                                                          |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Slack / Telegram / Discord / iMessage | 会話・承認・通知(`runSurfaceMessageConversation` 経由)                                                                                                                                                    | Slack の3経路(会話 / 配信 / API)は [SLACK_CHANNEL_ROUTES.ja.md](./SLACK_CHANNEL_ROUTES.ja.md)。`presence:dispatch` の非 Slack 配信は `telegram:` / `discord:` / `imessage:` prefix で同じ satellite outbox へ forward。深い履歴閲覧には不向き |
+| Voice(voice-hub / presence-studio)    | ハンズフリー会話・口述                                                                                                                                                                                    | 一括レビューには不向き                                                                                                                                                                                                                        |
+| **`pnpm kyberion`**                   | **ターミナルの統合ホーム**: 状態ダイジェスト+次の一手。`ask "<依頼>"`(ブリッジと同じ脳)、`inbox`(既読/受領)、`approvals`(承認/却下)、`notify`(通知先設定) が同居                                          | 迷ったらまずこれ                                                                                                                                                                                                                              |
+| **`pnpm tui`**(terminal-hud)          | **ターミナル常駐 HUD**(Ink TUI): ミッション・work item・ランタイムをパネルで監視/操作([README](../presence/displays/terminal-hud/README.md))                                                              | 常駐監視向け                                                                                                                                                                                                                                  |
+| `pnpm kyberion`                       | スクリプト向けCLI                                                                                                                                                                                         | 統合ホームではない                                                                                                                                                                                                                            |
+| MCP(mcp-server-cowork)                | Claude 連携のコンシェルジェ(persona: sovereign_concierge)。読み取りは `kyberion.capability.list` / `kyberion.service.capture` / allowlist pipeline。書き込みは `kyberion.service.actuate`(承認・既定オフ) | `pnpm mcp:server`                                                                                                                                                                                                                             |
 
 ## 会議・議事録
 
-| 入口                                                | 役割                                                                                                          |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `pnpm minutes:record --mission <ID>`                | マイク録音 → 文字起こし → 議事録(`meeting-followup` パイプライン)。presence-studio の「会議を記録」と同じ基盤 |
-| `pnpm meeting:participate --driver in-room`         | **同席モード**: ブラウザを使わず、その場の会議にマイク/スピーカーで出席                                       |
-| `pnpm meeting:participate`(既定 browser-playwright) | Meet/Zoom/Teams へのブラウザ経由出席                                                                          |
+| 入口                                                    | 役割                                                                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `pnpm minutes:record --mission <ID>`                    | マイク録音 → 文字起こし → 議事録(`meeting-followup` パイプライン)。presence-studio の「会議を記録」と同じ基盤 |
+| `pnpm meeting:participate --driver in-room`             | **同席モード**: ブラウザを使わず、その場の会議にマイク/スピーカーで出席                                       |
+| `pnpm meeting:participate`(既定 **browser-playwright**) | Meet/Zoom/Teams への**日常パス**。Playwright でブラウザ出席する。`meeting-browser-driver` が実装済みドライバ  |
 
-将来ドライバ(未実装・シームのみ): `zoom-sdk`、`recall-ai`。
+**未実装シーム / deferred product (P2-4 docs-only):** `zoom-sdk` と `recall-ai` はドライバレジストリの名前だけ。実装しない。日常は browser-playwright。シームを埋めるな。
 
 Related guidance:
 
+- [`docs/EMAIL_OPERATOR.ja.md`](./EMAIL_OPERATOR.ja.md) — inbox/triage is Gmail/gws (`pnpm kyberion email`); `email-actuator` is delivery-only
 - [`docs/OPERATOR_UX_GUIDE.md`](./OPERATOR_UX_GUIDE.md)
 - [`knowledge/product/architecture/surface-responsibility-model.md`](../knowledge/product/architecture/surface-responsibility-model.md)
 - [`knowledge/product/architecture/ceo-ux.md`](../knowledge/product/architecture/ceo-ux.md)
 - [`knowledge/product/architecture/multi-tenant-operations.md`](../knowledge/product/architecture/multi-tenant-operations.md)
 - [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)
+- [`docs/developer/CLOUD_AGENT_ENVIRONMENT.md`](./developer/CLOUD_AGENT_ENVIRONMENT.md) — Cloud Agent VM: Node `>=24` and `pnpm build` before pipeline / MCP / doctor

@@ -89,11 +89,12 @@
     "typecheck": "tsc --noEmit",
     "validate": "pnpm run build && pnpm run typecheck && pnpm run check -- --scope full",
     "doctor": "node dist/scripts/run_doctor.js",
+    "kyberion:doctor": "node --import ./scripts/ts-loader.mjs scripts/run_doctor.ts",
     "office": "node --import ./scripts/ts-loader.mjs scripts/virtual_office.ts",
     "tui": "node --import ./scripts/ts-loader.mjs scripts/tui.ts",
     "deps:check": "node dist/scripts/dependency_resolver.js",
     "service:preflight": "node dist/scripts/service_preflight.js",
-    "kyberion": "node dist/scripts/kyberion.js",
+    "kyberion": "node scripts/kyberion_cli_entry.mjs",
     "email:workflow": "node --import ./scripts/ts-loader.mjs scripts/email-workflow.ts",
     "mission": "node dist/scripts/mission_controller.js",
     "project": "node dist/scripts/project_controller.js",
@@ -123,7 +124,10 @@
     "backup": "node --import ./scripts/ts-loader.mjs scripts/backup.ts",
     "telegram:bridge": "node dist/satellites/telegram-bridge/src/index.js",
     "chronos:dev": "pnpm --filter @presence/chronos-mirror-v2 dev",
-    "capabilities": "node dist/scripts/capability_discovery.js",
+    "capabilities": "node scripts/capability_discovery_entry.mjs",
+    "kyberion:list": "node scripts/capability_discovery_entry.mjs",
+    "playground": "pnpm exec tsx scripts/actuator_playground.ts",
+    "actuator:playground": "pnpm exec tsx scripts/actuator_playground.ts",
     "provider-capabilities:scan": "node dist/scripts/scan_provider_cli_capabilities.js",
     "examples": "node dist/scripts/example_discovery.js",
     "system:upgrade": "node --import ./scripts/ts-loader.mjs scripts/system_upgrade.ts",
@@ -149,7 +153,7 @@
       "prettier --write"
     ],
     "knowledge/**/*.{md,json}": [
-      "node --import ./scripts/ts-loader.mjs scripts/generate_knowledge_index.ts",
+      "pnpm exec tsx scripts/generate_knowledge_index.ts",
       "git add knowledge/_index.md knowledge/_integrity-manifest.json"
     ]
   },

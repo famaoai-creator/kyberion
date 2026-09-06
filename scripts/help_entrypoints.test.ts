@@ -40,7 +40,9 @@ describe('CLI help entrypoints', () => {
     const result = runHelp(path.join('scripts', 'email-workflow.ts'), ['--help']);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('Usage: npm run email:workflow');
+    expect(result.stdout).toContain('Usage: pnpm kyberion email');
+    expect(result.stdout).toContain('Compat: pnpm email:workflow');
+    expect(result.stdout).toContain('docs/EMAIL_OPERATOR.ja.md');
   });
 
   it('honors shared output flags for email workflow results', () => {

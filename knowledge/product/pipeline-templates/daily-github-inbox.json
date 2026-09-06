@@ -1,0 +1,97 @@
+{
+  "action": "pipeline",
+  "name": "Daily GitHub Inbox Digest",
+  "version": "1.0.0",
+  "description": "Morning inbox: capture open issues, pull requests, and recent Actions runs via the canonical GitHub REST preset, then write a local digest. Slack delivery is not in this template — add slack post_message only after approval. Chronos pickup: copy to a tenant pipeline path and enable the schedule block (see pipeline-templates README).",
+  "_migration_note": "P1 daily inbox. Uses service:preset capture ops from github.json. Does not shell to gh or dist actuators. Slack post_message stays write-gated and is intentionally omitted from the default path.",
+  "schedule": {
+    "id": "daily-github-inbox",
+    "cron": "0 8 * * 1-5",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "context": {
+    "owner": "",
+    "repo": "",
+    "issue_state": "open",
+    "pull_state": "open",
+    "digest_output_path": "active/shared/tmp/daily-github-inbox.md"
+  },
+  "steps": [
+    {
+      "id": "list_open_issues",
+      "role": "source",
+      "op": "service:preset",
+      "produces": { "channel": "open_issues", "type": "ServiceResult" },
+      "params": {
+        "service_id": "github",
+        "action": "list_issues",
+        "params": {
+          "owner": "{{owner}}",
+          "repo": "{{repo}}",
+          "state": "{{issue_state}}",
+          "per_page": 30
+        }
+      }
+    },
+    {
+      "id": "list_open_pulls",
+      "role": "source",
+      "op": "service:preset",
+      "produces": { "channel": "open_pulls", "type": "ServiceResult" },
+      "params": {
+        "service_id": "github",
+        "action": "list_pulls",
+        "params": {
+          "owner": "{{owner}}",
+          "repo": "{{repo}}",
+          "state": "{{pull_state}}",
+          "per_page": 30
+        }
+      }
+    },
+    {
+      "id": "list_recent_runs",
+      "role": "source",
+      "op": "service:preset",
+      "produces": { "channel": "workflow_runs", "type": "ServiceResult" },
+      "params": {
+        "service_id": "github",
+        "action": "actions_list_runs",
+        "params": {
+          "owner": "{{owner}}",
+          "repo": "{{repo}}",
+          "per_page": 10
+        }
+      }
+    },
+    {
+      "id": "write_inbox_digest",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": ["open_issues", "open_pulls", "workflow_runs"],
+      "params": {
+        "path": "{{digest_output_path}}",
+        "content": {
+          "kind": "daily-github-inbox",
+          "generated_at": "{{run_utc_now}}",
+          "repository": "{{owner}}/{{repo}}",
+          "issue_state": "{{issue_state}}",
+          "pull_state": "{{pull_state}}",
+          "open_issues": "{{open_issues}}",
+          "open_pulls": "{{open_pulls}}",
+          "workflow_runs": "{{workflow_runs}}",
+          "notes": "Local digest only. Slack post_message is write-gated (approval_required) and is not part of this template. After instantiation, operators may add a slack post_message step if they want a channel ping."
+        }
+      }
+    },
+    {
+      "id": "log_digest",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Daily GitHub inbox digest written to {{digest_output_path}}. Slack delivery is not enabled in this template."
+      }
+    }
+  ]
+}

@@ -8,6 +8,8 @@ export interface ActuatorManifestCapabilityRequirements {
   bin?: string[];
   lib?: string[];
   env?: string[];
+  /** When set, `env` is required only on these platforms (e.g. Linux file-secret opt-in). */
+  env_platforms?: string[];
 }
 
 export interface ActuatorManifestCapabilityPrerequisites {

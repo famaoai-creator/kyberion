@@ -21,6 +21,8 @@ pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
+Kyberion's readiness check is `pnpm run doctor` or `pnpm kyberion:doctor`. After `pnpm build`, `pnpm doctor` in this first-win block is intended to run the repo script; bare `pnpm doctor` without `run` is pnpm's own diagnostic.
+
 ```bash
 pnpm kyberion setup report --persona first-time-user
 ```

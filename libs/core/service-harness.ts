@@ -245,6 +245,31 @@ export function describeServiceHarness(
   };
 }
 
+/**
+ * Guard for assistant-facing capture surfaces. Rejects unknown actions and
+ * any operation that is not kind=capture + risk=read.
+ */
+export function assertServiceCaptureOperation(
+  serviceId: string,
+  action: string
+): ServiceOperationContract {
+  const normalizedServiceId = serviceId.trim();
+  const normalizedAction = action.trim();
+  if (!normalizedServiceId) throw new Error('service_id is required');
+  if (!normalizedAction) throw new Error('action is required');
+  const descriptor = describeServiceHarness(normalizedServiceId, { detail: false });
+  const operation = descriptor.operations.find((item) => item.action === normalizedAction);
+  if (!operation) {
+    throw new Error(`Unknown service action: ${normalizedServiceId}:${normalizedAction}`);
+  }
+  if (operation.kind !== 'capture' || operation.risk !== 'read') {
+    throw new Error(
+      `Capture-only surface rejected ${normalizedServiceId}:${normalizedAction} (${operation.kind}/${operation.risk}). Use kyberion.service.actuate for writes.`
+    );
+  }
+  return operation;
+}
+
 function redactValue(value: unknown, key?: string): unknown {
   if (key && SENSITIVE_KEY.test(key)) return '[REDACTED]';
   if (Array.isArray(value)) return value.map((item) => redactValue(item));

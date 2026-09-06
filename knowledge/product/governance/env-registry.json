@@ -215,7 +215,7 @@
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "Acknowledge the plaintext file-secret fallback when the OS keychain is unavailable (warn-phase; see AC-05).",
+      "description": "Opt-in to the plaintext file-secret backend (vault/secrets/file-secrets.json, chmod 0600). Required on Linux; never the silent default on darwin/win32 keychain paths.",
       "documented": true,
       "subsystem": "secrets"
     },

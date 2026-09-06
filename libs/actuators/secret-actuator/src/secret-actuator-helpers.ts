@@ -1,7 +1,12 @@
 import { safeWriteFile, safeExec, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
-import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
+import {
+  getRegisteredEnvBool,
+  getRegisteredEnvText,
+  nowIso,
+  readJson,
+} from '@agent/core/foundation';
 import { ledger } from '@agent/core/ledger';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
@@ -197,6 +202,16 @@ export async function handleAction(input: SecretAction) {
     );
   }
   const params = preflight.input as SecretAction['params'];
+
+  if (platform === 'linux' && getRegisteredEnvBool('KYBERION_ALLOW_FILE_SECRETS') !== true) {
+    return {
+      status: 'failed',
+      error:
+        'Linux secret-actuator uses an opt-in file backend (vault/secrets/file-secrets.json, chmod 0600). Set KYBERION_ALLOW_FILE_SECRETS=1. Native keychain remains darwin/win32 only.',
+      platform: 'linux',
+      backend: 'unsupported_until_opt_in',
+    };
+  }
 
   switch (input.action) {
     case 'get':
