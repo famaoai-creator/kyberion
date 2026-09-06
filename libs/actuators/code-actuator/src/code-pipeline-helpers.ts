@@ -4,6 +4,7 @@ import {
   getRegisteredEnv,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
+  readJson,
 } from '@agent/core/foundation';
 import type { AdfEngineContext } from '@agent/core/adf-engine';
 import { logger } from '@agent/core/core';
@@ -68,7 +69,7 @@ function readCodeJson(filePath: string, label: string): unknown {
   if (!isExistingRegularFile(filePath)) {
     throw new Error(`${label} must be an existing regular file: ${filePath}`);
   }
-  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
+  return readJson(filePath);
 }
 
 export const buildRetryOptions = createGovernedRetryOptionsBuilder({
