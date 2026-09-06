@@ -83,6 +83,15 @@ import {
 } from '@agent/core/email-workflow';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 
+function safeParsePresenceStudioRequestBody(body: unknown, label: string): unknown {
+  if (body === undefined) return undefined;
+  try {
+    return parseSafeJsonObjectValue(body, label);
+  } catch {
+    return null;
+  }
+}
+
 presenceStudioData.app.get('/api/ui-vocabulary', (req, res) => {
   const locale = normalizeLocale(req.query.locale) ?? 'en';
   const texts = Object.fromEntries(
@@ -396,7 +405,9 @@ presenceStudioData.app.get('/api/os/control-plane', (req, res) => {
 
 presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
   const actionId = String(req.params.actionId || '').trim();
-  const parsed = presenceStudioApprovalDecisionSchema.safeParse(req.body);
+  const parsed = presenceStudioApprovalDecisionSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'held action decision body')
+  );
   if (!actionId || !parsed.success) {
     return res.status(400).json({
       ok: false,
@@ -496,7 +507,9 @@ presenceStudioData.app.get('/api/approvals', (_req, res) => {
 
 presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => {
   const requestId = String(req.params.requestId || '').trim();
-  const parsed = presenceStudioApprovalDecisionSchema.safeParse(req.body);
+  const parsed = presenceStudioApprovalDecisionSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'approval decision body')
+  );
   if (!requestId) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'approvals/decision.reject', {
@@ -690,7 +703,9 @@ presenceStudioData.app.get('/api/task-sessions/:sessionId/artifact', (req, res) 
 });
 
 presenceStudioData.app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
-  const parsed = presenceStudioBrowserBootstrapSchema.safeParse(req.body);
+  const parsed = presenceStudioBrowserBootstrapSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'browser bootstrap body')
+  );
   if (!parsed.success) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'browser-bootstrap.reject', {
@@ -740,14 +755,9 @@ presenceStudioData.app.post('/api/browser-conversation-sessions/bootstrap', (req
       sessionId: `BCS-presence-${browserSessionId}`,
       surface: 'presence',
       goal: {
-        summary:
-          typeof req.body?.goal_summary === 'string'
-            ? req.body.goal_summary
-            : activeTab?.title || browserSessionId,
+        summary: parsed.data.goal_summary || activeTab?.title || browserSessionId,
         success_condition:
-          typeof req.body?.success_condition === 'string'
-            ? req.body.success_condition
-            : 'Complete the requested browser step safely.',
+          parsed.data.success_condition || 'Complete the requested browser step safely.',
       },
       target: {
         app: 'browser',
@@ -842,7 +852,9 @@ presenceStudioData.app.post('/a2ui/dispatch', (req, res) => {
 });
 
 presenceStudioData.app.post('/api/voice/stimuli', (req, res) => {
-  const parsed = presenceStudioVoiceStimulusSchema.safeParse(req.body);
+  const parsed = presenceStudioVoiceStimulusSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'voice stimulus body')
+  );
   if (!parsed.success) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'voice/stimuli.reject', {
@@ -884,7 +896,9 @@ presenceStudioData.app.post('/api/voice/stimuli', (req, res) => {
 });
 
 presenceStudioData.app.post('/api/voice/ingest', async (req, res) => {
-  const parsed = presenceStudioVoiceIngestSchema.safeParse(req.body);
+  const parsed = presenceStudioVoiceIngestSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'voice ingest body')
+  );
   if (!parsed.success) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'voice/ingest.reject', {
@@ -938,7 +952,9 @@ presenceStudioData.app.post('/api/voice/ingest', async (req, res) => {
 });
 
 presenceStudioData.app.post('/api/voice/minutes', async (req, res) => {
-  const parsed = presenceStudioVoiceMinutesSchema.safeParse(req.body);
+  const parsed = presenceStudioVoiceMinutesSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'voice minutes body')
+  );
   if (!parsed.success) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'voice/minutes.reject', {
@@ -1078,7 +1094,9 @@ presenceStudioData.app.post('/api/voice/minutes', async (req, res) => {
 });
 
 presenceStudioData.app.post('/api/email-draft', async (req, res) => {
-  const parsed = presenceStudioEmailDraftSchema.safeParse(req.body);
+  const parsed = presenceStudioEmailDraftSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'email draft body')
+  );
   if (!parsed.success) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'email-draft.reject', {
@@ -1155,7 +1173,9 @@ presenceStudioData.app.post('/api/email-draft', async (req, res) => {
 });
 
 presenceStudioData.app.post('/api/email-deliver', async (req, res) => {
-  const parsed = presenceStudioEmailDeliverSchema.safeParse(req.body);
+  const parsed = presenceStudioEmailDeliverSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'email deliver body')
+  );
   if (!parsed.success) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'email-deliver.reject', {
@@ -1228,7 +1248,9 @@ presenceStudioData.app.post('/api/email-deliver', async (req, res) => {
 });
 
 presenceStudioData.app.post('/api/voice/native-listen', async (req, res) => {
-  const parsed = presenceStudioVoiceNativeListenSchema.safeParse(req.body);
+  const parsed = presenceStudioVoiceNativeListenSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'voice native listen body')
+  );
   if (!parsed.success) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'voice/native-listen.reject', {
@@ -1312,7 +1334,9 @@ presenceStudioData.app.get('/api/voice/selection', (_req, res) => {
 });
 
 presenceStudioData.app.post('/api/voice/selection', (req, res) => {
-  const parsed = presenceStudioVoiceSelectionSchema.safeParse(req.body);
+  const parsed = presenceStudioVoiceSelectionSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'voice selection body')
+  );
   if (!parsed.success) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'voice/selection.reject', {
@@ -1400,7 +1424,9 @@ presenceStudioData.app.get('/api/context/location', (_req, res) => {
 });
 
 presenceStudioData.app.post('/api/context/location', (req, res) => {
-  const parsed = presenceStudioLocationSchema.safeParse(req.body);
+  const parsed = presenceStudioLocationSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'location body')
+  );
   if (!parsed.success) {
     logger.warn(
       presenceStudioData.presenceStudioAuditLine(req, 'context/location.reject', {
@@ -1431,7 +1457,9 @@ presenceStudioData.app.post('/api/context/location', (req, res) => {
 });
 
 presenceStudioData.app.post('/api/voice/stop-speaking', async (req, res) => {
-  const parsed = presenceStudioVoiceStopSchema.safeParse(req.body);
+  const parsed = presenceStudioVoiceStopSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'voice stop body')
+  );
   if (!parsed.success) {
     return res
       .status(400)
@@ -1449,7 +1477,9 @@ presenceStudioData.app.post('/api/voice/stop-speaking', async (req, res) => {
 });
 
 presenceStudioData.app.post('/api/demo/frame', (req, res) => {
-  const parsed = presenceStudioDemoFrameSchema.safeParse(req.body);
+  const parsed = presenceStudioDemoFrameSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'demo frame body')
+  );
   if (!parsed.success) {
     return res
       .status(400)
