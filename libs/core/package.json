@@ -43,6 +43,10 @@
       "types": "./dist/feedback-loop.d.ts",
       "default": "./dist/feedback-loop.js"
     },
+    "./stimuli-journal": {
+      "types": "./dist/stimuli-journal.d.ts",
+      "default": "./dist/stimuli-journal.js"
+    },
     "./trace": {
       "types": "./dist/trace.d.ts",
       "default": "./dist/trace.js"
