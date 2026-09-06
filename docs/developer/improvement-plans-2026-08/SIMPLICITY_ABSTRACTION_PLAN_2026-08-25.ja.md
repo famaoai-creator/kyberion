@@ -23945,3 +23945,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: baseline audit freshness probe の JSONL reader、SX-01／SX-03／SX-07
 - **変更**: baselineの監査台帳freshness計算で行っていた手書き行分割・safe JSON parseを foundation `readJsonLines`へ統一した。malformed行skip、最新timestampの逆順探索、missing／stale／fresh判定、監査verifyとの責務分離は維持した。
 - **検証**: run-baseline-check **1 file／30 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1791
+
+- **対象**: presence controller の read-only perception JSONL loader、SX-03／SX-08／SX-09
+- **変更**: regular-file確認済みのpending／injected stimulus projectionを foundation `readJsonLines`へ統一した。malformed／invalid stimulus skip、channel priority／timestamp ordering、response解決とprune時の原文保持 semanticsは維持した。原文を再出力するresolve／prune pathは専用処理として残した。
+- **検証**: presence-controller **2 files／12 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
