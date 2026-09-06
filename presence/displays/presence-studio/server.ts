@@ -507,7 +507,7 @@ presenceStudioData.app.get('/api/approvals', (_req, res) => {
 });
 
 presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => {
-  const requestId = String(req.params.requestId || '').trim();
+  const requestId = readPresenceStudioRouteParam(req.params.requestId);
   const parsed = presenceStudioApprovalDecisionSchema.safeParse(
     safeParsePresenceStudioRequestBody(req.body, 'approval decision body')
   );
@@ -629,7 +629,7 @@ presenceStudioData.app.get('/api/runtime-ref', (req, res) => {
 });
 
 presenceStudioData.app.get('/api/artifacts/:artifactId', (req, res) => {
-  const artifactId = String(req.params.artifactId || '').trim();
+  const artifactId = readPresenceStudioRouteParam(req.params.artifactId);
   const artifact = listArtifactRecords().find((item) => item.artifact_id === artifactId) as
     presenceStudioData.ArtifactRecordShape | undefined;
   if (!artifact) {
@@ -671,7 +671,7 @@ presenceStudioData.app.get('/api/task-sessions', (_req, res) => {
 });
 
 presenceStudioData.app.get('/api/task-sessions/:sessionId', (req, res) => {
-  const sessionId = String(req.params.sessionId || '').trim();
+  const sessionId = readPresenceStudioRouteParam(req.params.sessionId);
   const session = presenceStudioData.findTaskSession(sessionId);
   if (!session) {
     return res.status(404).json({ ok: false, error: `task session not found: ${sessionId}` });
@@ -680,7 +680,7 @@ presenceStudioData.app.get('/api/task-sessions/:sessionId', (req, res) => {
 });
 
 presenceStudioData.app.get('/api/task-sessions/:sessionId/artifact', (req, res) => {
-  const sessionId = String(req.params.sessionId || '').trim();
+  const sessionId = readPresenceStudioRouteParam(req.params.sessionId);
   const session = presenceStudioData.findTaskSession(sessionId);
   if (!session) {
     return res.status(404).json({ ok: false, error: `task session not found: ${sessionId}` });
