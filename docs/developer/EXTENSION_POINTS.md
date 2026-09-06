@@ -281,8 +281,9 @@ When intentional, run `pnpm check:contract-semver -- --rebaseline` to update the
 
 The stable extension point for meeting participation is the actuator / CLI contract, not the browser automation internals:
 
-- Use `meeting-actuator` ops and `pnpm meeting:participate` for integration.
+- Use `meeting-actuator` ops and `pnpm meeting:participate` for integration. The **daily path is browser-playwright**.
 - Treat `libs/actuators/meeting-browser-driver/` as internal; wrap it only through the meeting actuator or the participation CLI.
+- `zoom-sdk` and `recall-ai` are **unimplemented seams** (P2-4 docs-only / deferred product). Do not implement or call them.
 - Keep `voice-consent.json` mission-scoped. The coordinator checks it before recording/capture and re-checks before TTS speech.
 - Use `pnpm doctor -- --runtime meeting --mission <MISSION_ID>` and `pnpm test -- --suite meeting-dry-run` before claiming meeting runtime readiness.
 

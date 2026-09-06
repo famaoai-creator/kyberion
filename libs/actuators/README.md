@@ -21,9 +21,14 @@ The operator catalog is generated from `libs/actuators/*/manifest.json`. **Do no
 - Discovery without `dist/`: `pnpm capabilities` or `pnpm kyberion list`
 - Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`
 - Runtime execution (`pnpm pipeline`, `pnpm kyberion run`) still needs `pnpm build`
+- Actuator `--dry-run`: capture still runs; apply validates only
+- Linux secrets: set `KYBERION_ALLOW_FILE_SECRETS=1` (file vault `chmod 0600`); darwin/win32 keychain unchanged
 
 For Slack (conversation vs presence vs API) see [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../../docs/SLACK_CHANNEL_ROUTES.ja.md).  
-For email inbox vs send see [`docs/EMAIL_OPERATOR.ja.md`](../../docs/EMAIL_OPERATOR.ja.md).
+Presence satellite forward: `telegram:<id>` / `discord:<id>` / `imessage:<id>` on `presence:dispatch`.  
+For email inbox vs send see [`docs/EMAIL_OPERATOR.ja.md`](../../docs/EMAIL_OPERATOR.ja.md).  
+Cloud Agent Node/build: [`docs/developer/CLOUD_AGENT_ENVIRONMENT.md`](../../docs/developer/CLOUD_AGENT_ENVIRONMENT.md).  
+Meeting: daily path is browser-playwright; `zoom-sdk` / `recall-ai` remain unimplemented seams.
 
 ## 4. Implementation Status & Capabilities
 

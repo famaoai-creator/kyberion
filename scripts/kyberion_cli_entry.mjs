@@ -30,9 +30,16 @@ if (existsSync(DIST_CLI)) {
     command === 'list' ? args.slice(1) : args.filter((arg) => !discoveryCommands.has(arg));
   run(['scripts/capability_discovery_entry.mjs', ...forwarded]);
 } else {
+  const nodeMajor = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10);
+  const nodeHint =
+    nodeMajor < 24
+      ? `This process is Node ${process.versions.node}; package.json engines require Node >=24. Use nvm install 24 && nvm use 24, then rebuild.`
+      : `Node ${process.versions.node} meets engines (>=24).`;
   console.error(
     [
       `Kyberion CLI execution needs a build (missing ${DIST_CLI}).`,
+      nodeHint,
+      'Cloud Agent / fresh VM: see docs/developer/CLOUD_AGENT_ENVIRONMENT.md',
       'Discovery without build: pnpm capabilities',
       '  or: pnpm kyberion list',
       'Execution: pnpm build && pnpm kyberion <command>',

@@ -2,7 +2,7 @@
 title: アクチュエータ日常運用ギャップ報告
 tags: [actuators, daily-ops, gap-analysis, operator-ux]
 last_updated: 2026-09-06
-status: p1-implemented
+status: p2-implemented
 ---
 
 # アクチュエータ日常運用ギャップ報告
@@ -36,7 +36,7 @@ status: p1-implemented
 | P0-3 | **done** | `pnpm capabilities` / `pnpm kyberion list` は `scripts/capability_discovery_entry.mjs` のマニフェスト走査(Node 22 でも可)。仮説「ts-loader だけで足りる」は破棄 — Node 22 に `registerHooks` が無く、`@agent/core` は dist export。実行系は引き続き `dist/` 必須。Doctor は `pnpm run doctor`(bare `pnpm doctor` は pnpm 組み込み) |
 | P0-4 | **done** | [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../SLACK_CHANNEL_ROUTES.ja.md)。`docs/SURFACES.md` / `CAPABILITIES_GUIDE.md` / `libs/actuators/README.md` からリンク                                                                                                                                                                           |
 
-残り(P2+): Linux secret、アクチュエータ級 dry-run の拡張、presence multi-channel。P1 は下表。
+P0–P2 は実装済み(§7)。P2-4 は docs-only / deferred product。
 
 ---
 
@@ -84,40 +84,40 @@ status: p1-implemented
 
 ### 2.1 一覧(マニフェスト public ops)
 
-| Actuator                     | Ver   | 目的                                | Public ops                                                                     | 契約スキーマ                              | 主な起動面                                                                                       |
-| ---------------------------- | ----- | ----------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `agent-actuator`             | 1.1.0 | エージェント寿命 / A2A              | `spawn, ask, delegate, list, health, a2a, team_plan`                           | `agent-action.schema.json`                | mission / pipeline                                                                               |
-| `android-actuator`           | 1.1.0 | ADB + Android CLI                   | `pipeline`                                                                     | `mobile-device-pipeline.schema.json`      | pipeline / examples                                                                              |
-| `approval-actuator`          | 1.1.0 | 人の承認状態機械                    | `create, load, decide, list_pending, evaluate_decision_rights, request_review` | `approval-action.schema.json`             | CLI `approvals` / MCP / pipeline                                                                 |
-| `artifact-actuator`          | 1.0.0 | 成果物・delivery pack               | `write_json, read_json, append_event, write_delivery_pack`                     | `artifact-action.schema.json`             | pipeline                                                                                         |
-| `blockchain-actuator`        | 1.1.0 | ローカル台帳アンカー(**simulated**) | `anchor_mission, anchor_trust, verify_anchor`                                  | `blockchain-action.schema.json`           | pipeline。`verify_anchor` は未実装注記あり                                                       |
-| `browser-actuator`           | 1.1.0 | Playwright RPA / セッション証跡     | `pipeline, computer_interaction`                                               | `browser-automation-pipeline.schema.json` | pipeline / examples。内部 ~56 step ops                                                           |
-| `build-actuator`             | 1.0.0 | iOS/Android ビルド                  | `scaffold_app, ios_*, android_*`                                               | `build-pipeline.schema.json`              | CLI / pipeline。Xcode / `ANDROID_HOME`                                                           |
-| `calendar-actuator`          | 1.2.0 | Calendar.app JXA + GWS              | `list_calendars, list_events, query_freebusy, create_event`                    | `calendar-action.schema.json`             | `pnpm kyberion calendar` / pipeline                                                              |
-| `code-actuator`              | 2.2.0 | コード解析 / Semgrep                | `pipeline, semgrep_scan, reconcile, impact_analysis`                           | `code-pipeline.schema.json`               | pipeline。`bin:semgrep`                                                                          |
-| `deployment-actuator`        | 1.0.0 | 配備境界                            | `deploy_release`                                                               | `deployment-action.schema.json`           | pipeline。承認ゲート                                                                             |
-| `email-actuator`             | 1.2.0 | 下書き/送信(Mail.app / SMTP)        | `create_draft, send, send_from_file`                                           | アクチュエータ内 schema                   | `pnpm kyberion email` / `email:workflow`。**受信なし**。`create_draft` は darwin                 |
-| `file-actuator`              | 1.1.0 | ガバナンス下ファイル I/O            | `pipeline`                                                                     | `file-pipeline.schema.json`               | pipeline。内部 21 ops(`read/write/search/…`)                                                     |
-| `ingest-actuator`            | 1.2.0 | 文書 → knowledge card               | `sync_source, parse_document, normalize_card, dedup, staleness_report, commit` | **manifest に未宣言**                     | `pnpm ingest` / pipeline                                                                         |
-| `ios-actuator`               | 1.1.0 | iOS Simulator                       | `pipeline`                                                                     | `mobile-device-pipeline.schema.json`      | **darwin only**                                                                                  |
-| `media-actuator`             | 1.2.0 | PPTX/DOCX/XLSX / digest             | `pipeline`                                                                     | `media-pipeline.schema.json`              | pipeline / examples                                                                              |
-| `media-generation-actuator`  | 1.2.0 | 生成 + 画面キャプチャ               | `generate_*, capture_*, record_screen, pipeline, …`(12)                        | `media-generation-action.schema.json`     | pipeline / generation schedule                                                                   |
-| `meeting-actuator`           | 1.2.0 | Meet/Zoom/Teams 抽象                | `join, leave, speak, listen, chat, status`                                     | `meeting-action.schema.json`              | `pnpm meeting:participate` / `meeting:run`                                                       |
-| `meeting-browser-driver`     | 1.0.0 | Playwright join ドライバ            | `join, leave`                                                                  | **未宣言**                                | meeting-actuator 内部。将来シーム: `zoom-sdk`, `recall-ai`([`docs/SURFACES.md`](../SURFACES.md)) |
-| `modeling-actuator`          | 1.0.0 | アーキテクチャ ADF                  | `pipeline, reconcile`                                                          | `modeling-pipeline.schema.json`           | pipeline                                                                                         |
-| `network-actuator`           | 2.2.0 | 安全 fetch / A2A                    | `pipeline`                                                                     | `network-pipeline.schema.json`            | pipeline                                                                                         |
-| `orchestrator-actuator`      | 1.0.0 | ミッション分解/実行計画             | `pipeline, reconcile`                                                          | `orchestrator-pipeline.schema.json`       | mission / pipeline                                                                               |
-| `presence-actuator`          | 1.0.0 | 人への配信                          | `dispatch, receive_event, dispatch_timeline`                                   | `presence-action.schema.json`             | pipeline。外部は **Slack のみ** + log fallback                                                   |
-| `process-actuator`           | 1.0.0 | プロセス寿命                        | `spawn, stop, list, status`                                                    | `process-action.schema.json`              | supervisor                                                                                       |
-| `secret-actuator`            | 1.1.0 | OS 秘密管理                         | `get, set, delete, list`                                                       | `secret-action.schema.json`               | pipeline。**linux なし**                                                                         |
-| `service-actuator`           | 1.3.0 | SaaS/API/MCP 到達                   | `pipeline, api, cli, preset, mcp, reconcile, oauth`                            | `service-action.schema.json`              | pipeline / MCP `service.actuate`                                                                 |
-| `system-actuator`            | 1.6.0 | OS 診断 / 入力 / baseline           | 26 public ops。内部 ~78                                                        | `system-pipeline.schema.json`             | `baseline-check` / doctor / pipeline                                                             |
-| `terminal-actuator`          | 1.0.0 | PTY                                 | `spawn, poll, write, kill, computer_interaction`                               | `terminal-action.schema.json`             | computer-surface / pipeline                                                                      |
-| `video-composition-actuator` | 1.1.0 | ナレーション動画束                  | 9 ops                                                                          | **未宣言**                                | pipeline                                                                                         |
-| `vision-actuator`            | 1.4.0 | 画像理解 facade                     | `inspect_image, ocr_image, describe_image`                                     | `vision-action.schema.json`               | pipeline。生成/キャプチャは media-generation へ                                                  |
-| `voice-actuator`             | 1.6.0 | ローカル TTS/録音                   | 12 ops                                                                         | `voice-action.schema.json`                | presence-studio / `voice:*` CLI                                                                  |
-| `wisdom-actuator`            | 1.6.0 | 知識・判断・互換 forwarder          | 81 ops                                                                         | `wisdom-action.schema.json`               | pipeline。新規は owner actuator を使え(CAPABILITIES_GUIDE 注記)                                  |
-| `working-memory-actuator`    | 1.2.0 | MEMORY/NOW/journal/TODO             | 15 ops                                                                         | `working-memory-action.schema.json`       | `pipelines/daily-routine.json`                                                                   |
+| Actuator                     | Ver   | 目的                                | Public ops                                                                     | 契約スキーマ                              | 主な起動面                                                                                        |
+| ---------------------------- | ----- | ----------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `agent-actuator`             | 1.1.0 | エージェント寿命 / A2A              | `spawn, ask, delegate, list, health, a2a, team_plan`                           | `agent-action.schema.json`                | mission / pipeline                                                                                |
+| `android-actuator`           | 1.1.0 | ADB + Android CLI                   | `pipeline`                                                                     | `mobile-device-pipeline.schema.json`      | pipeline / examples                                                                               |
+| `approval-actuator`          | 1.1.0 | 人の承認状態機械                    | `create, load, decide, list_pending, evaluate_decision_rights, request_review` | `approval-action.schema.json`             | CLI `approvals` / MCP / pipeline                                                                  |
+| `artifact-actuator`          | 1.0.0 | 成果物・delivery pack               | `write_json, read_json, append_event, write_delivery_pack`                     | `artifact-action.schema.json`             | pipeline                                                                                          |
+| `blockchain-actuator`        | 1.1.0 | ローカル台帳アンカー(**simulated**) | `anchor_mission, anchor_trust, verify_anchor`                                  | `blockchain-action.schema.json`           | pipeline。`verify_anchor` は未実装注記あり                                                        |
+| `browser-actuator`           | 1.1.0 | Playwright RPA / セッション証跡     | `pipeline, computer_interaction`                                               | `browser-automation-pipeline.schema.json` | pipeline / examples。内部 ~56 step ops                                                            |
+| `build-actuator`             | 1.0.0 | iOS/Android ビルド                  | `scaffold_app, ios_*, android_*`                                               | `build-pipeline.schema.json`              | CLI / pipeline。Xcode / `ANDROID_HOME`                                                            |
+| `calendar-actuator`          | 1.2.0 | Calendar.app JXA + GWS              | `list_calendars, list_events, query_freebusy, create_event`                    | `calendar-action.schema.json`             | `pnpm kyberion calendar` / pipeline                                                               |
+| `code-actuator`              | 2.2.0 | コード解析 / Semgrep                | `pipeline, semgrep_scan, reconcile, impact_analysis`                           | `code-pipeline.schema.json`               | pipeline。`bin:semgrep`                                                                           |
+| `deployment-actuator`        | 1.0.0 | 配備境界                            | `deploy_release`                                                               | `deployment-action.schema.json`           | pipeline。承認ゲート                                                                              |
+| `email-actuator`             | 1.2.0 | 下書き/送信(Mail.app / SMTP)        | `create_draft, send, send_from_file`                                           | アクチュエータ内 schema                   | `pnpm kyberion email` / `email:workflow`。**受信なし**。`create_draft` は darwin                  |
+| `file-actuator`              | 1.1.0 | ガバナンス下ファイル I/O            | `pipeline`                                                                     | `file-pipeline.schema.json`               | pipeline。内部 21 ops(`read/write/search/…`)                                                      |
+| `ingest-actuator`            | 1.2.0 | 文書 → knowledge card               | `sync_source, parse_document, normalize_card, dedup, staleness_report, commit` | **manifest に未宣言**                     | `pnpm ingest` / pipeline                                                                          |
+| `ios-actuator`               | 1.1.0 | iOS Simulator                       | `pipeline`                                                                     | `mobile-device-pipeline.schema.json`      | **darwin only**                                                                                   |
+| `media-actuator`             | 1.2.0 | PPTX/DOCX/XLSX / digest             | `pipeline`                                                                     | `media-pipeline.schema.json`              | pipeline / examples                                                                               |
+| `media-generation-actuator`  | 1.2.0 | 生成 + 画面キャプチャ               | `generate_*, capture_*, record_screen, pipeline, …`(12)                        | `media-generation-action.schema.json`     | pipeline / generation schedule                                                                    |
+| `meeting-actuator`           | 1.2.0 | Meet/Zoom/Teams 抽象                | `join, leave, speak, listen, chat, status`                                     | `meeting-action.schema.json`              | `pnpm meeting:participate` / `meeting:run`                                                        |
+| `meeting-browser-driver`     | 1.0.0 | Playwright join ドライバ            | `join, leave`                                                                  | **未宣言**                                | meeting-actuator 内部。将来シーム: `zoom-sdk`, `recall-ai`([`docs/SURFACES.md`](../SURFACES.md))  |
+| `modeling-actuator`          | 1.0.0 | アーキテクチャ ADF                  | `pipeline, reconcile`                                                          | `modeling-pipeline.schema.json`           | pipeline                                                                                          |
+| `network-actuator`           | 2.2.0 | 安全 fetch / A2A                    | `pipeline`                                                                     | `network-pipeline.schema.json`            | pipeline                                                                                          |
+| `orchestrator-actuator`      | 1.0.0 | ミッション分解/実行計画             | `pipeline, reconcile`                                                          | `orchestrator-pipeline.schema.json`       | mission / pipeline                                                                                |
+| `presence-actuator`          | 1.0.0 | 人への配信                          | `dispatch, receive_event, dispatch_timeline`                                   | `presence-action.schema.json`             | pipeline。既定は Slack + log fallback。`telegram:` / `discord:` / `imessage:` は satellite outbox |
+| `process-actuator`           | 1.0.0 | プロセス寿命                        | `spawn, stop, list, status`                                                    | `process-action.schema.json`              | supervisor                                                                                        |
+| `secret-actuator`            | 1.1.0 | OS 秘密管理                         | `get, set, delete, list`                                                       | `secret-action.schema.json`               | pipeline。linux は opt-in file vault(`KYBERION_ALLOW_FILE_SECRETS`)。未 opt-in は capabilities 赤 |
+| `service-actuator`           | 1.3.0 | SaaS/API/MCP 到達                   | `pipeline, api, cli, preset, mcp, reconcile, oauth`                            | `service-action.schema.json`              | pipeline / MCP `service.actuate`                                                                  |
+| `system-actuator`            | 1.6.0 | OS 診断 / 入力 / baseline           | 26 public ops。内部 ~78                                                        | `system-pipeline.schema.json`             | `baseline-check` / doctor / pipeline                                                              |
+| `terminal-actuator`          | 1.0.0 | PTY                                 | `spawn, poll, write, kill, computer_interaction`                               | `terminal-action.schema.json`             | computer-surface / pipeline                                                                       |
+| `video-composition-actuator` | 1.1.0 | ナレーション動画束                  | 9 ops                                                                          | **未宣言**                                | pipeline                                                                                          |
+| `vision-actuator`            | 1.4.0 | 画像理解 facade                     | `inspect_image, ocr_image, describe_image`                                     | `vision-action.schema.json`               | pipeline。生成/キャプチャは media-generation へ                                                   |
+| `voice-actuator`             | 1.6.0 | ローカル TTS/録音                   | 12 ops                                                                         | `voice-action.schema.json`                | presence-studio / `voice:*` CLI                                                                   |
+| `wisdom-actuator`            | 1.6.0 | 知識・判断・互換 forwarder          | 81 ops                                                                         | `wisdom-action.schema.json`               | pipeline。新規は owner actuator を使え(CAPABILITIES_GUIDE 注記)                                   |
+| `working-memory-actuator`    | 1.2.0 | MEMORY/NOW/journal/TODO             | 15 ops                                                                         | `working-memory-action.schema.json`       | `pipelines/daily-routine.json`                                                                    |
 
 発明していない。上記はツリー上の 32 のみ。
 
@@ -393,7 +393,7 @@ pnpm kyberion run browser-actuator -- --input libs/actuators/browser-actuator/ex
 
 ## 7. Brush-up 推奨(優先度つき)
 
-P0 と P1 は実装済み(上表および下表)。P2 は形だけ残す。
+P0 / P1 / P2 は実装済み(上表および下表)。P2-4 は docs-only / deferred product。
 
 ### P1 実装状況(2026-09-06)
 
@@ -429,6 +429,16 @@ P0 と P1 は実装済み(上表および下表)。P2 は形だけ残す。
 | P1-6 | アクチュエータ README の世代更新           | `libs/actuators/README.md` の Core Nine は 32 基と矛盾                                                                                                                                                                | 生成するか CAPABILITIES_GUIDE へリダイレクト                                                            |
 | P1-7 | `pnpm doctor` の名前衝突                   | 本調査で pnpm 組み込み doctor が実行された                                                                                                                                                                            | script を `kyberion:doctor` にするか、文書で `pnpm run doctor` を強制                                   |
 
+### P2 実装状況(2026-09-06)
+
+| ID   | 状態         | 入れたもの                                                                                                                                                                                                                                                                                                                                   |
+| ---- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P2-1 | **done**     | libsecret 仮説は破棄。家のパターンは `FileSecretProvider`(`vault/secrets/file-secrets.json`, dir 0700 / file 0600)。Linux は `KYBERION_ALLOW_FILE_SECRETS=1` の opt-in のみ。未設定時は capabilities が赤(`[Missing env: …]` + `[OS Mismatch]` ではない)。darwin/win32 keychain は非デフォルトのまま。warn-phase の黙黙 file fallback を廃止 |
+| P2-2 | **done**     | `planActuatorDryRun` / `resolveCliActionKind`。capture は常に handler 実行。apply/transform/control の `--dry-run` は契約検証のみ。`createStandardYargs`・`runActuatorCli`・playground・`kyberion run` の転送 args に配線                                                                                                                    |
+| P2-3 | **done**     | 新アクチュエータなし。`presence:dispatch` の `telegram:` / `discord:` / `imessage:` prefix を `enqueueSurfaceOutboxMessage` へ。Slack 既定は不変。経路は `docs/SLACK_CHANNEL_ROUTES.ja.md`                                                                                                                                                   |
+| P2-4 | **deferred** | docs-only / deferred product。`zoom-sdk` / `recall-ai` は実装しない。SURFACES / CAPABILITIES / EXTENSION_POINTS / meeting-facilitator で日常パス=browser-playwright、シーム=未実装と明記                                                                                                                                                     |
+| P2-5 | **done**     | 製品 runtime は未変更(`engines` 維持)。[`CLOUD_AGENT_ENVIRONMENT.md`](./CLOUD_AGENT_ENVIRONMENT.md) + CLI の missing-`dist/` エラーに Node `>=24` / `pnpm build` を明示。この環境の `environment.json` は触れない                                                                                                                            |
+
 ### P2 — 環境と周辺
 
 | ID   | 推奨                                       | なぜ                                            | 形                                                                        |
@@ -448,9 +458,9 @@ P0 と P1 は実装済み(上表および下表)。P2 は形だけ残す。
 - マニフェスト backed アクチュエータは 32。欠落ディレクトリなし
 - GitHub REST preset は 10 op。list/get issue・list/get PR・review はファイル内に存在しない
 - MCP `pipeline_run_allowlist` は 8 本。日常 pipeline は含まれない
-- `secret-actuator` platforms に linux が無い
+- `secret-actuator` は linux を宣言するが `KYBERION_ALLOW_FILE_SECRETS` 未設定なら capabilities 赤(opt-in file vault)
 - `email-actuator` に受信 op が無い
-- `presence-actuator` の外部メッセージは Slack(なければ log)
+- `presence-actuator` の既定外部メッセージは Slack(なければ log)。satellite は channel prefix で outbox 転送
 - この VM で `pnpm capabilities` / `pnpm pipeline` は `dist` 不足で失敗
 - `pnpm doctor` は pnpm 組み込みにシャドウされた
 

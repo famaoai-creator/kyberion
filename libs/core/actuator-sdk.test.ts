@@ -3,6 +3,8 @@ import {
   defineActuator,
   defineCatalogBackedActuator,
   defineLegacyPipelineActuator,
+  planActuatorDryRun,
+  resolveCliActionKind,
   runAdfActuatorPipeline,
   runActuatorPipeline,
   runActuatorStepSequence,
@@ -43,6 +45,71 @@ describe('actuator SDK', () => {
       ok: false,
       status: 'failed',
       error: expect.stringContaining('[UNKNOWN_OP]'),
+    });
+  });
+
+  it('plans capture as always-execute and apply dry-run as validate-only', () => {
+    expect(planActuatorDryRun({ kind: 'capture' })).toEqual({
+      skipHandler: false,
+      mode: 'capture',
+    });
+    expect(planActuatorDryRun({ kind: 'capture', dryRun: true })).toEqual({
+      skipHandler: false,
+      mode: 'capture',
+    });
+    expect(planActuatorDryRun({ kind: 'apply', dryRun: true })).toEqual({
+      skipHandler: true,
+      mode: 'validate-only',
+    });
+    expect(planActuatorDryRun({ kind: 'transform', dryRun: true })).toEqual({
+      skipHandler: true,
+      mode: 'validate-only',
+    });
+    expect(planActuatorDryRun({ kind: 'apply' })).toEqual({
+      skipHandler: false,
+      mode: 'execute',
+    });
+    expect(resolveCliActionKind({ action: 'get' })).toBe('capture');
+    expect(resolveCliActionKind({ action: 'set' })).toBe('apply');
+    expect(resolveCliActionKind({ op: 'secret:list' })).toBe('capture');
+  });
+
+  it('skips apply handlers on dry-run after validating input', async () => {
+    const handler = vi.fn(() => 'mutated');
+    const actuator = defineActuator({
+      id: 'dry-run-demo',
+      ops: {
+        write: {
+          kind: 'apply',
+          validateInput: (value: unknown) => {
+            if (!value || typeof value !== 'object' || !('name' in value)) {
+              throw new Error('name is required');
+            }
+            return value;
+          },
+          handler,
+        },
+        peek: {
+          kind: 'capture',
+          handler: () => 'peeked',
+        },
+      },
+    });
+
+    await expect(actuator.dispatch('write', {}, { dryRun: true })).resolves.toMatchObject({
+      ok: false,
+      error: 'name is required',
+    });
+    await expect(
+      actuator.dispatch('write', { name: 'ok' }, { dryRun: true })
+    ).resolves.toMatchObject({
+      ok: true,
+      output: { dry_run: true, mode: 'validate-only', kind: 'apply', validated: true },
+    });
+    expect(handler).not.toHaveBeenCalled();
+    await expect(actuator.dispatch('peek', {}, { dryRun: true })).resolves.toMatchObject({
+      ok: true,
+      output: 'peeked',
     });
   });
 
