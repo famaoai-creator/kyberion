@@ -183,6 +183,7 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
   const runtimeContext = {
     ...(packet.selected_parameters || {}),
     ...(context as Record<string, unknown>),
+    resolution_packet: packet,
     // Preserve the utterance for intent-specific parameter extraction after
     // the canonical resolver has selected an intent ID.
     source_text: intent,

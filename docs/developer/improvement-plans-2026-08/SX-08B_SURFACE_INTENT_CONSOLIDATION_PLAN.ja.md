@@ -388,6 +388,18 @@ free-text resolver 全体の単一化、残り surface の contract projection�
 voice surface の他の runtime switching（TTS artifact／provider 実機確認）、細粒度 command registry と package scripts
 の削減は継続課題である。
 
+## 2026-09-06 再レビュー修正 249
+
+自由文入口を再監査し、CLIの productivity task、browser conversation、Super-Nerve service selection が
+同じ自由文を受け取った後に `IntentResolutionPacket` を再生成できる残存を修正した。各APIに既存packetを
+受け取る境界を追加し、CLIからtask plan／task session／実行contextへ同じpacketを渡すようにした。
+Super-Nerveはpacketが実行contextにあればservice parameterを再解釈せず、単体呼び出し時だけ従来の
+canonical resolverへフォールバックする。tenant／tier、approval、実行順序は変更していない。
+
+検証: productivity plan／browser conversation／Super-Nerve／CLI entrypoint **4 files／35 tests passed**、
+root typecheck、Prettier、`git diff --check`。残る全surfaceの契約投影、approval本番相当テスト、provider実機依存、
+framework-specific request parsing、package scriptsの削減は継続課題である。
+
 ## 2026-08-30 実装レビュー追記 27
 
 CLI command registry を再監査し、実装側には email／calendar／task／schedule／project-trust の subcommand がある一方、

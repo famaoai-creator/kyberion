@@ -10,6 +10,7 @@ describe('intent gateway entrypoint', () => {
     );
 
     expect(source).toContain('resolveIntentResolutionPacket');
+    expect(source).toContain('resolution_packet: packet');
     expect(source).toContain('print(result)');
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('logger.info(');

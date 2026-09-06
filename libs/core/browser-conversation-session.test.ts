@@ -20,6 +20,7 @@ import {
 } from './browser-conversation-session.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile, safeRmSync, safeWriteFile, safeMkdir } from './secure-io.js';
+import { resolveIntentResolutionPacket } from './intent-resolution.js';
 
 describe('browser conversation session helpers', () => {
   const sessionDir = pathResolver.shared('runtime/browser/conversation-sessions');
@@ -309,6 +310,13 @@ describe('browser conversation session helpers', () => {
     expect(press?.action).toBe('press');
     expect(click?.action).toBe('click');
     expect(click?.targetHint?.text).toBe('Learn more');
+  });
+
+  it('accepts the shared resolution packet instead of re-resolving browser text', () => {
+    const utterance = '日経新聞を開いて';
+    const packet = resolveIntentResolutionPacket(utterance);
+
+    expect(classifyBrowserConversationCommand(utterance, { packet })?.action).toBe('navigate');
   });
 
   it('resolves a single candidate target from the latest browser snapshot', () => {

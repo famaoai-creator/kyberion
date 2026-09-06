@@ -1,7 +1,10 @@
 import { compileIntent } from '@agent/core/intent-compiler';
 import { logger } from '@agent/core/core';
 import { executeRegisteredSuperPipeline } from '@agent/core/super-nerve-execution-port';
-import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
+import {
+  resolveIntentResolutionPacket,
+  type IntentResolutionPacket,
+} from '@agent/core/intent-resolution';
 
 /**
  * Intent Resolver: Resolves high-level semantic intents into Super-Nerve pipeline steps.
@@ -26,6 +29,19 @@ function buildStartServiceShellCommand(serviceName?: string): string {
   return `${base}start --service-name ${serviceName}`;
 }
 
+function isIntentResolutionPacket(value: unknown): value is IntentResolutionPacket {
+  if (!value || typeof value !== 'object') return false;
+  const packet = value as Partial<IntentResolutionPacket>;
+  return packet.kind === 'intent_resolution_packet' && Array.isArray(packet.candidates);
+}
+
+function resolveServiceName(initialContext: any, sourceText: string): string | undefined {
+  const packet = isIntentResolutionPacket(initialContext?.resolution_packet)
+    ? initialContext.resolution_packet
+    : resolveIntentResolutionPacket(sourceText);
+  return packet.selected_parameters?.service_name;
+}
+
 export async function resolveIntentToSteps(
   intentId: string,
   initialContext: any = {}
@@ -43,7 +59,7 @@ export async function resolveIntentToSteps(
     const selectedService =
       typeof initialContext?.service_name === 'string' && initialContext.service_name.trim()
         ? initialContext.service_name.trim()
-        : resolveIntentResolutionPacket(sourceText).selected_parameters?.service_name;
+        : resolveServiceName(initialContext, sourceText);
 
     logger.info(
       `[INTENT_RESOLVER] Stop-service selection flow: ${selectedService ? `target=${selectedService}` : 'listing running services'}`
@@ -67,7 +83,7 @@ export async function resolveIntentToSteps(
     const selectedService =
       typeof initialContext?.service_name === 'string' && initialContext.service_name.trim()
         ? initialContext.service_name.trim()
-        : resolveIntentResolutionPacket(sourceText).selected_parameters?.service_name;
+        : resolveServiceName(initialContext, sourceText);
 
     logger.info(
       `[INTENT_RESOLVER] Start-service selection flow: ${selectedService ? `target=${selectedService}` : 'listing startable services'}`
