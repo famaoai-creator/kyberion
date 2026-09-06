@@ -50,10 +50,6 @@ const LEGACY_JSON_BOUNDARY_ALLOWLIST: ReadonlyMap<string, { count: number; reaso
       { count: 1, reason: 'encrypted A2A wire payload after decryption' },
     ],
     ['libs/core/secure-io.ts', { count: 1, reason: 'canonical secure JSON implementation' }],
-    [
-      'presence/displays/chronos-mirror-v2/src/lib/trace-feed.ts',
-      { count: 2, reason: 'legacy trace-feed JSONL entries' },
-    ],
   ]);
 const JSONL_APPEND_RATCHET = 0;
 const ENV_RATCHET = 0;

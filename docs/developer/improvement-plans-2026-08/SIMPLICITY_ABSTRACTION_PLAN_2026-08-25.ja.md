@@ -23705,3 +23705,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: terminal bridge の repository-bound JSON loader、SX-03
 - **変更**: terminal session state、file-watcher control request、brain profile registry の `safeReadFile` + `parseSafeJsonInput` を foundation `readJson`へ統一した。repository path／regular-file／missing・malformed時の既存fallback、session shape validation、socket raw-message parserは維持し、外部wireの生テキスト境界は移行対象外とした。
 - **検証**: terminal bridge **2 files／8 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1751
+
+- **対象**: Chronos Mirror trace-feed の JSONL loader、SX-03／SX-09
+- **変更**: persisted trace JSONLの二重手書き読込を foundation `readJsonLines`へ統一した。regular-file／symlink除外を担う既存 file discovery、malformed行skip、trace schema validation、tenant／tier／organization／project filter、summary／detail projectionは維持した。
+- **検証**: trace-feed **1 file／12 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。

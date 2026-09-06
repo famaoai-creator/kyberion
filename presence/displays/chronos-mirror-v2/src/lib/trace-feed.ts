@@ -1,14 +1,13 @@
 import path from 'node:path';
 
 import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
-import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { loadStateAtPath } from '@agent/core/mission-state';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
 import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
@@ -191,6 +190,16 @@ export function normalizePersistedTrace(
     ...(metadata ? { metadata } : {}),
     _persistedAt: optionalStringField(value, '_persistedAt'),
   };
+}
+
+function readPersistedTraceRecords(
+  filePath: string,
+  options: Pick<TraceFeedOptions, 'strictUnknownSpans'>
+): PersistedTraceShape[] {
+  return readJsonLines<unknown>(filePath, { onMalformed: 'skip' }).flatMap((value) => {
+    const record = normalizePersistedTrace(value, options);
+    return record ? [record] : [];
+  });
 }
 
 export function resolveTraceFeedDirs(): string[] {
@@ -397,39 +406,27 @@ export function collectTraceFeed(options: TraceFeedOptions = {}): TraceFeedRecor
 
   for (const dir of options.dir ? [options.dir] : resolveTraceFeedDirs()) {
     for (const filePath of listTraceFiles(dir)) {
-      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      for (const line of raw.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const parsed = normalizePersistedTrace(
-            parseSafeJsonInput(trimmed, 'trace feed entry'),
-            options
-          );
-          if (!parsed) continue;
-          const summary = summarizePersistedTrace(parsed, filePath);
-          if (!summary) continue;
-          if (!matchesTraceFilters(summary, options)) continue;
-          const dedupeKey = `${summary.traceId}:${summary.persistedAt}`;
-          if (seen.has(dedupeKey)) continue;
-          seen.add(dedupeKey);
-          records.push({
-            ...summary,
-            rootSpan: {
-              spanId: asTraceNode(parsed.rootSpan)?.spanId,
-              name: summary.rootSpanName,
-              status: summary.status,
-              startTime: summary.startedAt,
-              endTime: summary.completedAt,
-              attributes: asTraceNode(parsed.rootSpan)?.attributes,
-              events: summary.eventCount,
-              artifacts: summary.artifactCount,
-              children: Math.max(0, summary.spanCount - 1),
-            },
-          });
-        } catch {
-          // Skip malformed lines.
-        }
+      for (const parsed of readPersistedTraceRecords(filePath, options)) {
+        const summary = summarizePersistedTrace(parsed, filePath);
+        if (!summary) continue;
+        if (!matchesTraceFilters(summary, options)) continue;
+        const dedupeKey = `${summary.traceId}:${summary.persistedAt}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        records.push({
+          ...summary,
+          rootSpan: {
+            spanId: asTraceNode(parsed.rootSpan)?.spanId,
+            name: summary.rootSpanName,
+            status: summary.status,
+            startTime: summary.startedAt,
+            endTime: summary.completedAt,
+            attributes: asTraceNode(parsed.rootSpan)?.attributes,
+            events: summary.eventCount,
+            artifacts: summary.artifactCount,
+            children: Math.max(0, summary.spanCount - 1),
+          },
+        });
       }
     }
   }
@@ -448,36 +445,24 @@ export function collectTraceDetail(
 
   for (const dir of options.dir ? [options.dir] : resolveTraceFeedDirs()) {
     for (const filePath of listTraceFiles(dir)) {
-      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      for (const line of raw.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const parsed = normalizePersistedTrace(
-            parseSafeJsonInput(trimmed, 'trace feed entry'),
-            options
-          );
-          if (!parsed) continue;
-          if (parsed.traceId !== traceId) continue;
-          const detail = detailPersistedTrace(parsed, filePath);
-          if (
-            detail &&
-            (options.tenantSlugs === undefined ||
-              options.tenantSlugs === 'all' ||
-              (detail.tenantSlug && options.tenantSlugs.includes(detail.tenantSlug))) &&
-            (options.tierAccess === undefined ||
-              (detail.tier && options.tierAccess.includes(detail.tier))) &&
-            (options.organizationIds === undefined ||
-              options.organizationIds === 'all' ||
-              (detail.organizationId && options.organizationIds.includes(detail.organizationId))) &&
-            (options.projectIds === undefined ||
-              options.projectIds === 'all' ||
-              (detail.projectId && options.projectIds.includes(detail.projectId)))
-          )
-            return detail;
-        } catch {
-          // Skip malformed lines.
-        }
+      for (const parsed of readPersistedTraceRecords(filePath, options)) {
+        if (parsed.traceId !== traceId) continue;
+        const detail = detailPersistedTrace(parsed, filePath);
+        if (
+          detail &&
+          (options.tenantSlugs === undefined ||
+            options.tenantSlugs === 'all' ||
+            (detail.tenantSlug && options.tenantSlugs.includes(detail.tenantSlug))) &&
+          (options.tierAccess === undefined ||
+            (detail.tier && options.tierAccess.includes(detail.tier))) &&
+          (options.organizationIds === undefined ||
+            options.organizationIds === 'all' ||
+            (detail.organizationId && options.organizationIds.includes(detail.organizationId))) &&
+          (options.projectIds === undefined ||
+            options.projectIds === 'all' ||
+            (detail.projectId && options.projectIds.includes(detail.projectId)))
+        )
+          return detail;
       }
     }
   }
