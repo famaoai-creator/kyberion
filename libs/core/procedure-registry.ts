@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { logger } from './core.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { matchesAllowedOrigin } from './origin-policy.js';
 import { pathResolver } from './path-resolver.js';
@@ -13,7 +13,7 @@ import {
   type ProcedureResolution,
 } from './procedure-types.js';
 import { isDesktopPromotionPending } from './desktop-promotion-transaction.js';
-import { clamp, readTextFile } from './foundation/text.js';
+import { clamp } from './foundation/text.js';
 
 const PROCEDURES_PATH = 'knowledge/product/orchestration/procedures.json';
 /** User-local substrate-neutral overlay. This path is intentionally ignored by git. */
@@ -51,7 +51,7 @@ export function readProcedureCatalog(filePath: string): ProcedureCatalog {
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[PROCEDURE_REGISTRY] catalog must be a regular file: ${filePath}`);
   }
-  const parsed = parseSafeJsonInput(readTextFile(safeFilePath), `procedure catalog ${filePath}`);
+  const parsed = readJson<unknown>(safeFilePath);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return validateProcedureCatalog(parsed, safeFilePath);
   }

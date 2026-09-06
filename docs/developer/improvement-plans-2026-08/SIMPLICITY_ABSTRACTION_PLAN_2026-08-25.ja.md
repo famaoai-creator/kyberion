@@ -23723,3 +23723,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: shared-nerve reflex definition loader、SX-03／SX-11
 - **変更**: repository-bound `.adf.json` reflex定義の `readTextFile` + `parseSafeJsonInput` を foundation `readJson`へ統一した。reflex directory／regular-file／symlink boundary、malformed定義のskip、action validation、dispatch authority semanticsは維持し、テストdoubleもcanonical readerへ更新した。
 - **検証**: reflex-engine **1 file／14 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1754
+
+- **対象**: procedure registry の persisted JSON catalog loader、SX-03／SX-04
+- **変更**: regular-file確認後の procedure catalog 読み込みを `readTextFile` + `parseSafeJsonInput` から foundation `readJson`へ統一した。catalog schema validation、個別エントリの不正時drop、duplicate／personal overlayの優先順位、symlink／directory boundaryは維持し、テストdoubleもcanonical readerを通す形へ更新した。
+- **検証**: procedure registry **1 file／29 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption／improvement-plan-metadata gate、`git diff --check`。
