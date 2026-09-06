@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { rawExistsSync, rawReadTextFile, rawReaddir } from './fs-primitives.js';
+import { rawExistsSync, rawLstatSync, rawReadTextFile, rawReaddir } from './fs-primitives.js';
 import { isValidTenantSlug } from './foundation/scope.js';
 import { getProcessEnv } from './foundation/process-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
@@ -82,6 +82,55 @@ function readConfiguredMissionSubPath(tier: MissionTier): string | undefined {
 export function rootDir() {
   return PROJECT_ROOT_DIR;
 }
+
+/**
+ * Validate a repository-local resource without allowing an existing path
+ * component to be a symbolic link. This lives with the bootstrap path
+ * resolver so policy-engine can validate its own input without importing
+ * secure-io (which imports policy-engine during secure-io bootstrap).
+ */
+export function assertSafeRepositoryPath(
+  filePath: string,
+  options: {
+    allowMissingLeaf?: boolean;
+    allowSymlinkLeaf?: boolean;
+    rootDir?: string;
+  } = {}
+): string {
+  if (!filePath) throw new Error('Missing required resource path');
+
+  const resolved = resolve(filePath);
+  const root = path.resolve(options.rootDir ?? PROJECT_ROOT_DIR);
+  const relative = path.relative(root, resolved).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+    );
+  }
+
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (rawLstatSync(current).isSymbolicLink()) {
+        const isLeaf = current === resolved;
+        if (options.allowSymlinkLeaf && isLeaf) continue;
+        throw new Error(
+          `[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link: ${filePath}`
+        );
+      }
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') break;
+      throw error;
+    }
+  }
+
+  if (!options.allowMissingLeaf && !rawExistsSync(resolved)) {
+    throw new Error(`Resource path does not exist: ${resolved}`);
+  }
+  return resolved;
+}
+
 export function knowledge(subPath = '') {
   return path.join(KNOWLEDGE_ROOT, subPath);
 }

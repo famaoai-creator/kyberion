@@ -9,7 +9,7 @@ describe('presence studio runtime environment boundary', () => {
     const source = safeReadFile(
       fileURLToPath(new URL('./presence-studio-runtime-data.ts', import.meta.url)),
       { encoding: 'utf8' }
-    );
+    ) as string;
 
     expect(source).not.toContain('process.env.MISSION_ROLE');
     expect(source).toContain("setRegisteredEnv('MISSION_ROLE', 'surface_runtime');");
@@ -19,7 +19,7 @@ describe('presence studio runtime environment boundary', () => {
     const source = safeReadFile(
       fileURLToPath(new URL('./presence-studio-runtime-data.ts', import.meta.url)),
       { encoding: 'utf8' }
-    );
+    ) as string;
 
     expect(source).toContain("parseSafeJsonObjectValue(req.body, 'minutes session start body')");
     expect(source).toContain('presenceStudioMinutesSessionStartSchema.safeParse(requestBody)');
@@ -29,7 +29,7 @@ describe('presence studio runtime environment boundary', () => {
     const source = safeReadFile(
       fileURLToPath(new URL('./presence-studio-runtime-data.ts', import.meta.url)),
       { encoding: 'utf8' }
-    );
+    ) as string;
 
     expect(source).toContain('readPresenceStudioStringParam(req.query.profile_id)');
     expect(source).not.toContain("String(req.query.profile_id || '').trim()");
@@ -41,7 +41,7 @@ describe('presence studio runtime environment boundary', () => {
     const source = safeReadFile(
       fileURLToPath(new URL('./presence-studio-runtime-data.ts', import.meta.url)),
       { encoding: 'utf8' }
-    );
+    ) as string;
 
     expect(source.match(/readSurfaceStringParam\(req\.query\.tenant\)/gu)).toHaveLength(2);
     expect(source).not.toContain("typeof req.query.tenant === 'string'");
