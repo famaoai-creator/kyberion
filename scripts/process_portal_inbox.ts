@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 // chalk imported dynamically
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
 import { nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
@@ -24,6 +24,13 @@ const PORTAL_STATUSES = new Set<PortalRequest['status']>([
   'processed',
 ]);
 
+export function readPortalInboxTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function isPortalStatus(value: unknown): value is PortalRequest['status'] {
   return typeof value === 'string' && PORTAL_STATUSES.has(value as PortalRequest['status']);
 }
@@ -45,7 +52,7 @@ export function parsePortalRequest(raw: string): PortalRequest | null {
 async function processInbox(print: Print = () => undefined): Promise<void> {
   if (!safeExistsSync(inboxPath)) return;
 
-  const raw = readTextFile(inboxPath);
+  const raw = readPortalInboxTextFile(inboxPath);
   const request = parsePortalRequest(raw);
   if (!request) {
     print('[portal] ignored malformed inbox request');
