@@ -23519,3 +23519,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `satellites/voice-hub/server.ts`、`tests/voice-hub-request-input.test.ts`、SX-08b
 - **変更**: voice-hub のローカル `generateReply` wrapperを削除し、ingest の auto-replyをcanonical `runSurfaceMessageConversation`へ直接接続した。locale、scope、delegation summary、fallback intent contract、音声再生・timeline dispatchの順序は維持し、voice surfaceだけが別のfree-text reply入口を持つ残存を解消した。
 - **検証**: voice-hub request／surface approval **3 files／22 tests passed**、対象 ESLint、Prettier、`git diff --check`。12 surfaceの全面UI投影、provider live model call、OS-level enforcementは継続課題である。
+
+## 2026-09-06 再レビュー実装 1720
+
+- **対象**: `satellites/imessage-bridge/src/index.ts`、`satellites/imessage-bridge/src/index.test.ts`、SX-09b
+- **変更**: BlueBubbles webhook の authorization／secret header を strict scalar reader と共通の secret resolver へ接続した。配列・object・空文字を認証値へ暗黙変換せず、direct secret 優先、Bearer fallback、invalid scheme の既存 semantics をテストで固定した。
+- **検証**: iMessage bridge **1 file／9 tests passed**、対象 ESLint、Prettier、`git diff --check`。外部 BlueBubbles 実機受入と provider／OS-level enforcement は継続課題である。

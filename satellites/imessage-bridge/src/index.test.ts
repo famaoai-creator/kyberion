@@ -46,7 +46,9 @@ vi.mock('@agent/core/imessage-bridge', async (importOriginal) => {
 import {
   buildIMessageChannelAdapter,
   parseIMessageBridgeInput,
+  readIMessageHeader,
   resolveIMessageBridgeInputPath,
+  resolveBlueBubblesWebhookSecret,
 } from './index.js';
 
 const MESSAGE: IMessageStimulus = {
@@ -113,6 +115,26 @@ describe('imessage bridge processing note', () => {
     );
   });
 
+  it('keeps webhook authentication headers scalar and preserves fallback precedence', () => {
+    expect(readIMessageHeader(['unexpected'])).toBeUndefined();
+    expect(readIMessageHeader({ value: 'unexpected' })).toBeUndefined();
+    expect(readIMessageHeader('')).toBeUndefined();
+    expect(readIMessageHeader('secret')).toBe('secret');
+
+    expect(
+      resolveBlueBubblesWebhookSecret({
+        secret: 'direct-secret',
+        authorization: 'Bearer bearer-secret',
+      })
+    ).toBe('direct-secret');
+    expect(resolveBlueBubblesWebhookSecret({ authorization: 'Bearer bearer-secret' })).toBe(
+      'bearer-secret'
+    );
+    expect(
+      resolveBlueBubblesWebhookSecret({ authorization: 'Basic not-a-bearer' })
+    ).toBeUndefined();
+  });
+
   it('uses the shared safe JSON parser at Express input boundaries', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('satellites/imessage-bridge/src/index.ts'), {
@@ -121,6 +143,7 @@ describe('imessage bridge processing note', () => {
     );
     expect(source).toContain("parseSafeJsonObjectValue(req.body, 'BlueBubbles webhook body')");
     expect(source).toContain("parseSafeJsonObjectValue(req.body ?? {}, 'iMessage request body')");
+    expect(source).not.toContain("String(req.get('authorization') || '')");
   });
 
   it('preserves valid send input without coercing its fields', () => {
