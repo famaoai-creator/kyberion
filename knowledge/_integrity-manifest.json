@@ -1899,13 +1899,13 @@
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 2009,
+      "size": 2077,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 16631,
+      "size": 17493,
       "type": "json"
     },
     {
@@ -1917,7 +1917,7 @@
     {
       "path": "product/governance/model-registry/index.json",
       "tier": "public",
-      "size": 727,
+      "size": 758,
       "type": "json"
     },
     {
@@ -1976,6 +1976,12 @@
     },
     {
       "path": "product/governance/model-registry/model-67656d696e693a67656d696e692d332e372d666c617368.json",
+      "tier": "public",
+      "size": 749,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-67656d696e693a67656d696e692d332e382d666c617368.json",
       "tier": "public",
       "size": 749,
       "type": "json"
@@ -2385,7 +2391,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1549,
+      "size": 1546,
       "type": "json"
     },
     {
@@ -4119,7 +4125,7 @@
     {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
-      "size": 16067,
+      "size": 17432,
       "type": "json"
     },
     {

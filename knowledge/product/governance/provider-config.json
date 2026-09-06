@@ -5,9 +5,9 @@
   "default_priority": ["agy", "claude", "codex", "grok", "copilot"],
   "obsolete_agent_runtime_providers": ["gemini"],
   "default_models": {
-    "gemini": "gemini-3.6-flash",
+    "gemini": "gemini-3.8-flash",
     "claude": "claude-opus-5",
-    "agy": "Gemini 3.7 Flash (Medium)",
+    "agy": "Gemini 3.8 Flash (Low)",
     "codex": "gpt-5.6-sol",
     "grok": "grok-4.6",
     "copilot": "auto",
@@ -17,7 +17,7 @@
   "runtime_defaults": {
     "anthropic-default": "claude-opus-5",
     "anthropic-fast": "claude-haiku-4-5-20251001",
-    "gemini-default": "gemini-3.6-flash",
+    "gemini-default": "gemini-3.8-flash",
     "gemini-fast": "gemini-3.1-flash-lite",
     "openai-vision": "gpt-5.5",
     "codex-default": "gpt-5.6-sol",
