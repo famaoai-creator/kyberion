@@ -23597,3 +23597,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: system actuator の persisted `context_path` loader、SX-03
 - **変更**: system pipeline に残っていた `safeReadFile` + `parseSafeJsonInput` の context loader を foundation `readJson` へ統一した。root／regular-file boundary と safe object validation、pipeline context merge は維持した。
 - **検証**: system context resource-boundary／reconcile targeted **1 file／4 tests passed**、対象 ESLint、Prettier、`git diff --check`。system actuator 全体 suite の OS automation 受入は別途継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1733
+
+- **対象**: working-memory actuator の volatile knowledge index loader、SX-03
+- **変更**: `INDEX.volatile.json` の読み込みを foundation `readJson` へ統一した。volatile path／regular-file boundary、`parseVolatileIndex` の shape validation、malformed index 時の fail-closed 挙動は維持し、Markdown／journal の text loader は変更していない。
+- **検証**: working-memory index **1 file／9 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
