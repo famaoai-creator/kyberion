@@ -846,6 +846,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 の direct-loader inventory から、worker context compaction の update-summary prompt read を operation-time の regular-file 境界へ接続し、directory replacement を要約生成へ到達させず既定 fallbackへ閉じる回帰を追加した。関連 **2 files / 14 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、mission-distill の distill prompt read を operation-time の regular-file 境界へ接続し、directory replacement を wisdom生成へ到達させず空prompt fallbackへ閉じる回帰を追加した。関連 **2 files / 6 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、knowledge-weight recalculation の governance backup read を operation-time の regular-file 境界へ接続し、directory replacement の本文を backup／history へ読み込まない回帰を追加した。関連 **2 files / 5 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
+- 2026-09-06: PI-03 の direct-loader inventory から、mission orchestration progress の PLAN／NEXT_TASKS／TASK_BOARD read gate を operation-time の regular-file 境界へ接続し、directory replacement をtask board再調整へ到達させない回帰を追加した。関連 **2 files / 4 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 

@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createMissionProgressController } from './mission-orchestration-progress.js';
+import {
+  createMissionProgressController,
+  isRegularMissionProgressArtifactPath,
+} from './mission-orchestration-progress.js';
 import { renderProcessTemplateSkeleton } from './mission-planning-packet.js';
 import * as pathResolver from './path-resolver.js';
 import type { PlannedNextTask } from './mission-orchestration-worker-contracts.js';
@@ -34,6 +37,25 @@ describe('mission orchestration progress path boundaries', () => {
     removeTestPath(missionPath);
     removeTestPath(confidentialMissionPath);
     removeTestPath(pathResolver.sharedTmp('mission-progress-external'));
+  });
+
+  it('accepts only regular files for progress artifacts', () => {
+    const fixtureRoot = pathResolver.sharedTmp('mission-progress-artifact-loader');
+    const filePath = path.join(fixtureRoot, 'TASK_BOARD.md');
+    const directoryPath = path.join(fixtureRoot, 'TASK_BOARD-directory.md');
+    try {
+      fs.mkdirSync(fixtureRoot, { recursive: true });
+      fs.writeFileSync(filePath, '# task board\n');
+      fs.mkdirSync(directoryPath, { recursive: true });
+
+      expect(isRegularMissionProgressArtifactPath(filePath)).toBe(true);
+      expect(isRegularMissionProgressArtifactPath(directoryPath)).toBe(false);
+      expect(isRegularMissionProgressArtifactPath(path.join(fixtureRoot, 'missing.md'))).toBe(
+        false
+      );
+    } finally {
+      removeTestPath(fixtureRoot);
+    }
   });
 
   it('loads NEXT_TASKS from an existing confidential mission root', () => {

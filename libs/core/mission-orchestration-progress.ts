@@ -10,7 +10,7 @@ import { ledger } from './ledger.js';
 import { findMissionPath, missionDir } from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import {
   provisionMissionEntry,
   writeProvisionedJson,
@@ -77,6 +77,15 @@ function safeMissionArtifactPath(missionId: string, relativePath: string): strin
   });
 }
 
+export function isRegularMissionProgressArtifactPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 export function createMissionProgressController(
   dependencies: MissionProgressControllerDependencies
 ): MissionProgressController {
@@ -141,9 +150,9 @@ export function createMissionProgressController(
     const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
 
     if (
-      !safeExistsSync(planPath) ||
-      !safeExistsSync(nextTasksPath) ||
-      !safeExistsSync(taskBoardPath)
+      !isRegularMissionProgressArtifactPath(planPath) ||
+      !isRegularMissionProgressArtifactPath(nextTasksPath) ||
+      !isRegularMissionProgressArtifactPath(taskBoardPath)
     ) {
       return;
     }
@@ -372,7 +381,7 @@ export function createMissionProgressController(
 
   function reconcileMissionProgress(missionId: string): void {
     const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
-    if (!safeExistsSync(taskBoardPath)) return;
+    if (!isRegularMissionProgressArtifactPath(taskBoardPath)) return;
 
     const tasks = loadAllNextTasks(missionId);
     const acceptedCount = tasks.filter((task) => task.status === 'accepted').length;
@@ -443,7 +452,7 @@ export function createMissionProgressController(
 
   function markTaskBoardInProgress(missionId: string): void {
     const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
-    if (!safeExistsSync(taskBoardPath)) return;
+    if (!isRegularMissionProgressArtifactPath(taskBoardPath)) return;
     const currentTaskBoard = readTextFile(taskBoardPath);
     const updatedTaskBoard = currentTaskBoard
       .replace('## Status: Planning Ready', '## Status: Execution Ready')
