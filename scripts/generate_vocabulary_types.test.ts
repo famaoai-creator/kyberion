@@ -4,6 +4,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import {
   buildLocalesBlock,
   buildVocabularyKeys,
+  readVocabularyTypesTextFile,
   spliceLocalesBlock,
 } from './generate_vocabulary_types.js';
 
@@ -16,8 +17,15 @@ describe('generate_vocabulary_types (I18N-02)', () => {
     );
     expect(source).toContain('loadVocabularyCatalog()');
     expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain('readVocabularyTypesTextFile(filePath: string)');
     expect(source).not.toContain('safeReadFile(');
     expect(source).not.toContain('readJson<');
+  });
+
+  it('rejects a directory before reading the locale source', () => {
+    expect(() => readVocabularyTypesTextFile(pathResolver.rootResolve('libs'))).toThrow(
+      'must be a regular file'
+    );
   });
 
   describe('buildLocalesBlock / spliceLocalesBlock', () => {
