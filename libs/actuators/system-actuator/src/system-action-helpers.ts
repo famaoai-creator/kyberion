@@ -1,10 +1,5 @@
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-} from '@agent/core/secure-io';
-import { parsePersistedPipelineStrategy, parseSafeJsonInput } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { parsePersistedPipelineStrategy, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
@@ -810,13 +805,7 @@ async function performReconcile(input: SystemAction) {
   if (!safeExistsSync(strategyPath) || !safeLstat(strategyPath).isFile()) {
     throw new Error(`Strategy not found: ${strategyPath}`);
   }
-  const config = parsePersistedPipelineStrategy(
-    parseSafeJsonInput(
-      String(safeReadFile(strategyPath, { encoding: 'utf8' }) || ''),
-      'system strategy'
-    ),
-    'system strategy'
-  );
+  const config = parsePersistedPipelineStrategy(readJson(strategyPath), 'system strategy');
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }

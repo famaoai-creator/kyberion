@@ -23573,3 +23573,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `schema-integrity` environment manifest、environment capability contract test、SX-07
 - **変更**: environment manifest に残っていた削除済み `check:esm` alias を、`pnpm -s run check -- --scope pr --only esm` へ置換した。manifest contract test が ESM probe も canonical command として検査するよう拡張し、宣言だけ旧 alias のまま戻る再発を防止した。
 - **検証**: environment capability targeted tests、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1729
+
+- **対象**: orchestrator／system actuator の reconcile strategy loader、SX-03
+- **変更**: 2つの reconcile 経路に残っていた `safeReadFile` + `parseSafeJsonInput` の同型 persisted JSON 読み込みを foundation `readJson` へ統一した。repository／regular-file 境界、project trust／preflight、`parsePersistedPipelineStrategy` の domain validation は維持した。
+- **検証**: reconcile／strategy targeted tests **2 files／8 tests passed**、対象 ESLint、Prettier、`git diff --check`。system actuator 全体 suite は既存の `open_file` OS automation test 1件が失敗したが、reconcile targeted tests は通過している。CI／provider 実機受入は継続確認対象である。
