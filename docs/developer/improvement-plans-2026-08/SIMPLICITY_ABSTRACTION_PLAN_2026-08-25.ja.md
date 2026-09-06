@@ -23963,3 +23963,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: ops-alert triage の persisted JSONL reader、SX-03／SX-09
 - **変更**: foundation `readJsonLines` のmapper／malformed callbackへ原文行を渡せるようにし、ops-alertのファイル読込を手書きの本文分割・parseから共通readerへ移行した。schema-invalid／malformed行のunknown化、fingerprint、source order、regular-file boundary、in-memory parserの互換性は維持し、不要になった専用text loaderを削除した。
 - **検証**: foundation JSON／ops-alert **2 files／29 tests passed**、対象ESLint、Prettier、foundation adoption、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1794
+
+- **対象**: Nexus daemon の stimuli JSONL reader、SX-03／SX-08／SX-09
+- **変更**: stimuli の参照経路を手書きの本文分割・行 parser から foundation `readJsonLines` へ統一した。既存のGUSP shape validation、malformed／schema-invalid行のskip、operation-timeのregular-file boundaryは維持し、status更新経路では共通readerのraw line callbackで壊れた行を原文のまま再出力する契約を保持した。pending／injected projectionは同じ正規化readerを共有する。
+- **検証**: Nexus daemon／stimulus parser **2 files／9 tests passed**、対象ESLint、Prettier、foundation adoption、`git diff --check`。

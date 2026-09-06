@@ -7,11 +7,16 @@
 import { installProcessGuards } from '@agent/core/process-guards';
 import { logger } from '@agent/core/core';
 import { loadChannelRegistry, type ChannelRegistryChannel } from '@agent/core/channel-registry';
-import { getRegisteredEnvText, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonInput,
+  readJson,
+  readJsonLines,
+} from '@agent/core/foundation';
 import { terminalBridge } from '@agent/core/terminal-bridge';
 import {
   assertSafeRepositoryPath,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
@@ -26,7 +31,7 @@ import { sensoryMemory } from '@agent/core/sensory-memory';
 import { reflexEngine } from '@agent/shared-nerve';
 import { handleAction as dispatchService } from '@actuator/service';
 import * as path from 'node:path';
-import { parseGuspStimulusLine, type GuspStimulus } from './nexus-stimulus.js';
+import { normalizeGuspStimulus, type GuspStimulus } from './nexus-stimulus.js';
 import {
   parseNexusBrainProfileRegistry,
   parseNexusSessionMetadata,
@@ -69,6 +74,13 @@ function isExistingDirectory(filePath: string): boolean {
   } catch {
     return false;
   }
+}
+
+function readNexusStimuli(filePath: string): GuspStimulus[] {
+  return readJsonLines<GuspStimulus>(filePath, {
+    map: (value) => normalizeGuspStimulus(value),
+    onMalformed: 'skip',
+  });
 }
 
 interface NexusDispatchResult {
@@ -130,22 +142,22 @@ async function updateStimulusStatus(
   try {
     const stimuliPath = safeNexusPath(STIMULI_PATH);
     if (!isExistingRegularFile(stimuliPath)) return false;
-    const content = safeReadFile(stimuliPath, { encoding: 'utf8' }) as string;
-    const lines = content
-      .trim()
-      .split('\n')
-      .map((line) => {
-        if (!line) return '';
-        const s = parseGuspStimulusLine(line);
-        if (!s) return line;
-        if (s.id === id) {
-          s.control.status = status;
-          if (step) s.control.evidence.push({ step, ts: nowIso(), agent: 'nexus-daemon' });
+    const lines: string[] = [];
+    readJsonLines<GuspStimulus>(stimuliPath, {
+      map: (value) => {
+        const stimulus = normalizeGuspStimulus(value);
+        if (stimulus.id === id) {
+          stimulus.control.status = status;
+          if (step) stimulus.control.evidence.push({ step, ts: nowIso(), agent: 'nexus-daemon' });
         }
-        return JSON.stringify(s);
-      })
-      .filter((l) => l !== '');
-    safeWriteFile(stimuliPath, lines.join('\n') + '\n');
+        lines.push(JSON.stringify(stimulus));
+        return stimulus;
+      },
+      onMalformed: (_error, _lineNumber, rawLine) => {
+        if (rawLine.trim()) lines.push(rawLine);
+      },
+    });
+    safeWriteFile(stimuliPath, `${lines.join('\n')}\n`);
     return true;
   } catch (err: any) {
     logger.error(`[Nexus] Status update failed for ${id}: ${err.message}`);
@@ -255,13 +267,7 @@ async function scanAndDispatch(channels: ChannelRegistryChannel[]) {
   const runtimeBase = safeNexusPath(RUNTIME_BASE, true);
   if (!isExistingRegularFile(stimuliPath)) return;
 
-  const content = safeReadFile(stimuliPath, { encoding: 'utf8' }) as string;
-  const allStimuli = content
-    .trim()
-    .split('\n')
-    .filter((l) => l.length > 0)
-    .map(parseGuspStimulusLine)
-    .filter((stimulus): stimulus is GuspStimulus => stimulus !== undefined);
+  const allStimuli = readNexusStimuli(stimuliPath);
 
   const injected = allStimuli.filter((s) => s.control.status === 'injected');
 
@@ -345,13 +351,7 @@ async function nexusLoop() {
 
       if (isExistingRegularFile(STIMULI_PATH)) {
         const stimuliPath = safeNexusPath(STIMULI_PATH);
-        const content = safeReadFile(stimuliPath, { encoding: 'utf8' }) as string;
-        const allStimuli = content
-          .trim()
-          .split('\n')
-          .filter((l) => l.length > 0)
-          .map(parseGuspStimulusLine)
-          .filter((stimulus): stimulus is GuspStimulus => stimulus !== undefined);
+        const allStimuli = readNexusStimuli(stimuliPath);
 
         const pending = allStimuli.filter((s) => s.control.status === 'pending');
 
