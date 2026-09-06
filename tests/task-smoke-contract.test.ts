@@ -2,8 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeExistsSync, safeReadFile, safeRmSync } from '@agent/core';
 import { main } from '../scripts/task_smoke.js';
 
-const PROFILE_PATH = pathResolver.rootResolve('active/shared/tmp/task-smoke/daily-email-triage.json');
-const LEGACY_PROFILE_PATH = pathResolver.rootResolve('knowledge/personal/task-profiles/daily-email-triage.json');
+const PROFILE_PATH = pathResolver.rootResolve(
+  'active/shared/tmp/task-smoke/daily-email-triage.json'
+);
+const LEGACY_PROFILE_PATH = pathResolver.rootResolve(
+  'knowledge/personal/task-profiles/daily-email-triage.json'
+);
 
 describe('task smoke contract', () => {
   const originalPersona = process.env.KYBERION_PERSONA;
@@ -29,11 +33,13 @@ describe('task smoke contract', () => {
   });
 
   it('runs the daily email triage smoke flow and writes the profile to the temporary smoke path', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // main() now routes output through an explicit print sink (SX-05
+    // governed-printer pass) rather than calling console.log itself.
+    const captured: unknown[] = [];
 
-    await main(['daily-email-triage']);
+    await main(['daily-email-triage'], (value) => captured.push(value));
 
-    const output = logSpy.mock.calls.flat().join('\n');
+    const output = captured.map((value) => String(value)).join('\n');
     expect(output).toContain('TaskScenario smoke: daily-email-triage');
     expect(output).toContain('Phase 1: list');
     expect(output).toContain('Phase 2: init');
@@ -48,10 +54,14 @@ describe('task smoke contract', () => {
       answers?: Record<string, string>;
     };
     expect(profile.scenario_id).toBe('daily-email-triage');
-    expect(profile.answers?.['重要メールとして扱う送信元や条件は何か']).toBe('顧客、役員、採用候補者からのメール');
+    expect(profile.answers?.['重要メールとして扱う送信元や条件は何か']).toBe(
+      '顧客、役員、採用候補者からのメール'
+    );
   });
 
   it('fails on unknown scenarios', async () => {
-    await expect(main(['unknown-scenario'])).rejects.toThrow('Unknown TaskScenario: unknown-scenario');
+    await expect(main(['unknown-scenario'])).rejects.toThrow(
+      'Unknown TaskScenario: unknown-scenario'
+    );
   });
 });

@@ -11,7 +11,14 @@ function read(relPath: string): string {
 describe('Workflow operations contract', () => {
   it('keeps CI aligned with built capability and runtime-surface commands', () => {
     const ci = read('.github/workflows/ci.yml');
-    expect(ci).toContain('pnpm install --frozen-lockfile');
+    // commit 6a7ecf439 ("ci: reuse setup across workflows") moved the
+    // `pnpm install --frozen-lockfile` step out of ci.yml into the shared
+    // composite action every job now calls via `uses:
+    // ./.github/actions/setup-kyberion` — assert both halves of that
+    // contract instead of the inlined step.
+    const setupAction = read('.github/actions/setup-kyberion/action.yml');
+    expect(ci).toContain('uses: ./.github/actions/setup-kyberion');
+    expect(setupAction).toContain('pnpm install --frozen-lockfile');
     expect(ci).toContain('pnpm run check:commit-subject');
     expect(ci).toContain('node dist/scripts/capability_discovery.js');
     expect(ci).toContain('node dist/scripts/surface_runtime.js --action status');
