@@ -634,6 +634,7 @@ export async function handleTelegramUpdate(
     channel: chatId,
     thread: threadTs,
     text,
+    locale: resolveOperatorLocale(),
   });
   if (proposalReply.handled) {
     const reply = await sendTelegramMessage({ chatId, text: proposalReply.reply }, options);

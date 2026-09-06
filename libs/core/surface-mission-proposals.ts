@@ -342,6 +342,7 @@ export async function resolveMissionProposalReply(params: {
   channel: string;
   thread: string;
   text: string;
+  locale?: SupportedLocale;
 }): Promise<{ handled: false } | { handled: true; reply: string; missionId?: string }> {
   const pending = getMissionProposalState(params.surface, params.channel, params.thread);
   if (!pending) return { handled: false };
@@ -350,7 +351,7 @@ export async function resolveMissionProposalReply(params: {
     clearMissionProposalState(params.surface, params.channel, params.thread);
     return {
       handled: true,
-      reply: t('bridge:mission_proposal_cancelled', undefined, 'ja'),
+      reply: t('bridge:mission_proposal_cancelled', undefined, params.locale ?? 'ja'),
     };
   }
   if (isMissionConfirmation(params.text)) {
@@ -366,7 +367,7 @@ export async function resolveMissionProposalReply(params: {
     return {
       handled: true,
       missionId: issued.missionId,
-      reply: buildMissionIssuanceReply(issued),
+      reply: buildMissionIssuanceReply(issued, { locale: params.locale }),
     };
   }
   return { handled: false };
