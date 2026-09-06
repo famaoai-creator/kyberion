@@ -23867,3 +23867,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: stimuli journal の recent-load JSONL reader、SX-03／SX-09／SX-11
 - **変更**: regular-file境界を通過した stimuli journalの手書き本文分割・parse・normalizeを foundation `readJsonLines`へ統一した。5MB上限、malformed行skip、TTL filtering、tail limit、rotation、raw line helperの契約は維持した。
 - **検証**: stimuli journal／TTL **2 files／16 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1778
+
+- **対象**: A2A conversation history の persisted JSONL reader、SX-03／SX-09／PI-03
+- **変更**: operation-timeのregular-file確認後に行うconversation historyの本文分割・safe JSON parse・turn projectionを foundation `readJsonLines`へ統一した。malformed turn skip、tier／mission projection、rehydration、append側の原文保持とMAX_TURNS semanticsは維持した。
+- **検証**: A2A conversation store **1 file／6 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
