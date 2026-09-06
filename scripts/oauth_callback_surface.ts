@@ -11,6 +11,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { readSurfaceStringParam } from '@agent/core';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import * as path from 'node:path';
 
@@ -71,12 +72,11 @@ app.get('/health', (_req, res) => {
 
 app.get(CALLBACK_PATH, async (req, res) => {
   try {
-    const serviceId = typeof req.query.service === 'string' ? req.query.service : undefined;
-    const code = typeof req.query.code === 'string' ? req.query.code : undefined;
-    const state = typeof req.query.state === 'string' ? req.query.state : undefined;
-    const error = typeof req.query.error === 'string' ? req.query.error : undefined;
-    const errorDescription =
-      typeof req.query.error_description === 'string' ? req.query.error_description : undefined;
+    const serviceId = readSurfaceStringParam(req.query.service);
+    const code = readSurfaceStringParam(req.query.code);
+    const state = readSurfaceStringParam(req.query.state);
+    const error = readSurfaceStringParam(req.query.error);
+    const errorDescription = readSurfaceStringParam(req.query.error_description);
 
     const result = await completeOAuthCallback({ serviceId, code, state, error, errorDescription });
     ensureRuntimeDir();
