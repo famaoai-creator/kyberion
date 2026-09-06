@@ -749,6 +749,12 @@ First-Win lifecycle smoke の live identity、schedule pipeline、dry-run fixtur
 
 検証: First-Win lifecycle **3 files / 16 tests passed**、対象 lint、typecheck、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-06: PI-13／DH-11 の script integrity CLI 接続
+
+script integrity checkerをroot `package.json` の `check:script-integrity`へ登録した。共通 `defineScript`／`defineGenerator` のentrypoint監査は本体実装だけでなく、開発者とCIが同じ正規package scriptから再実行できることを受入条件とし、harness移行漏れを手動コマンドに依存させない。
+
+検証: `pnpm run check:script-integrity`、checker **1 file / 7 tests passed**、Prettier。provider CLIの実OS-level enforcement probeと未監査direct loader全体inventoryは継続課題である。
+
 ## 10. 検証コマンド(実装時)
 
 - DH-01: `pnpm vitest run libs/core/op-preflight.test.ts libs/core/op-preflight-defaults.test.ts` + `pnpm check -- --scope full --only op-preflight-coverage`
