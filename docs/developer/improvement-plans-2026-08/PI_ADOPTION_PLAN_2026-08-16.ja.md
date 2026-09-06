@@ -837,6 +837,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 の direct-loader inventory から、environment capability の `package.json` engines read を governed regular-file loader へ切り出し、directory replacement と repository 外 path を node floor parse 前に拒否する回帰を追加した。関連 **2 files / 40 tests passed**、typecheck、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、project mission ledger の markdown leaf を `ensureProjectMissionLedgerExists` の operation-time `safeLstat(...).isFile()` 境界へ接続し、directory replacement を `readTextFile` 前に拒否する回帰を追加した。関連 **2 files / 6 tests passed**、typecheck、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、stimuli journal の reader／rotation 前へ再利用可能な regular-file helper を接続し、directory replacement を sensory read／rotation に到達させない回帰を追加した。関連 **2 files / 11 tests passed**、typecheck、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
+- 2026-09-06: PI-03 の direct-loader inventory から、scope offboarding の asset ledger／dedup registry JSONL reader に operation-time の regular-file 検査を追加し、directory replacement を offboarding projection に混入させない回帰を追加した。関連 **2 files / 21 tests passed**、typecheck、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 
