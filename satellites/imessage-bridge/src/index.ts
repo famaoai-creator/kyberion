@@ -1,6 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { isDirectEntry } from '@agent/core/direct-entry';
+import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import { getRegisteredEnvText, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { t } from '@agent/core/t';
@@ -543,8 +543,8 @@ async function pollIMessages() {
   }
 }
 
-async function main() {
-  const argv = await createStandardYargs(process.argv)
+async function main(args: string[] = process.argv) {
+  const argv = await createStandardYargs(args)
     .option('input', { alias: 'i', type: 'string' })
     .option('port', {
       type: 'number',
@@ -685,12 +685,15 @@ async function main() {
 // starts the bridge, so importing this module in a test cannot start the HTTP
 // listener or the poll loop — and a leaked VITEST env cannot silently no-op a
 // real start.
-const directEntry = isDirectEntry(import.meta.url, 'satellites/imessage-bridge/src/index.ts');
+const directEntry = isDirectScript(import.meta.url, 'satellites/imessage-bridge/src/index.ts');
+const runIMessageBridge = defineScript({
+  name: 'imessage-bridge',
+  async run({ argv }) {
+    await main(['node', 'satellites/imessage-bridge/src/index.ts', ...argv]);
+  },
+});
 if (directEntry && !getRegisteredEnvText('VITEST')) {
-  main().catch((error) => {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  void runIMessageBridge();
 } else if (directEntry) {
   logger.warn('[iMessageBridge] VITEST is set — suppressing the direct-entry start.');
 }

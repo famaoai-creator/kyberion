@@ -24029,3 +24029,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: server protocol entrypointのshared harness、SX-06
 - **変更**: scripts配下だけから参照可能だった `defineScript`／`isDirectScript`／generator harnessを `@agent/core/script-harness` として公開し、既存の `scripts/lib/harness.ts` は互換re-exportへ整理した。Telegram bridgeのlong-lived server startupを同じharnessの失敗境界・argv境界へ移行し、satelliteが `scripts/` のrootDir外実装へ直接依存しないようにした。
 - **検証**: core build、Telegram bridge build、Telegram／process-exit／CLI manifest／check runner **4 files／32 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1805
+
+- **対象**: 残存server protocol entrypoint、SX-06
+- **変更**: Discord／iMessage bridgeも `@agent/core/script-harness` の同一argv・失敗境界へ移行し、3つの主要text bridgeで直接 `main().catch` による個別境界を廃止した。import時のlistener／gateway抑止と非TTYのexit-code semanticsは維持した。
+- **検証**: Telegram／Discord／iMessage／process-exit **4 files／31 tests passed**、Discord／iMessage bridge build、対象ESLint、Prettier、`git diff --check`。
