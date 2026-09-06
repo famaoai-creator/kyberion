@@ -193,6 +193,12 @@ describe('mission-orchestration-journal', () => {
       'Invalid catalog mission-provisioned-entry'
     );
 
+    safeRmSync(filePath, { force: true });
+    safeMkdir(filePath, { recursive: true });
+    expect(() => readProvisionedEntry(filePath, provisioned)).toThrow(
+      'MISSION_LOG_CORRUPT:provisioned_entry_unreadable'
+    );
+
     safeRmSync(dir, { recursive: true, force: true });
   });
 

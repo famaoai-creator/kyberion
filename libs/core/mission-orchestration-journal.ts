@@ -187,6 +187,14 @@ function artifactPath(filePath: string): string {
   return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
 }
 
+function assertRegularArtifactPath(filePath: string): string {
+  const safePath = artifactPath(filePath);
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_unreadable');
+  }
+  return safePath;
+}
+
 function writeProvisionedEntryRecord(
   recordPath: string,
   input: {
@@ -314,7 +322,7 @@ export function readProvisionedEntry<TContent>(
   const safeFilePath = artifactPath(filePath);
   let persisted: unknown;
   try {
-    persisted = readJson<unknown>(safeFilePath);
+    persisted = readJson<unknown>(assertRegularArtifactPath(safeFilePath));
   } catch {
     throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_unreadable');
   }
@@ -496,7 +504,7 @@ export function writeProvisionedJson<TContent>(input: {
       safeWriteFile(safeFilePath, `${JSON.stringify(input.provisioned.content, null, 2)}\n`);
       let content: unknown;
       try {
-        content = readJson<unknown>(safeFilePath);
+        content = readJson<unknown>(assertRegularArtifactPath(safeFilePath));
       } catch {
         throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_unreadable');
       }
@@ -545,7 +553,7 @@ export function writeProvisionedText(input: {
       });
       const safeFilePath = artifactPath(input.filePath);
       safeWriteFile(safeFilePath, input.provisioned.content);
-      const content = readTextFile(safeFilePath);
+      const content = readTextFile(assertRegularArtifactPath(safeFilePath));
       if (content !== input.provisioned.content) {
         throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_mismatch');
       }
