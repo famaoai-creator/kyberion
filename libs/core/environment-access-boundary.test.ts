@@ -36,7 +36,9 @@ const SOURCES = [
   ['scripts/peer_network_register.ts', /process\.env\[secretEnv\]/u],
   ['scripts/backup.ts', /process\.env\[(?:envName|options\.passphraseEnv)\]/u],
   ['libs/core/mission-work-reconciliation.ts', /process\.env\.GITHUB_(?:HEAD_REF|REF_NAME|SHA)/u],
-  ['scripts/lib/harness.ts', /process\.env\.LOG_LEVEL/u],
+  // 1d92b899f moved the harness body to @agent/core/script-harness; scripts/lib/harness.ts
+  // is now a pure re-export barrel, so the env boundary lives at the new location.
+  ['libs/core/script-harness.ts', /process\.env\.LOG_LEVEL/u],
   ['scripts/demos/demo_telegram_flow.ts', /process\.env\.MISSION_ROLE/u],
   ['scripts/soak_restart_e2e.ts', /process\.env\.(?:VITEST|NODE_ENV)/u],
   [

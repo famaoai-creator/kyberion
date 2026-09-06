@@ -30,6 +30,10 @@ const secureIo = vi.hoisted(() => {
       fs.appendFileSync(abs(filePath), data, 'utf8');
     },
     safeExistsSync: (filePath: string) => fs.existsSync(abs(filePath)),
+    // artifact-store guards governed artifacts with lstat (main 551d986d0);
+    // the mock mirrors it against the hermetic KYBERION_ROOT.
+    safeLstat: (filePath: string) => fs.lstatSync(abs(filePath)),
+    safeStat: (filePath: string) => fs.statSync(abs(filePath)),
     safeMkdir: (dirPath: string) => fs.mkdirSync(abs(dirPath), { recursive: true }),
     safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
       options.encoding === null

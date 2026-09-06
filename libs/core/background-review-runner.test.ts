@@ -212,7 +212,9 @@ describe('background-review-runner', () => {
 
     expect(result).toMatchObject({ status: 'queued', action: 'pipeline_proposal' });
     expect(result.approval_request_id).toBeUndefined();
-    expect(result.approval_request_error).toMatch(/File not found/);
+    // f896bc5cc made the pipeline target check explicit and symmetric with the
+    // skill target check below, replacing the generic secure-io read error.
+    expect(result.approval_request_error).toMatch(/Pipeline target not found/);
     const record = loadDistillCandidateRecord(result.candidate_id!);
     candidatePaths.add(
       pathResolver.shared(`runtime/distill-candidates/${result.candidate_id}.json`)
