@@ -23789,3 +23789,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `create_actuator` の生成テンプレート、SX-06／SX-10
 - **変更**: 新規actuator scaffoldの direct-entry 判定を `import.meta.main` から共有 `isDirectEntry` へ統一した。source／compiled `.js` の両方を判定する既存契約と、actuator CLIのエラー境界・生成内容は維持し、テンプレート契約テストで再導入を拒否する。
 - **検証**: create-actuator **1 file／4 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1765
+
+- **対象**: `intent_trace` の repository-bound JSONL loader、SX-03／SX-06／SX-09
+- **変更**: trace／audit JSONLの手書き `readTextFile`・行分割・`parseSafeJsonInput` を foundation `readJsonLines`へ統一した。operation-timeのrepository／regular-file検証、malformed行skip、normalize後のshape validation、symlink除外、intent trace projectionは維持した。
+- **検証**: intent-trace **1 file／5 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
