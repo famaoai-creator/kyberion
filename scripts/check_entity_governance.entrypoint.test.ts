@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
+import { readEntityGovernanceTextFile } from './check_entity_governance.js';
 
 describe('entity governance checker boundary', () => {
   it('uses the foundation text reader for status and gitignore sources', () => {
@@ -12,5 +13,11 @@ describe('entity governance checker boundary', () => {
     expect(source).toContain('getRegisteredEnvBool, readTextFile');
     expect(source).not.toContain('safeReadFile(statusPath');
     expect(source).not.toContain('safeReadFile(gitIgnorePath');
+  });
+
+  it('rejects a directory replacement before governance text parsing', () => {
+    expect(() => readEntityGovernanceTextFile(pathResolver.rootDir(), 'fixture')).toThrow(
+      'fixture must be a regular file'
+    );
   });
 });
