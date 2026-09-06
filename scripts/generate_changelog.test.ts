@@ -7,6 +7,7 @@ import {
   classify,
   main,
   parseCommit,
+  readChangelogTextFile,
   renderSection,
 } from './generate_changelog.js';
 
@@ -83,6 +84,7 @@ describe('generate_changelog', () => {
     expect(source).not.toContain("from 'node:child_process'");
     expect(source).toContain("safeExec('git'");
     expect(source).toContain('readTextFile');
+    expect(source).toContain('readChangelogTextFile(filePath: string)');
     expect(source).not.toContain('safeReadFile(CHANGELOG_PATH');
 
     process.exitCode = undefined;
@@ -90,6 +92,12 @@ describe('generate_changelog', () => {
 
     expect(report).toMatchObject({ from: 'HEAD', to: 'HEAD', count: 0 });
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('rejects a directory before reading the changelog', () => {
+    expect(() => readChangelogTextFile(pathResolver.rootResolve('docs'))).toThrow(
+      'must be a regular file'
+    );
   });
 
   it('keeps prepend read-only in dry-run mode', async () => {
