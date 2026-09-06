@@ -25,7 +25,7 @@ import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { readTextFile } from '../foundation/text.js';
-import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import {
   COMMON_TENANT_SLUG,
   listAssets,
@@ -140,9 +140,11 @@ export function computeTenantIngestCuration(input: {
       const cardAbs = path.join(rootDir, ...asset.target_path.split('/'));
       if (safeExistsSync(cardAbs)) {
         try {
-          const content = readTextFile(cardAbs);
-          kind = extractFrontmatterValue(content, 'kind') ?? kind;
-          lastUpdated = extractFrontmatterValue(content, 'last_updated');
+          if (safeLstat(cardAbs).isFile()) {
+            const content = readTextFile(cardAbs);
+            kind = extractFrontmatterValue(content, 'kind') ?? kind;
+            lastUpdated = extractFrontmatterValue(content, 'last_updated');
+          }
         } catch {
           /* unreadable card: fall back to the ledger below */
         }

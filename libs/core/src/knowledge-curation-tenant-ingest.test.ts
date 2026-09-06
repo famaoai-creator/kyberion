@@ -170,6 +170,39 @@ describe('computeTenantIngestCuration', () => {
     expect(sections).toEqual([]);
   });
 
+  it('does not read a directory that occupies a tenant card path', () => {
+    const directoryCard = path.join(
+      fixtureRoot,
+      'knowledge/confidential/acme-corp/reports/directory-card.md'
+    );
+    safeMkdir(directoryCard, { recursive: true });
+    writeFixtureFile(
+      'knowledge/confidential/acme-corp/_ledger/assets.jsonl',
+      ledgerLine({
+        asset_id: 'ing-directory-card',
+        source_id: 'PAGE-DIRECTORY-CARD',
+        target_path: 'knowledge/confidential/acme-corp/reports/directory-card.md',
+      }) + '\n'
+    );
+
+    const sections = computeTenantIngestCuration({
+      config: CONFIG,
+      now: NOW,
+      tenants: ['acme-corp'],
+      pathOptions: options,
+    });
+
+    expect(sections[0]?.flagged).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target_path: 'knowledge/confidential/acme-corp/reports/directory-card.md',
+          last_updated: '2026-01-01T00:00:00.000Z',
+          reason: 'stale',
+        }),
+      ])
+    );
+  });
+
   it('rejects an external tenant-ingest fixture root before ledger access', () => {
     const key = 'KYBERION_CURATION_TENANT_ROOTDIR';
     const previous = process.env[key];
