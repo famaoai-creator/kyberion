@@ -1891,12 +1891,6 @@
       "type": "json"
     },
     {
-      "path": "product/governance/model-cost-registry.fallback.json",
-      "tier": "public",
-      "size": 1387,
-      "type": "json"
-    },
-    {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
       "size": 2009,
