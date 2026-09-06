@@ -58,6 +58,7 @@ import { loadState } from './mission-state.js';
 import {
   gatherDistillContext,
   distillMission,
+  isRegularMissionDistillPromptPath,
   resolveWisdomOutputPath,
 } from './mission-distill.js';
 import { promoteMemoryCandidateToKnowledge } from './memory-promotion-workflow.js';
@@ -67,6 +68,24 @@ import { safeExec } from './secure-io.js';
 // real shared queue (root cause of combined-run flakes).
 process.env.KYBERION_MEMORY_QUEUE_PATH =
   'active/shared/tmp/test-memory-queue-mission-distill.jsonl';
+
+describe('mission-distill prompt resource loader', () => {
+  it('accepts only existing regular prompt files', () => {
+    const fixtureRoot = pathResolver.shared('tmp/mission-distill-prompt-loader-test');
+    const filePath = `${fixtureRoot}/prompt.md`;
+    const directoryPath = `${fixtureRoot}/prompt-directory.md`;
+    try {
+      safeWriteFile(filePath, 'distill prompt', { mkdir: true });
+      safeMkdir(directoryPath, { recursive: true });
+
+      expect(isRegularMissionDistillPromptPath(filePath)).toBe(true);
+      expect(isRegularMissionDistillPromptPath(directoryPath)).toBe(false);
+      expect(isRegularMissionDistillPromptPath(`${fixtureRoot}/missing.md`)).toBe(false);
+    } finally {
+      safeRmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('mission-distill end-to-end promotion flow', () => {
   const missionId = 'MSN-DISTILL-E2E-001';

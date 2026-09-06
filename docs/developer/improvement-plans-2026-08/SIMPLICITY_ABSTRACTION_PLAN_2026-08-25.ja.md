@@ -22877,3 +22877,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/worker-context-compaction.ts`、worker-context-compaction test、PI-03
 - **変更**: worker context compaction の update-summary prompt read を operation-time の regular-file 境界へ接続し、directory replacement を要約生成へ到達させず既定 fallbackへ閉じるようにした。prompt不存在時の既存 fallback と要約処理 semantics は維持した。
 - **検証**: worker-context-compaction **2 files／14 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1613
+
+- **対象**: `libs/core/mission-distill.ts`、mission-distill test、wisdom-policy catalog test、PI-03
+- **変更**: mission-distill の distill prompt read を operation-time の regular-file 境界へ接続し、directory replacement を wisdom生成へ到達させず空prompt fallbackへ閉じるようにした。governed wisdom policy catalog と既存の distillation semantics は維持した。
+- **検証**: mission-distill／wisdom-policy catalog **2 files／6 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
