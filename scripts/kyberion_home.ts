@@ -81,8 +81,11 @@ import {
 } from './operator-home-secondary-actions.js';
 import { printCommands, showHome, type HomePrint } from './operator-home-view.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import {
+  createExecuteBrowserPipeline,
+  loadBrowserActuator,
+} from './browser_playwright_executor.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { t as translate } from '@agent/core/t';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
@@ -946,6 +949,7 @@ async function handleProcedureRun(
     tabId?: string;
     cdpUrl?: string;
     cdpPort?: number;
+    headed?: boolean;
     recordVideo?: boolean;
     recordTrace?: boolean;
     correlationId?: string;
@@ -1028,10 +1032,7 @@ async function handleProcedureRun(
     const browserRecording = loaded.value as BrowserExtensionRecording;
     const origin = argv.origin || browserRecording.tab.origin;
     const tabId = argv.tabId || '';
-    if (!tabId) {
-      printOutput(ui('recorder:recorder_browser_tab_required'));
-      throw new ScriptExitError(1, '', true);
-    }
+    const connectOverCdp = Boolean(tabId || argv.cdpUrl || argv.cdpPort);
     const requestedOperations = Array.from(
       new Set(
         browserRecording.actions
@@ -1039,20 +1040,23 @@ async function handleProcedureRun(
           .filter((op: string) => op !== 'sensitive_input_omitted')
       )
     ) as Array<Exclude<BrowserExtensionOperation, 'sensitive_input_omitted'>>;
-    const actuatorPath = pathResolver.rootResolve(
-      'dist/libs/actuators/browser-actuator/src/index.js'
-    );
-    type BrowserActuatorResult = {
-      status?: string;
-      results?: unknown[];
-      errors?: string[];
-      context?: unknown;
-    };
-    let browserActuator: {
-      handleAction: (input: Record<string, unknown>) => Promise<BrowserActuatorResult>;
-    };
+    let executeBrowserPipeline;
     try {
-      browserActuator = (await import(pathToFileURL(actuatorPath).href)) as typeof browserActuator;
+      const browserActuator = await loadBrowserActuator();
+      executeBrowserPipeline = createExecuteBrowserPipeline(browserActuator.handleAction, {
+        sessionId: tabId || browserRecording.recording_id,
+        headless: argv.headed !== true,
+        connectOverCdp,
+        cdpUrl: argv.cdpUrl,
+        cdpPort: argv.cdpPort,
+        recordTrace: argv.recordTrace !== false,
+        recordVideo: argv.recordVideo !== false,
+        context: {
+          procedure_id: entry.procedure_id,
+          mission_id: missionId,
+          source: 'kyberion-home-cli',
+        },
+      });
     } catch (error) {
       printOutput(
         ui('recorder:recorder_browser_build_required', {
@@ -1084,30 +1088,13 @@ async function handleProcedureRun(
         pipelineId: entry.pipeline_ref,
         correlationId,
         channel: 'cli',
-        executeBrowserPipeline: async ({ steps, sessionId, options }) => {
-          const actuatorResult = await browserActuator.handleAction({
-            action: 'pipeline',
-            steps,
-            session_id: sessionId || tabId,
-            options: {
-              ...(options || {}),
-              connect_over_cdp: true,
-              record_trace: argv.recordTrace !== false,
-              record_video: argv.recordVideo !== false,
-              ...(argv.cdpUrl ? { cdp_url: argv.cdpUrl } : {}),
-              ...(argv.cdpPort ? { cdp_port: argv.cdpPort } : {}),
-            },
-            context: {
-              procedure_id: entry.procedure_id,
-              mission_id: missionId,
-              source: 'kyberion-home-cli',
-            },
-          });
-          browserEvidence = actuatorResult?.context;
+        executeBrowserPipeline: async (input) => {
+          const actuatorResult = await executeBrowserPipeline(input);
+          browserEvidence = actuatorResult.context;
           return {
-            status: actuatorResult?.status === 'succeeded' ? 'succeeded' : 'failed',
-            results: Array.isArray(actuatorResult?.results) ? actuatorResult.results : undefined,
-            errors: actuatorResult?.errors,
+            status: actuatorResult.status,
+            results: actuatorResult.results,
+            errors: actuatorResult.errors,
           };
         },
       })
@@ -1254,7 +1241,15 @@ async function mainImpl(args: string[] = []): Promise<void> {
     .option('note', { type: 'string', description: 'approvals: decision note' })
     .option('substrate', { type: 'string', choices: ['browser', 'desktop', 'service'] })
     .option('origin', { type: 'string', description: 'browser procedure origin binding' })
-    .option('tab-id', { type: 'string', description: 'browser procedure tab binding' })
+    .option('tab-id', {
+      type: 'string',
+      description: 'optional tab/session id; with --cdp-url/--cdp-port attaches to live Chrome',
+    })
+    .option('headed', {
+      type: 'boolean',
+      default: false,
+      description: 'standalone Playwright: launch a visible Chromium window',
+    })
     .option('cdp-url', {
       type: 'string',
       description: 'Chrome DevTools endpoint for CLI browser execution',
@@ -1391,6 +1386,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
           correlationId: argv['correlation-id'] ? String(argv['correlation-id']) : undefined,
           origin: argv.origin ? String(argv.origin) : undefined,
           tabId: argv['tab-id'] ? String(argv['tab-id']) : undefined,
+          headed: Boolean(argv.headed),
           cdpUrl: argv['cdp-url'] ? String(argv['cdp-url']) : undefined,
           cdpPort: typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined,
           recordVideo: argv['record-video'] !== false,
