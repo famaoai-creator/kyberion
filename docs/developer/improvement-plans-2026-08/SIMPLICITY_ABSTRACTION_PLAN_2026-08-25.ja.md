@@ -23045,3 +23045,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/src/knowledge-index.ts`、`libs/core/src/knowledge-index.test.ts`、PI-03
 - **変更**: JSON hint scanner の本文 read 前へ operation-time の `safeLstat(...).isFile()` 検査を追加し、`.json` 名のディレクトリ置換を parse／index登録へ到達させないようにした。既存の scanner containment、symlink 拒否、malformed hint の skip、Markdown index semantics は維持し、JSON hint directory の回帰テストを追加した。
 - **検証**: `libs/core/src/knowledge-index.test.ts` **1 file／16 tests passed**、`libs/core` typecheck、Prettier、`git diff --check`。needs-review loader の個別修正、完了計画の archive 移動、provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1641
+
+- **対象**: `scripts/inventory_resource_loaders.ts`、`scripts/inventory_resource_loaders.test.ts`、PI-03
+- **変更**: resource-loader inventory が同一ファイル内の regular-file helper 本体を解析し、`safeLstat/safeStat(...).isFile()` または regular-resource assertion を実装している helper の callsiteを evidence として扱えるようにした。generic function、class method、object-property arrow の宣言も収集対象へ拡張し、path-only helper は regular-file evidence として誤認しない回帰テストを追加した。
+- **検証**: 実 inventory **1,347 files／inline 6／nearby 178／needs-review 0**、inventory **1 file／7 tests passed**、root typecheck、Prettier、`git diff --check`。provider 実機受入と、外部 helper 間の semantic path flow は継続課題とする。
