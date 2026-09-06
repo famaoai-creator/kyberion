@@ -3,7 +3,7 @@ import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js
 import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEPRECATED = new Map(
@@ -29,12 +29,19 @@ type Finding = {
   kind: 'deprecated_alias' | 'compatibility_forwarder';
 };
 
+export function readDeprecatedWisdomTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function collectFindings(): Finding[] {
   const findings: Finding[] = [];
   for (const root of ROOTS) {
     if (!safeExistsSync(root)) continue;
     for (const file of getAllFiles(root).filter((entry) => entry.endsWith('.json'))) {
-      const content = readTextFile(file);
+      const content = readDeprecatedWisdomTextFile(file);
       for (const [alias, canonical] of DEPRECATED) {
         if (content.includes(`wisdom:${alias}`)) {
           findings.push({
