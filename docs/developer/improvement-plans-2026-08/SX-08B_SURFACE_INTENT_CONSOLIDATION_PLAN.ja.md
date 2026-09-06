@@ -1855,3 +1855,9 @@ generic approval text と mission proposal confirmation の日本語固定を再
 pending mission proposalの取消返信と発行結果を再監査し、confirmation promptだけlocale対応していて、確認後のgeneric replyが日本語固定の残存を修正した。`resolveMissionProposalReply` にoptional localeを追加し、Telegram／Discord／iMessageのoperator localeを取消／発行結果へ伝播した。proposal state、mission issuance、external delivery gate、既定の日本語は維持した。
 
 検証: mission proposal／3 bridge **4 test files／35 tests passed**、root typecheck、Prettier、`git diff --check`。残る自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は継続課題である。
+
+## 2026-09-06 再レビュー修正 244
+
+approval-gated な mission steering の承認待ち応答に `SurfaceConversationInput.locale` を伝播した。locale未指定時の既存日本語、approval request／human decision／steering authorityの境界は維持し、qps-ploc の承認表示回帰を追加した。
+
+検証: mission steering **1 file／12 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は引き続き未完了である。

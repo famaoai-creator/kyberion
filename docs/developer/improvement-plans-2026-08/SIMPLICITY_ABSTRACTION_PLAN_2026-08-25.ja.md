@@ -22638,6 +22638,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: pending mission proposal の取消返信と発行結果にもoptional localeを接続し、3 bridgeがoperator localeを確認後のgeneric proposal replyへ渡すようにした。proposal state、mission issuance、external delivery gate、既定の日本語表示は維持した。
 - **検証**: mission proposal／3 bridge **4 test files／35 tests passed**、root typecheck、Prettier、`git diff --check`。12 surfaceの全面contract描画、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1580
+
+- **対象**: `libs/core/surface-mission-steering.ts`、mission steering test、SX-08b／SX-09b
+- **変更**: approval-gated な mission steering の承認待ち応答を `SurfaceConversationInput.locale` から描画するようにした。locale未指定時の既存日本語、承認 request の生成、human-only decision、steering authority、finish／verify の実行境界は維持し、qps-ploc の承認文言回帰を追加した。
+- **検証**: mission steering **1 file／12 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`

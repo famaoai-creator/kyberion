@@ -79,6 +79,7 @@ import type {
   SurfaceAsyncChannel,
 } from './channel-surface-types.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
+import type { SupportedLocale } from './locale-normalize.js';
 import { t } from './t.js';
 
 // ---------------------------------------------------------------------------
@@ -458,8 +459,9 @@ function buildApprovalPendingText(params: {
   missionId: string;
   requestId: string;
   note?: string;
+  locale?: SupportedLocale;
 }): string {
-  const locale = 'ja' as const;
+  const locale = params.locale ?? 'ja';
   return [
     t(
       'bridge:mission_steering_approval_required',
@@ -520,6 +522,7 @@ async function handleGateApprovalVerb(params: {
   missionId: string;
   key: SteeringThreadKey;
   note?: string;
+  locale?: SupportedLocale;
 }): Promise<SurfaceConversationResult> {
   const record = buildSteeringApprovalRequest({
     missionId: params.missionId,
@@ -538,6 +541,7 @@ async function handleGateApprovalVerb(params: {
       missionId: params.missionId,
       requestId: record.id,
       note: params.note,
+      locale: params.locale,
     })
   );
 }
@@ -569,6 +573,7 @@ async function handleFinishRequestVerb(params: {
   missionId: string;
   key: SteeringThreadKey;
   note?: string;
+  locale?: SupportedLocale;
 }): Promise<SurfaceConversationResult> {
   const reconciliation = await reconcileFinishCompletion(params.missionId);
   if (reconciliation.missingContext) {
@@ -608,6 +613,7 @@ async function handleFinishRequestVerb(params: {
       missionId: params.missionId,
       requestId: record.id,
       note: params.note,
+      locale: params.locale,
     })
   );
 }
@@ -844,9 +850,19 @@ async function handleMissionSteeringTurn(
     case 'resume':
       return handleResumeVerb(missionId, surfaceTag);
     case 'gate_approval':
-      return handleGateApprovalVerb({ missionId, key, note: match.note });
+      return handleGateApprovalVerb({
+        missionId,
+        key,
+        note: match.note,
+        locale: context.input.locale,
+      });
     case 'finish':
-      return handleFinishRequestVerb({ missionId, key, note: match.note });
+      return handleFinishRequestVerb({
+        missionId,
+        key,
+        note: match.note,
+        locale: context.input.locale,
+      });
     default: {
       const exhaustiveCheck: never = match.verb;
       throw new Error(

@@ -393,3 +393,9 @@ generic approval／proposal builderにoptional localeを追加し、Telegram／D
 `resolveMissionProposalReply` の取消／発行結果へoptional localeを伝播し、Telegram／Discord／iMessage bridgeの確認後replyもoperator localeで描画するようにした。既定の日本語、proposal state、mission issuance、provider配送、approval／tenant scope semanticsは維持した。
 
 検証: mission proposal／3 bridge **4 test files／35 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、日英のchannelリテラル全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 38
+
+mission steering のapproval-gated replyへ `SurfaceConversationInput.locale` を伝播し、承認待ちの状態・選択肢・次アクションをoperator localeで描画するようにした。既定の日本語、approval／tenant scope、provider配送、human-only decision semanticsは維持した。
+
+検証: mission steering **1 file／12 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、日英のchannelリテラル全面移行は引き続き未完了である。
