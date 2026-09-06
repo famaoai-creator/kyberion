@@ -83,11 +83,22 @@ function checkScriptCommands(
 
   const ids = new Set<string>();
   const scripts = new Set<string>();
+  const commands = new Set<string>();
+  const registeredCommands = new Set(manifest.commands.map((command) => command.command));
   for (const command of manifest.script_commands) {
     if (!command.id || ids.has(command.id)) {
       failures.push(`script command id must be unique: ${command.id || '<missing>'}`);
     }
     ids.add(command.id);
+    if (commands.has(command.command)) {
+      failures.push(`script command must be unique: ${command.command || '<default>'}`);
+    }
+    commands.add(command.command);
+    if (registeredCommands.has(command.command)) {
+      failures.push(
+        `script command collides with command registry: ${command.command || '<default>'}`
+      );
+    }
     if ((!command.script && !command.module) || (command.script && command.module)) {
       failures.push(
         `script command must declare exactly one of script or module: ${command.id || '<missing>'}`

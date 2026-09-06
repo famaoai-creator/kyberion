@@ -110,7 +110,6 @@
     "config-mission": "node --import ./scripts/ts-loader.mjs scripts/run_with_env.ts KYBERION_PERSONA=worker SYSTEM_ROLE=system_configurator node dist/scripts/config_mission.js",
     "services:setup": "node dist/scripts/services_setup.js",
     "channels:list": "node dist/scripts/channel_directory.js",
-    "setup:report": "node dist/scripts/setup_report.js",
     "generation:schedule": "node dist/scripts/run_generation_schedule.js",
     "chronos": "node dist/scripts/chronos_daemon.js",
     "ops:alerts": "node --import ./scripts/ts-loader.mjs scripts/ops_alerts.ts",

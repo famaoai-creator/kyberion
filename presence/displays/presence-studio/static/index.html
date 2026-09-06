@@ -2243,7 +2243,7 @@
       function renderFirstRunLauncher(payload) {
         if (!firstRunSummaryEl || !firstRunSurfacesEl || !firstRunNextEl) return;
         if (!payload || payload.ok === false) {
-          firstRunSummaryEl.textContent = "Surface readiness could not be loaded. Use `pnpm setup:report --persona first-time-user` in the terminal.";
+          firstRunSummaryEl.textContent = "Surface readiness could not be loaded. Use `pnpm kyberion setup report --persona first-time-user` in the terminal.";
           firstRunSurfacesEl.innerHTML = "";
           firstRunNextEl.innerHTML = "";
           return;
@@ -2283,7 +2283,7 @@
           `<div class="first-run-action">
             <strong>${escapeHtml(action.title || "Next action")}</strong><br />
             ${escapeHtml(action.reason || "")}<br />
-            <code>${escapeHtml(action.suggested_command || "pnpm setup:report --persona first-time-user")}</code>
+            <code>${escapeHtml(action.suggested_command || "pnpm kyberion setup report --persona first-time-user")}</code>
           </div>`
         )).join("");
       }

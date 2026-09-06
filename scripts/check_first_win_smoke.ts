@@ -52,7 +52,7 @@ const RULES: SmokeRule[] = [
   {
     file: 'docs/user/TROUBLESHOOTING.md',
     required: [
-      'pnpm setup:report --persona first-time-user',
+      'pnpm kyberion setup report --persona first-time-user',
       'pnpm surfaces repair',
       'pnpm doctor',
     ],

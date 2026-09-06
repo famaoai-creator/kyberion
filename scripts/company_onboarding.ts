@@ -134,7 +134,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   const nextCommands = [
     `export KYBERION_CUSTOMER=${normalized.slug}`,
     'export KYBERION_TENANT_SCOPE_REQUIRED=true',
-    'pnpm setup:report --persona first-time-user',
+    'pnpm kyberion setup report --persona first-time-user',
     normalized.tenantSlug
       ? `pnpm tenant show ${normalized.tenantSlug} --json`
       : `pnpm tenant create ${tenantSlug} --display-name "${normalized.companyName}" --assigned-role owner --apply`,

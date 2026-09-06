@@ -14,7 +14,7 @@ describe('next-action remediation commands', () => {
 
     expect(action).toMatchObject({
       next_action_type: 'inspect_artifact',
-      suggested_command: 'pnpm setup:report --persona first-time-user',
+      suggested_command: 'pnpm kyberion setup report --persona first-time-user',
     });
   });
 

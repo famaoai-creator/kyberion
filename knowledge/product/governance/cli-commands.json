@@ -1516,14 +1516,6 @@
       "audience": "operator"
     },
     {
-      "id": "script.setup.report",
-      "script": "setup:report",
-      "command": "setup report",
-      "noun": "setup",
-      "verb": "report",
-      "audience": "operator"
-    },
-    {
       "id": "script.generation.schedule",
       "script": "generation:schedule",
       "command": "generation schedule",

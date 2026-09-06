@@ -148,7 +148,7 @@ Use `pnpm env:bootstrap --manifest kyberion-toolchain` first when you want to co
 
 Use `pnpm services:setup` when you want the external service catalog to tell you which presets still need customer/personal connection files or authentication secrets. Use `pnpm reasoning:setup` when you want the reasoning backend decision to be explicit before `doctor` or `env:bootstrap` runs. The reasoning setup now distinguishes `claude-cli`, `anthropic`, `codex-cli`, `gemini-cli`, `nemotron-api`, `local`, and `stub`, so OpenAI-compatible Nemotron endpoints are visible before bootstrap chooses a backend.
 
-Use `pnpm setup:report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
+Use `pnpm kyberion setup report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
 
 `pnpm doctor` includes the baseline runtime and reasoning backend manifest checks; use it when you want the consolidated readiness view rather than a domain-specific setup report.
 
