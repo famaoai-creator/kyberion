@@ -4,13 +4,8 @@ import {
   currentProcessArgv,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
-import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-} from '@agent/core/secure-io';
+import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
@@ -49,7 +44,7 @@ export function readProcessJson(filePath: string, label: string): unknown {
   if (!isExistingRegularFile(filePath)) {
     throw new Error(`${label} must be an existing regular file: ${filePath}`);
   }
-  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
+  return readJson(filePath);
 }
 
 export function readProcessJsonObject(filePath: string, label: string): Record<string, unknown> {

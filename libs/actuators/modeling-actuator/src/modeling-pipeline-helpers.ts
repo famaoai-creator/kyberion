@@ -36,9 +36,9 @@ import {
   createAjv,
   defineCatalog,
   nowIso,
-  parseSafeJsonInput,
   parseSafeJsonObjectValue,
   parsePersistedPipelineStrategy,
+  readJson,
 } from '@agent/core/foundation';
 import {
   loadSoftwareQualityContractAtPath,
@@ -139,7 +139,7 @@ function readModelingJson(filePath: string, label: string): unknown {
   if (!isExistingRegularFile(filePath)) {
     throw new Error(`${label} must be an existing regular file: ${filePath}`);
   }
-  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
+  return readJson(filePath);
 }
 
 // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
