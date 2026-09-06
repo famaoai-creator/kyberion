@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type UiUxGovernanceViolation = {
@@ -36,6 +36,13 @@ const REQUIRED_SEMANTIC_TOKENS = [
 ];
 const RAW_COLOR_PATTERN = /(?:#[0-9a-f]{3,8}\b|\brgba?\s*\()/giu;
 
+export function readUiUxGovernanceTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function walkFiles(directory: string): string[] {
   if (!safeExistsSync(directory)) return [];
   return safeReaddir(directory).flatMap((entry) => {
@@ -69,13 +76,13 @@ export function collectUiUxGovernanceReport(now = new Date()): UiUxGovernanceRep
 
   for (const filePath of operatorFiles) {
     const relativePath = path.relative(pathResolver.rootDir(), filePath);
-    const source = readTextFile(filePath);
+    const source = readUiUxGovernanceTextFile(filePath);
     violations.push(...findHardcodedColorViolations(source, relativePath));
   }
 
   for (const relativePath of GENERATED_TOKEN_FILES) {
     const filePath = pathResolver.rootResolve(relativePath);
-    const source = safeExistsSync(filePath) ? readTextFile(filePath) : '';
+    const source = safeExistsSync(filePath) ? readUiUxGovernanceTextFile(filePath) : '';
     for (const token of REQUIRED_SEMANTIC_TOKENS) {
       if (!source.includes(`${token}:`)) {
         violations.push({
@@ -88,7 +95,7 @@ export function collectUiUxGovernanceReport(now = new Date()): UiUxGovernanceRep
   }
 
   const dashboardPath = 'scripts/sovereign_dashboard.ts';
-  const dashboardSource = readTextFile(pathResolver.rootResolve(dashboardPath));
+  const dashboardSource = readUiUxGovernanceTextFile(pathResolver.rootResolve(dashboardPath));
   const rendererUses = dashboardSource.match(/renderStatus\s*\(/gu)?.length ?? 0;
   if (rendererUses < 5) {
     violations.push({
