@@ -1,12 +1,22 @@
+import * as path from 'node:path';
+import { afterEach } from 'vitest';
 import { describe, expect, it } from 'vitest';
 import {
   buildFallbackEmailDraft,
   extractBodyMarkdownFromDraft,
   extractFirstJsonBlock,
   generateEmailReplyDraft,
+  isRegularEmailDraftPath,
   parseEmailDraftArtifact,
   summarizeEmailSubject,
 } from './email-workflow.js';
+import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from './index.js';
+
+const FIXTURE_ROOT = pathResolver.sharedTmp('email-workflow-loader-test');
+
+afterEach(() => {
+  safeRmSync(FIXTURE_ROOT, { recursive: true, force: true });
+});
 
 describe('email-workflow shared helpers', () => {
   it('extracts only the body from a persisted draft envelope', () => {
@@ -62,6 +72,16 @@ describe('email-workflow shared helpers', () => {
     expect(parseEmailDraftArtifact([])).toBeNull();
     expect(parseEmailDraftArtifact('invalid')).toBeNull();
     expect(parseEmailDraftArtifact(null)).toBeNull();
+  });
+
+  it('accepts only regular files for persisted draft paths', () => {
+    const filePath = path.join(FIXTURE_ROOT, 'latest.json');
+    const directoryPath = path.join(FIXTURE_ROOT, 'latest.md');
+    safeWriteFile(filePath, '{"subject":"safe"}', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(isRegularEmailDraftPath(filePath)).toBe(true);
+    expect(isRegularEmailDraftPath(directoryPath)).toBe(false);
   });
 
   it('rejects a request id that escapes the draft artifact directory', async () => {
