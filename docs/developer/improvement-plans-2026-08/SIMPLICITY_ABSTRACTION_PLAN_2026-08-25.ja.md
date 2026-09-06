@@ -23495,3 +23495,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos filesystem／trace query routes、shared request-input helper、SX-09b
 - **変更**: knowledge-ref／runtime-file／trace-log に加え、mission-asset、deliverable-preview、traces の高リスク query input を共通 `readChronosStringParam`／`readChronosOptionalStringParam` へ接続した。配列・object・空白値の暗黙変換を path／artifact lookup／viewer scope／trace projection へ到達させず、既存の認可・safe path・404／403 semantics を維持した。
 - **検証**: request-input **1 file／2 tests passed**、route source boundary **1 file／1 test passed**、対象 lint、Prettier、`git diff --check`。残る全 route の framework-specific parsing と provider 実機受入は継続課題である。
+
+## 2026-09-06 再レビュー実装 1716
+
+- **対象**: Chronos approvals／deliverables／knowledge／tenant-scope／workitems route、request-input boundary test、SX-09b
+- **変更**: 認可・一覧投影へ直結する5つの Next route に残っていた query 値の個別既定値化を、共通 `readChronosStringParam`／`readChronosOptionalStringParam` へ統一した。tenant／organization／project／filter／limit は trim 済みの単一 string だけを認可計算・scope selector・一覧 projectionへ渡し、既存の viewer scope、tier、limit、404／403 semanticsは維持した。
+- **検証**: request-input boundary **1 file／2 tests passed**、対象 route の ESLint、Prettier、`git diff --check`。隔離依存に `next/server` がないため既存 `workitems/route.test.ts` は import 前に停止し、CIでの実行確認を継続する。
