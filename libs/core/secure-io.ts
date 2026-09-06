@@ -19,6 +19,10 @@ import { registerFoundationIo } from './foundation/io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
+// The policy gate is intentionally part of secure-io bootstrap; policy-engine
+// also validates policy-file paths through secure-io, so this known cycle must
+// remain explicit rather than being hidden by a second I/O implementation.
+// eslint-disable-next-line import/no-cycle
 import { policyEngine } from './policy-engine.js';
 import * as auditChainModule from './audit-chain.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
@@ -245,18 +249,28 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
  * implementation private prevents secure-io from becoming a second reader
  * API while preserving the permission checks used by the bridge itself.
  */
-function secureLoadJson<T>(filePath: string): T {
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return parseSafeJsonInput(raw, `JSON file ${path.basename(filePath)}`, {
+function secureLoadJson<T>(
+  filePath: string,
+  options: { maxSizeMB?: number; label?: string } = {}
+): T {
+  const raw = safeReadFile(filePath, {
+    encoding: 'utf8',
+    maxSizeMB: options.maxSizeMB,
+    label: options.label,
+  }) as string;
+  return parseSafeJsonInput(raw, options.label || `JSON file ${path.basename(filePath)}`, {
     preserveParseError: true,
   }) as T;
 }
 
 /** Read and parse an optional JSON file, returning null for missing or invalid input. */
-function secureLoadJsonIfPresent<T>(filePath: string): T | null {
+function secureLoadJsonIfPresent<T>(
+  filePath: string,
+  options?: { maxSizeMB?: number; label?: string }
+): T | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return secureLoadJson<T>(filePath);
+    return secureLoadJson<T>(filePath, options);
   } catch {
     return null;
   }
