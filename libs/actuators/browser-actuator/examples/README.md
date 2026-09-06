@@ -9,8 +9,18 @@ Browser-Actuator 固有のサンプル pipeline を配置するディレクト�
 実行例:
 
 ```bash
+# Preferred operator entry (same host boundary as catalog procedures)
+pnpm kyberion browser run --adf libs/actuators/browser-actuator/examples/explore-and-export.json
+
+# Direct actuator CLI (requires dist/)
 node dist/libs/actuators/browser-actuator/src/index.js --input libs/actuators/browser-actuator/examples/passkey-webauthn-io.json
 ```
+
+Approved extension recordings must not use `--adf`. Compile/run them with
+`pnpm kyberion browser run --recording <allowlisted.json>` or
+`pnpm kyberion browser run --procedure-id <id>` so the approval gate and origin
+allowlist still apply. See
+`knowledge/product/architecture/browser-execution-substrate-howto.md`.
 
 利用可能な examples:
 
