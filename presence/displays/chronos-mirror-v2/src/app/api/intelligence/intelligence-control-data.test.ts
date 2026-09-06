@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseControlEventLine } from './intelligence-control-data';
+import { parseControlEventLine, parseControlEventRecord } from './intelligence-control-data';
 
 describe('intelligence control event parser', () => {
   it('keeps typed control event fields and payload values', () => {
@@ -42,5 +42,16 @@ describe('intelligence control event parser', () => {
         '{"ts":"2099-01-01T00:00:00.000Z","decision":"event","payload":{"__proto__":{}}}'
       )
     ).toBeNull();
+  });
+
+  it('validates already-parsed JSONL records through the same control boundary', () => {
+    expect(
+      parseControlEventRecord({
+        ts: '2099-01-01T00:00:00.000Z',
+        decision: 'mission_control_action_applied',
+      })
+    ).toMatchObject({ decision: 'mission_control_action_applied' });
+    expect(parseControlEventRecord(null)).toBeNull();
+    expect(parseControlEventRecord(['not-an-event'])).toBeNull();
   });
 });

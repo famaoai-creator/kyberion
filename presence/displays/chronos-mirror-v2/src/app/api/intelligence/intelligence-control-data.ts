@@ -112,10 +112,11 @@ import {
 import { listWorkItems } from '@agent/core/work-coordination';
 import { getProjectManagementView } from '@agent/core/project-management';
 import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
+import { isRecord, readJsonLines } from '@agent/core/foundation';
 import * as intelligenceData from './intelligence-observation-data';
 import {
   parseDashboardJsonRecord,
-  parseDashboardOwnerSummaryLine,
+  parseDashboardOwnerSummary,
 } from '@agent/core/dashboard-event-parser';
 
 export function readSafeObservationFile(filePath: string): string | null {
@@ -151,7 +152,12 @@ function controlEventText(event: Record<string, unknown>, key: string): string |
 
 export function parseControlEventLine(line: string): Record<string, unknown> | null {
   const event = parseDashboardJsonRecord(line);
-  if (!event) return null;
+  return parseControlEventRecord(event);
+}
+
+export function parseControlEventRecord(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value)) return null;
+  const event = value;
   if (!controlEventTimestamp(event)) return null;
   if (CONTROL_EVENT_STRING_KEYS.some((key) => key in event && typeof event[key] !== 'string')) {
     return null;
@@ -169,6 +175,22 @@ export function parseControlEventLine(line: string): Record<string, unknown> | n
     }
   }
   return event;
+}
+
+function readSafeObservationRecords(filePath: string): Record<string, unknown>[] {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
+    return readJsonLines<Record<string, unknown>>(safePath, {
+      map: (value) => {
+        if (!isRecord(value)) throw new Error('observation JSONL entry must be an object');
+        return value;
+      },
+      onMalformed: 'skip',
+    });
+  } catch {
+    return [];
+  }
 }
 
 function controlEventTimestamp(event: Record<string, unknown>): string | null {
@@ -193,20 +215,20 @@ export function collectRecentEvents(
   ];
   const lines: Array<{ ts: string; decision: string; mission_id?: string; why?: string }> = [];
   for (const file of files) {
-    const raw = readSafeObservationFile(file);
-    if (raw === null) continue;
-    for (const line of raw.trim().split('\n')) {
-      if (!line.trim()) continue;
-      const event = parseControlEventLine(line);
-      if (!event) continue;
-      const ts = controlEventTimestamp(event);
-      const decision = controlEventText(event, 'decision') || controlEventText(event, 'event_type');
+    for (const event of readSafeObservationRecords(file)) {
+      const controlEvent = parseControlEventRecord(event);
+      if (!controlEvent) continue;
+      const ts = controlEventTimestamp(controlEvent);
+      const decision =
+        controlEventText(controlEvent, 'decision') || controlEventText(controlEvent, 'event_type');
       if (!ts || !decision) continue;
       lines.push({
         ts,
         decision,
-        mission_id: controlEventText(event, 'mission_id') || controlEventText(event, 'resource_id'),
-        why: controlEventText(event, 'why'),
+        mission_id:
+          controlEventText(controlEvent, 'mission_id') ||
+          controlEventText(controlEvent, 'resource_id'),
+        why: controlEventText(controlEvent, 'why'),
       });
     }
   }
@@ -222,14 +244,10 @@ export function collectControlActions(
   tierAccess?: readonly string[]
 ): intelligenceData.ControlActionSummary[] {
   const file = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
-  const raw = readSafeObservationFile(file);
-  if (raw === null) return [];
-
   const lifecycle = new Map<string, intelligenceData.ControlActionSummary>();
 
-  for (const line of raw.trim().split('\n')) {
-    if (!line.trim()) continue;
-    const event = parseControlEventLine(line);
+  for (const record of readSafeObservationRecords(file)) {
+    const event = parseControlEventRecord(record);
     if (!event) continue;
     const decision = controlEventText(event, 'decision') || controlEventText(event, 'event_type');
     const eventType = controlEventText(event, 'event_type');
@@ -605,14 +623,10 @@ export function collectControlActionDetails(
   tierAccess?: readonly string[]
 ): Record<string, intelligenceData.ControlActionDetail[]> {
   const file = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
-  const raw = readSafeObservationFile(file);
-  if (raw === null) return {};
-
   const details: Record<string, intelligenceData.ControlActionDetail[]> = {};
 
-  for (const line of raw.trim().split('\n')) {
-    if (!line.trim()) continue;
-    const event = parseControlEventLine(line);
+  for (const record of readSafeObservationRecords(file)) {
+    const event = parseControlEventRecord(record);
     if (!event) continue;
     const eventId = controlEventText(event, 'event_id');
     const eventType = controlEventText(event, 'event_type');
@@ -678,11 +692,8 @@ export function collectOwnerSummaries(
   ];
 
   for (const file of files) {
-    const raw = readSafeObservationFile(file);
-    if (raw === null) continue;
-    for (const line of raw.trim().split('\n')) {
-      if (!line.trim()) continue;
-      const summary = parseDashboardOwnerSummaryLine(line);
+    for (const event of readSafeObservationRecords(file)) {
+      const summary = parseDashboardOwnerSummary(event);
       if (!summary) continue;
       if (!intelligenceData.missionVisibleToScope(summary.mission_id, tenantSlugs, tierAccess)) {
         continue;
