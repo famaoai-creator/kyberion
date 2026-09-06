@@ -12,7 +12,7 @@ import {
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertProjectTrustApproval } from '@agent/core/project-trust';
-import { safeExistsSync, safeExec, safeLstat, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeExec, safeLstat } from '@agent/core/secure-io';
 import { suggestClosestStrings } from '@agent/core/op-suggestions';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
@@ -20,8 +20,8 @@ import { registerSuperNerveExecutor } from '@agent/core/super-nerve-execution-po
 import {
   getRegisteredEnvText,
   nowIso,
-  parseSafeJsonInput,
   parseSafeJsonObjectValue,
+  readJson,
 } from '@agent/core/foundation';
 import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
 import * as path from 'node:path';
@@ -267,10 +267,7 @@ async function handleCoreAction(
         throw new Error(`Super pipeline include must be an existing regular file: ${macroPath}`);
       }
       const macroDef = parseSafeJsonObjectValue(
-        parseSafeJsonInput(
-          String(safeReadFile(macroPath, { encoding: 'utf8' }) || ''),
-          `super pipeline include ${relativePath}`
-        ),
+        readJson(macroPath),
         `super pipeline include ${relativePath}`
       );
       const macroSteps = macroDef.steps === undefined ? [] : macroDef.steps;
