@@ -53,6 +53,29 @@ describe('manifest-driven check runner', () => {
     ).toThrow('unknown package script');
   });
 
+  it('fails closed for malformed runtime manifest entries', () => {
+    expect(() => validateGateManifest({ version: 2, gates: [gate('versioned', 'pr')] })).toThrow(
+      'version must be 1'
+    );
+    expect(() =>
+      validateGateManifest({
+        version: 1,
+        gates: [
+          {
+            ...gate('malformed', 'pr'),
+            args: ['--valid', 42 as unknown as string],
+          },
+        ],
+      })
+    ).toThrow('args must be an array of strings');
+    expect(() =>
+      validateGateManifest({
+        version: 1,
+        gates: [{ ...gate('malformed-owner', 'pr'), owner: '   ' }],
+      })
+    ).toThrow('non-empty owner');
+  });
+
   it('fails closed for unknown and empty scopes', async () => {
     await expect(main(['--scope', 'typo', '--json'])).resolves.toBe(1);
     expect(selectGates(loadGateManifest(), 'release').length).toBeGreaterThan(1);
