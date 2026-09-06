@@ -23117,3 +23117,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_packaging_contract.ts`、`scripts/check_packaging_contract.test.ts`、PI-03／PI-12
 - **変更**: packaging contract checkerの`.dockerignore`／package manifest／`env.example`本文readを`readPackagingTextFile`のoperation-time regular-file境界へ統一し、directory replacementをdistribution policy判定へ到達させないようにした。既存のsecret／tier／export-key semanticsは維持した。
 - **検証**: packaging contract **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1653
+
+- **対象**: `scripts/generate_knowledge_index.ts`、`scripts/generate_knowledge_index.test.ts`、PI-03
+- **変更**: knowledge index generatorのfrontmatter／Markdown metadata／既存index・manifest本文readを`readKnowledgeTextFile`のoperation-time regular-file境界へ統一し、directory replacementをknowledge parse／freshness判定へ到達させないようにした。tier除外、frontmatter、manifest/index normalization semanticsは維持した。
+- **検証**: knowledge index **2 files／focused 3 tests passed**、対象ESLint、Prettier、`git diff --check`。既存snapshot 2 testsは無関係な未コミット`knowledge/_integrity-manifest.json`差分で不一致となるため、生成物を変更せず継続課題とした。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
