@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { parsePortalRequest } from './process_portal_inbox.js';
+import { parsePortalRequest, readPortalInboxTextFile } from './process_portal_inbox.js';
 
 describe('process_portal_inbox input boundary', () => {
   it('normalizes a valid pending request without dropping extension fields', () => {
@@ -32,5 +32,11 @@ describe('process_portal_inbox input boundary', () => {
     expect(source).not.toContain('console.warn');
     expect(source).toContain('run({ print })');
     expect(source).toContain('return processInbox(print)');
+  });
+
+  it('rejects a directory before reading an inbox request', () => {
+    expect(() => readPortalInboxTextFile(pathResolver.rootResolve('active'))).toThrow(
+      'must be a regular file'
+    );
   });
 });
