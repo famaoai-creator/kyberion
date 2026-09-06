@@ -14,7 +14,7 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 import { nowIso, readTextFile } from '@agent/core/foundation';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
-import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
 
 const HELP = `Usage:
   pnpm reasoning:config list [--json]
@@ -28,6 +28,13 @@ const HELP = `Usage:
 
 function hasFlag(argv: string[], name: string): boolean {
   return argv.includes(name);
+}
+
+export function readReasoningConfigTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 function option(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -62,7 +69,7 @@ function saveWithBackup(
     return;
   }
   if (safeExistsSync(path)) {
-    const previous = readTextFile(path);
+    const previous = readReasoningConfigTextFile(path);
     safeWriteFile(backup, previous, { mkdir: true, encoding: 'utf8' });
     safeWriteFile(historyPath, previous, { mkdir: true, encoding: 'utf8' });
   }
