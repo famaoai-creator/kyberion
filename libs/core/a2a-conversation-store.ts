@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { parseSafeJsonInput } from './foundation/json.js';
+import { readJsonLines } from './foundation/json.js';
 import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
@@ -89,14 +89,6 @@ function parseConversationTurn(value: unknown): ConversationTurn | undefined {
     ...(missionIdValue !== undefined ? { mission_id: missionIdValue } : {}),
     ...(tierValue !== undefined ? { tier: tierValue } : {}),
   };
-}
-
-function parseConversationTurnLine(line: string): ConversationTurn | undefined {
-  try {
-    return parseConversationTurn(parseSafeJsonInput(line, 'A2A conversation entry'));
-  } catch {
-    return undefined;
-  }
 }
 
 function getConversationLock(conversationId: string): Semaphore {
@@ -222,12 +214,10 @@ export function readConversationHistory(conversationId: string): ConversationTur
   assertRegularConversationFile(filePath);
 
   try {
-    const content = readTextFile(filePath);
-    return content
-      .split('\n')
-      .filter((l) => l.trim().length > 0)
-      .map(parseConversationTurnLine)
-      .filter((turn): turn is ConversationTurn => turn !== undefined);
+    return readJsonLines<ConversationTurn | undefined>(filePath, {
+      onMalformed: 'skip',
+      map: parseConversationTurn,
+    }).filter((turn): turn is ConversationTurn => turn !== undefined);
   } catch (err: unknown) {
     logger.warn(
       `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${errorMessage(err)}`
