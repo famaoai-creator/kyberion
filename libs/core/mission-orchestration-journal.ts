@@ -439,6 +439,9 @@ export function findMissingProvisionedEntries(
       missing.push(record);
       continue;
     }
+    if (!safeLstat(targetPath).isFile()) {
+      throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_unreadable:${record.entry_id}`);
+    }
 
     let raw: string;
     try {
