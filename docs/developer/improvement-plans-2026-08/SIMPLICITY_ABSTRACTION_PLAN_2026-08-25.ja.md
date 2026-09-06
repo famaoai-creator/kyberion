@@ -23411,3 +23411,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/generate_vocabulary_types.ts`、`scripts/generate_vocabulary_types.test.ts`、PI-03
 - **変更**: vocabulary types generatorのlocale-normalize本文readを`readVocabularyTypesTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをlocale block／generated type判定へ到達させないようにした。既存のcatalog loader、locale marker、qualified key semanticsは維持した。
 - **検証**: vocabulary types generator **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1702
+
+- **対象**: `scripts/import_design_md_catalog.ts`、`scripts/import_design_md_catalog.test.ts`、PI-03
+- **変更**: design-md catalog importerのDESIGN.md／README本文readを`readDesignMdCatalogTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをdesign parsing／catalog comparison判定へ到達させないようにした。既存のrepository path gate、metadata parser、dry-run generation semanticsは維持した。
+- **検証**: design-md catalog importer **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
