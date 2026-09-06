@@ -58,6 +58,15 @@ export function loadWisdomPolicy(): WisdomPolicyFile | null {
   }
 }
 
+export function isRegularMissionDistillPromptPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 export function resolveWisdomOutputPath(outputDir: string, wisdomFileName: string): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(path.join(outputDir, wisdomFileName)), {
     allowMissingLeaf: true,
@@ -248,7 +257,9 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   const context = gatherDistillContext(upperId, state, missionPath);
 
   const promptTemplatePath = pathResolver.knowledge('product/governance/distill-prompt.md');
-  const promptTemplate = safeExistsSync(promptTemplatePath) ? readTextFile(promptTemplatePath) : '';
+  const promptTemplate = isRegularMissionDistillPromptPath(promptTemplatePath)
+    ? readTextFile(promptTemplatePath)
+    : '';
 
   const fullPrompt = [
     promptTemplate,
