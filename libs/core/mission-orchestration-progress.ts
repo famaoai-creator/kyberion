@@ -8,7 +8,7 @@ import {
 } from './mission-task-events.js';
 import { ledger } from './ledger.js';
 import { findMissionPath, missionDir } from './path-resolver.js';
-import { parseSafeJsonInput } from './foundation/json.js';
+import { readJsonLines } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import {
@@ -329,15 +329,12 @@ export function createMissionProgressController(
     const taskEventsPath = assertSafeRepositoryPath(missionTaskEventsPath(missionId), {
       allowMissingLeaf: true,
     });
-    if (!safeExistsSync(taskEventsPath)) return new Set();
-    const raw = readTextFile(taskEventsPath);
+    if (!isRegularMissionProgressArtifactPath(taskEventsPath)) return new Set();
     return new Set(
-      raw
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => {
+      readJsonLines<unknown>(taskEventsPath, { onMalformed: 'skip' })
+        .map((value) => {
           try {
-            return parseMissionTaskEventIdentity(parseSafeJsonInput(line, 'mission task event'));
+            return parseMissionTaskEventIdentity(value);
           } catch {
             return undefined;
           }
