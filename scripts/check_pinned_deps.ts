@@ -1,6 +1,7 @@
 /** PI-12: reject dependency declarations that bypass the lockfile policy. */
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
@@ -11,6 +12,13 @@ type PackageManifest = {
   overrides?: Record<string, string>;
   pnpm?: { overrides?: Record<string, string> };
 };
+
+export function readPinnedTextFile(filePath: string, label: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 export function checkPinnedDependencies(): string[] {
   const manifest = readSafeJsonFile<PackageManifest>(
@@ -31,7 +39,10 @@ export function checkPinnedDependencies(): string[] {
   }
 
   try {
-    const lockfile = readTextFile(pathResolver.rootResolve('pnpm-lock.yaml'));
+    const lockfile = readPinnedTextFile(
+      pathResolver.rootResolve('pnpm-lock.yaml'),
+      'pnpm-lock.yaml'
+    );
     if (!/^lockfileVersion:\s*['"]?9(?:\.0)?['"]?/mu.test(lockfile)) {
       findings.push('pnpm-lock.yaml must use the governed lockfileVersion 9');
     }
@@ -40,7 +51,7 @@ export function checkPinnedDependencies(): string[] {
   }
 
   try {
-    const npmrc = readTextFile(pathResolver.rootResolve('.npmrc'));
+    const npmrc = readPinnedTextFile(pathResolver.rootResolve('.npmrc'), '.npmrc');
     const releaseAge = npmrc.match(/^\s*minimum-release-age\s*=\s*(\d+)\s*$/mu);
     if (!releaseAge) {
       findings.push('.npmrc must set minimum-release-age');

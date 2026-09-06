@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { checkPinnedDependencies } from './check_pinned_deps.js';
+import { checkPinnedDependencies, readPinnedTextFile } from './check_pinned_deps.js';
 
 describe('pinned dependency checker', () => {
   it('uses the foundation text reader for the lockfile', () => {
@@ -17,5 +17,11 @@ describe('pinned dependency checker', () => {
 
   it('keeps the repository package manager, overrides, and lockfile governed', () => {
     expect(checkPinnedDependencies()).toEqual([]);
+  });
+
+  it('rejects a directory replacement before foundation text reading', () => {
+    expect(() => readPinnedTextFile(pathResolver.rootDir(), 'fixture')).toThrow(
+      'fixture must be a regular file'
+    );
   });
 });

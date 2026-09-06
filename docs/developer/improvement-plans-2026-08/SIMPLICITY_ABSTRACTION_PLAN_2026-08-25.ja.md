@@ -23081,3 +23081,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/reasoning-backend-contracts.ts`、`libs/core/reasoning-backend.ts`、`libs/core/openai-compatible-backend.ts`／test、PI-10
 - **変更**: `delegateStructured` の能力gate後の constrained sampling request を共通 `ReasoningCallOptions` へ伝播し、OpenAI-compatible adapterが JSON Schema を `response_format.json_schema` としてprovider wireへ載せるようにした。generic adapterがgrammar形式を推測して送らないよう、未対応grammarは送信前にfail-closedとした。画像promptを含む既存options／abort伝播も維持した。
 - **検証**: OpenAI-compatible／reasoning backend **2 files／48 tests passed**、`libs/core` typecheck、対象ESLint、Prettier、`git diff --check`。実モデル別capability probeとprovider実機wire受入は継続する。
+
+## 2026-09-06 再レビュー実装 1647
+
+- **対象**: `scripts/check_pinned_deps.ts`、`scripts/check_pinned_deps.test.ts`、PI-12／PI-03
+- **変更**: pinned-deps checkerの`pnpm-lock.yaml`／`.npmrc`本文readを共通`readPinnedTextFile`のoperation-time regular-file境界へ接続し、directory replacementをlockfile version／release-age判定へ到達させないようにした。foundation reader、既存のpinned dependency semanticsは維持した。
+- **検証**: pinned-deps **1 file／3 tests passed**、Prettier、`git diff --check`。scripts全体の未監査loaderとprovider実機受入は継続する。
