@@ -405,3 +405,9 @@ mission steering のapproval-gated replyへ `SurfaceConversationInput.locale` �
 voice-hub の入力言語を共有 surface conversation inputとtext-only contract projectionへ伝播し、音声surfaceでも応答本文・契約ラベル・fallback intent contractのlocaleを揃えた。voice-hub boundary testをroot Vitestのinclude対象へ追加し、既存のscope、provider配送、音声応答 semanticsは維持した。
 
 検証: voice-hub boundary **1 file／2 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、日英のchannelリテラル全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 40
+
+Slack automation／mission proposal と Discord interaction rejection に残っていた日英リテラルをshared vocabularyへ移し、operator localeを通して描画するようにした。approval／proposal decision、actor authorization、provider配送 semanticsは維持した。
+
+検証: Slack／Discord bridge **2 files／16 tests passed**、catalog integrity、vocabulary generators、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、残る日英のchannelリテラル全面移行は引き続き未完了である。

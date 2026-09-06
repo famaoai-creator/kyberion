@@ -22650,6 +22650,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: voice-hub が入力言語を判定している既存の `detectReplyLanguage` を共有 surface conversation input、text-only contract formatter、fallback の intent contractへ接続した。voice-hub の boundary testをroot Vitestのinclude対象へ追加し、実行されていなかったdaemon境界テストもCI検証へ含めた。音声応答、scope、fallback、provider配送の意味は維持した。
 - **検証**: voice-hub boundary **1 file／2 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1582
+
+- **対象**: `knowledge/product/orchestration/user-facing-vocabulary.json`、generated vocabulary keys、Slack／Discord bridge、対象テスト
+- **変更**: Slack automation／mission proposal と Discord interaction rejection に残っていた日英直書きを bridge vocabulary と operator localeへ移行した。新規メッセージは en／ja／qps-ploc をcatalog生成し、既存のapproval／proposal decision、外部配送、actor authorization semanticsは維持した。
+- **検証**: Slack／Discord bridge **2 files／16 tests passed**、catalog integrity、vocabulary generators、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`

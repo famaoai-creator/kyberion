@@ -82,6 +82,18 @@ describe('discord bridge thread context', () => {
     expect(source).not.toContain('process.exit(');
   });
 
+  it('uses localized vocabulary for interaction rejection replies', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/discord-bridge/src/index.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('bridge:operation_not_allowed');
+    expect(source).toContain('bridge:operation_unsupported');
+    expect(source).not.toContain('この操作は許可されていません。');
+    expect(source).not.toContain('未対応の操作です。');
+  });
+
   it('rejects malformed persisted thread history entries', () => {
     expect(parseDiscordThreadHistoryEntry(['invalid'])).toBeNull();
     expect(parseDiscordThreadHistoryEntry({ role: 'system' })).toBeNull();
