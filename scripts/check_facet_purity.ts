@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { validateFacetPurity } from '@agent/core/facet-registry';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const roots = [
@@ -11,6 +11,13 @@ const roots = [
   ['instruction', pathResolver.knowledge('product/facets/instructions')],
   ['output-contract', pathResolver.knowledge('product/facets/output-contracts')],
 ] as const;
+
+export function readFacetPurityTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 export function checkFacetPurity(): string[] {
   const violations: string[] = [];
@@ -22,7 +29,7 @@ export function checkFacetPurity(): string[] {
       const filePath = path.join(root, file);
       const errors = validateFacetPurity({
         kind,
-        content: readTextFile(filePath),
+        content: readFacetPurityTextFile(filePath),
       });
       for (const error of errors) violations.push(`${filePath}: ${error}`);
     }

@@ -23267,3 +23267,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_extension_order.ts`、`scripts/check_extension_order.test.ts`、PI-03
 - **変更**: extension order checkerのlifecycle document本文readを`readExtensionOrderTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをlifecycle contract判定へ到達させないようにした。既存のruntime event、lifecycle marker、harness semanticsは維持した。
 - **検証**: extension order **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行（15 runtime events OK）、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1678
+
+- **対象**: `scripts/check_facet_purity.ts`、`scripts/check_facet_purity.test.ts`、PI-03
+- **変更**: facet purity checkerのfacet document本文readを`readFacetPurityTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcross-kind content判定へ到達させないようにした。既存のfacet root、kind、purity semanticsは維持した。
+- **検証**: facet purity **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行（passed）、`git diff --check`で確認した。
