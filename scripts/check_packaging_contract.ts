@@ -14,14 +14,20 @@
  *    (commented or not) contains a high-confidence credential pattern.
  */
 
-import { readTextFile } from '@agent/core/foundation';
+import { parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import path from 'node:path';
 
 interface ClauseFailure {
   clause: string;
   detail: string;
+}
+
+interface PackagingSourceEntry {
+  path: string;
+  source: string;
 }
 
 export function readPackagingTextFile(filePath: string, label = filePath): string {
@@ -124,6 +130,75 @@ function checkPackageExportKeys(): void {
   }
 }
 
+/** Find package subpath imports that are absent from the published exports map. */
+export function findUnexportedCoreSubpathImports(
+  entries: readonly PackagingSourceEntry[],
+  exportedKeys: ReadonlySet<string>
+): string[] {
+  const imports = new Map<string, Set<string>>();
+  const importPattern = /["']@agent\/core\/([^"']+)["']/g;
+  for (const entry of entries) {
+    for (const match of entry.source.matchAll(importPattern)) {
+      const rawSubpath = match[1];
+      if (!rawSubpath) continue;
+      const subpath = `./${rawSubpath.replace(/\.js$/, '')}`;
+      if (exportedKeys.has(subpath)) continue;
+      const paths = imports.get(subpath) ?? new Set<string>();
+      paths.add(entry.path);
+      imports.set(subpath, paths);
+    }
+  }
+  return [...imports.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .flatMap(([subpath, paths]) =>
+      [...paths].sort().map((sourcePath) => `${subpath} <- ${sourcePath}`)
+    );
+}
+
+function collectPackagingSources(
+  directory: string,
+  root: string,
+  output: PackagingSourceEntry[]
+): void {
+  for (const name of safeReaddir(directory)) {
+    const filePath = path.join(directory, name);
+    const stat = safeLstat(filePath);
+    if (stat.isDirectory()) {
+      if (name === 'dist' || name === 'node_modules' || name === '.git') continue;
+      collectPackagingSources(filePath, root, output);
+      continue;
+    }
+    if (!/\.(ts|tsx|js|mjs)$/.test(name) || name.includes('.test.')) continue;
+    output.push({ path: path.relative(root, filePath), source: readTextFile(filePath) });
+  }
+}
+
+function checkCoreSubpathExports(): void {
+  const root = pathResolver.rootDir();
+  const packagePath = pathResolver.rootResolve('libs/core/package.json');
+  const packageJson = parseSafeJsonInput(readTextFile(packagePath), packagePath);
+  const exportsValue =
+    packageJson && typeof packageJson === 'object' && !Array.isArray(packageJson)
+      ? (packageJson as Record<string, unknown>).exports
+      : undefined;
+  const exportedKeys = new Set(
+    exportsValue && typeof exportsValue === 'object' && !Array.isArray(exportsValue)
+      ? Object.keys(exportsValue)
+      : []
+  );
+  const entries: PackagingSourceEntry[] = [];
+  for (const directory of ['libs', 'scripts', 'satellites', 'presence']) {
+    collectPackagingSources(path.join(root, directory), root, entries);
+  }
+  const missing = findUnexportedCoreSubpathImports(entries, exportedKeys);
+  for (const item of missing) {
+    failures.push({
+      clause: 'package-export-keys.published',
+      detail: `a production source imports an unpublished @agent/core subpath (${item}); add the subpath to libs/core/package.json exports or use the public facade.`,
+    });
+  }
+}
+
 function checkNoSecretValues(): void {
   const raw = readPackagingTextFile(
     `${pathResolver.rootDir()}/docs/developer/env.example`,
@@ -158,6 +233,7 @@ export function checkPackagingContract(): ClauseFailure[] {
   failures.length = 0;
   checkImageTierIsolation();
   checkPackageExportKeys();
+  checkCoreSubpathExports();
   checkNoSecretValues();
   return [...failures];
 }

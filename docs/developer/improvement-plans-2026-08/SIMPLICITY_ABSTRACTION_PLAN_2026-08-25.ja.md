@@ -24047,3 +24047,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Slack bridge packaging boundary、SX-03／SX-06
 - **変更**: `libs/core/stimuli-journal.ts` はcore barrelから公開済みなのにpackage subpath exportが欠けていたため、`@agent/core/stimuli-journal` のtypes/runtime exportを追加した。Slackのautomation replyでは任意のcron値を文字列へ暗黙変換せず、欠落時は登録失敗として利用者へ返すfail-closed境界を追加した。
 - **検証**: core build、Slack bridge build、Slack bridge **1 file／9 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1808
+
+- **対象**: package export boundary、SX-03／SX-07
+- **変更**: 実行時に使われるcore subpathのうちpackage manifestから漏れていた `foundation/io`／`text`／`governed-catalog`、camera output、prompt cache、surface request、tenant design overrideを公開した。さらに `packaging-contract` gateへproduction sourceの `@agent/core/<subpath>` とpackage exportsの突合を追加し、将来の未公開subpathをCIでfail-closedに検出する。
+- **検証**: core、media／shared-network／calendar／presence／voice／wisdom package build、packaging-contract **5 tests passed**、実workspace **3093 source files／未公開subpath 0件**、対象ESLint、Prettier、`git diff --check`。
