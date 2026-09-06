@@ -23249,3 +23249,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_design_ledger.ts`、`scripts/check_design_ledger.test.ts`、PI-03
 - **変更**: design ledger checkerのdesign-note／postmortem本文readを`readDesignLedgerTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfrontmatter／ledger判定へ到達させないようにした。既存のnote status、postmortem、evidence semanticsは維持した。
 - **検証**: design ledger **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1675
+
+- **対象**: `scripts/check_documentation_links.ts`、`scripts/check_documentation_links.test.ts`、`scripts/check_documentation_links.entrypoint.test.ts`、PI-03
+- **変更**: documentation links checkerのMarkdown本文readを`readDocumentationTextFile`のoperation-time regular-file境界へ統一し、canonical Markdown列挙からrepository既定のsymlinkを除外してdirectory／symlink replacementをlink判定へ到達させないようにした。既存のroot-relative、external、vendored documentation semanticsは維持した。
+- **検証**: documentation links **3 files／3 tests passed**、対象ESLint、Prettier、checker direct実行（1126 documents OK）、`git diff --check`で確認した。
