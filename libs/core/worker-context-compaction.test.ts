@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MissionWorkingMemory } from './mission-working-memory.js';
 import {
@@ -8,6 +9,7 @@ import {
   estimateContextTokenDetails,
   estimateContextTokens,
   isPromptTooLongError,
+  isRegularUpdateSummaryPromptPath,
   loadCarryover,
   resolveContextWindowProfile,
   type CompactionCarryover,
@@ -16,6 +18,10 @@ import {
   type WorkerContextMessage,
 } from './worker-context-compaction.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
+import * as pathResolver from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+
+const PROMPT_FIXTURE_ROOT = pathResolver.sharedTmp('worker-context-prompt-loader-test');
 
 const CARRYOVER: CompactionCarryover = {
   goal: 'Ship the Q3 governance report',
@@ -32,9 +38,23 @@ afterEach(() => {
   delete process.env.KYBERION_CONTEXT_WINDOW_TOKENS;
   delete process.env.KYBERION_CONTEXT_RESERVE_TOKENS;
   delete process.env.KYBERION_CONTEXT_BUFFER_TOKENS;
+  safeRmSync(PROMPT_FIXTURE_ROOT, { recursive: true, force: true });
 });
 
 describe('worker-context-compaction (OH-01)', () => {
+  it('accepts only regular files for the update-summary prompt', () => {
+    const filePath = path.join(PROMPT_FIXTURE_ROOT, 'prompt.md');
+    const directoryPath = path.join(PROMPT_FIXTURE_ROOT, 'prompt-directory.md');
+    safeWriteFile(filePath, 'summary prompt', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(isRegularUpdateSummaryPromptPath(filePath)).toBe(true);
+    expect(isRegularUpdateSummaryPromptPath(directoryPath)).toBe(false);
+    expect(isRegularUpdateSummaryPromptPath(path.join(PROMPT_FIXTURE_ROOT, 'missing.md'))).toBe(
+      false
+    );
+  });
+
   it('uses provider usage as an anchor and estimates only the trailing messages', () => {
     const messages: WorkerContextMessage[] = [
       { role: 'user', content: 'measured prefix' },
