@@ -23939,3 +23939,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: validation bundle の audit-chain JSONL projection、SX-03／SX-06／SX-09
 - **変更**: mission単位でaudit eventを抽出するexporterの手書き行分割・safe JSON parseを foundation `readJsonLines`へ統一した。malformed event skip、normalized audit entry、mission／override filtering、bundle output semanticsは維持した。
 - **検証**: export-validation-bundle **1 file／2 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1790
+
+- **対象**: baseline audit freshness probe の JSONL reader、SX-01／SX-03／SX-07
+- **変更**: baselineの監査台帳freshness計算で行っていた手書き行分割・safe JSON parseを foundation `readJsonLines`へ統一した。malformed行skip、最新timestampの逆順探索、missing／stale／fresh判定、監査verifyとの責務分離は維持した。
+- **検証**: run-baseline-check **1 file／30 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。

@@ -62,7 +62,7 @@ describe('run_baseline_check', () => {
     expect(source).not.toContain('process.exitCode');
     expect(source).toContain("new ScriptExitError(1, '', true, report)");
     expect(source).toContain('runBaselineCheckCli = defineScript');
-    expect(source).toContain('readTextFile');
+    expect(source).toContain('readJsonLines');
   });
 
   it('marks readiness config as degraded when parse fails', () => {
