@@ -22662,6 +22662,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: terminal-hudの選択locale、Conciergeのfallback locale、Chronos APIの正規化localeを共有 `SurfaceConversationMessageInput` へ伝播した。Conciergeのpackage-level contract test suiteをroot Vitestへ追加し、既存のsurface契約テストがCIから漏れていた状態も修正した。tenant scope、viewer authorization、voice fallback、外部配送 semanticsは維持した。
 - **検証**: terminal-hud／Concierge／Chronos **3 files／27 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1584
+
+- **対象**: `scripts/kyberion_home.ts`、background review E2E、iMessage／Telegram demo、CLI trust-boundary test、SX-08b／SX-09b
+- **変更**: CLIの `cliLocale` と、日本語固定のbackground/demo入力を共有 `SurfaceConversationMessageInput.locale` へ明示的に渡した。demoに残っていた不要な `as any` も除去し、operator CLI／E2E／demoを同じ契約入力型で検証できるようにした。実行 shape、mission／approval、tenant scope semanticsは維持した。
+- **検証**: CLI trust-boundary／locale wiring、demo／backgroundのtypecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`

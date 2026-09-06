@@ -19,6 +19,7 @@ export const simulateTelegram = defineScript({
     const result = await runSurfaceMessageConversation({
       surface: 'telegram',
       text: 'Telegram連携を試して',
+      locale: 'ja',
       channel: '123456789',
       threadTs: 'telegram-demo-1',
       correlationId: 'demo-telegram-123',
@@ -28,7 +29,7 @@ export const simulateTelegram = defineScript({
       agentId: 'telegram-surface-agent',
       delegationSummaryInstruction:
         'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
-    } as any);
+    });
 
     logger.success('✅ Conversation logic completed.');
     logger.info('📤 Response Text:');

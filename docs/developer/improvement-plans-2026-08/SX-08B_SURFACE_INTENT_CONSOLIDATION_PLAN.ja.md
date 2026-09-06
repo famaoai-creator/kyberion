@@ -1879,3 +1879,9 @@ Slack automation／mission proposal と Discord interaction rejection の日英�
 terminal-hud、Concierge fallback、Chronos APIで既に確定しているoperator localeを共有 conversation inputへ伝播した。Conciergeのpackage-level contract test suiteもroot Vitestへ追加し、locale／contract wiringの回帰をCI対象に含めた。viewer／tenant scope、voice fallback、approval semanticsは変更していない。
 
 検証: terminal-hud／Concierge／Chronos **3 files／27 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 248
+
+CLI homeの `cliLocale`、background review E2E、日本語固定のiMessage／Telegram demoをshared conversation inputのlocaleへ接続した。demoの不要な `as any` を除去し、operator／E2E／demo入口のcontract inputを型付きで揃えた。
+
+検証: CLI trust-boundary／locale wiring、demo／backgroundのtypecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は引き続き未完了である。
