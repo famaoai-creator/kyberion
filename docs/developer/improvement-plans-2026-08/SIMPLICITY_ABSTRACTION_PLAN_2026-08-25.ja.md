@@ -23201,3 +23201,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/run_ai_audit.ts`、`scripts/run_ai_audit.test.ts`、PI-03
 - **変更**: AI auditのinvariant／scope対象本文readを`readAiAuditTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをaudit prompt／scope contentへ到達させないようにした。既存のscope path、missing-file、stub backend semanticsは維持した。
 - **検証**: AI audit **2 files／11 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1667
+
+- **対象**: `scripts/scenario_storage_governance.ts`、`scripts/scenario_storage_governance.resource-boundary.test.ts`、PI-03
+- **変更**: storage governance scenarioのtenant mirror／process log本文readを`readScenarioTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをscenarioの監査・process log解析へ到達させないようにした。既存のaudit-chain、vault、process logger semanticsは維持した。
+- **検証**: storage governance scenario **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。

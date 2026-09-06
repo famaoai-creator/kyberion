@@ -14,7 +14,7 @@ import {
 import { createProcessLogger } from '@agent/core/process-logger';
 import { runJanitor } from '@agent/core/storage-janitor';
 import { sharedLogsAudit, sharedLogsProcess } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -22,6 +22,13 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 type Print = (value: unknown) => void;
 
 let activePrint: Print = () => undefined;
+
+export function readScenarioTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function emit(value: string): void {
   activePrint(value);
@@ -97,7 +104,7 @@ export async function main(print: Print = () => undefined): Promise<void> {
     if (safeExistsSync(sbissMirror)) {
       const files = safeReaddir(sbissMirror);
       ok(`tenant mirror sbiss: ${files.join(', ')}`);
-      const lines = readTextFile(path.join(sbissMirror, files[0]))
+      const lines = readScenarioTextFile(path.join(sbissMirror, files[0]))
         .trim()
         .split('\n')
         .filter(Boolean);
@@ -199,7 +206,7 @@ export async function main(print: Print = () => undefined): Promise<void> {
     procLog.error('connection reset', { host: 'api.example.com', attempt: 3 });
 
     if (safeExistsSync(sharedLogsProcess('scenario-daemon.log'))) {
-      const raw = readTextFile(sharedLogsProcess('scenario-daemon.log'));
+      const raw = readScenarioTextFile(sharedLogsProcess('scenario-daemon.log'));
       const lines = raw.trim().split('\n').filter(Boolean);
       ok(
         `process log written: ${lines.length} entries at active/shared/logs/process/scenario-daemon.log`
