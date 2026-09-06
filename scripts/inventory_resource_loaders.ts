@@ -26,7 +26,7 @@ export interface ResourceLoaderInventory {
 const DEFAULT_ROOTS = ['libs/core', 'satellites', 'presence'];
 const LOADER_PATTERN = /\b(readJsonLines|readJson|readTextFile)(?:<[^\n;>]+>)?\s*\(/gu;
 const DECLARATION_PATTERN =
-  /^\s*(?:export\s+)?(?:async\s+)?function\s+(?:readJsonLines|readJson|readTextFile)\s*\(|^\s*(?:const|let|var)\s+(?:readJsonLines|readJson|readTextFile)\s*=|^\s*(?:async\s+)?(?:readJsonLines|readJson|readTextFile)\s*\(/u;
+  /^\s*(?:export\s+)?(?:async\s+)?function\s+(?:readJsonLines|readJson|readTextFile)(?:<[^>\n]+>)?\s*\(|^\s*(?:const|let|var)\s+(?:readJsonLines|readJson|readTextFile)\s*=|^\s*(?:async\s+)?(?:readJsonLines|readJson|readTextFile)(?:<[^>\n]+>)?\s*\(/u;
 const EVIDENCE_PATTERNS: readonly [string, RegExp][] = [
   ['assertSafeRepositoryPath', /\bassertSafeRepositoryPath\s*\(/u],
   ['safeOptionalRepositoryPath', /\bsafeOptionalRepositoryPath\s*\(/u],
@@ -39,6 +39,59 @@ const EVIDENCE_PATTERNS: readonly [string, RegExp][] = [
 ];
 const GUARD_LOOKBACK_LINES = 32;
 
+function stripQuotedText(line: string): string {
+  return line
+    .replace(/'(?:\\.|[^'\\])*'/gu, '')
+    .replace(/"(?:\\.|[^"\\])*"/gu, '')
+    .replace(/`(?:\\.|[^`\\])*`/gu, '');
+}
+
+function braceDelta(line: string): number {
+  let delta = 0;
+  for (const token of stripQuotedText(line).match(/\{|\}/gu) || []) {
+    delta += token === '{' ? 1 : -1;
+  }
+  return delta;
+}
+
+/**
+ * Find local helpers whose implementation actually checks the final resource
+ * type. A helper named `safePath` is not enough evidence by itself: the body
+ * must contain a regular-file check. This keeps the inventory fail-closed for
+ * path-only helpers while avoiding repeated false positives for domain helpers
+ * such as `regularJournalPath` and `ensureDurableQueueFile`.
+ */
+function collectRegularFileHelperNames(source: string): Set<string> {
+  const lines = source.split(/\r?\n/u);
+  const names = new Set<string>();
+  const declarations = [
+    /^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)(?:<[^>\n]+>)?\s*\([^)]*\)[^{]*\{/u,
+    /^\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\{/u,
+    /^\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\{/u,
+    /^\s*([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\{/u,
+    /^\s*(?:(?:public|private|protected|static|async|readonly)\s+)+([A-Za-z_$][\w$]*)(?:<[^>\n]+>)?\s*\([^)]*\)[^{]*\{/u,
+  ];
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = declarations.map((pattern) => lines[index].match(pattern)).find(Boolean);
+    const name = match?.[1] || match?.[2];
+    if (!name) continue;
+    let depth = 0;
+    let body = '';
+    for (let cursor = index; cursor < lines.length; cursor += 1) {
+      body += `\n${lines[cursor]}`;
+      depth += braceDelta(lines[cursor]);
+      if (cursor > index && depth <= 0) break;
+    }
+    if (
+      /\b(?:safeLstat|safeStat)\s*\([^)]*\)\s*\.isFile\s*\(\)/u.test(body) ||
+      /\b(?:assertRegular|ensureRegular)[A-Za-z_$\d]*\s*\(/u.test(body)
+    ) {
+      names.add(name);
+    }
+  }
+  return names;
+}
+
 function toRepoRelative(filePath: string): string {
   return path.relative(pathResolver.rootDir(), filePath).split(path.sep).join('/');
 }
@@ -47,21 +100,37 @@ function isLoaderDeclaration(line: string): boolean {
   return DECLARATION_PATTERN.test(line);
 }
 
-function nearbyEvidence(lines: readonly string[], lineIndex: number): string[] {
+function nearbyEvidence(
+  lines: readonly string[],
+  lineIndex: number,
+  regularFileHelpers: ReadonlySet<string>
+): string[] {
   const start = Math.max(0, lineIndex - GUARD_LOOKBACK_LINES);
   const window = lines.slice(start, lineIndex + 1).join('\n');
-  return EVIDENCE_PATTERNS.filter(([, pattern]) => pattern.test(window)).map(([name]) => name);
+  const evidence = EVIDENCE_PATTERNS.filter(([, pattern]) => pattern.test(window)).map(
+    ([name]) => name
+  );
+  for (const helper of regularFileHelpers) {
+    const escapedHelper = helper.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    if (new RegExp(`\\b${escapedHelper}(?:<[^>\\n]+>)?\\s*\\(`, 'u').test(window)) {
+      evidence.push(`regular-file-helper:${helper}`);
+    }
+  }
+  return [...new Set(evidence)];
 }
 
 export function scanResourceLoaderSource(file: string, source: string): ResourceLoaderCallSite[] {
   const lines = source.split(/\r?\n/u);
+  const regularFileHelpers = collectRegularFileHelperNames(source);
   const callsites: ResourceLoaderCallSite[] = [];
   for (const [index, line] of lines.entries()) {
     if (isLoaderDeclaration(line)) continue;
     for (const match of line.matchAll(LOADER_PATTERN)) {
       const loader = match[1] as ResourceLoaderKind;
       const inline = line.slice(match.index).includes('assertSafeRepositoryPath(');
-      const evidence = inline ? ['assertSafeRepositoryPath'] : nearbyEvidence(lines, index);
+      const evidence = inline
+        ? ['assertSafeRepositoryPath']
+        : nearbyEvidence(lines, index, regularFileHelpers);
       callsites.push({
         file,
         line: index + 1,

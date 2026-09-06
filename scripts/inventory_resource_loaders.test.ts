@@ -74,4 +74,51 @@ describe('resource loader inventory', () => {
       },
     ]);
   });
+
+  it('recognizes a local helper only when its body checks regular-file type', () => {
+    expect(
+      scanResourceLoaderSource(
+        'libs/example.ts',
+        [
+          'function regularArtifactPath(filePath: string): string {',
+          '  if (!safeLstat(filePath).isFile()) throw new Error("not a file");',
+          '  return filePath;',
+          '}',
+          'regularArtifactPath(filePath);',
+          'return readTextFile(filePath);',
+        ].join('\n')
+      )
+    ).toEqual([
+      {
+        file: 'libs/example.ts',
+        line: 6,
+        loader: 'readTextFile',
+        status: 'nearby-path-guard',
+        evidence: ['safeLstat', 'regular-file-helper:regularArtifactPath'],
+      },
+    ]);
+  });
+
+  it('does not classify path-only helpers as regular-file helpers', () => {
+    expect(
+      scanResourceLoaderSource(
+        'libs/example.ts',
+        [
+          'function safeArtifactPath(filePath: string): string {',
+          '  return assertSafeRepositoryPath(filePath);',
+          '}',
+          'safeArtifactPath(filePath);',
+          'return readTextFile(filePath);',
+        ].join('\n')
+      )
+    ).toEqual([
+      {
+        file: 'libs/example.ts',
+        line: 5,
+        loader: 'readTextFile',
+        status: 'nearby-path-guard',
+        evidence: ['assertSafeRepositoryPath'],
+      },
+    ]);
+  });
 });
