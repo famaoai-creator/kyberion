@@ -23627,3 +23627,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: core secret-guard の auth grants loader、SX-03／security boundary
 - **変更**: sensitive path mediation 付きの auth grants JSON 読み込みを、旧 `safeReadFile` + `parseSafeJsonInput` から既存 `readSensitiveJson`／foundation `readJson` 経路へ統一した。secret path mediation、grant shape validation、malformed／dangerous record の fail-closed 挙動は維持し、test double も foundation safe parser を使用するよう整合させた。
 - **検証**: secret-guard branch／base **2 files／18 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1738
+
+- **対象**: code actuator の governed global skill index loader、SX-03／SX-04
+- **変更**: `discover_skills` の global skill index 読み込みを foundation `readJson` へ統一した。repository path／existence boundary、entry projection、invalid input の fallback は維持し、resource-boundary contract と test double を canonical reader に合わせた。code の JSON transform／command response parser は変更していない。
+- **検証**: code catalog boundary／discover skills **2 files／2 tests passed**、対象 ESLint、Prettier、`git diff --check`。code actuator 全体 suite の既存 manifest mock 不在は別途継続確認対象である。

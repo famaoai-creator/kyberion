@@ -44,6 +44,19 @@ vi.mock('@agent/core/async-utils', async (importOriginal) => {
   return { ...actual, retry: mocks.retry };
 });
 
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    readJson: vi.fn((filePath: string) => {
+      if (String(filePath).includes('global_skill_index.json')) {
+        return JSON.parse(String(mocks.safeReadFile(filePath)));
+      }
+      return actual.readJson(filePath);
+    }),
+  };
+});
+
 vi.mock('@agent/core/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/core')>();
   return { ...actual, logger: mocks.logger };
