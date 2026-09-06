@@ -1917,3 +1917,9 @@ CLI homeの `cliLocale`、background review E2E、日本語固定のiMessage／T
 voice-hub の直接 fallback 応答（エラー、挨拶、能力案内、質問、受領、謝意）に残っていた日英固定文を shared vocabulary へ移行した。`t()` と `surface:voice_hub_*` を使い、既存の入力言語判定、音声再生、scope、fallback intent contract の意味は維持した。catalog の `qps-ploc` は生成器で更新し、voice-hub boundary testで固定文の再混入を検出する。
 
 検証: voice-hub／vocabulary **3 files／28 tests passed**、vocabulary generator、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 250
+
+Computer Surface の Express A2UI dispatch が受け取った `req.body` を共有 `parseSafeJsonObjectValue` でメッセージ単位に正規化してから tenant scope 走査と A2UI validation へ渡すようにした。単体／配列メッセージ、認可順序、既存の400／403 semanticsは維持し、dangerous JSON key は状態反映前に拒否する回帰を追加した。
+
+検証: Computer Surface **3 files／18 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。

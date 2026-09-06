@@ -231,6 +231,16 @@ describe('Computer Surface Cloudflare OS projection', () => {
       });
       expect(malformedDispatchResponse.status).toBe(400);
 
+      const dangerousKeyDispatchResponse = await fetch(`${baseUrl}/a2ui/dispatch`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer computer-admin-token',
+          'Content-Type': 'application/json',
+        },
+        body: '{"updateDataModel":{"surfaceId":"computer-surface","data":{"__proto__":{"tenant_slug":"tenant-b"}}}}',
+      });
+      expect(dangerousKeyDispatchResponse.status).toBe(400);
+
       const crossTenantDispatchResponse = await fetch(`${baseUrl}/a2ui/dispatch`, {
         method: 'POST',
         headers: {
