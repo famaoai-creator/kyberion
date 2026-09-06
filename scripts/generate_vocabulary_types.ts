@@ -29,6 +29,7 @@
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { loadVocabularyCatalog } from '@agent/core/vocabulary-catalog';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
@@ -45,6 +46,13 @@ const VOCABULARY_KEYS_PATH = pathResolver.rootResolve('libs/core/vocabulary-keys
 
 const LOCALES_BEGIN_MARKER = '// GENERATED-LOCALES:BEGIN';
 const LOCALES_END_MARKER = '// GENERATED-LOCALES:END';
+
+export function readVocabularyTypesTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function loadCatalog(): VocabularyCatalogFile {
   const catalog = loadVocabularyCatalog();
@@ -139,7 +147,7 @@ export async function buildArtifacts(): Promise<BuiltArtifacts> {
   const requiredLocales = catalog.required_locales?.length
     ? catalog.required_locales
     : [catalog.default_locale];
-  const currentLocaleNormalize = readTextFile(LOCALE_NORMALIZE_PATH);
+  const currentLocaleNormalize = readVocabularyTypesTextFile(LOCALE_NORMALIZE_PATH);
   const localeNormalizeSource = await formatTs(
     spliceLocalesBlock(currentLocaleNormalize, requiredLocales),
     LOCALE_NORMALIZE_PATH
