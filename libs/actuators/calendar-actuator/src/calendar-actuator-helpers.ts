@@ -5,7 +5,6 @@ import { persistTrace, TraceContext } from '@agent/core/trace';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { createAjv } from '@agent/core/foundation';
-import * as addFormatsModule from 'ajv-formats';
 import type { ValidateFunction } from 'ajv';
 import {
   calendarBackendRegistry,
@@ -21,7 +20,6 @@ export type CalendarAction = {
   params?: CalendarParams;
 };
 
-const addFormats = (addFormatsModule as any).default || addFormatsModule;
 const CALENDAR_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/calendar-action.schema.json'
 );
@@ -31,7 +29,6 @@ let cachedValidator: ValidateFunction | null = null;
 function getValidator(): ValidateFunction {
   if (cachedValidator) return cachedValidator;
   const ajv = createAjv();
-  addFormats(ajv);
   cachedValidator = compileSchemaFromPath(ajv, CALENDAR_SCHEMA_PATH);
   return cachedValidator;
 }
