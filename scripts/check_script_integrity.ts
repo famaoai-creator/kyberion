@@ -120,6 +120,14 @@ function collectPackageScriptReferences(value: string, scripts: Set<string>): st
   return [...refs];
 }
 
+function collectStructuredPackageScriptReferences(command: unknown, args: unknown): string[] {
+  if (command !== 'pnpm' || !Array.isArray(args)) return [];
+  const tokens = args.filter((value): value is string => typeof value === 'string');
+  const runIndex = tokens.indexOf('run');
+  const script = runIndex >= 0 ? tokens[runIndex + 1] : undefined;
+  return script ? [script] : [];
+}
+
 /**
  * Package scripts that execute authored TypeScript must expose the shared
  * script harness. The build bootstrap is the only exception: it runs before
@@ -233,7 +241,13 @@ function scanValue(
     return;
   }
   if (value && typeof value === 'object') {
-    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    const record = value as Record<string, unknown>;
+    for (const script of collectStructuredPackageScriptReferences(record.command, record.args)) {
+      if (!PNPM_BUILT_INS.has(script) && !packageScripts.has(script)) {
+        violations.push(`${owner}: pnpm script not found (${script})`);
+      }
+    }
+    for (const [key, nested] of Object.entries(record)) {
       scanValue(owner, nested, violations, pathExists, packageScripts, key);
     }
   }
