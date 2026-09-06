@@ -23405,3 +23405,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/generate_subagent_definitions.ts`、`scripts/generate_subagent_definitions.test.ts`、PI-03
 - **変更**: subagent definitions generatorのauthority procedure本文readを`readSubagentDefinitionsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをprocedure condensation／generated definition判定へ到達させないようにした。既存のteam-role SSOT、profile projection、provider-specific generation semanticsは維持した。
 - **検証**: subagent definitions generator **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1701
+
+- **対象**: `scripts/generate_vocabulary_types.ts`、`scripts/generate_vocabulary_types.test.ts`、PI-03
+- **変更**: vocabulary types generatorのlocale-normalize本文readを`readVocabularyTypesTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをlocale block／generated type判定へ到達させないようにした。既存のcatalog loader、locale marker、qualified key semanticsは維持した。
+- **検証**: vocabulary types generator **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
