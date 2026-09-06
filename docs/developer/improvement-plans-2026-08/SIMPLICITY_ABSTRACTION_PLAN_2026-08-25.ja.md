@@ -24059,3 +24059,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: package export target boundary、SX-03／SX-07
 - **変更**: `@agent/core/native-pptx-engine/{text-metrics,design-cascade}` のpublic wrapperがcore `tsconfig` の対象外で、宣言済みexport targetがbuild成果物に生成されない残存を修正した。`packaging-contract` gateにtypes/default targetの実在検査も追加し、manifestだけ存在してruntime／型ファイルが欠ける状態を検出する。
 - **検証**: core build、media actuator build、native-pptx public subpath実import、packaging-contract **6 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1810
+
+- **対象**: OAuth callback surface の core public facade 境界、SX-03／SX-09
+- **変更**: production に残っていた唯一の `@agent/core` root barrel import を、既に公開済みの `@agent/core/surface-request-input` subpath へ移した。`readSurfaceStringParam` の配列／object-shaped query fail-closed semantics と OAuth callback の既存処理は変更していない。
+- **検証**: production root-barrel import **0 occurrences**、OAuth callback surface **1 file／4 tests passed**、対象ESLint、Prettier、`git diff --check`。
