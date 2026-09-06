@@ -52,6 +52,7 @@ import {
 } from './completion-token-budget.js';
 import { StablePrefixGuard, type StablePrefixSnapshot } from './prompt-cache-discipline.js';
 import type { ReasoningToolName, SamplingParams } from './reasoning-route-resolver.js';
+import type { ConstrainedSampling } from './backend-capability-profile.js';
 
 export type LocalLlmProviderPreset =
   'generic' | 'ollama' | 'vllm' | 'lmstudio' | 'llamacpp' | 'mlx' | 'localai';
@@ -144,6 +145,14 @@ interface ChatCompletionRequest {
   presence_penalty?: number;
   frequency_penalty?: number;
   stop?: string | string[];
+  response_format?: {
+    type: 'json_schema';
+    json_schema: {
+      name: string;
+      strict: boolean;
+      schema: Record<string, unknown>;
+    };
+  };
 }
 
 interface ChatCompletionResponse {
@@ -690,6 +699,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       useTools?: boolean;
       signal?: AbortSignal;
       toolDefinitions?: readonly ToolDefinition[];
+      constrainedSampling?: ConstrainedSampling;
     } = {}
   ): Promise<ChatCompletionResponse> {
     if (opts.signal?.aborted) {
@@ -722,6 +732,21 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         : {}),
       ...this.samplingParams,
     };
+    if (opts.constrainedSampling) {
+      if ('grammar' in opts.constrainedSampling) {
+        throw new Error(
+          '[openai-compatible] grammar constrained sampling is not supported by this adapter'
+        );
+      }
+      body.response_format = {
+        type: 'json_schema',
+        json_schema: {
+          name: 'kyberion_structured_output',
+          strict: opts.constrainedSampling.strict === 'require',
+          schema: opts.constrainedSampling.jsonSchema,
+        },
+      };
+    }
     const maxTokens = this.completionBudget(body);
     if (maxTokens !== undefined) body.max_tokens = maxTokens;
 
@@ -856,9 +881,12 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
 
   private async completePromptMessages(
     messages: ChatMessage[],
-    signal?: AbortSignal
+    options?: Pick<ReasoningCallOptions, 'signal' | 'constrainedSampling'>
   ): Promise<string> {
-    let response = await this.fetchChatCompletion(messages, { signal });
+    let response = await this.fetchChatCompletion(messages, {
+      signal: options?.signal,
+      constrainedSampling: options?.constrainedSampling,
+    });
     let message = response.choices[0].message;
     let guardrailState = createToolLoopGuardrailState();
     // KD-08: record the stable-prefix baseline for this turn before any tool
@@ -895,7 +923,10 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         });
       }
       prefixGuard.assertStable(this.stablePrefixSnapshot(messages));
-      response = await this.fetchChatCompletion(messages, { signal });
+      response = await this.fetchChatCompletion(messages, {
+        signal: options?.signal,
+        constrainedSampling: options?.constrainedSampling,
+      });
       message = response.choices[0].message;
     }
 
@@ -933,7 +964,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
           .join('\n\n'),
       },
     ];
-    return this.completePromptMessages(messages, optionsWithSignal?.signal);
+    return this.completePromptMessages(messages, optionsWithSignal);
   }
 
   async promptWithImages(
@@ -956,7 +987,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         content: [...imageContentParts(images), { type: 'text', text: prompt }],
       },
     ];
-    return this.completePromptMessages(messages, options?.signal);
+    return this.completePromptMessages(messages, options);
   }
 
   /**

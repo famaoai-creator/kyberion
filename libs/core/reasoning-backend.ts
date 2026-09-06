@@ -1016,7 +1016,11 @@ export async function delegateStructured<T>(
 
   let lastError = '';
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const raw = await backend.delegateTask(buildPrompt(attempt, lastError), options.context);
+    const raw = await backend.delegateTask(buildPrompt(attempt, lastError), options.context, {
+      ...(constrainedSampling.mode === 'native' && constrainedSampling.request
+        ? { constrainedSampling: constrainedSampling.request }
+        : {}),
+    });
     try {
       const parsed = parseStructuredJson(raw, 'delegateStructured');
       const validated = resolvedSchema.safeParse(parsed);
