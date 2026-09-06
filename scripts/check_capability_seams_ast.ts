@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import * as ts from 'typescript';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReaddir, safeStat } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const SOURCE_ROOT = pathResolver.rootResolve('libs/core');
@@ -24,6 +24,13 @@ interface SeamDeclaration {
 }
 
 const SEAM_CONSTRUCTORS = new Set(['createSeam', 'defineSeam']);
+
+export function readCapabilitySeamsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function collectSourceFiles(directory: string): string[] {
   const files: string[] = [];
@@ -60,7 +67,7 @@ function literalString(node: ts.Expression | undefined): string | undefined {
 function scanDeclarations(): SeamDeclaration[] {
   const declarations: SeamDeclaration[] = [];
   for (const file of collectSourceFiles(SOURCE_ROOT)) {
-    const source = readTextFile(file);
+    const source = readCapabilitySeamsTextFile(file);
     const sourceFile = ts.createSourceFile(
       file,
       source,
@@ -96,7 +103,7 @@ function check(): string[] {
   const findings: string[] = [];
   const declarations = scanDeclarations();
   const byKey = new Map<string, SeamDeclaration>();
-  const graph = readTextFile(GRAPH_PATH);
+  const graph = readCapabilitySeamsTextFile(GRAPH_PATH);
   // Prettier pads Markdown table cells to a common width, so compare the
   // trimmed first cell instead of relying on the exact substring
   // `| key |`.

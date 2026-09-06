@@ -901,6 +901,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、storage governance scenarioのtenant mirror／process log本文readを`readScenarioTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをscenarioの監査・process log解析へ到達させない回帰を追加した。関連 **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、sovereign dashboardのorchestration／owner summary本文readを`readDashboardTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをdashboard event解析へ到達させない回帰を追加した。関連 **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、dependency patch apply時のpackage manifest backup本文readを`readDependencyPatchTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpatch backup・rollback処理へ到達させない回帰を追加した。関連 **2 files／13 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、capability seams AST checkerのproduction source／generated graph本文readを`readCapabilitySeamsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをAST／graph整合判定へ到達させない回帰を追加した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミット`camera-output-bridge`に対する生成graph差分を表示したため、生成物は変更せず継続課題とした。
 
 ## 7. 検証コマンド(実装時)
 
