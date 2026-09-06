@@ -224,6 +224,7 @@ const VOICE_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   transcribe: [{ audio_path: 'active/shared/tmp/sample.wav', language: 'ja' }],
   normalize_audio: [{ audio_path: 'active/shared/tmp/meeting.m4a' }],
   render_talking_avatar: [
+    // i18n-exempt: op-discovery sample payload demonstrating ja synthesis input, not app-facing text
     { portrait_path: 'active/shared/tmp/avatar.png', text: 'こんにちは。', language: 'ja' },
   ],
   output_to_virtual_camera: [{ video_path: 'active/shared/tmp/avatar.mp4' }],
