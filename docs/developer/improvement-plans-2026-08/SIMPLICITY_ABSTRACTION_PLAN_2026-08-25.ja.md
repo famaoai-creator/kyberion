@@ -22787,3 +22787,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: 12 surface の IntentResolution contract renderer、surface provider manifest／policy、production approval wiring、既存contract tests、SX-08b
 - **変更**: Chronos、Computer Surface、Concierge、Discord、iMessage、Cowork、Presence Studio、Operator Surface、Slack、Telegram、Terminal HUD、Voice Hub の各 renderer marker、provider manifest、terminalを含むapproval停止・未実行 semanticsを横断再検証した。実装済みのsurface投影／approval本番相当テストを残存課題一覧から除外する根拠を追加した。
 - **検証**: `tests/ux-contract-surfaces.test.ts`、`tests/surface-smoke-contract.test.ts`、surface provider manifest／policy、production approval wiring **5 files／24 tests passed**。残る provider の live model call と OS-level enforcement の実証は外部CLI・環境依存の継続課題とする。
+
+## 2026-09-06 再レビュー実装 1598
+
+- **対象**: `libs/core/provider-capability-overview.ts`、`scripts/scan_provider_cli_capabilities.ts`、provider capability snapshot schema／tests、SX-08B
+- **変更**: provider CLI受入の残差を、version／helpの静的検出だけでなく、既存のprovider capability registryが返すruntime probe（binary検出、認証状態、sandbox flag状態）まで governed snapshotへ投影するようにした。snapshot parser／JSON Schemaを拡張し、build済みcore package経由のscanでもruntime probeを保存する。probe error本文や実行引数はsnapshotへ持ち込まず、表示・監査用の最小証跡に限定した。
+- **検証**: build後の実scanで **8 providers／registered 39／available capabilities 33／available providers 7／missing providers 2** を取得し、snapshotのruntime probe（認証 true／false／unknown、sandbox supported／unsupported）を確認。provider capability overview／scan entrypoint／report contract **3 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。live model call とOS-level enforcementの実証は外部CLI・環境依存の継続課題とする。
