@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { presenceStudioApprovalDecisionSchema } from './security.js';
+import { presenceStudioApprovalDecisionSchema, readPresenceStudioRouteParam } from './security.js';
 
 describe('presence studio approval decision input', () => {
   it('accepts only the governed decision enum', () => {
@@ -20,5 +20,16 @@ describe('presence studio approval decision input', () => {
     { decision: ['approved'] },
   ])('rejects malformed or expanded input: %j', (value) => {
     expect(presenceStudioApprovalDecisionSchema.safeParse(value).success).toBe(false);
+  });
+
+  it.each([undefined, null, [], {}, 42, true, ''])(
+    'rejects non-string route params: %j',
+    (value) => {
+      expect(readPresenceStudioRouteParam(value)).toBeNull();
+    }
+  );
+
+  it('trims a single string route param', () => {
+    expect(readPresenceStudioRouteParam(' action-1 ')).toBe('action-1');
   });
 });

@@ -40,10 +40,12 @@ describe('Presence Studio OS control-plane route contract', () => {
     );
     expect(route).not.toContain('error: error?.message || String(error)');
     expect(decisionRoute).toMatch(/decideHeldAction\(\s*actionId,\s*decision,\s*access\s*\)/u);
+    expect(decisionRoute).toContain('readPresenceStudioRouteParam(req.params.actionId)');
     expect(decisionRoute).toContain(
       "safeParsePresenceStudioRequestBody(req.body, 'held action decision body')"
     );
     expect(applyRoute).toContain('applyHeldAction(actionId, access)');
+    expect(applyRoute).toContain('readPresenceStudioRouteParam(req.params.actionId)');
     expect(applyRoute).toContain('res.status(502).json({');
   });
 
