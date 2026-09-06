@@ -100,7 +100,7 @@ If you only want the shortest path to a visible result, start here.
 The first-win path is intentionally staged:
 
 - 30 seconds: `pnpm doctor` shows whether the local runtime is ready and what value boundary is currently blocked
-- 60 seconds: `pnpm setup:report --persona first-time-user` tells you which surface to use next and whether auth/setup is still blocking it
+- 60 seconds: `pnpm kyberion setup report --persona first-time-user` tells you which surface to use next and whether auth/setup is still blocking it
 - 5 minutes: `pnpm pipeline --input pipelines/verify-session.json` writes `active/shared/tmp/first-win-session.png`
 - optional voice path: `pnpm pipeline --input pipelines/voice-hello.json`
 - on-demand pull: `pnpm deps:check --actuator browser|voice|media-generation` checks actuator-level dependencies before you start that surface
@@ -108,7 +108,7 @@ The first-win path is intentionally staged:
 
 ```bash
 pnpm doctor
-pnpm setup:report --persona first-time-user
+pnpm kyberion setup report --persona first-time-user
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
@@ -121,7 +121,7 @@ pnpm pipeline --input pipelines/voice-hello.json
 The browser session smoke writes `active/shared/tmp/first-win-session.png`.
 If browser launch is blocked, the pipeline now automatically falls back to `active/shared/tmp/first-win-fallback.txt`.
 
-If the smoke fails because a surface looks stale or a permission is missing, open [docs/user/TROUBLESHOOTING.md](./user/TROUBLESHOOTING.md) and run `pnpm surfaces repair` or `pnpm setup:report --persona first-time-user` before retrying.
+If the smoke fails because a surface looks stale or a permission is missing, open [docs/user/TROUBLESHOOTING.md](./user/TROUBLESHOOTING.md) and run `pnpm surfaces repair` or `pnpm kyberion setup report --persona first-time-user` before retrying.
 
 After the screenshot exists, spend the remaining 10 minutes on structure:
 
@@ -147,7 +147,7 @@ Useful local surfaces (full role map: [`docs/SURFACES.md`](./SURFACES.md)):
 
 Chronos API routes resolve a viewer principal server-side; `KYBERION_LOCALHOST_AUTOADMIN=true` grants loopback callers `localadmin` (see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`).
 
-If you are unsure which one matters for your goal, `pnpm setup:report --persona first-time-user` is the canonical entry guide:
+If you are unsure which one matters for your goal, `pnpm kyberion setup report --persona first-time-user` is the canonical entry guide:
 
 - `Chronos` for runtime visibility and operator control
 - `Concierge` for the "what should I decide now" secretary view

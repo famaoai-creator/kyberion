@@ -1275,7 +1275,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 44066,
+      "size": 45083,
       "type": "json"
     },
     {
@@ -1437,7 +1437,7 @@
     {
       "path": "product/governance/error-classifier-rules.json",
       "tier": "public",
-      "size": 17929,
+      "size": 17938,
       "type": "json"
     },
     {
@@ -2067,7 +2067,7 @@
     {
       "path": "product/governance/onboarding-flow.md",
       "tier": "public",
-      "size": 11872,
+      "size": 11881,
       "type": "md"
     },
     {
@@ -2205,7 +2205,7 @@
     {
       "path": "product/governance/phases/onboarding.md",
       "tier": "public",
-      "size": 5768,
+      "size": 5777,
       "type": "md"
     },
     {

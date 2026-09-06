@@ -195,7 +195,7 @@ K1〜K3 は OSS の健康度、K4 は本当に使われているか、K5〜K6 �
 
 - README から 1 本で到達できる `docs/demos/` の公開導線を作る
 - 画面収録版と音声ナレーション版を分け、どちらでも first win を見せられるようにする
-- `voice-hello` / `verify-session` / `setup:report` を 1 本の説明シナリオに束ねる
+- `voice-hello` / `verify-session` / `pnpm kyberion setup report` を 1 本の説明シナリオに束ねる
 - 失敗時の next-action を動画の最後に固定で出す
 
 ---

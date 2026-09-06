@@ -24,7 +24,7 @@ pnpm pipeline --input pipelines/baseline-check.json
 pnpm install
 pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm build
-pnpm setup:report --persona first-time-user
+pnpm kyberion setup report --persona first-time-user
 pnpm surfaces reconcile
 ```
 

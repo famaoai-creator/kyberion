@@ -403,7 +403,7 @@ async function tryHandleChronosQuickAction(
         core,
         PROJECT_ROOT,
         'Kyberion Setup Report',
-        ['setup:report'],
+        ['kyberion', 'setup', 'report'],
         'Inspect surfaces, services, reasoning, and doctor readiness together before you start work.',
         locale
       );

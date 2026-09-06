@@ -60,7 +60,7 @@ status: active
 | 業務                                     | 現行手段(CLI/手編集)                             | 方式   | 裏で使う既存資産                                                                                                        |
 | ---------------------------------------- | ------------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------- |
 | **初期セットアップ**                     |                                                  |        |                                                                                                                         |
-| 環境・前提チェック                       | `pnpm doctor` / `setup:report`                   | 状況+B | `scripts/setup_report.ts` の集約結果を API 化                                                                           |
+| 環境・前提チェック                       | `pnpm doctor` / `pnpm kyberion setup report`     | 状況+B | `scripts/setup_report.ts` の集約結果を API 化                                                                           |
 | アイデンティティ設定(自分・エージェント) | `pnpm onboard`(TTY 必須)/ `onboard apply`        | **B**  | `onboard apply` 相当の非対話パス+`writeTenantProfile`(pr653 実装を回収)                                                 |
 | アバター登録・音声プロファイル登録       | `onboard:avatar` / `onboard:voice`               | **B**  | pr653 の `getUserMedia`/`MediaRecorder` 実装、`saveBrowserOnboardingVoiceSample`                                        |
 | 顧客オーバーレイ作成・切替               | `customer:create/switch` + 手編集                | B      | `scripts/company_onboarding.ts` プリセット                                                                              |
@@ -129,7 +129,7 @@ status: active
 
 優先順(利用頻度×現行の痛み):
 
-1. **セットアップウィザード**(P3 解消): 読み取り専用 `/setup` を、pr653 回収分(プロファイル・テナント・アバター・音声サンプル・サービス接続)をベースに書き込み対応へ。doctor/setup:report 相当の診断を「未完了項目→その場で直すボタン」として提示。
+1. **セットアップウィザード**(P3 解消): 読み取り専用 `/setup` を、pr653 回収分(プロファイル・テナント・アバター・音声サンプル・サービス接続)をベースに書き込み対応へ。doctor / `pnpm kyberion setup report` 相当の診断を「未完了項目→その場で直すボタン」として提示。
 2. **通知チャネル設定**・**受領プレビュー**(SU-03 残件)。
 3. **停滞ミッション伺いカード**(hygiene 分類の表示+人間の開始/中止ボタン。状態変更は必ず明示操作)。
 4. **文書取込(ドラッグ&ドロップ ingest)**・**記憶昇格キュー**・**プラグイン承認の 1 画面化**。

@@ -41,7 +41,7 @@ track を追加すべき。
 
 - `pnpm pipeline --input pipelines/baseline-check.json` は成功した。
 - `pnpm pipeline --input pipelines/verify-session.json` は、OS 権限の制約を外すと成功し、`active/shared/tmp/first-win-session.png` を生成した。
-- `pnpm setup:report` は surface / service / reasoning / doctor を 1 回で一覧化できた。
+- `pnpm kyberion setup report` は surface / service / reasoning / doctor を 1 回で一覧化できた。
 - `pnpm kyberion vital --format=json` は readiness を JSON で返し、missing identity / onboarding を明示した。
 - 既存 docs は README / Quickstart / WHY / Operations readiness / Production roadmap に分かれており、以前より入口は整理されている。
 
@@ -126,7 +126,7 @@ UX Stabilization を明示した方がよい。
 | UX-2-1 | 3 use-case quickstarts    | meeting facilitator, report generation, browser research の 3 本を user docs から 1 click で辿れる。 |
 | UX-2-2 | Demo assets               | README から 3 つの GIF / terminal cast / screenshots が見える。                                      |
 | UX-2-3 | First-run role choice     | `pnpm onboard` が developer / operator / FDE evaluator の入口を分ける。                              |
-| UX-2-4 | Setup report persona mode | `pnpm setup:report --persona first-time-user` が必須以外の credential noise を畳む。                 |
+| UX-2-4 | Setup report persona mode | `pnpm kyberion setup report --persona first-time-user` が必須以外の credential noise を畳む。        |
 
 ## 5. 推奨優先順位
 
@@ -135,7 +135,7 @@ UX Stabilization を明示した方がよい。
 1. `docs/user/TROUBLESHOOTING.md` を作る。
 2. Browser first-win の permission preflight と fallback を入れる。
 3. `surfaces status` の unhealthy / stale 表示に runnable repair action を付ける。
-4. `setup:report` を first-time-user 向けに圧縮する。
+4. `pnpm kyberion setup report` を first-time-user 向けに圧縮する。
 5. README に demo assets を入れる。
 6. 3 つの use-case quickstart を user docs に追加する。
 7. 30 日運用 evidence を取り始める。
@@ -169,6 +169,6 @@ UX Stabilization を明示した方がよい。
 | PR-1 | `docs/user/TROUBLESHOOTING.md` + README / Quickstart からリンク | docs contract test                                                                       |
 | PR-2 | browser permission preflight + first-win fallback               | `pnpm run check -- --scope full --only first-win-smoke`, targeted browser preflight test |
 | PR-3 | `surfaces status` stale classification + repair suggestion      | `tests/runtime-surface-operations-contract.test.ts`                                      |
-| PR-4 | `setup:report --persona first-time-user`                        | `tests/setup-report.test.ts`                                                             |
+| PR-4 | `pnpm kyberion setup report --persona first-time-user`          | `tests/setup-report.test.ts`                                                             |
 
 この 4 本が終わるまで、機能追加よりも導入摩擦の削減を優先する。

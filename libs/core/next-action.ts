@@ -183,7 +183,7 @@ function buildPipelineFailureNextAction(
         next_action_key: 'next_action:inspect_configured_secrets',
         reason: classification.remediation,
         next_action_type: 'inspect_artifact',
-        suggested_command: 'pnpm setup:report --persona first-time-user',
+        suggested_command: 'pnpm kyberion setup report --persona first-time-user',
       });
     case 'kyberion.path-scope':
       return buildNextAction({
@@ -266,7 +266,7 @@ function buildPipelineFailureNextAction(
       next_action_key: 'next_action:inspect_configured_secrets',
       reason: classification.remediation,
       next_action_type: 'inspect_artifact',
-      suggested_command: 'pnpm setup:report --persona first-time-user',
+      suggested_command: 'pnpm kyberion setup report --persona first-time-user',
     });
   }
 

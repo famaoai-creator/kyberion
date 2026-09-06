@@ -150,6 +150,66 @@ describe('CLI manifest', () => {
     expect(failures).toContain('package script missing command registry entry: missing');
   });
 
+  it('rejects ambiguous script dispatch keys across both registries', () => {
+    const failures = checkCliManifest(
+      {
+        version: 1,
+        commands: [
+          {
+            id: 'operator-home.default',
+            command: '',
+            noun: 'home',
+            verb: 'default',
+            entry: 'operator-home',
+            audience: 'user',
+          },
+          {
+            id: 'operator-cli.help',
+            command: 'help',
+            noun: 'help',
+            verb: 'default',
+            entry: 'operator-cli',
+            audience: 'user',
+          },
+        ],
+        entrypoints: [
+          { id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: [''] },
+          { id: 'operator-cli', module: 'scripts/cli.ts', commands: ['help'] },
+        ],
+        script_commands: [
+          {
+            id: 'script.help-alias',
+            script: 'help-alias',
+            command: 'help',
+            noun: 'help',
+            verb: 'default',
+            audience: 'dev',
+          },
+          {
+            id: 'script.duplicate-a',
+            script: 'duplicate-a',
+            command: 'duplicate run',
+            noun: 'duplicate',
+            verb: 'run',
+            audience: 'dev',
+          },
+          {
+            id: 'script.duplicate-b',
+            script: 'duplicate-b',
+            command: 'duplicate run',
+            noun: 'duplicate',
+            verb: 'run',
+            audience: 'dev',
+          },
+        ],
+      },
+      { packageScripts: new Set(['help-alias', 'duplicate-a', 'duplicate-b']) }
+    );
+
+    expect(failures).toContain('script command collides with command registry: help');
+    expect(failures).toContain('script command must be unique: duplicate run');
+  });
+
   it('accepts module-backed commands after their package alias is removed', () => {
     const failures = checkCliManifest(
       {

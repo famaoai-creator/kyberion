@@ -9694,7 +9694,7 @@ SX-05 の旧 `cli` package alias を再レビューし、既存 `scripts/cli.ts`
 
 ## 2026-09-01 再レビュー修正: next-action／error remediation の実在コマンド整合
 
-CLI alias 移行後の再レビューで、`libs/core/next-action.ts` と `error-classifier-rules.json` に旧来の `secret list`／単数 `approval` が残り、利用者へ実行不能な復旧コマンドを提示する指摘を確認した。secret 系は実在する `pnpm setup:report --persona first-time-user`、approval 系は実在する `pnpm kyberion approvals` へ統一し、分類ルール・next-action・回帰テストを同期した。focused **3 files / 77 tests passed**、typecheck、Prettier、CLI manifest、script-integrity、catalog integrity、CI gate parity、`git diff --check`、canonical full gate **68/68 passed** を確認済み。scripts **≤120**、全 script harness／generator 移行は継続課題である。
+CLI alias 移行後の再レビューで、`libs/core/next-action.ts` と `error-classifier-rules.json` に旧来の `secret list`／単数 `approval` が残り、利用者へ実行不能な復旧コマンドを提示する指摘を確認した。secret 系は実在する `pnpm kyberion setup report --persona first-time-user`、approval 系は実在する `pnpm kyberion approvals` へ統一し、分類ルール・next-action・回帰テストを同期した。focused **3 files / 77 tests passed**、typecheck、Prettier、CLI manifest、script-integrity、catalog integrity、CI gate parity、`git diff --check`、canonical full gate **68/68 passed** を確認済み。scripts **≤120**、全 script harness／generator 移行は継続課題である。
 
 ## 2026-09-01 再レビュー修正: app preflight の doctor runtime 統合
 
@@ -24011,3 +24011,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: OAuth callback surface query boundary、SX-09／SX-14
 - **変更**: OAuth callbackの5 query値を共有 `readSurfaceStringParam`へ統一し、重複・object-shaped inputの暗黙変換を防止した。OAuth completion、provider error表示、HTML escaping semanticsは維持した。
 - **検証**: OAuth callback surface **1 file／4 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1802
+
+- **対象**: CLI command registryのscript dispatch key、SX-05／SX-06
+- **変更**: 通常command registryとscript command registryの同一command衝突、およびscript command同士の重複dispatch keyを`check:cli-manifest`でfail-closedにした。実行時のregistry優先順に依存した曖昧な入口を登録段階で拒否する。既存の通常command `setup report` と衝突していた `setup:report` package aliasを削除し、ドキュメント・復旧提示・Chronos quick actionを `pnpm kyberion setup report` に統一した。
+- **検証**: CLI manifest／canonical setup report **6 files／47 tests passed**、対象ESLint、Prettier、`git diff --check`。
