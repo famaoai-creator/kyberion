@@ -8,7 +8,7 @@ import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExecResult, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExecResult, safeLstat, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
@@ -136,6 +136,7 @@ class CodexCliQuery {
         throw err;
       }
 
+      assertRegularCodexOutputPath(outputPath);
       const raw = readTextFile(outputPath);
       recordEstimatedCliUsage(
         'codex-cli',
@@ -231,6 +232,12 @@ class CodexCliQuery {
   private tempFilePath(prefix: string, extension: string): string {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return path.join(pathResolver.sharedTmp(), `kyberion-${prefix}-${id}.${extension}`);
+  }
+}
+
+function assertRegularCodexOutputPath(outputPath: string): void {
+  if (!safeLstat(outputPath).isFile()) {
+    throw new Error(`[codex-cli] structured output must be a regular file: ${outputPath}`);
   }
 }
 
