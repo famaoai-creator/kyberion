@@ -27,6 +27,7 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["type", "description"],
         "properties": {
           "type": { "type": "string", "enum": ["string", "enum", "boolean", "secret"] },

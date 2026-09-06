@@ -5,9 +5,11 @@
  * may describe historical drift, while operator-facing guidance must not
  * reintroduce the retired Rule 7 / five-condition gate.
  */
-import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readTextFile } from '@agent/core/foundation';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import * as path from 'node:path';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 // Do not traverse tenant/personal knowledge tiers: the checker is a public
 // repository-governance lint and those paths are intentionally role-scoped.
@@ -79,7 +81,7 @@ function loadMissionGateDocuments(): Record<string, string> {
   return Object.fromEntries(
     collectMissionGateDocumentPaths().map((relativePath) => [
       relativePath,
-      String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) || ''),
+      readTextFile(pathResolver.rootResolve(relativePath)),
     ])
   );
 }
@@ -90,13 +92,16 @@ export const runCheckMissionGateDocs = defineScript({
   run(context) {
     const violations = collectMissionGateDocViolations(loadMissionGateDocuments());
     if (violations.length > 0) {
-      for (const violation of violations) console.error(`[check:mission-gate-docs] ${violation}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.map((violation) => `- ${violation}`)].join('\n')
+      );
     }
+    const documents = loadMissionGateDocuments();
     context.print(
-      `[check:mission-gate-docs] OK — ${Object.keys(loadMissionGateDocuments()).length} documents checked`
+      `[check:mission-gate-docs] OK — ${Object.keys(documents).length} documents checked`
     );
+    return { violations };
   },
 });
 

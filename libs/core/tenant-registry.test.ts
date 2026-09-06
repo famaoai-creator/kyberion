@@ -152,6 +152,80 @@ describe('resolveTenant (DA-01 spine)', () => {
     ]);
   });
 
+  it('rejects a profile knowledge_root that belongs to another tenant', () => {
+    seedProfile('acme-corp', {
+      knowledge_root: 'knowledge/confidential/beta-co/shared',
+    });
+
+    expect(() => resolveTenant('acme-corp', { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
+      /must remain under 'knowledge\/confidential\/acme-corp'/
+    );
+  });
+
+  it('rejects a symlinked tenant knowledge root before exposing its path', () => {
+    const outsideRoot = path.join(fixtureRoot, 'outside-knowledge');
+    fs.mkdirSync(outsideRoot, { recursive: true });
+    const confidentialRoot = path.join(fixtureRoot, 'knowledge', 'confidential');
+    fs.mkdirSync(confidentialRoot, { recursive: true });
+    fs.symlinkSync(outsideRoot, path.join(confidentialRoot, 'acme-corp'));
+    seedProfile('acme-corp');
+
+    expect(() => resolveTenant('acme-corp', { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
+      /traverses a symbolic link/
+    );
+  });
+
+  it('rejects a symlinked tenant profile before using it as registry authority', () => {
+    const outsideProfile = path.join(fixtureRoot, 'outside-profile.json');
+    const profileDir = path.join(fixtureRoot, 'knowledge', 'personal', 'tenants');
+    fs.mkdirSync(profileDir, { recursive: true });
+    fs.writeFileSync(
+      outsideProfile,
+      JSON.stringify({
+        tenant_slug: 'acme-corp',
+        display_name: 'Acme Corp',
+        status: 'active',
+        assigned_role: 'owner',
+      })
+    );
+    fs.symlinkSync(outsideProfile, path.join(profileDir, 'acme-corp.json'));
+
+    expect(() => resolveTenant('acme-corp', { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
+      /traverses a symbolic link/
+    );
+  });
+
+  it('does not enumerate a symlinked tenant profile as registered', () => {
+    const outsideProfile = path.join(fixtureRoot, 'outside-profile.json');
+    const profileDir = path.join(fixtureRoot, 'knowledge', 'personal', 'tenants');
+    fs.mkdirSync(profileDir, { recursive: true });
+    fs.writeFileSync(
+      outsideProfile,
+      JSON.stringify({
+        tenant_slug: 'acme-corp',
+        display_name: 'External profile',
+        status: 'active',
+        assigned_role: 'owner',
+      })
+    );
+    fs.symlinkSync(outsideProfile, path.join(profileDir, 'acme-corp.json'));
+
+    expect(listTenantProfileSlugs({ rootDir: fixtureRoot, env: EMPTY_ENV })).toEqual([]);
+  });
+
+  it('rejects a symlinked customer overlay before exposing its root', () => {
+    const outsideRoot = path.join(fixtureRoot, 'outside-customer');
+    const customerRoot = path.join(fixtureRoot, 'customer');
+    fs.mkdirSync(outsideRoot, { recursive: true });
+    fs.mkdirSync(customerRoot, { recursive: true });
+    fs.symlinkSync(outsideRoot, path.join(customerRoot, 'acme-corp'), 'dir');
+    seedProfile('acme-corp');
+
+    expect(() => resolveTenant('acme-corp', { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
+      /customer overlay traverses a symbolic link/
+    );
+  });
+
   it('throws for a slug with no profile (unregistered tenants cannot resolve)', () => {
     expect(() => resolveTenant('ghost-co', { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
       /has no profile/
@@ -174,6 +248,7 @@ describe('resolveTenant (DA-01 spine)', () => {
     }
     expect(message).toMatch(/could not be read/);
     expect(message).not.toMatch(/not valid JSON/);
+    expect(message).toMatch(/regular file/);
     // The hint is keyed off the personal-tier location, not the error text.
     expect(message).toMatch(/KYBERION_PERSONA/);
   });
@@ -184,6 +259,18 @@ describe('resolveTenant (DA-01 spine)', () => {
     fs.writeFileSync(path.join(dir, 'corrupt-co.json'), '{ not json');
     expect(() => resolveTenant('corrupt-co', { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
       /is not valid JSON/
+    );
+  });
+
+  it('rejects a JSON array before treating it as tenant authority', () => {
+    const dir = path.join(fixtureRoot, 'knowledge', 'personal', 'tenants');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'array-co.json'),
+      JSON.stringify([{ tenant_slug: 'array-co' }])
+    );
+    expect(() => resolveTenant('array-co', { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
+      /invalid tenant profile/
     );
   });
 

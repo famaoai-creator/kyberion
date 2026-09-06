@@ -67,6 +67,7 @@
  * as a thrown error.
  */
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { ShellClaudeCliBackend, buildClaudeCliOptionsFromEnv } from './shell-claude-cli-backend.js';
 import { CodexCliReasoningBackend } from './codex-cli-reasoning-backend.js';
 import type { CodexCliQueryOptions } from './codex-cli-query.js';
@@ -99,13 +100,17 @@ function isKnownProvider(value: string): value is KnownProvider {
   return (KNOWN_PROVIDERS as readonly string[]).includes(value);
 }
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 /** Same env parsing as `buildCodexCliQueryOptionsFromEnv`, minus its `which codex` spawn fallback (see module header). */
 function readCodexOptionsWithoutSpawn(env: NodeJS.ProcessEnv): CodexCliQueryOptions {
-  const bin = env.KYBERION_CODEX_CLI_BIN?.trim();
-  const model = env.KYBERION_CODEX_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_CODEX_CLI_TIMEOUT_MS?.trim();
+  const bin = envText(env, 'KYBERION_CODEX_CLI_BIN')?.trim();
+  const model = envText(env, 'KYBERION_CODEX_CLI_MODEL')?.trim();
+  const timeoutRaw = envText(env, 'KYBERION_CODEX_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const extraRaw = env.KYBERION_CODEX_CLI_EXTRA_ARGS?.trim();
+  const extraRaw = envText(env, 'KYBERION_CODEX_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
   return {
     ...(bin ? { bin } : {}),

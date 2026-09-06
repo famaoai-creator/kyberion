@@ -12,6 +12,7 @@
 export type WisdomActuatorRequest = {
   action:
     | 'knowledge_search'
+    | 'knowledge_read'
     | 'history_search'
     | 'knowledge_inject'
     | 'knowledge_export'
@@ -34,6 +35,11 @@ export type WisdomActuatorRequest = {
   | {
       action: 'knowledge_search';
       params: KnowledgeSearchParams;
+      [k: string]: unknown;
+    }
+  | {
+      action: 'knowledge_read';
+      params: KnowledgeReadParams;
       [k: string]: unknown;
     }
   | {
@@ -72,6 +78,7 @@ export type PipelineStep =
         | 'glob_files'
         | 'history_search'
         | 'knowledge_search'
+        | 'knowledge_read'
         | 'query'
         | 'read_file'
         | 'read_json'
@@ -98,6 +105,7 @@ export type PipelineStep =
         | 'conduct_1on1'
         | 'curate_background_review'
         | 'curation_report'
+        | 'knowledge_validation_sweep'
         | 'cross_critique'
         | 'typed_cross_critique'
         | 'decompose_into_tasks'
@@ -185,6 +193,11 @@ export interface KnowledgeSearchParams {
   query: string;
   tier?: KnowledgeTier;
   limit?: number;
+  export_as?: ExportAs;
+}
+export interface KnowledgeReadParams {
+  path: string;
+  skill_path?: string;
   export_as?: ExportAs;
 }
 export interface HistorySearchParams {

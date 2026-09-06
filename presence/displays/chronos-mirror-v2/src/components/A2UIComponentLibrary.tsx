@@ -9,7 +9,7 @@ import {
   ArrowDown,
   Minus,
 } from 'lucide-react';
-import { uxText, uxTextOr } from '../lib/ux-vocabulary';
+import { uxTextOr } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 import {
   KyberionDonut,

@@ -1,53 +1,65 @@
 /** Shared guards and control/display helpers for the system pipeline actuator. */
 
+import { logger } from '@agent/core/core';
 import {
-  logger,
-  loadJson,
+  assertSafeRepositoryPath,
   safeReadFile,
   safeMkdir,
   safeExec,
   safeExecResult,
   safeExistsSync,
+  safeLstat,
   safeStat,
-  pathResolver,
-  resolveVars,
-  evaluateCondition,
-  buildGovernedRetryOptions,
-  resolveActiveProfileRoot,
-  retry,
-  createVirtualMediaDeviceControlBridge,
-  createVirtualDeviceInventoryBridge,
-  createVirtualAudioOutputPlaybackBridge,
-  createVirtualAudioInputRecordingBridge,
-  createVirtualInputDeviceInventoryBridge,
-  createVirtualCameraBridge,
-  createVirtualCameraInjectionBridge,
-  createScreenCaptureBridge,
-  createScreenRecordingBridge,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { retry } from '@agent/core/async-utils';
+import { createVirtualMediaDeviceControlBridge } from '@agent/core/virtual-media-device-control-bridge';
+import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
+import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual-audio-output-playback-bridge';
+import { createVirtualAudioInputRecordingBridge } from '@agent/core/virtual-audio-input-recording-bridge';
+import { createVirtualInputDeviceInventoryBridge } from '@agent/core/virtual-input-device-inventory-bridge';
+import { createVirtualCameraBridge } from '@agent/core/virtual-camera-bridge';
+import { createVirtualCameraInjectionBridge } from '@agent/core/virtual-camera-injection-bridge';
+import { createScreenCaptureBridge } from '@agent/core/screen-capture-bridge';
+import { createScreenRecordingBridge } from '@agent/core/screen-recording-bridge';
+import {
   redactScreenVideoFrame,
   redactScreenCaptureFile,
-  createScreenDisplayInventoryBridge,
-  listToolRuntimeInventory,
-  listServiceRuntimeInventory,
-  probeSileroVad,
-  buildUnknownActuatorOpError,
-  type ScreenDisplayInventory,
-  type ScreenDisplayRecord,
-  StubVideoFrameBus,
-  writeVideoFrameBusToMp4,
-  pipeMp4ToVideoFrameBus,
-  withinLoopBounds,
-  DEFAULT_MAX_LOOP_ITERATIONS,
+} from '@agent/core/screen-frame-redaction';
+import { createScreenDisplayInventoryBridge } from '@agent/core/screen-display-inventory-bridge';
+import { listToolRuntimeInventory } from '@agent/core/tool-runtime-registry';
+import { listServiceRuntimeInventory } from '@agent/core/service-runtime-registry';
+import { probeSileroVad } from '@agent/core/silero-vad-bridge';
+import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
+import type {
+  ScreenDisplayInventory,
+  ScreenDisplayRecord,
+} from '@agent/core/screen-display-inventory-bridge';
+import { StubVideoFrameBus } from '@agent/core/video-frame-bus';
+import { writeVideoFrameBusToMp4, pipeMp4ToVideoFrameBus } from '@agent/core/video-frame-archive';
+import { withinLoopBounds, DEFAULT_MAX_LOOP_ITERATIONS } from '@agent/core/execution-bounds';
+import {
   reconcileConfigFallbacks,
   reconcileUnclassifiedErrors,
   reconcileUnhandledIntents,
-  buildCostReportFromHistory,
+} from '@agent/core/reconcile-ops';
+import { buildCostReportFromHistory } from '@agent/core/cost-report';
+import {
   collectAuditVerifyReport,
   runMemoryPromotionQueueSummary,
   runTaskModelRoutingSummary,
-  macosAutomationBridge,
-} from '@agent/core';
-import { getRegisteredEnv } from '@agent/core/foundation';
+} from '@agent/core/report-ops';
+import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
+import {
+  getRegisteredEnv,
+  getRegisteredEnvText,
+  parseSafeJsonObjectValue,
+  readJson,
+} from '@agent/core/foundation';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { runBaselineCheck } from '../../../../scripts/run_baseline_check.js';
@@ -61,7 +73,7 @@ import {
   listChromeTabs,
 } from '@agent/core/os-automation';
 import type { FocusedInputState } from '@agent/core/os-automation';
-import { validateOpInput } from '@agent/core';
+import { validateOpInput } from '@agent/core/op-input-contracts';
 import {
   systemDisplayHelpers,
   type ResolvedScreenDisplaySelection,
@@ -70,6 +82,29 @@ import { systemFocusHelpers } from './system-focus-helpers.js';
 import * as visionJudge from '@agent/shared-vision';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
+
+function resolveSystemPath(ref: string, allowMissingLeaf = true, allowSymlinkLeaf = false): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), {
+    allowMissingLeaf,
+    allowSymlinkLeaf,
+  });
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readSystemJson(filePath: string, label: string): unknown {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return readJson(filePath);
+}
 
 export const ALLOW_UNSAFE_SHELL =
   getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_SHELL', { defaultValue: false }) === true;
@@ -339,7 +374,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         ...ctx,
         [params.export_as || 'last_capture']: await retry(
           async () =>
-            safeExec(process.env.SHELL || '/bin/zsh', ['-lc', resolve(params.cmd)], {
+            safeExec(getRegisteredEnvText('SHELL') || '/bin/zsh', ['-lc', resolve(params.cmd)], {
               cwd: rootDir,
               env: params.env || {},
             }).trim(),
@@ -426,7 +461,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       const result = await retry(
         async () =>
           safeExecResult(command, args, {
-            cwd: params.cwd ? path.resolve(rootDir, resolve(params.cwd)) : rootDir,
+            cwd: params.cwd ? resolveSystemPath(String(resolve(params.cwd)), false) : rootDir,
             env,
             timeoutMs: params.timeout_ms || 30000,
             input: params.input ? resolve(params.input) : undefined,
@@ -461,8 +496,9 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'read_json':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: loadJson<unknown>(
-          pathResolver.rootResolve(resolve(params.path))
+        [params.export_as || 'last_capture_data']: readSystemJson(
+          resolveSystemPath(String(resolve(params.path))),
+          'system read_json input'
         ),
       };
     case 'probe': {
@@ -477,7 +513,11 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           },
         };
       }
-      const targetPath = pathResolver.rootResolve(resolve(params.path));
+      const targetPath = resolveSystemPath(
+        String(resolve(params.path)),
+        true,
+        params.allow_symlink_leaf === true
+      );
       let exists = false;
       let kind = 'unknown';
       try {
@@ -538,18 +578,14 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       return {
         ...ctx,
         [params.export_as || 'file_list']: getAllFiles(
-          pathResolver.rootResolve(resolve(params.dir))
+          resolveSystemPath(String(resolve(params.dir)))
         )
           .filter((f) => !params.ext || f.endsWith(params.ext))
           .map((f) => path.relative(pathResolver.rootDir(), f)),
       };
     case 'scan_directory': {
-      const {
-        safeStat,
-        safeReaddir,
-        safeExistsSync: scanExists,
-      } = await import('@agent/core/secure-io');
-      const scanRoot = pathResolver.rootResolve(resolve(params.path || '.'));
+      const { safeReaddir, safeExistsSync: scanExists } = await import('@agent/core/secure-io');
+      const scanRoot = resolveSystemPath(String(resolve(params.path || '.')));
       if (!scanExists(scanRoot)) {
         return {
           ...ctx,
@@ -587,15 +623,21 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         const results: any[] = [];
         for (const entry of entries) {
           if (entry.startsWith('.')) continue;
-          const abs = path.join(dir, entry);
-          const rel = path.relative(pathResolver.rootDir(), abs);
-          if (isExcluded(rel)) continue;
-          let stats: ReturnType<typeof safeStat> | null = null;
+          let abs: string;
           try {
-            stats = safeStat(abs);
+            abs = assertSafeRepositoryPath(path.join(dir, entry));
           } catch {
             continue;
           }
+          const rel = path.relative(pathResolver.rootDir(), abs);
+          if (isExcluded(rel)) continue;
+          let stats: ReturnType<typeof safeLstat> | null = null;
+          try {
+            stats = safeLstat(abs);
+          } catch {
+            continue;
+          }
+          if (stats.isSymbolicLink()) continue;
           if (stats.isDirectory()) {
             if (recursive) results.push(...scanDir(abs, depth + 1));
           } else {
@@ -624,7 +666,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         ),
       };
     case 'pulse_status': {
-      const { ledger } = await import('@agent/core');
+      const { ledger } = await import('@agent/core/ledger');
       return { ...ctx, [params.export_as || 'ledger_valid']: ledger.verifyIntegrity() };
     }
     case 'baseline_check': {
@@ -632,7 +674,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       return { ...ctx, [params.export_as || 'baseline_check']: report };
     }
     case 'list_missions': {
-      const missionRoot = pathResolver.rootResolve('active/missions');
+      const missionRoot = resolveSystemPath('active/missions');
       const tiers = ['personal', 'confidential', 'public'];
       const requestedStatus =
         typeof params.status === 'string' && params.status.trim()
@@ -641,20 +683,18 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       const allMissions: any[] = [];
       for (const tier of tiers) {
         const tierPath = path.join(missionRoot, tier);
-        if (safeExistsSync(tierPath)) {
+        if (safeExistsSync(tierPath) && safeLstat(tierPath).isDirectory()) {
           const { safeReaddir } = await import('@agent/core/secure-io');
           const missions = safeReaddir(tierPath);
           for (const missionId of missions.filter((m) => !m.startsWith('.'))) {
             const missionPath = path.join(tierPath, missionId);
-            const statePath = path.join(missionPath, 'mission-state.json');
-            let state: any = null;
-            if (safeExistsSync(statePath)) {
-              try {
-                state = loadJson<unknown>(statePath);
-              } catch (err) {
-                logger.warn(`[system-pipeline-helpers] suppressed error in scanDir: ${err}`);
-              }
-            }
+            if (!safeLstat(missionPath).isDirectory()) continue;
+            const statePath = assertSafeRepositoryPath(
+              path.join(missionPath, 'mission-state.json'),
+              { allowMissingLeaf: true }
+            );
+            const state = safeExistsSync(statePath) ? loadStateAtPath(statePath) : null;
+            if (!state) continue;
             if (requestedStatus && state?.status !== requestedStatus) continue;
             allMissions.push({
               id: missionId,
@@ -670,7 +710,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       return { ...ctx, [params.export_as || 'mission_list_data']: data };
     }
     case 'list_projects': {
-      const { listProjectRecords } = await import('@agent/core');
+      const { listProjectRecords } = await import('@agent/core/project-registry');
       const projects = listProjectRecords();
       const data = { status: 'ok', project_list: projects, count: projects.length };
       return { ...ctx, [params.export_as || 'project_list_data']: data };
@@ -684,13 +724,12 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         for (const entry of entries) {
           const actuatorPath = path.join(actuatorRoot, entry);
           const pkgPath = path.join(actuatorPath, 'package.json');
-          if (safeExistsSync(pkgPath)) {
+          if (safeLstat(actuatorPath).isDirectory() && safeExistsSync(pkgPath)) {
             try {
-              const pkg = loadJson<{
-                name?: unknown;
-                description?: unknown;
-                version?: unknown;
-              }>(pkgPath);
+              const pkg = parseSafeJsonObjectValue(
+                readSystemJson(assertSafeRepositoryPath(pkgPath), 'system capability metadata'),
+                'system capability metadata'
+              );
               capabilities.push({
                 id: entry,
                 name: pkg.name,
@@ -844,15 +883,27 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       };
       for (const mId of missionIds) {
         const mPath = path.resolve(missionRoot, mId);
-        if (isPathWithin(missionRoot, mPath) && safeExistsSync(mPath)) {
+        let safeMissionPath: string;
+        try {
+          safeMissionPath = assertSafeRepositoryPath(mPath, { allowMissingLeaf: true });
+        } catch {
+          continue;
+        }
+        if (
+          isPathWithin(missionRoot, safeMissionPath) &&
+          safeExistsSync(safeMissionPath) &&
+          safeLstat(safeMissionPath).isDirectory()
+        ) {
           results[mId] = {};
           for (const pattern of patterns) {
-            const files = getAllFiles(mPath).filter((f) =>
-              matchesPattern(path.relative(mPath, f), pattern)
+            const files = getAllFiles(safeMissionPath).filter((f) =>
+              matchesPattern(path.relative(safeMissionPath, f), pattern)
             );
             for (const f of files) {
-              const rel = path.relative(mPath, f);
-              results[mId][rel] = safeReadFile(f, { encoding: 'utf8' }) as string;
+              const rel = path.relative(safeMissionPath, f);
+              results[mId][rel] = safeReadFile(assertSafeRepositoryPath(f), {
+                encoding: 'utf8',
+              }) as string;
             }
           }
         }
@@ -860,19 +911,25 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       return { ...ctx, [params.export_as || 'artifact_collection']: results };
     }
     case 'sample_traces': {
-      const missionRoot = path.resolve(process.cwd(), 'active/missions');
+      const missionRoot = resolveSystemPath('active/missions');
       const count = Number(params.count || 5);
       const allTraces: any[] = [];
       const tiers = ['personal', 'confidential', 'public'];
       const { safeReaddir } = await import('@agent/core/secure-io');
       for (const tier of tiers) {
         const tierPath = path.join(missionRoot, tier);
-        if (safeExistsSync(tierPath)) {
+        if (safeExistsSync(tierPath) && safeLstat(tierPath).isDirectory()) {
           const missions = safeReaddir(tierPath);
           for (const m of missions) {
             const tracePath = path.join(tierPath, m, 'trace.json');
-            if (safeExistsSync(tracePath)) {
-              allTraces.push({ missionId: `${tier}/${m}`, path: tracePath });
+            if (
+              safeLstat(path.join(tierPath, m)).isDirectory() &&
+              safeExistsSync(assertSafeRepositoryPath(tracePath, { allowMissingLeaf: true }))
+            ) {
+              allTraces.push({
+                missionId: `${tier}/${m}`,
+                path: assertSafeRepositoryPath(tracePath),
+              });
             }
           }
         }
@@ -880,12 +937,12 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       const sampled = allTraces.sort(() => 0.5 - Math.random()).slice(0, count);
       const results = sampled.map((s) => ({
         missionId: s.missionId,
-        trace: loadJson<unknown>(s.path),
+        trace: readSystemJson(assertSafeRepositoryPath(s.path), 'system mission trace'),
       }));
       return { ...ctx, [params.export_as || 'sampled_traces']: results };
     }
     case 'list_running_apps': {
-      const { platform } = await import('@agent/core');
+      const { platform } = await import('@agent/core/platform');
       const apps = await platform.listRunningApps();
       return { ...ctx, [params.export_as || 'running_apps']: apps };
     }
@@ -1058,7 +1115,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       const frameIntervalMs = Math.max(0, Number(params.frame_interval_ms || 250));
       const mp4Path =
         typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim()
-          ? pathResolver.rootResolve(params.input_mp4_path.trim())
+          ? resolveSystemPath(params.input_mp4_path.trim(), false)
           : pathResolver.shared(`runtime/computer/video/camera-injection-${Date.now()}.mp4`);
       let sourcePath = mp4Path;
       if (!(typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim())) {
@@ -1144,7 +1201,7 @@ export const warnedSystemOpAliases = new Set<string>();
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
+  params: Record<string, unknown>;
 }
 
 export function assertUnsafeShellAllowed() {
@@ -1163,14 +1220,11 @@ export function assertUnsafeJsAllowed() {
   }
 }
 
-export function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: SYSTEM_MANIFEST_PATH,
-    defaults: DEFAULT_SYSTEM_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: SYSTEM_MANIFEST_PATH,
+  defaults: DEFAULT_SYSTEM_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 export async function delegateToFilePipeline(step: PipelineStep, ctx: any): Promise<any> {
   const delegatedCtx = { ...ctx };
@@ -1280,11 +1334,11 @@ export const SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS = new Set<string>([
   'list',
 ]);
 
-export function loadFocusTargetStore(): Record<string, any> {
+export function loadFocusTargetStore(): import('./system-focus-helpers.js').FocusTargetStore {
   return systemFocusHelpers.loadFocusTargetStore();
 }
 
-export function saveFocusTargetStore(store: Record<string, any>) {
+export function saveFocusTargetStore(store: import('./system-focus-helpers.js').FocusTargetStore) {
   systemFocusHelpers.saveFocusTargetStore(store);
 }
 
@@ -1413,7 +1467,7 @@ export function resolveCanonicalScreenRecordingPath(params: Record<string, unkno
   if (relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
     throw new Error('record_screen output must remain within the Kyberion root');
   }
-  return absolute;
+  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
 }
 
 export function resolveCanonicalScreenCapturePath(
@@ -1438,5 +1492,5 @@ export function resolveCanonicalScreenCapturePath(
       'screenshot output must remain within the governed screenshot or shared tmp store'
     );
   }
-  return absolute;
+  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
 }

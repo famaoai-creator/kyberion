@@ -9,9 +9,14 @@ const mocks = vi.hoisted(() => ({
     shared: vi.fn((p = '') => `/tmp/kyberion/active/shared/${String(p).replace(/^\/+/, '')}`),
   },
   safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(),
+  assertSafeRepositoryPath: vi.fn((target: string) => target),
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
-  classifyError: vi.fn((err: any) => ({ category: 'unknown', message: String(err?.message || err) })),
+  classifyError: vi.fn((err: any) => ({
+    category: 'unknown',
+    message: String(err?.message || err),
+  })),
   formatClassification: vi.fn((c: any) => JSON.stringify(c)),
 }));
 
@@ -22,6 +27,27 @@ vi.mock('@agent/core', () => ({
   safeExistsSync: mocks.safeExistsSync,
   safeMkdir: mocks.safeMkdir,
   safeWriteFile: mocks.safeWriteFile,
+}));
+
+vi.mock('@agent/core/path-resolver', () => ({
+  pathResolver: mocks.pathResolver,
+}));
+
+vi.mock('@agent/core/secure-io', () => ({
+  assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
+  safeExistsSync: mocks.safeExistsSync,
+  safeLstat: mocks.safeLstat,
+  safeMkdir: mocks.safeMkdir,
+  safeWriteFile: mocks.safeWriteFile,
+}));
+
+vi.mock('@agent/core/error-classifier', () => ({
+  classifyError: mocks.classifyError,
+  formatClassification: mocks.formatClassification,
+}));
+
+vi.mock('@agent/core/governance', () => ({
+  withExecutionContext: async (_role: string, run: () => unknown) => await run(),
 }));
 
 describe('customer_switch', () => {
@@ -44,9 +70,14 @@ describe('customer_switch', () => {
     fs.writeFileSync(path.join(customerDir, 'vision.md'), '# vision');
 
     mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
-    mocks.pathResolver.shared.mockImplementation((p = '') => path.join(tmpDir, 'active', 'shared', String(p).replace(/^\/+/, '')));
+    mocks.pathResolver.shared.mockImplementation((p = '') =>
+      path.join(tmpDir, 'active', 'shared', String(p).replace(/^\/+/, ''))
+    );
     mocks.safeExistsSync.mockImplementation((target: string) => fs.existsSync(target));
-    mocks.safeMkdir.mockImplementation((target: string) => fs.mkdirSync(target, { recursive: true }));
+    mocks.safeLstat.mockImplementation((target: string) => fs.lstatSync(target));
+    mocks.safeMkdir.mockImplementation((target: string) =>
+      fs.mkdirSync(target, { recursive: true })
+    );
     mocks.safeWriteFile.mockImplementation((target: string, content: string) => {
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, content);
@@ -73,8 +104,34 @@ describe('customer_switch', () => {
 
     mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
     mocks.safeExistsSync.mockImplementation((target: string) => fs.existsSync(target));
+    mocks.safeLstat.mockImplementation((target: string) => fs.lstatSync(target));
 
     const mod = await import('./customer_switch.js');
     expect(() => mod.switchCustomer('acme')).toThrow('Customer overlay is not ready');
+  });
+
+  it('formats activation output without writing to stdout', async () => {
+    const rootDir = '/tmp/kyberion';
+    mocks.pathResolver.rootDir.mockReturnValue(rootDir);
+    const mod = await import('./customer_switch.js');
+
+    expect(
+      mod.formatSwitchedCustomer({
+        slug: 'acme',
+        envPath: `${rootDir}/active/shared/runtime/customer.env`,
+      })
+    ).toEqual([
+      'Switched customer to acme',
+      'Activation profile: active/shared/runtime/customer.env',
+      'Source it with: source active/shared/runtime/customer.env',
+    ]);
+  });
+
+  it('routes help output through the injected printer', async () => {
+    const mod = await import('./customer_switch.js');
+    const output: unknown[] = [];
+
+    expect(() => mod.main(['--help'], (value) => output.push(value))).toThrow();
+    expect(output).toEqual(['Usage: customer_switch <slug>']);
   });
 });

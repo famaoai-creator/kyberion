@@ -1,8 +1,8 @@
-import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { clamp } from './foundation/text.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
 import { probeAppleImageGeneration } from './apple-intelligence-bridge.js';
@@ -15,7 +15,7 @@ import {
 
 export type MediaBackendModality = 'image' | 'voice' | 'video' | 'music';
 export type MediaBackendStatus = 'active' | 'shadow' | 'disabled';
-export type MediaBackendKind = 'service_preset' | 'api' | 'cli' | 'local';
+export type MediaBackendKind = 'service_preset' | 'api' | 'cli' | 'local' | 'agent_tool';
 export type MediaBackendPlatform = 'any' | 'darwin' | 'linux' | 'win32';
 export type MediaBackendProbeKind =
   'service_runtime' | 'tool_runtime' | 'native_bridge' | 'registry';
@@ -86,132 +86,33 @@ export function resetMediaBackendAvailabilityCache(): void {
   mediaBackendProbeCache.clear();
 }
 
+export function _resetMediaBackendAvailabilityCacheForTests(): void {
+  resetMediaBackendAvailabilityCache();
+}
+
 function defaultMediaBackendProbeTtlMs(): number {
   const configured = Number(getRegisteredEnvText('KYBERION_MEDIA_BACKEND_PROBE_TTL_MS') || 30_000);
-  return Number.isFinite(configured) ? Math.min(300_000, Math.max(1_000, configured)) : 30_000;
+  return Number.isFinite(configured) ? clamp(configured, 1_000, 300_000) : 30_000;
 }
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/media-backend-registry.json'
 );
-// Keep fallback construction free of registry calls at module evaluation time.
-// The canonical media registry is the source of truth; this fallback only
-// protects bootstrap when the governed files are unavailable.
-const LOCAL_FLUX_TOOL_BACKEND = {
-  command: 'uvx',
-  args: ['--from', 'mflux', 'mflux-generate'],
-};
-
-const FALLBACK_REGISTRY: MediaBackendRegistry = {
-  version: 'fallback',
-  default_backend_ids: {
-    image: 'media-generation.comfyui',
-    voice: 'voice.local_say',
-    video: 'video.hyperframes_cli',
-    music: 'media-generation.comfyui.music',
-  },
-  backends: [
-    {
-      backend_id: 'media-generation.comfyui',
-      modality: 'image',
-      display_name: 'ComfyUI Media Generation',
-      kind: 'service_preset',
-      provider: 'comfyui',
-      status: 'active',
-      platforms: ['any'],
-      supports: { artifact_formats: ['png', 'jpg', 'jpeg', 'webp'], async: true },
-      service_id: 'media-generation',
-      action: 'generate_image',
-    },
-    {
-      backend_id: 'media-generation.comfyui.video',
-      modality: 'video',
-      display_name: 'ComfyUI Video Generation',
-      kind: 'service_preset',
-      provider: 'comfyui',
-      status: 'active',
-      platforms: ['any'],
-      supports: { artifact_formats: ['mp4', 'mov', 'webm', 'gif'], async: true },
-      service_id: 'media-generation',
-      action: 'generate_video',
-      fallback_backend_id: 'video.hyperframes_cli',
-    },
-    {
-      backend_id: 'media-generation.comfyui.music',
-      modality: 'music',
-      display_name: 'ComfyUI Music Generation',
-      kind: 'service_preset',
-      provider: 'comfyui',
-      status: 'active',
-      platforms: ['any'],
-      supports: { artifact_formats: ['mp3', 'wav', 'flac'], async: true },
-      service_id: 'media-generation',
-      action: 'generate_music',
-    },
-    {
-      backend_id: 'media-generation.local_flux',
-      modality: 'image',
-      display_name: 'Local FLUX Image Generation',
-      kind: 'cli',
-      provider: 'mflux',
-      status: 'active',
-      platforms: ['darwin'],
-      supports: { artifact_formats: ['png', 'jpg', 'jpeg', 'webp'], async: false },
-      command: LOCAL_FLUX_TOOL_BACKEND.command,
-      args: LOCAL_FLUX_TOOL_BACKEND.args,
-      fallback_backend_id: 'media-generation.comfyui',
-      notes: 'Apple Silicon local FLUX generation via the governed tool runtime registry.',
-    },
-    {
-      backend_id: 'media-generation.apple_playground',
-      modality: 'image',
-      display_name: 'Apple Image Playground',
-      kind: 'local',
-      provider: 'apple_image_playground',
-      status: 'active',
-      platforms: ['darwin'],
-      supports: { artifact_formats: ['png'], async: false },
-      fallback_backend_id: 'media-generation.local_flux',
-      notes: 'macOS Apple Silicon Image Playground through the native capability bridge.',
-    },
-    {
-      backend_id: 'voice.local_say',
-      modality: 'voice',
-      display_name: 'Local System TTS',
-      kind: 'local',
-      provider: 'system_tts',
-      status: 'active',
-      platforms: ['darwin', 'linux', 'win32'],
-      supports: { playback: true, artifact_formats: ['wav', 'aiff'] },
-    },
-    {
-      backend_id: 'video.hyperframes_cli',
-      modality: 'video',
-      display_name: 'HyperFrames CLI Renderer',
-      kind: 'cli',
-      provider: 'hyperframes',
-      status: 'active',
-      platforms: ['any'],
-      supports: { artifact_formats: ['mp4', 'mov', 'webm', 'gif'], async: true, mux_audio: true },
-      command: 'npx',
-      args: ['hyperframes', 'render'],
-    },
-  ],
-};
-
 let cachedRegistryPath: string | null = null;
 let cachedRegistry: MediaBackendRegistry | null = null;
 
 function getRegistryPath(): string {
-  return (
-    getRegisteredEnvText('KYBERION_MEDIA_BACKEND_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
+  return assertSafeRepositoryPath(
+    getRegisteredEnvText('KYBERION_MEDIA_BACKEND_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH,
+    { allowMissingLeaf: true }
   );
 }
 
-function loadRegistryFromPath(registryPath: string): MediaBackendRegistry {
-  const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<MediaBackendRegistry>(raw, 'media backend registry');
-}
+const mediaBackendRegistryCatalog = defineCatalog<MediaBackendRegistry>({
+  id: 'media-backend-registry',
+  path: getRegistryPath,
+  schema: pathResolver.knowledge('product/schemas/media-backend-registry.schema.json'),
+});
 
 function inferVoiceBackendRecords(): MediaBackendRecord[] {
   return getVoiceEngineRegistry().engines.map((engine) => mapVoiceEngineToBackend(engine));
@@ -263,41 +164,23 @@ function resolveVoiceBackendRecord(
 function getRegistry(): MediaBackendRegistry {
   const registryPath = getRegistryPath();
   if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
+  const parsed = mediaBackendRegistryCatalog.load();
+  cachedRegistryPath = registryPath;
+  cachedRegistry = {
+    ...parsed,
+    backends: mergeVoiceBackends(parsed.backends || []),
+  };
+  return cachedRegistry;
+}
 
-  if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
-    cachedRegistry = {
-      ...FALLBACK_REGISTRY,
-      backends: mergeVoiceBackends(FALLBACK_REGISTRY.backends),
-    };
-    return cachedRegistry;
-  }
-
-  try {
-    const parsed = loadRegistryFromPath(registryPath);
-    cachedRegistryPath = registryPath;
-    cachedRegistry = {
-      ...parsed,
-      backends: mergeVoiceBackends(parsed.backends || []),
-    };
-    return cachedRegistry;
-  } catch (error: any) {
-    logger.warn(
-      `[MEDIA_BACKEND_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
-    );
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
+export function getMediaBackendRegistry(): MediaBackendRegistry {
+  return getRegistry();
 }
 
 export function resetMediaBackendRegistryCache(): void {
   cachedRegistryPath = null;
   cachedRegistry = null;
-}
-
-export function getMediaBackendRegistry(): MediaBackendRegistry {
-  return getRegistry();
+  mediaBackendRegistryCatalog.reset();
 }
 
 export function listMediaBackends(modality?: MediaBackendModality): MediaBackendRecord[] {
@@ -344,8 +227,7 @@ export function getMediaBackendRecord(
     ) ||
     (modality
       ? registry.backends.find((backend) => backend.modality === modality)
-      : registry.backends[0]) ||
-    FALLBACK_REGISTRY.backends[0]
+      : registry.backends[0])
   );
 }
 
@@ -420,7 +302,10 @@ async function probeMediaBackendAvailabilityUncached(
       ?.split('|')
       .map((name) => name.trim())
       .filter(Boolean) || [];
-  if (credentialNames.length > 0 && !credentialNames.some((name) => process.env[name]?.trim())) {
+  if (
+    credentialNames.length > 0 &&
+    !credentialNames.some((name) => getRegisteredEnvText(name)?.trim())
+  ) {
     return {
       backend_id: backend.backend_id,
       modality: backend.modality,
@@ -455,7 +340,7 @@ export async function probeMediaBackendAvailability(
   }
 
   const ttlMs = Number.isFinite(options.ttl_ms)
-    ? Math.min(300_000, Math.max(1_000, Number(options.ttl_ms)))
+    ? clamp(Number(options.ttl_ms), 1_000, 300_000)
     : defaultMediaBackendProbeTtlMs();
   const probedAt = new Date(now).toISOString();
   const expiresAt = new Date(now + ttlMs).toISOString();

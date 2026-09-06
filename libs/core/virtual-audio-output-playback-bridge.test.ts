@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 const mocks = vi.hoisted(() => {
   const createVirtualDeviceInventoryBridge = vi.fn();
@@ -11,17 +14,24 @@ vi.mock('./virtual-device-inventory-bridge.js', () => ({
   createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
 }));
 
-vi.mock('./secure-io.js', () => ({
-  safeExec: mocks.safeExec,
-  buildSafeExecEnv: vi.fn(() => ({})),
-  safeMkdir: vi.fn(),
-  safeWriteFile: mocks.safeWriteFile,
-  safeRmSync: vi.fn(),
-  safeCreateExclusiveFileSync: vi.fn(),
-  safeExistsSync: vi.fn(() => false),
-  safeReadFile: vi.fn(),
-  safeUnlink: vi.fn(),
-}));
+vi.mock('./secure-io.js', async () => {
+  const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+  return {
+    ...actual,
+    safeExec: mocks.safeExec,
+    buildSafeExecEnv: vi.fn(() => ({})),
+    safeMkdir: vi.fn(),
+    safeWriteFile: vi.fn((filePath: string, data: string | Buffer) => {
+      mocks.safeWriteFile(filePath, data);
+      actual.safeWriteFile(filePath, data);
+    }),
+    safeRmSync: vi.fn(),
+    safeCreateExclusiveFileSync: vi.fn(),
+    safeExistsSync: vi.fn(() => false),
+    safeReadFile: vi.fn(),
+    safeUnlink: vi.fn(),
+  };
+});
 
 describe('createVirtualAudioOutputPlaybackBridge', () => {
   const originalPlatform = process.platform;
@@ -68,6 +78,10 @@ describe('createVirtualAudioOutputPlaybackBridge', () => {
   });
 
   afterEach(() => {
+    fs.rmSync(pathResolver.sharedTmp('virtual-audio-output-boundary-test'), {
+      recursive: true,
+      force: true,
+    });
     Object.defineProperty(process, 'platform', {
       configurable: true,
       value: originalPlatform,
@@ -90,8 +104,11 @@ describe('createVirtualAudioOutputPlaybackBridge', () => {
     const { createVirtualAudioOutputPlaybackBridge } =
       await import('./virtual-audio-output-playback-bridge.js');
     const bridge = createVirtualAudioOutputPlaybackBridge();
+    const sourcePath = pathResolver.sharedTmp('virtual-audio-output-boundary-test/source.wav');
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+    fs.writeFileSync(sourcePath, Buffer.from('wav-fixture'));
     const result = await bridge.playOnOutputs(['Built-in Output'], {
-      source_path: '/tmp/voice-generation/req-1.wav',
+      source_path: sourcePath,
     });
 
     expect(result.outputs).toHaveLength(1);
@@ -99,18 +116,41 @@ describe('createVirtualAudioOutputPlaybackBridge', () => {
       expect.objectContaining({
         device_name: 'Built-in Output',
         status: 'played',
-        source_path: '/tmp/voice-generation/req-1.wav',
-        tone_path: '/tmp/voice-generation/req-1.wav',
+        source_path: sourcePath,
+        tone_path: sourcePath,
       })
     );
     expect(mocks.safeExec.mock.calls[0]?.[1]).toEqual(
-      expect.arrayContaining([
-        '--device',
-        'Built-in Output',
-        '--tone-path',
-        '/tmp/voice-generation/req-1.wav',
-      ])
+      expect.arrayContaining(['--device', 'Built-in Output', '--tone-path', sourcePath])
     );
+  });
+
+  it('rejects a source file outside the repository', async () => {
+    const { createVirtualAudioOutputPlaybackBridge } =
+      await import('./virtual-audio-output-playback-bridge.js');
+    const bridge = createVirtualAudioOutputPlaybackBridge();
+
+    await expect(
+      bridge.playOnOutputs(['Built-in Output'], { source_path: '/tmp/voice-generation/req-1.wav' })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(mocks.safeExec).not.toHaveBeenCalled();
+  });
+
+  it('rejects a source file that traverses a symbolic link', async () => {
+    const boundaryRoot = pathResolver.sharedTmp('virtual-audio-output-boundary-test');
+    const targetPath = path.join(boundaryRoot, 'target.wav');
+    const linkedPath = path.join(boundaryRoot, 'linked.wav');
+    fs.mkdirSync(boundaryRoot, { recursive: true });
+    fs.writeFileSync(targetPath, Buffer.from('wav-fixture'));
+    fs.symlinkSync(targetPath, linkedPath);
+
+    const { createVirtualAudioOutputPlaybackBridge } =
+      await import('./virtual-audio-output-playback-bridge.js');
+    const bridge = createVirtualAudioOutputPlaybackBridge();
+    await expect(
+      bridge.playOnOutputs(['Built-in Output'], { source_path: linkedPath })
+    ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+    expect(mocks.safeExec).not.toHaveBeenCalled();
   });
 
   it('plays a pcm stream by converting it to a wav temp file', async () => {

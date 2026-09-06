@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { computeApprovalPayloadHash, type ApprovalRequestRecord } from './approval-store.js';
 import { evaluateArtifactReviews } from './artifact-review.js';
 
@@ -52,6 +53,29 @@ export interface MarketingReview {
     required_action?: string;
     location?: Record<string, string>;
   }>;
+}
+
+export interface MarketingReviewPackage {
+  run_id: string;
+  risk_level: MarketingRiskLevel;
+  artifacts: Array<{ name: string; path: string; sha256: string }>;
+}
+
+export interface MarketingReviewAggregation {
+  run_id: string;
+  risk_level: MarketingRiskLevel;
+  gate: GateResult;
+  reviews: MarketingReview[];
+  blocking_findings: Array<{
+    review_id: string;
+    severity: 'blocking';
+    category: string;
+    description: string;
+    required_action?: string;
+    location?: Record<string, string>;
+  }>;
+  ready_for_approval: boolean;
+  evidence: string[];
 }
 
 export interface PublicationApproval {
@@ -108,6 +132,16 @@ export interface GateResult {
   evidence: string[];
 }
 
+export interface PublicationVerification extends GateResult {
+  approval_id: string;
+  shared_approval_request_id: string;
+  artifact_hashes: Record<string, ArtifactBinding>;
+  sensitive_data_scan: SensitiveDataScanResult;
+  rendered_artifact: string;
+  network_access: false;
+  counts_as_publication: false;
+}
+
 export interface SensitiveDataScanResult {
   pii_findings: Array<{ category: string; location: string }>;
   secret_findings: Array<{ category: string; location: string }>;
@@ -127,9 +161,110 @@ export interface MarketingCompletionEvidence {
 }
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/marketing-risk-policy.json');
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-risk-policy.schema.json'
+);
+const PUBLICATION_APPROVAL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/publication-approval.schema.json'
+);
+const MARKETING_COMPLETION_EVIDENCE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-completion-evidence.schema.json'
+);
+const MARKETING_REVIEW_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-review.schema.json'
+);
+const MARKETING_REVIEW_PACKAGE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-review-package.schema.json'
+);
+const MARKETING_REVIEW_AGGREGATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-review-aggregation.schema.json'
+);
+const PUBLICATION_VERIFICATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/publication-verification.schema.json'
+);
+
+function marketingReviewCatalogAtPath(filePath: string) {
+  return defineCatalog<MarketingReview>({
+    id: 'marketing-review',
+    path: filePath,
+    schema: MARKETING_REVIEW_SCHEMA_PATH,
+  });
+}
+
+function marketingReviewPackageCatalogAtPath(filePath: string) {
+  return defineCatalog<MarketingReviewPackage>({
+    id: 'marketing-review-package',
+    path: filePath,
+    schema: MARKETING_REVIEW_PACKAGE_SCHEMA_PATH,
+  });
+}
 
 export function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+/** Load a persisted publication approval through its canonical schema boundary. */
+export function loadPublicationApprovalAtPath(filePath: string): PublicationApproval {
+  return defineCatalog<PublicationApproval>({
+    id: 'publication-approval',
+    path: filePath,
+    schema: PUBLICATION_APPROVAL_SCHEMA_PATH,
+  }).load();
+}
+
+/** Load hash-bound marketing completion evidence through its canonical schema boundary. */
+export function loadMarketingCompletionEvidenceAtPath(
+  filePath: string
+): MarketingCompletionEvidence {
+  return defineCatalog<MarketingCompletionEvidence>({
+    id: 'marketing-completion-evidence',
+    path: filePath,
+    schema: MARKETING_COMPLETION_EVIDENCE_SCHEMA_PATH,
+  }).load();
+}
+
+/** Validate the persisted verification artifact produced by the local dry-run. */
+export function validatePublicationVerification(
+  value: unknown,
+  sourcePath = 'publication-verification'
+): PublicationVerification {
+  return defineCatalog<PublicationVerification>({
+    id: 'publication-verification',
+    path: sourcePath,
+    schema: PUBLICATION_VERIFICATION_SCHEMA_PATH,
+  }).validate(value, sourcePath);
+}
+
+function requireRegularMarketingFile(filePath: string, label: string): string {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`${label} must be a regular file: ${filePath}`);
+  }
+  return safeFilePath;
+}
+
+/** Load the persisted review package through its strict schema boundary. */
+export function loadMarketingReviewPackageAtPath(filePath: string): MarketingReviewPackage {
+  const safeFilePath = requireRegularMarketingFile(filePath, 'review package');
+  return marketingReviewPackageCatalogAtPath(safeFilePath).load();
+}
+
+/** Load one persisted marketing review through its strict schema boundary. */
+export function loadMarketingReviewAtPath(filePath: string): MarketingReview {
+  const safeFilePath = requireRegularMarketingFile(filePath, 'review');
+  return marketingReviewCatalogAtPath(safeFilePath).load();
+}
+
+/** Validate the persisted result produced by marketing review aggregation. */
+export function validateMarketingReviewAggregation(
+  value: unknown,
+  sourcePath = 'marketing-review-aggregation'
+): MarketingReviewAggregation {
+  return defineCatalog<MarketingReviewAggregation>({
+    id: 'marketing-review-aggregation',
+    path: sourcePath,
+    schema: MARKETING_REVIEW_AGGREGATION_SCHEMA_PATH,
+  }).validate(value, sourcePath);
 }
 
 export function scanMarketingTextForSensitiveData(
@@ -569,7 +704,11 @@ export function validateMarketingCompletionEvidence(input: {
 export function loadMarketingRiskPolicy(env: NodeJS.ProcessEnv = process.env): MarketingRiskPolicy {
   const overlay = customerResolver.customerRoot('policy/marketing-risk-policy.json', env);
   const source = overlay && safeExistsSync(overlay) ? overlay : DEFAULT_POLICY_PATH;
-  return loadJson<MarketingRiskPolicy>(source);
+  return defineCatalog<MarketingRiskPolicy>({
+    id: 'marketing-risk-policy',
+    path: source,
+    schema: POLICY_SCHEMA_PATH,
+  }).load();
 }
 
 export function requiredMarketingControls(

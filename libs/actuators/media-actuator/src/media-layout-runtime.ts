@@ -1,5 +1,8 @@
-import { logger, safeExistsSync, splitLinesBalanced, ensureReadableOn } from '@agent/core';
-import { validateThemeContrast } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { clamp } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
+import { splitLinesBalanced } from '@agent/core/native-pptx-engine/text-metrics';
+import { ensureReadableOn, validateThemeContrast } from '@agent/core/design-qa';
 import { classifyRenderSemantic } from './media-document-helpers.js';
 import * as path from 'node:path';
 import { resolveLatinFontFamily } from '@agent/core/design-fonts';
@@ -85,7 +88,7 @@ function cssVarHex(value: unknown): string | undefined {
     /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i
   );
   if (!rgba) return undefined;
-  const channels = rgba.slice(1, 4).map((entry) => Math.max(0, Math.min(255, Number(entry))));
+  const channels = rgba.slice(1, 4).map((entry) => clamp(Number(entry), 0, 255));
   if (channels.some((entry) => !Number.isFinite(entry))) return undefined;
   return `#${channels.map((entry) => entry.toString(16).padStart(2, '0')).join('')}`;
 }
@@ -124,7 +127,18 @@ function buildPptxSlideFromPattern(
   // violation anyway. Absent an explicit logo_url, render without a logo.
   const rawLogoPath =
     data.branding?.logo_url || theme?.assets?.logo_url || theme?.theme?.assets?.logo_url || null;
-  const logoPath = rawLogoPath ? path.resolve(rootDir, rawLogoPath) : null;
+  let logoPath: string | null = null;
+  if (rawLogoPath) {
+    try {
+      logoPath = assertSafeRepositoryPath(path.resolve(rootDir, rawLogoPath), {
+        allowMissingLeaf: true,
+      });
+    } catch {
+      // Optional branding must not make rendering fail, but it must never probe
+      // a path outside the repository either.
+      logoPath = null;
+    }
+  }
   const logoExists = logoPath ? safeExistsSync(logoPath) : false;
   const brandName = data.branding?.brand_name || theme?.name || theme?.theme?.name || '';
 

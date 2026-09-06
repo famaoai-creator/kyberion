@@ -68,7 +68,9 @@
           {
             "role": "sink",
             "op": "system:log",
-            "params": { "message": "💡 Next recommended action: pnpm system:upgrade:execute" }
+            "params": {
+              "message": "💡 Next recommended action: pnpm system:upgrade -- --mode execute"
+            }
           }
         ],
         "else": [

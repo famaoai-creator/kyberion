@@ -1,8 +1,16 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { getVoiceProfileRecord } from './voice-profile-registry.js';
 import {
   getVoiceEngineRegistry,
@@ -73,17 +81,31 @@ const DEFAULT_PREFERENCES: VoiceSelectionPreferences = {
   stt_backend: 'auto',
 };
 
+const VOICE_SELECTION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-selection-preferences.schema.json'
+);
+
+function voiceSelectionCatalogAtPath(filePath: string) {
+  return defineCatalog<VoiceSelectionPreferences>({
+    id: 'voice-selection-preferences',
+    path: filePath,
+    schema: VOICE_SELECTION_SCHEMA_PATH,
+  });
+}
+
 function selectionPath(): string {
-  return path.join(resolveActiveProfileRoot(), 'onboarding', 'voice-selection.json');
+  return assertSafeRepositoryPath(
+    path.join(resolveActiveProfileRoot(), 'onboarding', 'voice-selection.json'),
+    { allowMissingLeaf: true }
+  );
 }
 
 function readPreferences(): VoiceSelectionPreferences | null {
   const filePath = selectionPath();
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(filePath, { encoding: 'utf8' }))
-    ) as Partial<VoiceSelectionPreferences>;
+    if (!safeLstat(filePath).isFile()) return null;
+    const parsed = voiceSelectionCatalogAtPath(filePath).load();
     const backend = parseVoiceSttBackend(parsed.stt_backend);
     if (typeof parsed.tts_engine_id !== 'string' || !parsed.tts_engine_id.trim()) return null;
     return {
@@ -164,9 +186,9 @@ function resolveSttAvailability(): VoiceSttAvailability {
   );
   return {
     server: Boolean(
-      process.env.VOICE_HUB_STT_BASE_URL?.trim() ||
-      process.env.WHISPERKIT_BASE_URL?.trim() ||
-      process.env.MLX_AUDIO_BASE_URL?.trim()
+      getRegisteredEnvText('VOICE_HUB_STT_BASE_URL')?.trim() ||
+      getRegisteredEnvText('WHISPERKIT_BASE_URL')?.trim() ||
+      getRegisteredEnvText('MLX_AUDIO_BASE_URL')?.trim()
     ),
     fluidAudio,
     fasterWhisper,
@@ -258,6 +280,14 @@ export function getVoiceSelectionSnapshot(): VoiceSelectionSnapshot {
   };
 }
 
+export function loadVoiceSelectionPreferences(): VoiceSelectionPreferences | null {
+  try {
+    return readPreferences();
+  } catch {
+    return null;
+  }
+}
+
 export function saveVoiceSelectionPreferences(input: {
   tts_engine_id?: unknown;
   stt_backend?: unknown;
@@ -283,22 +313,15 @@ export function saveVoiceSelectionPreferences(input: {
 
   const filePath = selectionPath();
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(
-    filePath,
-    JSON.stringify(
-      {
-        version: '1.0.0',
-        tts_engine_id: nextTts,
-        stt_backend: nextStt,
-        updated_at: new Date().toISOString(),
-      },
-      null,
-      2
-    )
+  const validated = voiceSelectionCatalogAtPath(filePath).validate(
+    {
+      version: '1.0.0',
+      tts_engine_id: nextTts,
+      stt_backend: nextStt,
+      updated_at: nowIso(),
+    },
+    filePath
   );
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return getVoiceSelectionSnapshot();
-}
-
-export function resetVoiceSelectionPreferencesCache(): void {
-  // Preferences are intentionally read on each request so UI changes take effect without a restart.
 }

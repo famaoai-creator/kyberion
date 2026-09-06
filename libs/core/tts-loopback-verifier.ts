@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import { pcmToWav } from './pcm-wav.js';
 import type { TraceContext } from './src/trace.js';
@@ -562,12 +562,11 @@ async function* asAudioIterable(chunks: readonly AudioChunk[]): AsyncIterable<Au
 }
 
 function resolveOutputDir(requestId: string, requestedDir?: string): string {
-  const root = pathResolver.rootDir();
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/u.test(requestId)) {
+    throw new Error(`[LOOPBACK_REQUEST_SCOPE] invalid request id for receipt path: ${requestId}`);
+  }
   const dir = requestedDir
     ? pathResolver.rootResolve(requestedDir)
     : pathResolver.shared(`runtime/voice-loopback-receipts/${requestId}`);
-  const relative = path.relative(root, dir);
-  if (relative.startsWith('..') || path.isAbsolute(relative))
-    throw new Error('loopback receipt path escaped workspace');
-  return dir;
+  return assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
 }

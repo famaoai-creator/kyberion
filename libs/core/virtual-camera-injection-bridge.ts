@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { safeExec, safeMkdir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExec, safeMkdir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type { VideoFrame } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
@@ -74,9 +74,18 @@ export interface VirtualCameraInjectionBridgeOptions {
 export interface VirtualCameraInjectionBridge {
   readonly bridge_id: typeof VIRTUAL_CAMERA_INJECTION_BRIDGE_ID;
   probe(): Promise<VirtualCameraInjectionProbe>;
-  injectFromMp4(inputPath: string, request?: VirtualCameraInjectionRequest): Promise<VirtualCameraInjectionResult>;
-  injectFrames(stream: AsyncIterable<VideoFrame>, request?: VirtualCameraInjectionRequest): Promise<VirtualCameraInjectionResult>;
-  injectBus(bus: VideoFrameBus, request?: VirtualCameraInjectionRequest): Promise<VirtualCameraInjectionResult>;
+  injectFromMp4(
+    inputPath: string,
+    request?: VirtualCameraInjectionRequest
+  ): Promise<VirtualCameraInjectionResult>;
+  injectFrames(
+    stream: AsyncIterable<VideoFrame>,
+    request?: VirtualCameraInjectionRequest
+  ): Promise<VirtualCameraInjectionResult>;
+  injectBus(
+    bus: VideoFrameBus,
+    request?: VirtualCameraInjectionRequest
+  ): Promise<VirtualCameraInjectionResult>;
 }
 
 const DEFAULT_FFMPEG_BIN = 'ffmpeg';
@@ -98,22 +107,33 @@ function isAvailableCommand(command: string, args: string[]): boolean {
   }
 }
 
-function pickCamera(inventory: VirtualDeviceInventory | undefined, preference?: string): string | undefined {
+function pickCamera(
+  inventory: VirtualDeviceInventory | undefined,
+  preference?: string
+): string | undefined {
   const candidates = inventory?.virtual_cameras.length
     ? inventory.virtual_cameras
-    : inventory?.cameras ?? [];
+    : (inventory?.cameras ?? []);
   if (candidates.length === 0) return normalizePreference(preference);
   const normalizedPreference = normalizePreference(preference);
   if (!normalizedPreference) return candidates[0]?.name;
   const lowerPreference = normalizedPreference.toLowerCase();
-  const exact = candidates.find((candidate) => candidate.name.trim().toLowerCase() === lowerPreference);
+  const exact = candidates.find(
+    (candidate) => candidate.name.trim().toLowerCase() === lowerPreference
+  );
   if (exact) return exact.name;
-  const contains = candidates.find((candidate) => candidate.name.trim().toLowerCase().includes(lowerPreference));
+  const contains = candidates.find((candidate) =>
+    candidate.name.trim().toLowerCase().includes(lowerPreference)
+  );
   if (contains) return contains.name;
   return candidates[0]?.name;
 }
 
-function buildHostPlan(platform: NodeJS.Platform, selectedCamera?: string, selectedDevicePath?: string): VirtualCameraInjectionHostPlan {
+function buildHostPlan(
+  platform: NodeJS.Platform,
+  selectedCamera?: string,
+  selectedDevicePath?: string
+): VirtualCameraInjectionHostPlan {
   const notes = [
     'Runtime can replay frames from mp4, but host-level virtual camera injection requires an OS-specific sink.',
   ];
@@ -122,16 +142,18 @@ function buildHostPlan(platform: NodeJS.Platform, selectedCamera?: string, selec
     camera.push(
       'Install or enable a virtual camera sink such as OBS Virtual Camera or another CoreMediaIO-backed device.',
       'Expose a concrete sink that the runtime can target, then select it through the bridge.',
-      'Use the replay path for validation when a sink is not yet present.',
+      'Use the replay path for validation when a sink is not yet present.'
     );
   } else if (platform === 'linux') {
     camera.push(
       'Provide a v4l2loopback device path or equivalent writable virtual camera node.',
       'Pass that device path to the bridge so ffmpeg can stream mp4 frames into it.',
-      'Confirm the injected device appears in the inventory scan before relying on it in meeting flows.',
+      'Confirm the injected device appears in the inventory scan before relying on it in meeting flows.'
     );
   } else {
-    camera.push('This platform does not have a native camera injection backend in the runtime bridge.');
+    camera.push(
+      'This platform does not have a native camera injection backend in the runtime bridge.'
+    );
   }
   if (selectedCamera) {
     notes.push(`Selected camera hint: ${selectedCamera}.`);
@@ -163,15 +185,13 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
     const inventory = probe.inventory;
     const selectedCamera = pickCamera(
       inventory,
-      request.device_preference ?? this.opts.device_preference,
+      request.device_preference ?? this.opts.device_preference
     );
     const selectedDevicePath = normalizePreference(request.device_path ?? this.opts.device_path);
     const ffmpegBin = this.opts.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
     const ffmpegAvailable = isAvailableCommand(ffmpegBin, ['-version']);
     const actualDeviceReady =
-      process.platform === 'linux'
-      && Boolean(selectedDevicePath)
-      && ffmpegAvailable;
+      process.platform === 'linux' && Boolean(selectedDevicePath) && ffmpegAvailable;
     const backend: VirtualCameraInjectionBackendId = actualDeviceReady ? 'ffmpeg-v4l2' : 'stub';
     const reason = actualDeviceReady
       ? undefined
@@ -205,16 +225,19 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
     };
   }
 
-  async injectFromMp4(inputPath: string, request: VirtualCameraInjectionRequest = {}): Promise<VirtualCameraInjectionResult> {
+  async injectFromMp4(
+    inputPath: string,
+    request: VirtualCameraInjectionRequest = {}
+  ): Promise<VirtualCameraInjectionResult> {
     const selection = await this.resolveSelection(request);
-    const sourcePath = pathResolver.rootResolve(inputPath);
-    const frameCount = await collectFrameCount(readVideoFramesFromMp4(sourcePath, {
-      fps: request.fps,
-    }));
-
-    if (request.output_path) {
-      safeMkdir(path.dirname(pathResolver.rootResolve(request.output_path)), { recursive: true });
-    }
+    const sourcePath = assertSafeRepositoryPath(pathResolver.rootResolve(inputPath), {
+      allowMissingLeaf: true,
+    });
+    const frameCount = await collectFrameCount(
+      readVideoFramesFromMp4(sourcePath, {
+        fps: request.fps,
+      })
+    );
 
     if (selection.backend === 'ffmpeg-v4l2') {
       const devicePath = selection.selectedDevicePath;
@@ -236,18 +259,8 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
       }
       safeExec(
         selection.ffmpegBin,
-        [
-          '-y',
-          '-re',
-          '-i',
-          sourcePath,
-          '-vf',
-          'format=yuv420p',
-          '-f',
-          'v4l2',
-          devicePath,
-        ],
-        { env: process.env, timeoutMs: 120_000 },
+        ['-y', '-re', '-i', sourcePath, '-vf', 'format=yuv420p', '-f', 'v4l2', devicePath],
+        { env: process.env, timeoutMs: 120_000 }
       );
       return {
         bridge_id: VIRTUAL_CAMERA_INJECTION_BRIDGE_ID,
@@ -264,12 +277,23 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
     }
 
     const replayOutputPath = request.output_path
-      ? pathResolver.rootResolve(request.output_path)
-      : pathResolver.sharedTmp(path.join('camera-injection-replay', `${safeSlug(selection.selectedCamera || 'camera')}-${Date.now()}.mp4`));
+      ? assertSafeRepositoryPath(pathResolver.rootResolve(request.output_path), {
+          allowMissingLeaf: true,
+        })
+      : assertSafeRepositoryPath(
+          pathResolver.sharedTmp(
+            path.join(
+              'camera-injection-replay',
+              `${safeSlug(selection.selectedCamera || 'camera')}-${Date.now()}.mp4`
+            )
+          ),
+          { allowMissingLeaf: true }
+        );
+    safeMkdir(path.dirname(replayOutputPath), { recursive: true });
     const replayResult = await writeVideoFramesToMp4(
       replayOutputPath,
       readVideoFramesFromMp4(sourcePath, { fps: request.fps }),
-      { fps: request.fps, cleanup: true },
+      { fps: request.fps, cleanup: true }
     );
     return {
       bridge_id: VIRTUAL_CAMERA_INJECTION_BRIDGE_ID,
@@ -289,28 +313,37 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
 
   async injectFrames(
     stream: AsyncIterable<VideoFrame>,
-    request: VirtualCameraInjectionRequest = {},
+    request: VirtualCameraInjectionRequest = {}
   ): Promise<VirtualCameraInjectionResult> {
-    const tempMp4Path = pathResolver.sharedTmp(
-      path.join(
-        'camera-injection',
-        `${safeSlug(request.subject_hint || request.device_preference || 'stream')}-${Date.now()}.mp4`,
+    const tempMp4Path = assertSafeRepositoryPath(
+      pathResolver.sharedTmp(
+        path.join(
+          'camera-injection',
+          `${safeSlug(request.subject_hint || request.device_preference || 'stream')}-${Date.now()}.mp4`
+        )
       ),
+      { allowMissingLeaf: true }
     );
-    const archive = await writeVideoFramesToMp4(tempMp4Path, stream, { fps: request.fps, cleanup: true });
+    const archive = await writeVideoFramesToMp4(tempMp4Path, stream, {
+      fps: request.fps,
+      cleanup: true,
+    });
     return this.injectFromMp4(archive.output_path, {
       ...request,
       source_path: archive.output_path,
     });
   }
 
-  async injectBus(bus: VideoFrameBus, request: VirtualCameraInjectionRequest = {}): Promise<VirtualCameraInjectionResult> {
+  async injectBus(
+    bus: VideoFrameBus,
+    request: VirtualCameraInjectionRequest = {}
+  ): Promise<VirtualCameraInjectionResult> {
     return this.injectFrames(bus.frameStream(), request);
   }
 }
 
 export function createVirtualCameraInjectionBridge(
-  opts: VirtualCameraInjectionBridgeOptions = {},
+  opts: VirtualCameraInjectionBridgeOptions = {}
 ): VirtualCameraInjectionBridge {
   return new VirtualCameraInjectionBridgeImpl(opts);
 }

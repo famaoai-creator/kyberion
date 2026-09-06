@@ -4,8 +4,10 @@ import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { createVirtualAudioInputRecordingBridge } from './virtual-audio-input-recording-bridge.js';
 import { createVirtualDeviceInventoryBridge } from './virtual-device-inventory-bridge.js';
-import { safeExec, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExec, safeMkdir, safeWriteFile } from './secure-io.js';
 import { resolveVoicePath } from './voice-path-policy.js';
+import { clamp } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export interface RecordVoiceSampleRequest {
   action: 'record_voice_sample';
@@ -43,19 +45,34 @@ interface AudioCaptureMetrics {
 }
 
 function getRecordingCommand(env: NodeJS.ProcessEnv = process.env): string {
-  return String(env.KYBERION_AUDIO_RECORD_COMMAND || '').trim();
+  return getRegisteredEnvText('KYBERION_AUDIO_RECORD_COMMAND', { env })?.trim() || '';
 }
 
 function resolveOutputPath(input: RecordVoiceSampleRequest): string {
   if (String(input.output_path || '').trim()) {
     return resolveVoicePath(String(input.output_path).trim(), 'recording-output');
   }
-  return pathResolver.sharedTmp(`voice-sample-recording/${input.request_id}/${input.sample_id}.wav`);
+  const requestId = assertRecordingPathSegment(input.request_id, 'request_id');
+  const sampleId = assertRecordingPathSegment(input.sample_id, 'sample_id');
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`voice-sample-recording/${requestId}/${sampleId}.wav`),
+    { allowMissingLeaf: true }
+  );
 }
 
 function resolvePromptPath(outputPath: string): string {
   const parsed = path.parse(outputPath);
-  return path.join(parsed.dir, `${parsed.name}.prompt.txt`);
+  return assertSafeRepositoryPath(path.join(parsed.dir, `${parsed.name}.prompt.txt`), {
+    allowMissingLeaf: true,
+  });
+}
+
+function assertRecordingPathSegment(value: string, label: string): string {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[VOICE_RECORDING_${label.toUpperCase()}] must be a single path segment`);
+  }
+  return normalized;
 }
 
 function analyzeAudioChunks(chunks: AudioChunk[]): AudioCaptureMetrics {
@@ -129,12 +146,16 @@ function writeWavFromAudioChunks(outputPath: string, chunks: AudioChunk[]): Audi
 
 function renderProgress(elapsedSec: number, durationSec: number): string {
   const width = 28;
-  const ratio = Math.min(1, Math.max(0, elapsedSec / Math.max(durationSec, 0.1)));
+  const ratio = clamp(elapsedSec / Math.max(durationSec, 0.1), 0, 1);
   const filled = Math.round(width * ratio);
   return `[${'█'.repeat(filled)}${'░'.repeat(width - filled)}] ${elapsedSec.toFixed(1)}/${durationSec.toFixed(1)}s`;
 }
 
-async function prepareRecording(promptText: string, countdownSec: number, displayHoldMs: number): Promise<void> {
+async function prepareRecording(
+  promptText: string,
+  countdownSec: number,
+  displayHoldMs: number
+): Promise<void> {
   if (!promptText) return;
   logger.info(`[VOICE] 📖 読み上げる文章:\n「${promptText}」`);
   if (displayHoldMs > 0) {
@@ -145,7 +166,7 @@ async function prepareRecording(promptText: string, countdownSec: number, displa
     logger.info(`[VOICE] 🎙️ マイク ON まで ${remaining} 秒...`);
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-    logger.info(`[VOICE] 🔴 録音開始。次の文章をそのまま読み上げてください:\n「${promptText}」`);
+  logger.info(`[VOICE] 🔴 録音開始。次の文章をそのまま読み上げてください:\n「${promptText}」`);
 }
 
 function interpolateCommand(template: string, values: Record<string, string>): string {
@@ -162,7 +183,7 @@ function shellQuote(value: string): string {
 
 export async function recordVoiceSample(
   input: RecordVoiceSampleRequest,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<RecordVoiceSampleResult> {
   const requestId = String(input.request_id || '').trim();
   const sampleId = String(input.sample_id || '').trim();
@@ -207,7 +228,8 @@ export async function recordVoiceSample(
     }
 
     await prepareRecording(promptText, countdownSec, promptDisplayHoldMs);
-    const selectedInput = String(input.input_device_preference || '').trim() || probe.inputs[0] || '';
+    const selectedInput =
+      String(input.input_device_preference || '').trim() || probe.inputs[0] || '';
     const chunks: AudioChunk[] = [];
     let capturedBytes = 0;
     let lastProgressSecond = -1;
@@ -272,7 +294,9 @@ export async function recordVoiceSample(
         reason: `recording level is too low (RMS ${metrics.rms_dbfs.toFixed(1)} dBFS)`,
       };
     }
-    logger.info(`[VOICE] ✅ 録音完了 ${renderProgress(metrics.duration_sec, durationSec)} / peak ${metrics.peak_dbfs.toFixed(1)} dBFS`);
+    logger.info(
+      `[VOICE] ✅ 録音完了 ${renderProgress(metrics.duration_sec, durationSec)} / peak ${metrics.peak_dbfs.toFixed(1)} dBFS`
+    );
 
     return {
       status: 'succeeded',

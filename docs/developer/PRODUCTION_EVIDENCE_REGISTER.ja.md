@@ -19,7 +19,7 @@ production-readiness evidence を追跡する。機械判定の canonical source
 - Operational gate はこの register に evidence を追加し、対応する reviewer が確認してから `status` を更新する。
 - `status` が `pending_external_evidence` の項目が 1 つでも残る間は、Kyberion を「production-ready」と呼ばない。
 - 通常検証は `pnpm check -- --scope full --only production-evidence-status` で pending 項目を報告しつつ成功する。
-- Release promotion 時は `pnpm run check:production-evidence-complete` を実行し、全項目が `verified` でなければ失敗させる。
+- Release promotion 時は `pnpm run check -- --scope release --only production-evidence-complete` を実行し、全項目が `verified` でなければ失敗させる。
 - `evidence_refs` に repo-local path を使う場合は、レビュー時点で実在する file または directory だけを採用する。
 
 ## Evidence Items

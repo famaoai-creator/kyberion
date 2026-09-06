@@ -1,19 +1,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const sendOpsAlertMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@agent/core', async () => {
   const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
   return {
     ...actual,
-    sendOpsAlert: vi.fn(),
+    sendOpsAlert: sendOpsAlertMock,
   };
 });
 
-import { pathResolver, safeExistsSync, safeReadFile, safeRmSync } from '@agent/core';
+vi.mock('@agent/core/ops-alert', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/ops-alert')>('@agent/core/ops-alert');
+  return { ...actual, sendOpsAlert: sendOpsAlertMock };
+});
+
+import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 import type { VocabularyCatalogFile } from '@agent/core';
 import {
   computeTranslationCoverageReport,
   detectCoverageRegressions,
+  formatHumanReport,
+  main,
   runAlertOnRegression,
+  runReportI18nTranslationCoverage,
 } from './report_i18n_translation_coverage.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('report-i18n-coverage-test');
@@ -211,5 +222,63 @@ describe('runAlertOnRegression', () => {
         dedupe_key: 'i18n-translation-coverage-regression',
       })
     );
+  });
+});
+
+describe('shared report output boundary', () => {
+  afterEach(() => {
+    if (safeExistsSync(FIXTURE_DIR)) {
+      safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
+    }
+    vi.clearAllMocks();
+  });
+
+  it('formats the report and regression details without writing to stdout directly', () => {
+    const report = computeTranslationCoverageReport({
+      catalog: fixtureCatalog(),
+      now: new Date('2026-07-26T00:00:00.000Z'),
+    });
+    const output = formatHumanReport(
+      report,
+      [{ locale: 'ja', previous_pct: 100, current_pct: 66.67 }],
+      true
+    );
+
+    expect(output).toContain('[report:i18n-coverage]');
+    expect(output).toContain('ja: 100% -> 66.67%');
+  });
+
+  it('uses the canonical coverage history loader and writer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/report_i18n_translation_coverage.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('loadI18nCoverageHistoryAtPath');
+    expect(source).toContain('writeI18nCoverageHistoryAtPath');
+    expect(source).not.toContain('readJsonIfPresent<CoverageHistorySnapshot>');
+    expect(source).not.toContain('JSON.stringify(snapshot, null, 2)');
+  });
+
+  it('keeps alert history read-only for a dry-run and check invocation', async () => {
+    const historyPath = pathResolver.sharedTmp('report-i18n-coverage-test/read-only.json');
+    const original = JSON.stringify({ recorded_at: '2026-07-01T00:00:00.000Z', locales: {} });
+    safeWriteFile(historyPath, original);
+    const result = main(['--alert-on-regression'], {
+      writeSideEffects: false,
+      historyPath,
+    });
+
+    expect(result.alert_on_regression).toBe(true);
+    expect(result.regressions).toEqual([]);
+    expect(sendOpsAlertMock).not.toHaveBeenCalled();
+    expect(String(safeReadFile(historyPath, { encoding: 'utf8' }))).toBe(original);
+  });
+
+  it('returns structured results through the shared harness', async () => {
+    const result = await runReportI18nTranslationCoverage(['--json', '--dry-run', '--quiet']);
+
+    expect(result?.report.status).toBe('ok');
+    expect(result?.alert_on_regression).toBe(false);
   });
 });

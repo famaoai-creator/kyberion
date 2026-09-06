@@ -42,7 +42,9 @@ describe('production evidence register contract', () => {
     expect(runbook).toContain('EV-30DAY-OPS');
     expect(runbook).toContain('EV-EXT-CONTRIB');
     expect(runbook).toContain('EV-FDE-DEPLOY');
-    expect(runbook).toContain('pnpm run check:production-evidence-complete');
+    expect(runbook).toContain(
+      'pnpm run check -- --scope release --only production-evidence-complete'
+    );
     expect(runbook).toContain('templates/production-evidence-30day-ops.md');
     expect(runbook).toContain('templates/production-evidence-external-contribution.md');
     expect(runbook).toContain('templates/production-evidence-fde-deployment.md');
@@ -95,7 +97,9 @@ describe('production evidence register contract', () => {
     const index = read('docs/developer/README.md');
     const operatorIndex = read('docs/operator/README.md');
     expect(audit).toContain('PRODUCTION_EVIDENCE_REGISTER.ja.md');
-    expect(audit).toContain('check:production-evidence-complete');
+    expect(audit).toContain(
+      'pnpm run check -- --scope release --only production-evidence-complete'
+    );
     expect(audit).toContain('../operator/PRODUCTION_EVIDENCE_COLLECTION.md');
     expect(index).toContain('PRODUCTION_EVIDENCE_REGISTER.ja.md');
     expect(operatorIndex).toContain('PRODUCTION_EVIDENCE_COLLECTION.md');

@@ -1,0 +1,35 @@
+import { describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core';
+import { readPayload } from './google_workspace_meet.js';
+
+describe('google workspace meet payload boundaries', () => {
+  it('rejects payload files outside the repository before checking existence', () => {
+    expect(() => readPayload({ '--payload-file': '../outside.json' })).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    expect(() => readPayload({ '--payload-file': '/tmp/outside.json' })).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
+  it('rejects non-object and dangerous JSON before the gws call', () => {
+    expect(() => readPayload({ '--json': '[]' })).toThrow(
+      'Google Workspace Meet payload must be a JSON object'
+    );
+    expect(() => readPayload({ '--json': '{"constructor":{"polluted":true}}' })).toThrow(
+      'Google Workspace Meet payload contains a dangerous JSON key'
+    );
+  });
+
+  it('routes usage and gws output through the shared printer', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/google_workspace_meet.ts'));
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).not.toContain('process.env.CLOUDSDK_PYTHON');
+    expect(source).toContain("getRegisteredEnvText('CLOUDSDK_PYTHON')");
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
+  });
+});

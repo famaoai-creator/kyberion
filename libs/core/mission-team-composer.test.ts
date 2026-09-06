@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
+import { withExecutionContext } from './authority.js';
 import { safeMkdir, safeRmSync } from './secure-io.js';
+import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
+import { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
 import {
   composeMissionTeamPlan,
+  loadMissionTeamPlan,
   resolveMissionTeamReceiver,
   resolveMissionTeamPlan,
   writeMissionTeamPlan,
@@ -245,6 +249,35 @@ describe('mission-team-composer classification integration', () => {
     }
   });
 
+  it('rejects schema-invalid and cross-mission persisted team plans', () => {
+    const missionId = 'MSN-TEAM-PLAN-SCOPE-001';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'mission-controller-test';
+    try {
+      safeMkdir(missionPath, { recursive: true });
+      const plan = composeMissionTeamPlan({
+        missionId,
+        missionType: 'development',
+        tier: 'public',
+      });
+      writeMissionTeamPlan(missionPath, { ...plan, mission_id: 'MSN-OTHER-001' });
+
+      expect(() => loadMissionTeamPlan(missionId)).toThrow('[MISSION_TEAM_PLAN_SCOPE_MISMATCH]');
+
+      writeMissionTeamPlan(missionPath, { ...plan, assignments: null as never });
+      expect(() => loadMissionTeamPlan(missionId)).toThrow(/Invalid catalog mission-team-plan/);
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
+  });
+
   it('applies ops-oriented organization template overlays when composing an operations team plan', () => {
     const plan = composeMissionTeamPlan({
       missionId: 'MSN-OPS-001',
@@ -353,6 +386,11 @@ describe('mission-team-composer classification integration', () => {
       expect(reviewer?.agent_id).toBeTruthy();
       const implementationAgentId = reviewer!.agent_id!;
       writeMissionTeamPlan(missionPath, plan);
+      expect(
+        loadProvisionedEntryRecords(missionId)
+          .filter((record) => record.phase === 'verified')
+          .map((record) => record.target_path)
+      ).toContain('team-composition.json');
 
       const selected = resolveMissionTeamReceiver({
         missionId,
@@ -380,6 +418,38 @@ describe('mission-team-composer classification integration', () => {
       else process.env.MISSION_ROLE = previousRole;
       if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
       else process.env.KYBERION_PERSONA = previousPersona;
+    }
+  });
+
+  it('records a composed team brief through the provisioned receipt contract', () => {
+    const missionId = 'MSN-TEAM-BRIEF-RECEIPT-001';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(missionPath, { recursive: true });
+    });
+    try {
+      const brief = composeMissionTeamBrief({
+        missionId,
+        missionType: 'product_development',
+        request: 'Prepare a product development plan.',
+        tier: 'public',
+      });
+      const receiptTargets = withExecutionContext('mission_controller', () => {
+        const targetPath = writeMissionTeamBrief(missionPath, brief);
+        return {
+          targetPath,
+          targets: loadProvisionedEntryRecords(missionId)
+            .filter((record) => record.phase === 'verified')
+            .map((record) => record.target_path),
+        };
+      });
+
+      expect(receiptTargets.targetPath).toBe(`${missionPath}/evidence/team-composition-brief.json`);
+      expect(receiptTargets.targets).toContain('evidence/team-composition-brief.json');
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
     }
   });
 });

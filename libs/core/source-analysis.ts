@@ -1,16 +1,19 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { isRecord } from './foundation/primitives.js';
+import { clamp, readTextFile } from './foundation/text.js';
+import { parseTestInventory } from './software-quality.js';
 
 const SOURCE_EXTENSIONS = new Set([
   '.c',
@@ -148,17 +151,10 @@ const SOURCE_IAC_SCHEMA_PATH = pathResolver.knowledge(
 const TEST_INVENTORY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/test-inventory.schema.json'
 );
-const artifactAjv = createAjv();
-const validateSourceAnalysisSchema = compileSchemaFromPath(
-  artifactAjv,
-  SOURCE_ANALYSIS_SCHEMA_PATH
-);
-const validateTestInventorySchema = compileSchemaFromPath(artifactAjv, TEST_INVENTORY_SCHEMA_PATH);
-const validateTestScenarioSchema = compileSchemaFromPath(
-  artifactAjv,
-  SOURCE_TEST_SCENARIO_SCHEMA_PATH
-);
-const validateIacSchema = compileSchemaFromPath(artifactAjv, SOURCE_IAC_SCHEMA_PATH);
+const validateSourceAnalysisSchema = compileSchema(SOURCE_ANALYSIS_SCHEMA_PATH);
+const validateTestInventorySchema = compileSchema(TEST_INVENTORY_SCHEMA_PATH);
+const validateTestScenarioSchema = compileSchema(SOURCE_TEST_SCENARIO_SCHEMA_PATH);
+const validateIacSchema = compileSchema(SOURCE_IAC_SCHEMA_PATH);
 
 function languageFor(filePath: string): string | undefined {
   const extension = path.extname(filePath).toLowerCase();
@@ -400,12 +396,15 @@ function assertWorkspacePath(sourceRoot: string): { absolute: string; relative: 
   if (!safeExistsSync(absolute) || !safeLstat(absolute).isDirectory()) {
     throw new Error(`source_root directory not found: ${sourceRoot}`);
   }
-  return { absolute, relative: relative || '.' };
+  return {
+    absolute: relative ? assertSafeRepositoryPath(absolute) : absolute,
+    relative: relative || '.',
+  };
 }
 
 export function analyzeSourceTree(options: AnalyzeSourceTreeOptions = {}): SourceAnalysisIr {
   const resolved = assertWorkspacePath(options.sourceRoot || '.');
-  const maxFiles = Math.max(1, Math.min(10000, Number(options.maxFiles || 2000)));
+  const maxFiles = clamp(Number(options.maxFiles || 2000), 1, 10000);
   const files: SourceAnalysisFile[] = [];
   const dependencies = new Set<string>();
   const routes: SourceAnalysisIr['routes'] = [];
@@ -419,7 +418,7 @@ export function analyzeSourceTree(options: AnalyzeSourceTreeOptions = {}): Sourc
     const kind = classifyFile(relative);
     let text = '';
     try {
-      text = String(safeReadFile(absolute, { encoding: 'utf8', maxSizeMB: 4 }));
+      text = readTextFile(absolute, { maxSizeMB: 4 });
     } catch {
       continue;
     }
@@ -476,13 +475,16 @@ export function analyzeSourceTree(options: AnalyzeSourceTreeOptions = {}): Sourc
   const packagePath = path.join(resolved.absolute, 'package.json');
   if (safeExistsSync(packagePath)) {
     try {
-      const packageJson = JSON.parse(
-        String(safeReadFile(packagePath, { encoding: 'utf8' }))
-      ) as Record<string, unknown>;
+      const packageJson = parseSafeJsonObjectValue(
+        readJson<unknown>(assertSafeRepositoryPath(packagePath), {
+          maxSizeMB: 4,
+          label: 'source package manifest',
+        }),
+        'source package manifest'
+      );
       for (const group of ['dependencies', 'devDependencies', 'peerDependencies']) {
         const values = packageJson[group];
-        if (values && typeof values === 'object')
-          Object.keys(values).forEach((name) => dependencies.add(name));
+        if (isRecord(values)) Object.keys(values).forEach((name) => dependencies.add(name));
       }
     } catch {
       // The file is still represented in the IR; malformed metadata is a source limitation.
@@ -800,14 +802,10 @@ export function validateEngineeringArtifacts(bundle: EngineeringArtifactBundle):
   ) {
     throw new Error('[SOURCE_ARTIFACT_SCHEMA] source-analysis counts do not match records.');
   }
-  const inventory = bundle.test_inventory as {
-    items?: Array<{
-      item_id?: string;
-      requirement_refs?: string[];
-      execution_mode?: string;
-      automation?: { params?: { test_path?: string; framework?: string } };
-    }>;
-  };
+  const inventory = parseTestInventory(bundle.test_inventory);
+  if (!inventory) {
+    throw schemaFailure('source-test-inventory', 'strict parser rejected the artifact');
+  }
   for (const item of inventory.items ?? []) {
     for (const ref of item.requirement_refs ?? []) {
       if (ref.startsWith('source:') && !sourcePaths.has(ref.slice('source:'.length))) {
@@ -978,14 +976,28 @@ export function writeEngineeringArtifactBundle(
       'Engineering artifact output must stay under active/shared/tmp or active/missions.'
     );
   }
-  safeMkdir(root, { recursive: true });
+  const safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+  safeMkdir(safeRoot, { recursive: true });
   const outputs: Record<string, string> = {
-    analysis_ir: path.join(root, 'source-analysis-ir.json'),
-    design_document: path.join(root, 'source-derived-design.md'),
-    test_inventory: path.join(root, 'source-test-inventory.json'),
-    test_scenario_pipeline: path.join(root, 'source-test-scenarios.json'),
-    iac_proposal: path.join(root, 'iac-proposal.json'),
-    iac_terraform: path.join(root, 'iac-proposal.tf'),
+    analysis_ir: assertSafeRepositoryPath(path.join(safeRoot, 'source-analysis-ir.json'), {
+      allowMissingLeaf: true,
+    }),
+    design_document: assertSafeRepositoryPath(path.join(safeRoot, 'source-derived-design.md'), {
+      allowMissingLeaf: true,
+    }),
+    test_inventory: assertSafeRepositoryPath(path.join(safeRoot, 'source-test-inventory.json'), {
+      allowMissingLeaf: true,
+    }),
+    test_scenario_pipeline: assertSafeRepositoryPath(
+      path.join(safeRoot, 'source-test-scenarios.json'),
+      { allowMissingLeaf: true }
+    ),
+    iac_proposal: assertSafeRepositoryPath(path.join(safeRoot, 'iac-proposal.json'), {
+      allowMissingLeaf: true,
+    }),
+    iac_terraform: assertSafeRepositoryPath(path.join(safeRoot, 'iac-proposal.tf'), {
+      allowMissingLeaf: true,
+    }),
   };
   safeWriteFile(outputs.analysis_ir, json(bundle.analysis_ir));
   safeWriteFile(outputs.design_document, bundle.design_document);

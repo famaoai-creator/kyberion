@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { runSkillAsync } from './skill-wrapper.js';
+import { runSkill, runSkillAsync } from './skill-wrapper.js';
 
 /**
  * KD-06 wiring integration test: `runSkillAsync` is the actual production
@@ -86,7 +86,9 @@ describe('runSkillAsync plugin loading (KD-06 wiring)', () => {
     );
     process.chdir(cwd);
 
-    const output = await runSkillAsync('demo-skill', async () => ({ message: 'ok' }));
+    const output = await runSkillAsync('demo-skill', async () => ({ message: 'ok' }), {
+      trustResolved: true,
+    });
     expect(output.status).toBe('success');
 
     const marker = readMarker(markerPath);
@@ -119,5 +121,44 @@ describe('runSkillAsync plugin loading (KD-06 wiring)', () => {
     expect(output.status).toBe('success');
     // Fail-closed execution: the untrusted plugin's code must never run.
     expect(safeExistsSync(markerPath)).toBe(false);
+  });
+
+  it('does not consume project plugin configuration before trust is explicitly resolved', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const markerPath = path.join(sourceDir('pre-trust-marker'), 'marker.log');
+    safeMkdir(path.dirname(markerPath), { recursive: true });
+    process.env.KYBERION_SKILL_PLUGIN_TEST_MARKER = markerPath;
+
+    const cwd = tracked(
+      pathResolver.sharedTmp(`skill-wrapper-test/${process.pid}-cwd-pre-trust-${randomUUID()}`)
+    );
+    safeMkdir(cwd, { recursive: true });
+    safeWriteFile(
+      path.join(cwd, '.kyberion-plugins.json'),
+      JSON.stringify({ plugins: [OFFICIAL_FIXTURE_PATH] })
+    );
+    process.chdir(cwd);
+
+    const output = await runSkillAsync('demo-skill', async () => ({ message: 'ok' }));
+
+    expect(output.status).toBe('success');
+    expect(safeExistsSync(markerPath)).toBe(false);
+  });
+});
+
+describe('runSkill restricted-skill gate', () => {
+  it('applies restricted-skills policy to the synchronous public entrypoint', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const output = runSkill('mock-malicious-skill', () => {
+      throw new Error('restricted skill body must not execute');
+    });
+
+    expect(output).toMatchObject({
+      skill: 'mock-malicious-skill',
+      status: 'error',
+      error: { code: 'EXECUTION_ERROR', message: expect.stringContaining('[SKILL_RESTRICTED]') },
+    });
   });
 });

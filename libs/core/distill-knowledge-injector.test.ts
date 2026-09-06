@@ -109,6 +109,52 @@ Synthetic fixture for the placeholder-distill quarantine regression test.
 
     expect(r.some((entry) => entry.path.endsWith(probeName))).toBe(false);
   });
+
+  it('does not inject a distill document reached through a symbolic link', async () => {
+    const linkName = `distill_kp07-symlink-probe-${process.pid}.md`;
+    const linkPath = path.join(dir, linkName);
+    const targetPath = pathResolver.shared(`tmp/${linkName}`);
+    const uniqueTag = `kp07-symlink-tag-${process.pid}`;
+    try {
+      fs.writeFileSync(
+        targetPath,
+        `---\ntitle: Symlink Probe\ntags: ['${uniqueTag}']\n---\n\nExternal content\n`
+      );
+      fs.symlinkSync(targetPath, linkPath);
+
+      const r = await findRelevantDistilledKnowledge({
+        topic: 'Symlink Probe',
+        tags: [uniqueTag],
+        limit: 10,
+        minScore: 0,
+      });
+
+      expect(r.some((entry) => entry.path.endsWith(linkName))).toBe(false);
+    } finally {
+      if (fs.existsSync(linkPath)) fs.unlinkSync(linkPath);
+      if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+    }
+  });
+
+  it('does not inject a distill directory named like a markdown entry', async () => {
+    const directoryName = `distill_kp07-directory-probe-${process.pid}.md`;
+    const directoryPath = path.join(dir, directoryName);
+    const uniqueTag = `kp07-directory-tag-${process.pid}`;
+    try {
+      fs.mkdirSync(directoryPath, { recursive: true });
+
+      const r = await findRelevantDistilledKnowledge({
+        topic: 'Directory Probe',
+        tags: [uniqueTag],
+        limit: 10,
+        minScore: 0,
+      });
+
+      expect(r.some((entry) => entry.path.endsWith(directoryName))).toBe(false);
+    } finally {
+      if (fs.existsSync(directoryPath)) fs.rmSync(directoryPath, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── Hybrid search (semantic RRF) ─────────────────────────────────────────────

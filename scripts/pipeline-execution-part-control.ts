@@ -1,24 +1,25 @@
+import * as nodePath from 'node:path';
+import { logger } from '@agent/core/core';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { retry } from '@agent/core/async-utils';
+import { resolveVars } from '@agent/core/logic-utils';
+import { capabilityEntry } from '@agent/core/path-resolver';
 import {
-  logger,
-  safeExistsSync,
-  retry,
-  resolveVars,
-  capabilityEntry,
   getReasoningRuntimeInstructions,
   renderRuntimeInstructions,
-  buildWorkingPrinciplesLines,
-  loadApprovalRequest,
+} from '@agent/core/reasoning-runtime-instructions';
+import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
+import { loadApprovalRequest } from '@agent/core/approval-store';
+import {
   resolveActuatorOperation,
   resolveActuatorOperationTimeout,
-  type AdfStep,
-  type AdfSkippedStep,
-  executeProgrammaticToolCall,
-} from '@agent/core';
-
-import * as nodePath from 'node:path';
+} from '@agent/core/actuator-op-registry';
+import { executeProgrammaticToolCall } from '@agent/core/programmatic-tool-calling';
+import type { AdfStep, AdfSkippedStep } from '@agent/core/adf-engine';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { tryRepairJson } from '@agent/core/json-repair';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { type PipelineAdfStep } from '@agent/core/pipeline-contract';
 import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 import {
@@ -251,7 +252,7 @@ export function prepareEngineSteps(steps: PipelineAdfStep[]): AdfStep[] {
 
 export function parseFragmentJson(fragmentRaw: string, fragmentRef: string): any {
   try {
-    return JSON.parse(fragmentRaw);
+    return parseSafeJsonInput(fragmentRaw, `pipeline fragment ${fragmentRef}`);
   } catch {
     /* fall through */
   }
@@ -274,7 +275,7 @@ export async function dispatchReasoningLeaf(
   ctx: Record<string, unknown>,
   stepPolicy: ReasoningStepPolicy
 ): Promise<Record<string, unknown>> {
-  const { getReasoningBackend } = await import('@agent/core');
+  const { getReasoningBackend } = await import('@agent/core/reasoning-backend');
   const backend = getReasoningBackend();
   const resolvedInstruction =
     typeof params.instruction === 'string'

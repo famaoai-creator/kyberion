@@ -37,5 +37,8 @@ describe('Telegram bridge contract', () => {
     expect(demo).toContain("surface: 'telegram'");
     expect(demo).toContain("senderAgentId: 'kyberion:telegram-bridge'");
     expect(demo).toContain("agentId: 'telegram-surface-agent'");
+    expect(demo).toContain('simulateTelegram = defineScript');
+    expect(demo).toContain('currentProcessArgv().slice(2)');
+    expect(demo).toContain("isDirectScript(import.meta.url, 'demo_telegram_flow.ts')");
   });
 });

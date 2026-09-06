@@ -1,4 +1,5 @@
-import { getRegisteredEnv, loadEnvironmentManifest, probeManifest } from '@agent/core';
+import { loadEnvironmentManifest, probeManifest } from '@agent/core/environment-capability';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
 
 import '@agent/core/environment-capability-probes';
 

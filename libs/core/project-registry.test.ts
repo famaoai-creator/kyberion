@@ -3,11 +3,12 @@ import AjvModule from 'ajv';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
 import {
   buildProjectBootstrapWorkItems,
   listProjectRecords,
   loadProjectRecord,
+  projectRecordPath,
   resolveProjectRecordForText,
   saveProjectRecord,
 } from './project-registry.js';
@@ -72,6 +73,23 @@ describe('project and artifact registries', () => {
     ).toBe('PRJ-TEST-WEB');
   });
 
+  it('persists the canonical project payload returned by the catalog', () => {
+    saveProjectRecord({
+      project_id: 'PRJ-TEST-CANONICAL',
+      name: 'Canonical Project',
+      summary: 'Project metadata is canonicalized before persistence.',
+      status: 'active',
+      tier: 'public',
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveProjectRecord>[0]);
+
+    const persisted = JSON.parse(
+      String(safeReadFile(projectRecordPath('PRJ-TEST-CANONICAL'), { encoding: 'utf8' }))
+    ) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.project_id).toBe('PRJ-TEST-CANONICAL');
+  });
+
   it('persists service binding records', () => {
     saveServiceBindingRecord({
       binding_id: 'BIND-TEST-GITHUB',
@@ -88,6 +106,43 @@ describe('project and artifact registries', () => {
     expect(listServiceBindingRecords().some((item) => item.binding_id === 'BIND-TEST-GITHUB')).toBe(
       true
     );
+  });
+
+  it('persists the canonical service binding payload returned by the catalog', () => {
+    saveServiceBindingRecord({
+      binding_id: 'BIND-TEST-CANONICAL',
+      service_type: 'github',
+      scope: 'repository',
+      target: 'org/repo',
+      allowed_actions: ['read'],
+      secret_refs: [],
+      approval_policy: { read: 'allowed' },
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof saveServiceBindingRecord>[0]);
+
+    const persisted = JSON.parse(
+      String(
+        safeReadFile(pathResolver.shared('runtime/service-bindings/BIND-TEST-CANONICAL.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.binding_id).toBe('BIND-TEST-CANONICAL');
+  });
+
+  it('rejects a service binding id that escapes the binding directory', () => {
+    expect(() =>
+      saveServiceBindingRecord({
+        binding_id: '../outside',
+        service_type: 'github',
+        scope: 'repository',
+        target: 'org/repo',
+        allowed_actions: ['read'],
+        secret_refs: [],
+        approval_policy: { read: 'allowed' },
+      })
+    ).toThrow(/escapes its directory/);
   });
 
   it('persists artifact ownership and attaches it to a task session', () => {
@@ -136,6 +191,10 @@ describe('project and artifact registries', () => {
     expect(items[0]?.kind).toBe('task_session');
     expect(items[0]?.specialist_id).toBe('project-lead');
     expect(items.some((item) => item.title.toLowerCase().includes('architecture'))).toBe(true);
+  });
+
+  it('rejects a project id that escapes the project record directory', () => {
+    expect(() => loadProjectRecord('../outside')).toThrow(/escapes its directory/);
   });
 
   it('emits artifact records that satisfy the schema', () => {

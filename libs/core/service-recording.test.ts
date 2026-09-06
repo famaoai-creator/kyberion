@@ -1,10 +1,16 @@
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   collectServiceInputNames,
   isExternalEffectStep,
+  loadServiceRecordingAtPath,
   validateServiceRecording,
   type ServiceRecording,
 } from './service-recording.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+
+const RECORDING_TEST_ROOT = pathResolver.sharedTmp('service-recording-loader-test');
 
 function rec(overrides: Partial<ServiceRecording> = {}): ServiceRecording {
   return {
@@ -149,5 +155,25 @@ describe('isExternalEffectStep / collectServiceInputNames', () => {
 
   it('collects distinct {{input.*}} placeholder names', () => {
     expect(collectServiceInputNames(rec())).toEqual(['title']);
+  });
+});
+
+describe('loadServiceRecordingAtPath', () => {
+  it('loads a persisted recording through the regular-file contract boundary', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(RECORDING_TEST_ROOT, { recursive: true });
+    const recordingPath = path.join(RECORDING_TEST_ROOT, 'recording.json');
+    safeWriteFile(recordingPath, `${JSON.stringify(rec())}\n`);
+
+    expect(loadServiceRecordingAtPath(recordingPath).recording_id).toBe('svc-1');
+  });
+
+  it('rejects a directory at the persisted recording path', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.json'), { recursive: true });
+
+    expect(() =>
+      loadServiceRecordingAtPath(path.join(RECORDING_TEST_ROOT, 'recording.json'))
+    ).toThrow('recording must be a regular file');
   });
 });

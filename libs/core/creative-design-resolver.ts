@@ -1,9 +1,15 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
+import { loadBrandTokensAtPath, type BrandTokens } from './brand-tokens.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
 import { deriveAccentPalette, type CeAccentPalette } from './ce-adoption.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import {
+  loadTenantDesignOverride,
+  loadTenantDesignThemeOverlay,
+} from './tenant-design-override.js';
 
 /**
  * E2E-02: the single entry point for creative design resolution.
@@ -111,6 +117,17 @@ export interface PromptStylePack {
   };
 }
 
+interface StylePackConfig {
+  tone_words?: string[];
+  typography_hint?: string;
+  avoid?: string[];
+  music?: PromptStylePack['music'];
+}
+
+interface MediaDesignSystemsFile {
+  style_pack?: StylePackConfig;
+}
+
 export type CreativeProjection =
   | { surface: 'web'; theme_pack: WebThemePack }
   | { surface: 'pptx' | 'doc' | 'xlsx'; theme: MediaThemeRecord }
@@ -142,20 +159,24 @@ export interface ResolveCreativeDesignInput {
   tone?: number;
 }
 
-interface BrandTokensFile {
-  brand_name?: string;
-  tokens?: {
-    colors?: Record<CreativeDesignMode, Record<string, string>>;
-    fonts?: { sans?: string; mono?: string; heading?: string; body?: string };
+type CreativeBrandTokens = Omit<BrandTokens, 'tokens'> & {
+  tokens: BrandTokens['tokens'] & {
+    fonts: BrandTokens['tokens']['fonts'] & {
+      heading?: string;
+      body?: string;
+    };
     typography?: Partial<CreativeDesignTypography>;
     spacing?: Partial<CreativeDesignSpacing>;
     constraints?: Partial<CreativeDesignConstraints>;
   };
-}
+};
 
 const BRAND_TOKENS_PATH = 'public/design-patterns/brand-tokens/kyberion.json';
 const MEDIA_DESIGN_SYSTEMS_PATH =
   'public/design-patterns/media-templates/media-design-systems.json';
+const MEDIA_DESIGN_SYSTEMS_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/media-design-systems.schema.json'
+);
 
 const FALLBACK_COLORS: Record<CreativeDesignMode, CreativeDesignColors> = {
   light: {
@@ -375,8 +396,20 @@ const DEFAULT_STYLE_PACK_BASE = {
   music: { mood: 'focused and forward-moving', bpm_range: [90, 120] as [number, number] },
 };
 
-function readJsonIfPresent(filePath: string): Record<string, any> | null {
-  return loadOptionalJson<Record<string, any>>(filePath);
+const mediaDesignSystemsCatalog = defineCatalog<MediaDesignSystemsFile>({
+  id: 'media-design-systems',
+  path: () => pathResolver.knowledge(MEDIA_DESIGN_SYSTEMS_PATH),
+  schema: MEDIA_DESIGN_SYSTEMS_SCHEMA_PATH,
+});
+
+function loadDesignCatalog<T>(catalog: GovernedCatalog<T>): T | null {
+  try {
+    const filePath = assertSafeRepositoryPath(catalog.path(), { allowMissingLeaf: false });
+    if (!safeLstat(filePath).isFile()) return null;
+    return catalog.load();
+  } catch {
+    return null;
+  }
 }
 
 function loadBrandTokens(mode: CreativeDesignMode): {
@@ -387,18 +420,26 @@ function loadBrandTokens(mode: CreativeDesignMode): {
   constraints: CreativeDesignConstraints;
   brandName: string;
 } {
-  const parsed = readJsonIfPresent(
-    pathResolver.knowledge(BRAND_TOKENS_PATH)
-  ) as BrandTokensFile | null;
-  const rawColors = parsed?.tokens?.colors?.[mode] || {};
+  const parsed = (() => {
+    try {
+      const filePath = assertSafeRepositoryPath(pathResolver.knowledge(BRAND_TOKENS_PATH), {
+        allowMissingLeaf: false,
+      });
+      if (!safeLstat(filePath).isFile()) return null;
+      return loadBrandTokensAtPath(filePath) as CreativeBrandTokens;
+    } catch {
+      return null;
+    }
+  })();
+  const rawColors = parsed?.tokens?.colors?.[mode];
   const fallback = FALLBACK_COLORS[mode];
   const colors: CreativeDesignColors = {
-    primary: normalizeCssToken(rawColors.primary, fallback.primary),
-    secondary: normalizeCssToken(rawColors.secondary, fallback.secondary),
-    accent: normalizeCssToken(rawColors.accent, fallback.accent),
-    background: normalizeCssToken(rawColors.bg_main || rawColors.background, fallback.background),
-    text: normalizeCssToken(rawColors.text_primary || rawColors.text, fallback.text),
-    warning: normalizeCssToken(rawColors.warning, fallback.warning),
+    primary: normalizeCssToken(rawColors?.primary, fallback.primary),
+    secondary: normalizeCssToken(rawColors?.secondary, fallback.secondary),
+    accent: normalizeCssToken(rawColors?.accent, fallback.accent),
+    background: normalizeCssToken(rawColors?.bg_main, fallback.background),
+    text: normalizeCssToken(rawColors?.text_primary, fallback.text),
+    warning: normalizeCssToken(rawColors?.warning, fallback.warning),
   };
   const sans = String(parsed?.tokens?.fonts?.sans || FALLBACK_FONTS.sans);
   // MP-01: heading and body are distinct roles. They still default to the
@@ -434,11 +475,31 @@ interface TenantDesignData {
 }
 
 function loadTenantDesign(tenantSlug: string): TenantDesignData | null {
-  for (const dir of tenantDesignDirCandidates(tenantSlug)) {
-    const override = readJsonIfPresent(path.join(dir, 'tenant-override.json'));
-    if (!override) continue;
-    const themePack = readJsonIfPresent(path.join(dir, 'theme.json'));
-    return { override, themePack, matchedDir: dir };
+  for (const candidateDir of tenantDesignDirCandidates(tenantSlug)) {
+    try {
+      const dir = assertSafeRepositoryPath(candidateDir, { allowMissingLeaf: true });
+      const overridePath = assertSafeRepositoryPath(path.join(dir, 'tenant-override.json'), {
+        allowMissingLeaf: true,
+      });
+      const override = loadTenantDesignOverride(
+        pathResolver.rootDir(),
+        overridePath,
+        path.dirname(overridePath)
+      );
+      if (!override) continue;
+      const themePath = assertSafeRepositoryPath(path.join(dir, 'theme.json'), {
+        allowMissingLeaf: true,
+      });
+      const themePack = loadTenantDesignThemeOverlay(
+        pathResolver.rootDir(),
+        themePath,
+        path.dirname(overridePath)
+      );
+      return { override, themePack, matchedDir: dir };
+    } catch {
+      // An invalid or symlinked tenant design overlay is not trusted input.
+      // Continue with the next governed candidate or brand defaults.
+    }
   }
   return null;
 }
@@ -609,15 +670,8 @@ function buildVideoProjection(
   };
 }
 
-interface StylePackConfig {
-  tone_words?: string[];
-  typography_hint?: string;
-  avoid?: string[];
-  music?: PromptStylePack['music'];
-}
-
 function loadStylePackConfig(): StylePackConfig {
-  const parsed = readJsonIfPresent(pathResolver.knowledge(MEDIA_DESIGN_SYSTEMS_PATH));
+  const parsed = loadDesignCatalog(mediaDesignSystemsCatalog);
   const stylePack = parsed?.style_pack;
   return stylePack && typeof stylePack === 'object' ? (stylePack as StylePackConfig) : {};
 }

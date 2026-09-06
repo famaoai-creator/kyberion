@@ -26,16 +26,16 @@ service credentials, or multi-area coordination, keep it off the
 
 ## Starter slices from P1/P2
 
-| Slice | Files expected | Validation command | Out of scope |
-|---|---|---|---|
-| Add one `classifyError` rule for a real unknown error | `libs/core/error-classifier.ts`, `libs/core/error-classifier.test.ts` | `pnpm exec vitest run libs/core/error-classifier.test.ts` | Reworking classifier categories or CLI logging |
-| Add one meeting dry-run assertion | `libs/core/meeting-participation-coordinator.test.ts` or `libs/actuators/meeting-browser-driver/src/index.test.ts` | `pnpm run test:meeting-dry-run` | Joining a real meeting or changing browser automation behavior |
-| Add one release workflow contract assertion | `tests/release-operations-contract.test.ts`, `docs/developer/RELEASE_OPERATIONS.md` | `pnpm exec vitest run tests/release-operations-contract.test.ts` | Designing a new release process |
-| Add one cross-OS workflow wording check | `.github/workflows/cross-os.yml`, `tests/workflow-operations-contract.test.ts` | `pnpm exec vitest run tests/workflow-operations-contract.test.ts` | Changing the OS matrix or adding new CI jobs |
-| Add one first-win docs phrase | `README.md`, `docs/QUICKSTART.md`, `docs/WHY.md`, `tests/first-win-docs-contract.test.ts` | `pnpm exec vitest run tests/first-win-docs-contract.test.ts` | Rewriting the product positioning |
-| Update one developer tour path | `docs/developer/TOUR.md`, `tests/developer-tour-contract.test.ts` | `pnpm exec vitest run tests/developer-tour-contract.test.ts` | Reorganizing developer documentation |
-| Tighten one meeting guide safety sentence | `docs/user/meeting-facilitator.md`, `tests/user-meeting-use-case-contract.test.ts` | `pnpm exec vitest run tests/user-meeting-use-case-contract.test.ts` | Changing consent behavior or runtime code |
-| Improve the good-first-issue issue template copy | `.github/ISSUE_TEMPLATE/good-first-issue-guide.md`, `tests/good-first-issue-guidance-contract.test.ts` | `pnpm exec vitest run tests/good-first-issue-guidance-contract.test.ts` | Changing labels or repository triage policy |
+| Slice                                                 | Files expected                                                                                                     | Validation command                                                      | Out of scope                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Add one `classifyError` rule for a real unknown error | `libs/core/error-classifier.ts`, `libs/core/error-classifier.test.ts`                                              | `pnpm exec vitest run libs/core/error-classifier.test.ts`               | Reworking classifier categories or CLI logging                 |
+| Add one meeting dry-run assertion                     | `libs/core/meeting-participation-coordinator.test.ts` or `libs/actuators/meeting-browser-driver/src/index.test.ts` | `pnpm test -- --suite meeting-dry-run`                                  | Joining a real meeting or changing browser automation behavior |
+| Add one release workflow contract assertion           | `tests/release-operations-contract.test.ts`, `docs/developer/RELEASE_OPERATIONS.md`                                | `pnpm exec vitest run tests/release-operations-contract.test.ts`        | Designing a new release process                                |
+| Add one cross-OS workflow wording check               | `.github/workflows/cross-os.yml`, `tests/workflow-operations-contract.test.ts`                                     | `pnpm exec vitest run tests/workflow-operations-contract.test.ts`       | Changing the OS matrix or adding new CI jobs                   |
+| Add one first-win docs phrase                         | `README.md`, `docs/QUICKSTART.md`, `docs/WHY.md`, `tests/first-win-docs-contract.test.ts`                          | `pnpm exec vitest run tests/first-win-docs-contract.test.ts`            | Rewriting the product positioning                              |
+| Update one developer tour path                        | `docs/developer/TOUR.md`, `tests/developer-tour-contract.test.ts`                                                  | `pnpm exec vitest run tests/developer-tour-contract.test.ts`            | Reorganizing developer documentation                           |
+| Tighten one meeting guide safety sentence             | `docs/user/meeting-facilitator.md`, `tests/user-meeting-use-case-contract.test.ts`                                 | `pnpm exec vitest run tests/user-meeting-use-case-contract.test.ts`     | Changing consent behavior or runtime code                      |
+| Improve the good-first-issue issue template copy      | `.github/ISSUE_TEMPLATE/good-first-issue-guide.md`, `tests/good-first-issue-guidance-contract.test.ts`             | `pnpm exec vitest run tests/good-first-issue-guidance-contract.test.ts` | Changing labels or repository triage policy                    |
 
 ## Backlog categories
 

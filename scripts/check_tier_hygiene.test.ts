@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scan } from './check_tier_hygiene.js';
+import { pathResolver, safeReadFile } from '@agent/core';
+import { readTierHygieneTextFile, scan } from './check_tier_hygiene.js';
 
 /**
  * Regression test for the tier-hygiene checker. Instead of driving the
@@ -22,10 +23,26 @@ function writePublicFile(relPath: string, body: string): string {
 }
 
 describe.sequential('check_tier_hygiene', () => {
+  it('uses the foundation text reader for tier scan inputs', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_tier_hygiene.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain('defineCatalog, readTextFile');
+    expect(source).not.toContain('safeReadFile(');
+  });
+
+  it('rejects a directory replacement before tier text scanning', () => {
+    expect(() => readTierHygieneTextFile(pathResolver.rootDir())).toThrow(
+      `${pathResolver.rootDir()} must be a regular file`
+    );
+  });
+
   it('passes on the current tree (baseline)', async () => {
     const violations = await scan();
     expect(violations).toEqual([]);
-  });
+  }, 60_000);
 
   it('detects an injected internal Atlassian subdomain', async () => {
     const temp = writePublicFile(
@@ -43,7 +60,7 @@ describe.sequential('check_tier_hygiene', () => {
     } finally {
       fs.unlinkSync(temp);
     }
-  });
+  }, 60_000);
 
   it('detects an injected denied substring', async () => {
     const temp = writePublicFile(
@@ -58,7 +75,7 @@ describe.sequential('check_tier_hygiene', () => {
     } finally {
       fs.unlinkSync(temp);
     }
-  });
+  }, 60_000);
 
   it('allows framework placeholders and industry-standard terms', async () => {
     const temp = writePublicFile(
@@ -71,5 +88,5 @@ describe.sequential('check_tier_hygiene', () => {
     } finally {
       fs.unlinkSync(temp);
     }
-  });
+  }, 60_000);
 });

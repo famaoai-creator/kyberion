@@ -5,9 +5,10 @@
 import type { WisdomOperationExecutor, WisdomOperationSpec } from './contracts/wisdom-operation.js';
 import type { WisdomContext } from './contracts/wisdom-context.js';
 import { DEPRECATED_WISDOM_ALIASES } from './compatibility/legacy-aliases.js';
-import { withCatalogInputContract } from '@agent/core';
+import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
 
-export type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const WISDOM_INPUT_SCHEMA = {
   type: 'object',
@@ -107,6 +108,7 @@ const WISDOM_INPUT_SCHEMA = {
     time_budget_minutes: { type: 'number' },
     tone: { type: 'string' },
     tools: { type: 'array' },
+    deferred_tools: { type: 'array' },
     use_subagent: { type: 'boolean' },
     value: {},
     vetoed_options: {},
@@ -332,7 +334,7 @@ const WISDOM_REQUIRED_INPUTS: Record<string, string[]> = {
   capture_intuition: ['decision', 'anchor', 'analogy'],
 };
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const canonicalOp = DEPRECATED_WISDOM_ALIASES[op as keyof typeof DEPRECATED_WISDOM_ALIASES];
   const forwardTo = FORWARD_TARGETS[op];
   const executionKind = ENSEMBLE_OPS.has(op)
@@ -355,7 +357,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   });
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...WISDOM_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...WISDOM_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),
@@ -364,7 +366,7 @@ export function describeOps() {
   ];
 }
 
-type CatalogSpec = ReturnType<typeof toSpec> & { kind: Exclude<OpSpecKind, 'control'> };
+type CatalogSpec = ReturnType<typeof toSpec> & { kind: Exclude<PipelineStepType, 'control'> };
 
 const OPERATION_REGISTRY = new Map(
   describeOps()

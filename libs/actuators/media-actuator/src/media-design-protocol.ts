@@ -1,17 +1,32 @@
+import { logger } from '@agent/core/core';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeMkdir,
   safeExistsSync,
   safeReaddir,
-  loadProjectRecord,
-  loadServiceBindingRecord,
+} from '@agent/core/secure-io';
+import { defineCatalog, isRecord } from '@agent/core/foundation';
+import { loadProjectRecord } from '@agent/core/project-registry';
+import { loadServiceBindingRecord } from '@agent/core/service-binding-registry';
+import type { TenantDesignOverride } from '@agent/core/tenant-design-override';
+import {
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
+} from '@agent/core/media-theme-role-policy';
+import {
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
-} from '@agent/core';
+} from '@agent/core/document-inference-policy';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
-import { createMediaDocumentPipelineHelpers } from './media-document-pipeline-helpers.js';
+import {
+  createMediaDocumentPipelineHelpers,
+  type MediaInvoicePdfProtocol,
+  type MediaPptxProtocol,
+} from './media-document-pipeline-helpers.js';
+import type {
+  MediaReportDocxProtocol,
+  MediaReportPdfProtocol,
+} from './media-report-pipeline-helpers.js';
 import {
   buildMediaGenerationBoundary,
   resolveMediaBriefCategory,
@@ -20,6 +35,9 @@ import {
   buildReportNarrativeOutline,
   buildSpreadsheetNarrativeOutline,
   buildDiagramNarrativeOutline,
+  type MediaCompositionPreset,
+  type MediaDocumentCompositionCatalog,
+  type MediaTheme,
 } from './media-document-helpers.js';
 import { generateDrawioDocument, normalizeFontFamily } from './media-diagram-render-helpers.js';
 import { createMediaReportPipelineHelpers } from './media-report-pipeline-helpers.js';
@@ -27,15 +45,27 @@ import {
   createMediaSpreadsheetPipelineHelpers,
   normalizeXlsxDesignProtocol,
 } from './media-spreadsheet-pipeline-helpers.js';
+import type { MediaTrackerXlsxProtocol } from './media-spreadsheet-pipeline-helpers.js';
 import { buildPptxSlideFromPattern as runtimeBuildPptxSlideFromPattern } from './media-layout-runtime.js';
-import { loadJsonValue, resolveConfidentialTenantOverride } from './media-catalog-loaders.js';
+import {
+  loadConfidentialThemePack,
+  type ConfidentialThemePack,
+  type MediaDesignSystemDefinition,
+  resolveConfidentialTenantOverride,
+} from './media-catalog-loaders.js';
 import * as path from 'node:path';
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
+import {
+  loadSemanticRenderTokenCatalog as loadValidatedSemanticRenderTokenCatalog,
+  resolveSemanticRenderTokens as resolveValidatedSemanticRenderTokens,
+  type MediaPptxPalette,
+  type SemanticRenderTokenCatalog,
+  type SemanticRenderTokens,
+} from './media-layout-design-tokens.js';
 import {
   cloneJsonValue,
   deepMergeCatalog,
   readJsonFilesRecursively,
-  loadJsonCatalog,
   loadMediaDesignSystemsCatalog,
 } from './media-catalog-loaders.js';
 
@@ -46,55 +76,138 @@ function ensureParentDir(targetPath: string): void {
   }
 }
 
-function loadArtifactLibraryCatalog(rootDir: string): any {
+type ArtifactLibraryCatalog = {
+  profiles: Record<
+    string,
+    {
+      artifact_family: string;
+      document_type: string;
+      description?: string;
+      sections: Array<{
+        section_id: string;
+        title: string;
+        layout_key: string;
+      }>;
+    }
+  >;
+};
+
+interface MediaThemeCatalog {
+  version: string;
+  default_theme: string;
+  themes: Record<string, MediaTheme>;
+}
+
+function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   const dirPath = path.resolve(
     rootDir,
     'knowledge/public/design-patterns/media-templates/artifact-library'
   );
   const docs = readJsonFilesRecursively(dirPath);
-  const fallback = { profiles: {} };
-  if (docs.length === 0) {
-    return fallback;
-  }
-  return docs.reduce((acc, doc) => {
-    if (!doc || typeof doc !== 'object') return acc;
+  const aggregationSeed: ArtifactLibraryCatalog = { profiles: {} };
+  const catalog = defineCatalog<ArtifactLibraryCatalog>({
+    id: 'artifact-library',
+    path: path.join(dirPath, 'index.json'),
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/artifact-library.schema.json'),
+  });
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce((acc, doc) => {
+    if (!isRecord(doc)) return acc;
     return deepMergeCatalog(acc, { profiles: doc.profiles || {} });
-  }, cloneJsonValue(fallback));
+  }, cloneJsonValue(aggregationSeed));
+  return catalog.validate(merged, dirPath);
 }
 
-function loadDocumentCompositionCatalog(rootDir: string): any {
-  const primaryCatalog = loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/document-composition-presets',
-    filePath: 'knowledge/public/design-patterns/media-templates/document-composition-presets.json',
-    fallback: { defaults: {}, profiles: {} },
+function loadDocumentCompositionCatalog(rootDir: string): MediaDocumentCompositionCatalog {
+  const aggregationSeed: MediaDocumentCompositionCatalog = { defaults: {}, profiles: {} };
+  const catalog = defineCatalog<MediaDocumentCompositionCatalog>({
+    id: 'document-composition-presets',
+    path: path.resolve(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/document-composition-presets.json'
+    ),
+    schema: path.resolve(
+      rootDir,
+      'knowledge/product/schemas/document-composition-presets.schema.json'
+    ),
   });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/document-composition-presets'
+  );
+  const docs = readJsonFilesRecursively(directoryPath);
+  const primaryCatalog =
+    docs.length === 0
+      ? catalog.load()
+      : catalog.validate(
+          docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(aggregationSeed)),
+          directoryPath
+        );
   const artifactLibraryCatalog = loadArtifactLibraryCatalog(rootDir);
-  return {
-    ...primaryCatalog,
-    profiles: {
-      ...(artifactLibraryCatalog.profiles || {}),
-      ...(primaryCatalog.profiles || {}),
+  return catalog.validate(
+    {
+      ...primaryCatalog,
+      profiles: {
+        ...(artifactLibraryCatalog.profiles || {}),
+        ...(primaryCatalog.profiles || {}),
+      },
     },
-  };
+    directoryPath
+  );
 }
 
-function loadThemeCatalog(rootDir: string): any {
-  const publicCatalog = loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/themes',
-    filePath: 'knowledge/public/design-patterns/media-templates/themes.json',
-    fallback: { default_theme: 'kyberion-standard', themes: {} },
-  });
-  const runtimeCatalog = loadJsonCatalog(rootDir, {
-    directoryPath: 'active/shared/runtime/design-patterns/media-templates/themes',
-    filePath: 'active/shared/runtime/design-patterns/media-templates/themes.json',
-    fallback: { default_theme: 'kyberion-standard', themes: {} },
-  });
-  const personalCatalog = loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/personal/design-patterns/media-templates/themes',
-    filePath: 'knowledge/personal/design-patterns/media-templates/themes.json',
-    fallback: { default_theme: 'kyberion-standard', themes: {} },
-  });
-  return deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
+function loadThemeCatalog(rootDir: string): MediaThemeCatalog {
+  const emptyScope: MediaThemeCatalog = {
+    version: '1.0.0',
+    default_theme: 'kyberion-standard',
+    themes: {},
+  };
+  const schemaPath = path.resolve(rootDir, 'knowledge/product/schemas/media-themes.schema.json');
+  const loadScope = (
+    id: string,
+    directoryPath: string,
+    filePath: string,
+    optional = false
+  ): MediaThemeCatalog => {
+    const catalog = defineCatalog<MediaThemeCatalog>({
+      id,
+      path: path.resolve(rootDir, filePath),
+      schema: schemaPath,
+      ...(optional ? { fallback: emptyScope } : {}),
+    });
+    const directory = path.resolve(rootDir, directoryPath);
+    const docs = readJsonFilesRecursively(directory);
+    if (docs.length === 0) return catalog.load();
+    const merged = docs.reduce(
+      (acc, doc) => deepMergeCatalog(acc, doc),
+      cloneJsonValue(emptyScope)
+    );
+    return catalog.validate(merged, directory);
+  };
+
+  const publicCatalog = loadScope(
+    'media-themes-public',
+    'knowledge/public/design-patterns/media-templates/themes',
+    'knowledge/public/design-patterns/media-templates/themes.json'
+  );
+  const runtimeCatalog = loadScope(
+    'media-themes-runtime',
+    'active/shared/runtime/design-patterns/media-templates/themes',
+    'active/shared/runtime/design-patterns/media-templates/themes.json',
+    true
+  );
+  const personalCatalog = loadScope(
+    'media-themes-personal',
+    'knowledge/personal/design-patterns/media-templates/themes',
+    'knowledge/personal/design-patterns/media-templates/themes.json',
+    true
+  );
+  const merged = deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
+  return defineCatalog<MediaThemeCatalog>({
+    id: 'media-themes',
+    path: path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/themes.json'),
+    schema: schemaPath,
+  }).validate(merged, 'media theme scope merge');
 }
 
 function loadConfidentialThemePackEntries(
@@ -105,41 +218,46 @@ function loadConfidentialThemePackEntries(
     let tenantNames: string[] = [];
     try {
       tenantNames = safeReaddir(confidentialDir);
-    } catch (err: any) {
-      logger.warn(`[THEME_RESOLVER] safeReaddir failed on ${confidentialDir}: ${err.message}`);
+    } catch (err: unknown) {
+      logger.warn(
+        `[THEME_RESOLVER] safeReaddir failed on ${confidentialDir}: ${errorMessage(err)}`
+      );
     }
     const entries: { theme_id: string; theme_name?: string; pack_path: string }[] = [];
     for (const tenantName of tenantNames) {
       const themePackPath = path.join(confidentialDir, tenantName, 'design', 'theme.json');
       if (!safeExistsSync(themePackPath)) continue;
       try {
-        const pack = loadJsonValue(themePackPath);
+        const pack = loadConfidentialThemePack(rootDir, themePackPath);
         const themeId = String(
           pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || ''
         ).trim();
         if (!themeId) continue;
         entries.push({
           theme_id: themeId,
-          theme_name: pack?.theme?.name,
+          theme_name: typeof pack.theme?.name === 'string' ? pack.theme.name : undefined,
           pack_path: `knowledge/confidential/${tenantName}/design/theme.json`,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.warn(
-          `[THEME_RESOLVER] Failed reading theme JSON for tenant ${tenantName}: ${err.message}`
+          `[THEME_RESOLVER] Failed reading theme JSON for tenant ${tenantName}: ${errorMessage(err)}`
         );
         continue;
       }
     }
     return entries;
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.warn(
-      `[THEME_RESOLVER] loadConfidentialThemePackEntries general failure: ${err.message}`
+      `[THEME_RESOLVER] loadConfidentialThemePackEntries general failure: ${errorMessage(err)}`
     );
     return [];
   }
 }
 
-function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
+function resolveConfidentialThemePack(
+  rootDir: string,
+  themeName: string
+): ConfidentialThemePack | null {
   const normalized = String(themeName || '')
     .trim()
     .toLowerCase();
@@ -156,7 +274,7 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
     const directPath = path.join(rootDir, 'knowledge/confidential', slug, 'design/theme.json');
     if (safeExistsSync(directPath)) {
       try {
-        const pack = loadJsonValue(directPath);
+        const pack = loadConfidentialThemePack(rootDir, directPath);
         const themeId = String(
           pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || ''
         ).trim();
@@ -169,8 +287,8 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
           );
           return pack;
         }
-      } catch (err: any) {
-        logger.warn(`[THEME_RESOLVER] Direct load failed for ${directPath}: ${err.message}`);
+      } catch (err: unknown) {
+        logger.warn(`[THEME_RESOLVER] Direct load failed for ${directPath}: ${errorMessage(err)}`);
       }
     }
   }
@@ -184,8 +302,10 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
       continue;
     }
     try {
-      const packPath = path.resolve(rootDir, entry.pack_path);
-      return loadJsonValue(packPath);
+      const packPath = assertSafeRepositoryPath(path.resolve(rootDir, entry.pack_path), {
+        allowMissingLeaf: true,
+      });
+      return loadConfidentialThemePack(rootDir, packPath);
     } catch {
       continue;
     }
@@ -193,20 +313,75 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
   return null;
 }
 
-function loadImportedDesignMdIndex(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/design-md-catalog',
-    filePath: 'knowledge/public/design-patterns/media-templates/design-md-catalog/index.json',
-    fallback: { systems: [] },
+type ImportedDesignMdIndex = {
+  generated_at: string;
+  source_repo: string;
+  source_dir: string;
+  count: number;
+  systems: Array<{
+    design_system_id: string;
+    theme_id: string;
+    slug: string;
+    name: string;
+    category: string;
+    description: string;
+    source_path: string;
+    keywords: string[];
+  }>;
+};
+
+type ImportedDesignReference = ImportedDesignMdIndex['systems'][number];
+
+type ImportedDesignRecommendation = Pick<
+  ImportedDesignReference,
+  'design_system_id' | 'theme_id' | 'slug' | 'name' | 'category' | 'description' | 'source_path'
+> & {
+  recommendation_score: number;
+};
+
+function loadImportedDesignMdIndex(rootDir: string): ImportedDesignMdIndex {
+  const aggregationSeed: ImportedDesignMdIndex = {
+    generated_at: '1970-01-01T00:00:00.000Z',
+    source_repo: 'unavailable',
+    source_dir: 'unavailable',
+    count: 0,
+    systems: [],
+  };
+  const catalog = defineCatalog<ImportedDesignMdIndex>({
+    id: 'imported-design-md-index',
+    path: path.resolve(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/design-md-catalog/index.json'
+    ),
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/imported-design-md-index.schema.json'),
   });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/design-md-catalog'
+  );
+  const docs = readJsonFilesRecursively(directoryPath);
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce(
+    (acc, doc) => deepMergeCatalog(acc, doc),
+    cloneJsonValue(aggregationSeed)
+  );
+  return catalog.validate(merged, directoryPath);
 }
 
-function normalizeDesignLookupKey(input: any): string {
+function normalizeDesignLookupKey(input: unknown): string {
   return String(input || '')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function resolveDesignBindingHints(brief: any): {
@@ -215,7 +390,7 @@ function resolveDesignBindingHints(brief: any): {
   design_system_id?: string;
   design_reference?: string;
   theme?: string;
-  branding?: Record<string, any>;
+  branding?: Record<string, unknown>;
 } {
   const direct = {
     tenant_id:
@@ -243,19 +418,19 @@ function resolveDesignBindingHints(brief: any): {
   const project = projectId ? loadProjectRecord(projectId) : null;
   const projectMeta =
     project?.metadata && typeof project.metadata === 'object'
-      ? (project.metadata as Record<string, any>)
+      ? (project.metadata as Record<string, unknown>)
       : {};
   const bindingIds = [
     ...(Array.isArray(project?.service_bindings) ? project!.service_bindings : []).map(
-      (value: any) => String(value)
+      (value: unknown) => String(value)
     ),
     ...(Array.isArray(brief?.service_binding_ids) ? brief.service_binding_ids : []).map(
-      (value: any) => String(value)
+      (value: unknown) => String(value)
     ),
     ...(Array.isArray(brief?.payload?.service_binding_ids)
       ? brief.payload.service_binding_ids
       : []
-    ).map((value: any) => String(value)),
+    ).map((value: unknown) => String(value)),
   ].filter(Boolean);
   const bindings = bindingIds
     .map((bindingId) => loadServiceBindingRecord(bindingId))
@@ -264,7 +439,7 @@ function resolveDesignBindingHints(brief: any): {
     bindings
       .map((binding) =>
         binding.metadata && typeof binding.metadata === 'object'
-          ? (binding.metadata as Record<string, any>)
+          ? (binding.metadata as Record<string, unknown>)
           : {}
       )
       .find((meta) => Object.keys(meta).length > 0) || {};
@@ -293,14 +468,17 @@ function resolveDesignBindingHints(brief: any): {
       undefined,
     theme: direct.theme || String(projectMeta.theme || bindingMeta.theme || '').trim() || undefined,
     branding: {
-      ...(projectMeta.branding || {}),
-      ...(bindingMeta.branding || {}),
-      ...(direct.branding || {}),
+      ...recordValue(projectMeta.branding),
+      ...recordValue(bindingMeta.branding),
+      ...recordValue(direct.branding),
     },
   };
 }
 
-function resolveImportedDesignReference(rootDir: string, input: any): any | null {
+function resolveImportedDesignReference(
+  rootDir: string,
+  input: Record<string, unknown>
+): ImportedDesignReference | null {
   const catalog = loadImportedDesignMdIndex(rootDir);
   const candidates = [
     input?.design_reference,
@@ -310,12 +488,12 @@ function resolveImportedDesignReference(rootDir: string, input: any): any | null
     input?.project_name,
     input?.project_id,
   ]
-    .map((value: any) => normalizeDesignLookupKey(value))
+    .map((value: unknown) => normalizeDesignLookupKey(value))
     .filter(Boolean);
   if (candidates.length === 0) return null;
   const systems = Array.isArray(catalog.systems) ? catalog.systems : [];
   return (
-    systems.find((entry: any) => {
+    systems.find((entry: ImportedDesignReference) => {
       const values = [
         entry?.design_system_id,
         entry?.theme_id,
@@ -337,7 +515,11 @@ function resolveImportedDesignReference(rootDir: string, input: any): any | null
   );
 }
 
-function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 3): any[] {
+function recommendImportedDesignReferences(
+  rootDir: string,
+  brief: any,
+  limit = 3
+): ImportedDesignRecommendation[] {
   const catalog = loadImportedDesignMdIndex(rootDir);
   const systems = Array.isArray(catalog.systems) ? catalog.systems : [];
   const haystack = normalizeDesignLookupKey(
@@ -366,7 +548,7 @@ function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 
   if (!haystack) return [];
 
   const scored = systems
-    .map((entry: any) => {
+    .map((entry: ImportedDesignReference) => {
       const terms = [
         entry?.slug,
         entry?.name,
@@ -389,8 +571,8 @@ function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 
         recommendation_score: score,
       };
     })
-    .filter((entry: any) => entry.recommendation_score > 0)
-    .sort((left: any, right: any) => {
+    .filter((entry) => entry.recommendation_score > 0)
+    .sort((left: ImportedDesignRecommendation, right: ImportedDesignRecommendation) => {
       if (right.recommendation_score !== left.recommendation_score)
         return right.recommendation_score - left.recommendation_score;
       return String(left.design_system_id || '').localeCompare(
@@ -398,7 +580,7 @@ function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 
       );
     });
 
-  return scored.slice(0, limit).map((entry: any) => ({
+  return scored.slice(0, limit).map((entry: ImportedDesignRecommendation) => ({
     design_system_id: entry.design_system_id,
     theme_id: entry.theme_id,
     slug: entry.slug,
@@ -415,19 +597,19 @@ function resolveMediaDesignSystem(
   brief: any
 ): {
   designSystemId: string;
-  system: any;
-  tenantOverride: any;
+  system: MediaDesignSystemDefinition;
+  tenantOverride: TenantDesignOverride | null;
   resolvedThemeName: string;
-  branding: any;
+  branding: Record<string, unknown>;
   promptGuide: string[];
-  sourceDesign?: Record<string, any> | null;
-  recommendations: any[];
+  sourceDesign?: Record<string, unknown> | null;
+  recommendations: ImportedDesignRecommendation[];
 } {
   const catalog = loadMediaDesignSystemsCatalog(rootDir);
   const bindingHints = resolveDesignBindingHints(brief);
   const recommendations = recommendImportedDesignReferences(rootDir, brief);
   const explicit = String(bindingHints.design_system_id || '').trim();
-  const resolveTenantOverride = (_system: any, designSystemId?: string) => {
+  const resolveTenantOverride = (_system: MediaDesignSystemDefinition, designSystemId?: string) => {
     const clientHint =
       bindingHints.tenant_id ||
       bindingHints.client_key ||
@@ -440,10 +622,10 @@ function resolveMediaDesignSystem(
       ? resolveConfidentialTenantOverride(rootDir, String(clientHint), designSystemId)
       : null;
   };
-  const buildResult = (designSystemId: string, system: any) => {
+  const buildResult = (designSystemId: string, system: MediaDesignSystemDefinition) => {
     const tenantOverride = resolveTenantOverride(system, designSystemId);
     const promptGuide = Array.isArray(system?.metadata?.prompt_guide)
-      ? system.metadata.prompt_guide
+      ? system.metadata.prompt_guide.filter((value): value is string => typeof value === 'string')
       : [];
     return {
       designSystemId,
@@ -487,39 +669,26 @@ function resolveMediaDesignSystem(
   }
   const profileId = String(brief?.document_profile || '').trim();
   const matched = Object.entries(catalog.systems || {}).find(
-    ([, system]: any) => Array.isArray(system?.profiles) && system.profiles.includes(profileId)
+    ([, system]: [string, MediaDesignSystemDefinition]) =>
+      Array.isArray(system?.profiles) && system.profiles.includes(profileId)
   );
   if (matched) {
     return buildResult(matched[0], matched[1]);
   }
   const fallbackId = String(catalog.default_system || 'executive-standard');
-  return buildResult(fallbackId, catalog.systems?.[fallbackId] || {});
+  return buildResult(fallbackId, catalog.systems?.[fallbackId] || { theme: 'kyberion-standard' });
 }
 
-function loadSemanticRenderTokenCatalog(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens',
-    filePath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens.json',
-    fallback: { defaults: { content: {} }, semantics: {}, signal_tones: {} },
-  });
+function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderTokenCatalog {
+  return loadValidatedSemanticRenderTokenCatalog(rootDir);
 }
 
 function resolveSemanticRenderTokens(
   rootDir: string,
   semanticType?: string,
   designSystemId?: string
-): any {
-  const catalog = loadSemanticRenderTokenCatalog(rootDir);
-  const key = String(semanticType || 'content').trim() || 'content';
-  const designSystems = loadMediaDesignSystemsCatalog(rootDir);
-  const systemOverrides = designSystemId
-    ? designSystems.systems?.[designSystemId]?.semantic_overrides?.[key] || {}
-    : {};
-  return {
-    ...(catalog.defaults?.content || {}),
-    ...(catalog.semantics?.[key] || {}),
-    ...systemOverrides,
-  };
+): SemanticRenderTokens {
+  return resolveValidatedSemanticRenderTokens(rootDir, semanticType, designSystemId);
 }
 
 function resolveSemanticComponentRule(
@@ -527,14 +696,19 @@ function resolveSemanticComponentRule(
   semanticType: string | undefined,
   medium: string,
   component: string
-): any {
+): Record<string, unknown> {
   const tokens = resolveSemanticRenderTokens(rootDir, semanticType);
-  return {
-    ...(tokens?.[medium] && tokens[medium][component] ? tokens[medium][component] : {}),
-  };
+  const mediumTokens = tokens[medium];
+  if (!mediumTokens) return {};
+  const componentTokens = mediumTokens[component];
+  if (isRecord(componentTokens)) return { ...componentTokens };
+  // PDF rules are defined directly under the medium rather than beneath a
+  // component key. Preserve that schema shape while keeping docx component
+  // lookups strict and fail-closed when the requested component is absent.
+  return medium === 'pdf' ? { ...mediumTokens } : {};
 }
 
-function resolveNamedTheme(rootDir: string, preferredTheme?: string): any {
+function resolveNamedTheme(rootDir: string, preferredTheme?: string): MediaTheme | null {
   const catalog = loadThemeCatalog(rootDir);
   const themeName = String(preferredTheme || catalog.default_theme || 'kyberion-standard').trim();
 
@@ -561,7 +735,7 @@ function resolveNamedTheme(rootDir: string, preferredTheme?: string): any {
 function resolveDocumentCompositionPresetCore(
   rootDir: string,
   brief: any
-): { profileId: string; preset: any } {
+): { profileId: string; preset: MediaCompositionPreset } {
   const catalog = loadDocumentCompositionCatalog(rootDir);
   const profiles = catalog.profiles || {};
   const defaults = catalog.defaults || {};
@@ -599,7 +773,7 @@ function resolveDocumentCompositionPresetCore(
     .map((value) => String(value).toLowerCase())
     .join(' ');
   const keywords = resolveDocumentProfileKeywordsPolicy(documentType, artifactFamily);
-  const buildPreset = (profileId: string, preset: any) => {
+  const buildPreset = (profileId: string, preset: MediaCompositionPreset) => {
     const designSystem = resolveMediaDesignSystem(rootDir, {
       ...brief,
       document_profile: profileId,
@@ -634,23 +808,24 @@ function resolveDocumentCompositionPresetCore(
     }
   }
 
+  const defaultProfile = (key: string): string =>
+    typeof defaults[key] === 'string' ? defaults[key] : '';
   const inferredProfileId =
     explicitProfile ||
-    defaults[artifactFamily] ||
-    defaults[documentType] ||
-    defaults.proposal ||
-    defaults.report ||
-    defaults.spreadsheet ||
-    defaults.diagram;
+    defaultProfile(artifactFamily) ||
+    defaultProfile(documentType) ||
+    defaultProfile('proposal') ||
+    defaultProfile('report') ||
+    defaultProfile('spreadsheet') ||
+    defaultProfile('diagram');
   if (inferredProfileId && profiles?.[inferredProfileId]) {
     return buildPreset(inferredProfileId, profiles[inferredProfileId]);
   }
 
   for (const [profileId, preset] of Object.entries(profiles)) {
     if (!preset || typeof preset !== 'object') continue;
-    if (artifactFamily && String((preset as any).artifact_family || '') !== artifactFamily)
-      continue;
-    if (documentType && String((preset as any).document_type || '') !== documentType) continue;
+    if (artifactFamily && String(preset.artifact_family || '') !== artifactFamily) continue;
+    if (documentType && String(preset.document_type || '') !== documentType) continue;
     return buildPreset(profileId, preset);
   }
 
@@ -674,6 +849,8 @@ function resolveDocumentCompositionPresetCore(
 
 const buildPptxSlideFromPattern = (...args: Parameters<typeof runtimeBuildPptxSlideFromPattern>) =>
   runtimeBuildPptxSlideFromPattern(...args);
+
+type DocumentCompositionPresetResolution = ReturnType<typeof resolveDocumentCompositionPresetCore>;
 
 const mediaDocumentPipelineHelpers = createMediaDocumentPipelineHelpers({
   resolveNamedTheme,
@@ -716,14 +893,14 @@ const mediaSpreadsheetPipelineHelpers = createMediaSpreadsheetPipelineHelpers({
 function resolveDocumentCompositionPreset(
   rootDir: string,
   brief: any
-): { profileId: string; preset: any } {
+): DocumentCompositionPresetResolution {
   return resolveDocumentCompositionPresetCore(rootDir, brief);
 }
 
 function buildOutlineDrivenPptxProtocol(
   rootDir: string,
   outline: any
-): { protocol: any; theme: any; themeName: string } {
+): { protocol: MediaPptxProtocol; theme: any; themeName: string } {
   return mediaDocumentPipelineHelpers.buildOutlineDrivenPptxProtocol(rootDir, outline);
 }
 
@@ -735,7 +912,7 @@ const proposalPptxFlow = createProposalPptxFlow({
 function buildPresentationPptxProtocol(
   rootDir: string,
   brief: any
-): { protocol: any; outline: any; theme: any; themeName: string } {
+): { protocol: MediaPptxProtocol; outline: any; theme: any; themeName: string } {
   return mediaDocumentPipelineHelpers.buildPresentationPptxProtocol(rootDir, brief);
 }
 
@@ -813,8 +990,9 @@ function compileBriefToDesignProtocol(
   return mediaDocumentPipelineHelpers.compileBriefToDesignProtocol(rootDir, rawBrief);
 }
 
-function themeToPptxPalette(theme: any): any {
-  const colors = theme?.colors || theme?.theme?.colors || {};
+function themeToPptxPalette(theme: MediaTheme | null): MediaPptxPalette {
+  const nestedTheme = recordValue(theme?.theme);
+  const colors = recordValue(theme?.colors ?? nestedTheme.colors);
   return {
     dk1: String(colors.primary || '#000000').replace('#', ''),
     dk2: String(colors.secondary || colors.text || '#44546A').replace('#', ''),
@@ -826,31 +1004,32 @@ function themeToPptxPalette(theme: any): any {
 }
 
 function themeToDocxStyleHints(
-  theme: any,
+  theme: MediaTheme | null,
   locale?: string
 ): { headingFont: string; bodyFont: string; accent: string } {
-  const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
+  const nestedTheme = recordValue(theme?.theme);
+  const themeFonts = recordValue(theme?.fonts ?? nestedTheme.fonts);
+  const heading = typeof themeFonts.heading === 'string' ? themeFonts.heading : undefined;
+  const body = typeof themeFonts.body === 'string' ? themeFonts.body : undefined;
   const headingFont = normalizeFontFamily(
-    locale?.startsWith('ja')
-      ? resolveEastAsianFontFamily(themeFonts.heading || themeFonts.body)
-      : themeFonts.heading || 'Aptos'
+    locale?.startsWith('ja') ? resolveEastAsianFontFamily(heading || body) : heading || 'Aptos'
   );
   const bodyFont = normalizeFontFamily(
-    locale?.startsWith('ja')
-      ? resolveEastAsianFontFamily(themeFonts.body || themeFonts.heading)
-      : themeFonts.body || 'Aptos'
+    locale?.startsWith('ja') ? resolveEastAsianFontFamily(body || heading) : body || 'Aptos'
   );
+  const colors = recordValue(theme?.colors ?? nestedTheme.colors);
   return {
     headingFont,
     bodyFont,
-    accent: String(theme?.colors?.accent || theme?.theme?.colors?.accent || '#2563eb').replace(
-      '#',
-      ''
-    ),
+    accent: String(colors.accent || '#2563eb').replace('#', ''),
   };
 }
 
-function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
+function resolveThemeColorRole(
+  palette: MediaPptxPalette,
+  accentHex: string,
+  role?: string
+): string {
   const resolvedRole = resolveThemeColorRolePolicy(role, 'secondary');
   switch (resolvedRole) {
     case 'accent':
@@ -862,7 +1041,11 @@ function resolveThemeColorRole(palette: any, accentHex: string, role?: string): 
   }
 }
 
-function resolveThemeHexColor(themeColors: any, role?: string, fallback = '#334155'): string {
+function resolveThemeHexColor(
+  themeColors: Record<string, unknown>,
+  role?: string,
+  fallback = '#334155'
+): string {
   const resolvedRole = resolveThemeHexRolePolicy(role, 'secondary');
   switch (resolvedRole) {
     case 'accent':
@@ -938,15 +1121,15 @@ function normalizeProposalBrief(rootDir: string, input: any): any {
   return proposalPptxFlow.normalizeProposalBrief(rootDir, input);
 }
 
-function buildReportDocxProtocol(rootDir: string, brief: any): any {
+function buildReportDocxProtocol(rootDir: string, brief: any): MediaReportDocxProtocol {
   return mediaReportPipelineHelpers.buildReportDocxProtocol(rootDir, brief);
 }
 
-function buildReportPdfProtocol(rootDir: string, brief: any): any {
+function buildReportPdfProtocol(rootDir: string, brief: any): MediaReportPdfProtocol {
   return mediaReportPipelineHelpers.buildReportPdfProtocol(rootDir, brief);
 }
 
-function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
+function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): MediaTrackerXlsxProtocol {
   return mediaSpreadsheetPipelineHelpers.buildTrackerSpreadsheetProtocol(rootDir, brief);
 }
 function resolveDocumentLayoutTemplate(
@@ -956,7 +1139,7 @@ function resolveDocumentLayoutTemplate(
   return mediaDocumentPipelineHelpers.resolveDocumentLayoutTemplate(rootDir, brief);
 }
 
-function buildDocumentPdfProtocol(rawBrief: any): any {
+function buildDocumentPdfProtocol(rawBrief: any): MediaInvoicePdfProtocol {
   return mediaDocumentPipelineHelpers.buildDocumentPdfProtocol(rawBrief);
 }
 
@@ -964,7 +1147,6 @@ export {
   ensureParentDir,
   deepMergeCatalog,
   readJsonFilesRecursively,
-  loadJsonCatalog,
   loadArtifactLibraryCatalog,
   loadDocumentCompositionCatalog,
   loadThemeCatalog,

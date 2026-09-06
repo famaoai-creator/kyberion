@@ -2,14 +2,14 @@
 // LE-03: the report collection/formatting now lives in @agent/core report-ops
 // and is exposed in-process as the `system:audit_verify` op. This shell
 // remains for direct CLI use and the SA-01 warn-observation exit-code policy.
-import { createStandardYargs } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   collectAuditVerifyReport,
   formatAuditVerifyReport,
   type AuditVerifyCliReport,
-} from '@agent/core';
+} from '@agent/core/report-ops';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export { collectAuditVerifyReport, formatAuditVerifyReport, type AuditVerifyCliReport };
 
@@ -50,7 +50,7 @@ function hasArg(args: string[], name: string): boolean {
   return args.includes(name) || args.some((arg) => arg.startsWith(`${name}=`));
 }
 
-async function main(args: string[] = []): Promise<number> {
+async function main(args: string[] = []) {
   const argv = await createStandardYargs(['node', 'audit_verify', ...args])
     .option('json', { type: 'boolean', default: false })
     .option('since', { type: 'string', describe: 'Audit file lower bound in YYYY-MM-DD form' })
@@ -77,11 +77,6 @@ async function main(args: string[] = []): Promise<number> {
     ),
     ledgers: parseLedgerArgs(argv.ledger ?? readArgValue(args, '--ledger')),
   });
-  if (argv.json || hasArg(args, '--json')) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    for (const line of formatAuditVerifyReport(report)) console.log(line);
-  }
   // TODO(SA-01): historical chain data written before HMAC hardening (and by
   // concurrent appenders) fails verification. Per README §5, fail-closed
   // switches go through a warn observation period first. Set
@@ -89,13 +84,11 @@ async function main(args: string[] = []): Promise<number> {
   const warnOnly =
     (argv.warnOnly || hasArg(args, '--warn-only')) &&
     getRegisteredEnvText('KYBERION_AUDIT_CONTINUITY_ENFORCE') !== 'true';
-  if (!report.ok && warnOnly) {
-    console.warn(
-      '[audit:verify] findings detected but running in warn observation mode (SA-01); exiting 0.'
-    );
-    return 0;
-  }
-  return report.ok ? 0 : 1;
+  return {
+    report,
+    status: !report.ok && !warnOnly ? 1 : 0,
+    warnOnly,
+  };
 }
 
 if (
@@ -104,9 +97,21 @@ if (
 )
   void defineScript({
     name: 'audit:verify',
-    flags: [],
+    flags: ['json'],
     async run(context) {
-      const status = await main(context.argv);
-      if (status !== 0) throw new Error(`audit:verify failed with exit code ${status}`);
+      const result = await main(context.argv);
+      if (context.json) {
+        context.print(result.report);
+      } else {
+        const lines = formatAuditVerifyReport(result.report);
+        if (result.warnOnly && !result.report.ok) {
+          lines.push(
+            '[audit:verify] findings detected but running in warn observation mode (SA-01); exiting 0.'
+          );
+        }
+        context.print(lines.join('\n'));
+      }
+      if (result.status !== 0) throw new ScriptExitError(result.status, '', true);
+      return result.report;
     },
   })();

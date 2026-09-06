@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "service-runtime-state.schema.json",
+  "title": "Persisted service runtime state",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": "1.0.0" },
+    "service_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["trial", "approved_install", "installed", "pinned"]
+    },
+    "base_url": { "type": "string" },
+    "managed_service_path": { "type": "string", "minLength": 1 },
+    "installed_at": { "type": "string", "format": "date-time" },
+    "pinned_at": { "type": "string", "format": "date-time" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action": { "type": "string", "minLength": 1 },
+        "command": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      },
+      "required": ["action"]
+    }
+  },
+  "required": ["version", "service_id", "status", "managed_service_path"]
+}

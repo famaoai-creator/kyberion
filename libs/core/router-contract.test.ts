@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveSurfaceIntent } from './router-contract.js';
+import { loadIntentRoutingMap, resolveSurfaceIntent } from './router-contract.js';
 import { classifySurfaceQueryIntent } from './surface-query.js';
 import { classifyBrowserConversationCommand } from './browser-conversation-session.js';
 
@@ -14,6 +14,30 @@ describe('router-contract', () => {
     expect(live.routeFamily).toBe('direct_reply');
     expect(live.queryType).toBe('weather');
     expect(classifySurfaceQueryIntent('今日の天気を教えて')).toBe('weather');
+  });
+
+  it('uses a supplied packet without resolving the utterance again', () => {
+    const resolved = resolveSurfaceIntent('unrelated text', {
+      packet: {
+        kind: 'intent_resolution_packet',
+        utterance: 'unrelated text',
+        selected_intent_id: 'live-query',
+        selected_confidence: 0.9,
+        selected_resolution: { shape: 'direct_reply' },
+        candidates: [],
+      },
+    });
+
+    expect(resolved.intentId).toBe('live-query');
+    expect(resolved.routeFamily).toBe('direct_reply');
+  });
+
+  it('applies the viewer tier while selecting a surface route', () => {
+    const publicOnly = resolveSurfaceIntent('personal memo をまとめて', {
+      tier: 'public',
+      tenantId: 'tenant-a',
+    });
+    expect(publicOnly.intentId).not.toBe('generate-report');
   });
 
   it('routes browser intents through the shared resolver before command shaping', () => {
@@ -55,6 +79,15 @@ describe('router-contract', () => {
     expect(codeChange.intentId).toBe('feature-expansion-delivery');
     expect(codeChange.routeFamily).toBe('mission');
     expect(codeChange.missionAction).toBe('create');
+  });
+
+  it('exposes track routing from the same governed map used by surface routing', () => {
+    const routing = loadIntentRoutingMap();
+    expect(routing.track_intent_policy_map?.['request-feature-development']).toEqual({
+      track_type: 'delivery',
+      default_lifecycle: 'default-sdlc',
+      min_confidence_to_autostart: 0.75,
+    });
   });
 
   it('maps extended mission-process intents to direct mission actions', () => {

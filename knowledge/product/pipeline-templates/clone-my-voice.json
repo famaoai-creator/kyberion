@@ -232,9 +232,21 @@
           "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline."
         },
         "samples": [
-          { "sample_id": "sample-01", "path": "{{record1.training_path}}", "language": "{{language}}" },
-          { "sample_id": "sample-02", "path": "{{record2.training_path}}", "language": "{{language}}" },
-          { "sample_id": "sample-03", "path": "{{record3.training_path}}", "language": "{{language}}" }
+          {
+            "sample_id": "sample-01",
+            "path": "{{record1.training_path}}",
+            "language": "{{language}}"
+          },
+          {
+            "sample_id": "sample-02",
+            "path": "{{record2.training_path}}",
+            "language": "{{language}}"
+          },
+          {
+            "sample_id": "sample-03",
+            "path": "{{record3.training_path}}",
+            "language": "{{language}}"
+          }
         ],
         "policy": { "allow_update": "{{allow_update}}" },
         "dry_run": "{{dry_run}}"
@@ -245,7 +257,9 @@
       "role": "sink",
       "op": "system:log",
       "consumes": "registration_result",
-      "params": { "message": "[clone-my-voice] 学習済み音声は active/shared/runtime/voice-profiles/{{profile_id}}/ に保存されました。tmp は収録 staging 用です。" }
+      "params": {
+        "message": "[clone-my-voice] 学習済み音声は active/shared/runtime/voice-profiles/{{profile_id}}/ に保存されました。tmp は収録 staging 用です。"
+      }
     },
     {
       "id": "notify_done",
@@ -254,7 +268,7 @@
       "consumes": "registration_result",
       "params": {
         "title": "✅ 声のクローン登録完了",
-        "message": "プロフィール {{profile_id}} が登録されました。学習済み音声は active/shared/runtime/voice-profiles/{{profile_id}}/ に保存されています。pnpm voice:speak で発話テストできます。",
+        "message": "プロフィール {{profile_id}} が登録されました。学習済み音声は active/shared/runtime/voice-profiles/{{profile_id}}/ に保存されています。pnpm pipeline speak-with-my-voice で発話テストできます。",
         "subtitle": "clone-my-voice"
       }
     },

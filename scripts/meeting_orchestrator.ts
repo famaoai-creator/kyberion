@@ -27,19 +27,32 @@ import * as path from 'node:path';
 import {
   buildMeetingOperationsBrief,
   getMeetingBriefQuestions,
-  logger,
-  pathResolver,
-  safeWriteFile,
-  safeMkdir,
-  safeExec,
+  loadMeetingOperationsProfileAtPath,
+} from '@agent/core/meeting-operations-profile';
+import {
+  loadMeetingAttendeesAtPath,
+  validateMeetingAttendees,
+  type MeetingAttendee,
+} from '@agent/core/meeting-attendees';
+import {
   listOperatorSelfPending,
   listOthersPending,
   listActionItems,
   summarizeActionItemLifecycle,
-} from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+} from '@agent/core/action-item-store';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+  safeMkdir,
+  safeExec,
+} from '@agent/core/secure-io';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { readTextFile } from '@agent/core/foundation';
+import { parseSafeJsonInput, setRegisteredEnv } from '@agent/core/foundation';
 
 interface OrchestratorOptions {
   mission: string;
@@ -52,12 +65,16 @@ interface OrchestratorOptions {
   purpose: string;
   agentId: string;
   agenda: string[];
-  attendees: Array<{ name: string; person_slug?: string; channel_handle?: string }>;
+  attendees: MeetingAttendee[];
   listenSec: number;
   language: string;
   skipFacilitate: boolean;
   skipSelf: boolean;
   skipTracking: boolean;
+}
+
+export function parseMeetingAttendeesJson(value: string): MeetingAttendee[] {
+  return validateMeetingAttendees(parseSafeJsonInput(value, '--attendees'));
 }
 
 function runPipeline(name: string, context: Record<string, unknown>): void {
@@ -114,20 +131,34 @@ function summarize(missionId: string): void {
   }
 }
 
-function loadOperationsProfile(profilePath: string): any {
-  return JSON.parse(readTextFile(pathResolver.rootResolve(profilePath)));
-}
-
 function writeMeetingBrief(missionId: string, brief: unknown): string {
   const dir = pathResolver.rootResolve('active/shared/runtime/meeting/briefs');
   safeMkdir(dir, { recursive: true });
-  const outputPath = path.join(dir, `${missionId}.json`);
+  const outputPath = assertSafeRepositoryPath(path.join(dir, `${missionId}.json`), {
+    allowMissingLeaf: true,
+  });
   safeWriteFile(outputPath, JSON.stringify(brief, null, 2));
   return outputPath;
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export function resolveMeetingResourcePath(resourcePath: string): string {
+  const normalized = String(resourcePath || '').trim();
+  if (!normalized) throw new Error('[MEETING_RESOURCE_SCOPE] resource path is required');
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(normalized), {
+    allowMissingLeaf: false,
+  });
+  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
+    throw new Error(`[MEETING_RESOURCE_FILE] resource must be a regular file: ${normalized}`);
+  }
+  return resolved;
+}
+
+function loadOperationsProfile(profilePath: string): any {
+  return loadMeetingOperationsProfileAtPath(resolveMeetingResourcePath(profilePath));
+}
+
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'meeting_orchestrator', ...args])
     .option('mission', { type: 'string', demandOption: true })
     .option('meeting-url', { type: 'string' })
     .option('platform', { type: 'string', default: 'auto' })
@@ -160,9 +191,11 @@ async function main(): Promise<void> {
   if (argv.attendees) {
     try {
       const a = (argv.attendees as string).startsWith('@')
-        ? JSON.parse(readTextFile(pathResolver.rootResolve((argv.attendees as string).slice(1))))
-        : JSON.parse(argv.attendees as string);
-      attendees = Array.isArray(a) ? a : [];
+        ? loadMeetingAttendeesAtPath(
+            resolveMeetingResourcePath((argv.attendees as string).slice(1))
+          )
+        : parseMeetingAttendeesJson(argv.attendees as string);
+      attendees = a;
     } catch (err: any) {
       logger.warn(
         `[orchestrator] failed to parse --attendees: ${err?.message ?? err}; proceeding with []`
@@ -189,7 +222,7 @@ async function main(): Promise<void> {
     skipTracking: Boolean(argv['skip-tracking']),
   };
 
-  process.env.MISSION_ID = options.mission;
+  setRegisteredEnv('MISSION_ID', options.mission);
 
   logger.info(
     `🎙️ meeting_orchestrator start (mission=${options.mission}, platform=${options.platform})`
@@ -299,14 +332,17 @@ async function main(): Promise<void> {
   summarize(options.mission);
 }
 
+const runMeetingOrchestratorScript = defineScript({
+  name: 'meeting:run',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
 if (
   isDirectScript(import.meta.url, 'meeting_orchestrator.ts') ||
   isDirectScript(import.meta.url, 'meeting_orchestrator.js')
 ) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exitCode = 1;
-  });
+  void runMeetingOrchestratorScript();
 }
 
 export { main as runMeetingOrchestrator };

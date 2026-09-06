@@ -15,8 +15,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       # Native PDF engine CJK embedding test needs a CJK font on Linux
       - name: Install CJK fonts
@@ -36,18 +35,10 @@ jobs:
             -o Acquire::https::Timeout=30 \
             -o DPkg::Lock::Timeout=60 install -y -qq fonts-noto-cjk
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build @agent/core
         run: pnpm --filter '@agent/core' build
@@ -68,16 +59,16 @@ jobs:
         run: pnpm run lint
 
       - name: Format check
-        run: pnpm run format:check:ci
+        run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml .github/actions/setup-kyberion/action.yml
 
       - name: Run core tests
         env:
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
-        run: pnpm run test:core
+        run: pnpm test -- --suite core
 
       - name: Run actuator tests
-        run: pnpm run test:actuators
+        run: pnpm test -- --suite actuators
 
       - name: Run governance boundary tests
         run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts

@@ -1,9 +1,16 @@
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 
 export type ScheduleSourceKind =
   'operator_default_calendar' | 'google_calendar' | 'outlook_calendar' | 'browser_calendar';
@@ -24,17 +31,25 @@ export interface ContextualIntentMemory {
   };
 }
 
+const CONTEXTUAL_INTENT_MEMORY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/contextual-intent-memory.schema.json'
+);
+
 function memoryPath(scope?: ScopeContext): string {
   const configuredPath = getRegisteredEnvText('KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH')?.trim();
-  const base = configuredPath
-    ? pathResolver.rootResolve(configuredPath)
-    : pathResolver.knowledge('personal/contextual-intent-memory.json');
+  const base = assertSafeRepositoryPath(
+    configuredPath
+      ? pathResolver.rootResolve(configuredPath)
+      : pathResolver.knowledge('personal/contextual-intent-memory.json'),
+    { allowMissingLeaf: true }
+  );
   if (!scope?.tenant_slug) return base;
-  return (
+  return assertSafeRepositoryPath(
     physicalScopedPath(path.dirname(base), {
       ...scope,
       scope_kind: scope.mission_id ? 'mission' : 'tenant',
-    }) + `/${path.basename(base)}`
+    }) + `/${path.basename(base)}`,
+    { allowMissingLeaf: true }
   );
 }
 
@@ -44,10 +59,13 @@ function defaultMemory(): ContextualIntentMemory {
 
 export function loadContextualIntentMemory(scope?: ScopeContext): ContextualIntentMemory {
   const filePath = memoryPath(scope);
-  if (!safeExistsSync(filePath)) return defaultMemory();
   try {
-    const parsed = readJson<ContextualIntentMemory>(filePath);
-    return parsed && typeof parsed === 'object' ? parsed : defaultMemory();
+    if (!safeLstat(filePath).isFile()) return defaultMemory();
+    return defineCatalog<ContextualIntentMemory>({
+      id: 'contextual-intent-memory',
+      path: filePath,
+      schema: CONTEXTUAL_INTENT_MEMORY_SCHEMA_PATH,
+    }).load();
   } catch {
     return defaultMemory();
   }
@@ -58,11 +76,16 @@ export function saveContextualIntentMemory(
   scope?: ScopeContext
 ): void {
   const filePath = memoryPath(scope);
+  const validated = defineCatalog<ContextualIntentMemory>({
+    id: 'contextual-intent-memory',
+    path: filePath,
+    schema: CONTEXTUAL_INTENT_MEMORY_SCHEMA_PATH,
+  }).validate(memory, filePath);
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) {
     safeMkdir(dir, { recursive: true });
   }
-  safeWriteFile(filePath, JSON.stringify(memory, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
 }
 
 export function resolveDefaultScheduleSource(scope?: ScopeContext): {
@@ -98,9 +121,7 @@ export function recordSchedulePreference(input: {
   memory.schedule = {
     default_calendar_source: input.source,
     default_calendar_name: input.calendarName || memory.schedule?.default_calendar_name,
-    last_confirmed_at: input.confirmed
-      ? new Date().toISOString()
-      : memory.schedule?.last_confirmed_at,
+    last_confirmed_at: input.confirmed ? nowIso() : memory.schedule?.last_confirmed_at,
     last_seen_utterance: input.utterance || memory.schedule?.last_seen_utterance,
   };
   saveContextualIntentMemory(memory, input.scope);
@@ -118,9 +139,7 @@ export function recordApprovalPreference(input: {
   memory.approval = {
     default_approval_system: input.system,
     default_approval_scope: input.scope || memory.approval?.default_approval_scope,
-    last_confirmed_at: input.confirmed
-      ? new Date().toISOString()
-      : memory.approval?.last_confirmed_at,
+    last_confirmed_at: input.confirmed ? nowIso() : memory.approval?.last_confirmed_at,
     last_seen_utterance: input.utterance || memory.approval?.last_seen_utterance,
   };
   saveContextualIntentMemory(memory, input.scopeContext);

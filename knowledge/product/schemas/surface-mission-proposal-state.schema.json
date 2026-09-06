@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/surface-mission-proposal-state.schema.json",
+  "title": "Surface Mission Proposal State",
+  "type": "object",
+  "required": ["channel", "threadTs", "proposal", "createdAt"],
+  "properties": {
+    "surface": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "channel": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "threadTs": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "proposal": {
+      "type": "object",
+      "required": ["intent"],
+      "properties": {
+        "intent": { "const": "create_mission" },
+        "mission_type": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "assigned_persona": { "type": "string", "minLength": 1 },
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "vision_ref": { "type": "string", "minLength": 1 },
+        "why": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "sourceText": { "type": "string" },
+    "routingDecision": { "$ref": "./agent-routing-decision.schema.json" },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

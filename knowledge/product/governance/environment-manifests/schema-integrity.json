@@ -52,16 +52,16 @@
     {
       "capability_id": "esm-integrity",
       "kind": "binary",
-      "description": "ESM imports across the repo do not have invalid extensions / specifier shapes (run by `pnpm run check:esm`).",
+      "description": "ESM imports across the repo do not have invalid extensions / specifier shapes (run by `pnpm run check -- --scope pr --only esm`).",
       "required_for": ["validate", "build"],
       "probe": {
         "kind": "command",
         "command": "pnpm",
-        "args": ["-s", "run", "check:esm"]
+        "args": ["-s", "run", "check", "--", "--scope", "pr", "--only", "esm"]
       },
       "install": {
         "operator_confirmed": true,
-        "instruction": "Re-run `pnpm run check:esm` to see the violation. Fix the import (typically: append `.js` to a relative TS import in a `.ts` file)."
+        "instruction": "Re-run `pnpm run check -- --scope pr --only esm` to see the violation. Fix the import (typically: append `.js` to a relative TS import in a `.ts` file)."
       }
     }
   ]

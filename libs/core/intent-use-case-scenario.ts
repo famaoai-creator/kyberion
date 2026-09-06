@@ -1,5 +1,6 @@
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
+import { clamp } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import type { CompileUserIntentFlowInput, IntentContract } from './intent-contract.js';
 import type {
@@ -236,10 +237,7 @@ export function buildIntentUseCaseScenario(
     input.executionBrief.confidence,
     input.packet.selected_confidence,
   ].filter((value): value is number => typeof value === 'number' && !Number.isNaN(value));
-  const confidence = Math.min(
-    1,
-    Math.max(0, ...(confidenceSignals.length ? confidenceSignals : [0]))
-  );
+  const confidence = clamp(Math.max(...(confidenceSignals.length ? confidenceSignals : [0])), 0, 1);
   const title =
     input.selectedIntent?.description ||
     input.workLoop.intent.label ||

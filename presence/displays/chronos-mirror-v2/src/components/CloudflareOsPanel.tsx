@@ -3,34 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
-
-type HeldAction = {
-  id: string;
-  op: string;
-  missionId: string;
-  status: string;
-  submittedAt: string;
-  submittedBy: string;
-  tenantSlug?: string;
-  irreversible?: boolean;
-  effectBinding?: string;
-  failureRecorded?: boolean;
-};
-
-type Observation = {
-  id: string;
-  service: string;
-  resourceRef: string;
-  tier: string;
-  purpose: string;
-  summary: string;
-  observedAt: string;
-};
-
-type CloudflareOsSnapshot = {
-  heldActions: HeldAction[];
-  observations: Observation[];
-};
+import {
+  parseCloudflareOsResponse,
+  type CloudflareOsSnapshot,
+} from '../lib/cloudflare-os-response';
 
 export function CloudflareOsPanel({ missionId }: { missionId?: string | null }) {
   const locale = useChronosLocale();
@@ -55,19 +31,14 @@ export function CloudflareOsPanel({ missionId }: { missionId?: string | null }) 
         headers: { 'Cache-Control': 'no-cache' },
         signal: controller.signal,
       });
-      const payload = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-        heldActions?: HeldAction[];
-        observations?: Observation[];
-      };
-      if (!response.ok || payload.ok === false) {
-        throw new Error(payload.error || `OS control plane ${response.status}`);
+      const payload = parseCloudflareOsResponse(await response.json().catch(() => null));
+      if (!response.ok || !payload.ok) {
+        throw new Error(!payload.ok ? payload.error : `OS control plane ${response.status}`);
       }
       if (controller.signal.aborted || sequence !== requestSequence.current) return;
       setSnapshot({
-        heldActions: Array.isArray(payload.heldActions) ? payload.heldActions : [],
-        observations: Array.isArray(payload.observations) ? payload.observations : [],
+        heldActions: payload.snapshot.heldActions,
+        observations: payload.snapshot.observations,
       });
       setError(null);
     } catch (reason) {

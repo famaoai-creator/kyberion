@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
-import addFormatsModule from 'ajv-formats';
 import {
   assertTenantOperational,
   readTenantProfile,
@@ -34,32 +33,28 @@ import { bootstrapManagedProject, type ProjectBootstrapResult } from './project-
 import { createWorkItem, getWorkItem, updateWorkItem, type WorkItem } from './work-coordination.js';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
+  safeLstat,
   safeUnlinkSync,
   safeWriteFile,
-  loadJson,
 } from './secure-io.js';
 
-type AddFormatsPlugin = typeof import('ajv-formats').default;
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormatsPlugin }).default ||
-  (addFormatsModule as unknown as AddFormatsPlugin);
-const ajv = createAjv();
-addFormats(ajv);
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/onboarding-context-binding.schema.json'
 );
-const validator: ValidateFunction = compileSchemaFromPath(ajv, SCHEMA_PATH);
+const validator: ValidateFunction = compileSchema(SCHEMA_PATH);
 const FIRST_WORK_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/onboarding-first-work.schema.json'
 );
-const firstWorkValidator: ValidateFunction = compileSchemaFromPath(ajv, FIRST_WORK_SCHEMA_PATH);
+const firstWorkValidator: ValidateFunction = compileSchema(FIRST_WORK_SCHEMA_PATH);
 const CUSTOMER_SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
 export type OnboardingContextBindingStatus = 'draft' | 'confirmed' | 'active' | 'blocked';
@@ -191,11 +186,30 @@ function assertCustomerSlug(slug: string): string {
 }
 
 function contextPath(customerSlug: string, rootDir = pathResolver.rootDir()): string {
-  return path.join(rootDir, 'customer', customerSlug, 'onboarding', 'organization-context.json');
+  return assertSafeRepositoryPath(
+    path.join(rootDir, 'customer', customerSlug, 'onboarding', 'organization-context.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
+}
+
+export function readOptionalOnboardingFile(filePath: string, label: string): string | undefined {
+  if (!safeExistsSync(filePath)) return undefined;
+  try {
+    if (!safeLstat(filePath).isFile()) {
+      throw new Error(`[ONBOARDING_RESOURCE] ${label} must be a regular file: ${filePath}`);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[ONBOARDING_RESOURCE]')) throw error;
+    throw new Error(`[ONBOARDING_RESOURCE] ${label} could not be inspected: ${filePath}`);
+  }
+  return readTextFile(filePath);
 }
 
 function firstWorkPath(customerSlug: string, rootDir = pathResolver.rootDir()): string {
-  return path.join(rootDir, 'customer', customerSlug, 'onboarding', 'first-work-resolution.json');
+  return assertSafeRepositoryPath(
+    path.join(rootDir, 'customer', customerSlug, 'onboarding', 'first-work-resolution.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
 }
 
 function firstWorkId(binding: OnboardingContextBinding, intent: string): string {
@@ -290,7 +304,21 @@ export function loadOnboardingFirstWorkRecord(
 ): OnboardingFirstWorkRecord | null {
   const filePath = firstWorkPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateFirstWorkRecord(loadJson<unknown>(filePath));
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(
+      `Invalid onboarding first work record: document must be a regular file: ${filePath}`
+    );
+  }
+  try {
+    return defineCatalog<OnboardingFirstWorkRecord>({
+      id: 'onboarding-first-work',
+      path: filePath,
+      schema: FIRST_WORK_SCHEMA_PATH,
+    }).load();
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid onboarding first work record: ${reason}`);
+  }
 }
 
 function saveOnboardingFirstWorkRecord(record: OnboardingFirstWorkRecord, rootDir: string): string {
@@ -340,7 +368,7 @@ function saveOrganizationStateLink(
     ...(kind === 'operation'
       ? { active_operation_ids: addUnique(state.active_operation_ids, id) }
       : { open_incident_ids: addUnique(state.open_incident_ids, id) }),
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   return saveOrganizationOperationalState(next, { rootDir });
 }
@@ -452,7 +480,7 @@ function bindingFor(
     );
   }
   const tier = input.tier || 'confidential';
-  const now = new Date().toISOString();
+  const now = nowIso();
   const binding: OnboardingContextBinding = {
     version: '1.0.0',
     kind: 'onboarding_context_binding',
@@ -538,7 +566,21 @@ export function loadOnboardingContextBinding(
 ): OnboardingContextBinding | null {
   const filePath = contextPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateBinding(loadJson<unknown>(filePath));
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(
+      `Invalid onboarding context binding: document must be a regular file: ${filePath}`
+    );
+  }
+  try {
+    return defineCatalog<OnboardingContextBinding>({
+      id: 'onboarding-context-binding',
+      path: filePath,
+      schema: SCHEMA_PATH,
+    }).load();
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid onboarding context binding: ${reason}`);
+  }
 }
 
 export function resolveOnboardingContext(
@@ -639,18 +681,13 @@ export function applyOnboardingContextBinding(
       : {
           ...resolved.binding,
           status: 'active',
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso(),
         };
     const organizationState = resolved.organization_state;
     const savedPaths: string[] = [];
     const previousFiles = new Map<string, string | undefined>();
     for (const filePath of [statePath, purposePath, contextPath(binding.customer_slug, rootDir)]) {
-      previousFiles.set(
-        filePath,
-        safeExistsSync(filePath)
-          ? (safeReadFile(filePath, { encoding: 'utf8' }) as string)
-          : undefined
-      );
+      previousFiles.set(filePath, readOptionalOnboardingFile(filePath, 'rollback snapshot'));
     }
     try {
       if (!organizationState) {
@@ -786,16 +823,19 @@ export function applyOnboardingFirstWork(
         const nextBinding: OnboardingContextBinding = {
           ...resolved.binding,
           default_project_id: existing.project_id,
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso(),
         };
         const bindingPath = contextPath(nextBinding.customer_slug, rootDir);
-        const previousBinding = safeReadFile(bindingPath, { encoding: 'utf8' }) as string;
+        const previousBinding = readOptionalOnboardingFile(bindingPath, 'onboarding binding');
+        if (previousBinding === undefined) {
+          throw new Error(`[ONBOARDING_RESOURCE] onboarding binding is missing: ${bindingPath}`);
+        }
         safeWriteFile(bindingPath, `${JSON.stringify(nextBinding, null, 2)}\n`, {
           encoding: 'utf8',
         });
         let workItem: WorkItem | undefined;
         try {
-          const now = new Date().toISOString();
+          const now = nowIso();
           workItem = createOnboardingWorkItem({
             binding: nextBinding,
             intent: input.intent,
@@ -858,9 +898,7 @@ export function applyOnboardingFirstWork(
         rootDir,
         onCommit: (bootstrapped) => {
           const bindingPath = contextPath(resolved.binding.customer_slug, rootDir);
-          const previousBinding = safeExistsSync(bindingPath)
-            ? (safeReadFile(bindingPath, { encoding: 'utf8' }) as string)
-            : undefined;
+          const previousBinding = readOptionalOnboardingFile(bindingPath, 'onboarding binding');
           let firstWorkPath: string | undefined;
           let workItem: WorkItem | undefined;
           const rollbackCommit = (): void => {
@@ -878,14 +916,14 @@ export function applyOnboardingFirstWork(
             const nextBinding: OnboardingContextBinding = {
               ...resolved.binding,
               default_project_id: bootstrapped.project.project_id,
-              updated_at: new Date().toISOString(),
+              updated_at: nowIso(),
             };
             safeMkdir(path.dirname(bindingPath), { recursive: true });
             safeWriteFile(bindingPath, `${JSON.stringify(nextBinding, null, 2)}\n`, {
               encoding: 'utf8',
             });
             savedPaths.push(bindingPath);
-            const now = new Date().toISOString();
+            const now = nowIso();
             workItem = createOnboardingWorkItem({
               binding: nextBinding,
               intent: input.intent,
@@ -991,7 +1029,7 @@ export function applyOnboardingFirstWork(
       ),
       'organization-state.json'
     );
-    const now = new Date().toISOString();
+    const now = nowIso();
     let workItem: WorkItem | undefined;
     try {
       if (!contextUnitId && managementUnit === 'operation') {

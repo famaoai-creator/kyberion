@@ -1,7 +1,8 @@
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeReadFile, safeStat } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { clamp } from './foundation/text.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import { resolveIdentityContext } from './authority.js';
 
 export type AutonomousOpsDecision = 'auto' | 'notify' | 'approve';
@@ -54,123 +55,30 @@ export interface AutonomousOpsGateResult {
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/autonomous-ops-policy.json');
 
-const FALLBACK_POLICY: AutonomousOpsPolicy = {
-  version: 'fallback',
-  decision_thresholds: {
-    auto_max_score: 3,
-    notify_max_score: 6,
-  },
-  axis_weights: {
-    scope: 1,
-    reversibility: 1,
-    sensitivity: 1,
-    confidence: 1,
-  },
-  actions: {
-    storage_janitor: {
-      title: 'Storage janitor',
-      description: 'Remove stale runtime and temporary artifacts after safe verification.',
-      axis_scores: { scope: 2, reversibility: 2, sensitivity: 1, confidence: 2 },
-      budget_cap_tokens: 2000,
-    },
-    baseline_health_scan: {
-      title: 'Baseline health scan',
-      description: 'Run the baseline health and maintenance readiness scan.',
-      axis_scores: { scope: 0, reversibility: 0, sensitivity: 0, confidence: 1 },
-      budget_cap_tokens: 1000,
-    },
-    tenant_drift_watch: {
-      title: 'Tenant drift watch',
-      description: 'Observe tenant drift and surface drift signals.',
-      axis_scores: { scope: 1, reversibility: 0, sensitivity: 1, confidence: 2 },
-      budget_cap_tokens: 1500,
-    },
-    dependency_vuln_scan: {
-      title: 'Dependency vulnerability scan',
-      description: 'Scan dependency vulnerabilities and append to the ledger.',
-      axis_scores: { scope: 1, reversibility: 0, sensitivity: 1, confidence: 1 },
-      budget_cap_tokens: 4000,
-    },
-    auto_checkpoint: {
-      title: 'Automatic checkpoint',
-      description: 'Persist a durable checkpoint for long-running maintenance.',
-      axis_scores: { scope: 0, reversibility: 0, sensitivity: 0, confidence: 1 },
-      budget_cap_tokens: 1000,
-    },
-  },
-};
-
-let cachedPolicyPath: string | null = null;
-let cachedPolicy: AutonomousOpsPolicy | null = null;
-let cachedPolicySourceHealthy = false;
-let cachedPolicyMtimeMs: number | null = null;
-
 function getPolicyPath(): string {
-  return getRegisteredEnvText('KYBERION_AUTONOMOUS_OPS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
+  return assertSafeRepositoryPath(
+    getRegisteredEnvText('KYBERION_AUTONOMOUS_OPS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH,
+    { allowMissingLeaf: true }
+  );
 }
 
-function loadPolicyFromPath(policyPath: string): AutonomousOpsPolicy {
-  const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<AutonomousOpsPolicy>(raw, 'autonomous ops policy');
-}
+const autonomousOpsPolicyCatalog = defineCatalog<AutonomousOpsPolicy>({
+  id: 'autonomous-ops-policy',
+  path: getPolicyPath,
+  schema: pathResolver.knowledge('product/schemas/autonomous-ops-policy.schema.json'),
+});
 
-function cloneFallbackPolicy(): AutonomousOpsPolicy {
-  return JSON.parse(JSON.stringify(FALLBACK_POLICY)) as AutonomousOpsPolicy;
-}
-
-export function resetAutonomousOpsPolicyCache(): void {
-  cachedPolicyPath = null;
-  cachedPolicy = null;
-  cachedPolicySourceHealthy = false;
-  cachedPolicyMtimeMs = null;
+export function _resetAutonomousOpsPolicyCacheForTests(): void {
+  autonomousOpsPolicyCatalog.reset();
 }
 
 export function getAutonomousOpsPolicy(): AutonomousOpsPolicy {
-  const policyPath = getPolicyPath();
-  let currentPolicyMtimeMs: number | null = null;
-  if (safeExistsSync(policyPath)) {
-    try {
-      currentPolicyMtimeMs = safeStat(policyPath).mtimeMs;
-    } catch {
-      currentPolicyMtimeMs = null;
-    }
-  }
-
-  if (
-    cachedPolicyPath === policyPath &&
-    cachedPolicy &&
-    cachedPolicyMtimeMs === currentPolicyMtimeMs
-  ) {
-    return cachedPolicy;
-  }
-
-  if (currentPolicyMtimeMs === null) {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = cloneFallbackPolicy();
-    cachedPolicySourceHealthy = false;
-    cachedPolicyMtimeMs = null;
-    return cachedPolicy;
-  }
-
-  try {
-    const parsed = loadPolicyFromPath(policyPath);
-    cachedPolicyPath = policyPath;
-    cachedPolicy = parsed;
-    cachedPolicySourceHealthy = true;
-    cachedPolicyMtimeMs = currentPolicyMtimeMs;
-    return parsed;
-  } catch {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = cloneFallbackPolicy();
-    cachedPolicySourceHealthy = false;
-    cachedPolicyMtimeMs = currentPolicyMtimeMs;
-    return cachedPolicy;
-  }
+  return autonomousOpsPolicyCatalog.load();
 }
 
 function clampAxisScore(score: number | undefined): number {
   if (!Number.isFinite(score ?? Number.NaN)) return 0;
-  return Math.max(0, Math.min(3, Math.trunc(score ?? 0)));
+  return clamp(Math.trunc(score ?? 0), 0, 3);
 }
 
 function mergeActionPolicy(
@@ -228,16 +136,17 @@ export function evaluateAutonomousOpsAction(
   const identity = resolveIdentityContext();
   const tenantSlug = input.tenantSlug ?? identity.tenantSlug;
   const executionMode = input.executionMode ?? 'apply';
-  const policy = getAutonomousOpsPolicy();
-
-  if (!cachedPolicySourceHealthy) {
+  let policy: AutonomousOpsPolicy;
+  try {
+    policy = getAutonomousOpsPolicy();
+  } catch {
     return {
       actionId: input.actionId,
       decision: 'approve',
       allowed: false,
       score: Number.POSITIVE_INFINITY,
-      maxScore: policy.decision_thresholds.notify_max_score,
-      policyVersion: policy.version,
+      maxScore: 0,
+      policyVersion: 'unavailable',
       tenantSlug,
       executionMode,
       reason: `Autonomous ops policy unavailable or invalid; refusing ${input.actionId}`,

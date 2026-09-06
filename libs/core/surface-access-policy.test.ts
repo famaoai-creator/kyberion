@@ -63,4 +63,23 @@ describe('surface-access-policy', () => {
       reason: 'invalid_allowlist',
     });
   });
+
+  it('fails closed for non-string actors and dangerous allowlist keys', () => {
+    vi.stubEnv('KYBERION_SURFACE_ALLOWLISTS', JSON.stringify({ slack: [123] }));
+    expect(evaluateSurfaceActorAccess('slack', '123')).toMatchObject({
+      allowed: false,
+      configured: true,
+      reason: 'invalid_allowlist',
+    });
+
+    vi.stubEnv(
+      'KYBERION_SURFACE_ALLOWLISTS',
+      JSON.stringify({ slack: { constructor: { actors: ['U123'] } } })
+    );
+    expect(evaluateSurfaceActorAccess('slack', 'U123')).toMatchObject({
+      allowed: false,
+      configured: true,
+      reason: 'invalid_allowlist',
+    });
+  });
 });

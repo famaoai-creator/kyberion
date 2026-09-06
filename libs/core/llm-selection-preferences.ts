@@ -1,24 +1,24 @@
-import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 
 import { discoverProviders } from './provider-discovery.js';
 import {
   discoverReasoningEndpoints,
   type ReasoningEndpointInfo,
 } from './reasoning-endpoint-discovery.js';
-import { resolveActiveProfileRoot } from './profile-root.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
 import { loadReasoningRoutePolicy, type ReasoningRoutePolicy } from './reasoning-route-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  getLlmSelectionPreferencesPath,
+  loadLlmSelectionPreferences as loadPersistedLlmSelectionPreferences,
+  validateLlmSelectionPreferencesAtPath,
+  type LlmSelectionPreferences,
+} from './llm-selection-state.js';
+import { safeWriteFile } from './secure-io.js';
 
 export type LlmSelectionStatus = 'ready' | 'needs_setup' | 'unsupported';
 
-export interface LlmSelectionPreferences {
-  version: '1.0.0';
-  provider: string;
-  model_id?: string;
-  updated_at?: string;
-}
+export type { LlmSelectionPreferences } from './llm-selection-state.js';
 
 export interface LlmSelectionCandidate {
   provider: string;
@@ -41,32 +41,6 @@ const DEFAULT_SELECTION: LlmSelectionPreferences = {
   version: '1.0.0',
   provider: 'codex-cli',
 };
-
-function selectionPath(): string {
-  return path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json');
-}
-
-function readSelection(): LlmSelectionPreferences | null {
-  const filePath = selectionPath();
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    const parsed = JSON.parse(
-      String(safeReadFile(filePath, { encoding: 'utf8' }))
-    ) as Partial<LlmSelectionPreferences>;
-    if (typeof parsed.provider !== 'string' || !parsed.provider.trim()) return null;
-    return {
-      version: '1.0.0',
-      provider: parsed.provider.trim(),
-      model_id:
-        typeof parsed.model_id === 'string' && parsed.model_id.trim()
-          ? parsed.model_id.trim()
-          : undefined,
-      updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : undefined,
-    };
-  } catch {
-    return null;
-  }
-}
 
 function hasProfileForMode(policy: ReasoningRoutePolicy, mode: string): boolean {
   return Object.values(policy.profiles).some((profile) => profile.mode === mode);
@@ -138,7 +112,7 @@ function defaultSelection(policy: ReasoningRoutePolicy): LlmSelectionPreferences
 }
 
 function getPreferences(policy: ReasoningRoutePolicy): LlmSelectionPreferences {
-  return readSelection() || defaultSelection(policy);
+  return loadPersistedLlmSelectionPreferences() || defaultSelection(policy);
 }
 
 export function getLlmSelectionSnapshot(
@@ -176,11 +150,11 @@ export function getLlmSelectionSnapshot(
       reason,
     };
   });
-  return { preferences, storage_path: selectionPath(), candidates };
+  return { preferences, storage_path: getLlmSelectionPreferencesPath(), candidates };
 }
 
 export function loadLlmSelectionPreferences(): LlmSelectionPreferences | null {
-  return readSelection();
+  return loadPersistedLlmSelectionPreferences();
 }
 
 export function validateLlmSelectionPreferences(
@@ -214,9 +188,11 @@ export function saveLlmSelectionPreferences(input: {
     version: '1.0.0',
     provider,
     model_id,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
-  safeWriteFile(selectionPath(), JSON.stringify(next, null, 2) + '\n', {
+  const filePath = getLlmSelectionPreferencesPath();
+  const validated = validateLlmSelectionPreferencesAtPath(next, filePath);
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2) + '\n', {
     mkdir: true,
     encoding: 'utf8',
   });

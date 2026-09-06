@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 describe('document-layouts', () => {
   it('exposes invoice body section order and compliance bullets in knowledge', () => {
-    const layoutPath = pathResolver.rootResolve('knowledge/public/design-patterns/media-templates/document-layouts.json');
+    const layoutPath = pathResolver.rootResolve(
+      'knowledge/public/design-patterns/media-templates/document-layouts.json'
+    );
     const raw = safeReadFile(layoutPath, { encoding: 'utf8' }) as string;
     const catalog = JSON.parse(raw);
     const invoice = catalog.documents.invoice.templates['jp-qualified-invoice-standard'];

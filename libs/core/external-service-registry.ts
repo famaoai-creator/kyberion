@@ -11,7 +11,9 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -25,9 +27,22 @@ export interface ExternalServiceEntry {
   failure_count: number;
 }
 
-interface ExternalServiceRegistry {
+export interface ExternalServiceRegistry {
   version: string;
   services: ExternalServiceEntry[];
+}
+
+interface ServiceProvider {
+  id: string;
+  aliases: string[];
+  topics: string[];
+  url_template: string;
+  notes?: string;
+}
+
+interface ServiceProviderCatalog {
+  version: string;
+  providers: ServiceProvider[];
 }
 
 // ─── Paths ──────────────────────────────────────────────────────────────────
@@ -51,16 +66,25 @@ const PERSONAL_SEED_PATH = pathResolver.knowledge(
  * Highest priority — overrides both seed layers.
  */
 const RUNTIME_PATH = pathResolver.shared('runtime/external-service-registry.json');
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/external-service-registry.schema.json'
+);
+const PROVIDER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-provider-catalog.schema.json'
+);
+
+const EMPTY_REGISTRY: ExternalServiceRegistry = { version: '1.0.0', services: [] };
+const EMPTY_PROVIDER_CATALOG: ServiceProviderCatalog = { version: '1.0.0', providers: [] };
 
 // ─── Internal Helpers ───────────────────────────────────────────────────────
 
-function parseRegistry(filePath: string): ExternalServiceRegistry | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return loadJson<ExternalServiceRegistry>(filePath);
-  } catch {
-    return null;
-  }
+function parseRegistry(filePath: string, optional = false): ExternalServiceRegistry {
+  if (optional && !safeExistsSync(filePath)) return EMPTY_REGISTRY;
+  return defineCatalog<ExternalServiceRegistry>({
+    id: 'external-service-registry',
+    path: filePath,
+    schema: REGISTRY_SCHEMA_PATH,
+  }).load();
 }
 
 /**
@@ -68,10 +92,9 @@ function parseRegistry(filePath: string): ExternalServiceRegistry | null {
  * Later tiers win on same service_id. Priority: runtime > personal > public.
  */
 function loadMerged(): ExternalServiceRegistry {
-  const fallback: ExternalServiceRegistry = { version: '1.0.0', services: [] };
-  const publicSeed = parseRegistry(PUBLIC_SEED_PATH) ?? fallback;
-  const personalSeed = parseRegistry(PERSONAL_SEED_PATH) ?? fallback;
-  const runtime = parseRegistry(RUNTIME_PATH) ?? fallback;
+  const publicSeed = parseRegistry(PUBLIC_SEED_PATH);
+  const personalSeed = parseRegistry(PERSONAL_SEED_PATH, true);
+  const runtime = parseRegistry(RUNTIME_PATH, true);
 
   const byId = new Map<string, ExternalServiceEntry>();
   // Apply in ascending priority order (later writes win)
@@ -86,7 +109,21 @@ function loadMerged(): ExternalServiceRegistry {
 }
 
 function saveRuntime(registry: ExternalServiceRegistry): void {
-  safeWriteFile(RUNTIME_PATH, JSON.stringify(registry, null, 2), { mkdir: true });
+  writeExternalServiceRegistryAtPath(RUNTIME_PATH, registry);
+}
+
+export function writeExternalServiceRegistryAtPath(
+  filePath: string,
+  registry: ExternalServiceRegistry
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = defineCatalog<ExternalServiceRegistry>({
+    id: 'external-service-registry',
+    path: safePath,
+    schema: REGISTRY_SCHEMA_PATH,
+  }).validate(registry, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2), { mkdir: true });
+  return safePath;
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -125,8 +162,8 @@ export function registerService(params: {
   topic: string;
   url: string;
 }): ExternalServiceEntry {
-  const runtime = parseRegistry(RUNTIME_PATH) ?? { version: '1.0.0', services: [] };
-  const now = new Date().toISOString();
+  const runtime = parseRegistry(RUNTIME_PATH, true);
+  const now = nowIso();
 
   const entry: ExternalServiceEntry = {
     service_id: params.service_id,
@@ -152,7 +189,8 @@ export function registerService(params: {
  * Update success/failure stats for a registered service.
  */
 export function updateServiceStats(serviceId: string, success: boolean): void {
-  const runtime = parseRegistry(RUNTIME_PATH) ?? { version: '1.0.0', services: [] };
+  const runtime = parseRegistry(RUNTIME_PATH, true);
+  const updatedAt = nowIso();
   const idx = runtime.services.findIndex((e) => e.service_id === serviceId);
 
   if (idx < 0) {
@@ -164,7 +202,7 @@ export function updateServiceStats(serviceId: string, success: boolean): void {
       ...entry,
       success_count: success ? 1 : 0,
       failure_count: success ? 0 : 1,
-      ...(success ? { last_success_at: new Date().toISOString() } : {}),
+      ...(success ? { last_success_at: updatedAt } : {}),
     });
   } else {
     const prev = runtime.services[idx];
@@ -172,7 +210,7 @@ export function updateServiceStats(serviceId: string, success: boolean): void {
       ...prev,
       success_count: prev.success_count + (success ? 1 : 0),
       failure_count: prev.failure_count + (success ? 0 : 1),
-      ...(success ? { last_success_at: new Date().toISOString() } : {}),
+      ...(success ? { last_success_at: updatedAt } : {}),
     };
   }
 
@@ -218,19 +256,6 @@ export function topicToServiceId(topic: string): string {
 
 // ─── Provider Catalog ────────────────────────────────────────────────────────
 
-interface ServiceProvider {
-  id: string;
-  aliases: string[];
-  topics: string[];
-  url_template: string;
-  notes?: string;
-}
-
-interface ServiceProviderCatalog {
-  version: string;
-  providers: ServiceProvider[];
-}
-
 const PUBLIC_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
   'product/orchestration/service-provider-catalog.json'
 );
@@ -239,18 +264,17 @@ const PERSONAL_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
 );
 
 function loadProviderCatalog(): ServiceProvider[] {
-  const load = (p: string): ServiceProvider[] => {
-    if (!safeExistsSync(p)) return [];
-    try {
-      const parsed = loadJson<ServiceProviderCatalog>(p);
-      return parsed.providers || [];
-    } catch {
-      return [];
-    }
+  const load = (p: string, optional = false): ServiceProvider[] => {
+    if (optional && !safeExistsSync(p)) return EMPTY_PROVIDER_CATALOG.providers;
+    return defineCatalog<ServiceProviderCatalog>({
+      id: 'service-provider-catalog',
+      path: p,
+      schema: PROVIDER_SCHEMA_PATH,
+    }).load().providers;
   };
 
   const publicProviders = load(PUBLIC_PROVIDER_CATALOG_PATH);
-  const personalProviders = load(PERSONAL_PROVIDER_CATALOG_PATH);
+  const personalProviders = load(PERSONAL_PROVIDER_CATALOG_PATH, true);
 
   // Personal overrides public by id
   const byId = new Map<string, ServiceProvider>();

@@ -1,24 +1,56 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-template.schema.json",
   "title": "MissionTemplate",
   "type": "object",
+  "additionalProperties": false,
   "required": ["templates"],
   "properties": {
+    "$schema": { "type": "string" },
     "templates": {
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["name", "files"],
         "properties": {
-          "name": { "type": "string" },
+          "name": { "type": "string", "minLength": 1 },
+          "knowledge_injections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["tier"],
+              "properties": {
+                "tier": {
+                  "type": "string",
+                  "enum": ["personal", "confidential", "public"]
+                },
+                "project": { "type": "string", "minLength": 1 },
+                "domains": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "tags": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          },
           "files": {
             "type": "array",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": ["path", "content_template"],
               "properties": {
-                "path": { "type": "string" },
-                "content_template": { "type": "string" }
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$)).+$"
+                },
+                "content_template": { "type": "string", "minLength": 1 }
               }
             }
           }

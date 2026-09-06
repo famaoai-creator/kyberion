@@ -5,6 +5,7 @@
 
 import * as path from 'node:path';
 import { safeExistsSync, safeLstat, safeStat } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 /**
  * Validate that a file path exists and points to a regular file.
@@ -45,7 +46,7 @@ export function validateDirPath(dirPath: string | undefined | null, label = 'dir
  */
 export function safeJsonParse<T = unknown>(jsonString: string, label = 'JSON'): T {
   try {
-    return JSON.parse(jsonString) as T;
+    return parseSafeJsonInput(jsonString, label) as T;
   } catch (err) {
     throw new Error(`Invalid ${label}: ${(err as Error).message}`);
   }

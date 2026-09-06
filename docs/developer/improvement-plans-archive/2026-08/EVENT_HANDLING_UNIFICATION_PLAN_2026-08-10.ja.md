@@ -320,7 +320,7 @@ pnpm daemon:watchdog -- --json                                  # EV-05
 - `pnpm build` 成功 / `npx tsc -p tsconfig.json --noEmit` クリーン
 - 新規・改修テスト **123 件**（3 回連続実行で安定）: `jsonl-tail`(13) `event-vocabulary`(8) `event-store-retention`(6) `trigger-correlation`(7) `stimuli-ttl`(5) `generation-scheduler.tick`(14) `cron-utils.catchup`(7) `lock-utils`(4) `reflex-engine`(13) `check_event_wiring`(18) `daemon_watchdog`(4) `run_generation_schedule`(6) + 既存 `trigger-runner` / `pipeline-scheduler`
 - `libs/core` 全体 4873 passed / `scripts` 全体 608 passed
-- `pnpm check:event-wiring` OK（2465 ファイル走査・6 ルール充足）、`pnpm check:catalogs` OK（authority-role 3 件追加に伴い `pnpm generate:knowledge-index` 実行）
+- `pnpm check:event-wiring` OK（2465 ファイル走査・6 ルール充足）、`pnpm run check -- --scope full --only catalogs` OK（authority-role 3 件追加に伴い `pnpm generate:knowledge-index` 実行）
 - **未解決の既存失敗（本計画と無関係）**: `libs/core/history-search-index.test.ts` 5 件 — Apple 版 sqlite3 の `trusted_schema=0` による `unsafe use of virtual table` で、当該ファイルに本計画の変更はない（`git diff` 空）。環境依存。
 
 #### 残作業

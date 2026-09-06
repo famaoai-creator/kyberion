@@ -6,11 +6,13 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
   safeReaddir: vi.fn(),
+  safeLstat: vi.fn(),
   safeCreateExclusiveFileSync: vi.fn(),
   safeUnlinkSync: vi.fn(),
   safeFsyncFile: vi.fn(),
   resolveServiceBinding: vi.fn(),
   loadServiceEndpointsCatalog: vi.fn(),
+  getServicePresetRecord: vi.fn(),
   executeServicePreset: vi.fn(),
   loadConnectionDocument: vi.fn(),
   storeConnectionDocument: vi.fn(),
@@ -25,12 +27,18 @@ vi.mock('./secure-io.js', async () => {
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
     safeReaddir: mocks.safeReaddir,
+    safeLstat: mocks.safeLstat,
     safeCreateExclusiveFileSync: mocks.safeCreateExclusiveFileSync,
     safeUnlinkSync: mocks.safeUnlinkSync,
     safeFsyncFile: mocks.safeFsyncFile,
+    // governed-catalog compiles the real schema file (not a fixture) through
+    // this same loadJson boundary — route .schema.json paths to the real reader.
     loadJson: <T>(filePath: string): T =>
-      JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T,
+      filePath.endsWith('.schema.json')
+        ? (actual.loadJson(filePath) as T)
+        : (JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T),
     loadJsonIfPresent: <T>(filePath: string): T | null => {
+      if (filePath.endsWith('.schema.json')) return actual.loadJsonIfPresent(filePath) as T | null;
       try {
         return JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
       } catch {
@@ -40,11 +48,48 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+// defineCatalog (foundation/governed-catalog.ts) reads presence/content
+// through FoundationIo, which secure-io.ts registers with a direct reference
+// to its own real internal functions at module-evaluation time — overriding
+// the exported `safeExistsSync` etc. above does not reach that already
+// -registered object, so route FoundationIo through the same test doubles.
+vi.mock('./foundation/io.js', async () => {
+  const realSecureIo = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+  return {
+    getFoundationIo: () => ({
+      loadJson: <T>(filePath: string): T =>
+        filePath.endsWith('.schema.json')
+          ? (realSecureIo.loadJson(filePath) as T)
+          : (JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T),
+      loadJsonIfPresent: <T>(filePath: string): T | null => {
+        if (filePath.endsWith('.schema.json')) {
+          return realSecureIo.loadJsonIfPresent(filePath) as T | null;
+        }
+        try {
+          return JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+        } catch {
+          return null;
+        }
+      },
+      appendFile: () => undefined,
+      exists: (filePath: string) => mocks.safeExistsSync(filePath),
+      readFile: (filePath: string) => String(mocks.safeReadFile(filePath, { encoding: 'utf8' })),
+      stat: () => ({ mtimeMs: Date.now(), size: 1 }),
+      writeFile: (filePath: string, content: string) => mocks.safeWriteFile(filePath, content),
+    }),
+    registerFoundationIo: vi.fn(),
+  };
+});
+
 vi.mock('./foundation/json.js', async () => {
   const actual =
     await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  // governed-catalog compiles the real schema file (not a fixture) via this
+  // same readJson boundary — route .schema.json paths to the real reader.
   const read = <T>(filePath: string): T =>
-    JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+    filePath.endsWith('.schema.json')
+      ? actual.readJson<T>(filePath)
+      : (JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T);
   const readIfPresent = <T>(filePath: string): T | null => {
     try {
       return read<T>(filePath);
@@ -66,6 +111,10 @@ vi.mock('./service-binding.js', () => ({
   loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
 }));
 
+vi.mock('./service-preset-registry.js', () => ({
+  getServicePresetRecord: mocks.getServicePresetRecord,
+}));
+
 vi.mock('./service-engine.js', () => ({
   executeServicePreset: mocks.executeServicePreset,
 }));
@@ -80,6 +129,7 @@ describe('oauth-broker', () => {
     vi.clearAllMocks();
     mocks.safeExistsSync.mockReturnValue(false);
     mocks.safeReaddir.mockReturnValue([]);
+    mocks.safeLstat.mockReturnValue({ isFile: () => true });
     mocks.resolveServiceBinding.mockReturnValue({
       serviceId: 'canva',
       clientId: 'client-id',
@@ -99,9 +149,22 @@ describe('oauth-broker', () => {
         canva: { preset_path: 'knowledge/product/orchestration/service-presets/canva.json' },
       },
     });
+    mocks.getServicePresetRecord.mockReturnValue({
+      service_id: 'canva',
+      operations: {},
+      oauth: {
+        authorize_url: 'https://www.canva.com/api/oauth/authorize',
+        token_operation: 'exchange_oauth_code',
+        refresh_operation: 'refresh_oauth_token',
+        pkce: true,
+        scopes: ['design:meta:read', 'asset:write'],
+      },
+    });
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -167,6 +230,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -283,6 +348,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -345,6 +412,8 @@ describe('oauth-broker', () => {
         return JSON.stringify({
           serviceId: 'canva',
           state: 'test-state',
+          scopes: [],
+          createdAt: '2026-03-23T00:00:00.000Z',
           expiresAt: '2099-03-23T00:00:00.000Z',
         });
       }
@@ -401,6 +470,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -440,6 +511,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -482,6 +555,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',

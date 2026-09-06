@@ -27,8 +27,10 @@
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import { safeReadFile, safeReaddir, safeExistsSync } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { safeReaddir, safeExistsSync, safeLstat } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import {
   getEmbeddingBackend,
   cosineSimilarity,
@@ -39,6 +41,25 @@ import {
 const CURRENT_DISTILL_DIR = 'knowledge/product/evolution';
 const LEGACY_DISTILL_DIRS = ['knowledge/product/incidents', 'knowledge/product/evolution'];
 const DISTILL_FILE_RE = /^distill_.+\.md$/;
+
+function isSafeDistillPath(filePath: string): boolean {
+  const root = path.resolve(pathResolver.rootDir());
+  const absolute = path.resolve(filePath);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    return false;
+  }
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (safeLstat(current).isSymbolicLink()) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * KP-07: substrings that mark an auto-distilled document as a policy
@@ -160,16 +181,12 @@ function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
   const out: DistilledKnowledgeEntry[] = [];
   const seenKeys = new Set<string>();
   const dirNames = [...new Set([CURRENT_DISTILL_DIR, ...LEGACY_DISTILL_DIRS])];
-  if (
-    scope?.tier === 'confidential' &&
-    scope.tenant_slug &&
-    !scope.tenant_slug.includes('/') &&
-    !scope.tenant_slug.includes('\\')
-  ) {
+  if (scope?.tier === 'confidential' && scope.tenant_slug && isValidTenantSlug(scope.tenant_slug)) {
     dirNames.push(`knowledge/confidential/${scope.tenant_slug}/evolution`);
   }
   for (const dirName of dirNames) {
     const dir = pathResolver.rootResolve(dirName);
+    if (!isSafeDistillPath(dir)) continue;
     if (!safeExistsSync(dir)) continue;
     let entries: string[] = [];
     try {
@@ -181,9 +198,17 @@ function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
       const key = `${dirName}/${name}`;
       if (seenKeys.has(key) || !DISTILL_FILE_RE.test(name)) continue;
       const abs = path.join(dir, name);
+      if (!isSafeDistillPath(abs)) {
+        seenKeys.add(key);
+        continue;
+      }
+      if (!safeLstat(abs).isFile()) {
+        seenKeys.add(key);
+        continue;
+      }
       let text: string;
       try {
-        text = safeReadFile(abs, { encoding: 'utf8' }) as string;
+        text = readTextFile(abs);
       } catch {
         continue;
       }

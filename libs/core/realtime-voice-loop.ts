@@ -30,7 +30,7 @@ import { checkMeetingParticipationConsent } from './meeting-participation-coordi
 import { startMicCapture, type MicCaptureOptions } from './mic-capture.js';
 import { pcmToWav } from './pcm-wav.js';
 import { playAudioFile, type PlaybackHandle } from './audio-playback.js';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
 import { speakSegmented, type SegmentedSpeechController } from './segmented-voice-playback.js';
 import {
   streamVoicePlayback,
@@ -233,7 +233,8 @@ export async function startRealtimeVoiceLoop(
 
   const sampleRateHz = options.mic?.sampleRateHz ?? 16_000;
   const format: AudioFormat = { encoding: 'pcm_s16le', sample_rate_hz: sampleRateHz, channels: 1 };
-  safeMkdir(options.recordingDir, { recursive: true });
+  const recordingDir = assertSafeRepositoryPath(options.recordingDir, { allowMissingLeaf: true });
+  safeMkdir(recordingDir, { recursive: true });
 
   const segmenter = new VadTurnSegmenter({
     ...options.vad,
@@ -285,7 +286,9 @@ export async function startRealtimeVoiceLoop(
 
   const processTurn = async (turnIndex: number, feed: SttFeed | null) => {
     const turnLabel = String(turnIndex + 1).padStart(2, '0');
-    const audioPath = path.join(options.recordingDir, `turn-${turnLabel}.wav`);
+    const audioPath = assertSafeRepositoryPath(path.join(recordingDir, `turn-${turnLabel}.wav`), {
+      allowMissingLeaf: true,
+    });
     const segment = segmenter.takeSegment();
     safeWriteFile(audioPath, pcmToWav(segment.pcm, sampleRateHz));
     options.onEvent?.({

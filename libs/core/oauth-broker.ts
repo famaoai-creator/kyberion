@@ -1,5 +1,6 @@
 import { loadServiceEndpointsCatalog, resolveServiceBinding } from './service-binding.js';
 import { executeServicePreset } from './service-engine.js';
+import { nowIso } from './foundation/time.js';
 import { loadConnectionDocument, storeConnectionDocument } from './secret-guard.js';
 import { getServicePresetRecord } from './service-preset-registry.js';
 import { assertAuthConfigMutationSource } from './cloudflare-os-control-plane.js';
@@ -114,14 +115,15 @@ function beginServiceOAuthInternal(
   }
 
   if (options.persistSession !== false) {
+    const createdAt = nowIso();
     savePendingOAuthSession({
       serviceId,
       state,
       codeVerifier,
       redirectUri,
       scopes,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + OAUTH_INITIATION_TTL_MS).toISOString(),
+      createdAt,
+      expiresAt: nowIso(new Date(Date.now() + OAUTH_INITIATION_TTL_MS)),
     });
   }
 
@@ -158,7 +160,7 @@ function persistOAuthTokens(serviceId: string, result: Record<string, any>, redi
   if (typeof result.scope === 'string') patch.scope = result.scope;
   if (typeof result.token_type === 'string') patch.token_type = result.token_type;
   if (typeof result.expires_in === 'number' && Number.isFinite(result.expires_in)) {
-    patch.expires_at = new Date(Date.now() + result.expires_in * 1000).toISOString();
+    patch.expires_at = nowIso(new Date(Date.now() + result.expires_in * 1000));
   }
   if (redirectUri) patch.redirect_uri = redirectUri;
 

@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { z } from 'zod';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   buildShellGrokCliBackendFromEnv,
   probeShellGrokCliAvailability,
   ShellGrokCliBackend,
 } from './shell-grok-cli-backend.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -47,6 +50,16 @@ function createChild(stdoutText: string, exitCode = 0): any {
 }
 
 describe('shell-grok-cli-backend', () => {
+  it('routes Grok CLI environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/shell-grok-cli-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   afterEach(() => {
     spawnMock.mockClear();
     withWallClockBudgetMock.mockClear();
@@ -116,6 +129,32 @@ describe('shell-grok-cli-backend', () => {
       schema: z.object({ answer: z.string() }),
     });
     expect(result).toEqual({ answer: 'pong' });
+  });
+
+  it('ambient read-only sandbox removes auto-approve and applies Grok read-only flags', async () => {
+    const envelope = JSON.stringify({
+      structuredOutput: { answer: 'pong' },
+      stopReason: 'EndTurn',
+    });
+    spawnMock.mockReturnValueOnce(createChild(envelope));
+    const policy = resolveSandboxPolicy({
+      provider: 'grok',
+      mode: 'read-only',
+      networkAccess: true,
+    });
+
+    const backend = new ShellGrokCliBackend({ bin: 'grok', model: 'grok-4.5' });
+    await withSandboxPolicy(policy, () =>
+      backend.runStructured({
+        systemPrompt: 'sys',
+        userPrompt: 'user',
+        schema: z.object({ answer: z.string() }),
+      })
+    );
+
+    const [, args] = spawnMock.mock.calls[0];
+    expect(args).not.toContain('--always-approve');
+    expect(args).toEqual(expect.arrayContaining(['--permission-mode', 'default']));
   });
 
   it('routes native delegation through the injected Grok ACP adopter session', async () => {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 vi.mock('./path-resolver.js', async () => {
   const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
@@ -26,8 +26,10 @@ import {
   evaluateCustomerSignoffGate,
   evaluateRequirementsCompletenessGate,
   readRequirementsDraft,
+  readRequirementsDraftAtPath,
   recordCustomerSignoff,
   saveRequirementsDraft,
+  writeRequirementsDraftAtPath,
 } from './requirements-draft-store.js';
 import type { ExtractedRequirements } from './reasoning-backend.js';
 
@@ -57,7 +59,8 @@ describe('requirements-draft-store', () => {
   let tmpDir = '';
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'req-draft-'));
+    tmpDir = pathResolver.sharedTmp(`req-draft-${process.pid}-${Date.now()}`);
+    fs.mkdirSync(tmpDir, { recursive: true });
     (missionEvidenceDir as unknown as ReturnType<typeof vi.fn>).mockReturnValue(tmpDir);
   });
 
@@ -96,6 +99,65 @@ describe('requirements-draft-store', () => {
     it('returns null when no draft exists', () => {
       expect(readRequirementsDraft('MSN-MISSING')).toBeNull();
     });
+
+    it('rejects a schema-invalid persisted draft', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, 'requirements-draft.json'),
+        JSON.stringify({ version: 'v1', project_name: 'X', functional_requirements: [] })
+      );
+
+      expect(() => readRequirementsDraft('MSN-INVALID')).toThrow(
+        /Invalid catalog requirements-draft/
+      );
+    });
+
+    it('loads an explicitly supplied draft through the same schema boundary', () => {
+      const file = path.join(tmpDir, 'explicit-requirements-draft.json');
+      fs.writeFileSync(
+        file,
+        JSON.stringify({
+          version: 'v1',
+          project_name: 'Explicit project',
+          ...sampleExtracted,
+          generated_at: new Date().toISOString(),
+        })
+      );
+
+      expect(readRequirementsDraftAtPath(file)?.project_name).toBe('Explicit project');
+    });
+
+    it('rejects a schema-invalid explicitly supplied draft', () => {
+      const file = path.join(tmpDir, 'explicit-invalid-requirements-draft.json');
+      fs.writeFileSync(file, JSON.stringify({ version: 'v1', project_name: 'Broken' }));
+
+      expect(() => readRequirementsDraftAtPath(file)).toThrow(/Invalid catalog requirements-draft/);
+    });
+
+    it('preserves the parse error contract for malformed drafts', () => {
+      fs.writeFileSync(path.join(tmpDir, 'requirements-draft.json'), '{ malformed');
+
+      expect(() => readRequirementsDraft('MSN-MALFORMED')).toThrow(SyntaxError);
+    });
+
+    it('rejects a symlinked mission evidence directory before reading', () => {
+      const boundaryRoot = pathResolver.sharedTmp('requirements-draft-boundary');
+      const targetDir = path.join(boundaryRoot, 'target');
+      const linkedDir = path.join(boundaryRoot, 'linked');
+      fs.mkdirSync(targetDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(targetDir, 'requirements-draft.json'),
+        JSON.stringify({ version: 'v1', project_name: 'outside' })
+      );
+      fs.symlinkSync(targetDir, linkedDir, 'dir');
+      (missionEvidenceDir as unknown as ReturnType<typeof vi.fn>).mockReturnValue(linkedDir);
+
+      try {
+        expect(() => readRequirementsDraft('MSN-SYMLINK')).toThrow('[RESOURCE_PATH_SYMLINK]');
+        expect(fs.existsSync(path.join(targetDir, 'requirements-draft.json'))).toBe(true);
+      } finally {
+        fs.rmSync(boundaryRoot, { recursive: true, force: true });
+      }
+    });
   });
 
   describe('recordCustomerSignoff', () => {
@@ -117,9 +179,25 @@ describe('requirements-draft-store', () => {
           missionId: 'MSN-NOPE',
           signedBy: 'x',
           channel: 'email',
-        }),
+        })
       ).toThrow(/no draft found/);
     });
+  });
+
+  it('persists the catalog-normalized draft payload', () => {
+    const file = path.join(tmpDir, 'normalized-requirements-draft.json');
+    const draft = {
+      version: 'v1',
+      project_name: 'X',
+      functional_requirements: sampleExtracted.functional_requirements,
+      generated_at: '2026-09-04T00:00:00.000Z',
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof writeRequirementsDraftAtPath>[1];
+
+    const persisted = writeRequirementsDraftAtPath(file, draft);
+
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).not.toHaveProperty('$schema');
   });
 
   describe('evaluateRequirementsCompletenessGate', () => {
@@ -136,9 +214,7 @@ describe('requirements-draft-store', () => {
         projectName: 'X',
         extracted: {
           ...sampleExtracted,
-          functional_requirements: [
-            { id: 'FR-1', description: '必須機能', priority: 'must' },
-          ],
+          functional_requirements: [{ id: 'FR-1', description: '必須機能', priority: 'must' }],
         },
       });
       const result = evaluateRequirementsCompletenessGate('MSN-G2');

@@ -11,7 +11,10 @@ import type {
   ConversationPromotion,
   ConversationShape,
 } from '../lib/conversation-types';
-import type { IntentResolutionContract } from '@agent/core';
+import {
+  parseIntentResolutionContract,
+  type IntentResolutionContract,
+} from '@agent/core/intent-resolution-contract-parser';
 
 type DockMessage = {
   id: string;
@@ -31,6 +34,14 @@ const AUTHORITY_LABEL_KEYS: Record<
   autonomous: 'dock.intent_resolution.authority_autonomous',
   approval_required: 'dock.intent_resolution.authority_approval',
   human_clarification_required: 'dock.intent_resolution.authority_clarification',
+};
+
+const OUTCOME_LABEL_KEYS: Record<IntentResolutionContract['outcome_kind'], ConciergeMessageKey> = {
+  answer: 'dock.intent_resolution.outcome_answer',
+  artifact: 'dock.intent_resolution.outcome_artifact',
+  approval_ready_plan: 'dock.intent_resolution.outcome_approval_ready_plan',
+  service_change: 'dock.intent_resolution.outcome_service_change',
+  status_report: 'dock.intent_resolution.outcome_status_report',
 };
 
 // Only the four contract shapes carry a card label; a plain reply stays a
@@ -95,9 +106,8 @@ export function ConversationDock() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: trimmed, locale, sessionId: sessionIdRef.current }),
         });
-        const payload = (await response.json()) as Partial<ConversationMessageResponse> & {
-          error?: string;
-        };
+        const rawPayload: unknown = await response.json();
+        const payload = parseConversationMessageResponse(rawPayload);
         // A 503 still carries a polite, actionable reply — show it as the
         // secretary's answer instead of a technical failure.
         const reply = typeof payload.reply === 'string' ? payload.reply : '';
@@ -315,7 +325,7 @@ export function ConversationDock() {
                     </div>
                     <div>
                       <dt>{t('dock.intent_resolution.outcome')}</dt>
-                      <dd>{intentView.outcome}</dd>
+                      <dd>{t(OUTCOME_LABEL_KEYS[intentView.outcome])}</dd>
                     </div>
                   </dl>
                   {intentView.authority === 'approval_required' ? (
@@ -483,4 +493,76 @@ export function ConversationDock() {
       </form>
     </aside>
   );
+}
+
+export function parseConversationMessageResponse(
+  value: unknown
+): Partial<ConversationMessageResponse> & { error?: string } {
+  if (!isSafeConversationResponseTree(value)) {
+    return { error: 'The conversation response was invalid.' };
+  }
+  const raw = value as Record<string, unknown>;
+  const reply = typeof raw.reply === 'string' ? raw.reply.trim() : undefined;
+  const mode =
+    raw.mode === 'voice-hub' || raw.mode === 'orchestrator' || raw.mode === 'unavailable'
+      ? raw.mode
+      : undefined;
+  const shape =
+    raw.shape === 'clarification' ||
+    raw.shape === 'execution_preview' ||
+    raw.shape === 'status_summary' ||
+    raw.shape === 'delivery_summary' ||
+    raw.shape === 'reply'
+      ? raw.shape
+      : undefined;
+  if (!reply || !mode || !shape) {
+    return { error: 'The conversation response was invalid.' };
+  }
+  const intentResolution = parseIntentResolutionContract(raw.intentResolution);
+  const nextActions = Array.isArray(raw.nextActions)
+    ? raw.nextActions.flatMap((action): ConversationNextAction[] => {
+        if (!action || typeof action !== 'object' || Array.isArray(action)) return [];
+        const candidate = action as Record<string, unknown>;
+        return typeof candidate.id === 'string' &&
+          candidate.id.trim() &&
+          typeof candidate.label === 'string' &&
+          candidate.label.trim()
+          ? [{ id: candidate.id, label: candidate.label }]
+          : [];
+      })
+    : undefined;
+  const promoted =
+    raw.promoted && typeof raw.promoted === 'object' && !Array.isArray(raw.promoted)
+      ? (() => {
+          const candidate = raw.promoted as Record<string, unknown>;
+          return isConversationPromotionKind(candidate.kind) &&
+            typeof candidate.label === 'string' &&
+            candidate.label.trim()
+            ? { kind: candidate.kind, label: candidate.label }
+            : undefined;
+        })()
+      : undefined;
+  return {
+    reply,
+    mode,
+    shape,
+    ...(promoted ? { promoted } : {}),
+    ...(nextActions ? { nextActions } : {}),
+    ...(intentResolution ? { intentResolution } : {}),
+  };
+}
+
+const CONVERSATION_RESPONSE_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isSafeConversationResponseTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(isSafeConversationResponseTree);
+  if (!value || typeof value !== 'object') return true;
+  return Object.entries(value).every(
+    ([key, nested]) =>
+      !CONVERSATION_RESPONSE_DANGEROUS_KEYS.has(key) && isSafeConversationResponseTree(nested)
+  );
+}
+
+function isConversationPromotionKind(value: unknown): value is ConversationPromotion['kind'] {
+  return value === 'mission' || value === 'task_session';
 }

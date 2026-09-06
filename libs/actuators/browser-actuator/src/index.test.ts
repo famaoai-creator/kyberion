@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 
 const REPO_ROOT = process.cwd();
 
@@ -74,6 +81,7 @@ const mocks = vi.hoisted(() => {
   const safeExistsSync = vi.fn((filePath: string) => fileStore.has(filePath));
   const safeMkdir = vi.fn();
   const safeReadFile = vi.fn((filePath: string) => fileStore.get(filePath) || '');
+  const safeLstat = vi.fn((filePath: string) => ({ isFile: () => fileStore.has(filePath) }));
   const safeWriteFile = vi.fn((filePath: string, content: string) => {
     fileStore.set(filePath, content);
   });
@@ -146,6 +154,7 @@ const mocks = vi.hoisted(() => {
     safeExistsSync,
     safeMkdir,
     safeReadFile,
+    safeLstat,
     safeWriteFile,
     safeRmSync,
     safeExec,
@@ -156,19 +165,30 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
   return {
     ...actual,
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
     safeReadFile: mocks.safeReadFile,
+    safeLstat: mocks.safeLstat,
     safeWriteFile: mocks.safeWriteFile,
     safeRmSync: mocks.safeRmSync,
     safeExec: mocks.safeExec,
     secureFetch: mocks.secureFetch,
     retry: mocks.retry,
   };
+});
+
+vi.mock('@agent/core/network', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/network')>();
+  return { ...actual, secureFetch: mocks.secureFetch };
+});
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/async-utils')>();
+  return { ...actual, retry: mocks.retry };
 });
 
 vi.mock('@playwright/test', async () => {
@@ -187,6 +207,52 @@ describe('browser-actuator v3 contract', () => {
     const { resetBrowserRuntimeLeasesForTest } = await import('./index');
     await resetBrowserRuntimeLeasesForTest();
     vi.clearAllMocks();
+  });
+
+  it('rejects a browser profile path outside the repository before launching', async () => {
+    const { handleAction } = await import('./index');
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        session_id: 'browser-path-boundary',
+        steps: [],
+        options: { headless: true, user_data_dir: '/tmp/external-browser-profile' },
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+  });
+
+  it('sanitizes persisted operator approval fields before completing the artifact', async () => {
+    const approval = browserRuntimeHelpers.beginOperatorApproval({
+      sessionId: 'approval-boundary',
+      message: 'Confirm action',
+      continueFile: 'active/shared/runtime/browser/approval-boundary.continue',
+    });
+    mocks.safeWriteFile(
+      approval.path,
+      JSON.stringify({
+        request_id: approval.request_id,
+        session_id: 'approval-boundary',
+        status: 'pending',
+        message: 'Confirm action',
+        continue_file: approval.continue_file,
+        created_at: '2026-09-04T00:00:00.000Z',
+        unexpected: 'discard me',
+      })
+    );
+
+    browserRuntimeHelpers.completeOperatorApproval('approval-boundary', 'approved');
+
+    const completed = JSON.parse(mocks.fileStore.get(approval.path) || '{}');
+    expect(completed).toMatchObject({
+      request_id: approval.request_id,
+      session_id: 'approval-boundary',
+      status: 'approved',
+      message: 'Confirm action',
+    });
+    expect(Object.hasOwn(completed, 'constructor')).toBe(false);
+    expect(completed.unexpected).toBeUndefined();
+    expect(completed.completed_at).toEqual(expect.any(String));
   });
 
   it('uses the manifest recovery policy for ref interactions', async () => {

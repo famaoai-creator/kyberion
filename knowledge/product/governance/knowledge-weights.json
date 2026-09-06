@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/knowledge-weights.schema.json",
   "version": "1.0.0",
   "description": "Governed, rollbackable knowledge ranking weights. Tenant overrides apply only after viewer or mission scope resolution.",
   "defaults": {

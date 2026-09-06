@@ -2,7 +2,8 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
-import { compileSchemaFromPath, pathResolver } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { pathResolver } from '@agent/core/path-resolver';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -44,25 +45,26 @@ const mocks = vi.hoisted(() => ({
   decideApprovalRequest: vi.fn(),
   loadApprovalRequest: vi.fn(),
   listApprovalRequests: vi.fn(),
-  safeReadFile: vi.fn(),
   retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
-  return {
-    ...actual,
-    safeReadFile: mocks.safeReadFile,
-    retry: mocks.retry,
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
-    pathResolver: {
-      ...actual.pathResolver,
-      rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
-    },
-  };
-});
+vi.mock('@agent/core/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/core')>()),
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+}));
 
-vi.mock('@agent/core/governance', () => ({
+vi.mock('@agent/core/async-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
+  retry: mocks.retry,
+}));
+
+vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/path-resolver')>()),
+  rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
+}));
+
+vi.mock('@agent/core/governance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/governance')>()),
   createApprovalRequest: mocks.createApprovalRequest,
   decideApprovalRequest: mocks.decideApprovalRequest,
   loadApprovalRequest: mocks.loadApprovalRequest,

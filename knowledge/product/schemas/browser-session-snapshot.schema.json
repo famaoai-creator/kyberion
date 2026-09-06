@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "browser-session-snapshot.schema.json",
+  "title": "Persisted browser session snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "session_id": { "type": "string", "minLength": 1 },
+    "tab_id": { "type": "string", "minLength": 1 },
+    "url": { "type": "string" },
+    "title": { "type": "string" },
+    "captured_at": { "type": "string", "minLength": 1 },
+    "element_count": { "type": "integer", "minimum": 0 },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "scale"],
+      "properties": {
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "scale": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "focused_ref": { "type": ["string", "null"] },
+    "ready_state": { "type": "string" },
+    "elements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1 },
+          "tag": { "type": "string" },
+          "role": { "type": ["string", "null"] },
+          "text": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": ["string", "null"] },
+          "placeholder": { "type": ["string", "null"] },
+          "href": { "type": ["string", "null"] },
+          "value": { "type": ["string", "null"] },
+          "visible": { "type": "boolean" },
+          "editable": { "type": "boolean" },
+          "focused": { "type": "boolean" },
+          "value_redacted": { "type": "boolean" },
+          "selector": { "type": "string" }
+        }
+      }
+    }
+  },
+  "required": ["session_id", "tab_id", "url", "title", "captured_at", "elements"]
+}

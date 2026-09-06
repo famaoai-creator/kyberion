@@ -1,21 +1,21 @@
-import { runActuatorCli, safeReadFile, pathResolver } from '@agent/core';
-import { fileURLToPath } from 'node:url';
-import * as path from 'node:path';
-import { handleAction } from './process-actuator-helpers.js';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
+import { isDirectEntry } from '@agent/core/direct-entry';
+import * as pathResolver from '@agent/core/path-resolver';
+import { handleAction, readProcessJsonObject } from './process-actuator-helpers.js';
+import { parseProcessAction } from './process-action-input.js';
 
 async function main() {
-  const processActionSchema = JSON.parse(
-    String(
-      safeReadFile(
-        pathResolver.rootResolve('knowledge/product/schemas/process-action.schema.json'),
-        {
-          encoding: 'utf8',
-        }
-      )
-    )
+  const processActionSchema = readProcessJsonObject(
+    pathResolver.rootResolve('knowledge/product/schemas/process-action.schema.json'),
+    'process action schema'
   );
   await runActuatorCli({
     name: 'process-actuator',
+    args: currentProcessArgv(),
     handleAction,
     schema: processActionSchema,
   });
@@ -24,19 +24,13 @@ async function main() {
 export const actuator = defineCatalogBackedActuator({
   id: 'process-actuator',
   describeOps,
-  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+  handleAction: (input) => handleAction(parseProcessAction(input)),
 });
 
-export { handleAction };
+export { handleAction, parseProcessAction };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  main().catch((err) => {
-    console.error(`[process-actuator] ${err?.message || err}`);
-    process.exitCode = 1;
-  });
+if (isDirectEntry(import.meta.url, 'libs/actuators/process-actuator/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, 'process-actuator');
 }
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

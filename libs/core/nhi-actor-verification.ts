@@ -41,6 +41,7 @@
 
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 import { auditChain } from './audit-chain.js';
 import { getAgentIdentity, NHI_ID_PREFIX, parseNhiId } from './agent-identity.js';
 
@@ -191,7 +192,7 @@ function recordViolationAudit(event: NhiActorAuditEvent): void {
       auditSinkOverride(event);
       return;
     }
-    if (process.env.VITEST) return; // hermetic guard — see setNhiActorAuditSinkForTests
+    if (isVitestProcess()) return; // hermetic guard — see setNhiActorAuditSinkForTests
     auditChain.record({
       agentId: event.actor,
       action: event.action,

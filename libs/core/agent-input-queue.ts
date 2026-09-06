@@ -1,4 +1,5 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * PI-15: governed input queues for an agent operation.
  *
@@ -11,8 +12,9 @@ import { appendJsonLine } from './foundation/json.js';
 
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { missionDir } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { escapeXml } from './text-escaping.js';
 import { withLock } from './src/lock-utils.js';
 
@@ -38,9 +40,30 @@ export interface AgentInputQueueEntry {
   scope?: AgentInputQueueScope;
 }
 
+export interface AgentInputQueueWake {
+  missionId: string;
+  queuePath: string;
+  reason: 'next_run';
+  scope?: AgentInputQueueScope;
+}
+
+export type AgentInputQueueWorkerHandler = (wake: AgentInputQueueWake) => Promise<void> | void;
+
 type AgentInputQueueRecord =
   | { kind: 'enqueued'; entry: AgentInputQueueEntry; recorded_at: string }
   | { kind: 'consumed' | 'cancelled'; entry_id: string; recorded_at: string };
+
+const QUEUE_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-input-queue-record.schema.json'
+);
+
+function queueRecordCatalog(filePath: string) {
+  return defineCatalog<AgentInputQueueRecord>({
+    id: 'agent-input-queue-record',
+    path: filePath,
+    schema: QUEUE_RECORD_SCHEMA_PATH,
+  });
+}
 
 export interface AgentInputQueueOptions {
   missionId: string;
@@ -57,12 +80,38 @@ export interface EnqueueAgentInput {
   scope?: AgentInputQueueScope;
 }
 
+/**
+ * Explicit producer boundary for non-surface callers (worker, scheduler, or
+ * another governed service). `delivery` is required on purpose: free-form
+ * text never becomes steer/follow_up implicitly at this boundary.
+ */
+export type MissionAgentInput = AgentInputQueueOptions & EnqueueAgentInput;
+
+export async function enqueueMissionAgentInput(
+  input: MissionAgentInput
+): Promise<AgentInputQueueEntry> {
+  return getMissionAgentInputQueue({
+    missionId: input.missionId,
+    ...(input.tier ? { tier: input.tier } : {}),
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    ...(input.queuePath ? { queuePath: input.queuePath } : {}),
+  }).enqueue({
+    delivery: input.delivery,
+    text: input.text,
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+    ...(input.scope ? { scope: input.scope } : {}),
+  });
+}
+
 /** PI-15: the narrow surface-to-worker delivery API. */
 export interface SurfaceAgentInput {
   missionId: string;
   delivery: 'steer' | 'follow_up';
   text: string;
   surface: string;
+  /** Optional explicit mission visibility scope; defaults to the resolved mission scope. */
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantSlug?: string;
   channel?: string;
   threadTs?: string;
   scope?: AgentInputQueueScope;
@@ -82,6 +131,8 @@ export async function enqueueSurfaceAgentInput(
   if (!surface) throw new Error('[AGENT_INPUT_QUEUE] surface is required');
   return getMissionAgentInputQueue({
     missionId: input.missionId,
+    ...(input.tier ? { tier: input.tier } : {}),
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
     ...(input.queuePath ? { queuePath: input.queuePath } : {}),
   }).enqueue({
     delivery: input.delivery,
@@ -94,10 +145,6 @@ export async function enqueueSurfaceAgentInput(
     },
     ...(input.scope ? { scope: input.scope } : {}),
   });
-}
-
-function now(): string {
-  return new Date().toISOString();
 }
 
 function validateDelivery(delivery: string): AgentInputDelivery {
@@ -155,60 +202,52 @@ function scopeMatches(
   );
 }
 
-function parseRecords(raw: string): AgentInputQueueRecord[] {
-  const records: AgentInputQueueRecord[] = [];
-  for (const [index, line] of raw.split('\n').entries()) {
-    if (!line.trim()) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] unreadable record:${index + 1}`);
-    }
-    if (!parsed || typeof parsed !== 'object') {
-      throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] invalid record:${index + 1}`);
-    }
-    const record = parsed as Partial<AgentInputQueueRecord>;
-    if (record.kind === 'enqueued' && record.entry && typeof record.recorded_at === 'string') {
-      const entry = record.entry as Partial<AgentInputQueueEntry>;
-      if (
-        typeof entry.id === 'string' &&
-        typeof entry.mission_id === 'string' &&
-        typeof entry.delivery === 'string' &&
-        typeof entry.text === 'string' &&
-        typeof entry.enqueued_at === 'string'
-      ) {
-        records.push({
-          kind: 'enqueued',
-          recorded_at: record.recorded_at,
-          entry: {
-            id: entry.id,
-            mission_id: entry.mission_id,
-            delivery: validateDelivery(entry.delivery),
-            text: entry.text,
-            enqueued_at: entry.enqueued_at,
-            ...(entry.metadata ? { metadata: validateMetadata(entry.metadata) } : {}),
-            ...(entry.scope ? { scope: validateScope(entry.scope) } : {}),
-          },
-        });
-        continue;
-      }
-    }
-    if (
-      (record.kind === 'consumed' || record.kind === 'cancelled') &&
-      typeof record.entry_id === 'string' &&
-      typeof record.recorded_at === 'string'
-    ) {
-      records.push({
-        kind: record.kind,
-        entry_id: record.entry_id,
-        recorded_at: record.recorded_at,
-      });
-      continue;
-    }
-    throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] invalid record:${index + 1}`);
+function parseRecord(
+  parsed: unknown,
+  lineNumber: number,
+  catalog: GovernedCatalog<AgentInputQueueRecord>
+): AgentInputQueueRecord {
+  const validated = catalog.validate(parsed, `${catalog.path()}:${lineNumber}`);
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] invalid record:${lineNumber}`);
   }
-  return records;
+  const record = validated as Partial<AgentInputQueueRecord>;
+  if (record.kind === 'enqueued' && record.entry && typeof record.recorded_at === 'string') {
+    const entry = record.entry as Partial<AgentInputQueueEntry>;
+    if (
+      typeof entry.id === 'string' &&
+      typeof entry.mission_id === 'string' &&
+      typeof entry.delivery === 'string' &&
+      typeof entry.text === 'string' &&
+      typeof entry.enqueued_at === 'string'
+    ) {
+      return {
+        kind: 'enqueued',
+        recorded_at: record.recorded_at,
+        entry: {
+          id: entry.id,
+          mission_id: entry.mission_id,
+          delivery: validateDelivery(entry.delivery),
+          text: entry.text,
+          enqueued_at: entry.enqueued_at,
+          ...(entry.metadata ? { metadata: validateMetadata(entry.metadata) } : {}),
+          ...(entry.scope ? { scope: validateScope(entry.scope) } : {}),
+        },
+      };
+    }
+  }
+  if (
+    (record.kind === 'consumed' || record.kind === 'cancelled') &&
+    typeof record.entry_id === 'string' &&
+    typeof record.recorded_at === 'string'
+  ) {
+    return {
+      kind: record.kind,
+      entry_id: record.entry_id,
+      recorded_at: record.recorded_at,
+    };
+  }
+  throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] invalid record:${lineNumber}`);
 }
 
 function reduceDurableRecords(records: AgentInputQueueRecord[]): {
@@ -251,6 +290,18 @@ function reduceDurableRecords(records: AgentInputQueueRecord[]): {
   return { active, consumed, cleared };
 }
 
+function appendDurableRecord(filePath: string, record: AgentInputQueueRecord): void {
+  ensureDurableQueueFile(filePath);
+  const validated = queueRecordCatalog(filePath).validate(record, filePath);
+  appendJsonLine(filePath, validated);
+}
+
+function ensureDurableQueueFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[AGENT_INPUT_QUEUE] durable queue must be a regular file: ${filePath}`);
+  }
+}
+
 export class AgentInputQueue {
   private readonly missionId: string;
   private readonly queuePath: string;
@@ -262,13 +313,10 @@ export class AgentInputQueue {
   constructor(options: AgentInputQueueOptions) {
     if (!options.missionId.trim()) throw new Error('[AGENT_INPUT_QUEUE] missionId is required');
     this.missionId = options.missionId.trim();
-    this.queuePath =
-      options.queuePath ||
-      path.join(
-        missionDir(this.missionId, options.tier || 'public', options.tenantSlug),
-        'coordination',
-        'agent-input-queue.jsonl'
-      );
+    this.queuePath = resolveMissionAgentInputQueuePath({
+      ...options,
+      missionId: this.missionId,
+    });
     this.lockId = `agent-input-queue-${this.missionId}-${options.tenantSlug || 'shared'}`;
   }
 
@@ -284,7 +332,7 @@ export class AgentInputQueue {
       mission_id: this.missionId,
       delivery: validateDelivery(input.delivery),
       text,
-      enqueued_at: now(),
+      enqueued_at: nowIso(),
       ...(input.metadata ? { metadata: validateMetadata(input.metadata) } : {}),
       ...(input.scope ? { scope: validateScope(input.scope) } : {}),
     };
@@ -294,12 +342,16 @@ export class AgentInputQueue {
     }
     await withLock(this.lockId, async () => {
       safeMkdir(path.dirname(this.queuePath), { recursive: true });
-      appendJsonLine(this.queuePath, {
+      appendDurableRecord(this.queuePath, {
         kind: 'enqueued',
         entry,
-        recorded_at: now(),
+        recorded_at: nowIso(),
       } satisfies AgentInputQueueRecord);
     });
+    // A durable next_run survives process restart. When a matching worker is
+    // already registered in this process, wake it after the append so the
+    // durable record remains the source of truth and the wake is only a hint.
+    void wakeRegisteredMissionAgentInputWorker(this.queuePath).catch(() => undefined);
     return entry;
   }
 
@@ -327,10 +379,10 @@ export class AgentInputQueue {
         .filter((entry) => entry.delivery === 'next_run' && scopeMatches(entry.scope, scope))
         .slice(0, limit);
       for (const entry of entries) {
-        appendJsonLine(this.queuePath, {
+        appendDurableRecord(this.queuePath, {
           kind: 'consumed',
           entry_id: entry.id,
-          recorded_at: now(),
+          recorded_at: nowIso(),
         } satisfies AgentInputQueueRecord);
       }
       return entries;
@@ -391,10 +443,10 @@ export class AgentInputQueue {
     return withLock(this.lockId, async () => {
       const state = this.readDurableState();
       if (state.active.has(id)) {
-        appendJsonLine(this.queuePath, {
+        appendDurableRecord(this.queuePath, {
           kind: 'cancelled',
           entry_id: id,
-          recorded_at: now(),
+          recorded_at: nowIso(),
         } satisfies AgentInputQueueRecord);
         return 'cancelled';
       }
@@ -407,13 +459,172 @@ export class AgentInputQueue {
     if (!safeExistsSync(this.queuePath)) {
       return { active: new Map(), consumed: new Set(), cleared: new Set() };
     }
+    ensureDurableQueueFile(this.queuePath);
+    const catalog = queueRecordCatalog(this.queuePath);
     return reduceDurableRecords(
-      parseRecords(String(safeReadFile(this.queuePath, { encoding: 'utf8' })))
+      readJsonLines<AgentInputQueueRecord>(this.queuePath, {
+        map: (value, lineNumber) => parseRecord(value, lineNumber, catalog),
+        onMalformed: (error, lineNumber) => {
+          if (error instanceof Error && error.message.startsWith('[AGENT_INPUT_QUEUE')) {
+            throw error;
+          }
+          throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] unreadable record:${lineNumber}`);
+        },
+      })
     );
   }
 }
 
+function resolveMissionAgentInputQueuePath(options: AgentInputQueueOptions): string {
+  const candidate =
+    options.queuePath ||
+    path.join(
+      resolveMissionQueueDir(options.missionId.trim(), options),
+      'coordination',
+      'agent-input-queue.jsonl'
+    );
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+}
+
+/**
+ * Resolve the queue beside the authoritative mission directory. A caller that
+ * supplies a tier or tenant is explicit and must not be redirected through the
+ * process-global current-tenant lookup. For an unscoped call, an existing
+ * mission path is authoritative; a new mission uses missionDir's canonical
+ * confidential default.
+ */
+function resolveMissionQueueDir(missionId: string, options: AgentInputQueueOptions): string {
+  if (options.tier !== undefined || options.tenantSlug !== undefined) {
+    return missionDir(missionId, options.tier ?? 'confidential', options.tenantSlug);
+  }
+  return findMissionPath(missionId) || missionDir(missionId);
+}
+
 const MISSION_QUEUE_REGISTRY = Symbol.for('kyberion.agentInputQueueRegistry');
+const MISSION_QUEUE_WORKER_REGISTRY = Symbol.for('kyberion.agentInputQueueWorkerRegistry');
+
+interface MissionAgentInputWorkerRegistration {
+  missionId: string;
+  queue: AgentInputQueue;
+  scope?: AgentInputQueueScope;
+  handler: AgentInputQueueWorkerHandler;
+  wakeInFlight?: Promise<void>;
+  pendingWakeSignature?: string;
+  pollTimer?: ReturnType<typeof setInterval>;
+}
+
+function missionAgentInputWorkerRegistry(): Map<string, MissionAgentInputWorkerRegistration> {
+  const holder = globalThis as Record<symbol, unknown>;
+  const registry =
+    (holder[MISSION_QUEUE_WORKER_REGISTRY] as
+      Map<string, MissionAgentInputWorkerRegistration> | undefined) ||
+    new Map<string, MissionAgentInputWorkerRegistration>();
+  holder[MISSION_QUEUE_WORKER_REGISTRY] = registry;
+  return registry;
+}
+
+async function wakeRegisteredMissionAgentInputWorker(
+  queuePath: string,
+  options: { force?: boolean } = {}
+): Promise<boolean> {
+  const registration = missionAgentInputWorkerRegistry().get(queuePath);
+  if (!registration) return false;
+  const pending = await registration.queue.peek('next_run', 1, registration.scope);
+  if (pending.length === 0) {
+    registration.pendingWakeSignature = undefined;
+    return false;
+  }
+  if (registration.wakeInFlight) {
+    await registration.wakeInFlight;
+    return true;
+  }
+  const signature = pending.map((entry) => entry.id).join('\n');
+  if (!options.force && registration.pendingWakeSignature === signature) return false;
+  registration.pendingWakeSignature = signature;
+  const wake: AgentInputQueueWake = {
+    missionId: registration.missionId,
+    queuePath,
+    reason: 'next_run',
+    ...(registration.scope ? { scope: { ...registration.scope } } : {}),
+  };
+  const execution = Promise.resolve().then(() => registration.handler(wake));
+  registration.wakeInFlight = execution;
+  try {
+    await execution;
+    return true;
+  } catch (error) {
+    // A failed handler must be eligible for a later durable poll retry.
+    if (registryEntryStillRegistered(queuePath, registration)) {
+      registration.pendingWakeSignature = undefined;
+    }
+    throw error;
+  } finally {
+    if (registration.wakeInFlight === execution) registration.wakeInFlight = undefined;
+  }
+}
+
+function registryEntryStillRegistered(
+  queuePath: string,
+  registration: MissionAgentInputWorkerRegistration
+): boolean {
+  return missionAgentInputWorkerRegistry().get(queuePath) === registration;
+}
+
+/** Register a process-local wake handler for a durable mission next_run lane. */
+export function registerMissionAgentInputWorker(input: {
+  missionId: string;
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantSlug?: string;
+  queuePath?: string;
+  scope?: AgentInputQueueScope;
+  /** Poll the durable lane so producers in another process can wake this worker. */
+  pollIntervalMs?: number;
+  handler: AgentInputQueueWorkerHandler;
+}): () => void {
+  if (!input.missionId.trim()) throw new Error('[AGENT_INPUT_QUEUE] missionId is required');
+  if (typeof input.handler !== 'function') {
+    throw new Error('[AGENT_INPUT_QUEUE] worker handler is required');
+  }
+  const pollIntervalMs = input.pollIntervalMs ?? 1_000;
+  if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 10) {
+    throw new Error('[AGENT_INPUT_QUEUE] pollIntervalMs must be an integer >= 10');
+  }
+  const queue = getMissionAgentInputQueue({
+    missionId: input.missionId,
+    ...(input.tier ? { tier: input.tier } : {}),
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    ...(input.queuePath ? { queuePath: input.queuePath } : {}),
+  });
+  const queuePath = queue.durablePath;
+  const registry = missionAgentInputWorkerRegistry();
+  if (registry.has(queuePath)) {
+    throw new Error(`[AGENT_INPUT_QUEUE] worker already registered: ${queuePath}`);
+  }
+  const registration: MissionAgentInputWorkerRegistration = {
+    missionId: input.missionId.trim(),
+    queue,
+    ...(input.scope ? { scope: validateScope(input.scope) } : {}),
+    handler: input.handler,
+  };
+  registry.set(queuePath, registration);
+  void wakeRegisteredMissionAgentInputWorker(queuePath, { force: true }).catch(() => undefined);
+  registration.pollTimer = setInterval(() => {
+    void wakeRegisteredMissionAgentInputWorker(queuePath).catch(() => undefined);
+  }, pollIntervalMs);
+  registration.pollTimer.unref?.();
+  return () => {
+    if (registry.get(queuePath) !== registration) return;
+    if (registration.pollTimer) clearInterval(registration.pollTimer);
+    registry.delete(queuePath);
+  };
+}
+
+/** Explicitly request a wake for a registered worker; durable state is unchanged. */
+export function wakeMissionAgentInputWorker(input: AgentInputQueueOptions): Promise<boolean> {
+  return wakeRegisteredMissionAgentInputWorker(resolveMissionAgentInputQueuePath(input), {
+    force: true,
+  });
+}
 
 /** Process-local shared queue instance; `next_run` remains durable underneath. */
 export function getMissionAgentInputQueue(options: AgentInputQueueOptions): AgentInputQueue {
@@ -422,7 +633,8 @@ export function getMissionAgentInputQueue(options: AgentInputQueueOptions): Agen
     (holder[MISSION_QUEUE_REGISTRY] as Map<string, AgentInputQueue> | undefined) ||
     new Map<string, AgentInputQueue>();
   holder[MISSION_QUEUE_REGISTRY] = registry;
-  const key = `${options.missionId.trim()}:${options.tier || 'public'}:${options.tenantSlug || 'shared'}:${options.queuePath || ''}`;
+  const resolvedQueuePath = resolveMissionAgentInputQueuePath(options);
+  const key = resolvedQueuePath;
   const existing = registry.get(key);
   if (existing) return existing;
   const queue = new AgentInputQueue(options);

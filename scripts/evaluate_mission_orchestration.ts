@@ -1,14 +1,9 @@
 import * as path from 'node:path';
-import {
-  buildMissionOrchestrationEvaluationReport,
-  pathResolver,
-  safeMkdir,
-  safeWriteFile,
-} from '@agent/core';
-import { createAjv, readJson as readFoundationJson } from '@agent/core/foundation';
+import { buildMissionOrchestrationEvaluationReport } from '@agent/core/mission-orchestration-evaluator';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
-
-const ajv = createAjv();
 
 interface ScenarioRunRecord {
   scenario_id: string;
@@ -24,12 +19,29 @@ interface ScenarioRunRecord {
   needs_count?: number;
 }
 
-function readJson<T>(filePath: string): T {
-  return readFoundationJson<T>(filePath);
+const RUNS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-orchestration-scenario-runs.schema.json'
+);
+const REPORT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-orchestration-evaluation-report.schema.json'
+);
+
+function loadScenarioRuns(filePath: string): ScenarioRunRecord[] {
+  return defineCatalog<ScenarioRunRecord[]>({
+    id: 'mission-orchestration-scenario-runs',
+    path: filePath,
+    schema: RUNS_SCHEMA_PATH,
+  }).load();
 }
 
-function compileSchema(schemaPath: string) {
-  return ajv.compile(readJson<Record<string, unknown>>(schemaPath));
+function validateReport(
+  report: ReturnType<typeof buildMissionOrchestrationEvaluationReport>
+): void {
+  defineCatalog<ReturnType<typeof buildMissionOrchestrationEvaluationReport>>({
+    id: 'mission-orchestration-evaluation-report',
+    path: REPORT_SCHEMA_PATH,
+    schema: REPORT_SCHEMA_PATH,
+  }).validate(report, REPORT_SCHEMA_PATH);
 }
 
 function parseArg(argv: string[], name: string, fallback?: string): string {
@@ -41,49 +53,48 @@ function parseArg(argv: string[], name: string, fallback?: string): string {
   throw new Error(`Missing required argument: ${name}`);
 }
 
-export function main(argv: string[] = []): void {
+export function main(argv: string[], print: (value: unknown) => void, json = false): void {
   const runsPath = parseArg(argv, '--runs');
   const outPath = parseArg(
     argv,
     '--out',
     pathResolver.shared('evaluations/mission-orchestration/evaluation-report.json')
   );
-  const runs = readJson<ScenarioRunRecord[]>(runsPath);
+  const runs = loadScenarioRuns(runsPath);
   if (!Array.isArray(runs) || runs.length === 0) {
     throw new Error('Run record input must be a non-empty array.');
   }
 
   const report = buildMissionOrchestrationEvaluationReport(runs);
-  const reportSchemaPath = pathResolver.knowledge(
-    'product/schemas/mission-orchestration-evaluation-report.schema.json'
-  );
-  const validate = compileSchema(reportSchemaPath);
-  if (!validate(report)) {
-    const errors = (validate.errors || [])
-      .map((error: any) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Evaluation report validation failed: ${errors}`);
-  }
+  validateReport(report);
 
-  const resolvedOutPath = pathResolver.resolve(outPath);
+  const resolvedOutPath = assertSafeRepositoryPath(pathResolver.resolve(outPath), {
+    allowMissingLeaf: true,
+  });
   safeMkdir(path.dirname(resolvedOutPath), { recursive: true });
   safeWriteFile(resolvedOutPath, JSON.stringify(report, null, 2));
-  console.log(`[evaluate:mission-orchestration] wrote report to ${outPath}`);
-  console.log(
-    `[evaluate:mission-orchestration] completion delta: ${report.summary.orchestrated_completion_rate_delta}`
-  );
-  console.log(
-    `[evaluate:mission-orchestration] policy violation delta: ${report.summary.orchestrated_policy_violations_delta}`
-  );
-  console.log(
-    `[evaluate:mission-orchestration] average context chars / needs rate: ${report.mode_metrics.orchestrated.average_context_chars_per_run} / ${report.mode_metrics.orchestrated.needs_rate_per_run}`
+  if (json) {
+    print({
+      ok: true,
+      report_path: outPath,
+      report,
+    });
+    return;
+  }
+  print(
+    [
+      `[evaluate:mission-orchestration] wrote report to ${outPath}`,
+      `[evaluate:mission-orchestration] completion delta: ${report.summary.orchestrated_completion_rate_delta}`,
+      `[evaluate:mission-orchestration] policy violation delta: ${report.summary.orchestrated_policy_violations_delta}`,
+      `[evaluate:mission-orchestration] average context chars / needs rate: ${report.mode_metrics.orchestrated.average_context_chars_per_run} / ${report.mode_metrics.orchestrated.needs_rate_per_run}`,
+    ].join('\n')
   );
 }
 
 export const runEvaluateMissionOrchestration = defineScript({
   name: 'evaluate:mission-orchestration',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json'],
+  run: ({ argv, json, print }) => main(argv, print, json),
 });
 
 if (

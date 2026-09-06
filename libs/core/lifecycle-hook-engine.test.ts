@@ -5,7 +5,7 @@ vi.mock('./core.js', () => ({
 }));
 
 const recordGovernanceAction = vi.fn();
-vi.mock('./kill-switch.js', () => ({
+vi.mock('./governance-action-recorder.js', () => ({
   recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
 }));
 
@@ -17,8 +17,10 @@ const execResult = vi.hoisted(() => ({
   },
 }));
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: vi.fn((filePath: string) => filePath),
   safeExecResult: vi.fn(() => execResult.value),
   safeExistsSync: vi.fn(() => false),
+  safeLstat: vi.fn(() => ({ isSymbolicLink: () => false })),
   safeReadFile: vi.fn(() => '{}'),
   safeAppendFileSync: vi.fn(),
   safeMkdir: vi.fn(),
@@ -357,6 +359,23 @@ describe('LifecycleHookEngine', () => {
     expect(denied.reasons).toEqual(['policy denied']);
   });
 
+  it('ignores malformed command-hook JSON instead of applying unsafe patches', async () => {
+    const engine = new LifecycleHookEngine();
+    registerExternalLifecycleHooks(
+      engine,
+      { PostToolUse: [{ hooks: [{ type: 'command', command: ['external-hook'] }] }] },
+      'claude-code'
+    );
+    execResult.value = {
+      stdout: '{"decision":"block","result_patch":{"__proto__":{"polluted":true}}}',
+      stderr: '',
+      status: 0,
+    };
+
+    const outcome = await engine.fire('post_tool_use', { matcher_value: 'tool:write' });
+    expect(outcome).toMatchObject({ blocked: false, decision: 'allow', resultPatch: {} });
+  });
+
   it('aggregates partial result patches for post-tool middleware', async () => {
     const engine = new LifecycleHookEngine();
     engine.register({
@@ -373,6 +392,11 @@ describe('LifecycleHookEngine', () => {
 
   it('loadLifecycleHookEngine skips malformed config entries (fail-open)', () => {
     const engine = loadLifecycleHookEngine('/nonexistent/hooks.json');
+    expect(engine.hookCountFor('pre_tool_use')).toBe(0);
+  });
+
+  it('does not load a non-canonical config path as executable hooks', () => {
+    const engine = loadLifecycleHookEngine('/tmp/provider-settings.json');
     expect(engine.hookCountFor('pre_tool_use')).toBe(0);
   });
 });

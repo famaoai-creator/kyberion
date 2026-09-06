@@ -14,6 +14,8 @@
  * scoped JSON file can plug in here without churning callers.
  */
 
+import { getRegisteredEnvText } from './foundation/env.js';
+
 const DEFAULT_RESTRICTED_POLICY_PATH =
   'knowledge/product/governance/restricted-action-kinds-policy.json';
 
@@ -62,26 +64,30 @@ function parseIdList(input: string | undefined): ReadonlySet<string> {
     (input ?? '')
       .split(',')
       .map((s) => s.trim())
-      .filter(Boolean),
+      .filter(Boolean)
   );
 }
 
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
 export function loadMeetingFacilitatorPolicy(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): MeetingFacilitatorPolicy {
   return {
-    restricted_approved_item_ids: parseIdList(env.KYBERION_RESTRICTED_APPROVED_ITEMS),
-    sudo_override: env.KYBERION_SUDO === 'true',
-    reminder_cc_after_n: parseNumber(env.KYBERION_REMINDER_CC_AFTER_N, 3),
+    restricted_approved_item_ids: parseIdList(envText(env, 'KYBERION_RESTRICTED_APPROVED_ITEMS')),
+    sudo_override: envText(env, 'KYBERION_SUDO') === 'true',
+    reminder_cc_after_n: parseNumber(envText(env, 'KYBERION_REMINDER_CC_AFTER_N'), 3),
     speaker_fairness_total_threshold: parseNumber(
-      env.KYBERION_SPEAKER_FAIRNESS_TOTAL_THRESHOLD,
-      0.6,
+      envText(env, 'KYBERION_SPEAKER_FAIRNESS_TOTAL_THRESHOLD'),
+      0.6
     ),
     speaker_fairness_must_threshold: parseNumber(
-      env.KYBERION_SPEAKER_FAIRNESS_MUST_THRESHOLD,
-      0.7,
+      envText(env, 'KYBERION_SPEAKER_FAIRNESS_MUST_THRESHOLD'),
+      0.7
     ),
     restricted_actions_policy_path:
-      env.KYBERION_RESTRICTED_ACTIONS_POLICY ?? DEFAULT_RESTRICTED_POLICY_PATH,
+      envText(env, 'KYBERION_RESTRICTED_ACTIONS_POLICY') ?? DEFAULT_RESTRICTED_POLICY_PATH,
   };
 }

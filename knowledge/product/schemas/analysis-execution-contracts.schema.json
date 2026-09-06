@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "analysis-execution-contracts.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "contracts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "contract_id": { "type": "string", "minLength": 1 },
+          "intent_id": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "required_bindings": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "compiler_steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "evidence_outputs": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "required": [
+          "contract_id",
+          "intent_id",
+          "summary",
+          "required_bindings",
+          "compiler_steps",
+          "evidence_outputs"
+        ]
+      }
+    }
+  },
+  "required": ["version", "contracts"]
+}

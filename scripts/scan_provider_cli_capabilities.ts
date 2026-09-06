@@ -1,19 +1,31 @@
 import * as path from 'node:path';
 import {
   buildProviderCapabilitySnapshot,
+  validateProviderCapabilitySnapshot,
+} from '@agent/core/provider-capability-overview';
+import {
   discoverProviders,
-  loadCapabilityRegistry,
   mergeProbedCapabilitiesIntoCatalog,
-  pathResolver,
-  probeProviderAvailability,
-  safeMkdir,
-  safeWriteFile,
-  scanProviderCapabilities,
   type ProbedProviderCapabilities,
-} from '@agent/core';
+} from '@agent/core/provider-discovery';
+import {
+  loadCapabilityRegistry,
+  probeProviderAvailability,
+  scanProviderCapabilities,
+} from '@agent/core/provider-capability-scanner';
+import { probeProviderCapabilities } from '@agent/core/provider-capability-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-function main(args: string[]): void {
+export const PROVIDER_CAPABILITY_SCAN_USAGE =
+  'Usage: pnpm scan:provider-cli-capabilities [--out <path>] [--write-knowledge]';
+
+export function main(args: string[]): unknown {
+  if (args.includes('--help') || args.includes('-h')) {
+    return { status: 'help', usage: PROVIDER_CAPABILITY_SCAN_USAGE };
+  }
+
   const outPathArgIndex = args.indexOf('--out');
   const outPath =
     outPathArgIndex >= 0 && args[outPathArgIndex + 1]
@@ -22,6 +34,7 @@ function main(args: string[]): void {
 
   const registry = loadCapabilityRegistry();
   const providerAvailability = probeProviderAvailability();
+  const runtimeProbes = probeProviderCapabilities();
   const discovered = scanProviderCapabilities(registry);
   const discoveredProviders = new Map(
     discoverProviders(true).map((provider) => [provider.provider, provider])
@@ -46,11 +59,17 @@ function main(args: string[]): void {
     discovered,
     providerAvailability,
     providers,
+    runtimeProbes,
   });
 
-  const resolvedOutPath = pathResolver.resolve(outPath);
+  const resolvedOutPath = assertSafeRepositoryPath(pathResolver.resolve(outPath), {
+    allowMissingLeaf: true,
+  });
+  const validatedSummary = validateProviderCapabilitySnapshot(summary, resolvedOutPath);
   safeMkdir(path.dirname(resolvedOutPath), { recursive: true });
-  safeWriteFile(resolvedOutPath, JSON.stringify(summary, null, 2), { encoding: 'utf8' });
+  safeWriteFile(resolvedOutPath, JSON.stringify(validatedSummary, null, 2), {
+    encoding: 'utf8',
+  });
 
   // probe -> knowledge loop: optionally merge what was discovered into the knowledge catalog
   // (knowledge/product/orchestration/provider-capabilities.json), preserving manual edits.
@@ -68,18 +87,19 @@ function main(args: string[]): void {
       updatedBy: 'scan_provider_cli_capabilities',
       note: 'Refreshed from CLI discovery; union-merged so manual entries are preserved.',
     });
-    console.error(
-      `[scan] merged ${Object.keys(probed).length} provider(s) into the knowledge capability catalog`
-    );
   }
 
-  console.log(JSON.stringify(summary, null, 2));
+  return summary;
 }
 
 const script = defineScript({
   name: 'scan:provider-cli-capabilities',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json'],
+  run: ({ argv, print }) => {
+    const result = main(argv);
+    print(result);
+    return result;
+  },
 });
 if (
   isDirectScript(import.meta.url, 'scan_provider_cli_capabilities.ts') ||

@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardRequest } from '../../../lib/api-guard';
 import * as customerResolver from '@agent/core/customer-resolver';
-import { loadJson, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import {
+  loadPersonalAgentIdentityAtPath,
+  loadPersonalIdentityAtPath,
+  parsePersonalAgentIdentitySummary,
+  parsePersonalSovereignIdentitySummary,
+} from '@agent/core/personal-identity-reader';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
 import {
   resolveViewerContextForRequest,
   withViewerExecutionContext,
@@ -9,35 +20,12 @@ import {
 
 export const runtime = 'nodejs';
 
-interface SovereignIdentity {
-  name?: string;
-  language?: string;
-  interaction_style?: string;
-  primary_domain?: string;
-  status?: string;
-}
-
-interface AgentIdentity {
-  agent_id?: string;
-  role?: string;
-  owner?: string;
-  trust_tier?: string;
-}
-
-function readJson<T>(fileName: string): T | null {
-  const full = customerResolver.resolveOverlay(fileName);
-  if (!safeExistsSync(full)) return null;
-  try {
-    return loadJson<T>(full);
-  } catch {
-    return null;
-  }
-}
-
 function readText(fileName: string): string | null {
-  const full = customerResolver.resolveOverlay(fileName);
-  if (!safeExistsSync(full)) return null;
   try {
+    const full = assertSafeRepositoryPath(customerResolver.resolveOverlay(fileName), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(full) || !safeLstat(full).isFile()) return null;
     return safeReadFile(full, { encoding: 'utf8' }) as string;
   } catch {
     return null;
@@ -55,8 +43,12 @@ export async function GET(req: NextRequest) {
     // over knowledge/personal/, matching operator-identity.ts's resolution
     // order, so vital-check and FirstRunBanner don't misreport identity as
     // missing under a tenant overlay.
-    const sovereign = readJson<SovereignIdentity>('my-identity.json');
-    const agent = readJson<AgentIdentity>('agent-identity.json');
+    const sovereign = parsePersonalSovereignIdentitySummary(
+      loadPersonalIdentityAtPath(customerResolver.resolveOverlay('my-identity.json'))
+    );
+    const agent = parsePersonalAgentIdentitySummary(
+      loadPersonalAgentIdentityAtPath(customerResolver.resolveOverlay('agent-identity.json'))
+    );
     const visionRaw = readText('my-vision.md');
     const vision = visionRaw
       ? visionRaw

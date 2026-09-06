@@ -1,20 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  pathResolver,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-  sha256,
-  type MarketingCompletionEvidence,
-} from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { sha256, type MarketingCompletionEvidence } from '@agent/core/marketing-workload';
 import { validateMarketingMissionCompletionGate } from './mission-governance.js';
 
 const roots: string[] = [];
 
-function createFixture(): { missionPath: string; artifactPath: string } {
+function createFixture(): {
+  missionPath: string;
+  artifactPath: string;
+  completionEvidencePath: string;
+} {
   const missionPath = pathResolver.shared(`tmp/mission-marketing-completion-tests/${randomUUID()}`);
   roots.push(missionPath);
   const runPath = path.join(missionPath, 'evidence', 'marketing-video', 'runs', 'run-1');
@@ -40,8 +38,9 @@ function createFixture(): { missionPath: string; artifactPath: string } {
     sensitive_data_scan: { pii_findings: [], secret_findings: [], passed: true },
     completion_eligible: true,
   };
-  safeWriteFile(path.join(runPath, 'completion-evidence.json'), JSON.stringify(evidence));
-  return { missionPath, artifactPath };
+  const completionEvidencePath = path.join(runPath, 'completion-evidence.json');
+  safeWriteFile(completionEvidencePath, JSON.stringify(evidence));
+  return { missionPath, artifactPath, completionEvidencePath };
 }
 
 afterEach(() => {
@@ -88,5 +87,20 @@ describe('mission marketing completion gate', () => {
     expect(
       validateMarketingMissionCompletionGate({ missionType: 'development', missionPath: null })
     ).toEqual({ ok: true });
+  });
+
+  it('rejects schema-invalid completion evidence before semantic gate evaluation', () => {
+    const fixture = createFixture();
+    safeWriteFile(
+      fixture.completionEvidencePath,
+      JSON.stringify({ workload: 'marketing-video-production', completion_eligible: true })
+    );
+
+    expect(
+      validateMarketingMissionCompletionGate({
+        missionType: 'marketing-video-production',
+        missionPath: fixture.missionPath,
+      }).reason
+    ).toContain('Marketing completion evidence is invalid');
   });
 });

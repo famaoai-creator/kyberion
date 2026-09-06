@@ -7,7 +7,7 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import {
   getSurfaceCoordinationRole,
-  resetSurfaceCoordinationRoleMapCache,
+  _resetSurfaceCoordinationRoleMapCacheForTests,
 } from './surface-coordination-role-map.js';
 import { withoutSchemaMetadata } from './test-governance-payload.js';
 
@@ -15,7 +15,7 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 
 describe('surface-coordination-role-map', () => {
   it('maps surfaces to governed roles', () => {
-    resetSurfaceCoordinationRoleMapCache();
+    _resetSurfaceCoordinationRoleMapCacheForTests();
     expect(getSurfaceCoordinationRole('slack')).toBe('slack_bridge');
     expect(getSurfaceCoordinationRole('chronos')).toBe('chronos_gateway');
     expect(getSurfaceCoordinationRole('presence')).toBe('surface_runtime');

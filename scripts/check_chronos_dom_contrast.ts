@@ -4,7 +4,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEFAULT_PORT = 3317;
 const DEFAULT_URL = `http://127.0.0.1:${DEFAULT_PORT}`;
@@ -72,7 +72,8 @@ async function waitForServer(
   while (Date.now() < deadline) {
     if (server.exitCode !== null) {
       const startupOutput = getStartupOutput();
-      throw new Error(
+      throw new ScriptExitError(
+        1,
         `Chronos exited before becoming ready (code ${server.exitCode}).${startupOutput ? `\n${startupOutput.trim()}` : ''}`
       );
     }
@@ -85,7 +86,8 @@ async function waitForServer(
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   const startupOutput = getStartupOutput();
-  throw new Error(
+  throw new ScriptExitError(
+    1,
     `Chronos did not become ready at ${url}.${startupOutput ? `\n${startupOutput.trim()}` : ''}`
   );
 }
@@ -270,15 +272,21 @@ export const runCheckChronosDomContrast = defineScript({
         requestedMode === 'light' || requestedMode === 'dark' ? [requestedMode] : ['light', 'dark'];
       const findings = (await Promise.all(modes.map((mode) => inspect(url, mode)))).flat();
       if (findings.length > 0) {
-        console.error(`[check:chronos-dom-contrast] ${findings.length} violation(s)`);
-        for (const finding of findings.slice(0, 20)) {
-          console.error(
-            `- ${finding.tag} ${finding.ratio}:1 < ${finding.threshold}:1 ${finding.color} on ${finding.background} ${finding.text}`
-          );
-        }
-        throw new Error(`${findings.length} Chronos contrast violation(s)`);
+        throw new ScriptExitError(
+          1,
+          [
+            `${findings.length} violation(s)`,
+            ...findings
+              .slice(0, 20)
+              .map(
+                (finding) =>
+                  `- ${finding.tag} ${finding.ratio}:1 < ${finding.threshold}:1 ${finding.color} on ${finding.background} ${finding.text}`
+              ),
+          ].join('\n')
+        );
       }
       context.print(`[check:chronos-dom-contrast] OK (${modes.join(' + ')}, reduced-motion)`);
+      return { modes, findings };
     } finally {
       if (server) await stopChronos(server);
     }

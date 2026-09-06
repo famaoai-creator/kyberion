@@ -1,19 +1,12 @@
-import {
-  compileSchemaFromPath,
-  isValidTenantSlug,
-  logger,
-  pathResolver,
-  physicalScopedPath,
-  resolveIntentContractMemoryPaths,
-  safeExistsSync,
-  safeWriteFile,
-} from '@agent/core';
-import { createAjv } from '@agent/core/foundation';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { physicalScopedPath } from '@agent/core/physical-namespace';
+import { resolveIntentContractMemoryPaths } from '@agent/core/intent-contract-learning';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { defineCatalog, nowIso } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
-
-const ajv = createAjv();
 
 const MEMORY_SCHEMA_PATH =
   getRegisteredEnvText('KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH') ||
@@ -35,18 +28,30 @@ type MemoryFile = {
   >;
 };
 
-function readJson<T>(absPath: string): T {
-  return readFoundationJson<T>(absPath);
+function memoryCatalog(filePath: string) {
+  return defineCatalog<MemoryFile>({
+    id: 'intent-contract-memory',
+    path: assertSafeRepositoryPath(pathResolver.resolve(filePath), { allowMissingLeaf: true }),
+    schema: assertSafeRepositoryPath(pathResolver.resolve(MEMORY_SCHEMA_PATH)),
+  });
 }
 
-function validateMemory(value: unknown): asserts value is MemoryFile {
-  const validate = compileSchemaFromPath(ajv as any, MEMORY_SCHEMA_PATH);
-  if (!validate(value)) {
-    const errors = (validate.errors || [])
-      .map((e) => `${e.instancePath || '/'} ${e.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`intent-contract-memory schema violation: ${errors}`);
+export function resolveIntentContractMemoryPath(filePath: string, label: string): string {
+  try {
+    return assertSafeRepositoryPath(pathResolver.resolve(filePath), { allowMissingLeaf: true });
+  } catch (error) {
+    throw new Error(
+      `[${label}_PATH_SCOPE] ${error instanceof Error ? error.message : String(error)}`
+    );
   }
+}
+
+function loadMemory(filePath: string): MemoryFile {
+  return memoryCatalog(filePath).load();
+}
+
+function validateMemory(value: unknown, sourcePath: string): MemoryFile {
+  return memoryCatalog(sourcePath).validate(value, sourcePath);
 }
 
 function entryKey(entry: {
@@ -104,8 +109,14 @@ export const runSyncIntentContractMemory = defineScript({
   name: 'sync:intent-contract-memory',
   run(context) {
     const scope = resolveTenantScope(context.argv);
-    const reportPath = getOptionValue('--report', context.argv) || scopedReportPath(scope);
-    const exportDir = getOptionValue('--export-dir', context.argv) || scopedExportDir(scope);
+    const reportPath = resolveIntentContractMemoryPath(
+      getOptionValue('--report', context.argv) || scopedReportPath(scope),
+      'REPORT'
+    );
+    const exportDir = resolveIntentContractMemoryPath(
+      getOptionValue('--export-dir', context.argv) || scopedExportDir(scope),
+      'EXPORT_DIR'
+    );
     const persistExport = context.positional.includes('--persist-export');
     const syncSeed = context.positional.includes('--sync-seed');
     const missionId = getOptionValue('--mission-id', context.argv);
@@ -119,24 +130,27 @@ export const runSyncIntentContractMemory = defineScript({
     const runtimePathOverride = getRegisteredEnvText(
       'KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH'
     )?.trim();
-    const runtimePath =
-      runtimePathOverride && !scope ? pathResolver.rootResolve(runtimePathOverride) : paths.runtime;
+    const runtimePath = resolveIntentContractMemoryPath(
+      runtimePathOverride && !scope ? pathResolver.rootResolve(runtimePathOverride) : paths.runtime,
+      'RUNTIME'
+    );
     const seedPathOverride = getRegisteredEnvText(
       'KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH'
     )?.trim();
-    const seedPath = seedPathOverride ? pathResolver.rootResolve(seedPathOverride) : paths.seed;
+    const seedPath = resolveIntentContractMemoryPath(
+      seedPathOverride ? pathResolver.rootResolve(seedPathOverride) : paths.seed,
+      'SEED'
+    );
     if (!safeExistsSync(runtimePath)) {
       logger.info('[sync:intent-contract-memory] runtime memory not found; nothing to sync');
       return;
     }
 
-    const runtime = readJson<unknown>(runtimePath);
-    validateMemory(runtime);
+    const runtime = loadMemory(runtimePath);
 
     const base = safeExistsSync(seedPath)
-      ? readJson<unknown>(seedPath)
-      : { version: '1.0.0', entries: [] };
-    validateMemory(base);
+      ? loadMemory(seedPath)
+      : validateMemory({ version: '1.0.0', entries: [] }, seedPath);
 
     const seedMemory = base as MemoryFile;
     const runtimeMemory = runtime as MemoryFile;
@@ -166,13 +180,13 @@ export const runSyncIntentContractMemory = defineScript({
       version: runtimeMemory.version || seedMemory.version || '1.0.0',
       entries: Array.from(merged.values()),
     };
-    validateMemory(snapshot);
+    validateMemory(snapshot, `${runtimePath}#merged`);
 
     if (syncSeed) {
       safeWriteFile(seedPath, JSON.stringify(snapshot, null, 2));
     }
     const report = {
-      generated_at: new Date().toISOString(),
+      generated_at: nowIso(),
       ...(missionId ? { mission_id: missionId.toUpperCase() } : {}),
       ...(stage ? { stage } : {}),
       ...(scope ? { scope } : {}),
@@ -190,8 +204,11 @@ export const runSyncIntentContractMemory = defineScript({
     };
     safeWriteFile(reportPath, JSON.stringify(report, null, 2));
     if (persistExport) {
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const exportPath = `${exportDir}/intent-contract-memory-sync-${stamp}.json`;
+      const stamp = nowIso().replace(/[:.]/g, '-');
+      const exportPath = resolveIntentContractMemoryPath(
+        `${exportDir}/intent-contract-memory-sync-${stamp}.json`,
+        'EXPORT'
+      );
       try {
         safeWriteFile(exportPath, JSON.stringify(report, null, 2));
       } catch (error) {

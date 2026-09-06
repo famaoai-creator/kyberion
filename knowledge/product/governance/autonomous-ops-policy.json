@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/autonomous-ops-policy.schema.json",
   "version": "1.0.0",
   "decision_thresholds": {
     "auto_max_score": 3,

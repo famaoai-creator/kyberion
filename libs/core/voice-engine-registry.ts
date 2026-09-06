@@ -1,10 +1,8 @@
-import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 
 export type VoiceEngineStatus = 'active' | 'shadow' | 'disabled';
 export type VoiceEngineKind = 'native_local' | 'voice_clone_service';
@@ -46,53 +44,39 @@ const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
 );
 const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('product/governance/voice-engines');
 
-const FALLBACK_REGISTRY: VoiceEngineRegistry = {
-  version: 'fallback',
-  default_engine_id: 'local_say',
-  engines: [
-    {
-      engine_id: 'local_say',
-      display_name: 'Local System TTS',
-      kind: 'native_local',
-      provider: 'system_tts',
-      status: 'active',
-      platforms: ['darwin', 'linux', 'win32'],
-      supports: {
-        list_voices: true,
-        playback: true,
-        artifact_formats: ['wav', 'aiff'],
-      },
-    },
-  ],
-};
-
 let cachedRegistryPath: string | null = null;
 let cachedRegistryDir: string | null = null;
 let cachedRegistry: VoiceEngineRegistry | null = null;
 
 function getRegistryPath(): string {
-  return (
-    getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
-  );
+  const configured =
+    getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 function getRegistryDir(): string {
-  return getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_DIR')?.trim() || DEFAULT_REGISTRY_DIR;
+  const configured =
+    getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_DIR')?.trim() || DEFAULT_REGISTRY_DIR;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 const voiceEngineCatalog = defineCatalog<VoiceEngineRegistry>({
   id: 'voice-engine-registry',
   path: getRegistryPath,
   schema: pathResolver.knowledge('product/schemas/voice-engine-registry.schema.json'),
-  fallback: () => FALLBACK_REGISTRY,
 });
 
 function loadRegistryFromPath(registryPath: string): VoiceEngineRegistry {
-  return voiceEngineCatalog.validate(readJson<unknown>(registryPath), registryPath);
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath);
+  return defineCatalog<VoiceEngineRegistry>({
+    id: 'voice-engine-registry.entry',
+    path: safeRegistryPath,
+    schema: pathResolver.knowledge('product/schemas/voice-engine-registry.schema.json'),
+  }).load();
 }
 
 function loadRegistryDirectory(registryDir: string): VoiceEngineRegistry {
-  const dir = pathResolver.rootResolve(registryDir);
+  const dir = assertSafeRepositoryPath(registryDir, { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) {
     throw new Error(`Voice engine registry directory not found: ${dir}`);
   }
@@ -109,7 +93,7 @@ function loadRegistryDirectory(registryDir: string): VoiceEngineRegistry {
   let defaultEngineId = '';
 
   for (const file of files) {
-    const filePath = pathResolver.rootResolve(path.join(dir, file));
+    const filePath = assertSafeRepositoryPath(path.join(dir, file));
     if (!safeStat(filePath).isFile()) {
       continue;
     }
@@ -148,7 +132,13 @@ function loadRegistryDirectory(registryDir: string): VoiceEngineRegistry {
   };
 }
 
-export function resetVoiceEngineRegistryCache(): void {
+export function loadVoiceEngineRegistryDirectory(
+  registryDir = getRegistryDir()
+): VoiceEngineRegistry {
+  return loadRegistryDirectory(registryDir);
+}
+
+export function _resetVoiceEngineRegistryCacheForTests(): void {
   cachedRegistryPath = null;
   cachedRegistryDir = null;
   cachedRegistry = null;
@@ -161,38 +151,19 @@ export function getVoiceEngineRegistry(): VoiceEngineRegistry {
   if (cachedRegistryPath === registryPath && cachedRegistryDir === registryDir && cachedRegistry)
     return cachedRegistry;
 
-  if (
-    registryPath === DEFAULT_REGISTRY_PATH &&
-    safeExistsSync(pathResolver.rootResolve(registryDir))
-  ) {
-    try {
-      const parsed = loadRegistryDirectory(registryDir);
-      cachedRegistryPath = registryPath;
-      cachedRegistryDir = registryDir;
-      cachedRegistry = parsed;
-      return parsed;
-    } catch (error: any) {
-      logger.warn(
-        `[VOICE_ENGINE_REGISTRY] Failed to load registry directory at ${registryDir}: ${error.message}`
-      );
-    }
-  }
-
-  try {
-    const parsed = voiceEngineCatalog.load();
+  if (registryPath === DEFAULT_REGISTRY_PATH && safeExistsSync(registryDir)) {
+    const parsed = loadRegistryDirectory(registryDir);
     cachedRegistryPath = registryPath;
     cachedRegistryDir = registryDir;
     cachedRegistry = parsed;
     return parsed;
-  } catch (error: any) {
-    logger.warn(
-      `[VOICE_ENGINE_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
-    );
-    cachedRegistryPath = registryPath;
-    cachedRegistryDir = registryDir;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
   }
+
+  const parsed = voiceEngineCatalog.load();
+  cachedRegistryPath = registryPath;
+  cachedRegistryDir = registryDir;
+  cachedRegistry = parsed;
+  return parsed;
 }
 
 export function listVoiceEngines(
@@ -209,7 +180,7 @@ export function getVoiceEngineRecord(engineId?: string): VoiceEngineRecord {
   return (
     registry.engines.find((engine) => engine.engine_id === resolvedEngineId) ||
     registry.engines.find((engine) => engine.engine_id === registry.default_engine_id) ||
-    FALLBACK_REGISTRY.engines[0]
+    registry.engines[0]
   );
 }
 

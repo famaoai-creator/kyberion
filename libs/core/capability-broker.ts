@@ -1,9 +1,17 @@
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import type { CapabilityResolveOptions } from './agent-provider-resolution.js';
 import {
   isInstanceDemoted,
@@ -56,10 +64,15 @@ interface PinFile {
 }
 
 const PIN_FILE_VERSION = '1.0';
+const PROVIDER_PINS_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/provider-pins.schema.json'
+);
 
 function actorId(): string {
   return (
-    getRegisteredEnvText('KYBERION_PERSONA') || process.env.MISSION_ROLE || 'capability-broker'
+    getRegisteredEnvText('KYBERION_PERSONA') ||
+    getRegisteredEnvText('MISSION_ROLE') ||
+    'capability-broker'
   );
 }
 
@@ -68,27 +81,44 @@ function actorId(): string {
  * atomically with the mission); otherwise a shared runtime file keyed by mission id.
  */
 function pinFilePath(): string {
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   if (missionId) {
     for (const tier of ['personal', 'confidential', 'public']) {
       const missionDir = pathResolver.rootResolve(path.join('active/missions', tier, missionId));
-      if (safeExistsSync(path.join(missionDir, 'mission-state.json'))) {
-        return path.join(missionDir, 'provider-pins.json');
+      const missionStatePath = assertSafeRepositoryPath(
+        path.join(missionDir, 'mission-state.json'),
+        { allowMissingLeaf: true }
+      );
+      if (safeExistsSync(missionStatePath)) {
+        return assertSafeRepositoryPath(path.join(missionDir, 'provider-pins.json'), {
+          allowMissingLeaf: true,
+        });
       }
     }
-    return pathResolver.rootResolve(
-      path.join('active/shared/runtime/provider-pins', `${missionId}.json`)
+    return assertSafeRepositoryPath(
+      pathResolver.rootResolve(
+        path.join('active/shared/runtime/provider-pins', `${missionId}.json`)
+      ),
+      { allowMissingLeaf: true }
     );
   }
-  return pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json');
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json'),
+    { allowMissingLeaf: true }
+  );
 }
+
+const providerPinsCatalog = defineCatalog<PinFile>({
+  id: 'provider-pins',
+  path: pinFilePath,
+  schema: PROVIDER_PINS_SCHEMA_PATH,
+});
 
 function readPinFile(): PinFile {
   try {
     const filePath = pinFilePath();
-    if (!safeExistsSync(filePath)) return { version: PIN_FILE_VERSION, pins: {} };
-    const parsed = loadJson<PinFile>(filePath);
-    if (parsed && typeof parsed.pins === 'object' && parsed.pins !== null) return parsed;
+    if (!safeLstat(filePath).isFile()) return { version: PIN_FILE_VERSION, pins: {} };
+    return providerPinsCatalog.load();
   } catch {
     /* treat as empty */
   }
@@ -113,11 +143,11 @@ export function pinProviderDecision(decisionKey: string, decision: ProviderDecis
     modelId: decision.modelId,
     instance: decision.instance,
     orchestration: decision.orchestration,
-    pinnedAt: new Date().toISOString(),
+    pinnedAt: nowIso(),
     by: actorId(),
   };
   file.version = PIN_FILE_VERSION;
-  file.missionId = process.env.MISSION_ID;
+  file.missionId = getRegisteredEnvText('MISSION_ID');
   file.pins[decisionKey] = entry;
   writePinFile(file);
   return entry;

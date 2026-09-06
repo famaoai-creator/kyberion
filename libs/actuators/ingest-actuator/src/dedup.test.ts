@@ -5,8 +5,16 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from '@agent/core';
-import { dedupContent } from './dedup.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { dedupContent, parseIngestRegistryRecord } from './dedup.js';
 
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
@@ -112,5 +120,75 @@ describe('ingest:dedup (DA-04 acceptance 3)', () => {
 
   it('requires content_sha256', () => {
     expect(() => dedupContent({ content_sha256: '' })).toThrow(/content_sha256 is required/);
+    expect(() => dedupContent({ content_sha256: 'not-a-sha256' })).toThrow(
+      /content_sha256 is required/
+    );
+  });
+
+  it('ignores malformed registry rows during duplicate detection', () => {
+    const valid = JSON.stringify({
+      content_sha256: HASH_A,
+      source_system: 'confluence',
+      source_id: 'PAGE-1',
+      first_seen: NOW,
+    });
+    safeWriteFile(
+      registryPath,
+      `${valid}\n${JSON.stringify({ content_sha256: HASH_A, first_seen: 42 })}\n[]\n`,
+      { encoding: 'utf8' }
+    );
+    const result = dedupContent({
+      content_sha256: HASH_A,
+      registry_path: registryPath,
+      register: false,
+    });
+    expect(result.existing).toEqual(JSON.parse(valid));
+    expect(parseIngestRegistryRecord({ content_sha256: 'bad', first_seen: NOW })).toBeUndefined();
+  });
+
+  it('ignores registry rows containing dangerous keys', () => {
+    safeWriteFile(
+      registryPath,
+      `{"content_sha256":"${HASH_A}","first_seen":"${NOW}","__proto__":{"polluted":true}}\n`,
+      { encoding: 'utf8' }
+    );
+    expect(
+      dedupContent({ content_sha256: HASH_A, registry_path: registryPath, register: false })
+    ).toEqual({ duplicate: false, registered: false });
+  });
+
+  it('rejects registry paths outside the repository and through symlinks', () => {
+    expect(() =>
+      dedupContent({
+        content_sha256: 'd'.repeat(64),
+        registry_path: '/tmp/kyberion-outside-registry.jsonl',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+
+    const linkedDir = path.join(fixtureDir, 'linked-registry');
+    const targetDir = path.join(fixtureDir, 'registry-target');
+    safeMkdir(targetDir, { recursive: true });
+    safeSymlinkSync(targetDir, linkedDir, 'dir');
+    try {
+      expect(() =>
+        dedupContent({
+          content_sha256: 'e'.repeat(64),
+          registry_path: path.join(linkedDir, 'content-hash-registry.jsonl'),
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(linkedDir, { force: true });
+      safeRmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects an absolute target_path before registering a hash', () => {
+    expect(() =>
+      dedupContent({
+        content_sha256: 'f'.repeat(64),
+        registry_path: registryPath,
+        target_path: '/tmp/outside-card.md',
+      })
+    ).toThrow('target_path must be repository-relative');
   });
 });

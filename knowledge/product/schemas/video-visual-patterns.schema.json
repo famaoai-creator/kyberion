@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Video Visual Pattern Catalog",
+  "description": "Curated visual patterns selected by the reasoning layer and resolved deterministically by the video compiler.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "description", "patterns"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "patterns": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "mood", "palette", "typography"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "mood": { "type": "string", "minLength": 1 },
+          "palette": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["bg", "panel", "accent", "accent_text", "text", "subtext"],
+            "properties": {
+              "bg": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+              "panel": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+              "accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+              "accent_text": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+              "text": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+              "subtext": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+            }
+          },
+          "typography": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["portrait", "landscape"],
+            "properties": {
+              "portrait": {
+                "$ref": "#/definitions/type_scale"
+              },
+              "landscape": {
+                "$ref": "#/definitions/type_scale"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "type_scale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headline_px", "body_px"],
+      "properties": {
+        "headline_px": { "type": "number", "minimum": 1 },
+        "body_px": { "type": "number", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -11,11 +11,22 @@ import { metrics, MetricsCollector } from './metrics.js';
 import { pathResolver } from './path-resolver.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { withLockSync } from './src/lock-utils.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeReaddir, safeStat, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeLstat,
+  safeWriteFile,
+} from './secure-io.js';
 
 export const GENERATION_COST_SETTLEMENT_ROOT =
   'active/shared/runtime/media-generation/cost-settlements';
+
+const GENERATION_COST_SETTLEMENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/generation-cost-settlement.schema.json'
+);
 
 export type GenerationCostSettlementStatus = 'settled' | 'unavailable';
 
@@ -50,6 +61,20 @@ export interface SettleGenerationProviderCostOptions {
   rootDir?: string;
 }
 
+const generationCostSettlementCatalog = defineCatalog<GenerationCostSettlement>({
+  id: 'generation-cost-settlement',
+  path: GENERATION_COST_SETTLEMENT_SCHEMA_PATH,
+  schema: GENERATION_COST_SETTLEMENT_SCHEMA_PATH,
+});
+
+function generationCostSettlementCatalogAtPath(filePath: string) {
+  return defineCatalog<GenerationCostSettlement>({
+    id: 'generation-cost-settlement',
+    path: filePath,
+    schema: GENERATION_COST_SETTLEMENT_SCHEMA_PATH,
+  });
+}
+
 function settlementFile(
   jobId: string,
   scope: EventScope,
@@ -58,9 +83,12 @@ function settlementFile(
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(jobId)) {
     throw new Error(`[GENERATION_COST_JOB_ID_INVALID] invalid job_id '${jobId}'`);
   }
-  return path.join(
-    rootDir,
-    physicalScopedPath(GENERATION_COST_SETTLEMENT_ROOT, scope, `${jobId}.json`)
+  return assertSafeRepositoryPath(
+    path.join(
+      assertSafeRepositoryPath(rootDir, { allowMissingLeaf: true }),
+      physicalScopedPath(GENERATION_COST_SETTLEMENT_ROOT, scope, `${jobId}.json`)
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -109,27 +137,88 @@ export function extractProviderReportedCost(job: GenerationCostSettlementJob): n
   return candidates.map(finiteNonNegative).find((value): value is number => value !== undefined);
 }
 
-function readSettlement(filePath: string): GenerationCostSettlement | undefined {
+function scopesEqual(left: EventScope, right: EventScope): boolean {
+  const keys: Array<keyof EventScope> = [
+    'scope_kind',
+    'tier',
+    'tenant_slug',
+    'organization_id',
+    'project_id',
+    'mission_id',
+    'task_id',
+    'session_id',
+    'work_shape',
+    'customer_stance',
+    'viewer_principal',
+    'nhi_id',
+  ];
+  return keys.every((key) => left[key] === right[key]);
+}
+
+function parseSettlement(
+  value: unknown,
+  filePath: string,
+  options: { jobId?: string; scope?: EventScope; rootDir?: string } = {}
+): GenerationCostSettlement {
+  const parsed = generationCostSettlementCatalog.validate(value, filePath);
+  const fileJobId = path.basename(filePath, '.json');
+  if (parsed.job_id !== fileJobId || parsed.settlement_id !== `generation:${parsed.job_id}`) {
+    throw new Error('generation cost settlement job binding mismatch');
+  }
+  if (options.jobId && parsed.job_id !== options.jobId) {
+    throw new Error('generation cost settlement job scope mismatch');
+  }
+  const scope = normalizeEventScope(parsed.scope);
+  if (options.scope && !scopesEqual(scope, options.scope)) {
+    throw new Error('generation cost settlement scope mismatch');
+  }
+  const expectedPath = settlementFile(
+    parsed.job_id,
+    scope,
+    options.rootDir ?? pathResolver.rootDir()
+  );
+  if (path.resolve(expectedPath) !== path.resolve(filePath)) {
+    throw new Error('generation cost settlement physical scope mismatch');
+  }
+  return { ...parsed, scope };
+}
+
+/** Load a settlement through schema, regular-file, job, and scope binding checks. */
+export function loadGenerationCostSettlementAtPath(
+  filePath: string,
+  options: { jobId?: string; scope?: EventScope; rootDir?: string } = {}
+): GenerationCostSettlement {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[GENERATION_COST_SETTLEMENT] settlement must be a regular file: ${filePath}`);
+  }
+  return parseSettlement(
+    generationCostSettlementCatalogAtPath(safeFilePath).load(),
+    safeFilePath,
+    options
+  );
+}
+
+function readSettlement(
+  filePath: string,
+  options: { jobId?: string; scope?: EventScope; rootDir?: string } = {}
+): GenerationCostSettlement | undefined {
   if (!safeExistsSync(filePath)) return undefined;
   try {
-    const parsed = readJson<GenerationCostSettlement>(filePath);
-    if (
-      parsed?.kind !== 'generation-cost-settlement' ||
-      typeof parsed.job_id !== 'string' ||
-      !parsed.scope ||
-      (parsed.status !== 'settled' && parsed.status !== 'unavailable')
-    ) {
-      return undefined;
-    }
-    return { ...parsed, scope: normalizeEventScope(parsed.scope) };
+    return loadGenerationCostSettlementAtPath(filePath, options);
   } catch {
     return undefined;
   }
 }
 
-function writeSettlement(filePath: string, settlement: GenerationCostSettlement): void {
+function writeSettlement(
+  filePath: string,
+  settlement: GenerationCostSettlement,
+  rootDir?: string
+): void {
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(settlement, null, 2));
+  const validated = parseSettlement(settlement, filePath, { rootDir });
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
 }
 
 export function settleGenerationProviderCost(
@@ -140,11 +229,15 @@ export function settleGenerationProviderCost(
   const filePath = settlementFile(job.job_id, scope, options.rootDir);
   const now = (options.now || new Date()).toISOString();
   const actualCost = extractProviderReportedCost(job);
-  const existing = readSettlement(filePath);
+  const existing = readSettlement(filePath, { jobId: job.job_id, scope, rootDir: options.rootDir });
   if (existing && actualCost === undefined) return existing;
 
   return withLockSync(lockId(job.job_id, scope), () => {
-    const lockedExisting = readSettlement(filePath);
+    const lockedExisting = readSettlement(filePath, {
+      jobId: job.job_id,
+      scope,
+      rootDir: options.rootDir,
+    });
     if (lockedExisting && actualCost === undefined) return lockedExisting;
 
     const settlement: GenerationCostSettlement = {
@@ -198,7 +291,7 @@ export function settleGenerationProviderCost(
       }
     }
 
-    writeSettlement(filePath, settlement);
+    writeSettlement(filePath, settlement, options.rootDir);
     return settlement;
   });
 }
@@ -208,7 +301,7 @@ function settlementFiles(root: string): string[] {
   return safeReaddir(root).flatMap((entry) => {
     const entryPath = path.join(root, entry);
     if (entry === '.quarantine') return [];
-    const stat = safeStat(entryPath);
+    const stat = safeLstat(entryPath);
     if (stat.isFile() && entry.endsWith('.json')) return [entryPath];
     if (stat.isDirectory()) return settlementFiles(entryPath);
     return [];
@@ -222,13 +315,18 @@ export function listGenerationCostSettlements(
     rootDir?: string;
   } = {}
 ): GenerationCostSettlement[] {
-  const root = path.join(
-    options.rootDir || pathResolver.rootDir(),
-    GENERATION_COST_SETTLEMENT_ROOT
+  const root = assertSafeRepositoryPath(
+    path.join(
+      assertSafeRepositoryPath(options.rootDir || pathResolver.rootDir(), {
+        allowMissingLeaf: true,
+      }),
+      GENERATION_COST_SETTLEMENT_ROOT
+    ),
+    { allowMissingLeaf: true }
   );
   const seen = new Map<string, GenerationCostSettlement>();
   for (const filePath of settlementFiles(root)) {
-    const settlement = readSettlement(filePath);
+    const settlement = readSettlement(filePath, { rootDir: options.rootDir });
     if (!settlement) continue;
     if (options.since && settlement.observed_at < options.since) continue;
     if (options.scopeFilter && !eventScopeMatches(settlement.scope, options.scopeFilter)) continue;

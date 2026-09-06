@@ -16,14 +16,15 @@
  * before the pipeline reaches this step.
  */
 
-import type { ValidateFunction } from 'ajv';
 import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
-import { compileSchema } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
@@ -52,6 +53,10 @@ export interface DeployResult {
 export interface DeploymentAdapter {
   name: string;
   deploy(input: DeployInput): Promise<DeployResult>;
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 const deploymentAdapterSeam = createSeam<DeploymentAdapter>({
@@ -91,7 +96,7 @@ export const stubDeploymentAdapter: DeploymentAdapter = {
       adapter: 'stub',
       status: 'dry_run',
       message: `[DRY RUN] ${input.projectName}@${input.version} → ${input.environment}. To enable real deployment, create knowledge/personal/deployments/${input.projectName}.json matching deployment-adapter-config.schema.json.`,
-      started_at: new Date().toISOString(),
+      started_at: nowIso(),
     };
   },
 };
@@ -130,18 +135,23 @@ function normalizeDeploymentProjectName(value: string): string {
 }
 
 function resolveDeploymentConfigPath(env: NodeJS.ProcessEnv): string | null {
-  const explicitPath = env.KYBERION_DEPLOY_CONFIG_PATH?.trim();
+  const explicitPath = envText(env, 'KYBERION_DEPLOY_CONFIG_PATH')?.trim();
   if (explicitPath) {
-    return pathResolver.resolve(explicitPath);
+    return assertSafeRepositoryPath(pathResolver.resolve(explicitPath), {
+      allowMissingLeaf: true,
+    });
   }
   const projectName = normalizeDeploymentProjectName(
-    env.KYBERION_DEPLOY_PROJECT ||
-      env.KYBERION_PROJECT_NAME ||
-      env.KYBERION_DEPLOYMENT_PROJECT ||
+    envText(env, 'KYBERION_DEPLOY_PROJECT') ||
+      envText(env, 'KYBERION_PROJECT_NAME') ||
+      envText(env, 'KYBERION_DEPLOYMENT_PROJECT') ||
       'default'
   );
   if (!projectName) return null;
-  return pathResolver.knowledge(path.join('personal/deployments', `${projectName}.json`));
+  return assertSafeRepositoryPath(
+    pathResolver.knowledge(path.join('personal/deployments', `${projectName}.json`)),
+    { allowMissingLeaf: true }
+  );
 }
 
 function loadShellDeploymentAdapterConfig(
@@ -150,15 +160,22 @@ function loadShellDeploymentAdapterConfig(
   return withExecutionContext('ecosystem_architect', () => {
     const configPath = resolveDeploymentConfigPath(env);
     if (!configPath || !safeExistsSync(configPath)) return null;
-    const parsed = loadJson<unknown>(configPath);
-    const validate = ensureDeploymentConfigValidator();
-    if (!validate(parsed)) {
-      const errors = (validate.errors || [])
-        .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-        .join('; ');
-      throw new Error(`Invalid deployment adapter config at ${configPath}: ${errors}`);
+    if (!safeLstat(configPath).isFile()) {
+      throw new Error(
+        `Invalid deployment adapter config at ${configPath}: config must be a regular file`
+      );
     }
-    return { config: parsed as ShellDeploymentAdapterConfig, path: configPath };
+    try {
+      const parsed = defineCatalog<ShellDeploymentAdapterConfig>({
+        id: 'deployment-adapter-config',
+        path: configPath,
+        schema: DEPLOYMENT_CONFIG_SCHEMA_PATH,
+      }).load();
+      return { config: parsed, path: configPath };
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid deployment adapter config at ${configPath}: ${reason}`);
+    }
   });
 }
 
@@ -172,8 +189,8 @@ export class ShellDeploymentAdapter implements DeploymentAdapter {
       .replace(/\{\{projectName\}\}/gu, input.projectName)
       .replace(/\{\{version\}\}/gu, input.version)
       .replace(/\{\{releaseNotesPath\}\}/gu, input.releaseNotesPath ?? '');
-    const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
-    const startedAt = new Date().toISOString();
+    const shell = this.options.shell ?? getRegisteredEnvText('SHELL') ?? '/bin/sh';
+    const startedAt = nowIso();
     try {
       const stdout = execFileSync(shell, ['-c', cmd], {
         encoding: 'utf8',
@@ -207,15 +224,14 @@ export class ShellDeploymentAdapter implements DeploymentAdapter {
 export function installShellDeploymentAdapterIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  const command = env.KYBERION_DEPLOY_COMMAND?.trim();
+  const command = envText(env, 'KYBERION_DEPLOY_COMMAND')?.trim();
   if (!command) return false;
+  const timeoutText = envText(env, 'KYBERION_DEPLOY_TIMEOUT_MS');
   resetDeploymentAdapter();
   registerDeploymentAdapter(
     new ShellDeploymentAdapter({
       command,
-      ...(env.KYBERION_DEPLOY_TIMEOUT_MS
-        ? { timeoutMs: parseInt(env.KYBERION_DEPLOY_TIMEOUT_MS, 10) }
-        : {}),
+      ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
     })
   );
   logger.success(
@@ -275,11 +291,3 @@ export function installShellDeploymentAdapterFromConfigIfAvailable(
 const DEPLOYMENT_CONFIG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/deployment-adapter-config.schema.json'
 );
-
-let deploymentConfigValidateFn: ValidateFunction | null = null;
-
-function ensureDeploymentConfigValidator(): ValidateFunction {
-  if (deploymentConfigValidateFn) return deploymentConfigValidateFn;
-  deploymentConfigValidateFn = compileSchema(DEPLOYMENT_CONFIG_SCHEMA_PATH);
-  return deploymentConfigValidateFn;
-}

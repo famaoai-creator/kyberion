@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media Design Systems Catalog",
+  "type": "object",
+  "required": ["version", "default_system", "systems"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "default_system": { "type": "string", "minLength": 1 },
+    "systems": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["theme"],
+        "properties": {
+          "theme": { "type": "string", "minLength": 1 },
+          "profiles": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "style_pack": {
+      "type": "object",
+      "properties": {
+        "tone_words": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "typography_hint": { "type": "string", "minLength": 1 },
+        "avoid": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "music": {
+          "type": "object",
+          "properties": {
+            "mood": { "type": "string", "minLength": 1 },
+            "bpm_range": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "instrumentation_hint": { "type": "string", "minLength": 1 }
+          },
+          "required": ["mood"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

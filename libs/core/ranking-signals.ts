@@ -10,9 +10,10 @@
  * the next step.
  */
 
-import { readJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { clamp } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 
 /** Cross-scope affinity: how relevant an entry of scope X is when ranking for scope Y. */
@@ -98,27 +99,59 @@ export interface KnowledgeRankingWeights {
 
 export interface KnowledgeRankingWeightConfig {
   version?: string;
+  description?: string;
   defaults?: KnowledgeRankingWeights;
   tenant_overrides?: Record<string, KnowledgeRankingWeights>;
+}
+
+const KNOWLEDGE_WEIGHTS_PATH = pathResolver.knowledge('product/governance/knowledge-weights.json');
+const KNOWLEDGE_WEIGHTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-weights.schema.json'
+);
+const DEFAULT_KNOWLEDGE_WEIGHTS_CONFIG: KnowledgeRankingWeightConfig = {
+  version: '1.0.0',
+  defaults: { proximity: 1, usage_yield: 4 },
+  tenant_overrides: {},
+};
+
+const knowledgeWeightsCatalog = defineCatalog<KnowledgeRankingWeightConfig>({
+  id: 'knowledge-weights',
+  path: KNOWLEDGE_WEIGHTS_PATH,
+  schema: KNOWLEDGE_WEIGHTS_SCHEMA_PATH,
+});
+
+export function loadKnowledgeRankingWeightConfig(
+  rootPath = KNOWLEDGE_WEIGHTS_PATH,
+  fallbackOnInvalid = true
+): KnowledgeRankingWeightConfig {
+  void fallbackOnInvalid;
+  const safeRootPath = assertSafeRepositoryPath(rootPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeRootPath)) {
+    return { ...DEFAULT_KNOWLEDGE_WEIGHTS_CONFIG };
+  }
+  const catalog =
+    safeRootPath === KNOWLEDGE_WEIGHTS_PATH
+      ? knowledgeWeightsCatalog
+      : defineCatalog<KnowledgeRankingWeightConfig>({
+          id: 'knowledge-weights',
+          path: safeRootPath,
+          schema: KNOWLEDGE_WEIGHTS_SCHEMA_PATH,
+        });
+  return catalog.load();
 }
 
 /** Load governed ranking knobs after the caller has resolved its scope. */
 export function loadKnowledgeRankingWeights(
   scope?: ScopeContext,
-  rootPath = pathResolver.knowledge('product/governance/knowledge-weights.json')
+  rootPath = KNOWLEDGE_WEIGHTS_PATH
 ): KnowledgeRankingWeights {
   const defaults: KnowledgeRankingWeights = { proximity: 1, usage_yield: 4 };
-  if (!safeExistsSync(rootPath)) return defaults;
-  try {
-    const config = readJson<KnowledgeRankingWeightConfig>(rootPath);
-    return {
-      ...defaults,
-      ...(config.defaults || {}),
-      ...(scope?.tenant_slug ? config.tenant_overrides?.[scope.tenant_slug] || {} : {}),
-    };
-  } catch {
-    return defaults;
-  }
+  const config = loadKnowledgeRankingWeightConfig(rootPath);
+  return {
+    ...defaults,
+    ...(config.defaults || {}),
+    ...(scope?.tenant_slug ? config.tenant_overrides?.[scope.tenant_slug] || {} : {}),
+  };
 }
 
 /**
@@ -206,6 +239,6 @@ export function knowledgeMetadataScore(
     : 0;
   const proximityScore =
     knowledgeScopeProximityScore(metadata, currentScopeContext) * proximityWeight;
-  const usageYieldScore = Math.max(0, Math.min(1, metadata.usage_yield ?? 0)) * usageYieldWeight;
+  const usageYieldScore = clamp(metadata.usage_yield ?? 0, 0, 1) * usageYieldWeight;
   return scopeScore + authorityScore + recencyScore + proximityScore + usageYieldScore;
 }

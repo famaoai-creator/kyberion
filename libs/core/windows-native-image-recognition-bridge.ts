@@ -1,6 +1,7 @@
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExecResult } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { assertSafeRepositoryPath, safeExecResult } from './secure-io.js';
 
 export interface WindowsNativeImageRecognitionAvailability {
   ocr: boolean;
@@ -18,7 +19,7 @@ function invoke(helper: string, args: string[], timeoutMs = 60_000): any | null 
   const result = safeExecResult(helper, args, { timeoutMs, maxOutputMB: 4 });
   if (result.status !== 0) return null;
   try {
-    return JSON.parse(result.stdout.trim());
+    return parseSafeJsonInput(result.stdout.trim(), 'Windows image recognition response');
   } catch {
     return null;
   }
@@ -48,18 +49,20 @@ export function probeWindowsNativeImageRecognition(): WindowsNativeImageRecognit
 }
 
 export function recognizeTextWithWindowsNativeApi(imagePath: string): any | null {
+  const safeImagePath = assertSafeRepositoryPath(pathResolver.rootResolve(imagePath), {
+    allowMissingLeaf: true,
+  });
   const helper = helperPath();
   if (!helper || process.platform !== 'win32') return null;
-  return invoke(helper, ['--ocr', '--input', pathResolver.rootResolve(imagePath)], 120_000);
+  return invoke(helper, ['--ocr', '--input', safeImagePath], 120_000);
 }
 
 export function describeImageWithWindowsNativeApi(imagePath: string): string | null {
+  const safeImagePath = assertSafeRepositoryPath(pathResolver.rootResolve(imagePath), {
+    allowMissingLeaf: true,
+  });
   const helper = helperPath();
   if (!helper || process.platform !== 'win32') return null;
-  const result = invoke(
-    helper,
-    ['--describe', '--input', pathResolver.rootResolve(imagePath)],
-    120_000
-  );
+  const result = invoke(helper, ['--describe', '--input', safeImagePath], 120_000);
   return typeof result?.description === 'string' ? result.description : null;
 }

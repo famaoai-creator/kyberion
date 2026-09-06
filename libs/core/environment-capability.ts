@@ -25,13 +25,16 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeReaddir,
-  loadJson,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
@@ -238,7 +241,7 @@ function stableHostFingerprint(): string {
 }
 
 function addMinutes(isoTimestamp: string, minutes: number): string {
-  return new Date(new Date(isoTimestamp).getTime() + minutes * 60_000).toISOString();
+  return nowIso(new Date(new Date(isoTimestamp).getTime() + minutes * 60_000));
 }
 
 function parseIsoDate(value: unknown): { ok: true; ms: number } | { ok: false } {
@@ -290,7 +293,7 @@ async function runProbe(
       }
     }
     case 'env': {
-      const value = process.env[probe.name];
+      const value = getRegisteredEnvText(probe.name, { preserveEmpty: true });
       if (value === undefined) {
         return { available: false, reason: `env var ${probe.name} is unset` };
       }
@@ -305,11 +308,31 @@ async function runProbe(
       const evidenceDir = pathResolver.missionEvidenceDir(missionId);
       if (!evidenceDir)
         return { available: false, reason: `mission '${missionId}' has no evidence dir` };
-      const file = path.join(evidenceDir, probe.filename);
+      if (!isSafeMissionEvidenceFilename(probe.filename)) {
+        return {
+          available: false,
+          reason: `mission-evidence filename must be a single repository-local file name: ${probe.filename}`,
+        };
+      }
+      let file: string;
+      try {
+        file = assertSafeRepositoryPath(path.join(evidenceDir, probe.filename));
+      } catch (err: any) {
+        return {
+          available: false,
+          reason: `mission-evidence path rejected: ${err?.message ?? String(err)}`,
+        };
+      }
       if (!safeExistsSync(file)) return { available: false, reason: `${probe.filename} missing` };
+      if (!safeLstat(file).isFile()) {
+        return {
+          available: false,
+          reason: `${probe.filename} is not a regular file`,
+        };
+      }
       if (!probe.require_field) return { available: true };
       try {
-        const data = loadJson<unknown>(file);
+        const data = readJson<unknown>(file);
         const value = probe.require_field.path
           .split('.')
           .reduce<any>((acc, key) => (acc != null ? acc[key] : undefined), data);
@@ -473,13 +496,14 @@ export async function bootstrapManifest(
     }
   }
 
+  const generatedAt = nowIso();
   const receipt: SetupReceipt = {
     manifest_id: manifest.manifest_id,
     manifest_version: manifest.version,
     manifest_fingerprint: stableManifestFingerprint(manifest),
     host_fingerprint: stableHostFingerprint(),
-    generated_at: new Date().toISOString(),
-    expires_at: addMinutes(new Date().toISOString(), DEFAULT_RECEIPT_TTL_MINUTES),
+    generated_at: generatedAt,
+    expires_at: addMinutes(generatedAt, DEFAULT_RECEIPT_TTL_MINUTES),
     host_platform: process.platform,
     satisfied,
     unsatisfied,
@@ -509,12 +533,13 @@ export function verifyReady(
   manifest: EnvironmentManifest,
   opts: { mission_id?: string; max_age_minutes?: number } = {}
 ): ReadinessReport {
+  const checkedAt = nowIso();
   const receipt = readReceipt(manifest.manifest_id, opts.mission_id);
   if (!receipt) {
     return {
       ready: false,
       manifest_id: manifest.manifest_id,
-      generated_at: new Date().toISOString(),
+      generated_at: checkedAt,
       receipt_expires_at: null,
       missing: manifest.capabilities.map((c) => ({
         capability_id: c.capability_id,
@@ -615,7 +640,7 @@ export function verifyReady(
   return {
     ready: blocking.length === 0,
     manifest_id: manifest.manifest_id,
-    generated_at: generatedAt.ok ? receipt.generated_at : new Date().toISOString(),
+    generated_at: generatedAt.ok ? receipt.generated_at : checkedAt,
     receipt_expires_at: receiptExpiresAt,
     missing: blocking,
     receipt_age_minutes: generatedAt.ok ? ageMin : null,
@@ -627,26 +652,55 @@ export function verifyReady(
  * ------------------------------------------------------------------ */
 
 function receiptPath(manifestId: string, missionId?: string): string {
+  const normalizedManifestId = assertEnvironmentManifestId(manifestId);
   if (missionId) {
+    pathResolver.assertMissionIdArgument(missionId);
     const evidenceDir =
       pathResolver.missionEvidenceDir(missionId) ??
       pathResolver.rootResolve(`active/missions/confidential/${missionId}/evidence`);
-    return path.join(evidenceDir, `env-setup-receipt.${manifestId}.json`);
+    return assertSafeRepositoryPath(
+      path.join(evidenceDir, `env-setup-receipt.${normalizedManifestId}.json`),
+      { allowMissingLeaf: true }
+    );
   }
-  return pathResolver.rootResolve(`active/shared/state/env-setup-receipts/${manifestId}.json`);
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(`active/shared/state/env-setup-receipts/${normalizedManifestId}.json`),
+    { allowMissingLeaf: true }
+  );
+}
+
+function assertEnvironmentManifestId(value: unknown): string {
+  const manifestId = String(value || '').trim();
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/u.test(manifestId)) {
+    throw new Error(`[environment-capability] invalid manifest id for receipt path: ${manifestId}`);
+  }
+  return manifestId;
+}
+
+function isSafeMissionEvidenceFilename(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/u.test(value.trim());
 }
 
 function writeReceipt(receipt: SetupReceipt, missionId?: string): void {
   const file = receiptPath(receipt.manifest_id, missionId);
   safeMkdir(path.dirname(file), { recursive: true });
-  safeWriteFile(file, JSON.stringify(receipt, null, 2));
+  const validated = defineCatalog<SetupReceipt>({
+    id: 'environment-setup-receipt',
+    path: file,
+    schema: RECEIPT_SCHEMA_PATH,
+  }).validate(receipt, file);
+  safeWriteFile(file, JSON.stringify(validated, null, 2));
 }
 
 function readReceipt(manifestId: string, missionId?: string): SetupReceipt | null {
   const file = receiptPath(manifestId, missionId);
   if (!safeExistsSync(file)) return null;
   try {
-    return loadJson<SetupReceipt>(file);
+    return defineCatalog<SetupReceipt>({
+      id: 'environment-setup-receipt',
+      path: file,
+      schema: RECEIPT_SCHEMA_PATH,
+    }).load();
   } catch (err: any) {
     logger.warn(`[environment-capability] receipt parse failed: ${err?.message ?? err}`);
     return null;
@@ -658,6 +712,12 @@ function readReceipt(manifestId: string, missionId?: string): SetupReceipt | nul
  * ------------------------------------------------------------------ */
 
 const DEFAULT_MANIFEST_DIR = 'knowledge/product/governance/environment-manifests';
+const MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/environment-capability-manifest.schema.json'
+);
+const RECEIPT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/environment-setup-receipt.schema.json'
+);
 
 function governedManifestDir(): string {
   const dir = pathResolver.rootResolve(DEFAULT_MANIFEST_DIR);
@@ -728,7 +788,7 @@ export function verifyManifestSignature(
 }
 
 function enforceManifestSignature(manifest: EnvironmentManifest): void {
-  const signingKey = process.env[MANIFEST_SIGNING_KEY_ENV];
+  const signingKey = getRegisteredEnvText(MANIFEST_SIGNING_KEY_ENV);
   if (signingKey) {
     if (!verifyManifestSignature(manifest, signingKey)) {
       throw new Error(
@@ -748,47 +808,12 @@ function enforceManifestSignature(manifest: EnvironmentManifest): void {
   }
 }
 
-function parseEnvironmentManifest(raw: string, expectedId: string): EnvironmentManifest {
-  const value: unknown = JSON.parse(raw);
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('[environment-capability] manifest must be a JSON object');
-  }
-  const candidate = value as Record<string, unknown>;
-  if (candidate.manifest_id !== expectedId || typeof candidate.version !== 'string') {
-    throw new Error('[environment-capability] manifest id/version is invalid');
-  }
-  if (!Array.isArray(candidate.capabilities)) {
-    throw new Error('[environment-capability] manifest capabilities must be an array');
-  }
-  for (const [index, capability] of candidate.capabilities.entries()) {
-    if (!capability || typeof capability !== 'object' || Array.isArray(capability)) {
-      throw new Error(`[environment-capability] capability ${index} must be an object`);
-    }
-    const cap = capability as Record<string, unknown>;
-    if (
-      typeof cap.capability_id !== 'string' ||
-      typeof cap.kind !== 'string' ||
-      typeof cap.description !== 'string' ||
-      !Array.isArray(cap.required_for) ||
-      !cap.required_for.every((item) => typeof item === 'string') ||
-      !cap.probe ||
-      typeof cap.probe !== 'object' ||
-      Array.isArray(cap.probe)
-    ) {
-      throw new Error(`[environment-capability] capability ${index} has an invalid schema`);
-    }
-    const probe = cap.probe as Record<string, unknown>;
-    if (!['command', 'module', 'env', 'mission-evidence', 'probe'].includes(String(probe.kind))) {
-      throw new Error(`[environment-capability] capability ${index} has an invalid probe kind`);
-    }
-    if (probe.kind === 'command' && typeof probe.command !== 'string') {
-      throw new Error(`[environment-capability] capability ${index} command probe is invalid`);
-    }
-    if (probe.kind === 'module' && typeof probe.specifier !== 'string') {
-      throw new Error(`[environment-capability] capability ${index} module probe is invalid`);
-    }
-  }
-  return value as EnvironmentManifest;
+function environmentManifestCatalog(filePath: string): GovernedCatalog<EnvironmentManifest> {
+  return defineCatalog<EnvironmentManifest>({
+    id: 'environment-capability-manifest',
+    path: filePath,
+    schema: MANIFEST_SCHEMA_PATH,
+  });
 }
 
 /**
@@ -801,7 +826,15 @@ export function listEnvironmentManifestIds(): string[] {
   const ids: string[] = [];
   try {
     for (const entry of safeReaddir(dir)) {
-      if (entry.endsWith('.json')) ids.push(entry.slice(0, -'.json'.length));
+      if (!entry.endsWith('.json')) continue;
+      const candidate = path.join(dir, entry);
+      try {
+        const stat = safeLstat(candidate);
+        if (!stat.isFile()) continue;
+        ids.push(entry.slice(0, -'.json'.length));
+      } catch {
+        // A concurrently removed or inaccessible entry is not a manifest.
+      }
     }
   } catch (err: any) {
     logger.warn(`[environment-capability] listEnvironmentManifestIds: ${err?.message ?? err}`);
@@ -809,7 +842,10 @@ export function listEnvironmentManifestIds(): string[] {
   return ids.sort();
 }
 
-export function loadEnvironmentManifest(manifestIdOrPath: string): EnvironmentManifest {
+function loadEnvironmentManifestRecord(
+  manifestIdOrPath: string,
+  enforceSignatureAfterLoad: boolean
+): EnvironmentManifest {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(manifestIdOrPath)) {
     throw new Error('[environment-capability] manifest must be referenced by id, not by path');
   }
@@ -820,15 +856,29 @@ export function loadEnvironmentManifest(manifestIdOrPath: string): EnvironmentMa
   const abs = path.join(dir, `${manifestId}.json`);
   if (safeExistsSync(abs)) {
     assertNoSymlinkPath(abs, dir);
-    const manifest = parseEnvironmentManifest(
-      safeReadFile(abs, { encoding: 'utf8' }) as string,
-      manifestId
-    );
-    enforceManifestSignature(manifest);
-    _trustedExecutableManifests.add(manifest);
+    if (!safeLstat(abs).isFile()) {
+      throw new Error('[environment-capability] manifest must be a regular file');
+    }
+    const manifest = environmentManifestCatalog(abs).load();
+    if (manifest.manifest_id !== manifestId) {
+      throw new Error('[environment-capability] manifest id does not match its filename');
+    }
+    if (enforceSignatureAfterLoad) {
+      enforceManifestSignature(manifest);
+      _trustedExecutableManifests.add(manifest);
+    }
     return manifest;
   }
   throw new Error(`[environment-capability] manifest not found: ${manifestIdOrPath}`);
+}
+
+export function loadEnvironmentManifest(manifestIdOrPath: string): EnvironmentManifest {
+  return loadEnvironmentManifestRecord(manifestIdOrPath, true);
+}
+
+/** Schema-valid manifest load for the signing ceremony before signature enforcement. */
+export function loadEnvironmentManifestForSigning(manifestIdOrPath: string): EnvironmentManifest {
+  return loadEnvironmentManifestRecord(manifestIdOrPath, false);
 }
 
 /* ------------------------------------------------------------------ *

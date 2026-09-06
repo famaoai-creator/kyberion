@@ -13,8 +13,8 @@
 ## 経路の確認
 
 ```bash
-pnpm voice:route:list -- --json
-pnpm voice:route:probe -- --device-label 'BlackHole 2ch' --json
+pnpm voice:route list -- --json
+pnpm voice:route probe -- --device-label 'BlackHole 2ch' --json
 ```
 
 永続設定には表示名ではなくCoreAudio device UIDを使用します。UIDが取得できない場合だけexact labelへfallbackし、substring一致やdevice indexの保存は行いません。同名候補が複数ある場合はblockedになります。
@@ -24,7 +24,7 @@ pnpm voice:route:probe -- --device-label 'BlackHole 2ch' --json
 実機テストは、preflightとoperator確認が済み、会議が未参加である場合だけ実行します。
 
 ```bash
-KYBERION_LIVE_BLACKHOLE_TEST=1 pnpm voice:loopback:test -- \
+KYBERION_LIVE_BLACKHOLE_TEST=1 pnpm voice:route test \
   --bus blackhole \
   --text '音声経路の確認です' \
   --language ja \

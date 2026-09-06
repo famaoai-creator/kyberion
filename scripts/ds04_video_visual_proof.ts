@@ -1,15 +1,10 @@
 import * as path from 'node:path';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-import {
-  pathResolver,
-  safeExec,
-  safeExistsSync,
-  safeReaddir,
-  safeStat,
-  writeVideoCompositionBundle,
-} from '@agent/core';
-import type { VideoCompositionADF } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExec, safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { writeVideoCompositionBundle } from '@agent/core/video-composition-compiler';
+import type { VideoCompositionADF } from '@agent/core/video-composition-contract';
 
 const PROOF_ROOT = 'active/shared/tmp/ds04-video-visual-proof/client-a';
 
@@ -122,10 +117,18 @@ export async function runDs04VideoVisualProof(): Promise<{
   return { bundleDir, videoPath, screenshots };
 }
 
+export const runDs04VideoVisualProofCli = defineScript({
+  name: 'media:visual-proof:ds04',
+  flags: ['json', 'quiet'],
+  async run(context) {
+    const result = await runDs04VideoVisualProof();
+    context.print(result);
+    return result;
+  },
+});
+
 if (
   isDirectScript(import.meta.url, 'ds04_video_visual_proof.ts') ||
   isDirectScript(import.meta.url, 'ds04_video_visual_proof.js')
-) {
-  const result = await runDs04VideoVisualProof();
-  console.log(JSON.stringify(result, null, 2));
-}
+)
+  void runDs04VideoVisualProofCli();

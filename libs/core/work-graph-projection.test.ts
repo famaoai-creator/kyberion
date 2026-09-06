@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
 import * as nodePath from 'node:path';
 import {
   clearWorkCoordinationNamespace,
@@ -250,5 +251,30 @@ describe('work graph projection', () => {
         apply: true,
       })
     ).toThrow(/missing task_id/);
+  });
+
+  it('rejects a symlinked mission path before reading or writing the projection', () => {
+    const externalMissionPath = nodePath.join(
+      nodePath.dirname(missionPath),
+      'work-graph-projection-external'
+    );
+    fs.mkdirSync(externalMissionPath, { recursive: true });
+    safeRmSync(missionPath, { recursive: true, force: true });
+    // Tests intentionally use the native symlink primitive to model an
+    // attacker replacing the mission directory between discovery and use.
+    fs.symlinkSync(externalMissionPath, missionPath, 'dir');
+    try {
+      expect(() =>
+        projectWorkGraphToNextTasks({
+          missionId: 'MSN-PROJECTION',
+          projectId: 'PRJ-PROJECTION',
+          missionPath,
+          apply: true,
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.unlinkSync(missionPath);
+      safeRmSync(externalMissionPath, { recursive: true, force: true });
+    }
   });
 });

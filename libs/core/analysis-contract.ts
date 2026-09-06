@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface AnalysisExecutionContractDefinition {
   contract_id: string;
@@ -11,17 +11,18 @@ export interface AnalysisExecutionContractDefinition {
 }
 
 interface AnalysisExecutionContractFile {
-  contracts?: AnalysisExecutionContractDefinition[];
+  version: string;
+  contracts: AnalysisExecutionContractDefinition[];
 }
 
-let analysisExecutionContractCache: AnalysisExecutionContractDefinition[] | null = null;
+const analysisExecutionContractCatalog = defineCatalog<AnalysisExecutionContractFile>({
+  id: 'analysis-execution-contracts',
+  path: () => pathResolver.knowledge('product/governance/analysis-execution-contracts.json'),
+  schema: pathResolver.knowledge('product/schemas/analysis-execution-contracts.schema.json'),
+});
 
 export function loadAnalysisExecutionContracts(): AnalysisExecutionContractDefinition[] {
-  if (analysisExecutionContractCache) return analysisExecutionContractCache;
-  const filePath = pathResolver.knowledge('product/governance/analysis-execution-contracts.json');
-  const parsed = loadJson<AnalysisExecutionContractFile>(filePath);
-  analysisExecutionContractCache = Array.isArray(parsed.contracts) ? parsed.contracts : [];
-  return analysisExecutionContractCache;
+  return analysisExecutionContractCatalog.load().contracts;
 }
 
 export function resolveAnalysisExecutionContract(

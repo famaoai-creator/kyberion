@@ -4,8 +4,8 @@
 
 ```bash
 pnpm meeting:preflight --mission <MISSION_ID> --json
-pnpm voice:route:list -- --json
-pnpm voice:route:probe -- --json
+pnpm voice:route list -- --json
+pnpm voice:route probe -- --json
 pnpm doctor -- --runtime meeting
 ```
 

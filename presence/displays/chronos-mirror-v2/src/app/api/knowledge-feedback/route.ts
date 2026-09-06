@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { recordHumanKnowledgeFeedback } from '@agent/core';
+import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loop';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
+import { readChronosJsonObject } from '../../../lib/request-input';
+import { parseKnowledgeFeedbackInput } from './knowledge-feedback-input';
 import {
   resolveViewerContextForRequest,
   strictViewerScopeOrganizationIds,
@@ -19,21 +21,22 @@ export async function POST(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
   try {
-    const body = (await req.json()) as Record<string, unknown>;
-    const documentPath = typeof body.document_path === 'string' ? body.document_path.trim() : '';
-    const verdict =
-      body.verdict === 'useful' || body.verdict === 'not_useful' ? body.verdict : null;
-    if (
-      !documentPath ||
-      !verdict ||
-      !/^knowledge\/(public|confidential|personal)\/.+\.(md|json)$/i.test(documentPath)
-    ) {
-      return NextResponse.json(
-        { error: 'document_path and verdict are required' },
-        { status: 400 }
-      );
+    const parsedBody = await readChronosJsonObject(req, 'Chronos knowledge feedback');
+    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    let input;
+    try {
+      input = parseKnowledgeFeedbackInput(parsedBody.body);
+    } catch (error) {
+      return viewerErrorResponse(error, 400);
     }
-    const requestedTenant = typeof body.tenant === 'string' ? body.tenant : undefined;
+    const {
+      documentPath,
+      verdict,
+      tenant: requestedTenant,
+      organizationId,
+      projectId,
+      reason,
+    } = input;
     const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
     const pathParts = documentPath.split('/');
     const tier = strictViewerTier(
@@ -50,12 +53,9 @@ export async function POST(req: NextRequest) {
     }
     const organizationIds = strictViewerScopeOrganizationIds(
       resolvedViewer.context,
-      typeof body.organization_id === 'string' ? body.organization_id : undefined
+      organizationId
     );
-    const projectIds = strictViewerScopeProjectIds(
-      resolvedViewer.context,
-      typeof body.project_id === 'string' ? body.project_id : undefined
-    );
+    const projectIds = strictViewerScopeProjectIds(resolvedViewer.context, projectId);
     const scope = {
       tier,
       ...(pathTenant ? { tenant_slug: pathTenant } : {}),
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       recordHumanKnowledgeFeedback({
         document_path: documentPath,
         verdict,
-        reason: typeof body.reason === 'string' ? body.reason : undefined,
+        reason,
         actor: resolvedViewer.context.principalId || 'chronos-viewer',
         source: 'chronos',
         scope,

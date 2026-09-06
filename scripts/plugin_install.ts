@@ -4,7 +4,7 @@
  * Stages a plugin source into the managed-copy directory, prints the
  * provenance-derived trust label, and — for anything other than `official`
  * — the pending approval id and how to approve it via the existing
- * approval CLI (`pnpm cli -- approvals` / `pnpm cli -- approve <id>
+ * approval CLI (`pnpm kyberion approvals` / `pnpm kyberion approve <id>
  * <channel>`). Installing (staging + listing) never itself requires
  * approval; only activation does (enforced at load time by
  * `skill-plugin-loader.ts`, not by this script).
@@ -15,10 +15,14 @@
  *   pnpm plugin:install --source ./some/plugin --id my-plugin
  *   pnpm plugin:install --source ./some/plugin --id my-plugin --requested-by alice
  */
-import { createStandardYargs, importPluginPack, installPluginManaged, logger } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { importPluginPack } from '@agent/core/plugin-pack';
+import { installPluginManaged } from '@agent/core/plugin-managed-install';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-export function runPluginInstall(args: string[] = []): number {
+type Print = (value: unknown) => void;
+
+export function runPluginInstall(args: string[] = [], print: Print = () => undefined): number {
   const argv = createStandardYargs(['node', 'plugin_install', ...args])
     .scriptName('plugin_install')
     .option('source', {
@@ -65,11 +69,11 @@ export function runPluginInstall(args: string[] = []): number {
     // A no-op import (everything skipped) must be visible to scripted callers.
     const exitCode = result.importRecord.installed.length > 0 ? 0 : 1;
     if (argv.json) {
-      process.stdout.write(`${JSON.stringify(result.importRecord, null, 2)}\n`);
+      print(JSON.stringify(result.importRecord, null, 2));
       return exitCode;
     }
     const { importRecord } = result;
-    process.stdout.write(
+    print(
       [
         `Pack '${importRecord.pack_id}' imported${importRecord.commit ? ` @ ${importRecord.commit.slice(0, 12)}` : ''} (${result.pack.sync_mode})`,
         `  installed: ${importRecord.installed.join(', ') || '(none)'}`,
@@ -77,8 +81,8 @@ export function runPluginInstall(args: string[] = []): number {
         ...importRecord.skipped.map((skip) => `  skipped:   ${skip.plugin_id} — ${skip.reason}`),
         '',
         'Every installed plugin is third-party by provenance and stays pending_approval',
-        'until approved (pnpm cli -- approvals); it is never executed before then.',
-      ].join('\n') + '\n'
+        'until approved (pnpm kyberion approvals); it is never executed before then.',
+      ].join('\n')
     );
     return exitCode;
   }
@@ -86,9 +90,7 @@ export function runPluginInstall(args: string[] = []): number {
   const source = argv.source ? String(argv.source) : '';
   const pluginId = argv.id ? String(argv.id) : '';
   if (!source || !pluginId) {
-    logger.error(
-      'Usage: pnpm plugin:install --source <path> --id <plugin-id> | --pack <https-git-url>'
-    );
+    print('Usage: pnpm plugin:install --source <path> --id <plugin-id> | --pack <https-git-url>');
     return 1;
   }
 
@@ -101,32 +103,28 @@ export function runPluginInstall(args: string[] = []): number {
   });
 
   if (argv.json) {
-    process.stdout.write(`${JSON.stringify(record, null, 2)}\n`);
+    print(JSON.stringify(record, null, 2));
     return record.activationStatus === 'blocked_broken_manifest' ? 1 : 0;
   }
 
-  process.stdout.write(`Plugin '${record.pluginId}' staged at: ${record.managedPath}\n`);
-  process.stdout.write(`Trust: ${record.trust} (${record.trustReason})\n`);
-  process.stdout.write(`Activation status: ${record.activationStatus}\n`);
+  print(`Plugin '${record.pluginId}' staged at: ${record.managedPath}`);
+  print(`Trust: ${record.trust} (${record.trustReason})`);
+  print(`Activation status: ${record.activationStatus}`);
 
   if (record.diagnostics.length > 0) {
-    process.stdout.write('Diagnostics:\n');
+    print('Diagnostics:');
     for (const diagnostic of record.diagnostics) {
-      process.stdout.write(
-        `  [${diagnostic.severity}] ${diagnostic.code}: ${diagnostic.message}\n`
-      );
+      print(`  [${diagnostic.severity}] ${diagnostic.code}: ${diagnostic.message}`);
     }
   }
 
   if (record.activationStatus === 'blocked_broken_manifest') {
-    process.stdout.write(
-      'This plugin will never be loaded — fix the manifest and re-run plugin:install.\n'
-    );
+    print('This plugin will never be loaded — fix the manifest and re-run plugin:install.');
     return 1;
   }
 
   if (record.trust !== 'official' && record.approvalRequestId) {
-    process.stdout.write(
+    print(
       [
         '',
         `This is a non-official (${record.trust}) source, so it stays pending until a human approves it:`,
@@ -134,15 +132,15 @@ export function runPluginInstall(args: string[] = []): number {
         `  Storage channel:      ${record.approvalChannel}`,
         '',
         'To review and decide:',
-        `  pnpm cli -- approvals`,
-        `  pnpm cli -- approve ${record.approvalRequestId} ${record.approvalChannel}`,
+        `  pnpm kyberion approvals`,
+        `  pnpm kyberion approve ${record.approvalRequestId} ${record.approvalChannel}`,
         '',
         'The plugin is skipped (never executed) at skill-load time until then.',
-      ].join('\n') + '\n'
+      ].join('\n')
     );
   } else {
-    process.stdout.write(
-      'This plugin is activatable and will be loaded when configured in .kyberion-plugins.json.\n'
+    print(
+      'This plugin is activatable and will be loaded when configured in .kyberion-plugins.json.'
     );
   }
 
@@ -157,7 +155,7 @@ if (
     name: 'plugin:install',
     flags: [],
     run(context) {
-      const status = runPluginInstall(context.argv);
+      const status = runPluginInstall(context.argv, context.print);
       if (status !== 0) throw new Error(`plugin:install failed with exit code ${status}`);
     },
   })();

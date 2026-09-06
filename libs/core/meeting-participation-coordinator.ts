@@ -21,10 +21,11 @@
 
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import * as pathResolver from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { TraceContext } from './src/trace.js';
 import { teeAudio } from './audio-tee.js';
 import type { AudioBus } from './audio-bus.js';
@@ -41,6 +42,7 @@ import type {
 } from './meeting-session-types.js';
 import { abortableAudioChunks } from './meeting-session-types.js';
 import { BargeInController } from './barge-in-controller.js';
+import { loadVoiceConsentAtPath, validateVoiceConsentRecord } from './voice-consent.js';
 
 export interface ConversationAgent {
   /**
@@ -87,6 +89,13 @@ export interface MeetingParticipationOptions {
    * stream (session.transcriptInput) and replies over meeting chat.
    */
   transcript_source?: 'stt' | 'driver_captions';
+  /**
+   * Called with the live session right after join. Lets the caller
+   * (e.g. an interactive CLI loop) drive declared session verbs
+   * (`raiseHand`, `admit`, `chat`) while the run proceeds.
+   * Throwing here fails the run — keep handlers non-throwing.
+   */
+  onSession?: (session: MeetingSession) => void;
 }
 
 export interface MeetingParticipationReport {
@@ -100,20 +109,8 @@ export interface MeetingParticipationReport {
   error?: string;
 }
 
-interface MeetingParticipationConsentRecord {
-  consent?: unknown;
-  mission_id?: unknown;
-  operator_handle?: unknown;
-  tenant_slug?: unknown;
-  expires_at?: unknown;
-}
-
 function normalizeOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function checkMeetingParticipationConsent(input: {
@@ -129,64 +126,46 @@ export function checkMeetingParticipationConsent(input: {
       reason: `${input.purpose} requires mission_id + voice-consent.json in the mission evidence dir`,
     };
   }
-  const evidenceDir = pathResolver.missionEvidenceDir(missionId);
+  let evidenceDir: string | null;
+  try {
+    pathResolver.assertMissionIdArgument(missionId);
+    evidenceDir = pathResolver.missionEvidenceDir(missionId);
+  } catch (err: unknown) {
+    return {
+      allowed: false,
+      reason: `mission evidence path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
   if (!evidenceDir) {
     return { allowed: false, reason: `mission evidence dir not found for ${missionId}` };
   }
-  const consentPath = path.join(evidenceDir, 'voice-consent.json');
+  let consentPath: string;
+  try {
+    consentPath = assertSafeRepositoryPath(path.join(evidenceDir, 'voice-consent.json'), {
+      allowMissingLeaf: true,
+    });
+  } catch (err: unknown) {
+    return {
+      allowed: false,
+      reason: `voice-consent path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
   if (!safeExistsSync(consentPath)) {
     return {
       allowed: false,
       reason: `voice-consent.json missing at ${path.relative(pathResolver.rootDir(), consentPath)}`,
     };
   }
-  let raw: MeetingParticipationConsentRecord;
   try {
-    const parsed = loadJson<unknown>(consentPath);
-    if (!isPlainObject(parsed)) {
-      return { allowed: false, reason: 'voice-consent.json is malformed: expected an object' };
-    }
-    raw = parsed;
+    const consent = loadVoiceConsentAtPath(consentPath);
+    return validateVoiceConsentRecord(consent, {
+      missionId,
+      tenantSlug: input.tenant_slug,
+    });
   } catch (err: unknown) {
     const reason = err instanceof Error ? err.message : String(err);
     return { allowed: false, reason: `failed to parse voice-consent.json: ${reason}` };
   }
-  if (raw.consent !== 'granted') {
-    return {
-      allowed: false,
-      reason: `voice-consent.json present but consent != 'granted' (got '${String(raw.consent)}')`,
-    };
-  }
-  if (normalizeOptionalString(raw.mission_id) !== missionId) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json mission_id '${String(raw.mission_id)}' does not match active mission '${missionId}'`,
-    };
-  }
-  if (!normalizeOptionalString(raw.operator_handle)) {
-    return {
-      allowed: false,
-      reason: 'voice-consent.json is malformed: operator_handle is required',
-    };
-  }
-  const expiresAt = normalizeOptionalString(raw.expires_at);
-  if (expiresAt) {
-    const expiry = Date.parse(expiresAt);
-    if (!Number.isFinite(expiry)) {
-      return { allowed: false, reason: `voice-consent.json expires_at is invalid: ${expiresAt}` };
-    }
-    if (expiry <= Date.now()) {
-      return { allowed: false, reason: `voice-consent.json expired at ${expiresAt}` };
-    }
-  }
-  const activeTenant = normalizeOptionalString(input.tenant_slug);
-  if (activeTenant && normalizeOptionalString(raw.tenant_slug) !== activeTenant) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json tenant_slug '${normalizeOptionalString(raw.tenant_slug) ?? 'missing'}' does not match active tenant '${activeTenant}'`,
-    };
-  }
-  return { allowed: true };
 }
 
 export function filterSelfAudioFromMeetingInput(
@@ -292,6 +271,13 @@ export class MeetingParticipationCoordinator {
       this.deps.trace?.addEvent('meeting_participation.joined', {
         session_id: session.state.session_id,
       });
+      try {
+        options.onSession?.(session);
+      } catch (err: any) {
+        logger.warn(
+          `[participation-coordinator] onSession handler failed: ${err?.message ?? String(err)}`
+        );
+      }
     } catch (err: any) {
       this.deps.trace?.addEvent('meeting_participation.join_failed', {
         error: err?.message ?? String(err),
@@ -302,7 +288,7 @@ export class MeetingParticipationCoordinator {
       throw err;
     }
 
-    const joinedAt = session.state.joined_at ?? new Date().toISOString();
+    const joinedAt = session.state.joined_at ?? nowIso();
 
     // 2. Pick the transcript source: local STT over the inbound audio
     //    (default), or the driver's native caption stream (captions_first).
@@ -479,7 +465,7 @@ export class MeetingParticipationCoordinator {
     return {
       session_id: session.state.session_id,
       joined_at: joinedAt,
-      left_at: session.state.left_at ?? new Date().toISOString(),
+      left_at: session.state.left_at ?? nowIso(),
       utterances_received: utterancesReceived,
       utterances_spoken: utterancesSpoken,
       ended_by_timeout: endedByTimeout,

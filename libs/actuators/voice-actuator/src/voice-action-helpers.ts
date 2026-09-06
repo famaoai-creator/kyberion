@@ -1,18 +1,16 @@
-import {
-  createCoreAudioDeviceInventoryBridge,
-  checkMeetingParticipationConsent,
-  getStreamingSttBridge,
-  getVoiceProfileRegistry,
-  getVoiceTtsLanguageConfig,
-  installShellStreamingSttBridgeFromEnv,
-  pathResolver,
-  TtsLoopbackVerifier,
-  resolveVoiceBackend,
-  resolveVoiceEngineForPlatform,
-  safeExec,
-  StubAudioBus,
-  BlackHoleAudioBus,
-} from '@agent/core';
+import { createCoreAudioDeviceInventoryBridge } from '@agent/core/coreaudio-device-inventory';
+import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
+import { getStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
+import { getVoiceProfileRegistry } from '@agent/core/voice-profile-registry';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
+import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell-streaming-stt-bridge';
+import { pathResolver } from '@agent/core/path-resolver';
+import { TtsLoopbackVerifier } from '@agent/core/tts-loopback-verifier';
+import { resolveVoiceBackend } from '@agent/core/media-backend-registry';
+import { resolveVoiceEngineForPlatform } from '@agent/core/voice-engine-registry';
+import { safeExec } from '@agent/core/secure-io';
+import { StubAudioBus } from '@agent/core/audio-bus';
+import { BlackHoleAudioBus } from '@agent/core/blackhole-audio-bus';
 import { performPlayback } from './voice-runtime-helpers.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import {

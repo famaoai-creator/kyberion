@@ -1,4 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeSpawn } from './secure-io.js';
 import type { DesktopObservationSnapshot } from './desktop-recording.js';
@@ -20,6 +22,56 @@ export interface DesktopEventFeed {
 }
 
 const ALLOWED_EVENTS = new Set(['click_at', 'right_click_at', 'press_key']);
+
+function isFiniteCoordinate(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100_000;
+}
+
+/** Normalize one JSON event emitted by the native listen-only event source. */
+export function parseDesktopEventLine(value: unknown): DesktopEvent | undefined {
+  if (!isRecord(value) || typeof value.op !== 'string' || !ALLOWED_EVENTS.has(value.op)) {
+    return undefined;
+  }
+
+  if (value.op === 'press_key') {
+    if (!isRecord(value.params) || Object.keys(value.params).some((key) => key !== 'key_code')) {
+      return undefined;
+    }
+    const keyCode = value.params.key_code;
+    if (
+      typeof keyCode !== 'number' ||
+      !Number.isInteger(keyCode) ||
+      keyCode < 0 ||
+      keyCode > 65_535
+    ) {
+      return undefined;
+    }
+    return { op: 'press_key', params: { key_code: keyCode } };
+  }
+
+  if (
+    Object.keys(value).some((key) => !['op', 'x', 'y', 'click_count'].includes(key)) ||
+    !isFiniteCoordinate(value.x) ||
+    !isFiniteCoordinate(value.y)
+  ) {
+    return undefined;
+  }
+  const clickCount = value.click_count === undefined ? 1 : value.click_count;
+  if (
+    typeof clickCount !== 'number' ||
+    !Number.isInteger(clickCount) ||
+    clickCount < 1 ||
+    clickCount > 3
+  ) {
+    return undefined;
+  }
+  return {
+    op: value.op,
+    x: value.x,
+    y: value.y,
+    click_count: clickCount,
+  };
+}
 
 function fallback(reason: string): DesktopEventFeedStatus {
   return { event_source: 'state-observation-only', status: 'unavailable', reason };
@@ -99,9 +151,8 @@ export class NativeMacDesktopEventFeed implements DesktopEventFeed {
     for (const line of lines) {
       if (!line.trim()) continue;
       try {
-        const value = JSON.parse(line) as DesktopObservationSnapshot['event'];
-        if (!value || !ALLOWED_EVENTS.has(value.op)) continue;
-        this.queue.push(value as NonNullable<DesktopObservationSnapshot['event']>);
+        const value = parseDesktopEventLine(parseSafeJsonInput(line, 'desktop event'));
+        if (value) this.queue.push(value);
       } catch {
         // A malformed helper line is ignored; the feed remains fail-closed.
       }

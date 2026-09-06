@@ -1,10 +1,13 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import {
-  loadJson,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -13,6 +16,7 @@ import { notifyOperator } from './operator-notifications.js';
 import { writeIntentGoalHandoff } from './intent-handoff.js';
 import { readDealRequirementsCapture } from './customer-conversation-modes.js';
 import { saveRequirementsDraft } from './requirements-draft-store.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   advanceDealStage,
@@ -39,7 +43,29 @@ import { formatNumber } from './format.js';
  */
 
 function dealDocsDir(tenantSlug: string, dealId: string): string {
-  return pathResolver.rootResolve(path.join('customer', tenantSlug, 'deals', dealId));
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/.test(dealId)) {
+    throw new Error(`[DEAL_SCOPE] invalid deal id: ${dealId}`);
+  }
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(path.join('customer', tenantSlug, 'deals', dealId)),
+    { allowMissingLeaf: true }
+  );
+}
+
+function dealDocumentPath(dir: string, fileName: string): string {
+  return assertSafeRepositoryPath(path.join(dir, fileName), { allowMissingLeaf: true });
+}
+
+export function isRegularDealDocumentPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function nextVersion(dir: string, prefix: string): number {
@@ -62,6 +88,56 @@ function nextVersion(dir: string, prefix: string): number {
 // TODO(I18N-04): thread a resolved customer/tenant locale once this
 // template itself is localized.
 const QUOTE_DOCUMENT_LOCALE = 'ja-JP';
+const QUOTE_RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/quote-result.schema.json');
+
+function quoteResultCatalog(filePath: string) {
+  return defineCatalog<QuoteResult>({
+    id: 'quote-result',
+    path: filePath,
+    schema: QUOTE_RESULT_SCHEMA_PATH,
+  });
+}
+
+export interface ContractReviewRecord {
+  kind: 'contract-review-record';
+  deal_id: string;
+  version: number;
+  verdict: 'approve' | 'reject';
+  reviewer: string;
+  notes: string;
+  reviewed_at: string;
+}
+
+const CONTRACT_REVIEW_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/contract-review-record.schema.json'
+);
+
+function contractReviewCatalog(filePath: string) {
+  return defineCatalog<ContractReviewRecord>({
+    id: 'contract-review-record',
+    path: filePath,
+    schema: CONTRACT_REVIEW_SCHEMA_PATH,
+  });
+}
+
+export function loadContractReviewAtPath(
+  filePath: string,
+  tenantSlug: string,
+  dealId: string,
+  version: number
+): ContractReviewRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`contract review record must be a regular file: ${filePath}`);
+  }
+  const record = contractReviewCatalog(safeFilePath).load();
+  if (record.deal_id !== dealId || record.version !== version || tenantSlug.trim() === '') {
+    throw new Error(
+      `contract review record binding mismatch for ${tenantSlug}/${dealId} v${version}`
+    );
+  }
+  return record;
+}
 
 function renderQuoteMarkdown(deal: DealRecord, quote: QuoteResult, version: number): string {
   return [
@@ -121,8 +197,13 @@ export function generateQuoteForDeal(input: {
     input.dealId,
     `quote-v${version}.md`
   );
-  safeWriteFile(path.join(dir, `quote-v${version}.json`), JSON.stringify(quote, null, 2));
-  safeWriteFile(path.join(dir, `quote-v${version}.md`), renderQuoteMarkdown(deal, quote, version));
+  const quoteJsonPath = dealDocumentPath(dir, `quote-v${version}.json`);
+  const canonicalQuote = quoteResultCatalog(quoteJsonPath).validate(quote, quoteJsonPath);
+  safeWriteFile(quoteJsonPath, JSON.stringify(canonicalQuote, null, 2));
+  safeWriteFile(
+    dealDocumentPath(dir, `quote-v${version}.md`),
+    renderQuoteMarkdown(deal, quote, version)
+  );
   const advanced = advanceDealStage({
     tenantSlug: input.tenantSlug,
     dealId: input.dealId,
@@ -151,12 +232,23 @@ export function draftContractForDeal(input: {
   if (!deal.agreed?.scope?.length || !deal.agreed.amount) {
     throw new Error('contract_requires_agreement: record agreed scope and amount first');
   }
-  const templateFile = pathResolver.knowledge(input.templatePath || DEFAULT_CONTRACT_TEMPLATE);
+  const knowledgeRoot = assertSafeRepositoryPath(pathResolver.knowledge());
+  const templateFile = assertSafeRepositoryPath(
+    pathResolver.knowledge(input.templatePath || DEFAULT_CONTRACT_TEMPLATE)
+  );
+  if (templateFile !== knowledgeRoot && !templateFile.startsWith(`${knowledgeRoot}${path.sep}`)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] contract template is outside knowledge: ${templateFile}`
+    );
+  }
   if (!safeExistsSync(templateFile)) throw new Error(`contract_template_missing:${templateFile}`);
-  const template = String(safeReadFile(templateFile, { encoding: 'utf8' }));
+  if (!safeLstat(templateFile).isFile()) {
+    throw new Error(`contract_template_must_be_a_regular_file:${templateFile}`);
+  }
+  const template = readTextFile(templateFile);
   const rendered = template
     .split('{{DATE}}')
-    .join(new Date().toISOString().slice(0, 10))
+    .join(nowIso().slice(0, 10))
     .split('{{CUSTOMER_NAME}}')
     .join('(担当者名)')
     .split('{{CUSTOMER_ORG}}')
@@ -183,7 +275,7 @@ export function draftContractForDeal(input: {
     input.dealId,
     `contract-v${version}.md`
   );
-  safeWriteFile(path.join(dir, `contract-v${version}.md`), rendered);
+  safeWriteFile(dealDocumentPath(dir, `contract-v${version}.md`), rendered);
   const advanced = advanceDealStage({
     tenantSlug: input.tenantSlug,
     dealId: input.dealId,
@@ -213,34 +305,32 @@ export function recordContractReview(input: {
   notes?: string;
 }): string {
   const dir = dealDocsDir(input.tenantSlug, input.dealId);
-  safeMkdir(dir, { recursive: true });
-  const filePath = path.join(dir, `contract-review-v${input.version}.json`);
-  safeWriteFile(
-    filePath,
-    JSON.stringify(
-      {
-        kind: 'contract-review-record',
-        deal_id: input.dealId,
-        version: input.version,
-        verdict: input.verdict,
-        reviewer: input.reviewer,
-        notes: input.notes || '',
-        reviewed_at: new Date().toISOString(),
-      },
-      null,
-      2
-    )
+  const filePath = dealDocumentPath(dir, `contract-review-v${input.version}.json`);
+  const record = contractReviewCatalog(filePath).validate(
+    {
+      kind: 'contract-review-record',
+      deal_id: input.dealId,
+      version: input.version,
+      verdict: input.verdict,
+      reviewer: input.reviewer,
+      notes: input.notes || '',
+      reviewed_at: nowIso(),
+    },
+    filePath
   );
+  safeMkdir(dir, { recursive: true });
+  safeWriteFile(filePath, JSON.stringify(record, null, 2));
   return filePath;
 }
 
 function contractReviewApproved(tenantSlug: string, dealId: string, version: number): boolean {
-  const filePath = path.join(dealDocsDir(tenantSlug, dealId), `contract-review-v${version}.json`);
+  const filePath = dealDocumentPath(
+    dealDocsDir(tenantSlug, dealId),
+    `contract-review-v${version}.json`
+  );
   try {
     if (!safeExistsSync(filePath)) return false;
-    const record = loadJson<{
-      verdict?: string;
-    }>(filePath);
+    const record = loadContractReviewAtPath(filePath, tenantSlug, dealId, version);
     return record.verdict === 'approve';
   } catch {
     return false;
@@ -259,14 +349,17 @@ export async function sendDealDocumentToCustomer(input: {
   dealId: string;
   kind: 'quote' | 'contract';
   version: number;
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
   deliver: (text: string) => Promise<unknown>;
 }): Promise<SendDealDocumentResult> {
   const tenantSlug = input.binding.tenantSlug;
-  const docPath = path.join(
+  const docPath = dealDocumentPath(
     dealDocsDir(tenantSlug, input.dealId),
     `${input.kind}-v${input.version}.md`
   );
-  if (!safeExistsSync(docPath)) {
+  if (!isRegularDealDocumentPath(docPath)) {
     return {
       sent: false,
       status: 'blocked',
@@ -282,12 +375,15 @@ export async function sendDealDocumentToCustomer(input: {
     );
     return { sent: false, status: 'blocked', reason: 'contract_review_required' };
   }
-  const body = String(safeReadFile(docPath, { encoding: 'utf8' }));
+  const body = readTextFile(docPath);
   const result = await sendToCustomer({
     binding: input.binding,
     title: `${input.kind === 'quote' ? 'お見積書' : '契約書ドラフト'} (${input.dealId} v${input.version})`,
     body,
     correlationId: `${input.dealId}:${input.kind}-v${input.version}`,
+    ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
+    ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
+    ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
     deliver: input.deliver,
   });
   if (result.sent) {
@@ -295,7 +391,7 @@ export async function sendDealDocumentToCustomer(input: {
       tenantSlug,
       dealId: input.dealId,
       role: 'kyberion',
-      text: `${input.kind}-v${input.version} を送付しました (sent_at: ${new Date().toISOString()})`,
+      text: `${input.kind}-v${input.version} を送付しました (sent_at: ${nowIso()})`,
     });
   }
   return result;

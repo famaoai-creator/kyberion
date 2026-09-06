@@ -7,43 +7,50 @@
  * drivers concurrently would turn at-least-once into at-N-times.
  */
 import {
-  acquireLock,
-  releaseLock,
-  logger,
   runMeshDeliveryPass,
   formatMeshDeliveryPassReport,
   type MeshDeliveryPassReport,
-} from '@agent/core';
+} from '@agent/core/mesh-delivery-driver';
+import { acquireLock, releaseLock } from '@agent/core/lock-utils';
+import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DRIVER_LOCK_ID = 'mesh-delivery-driver';
+type Print = (value: unknown) => void;
 
-export async function runMeshDeliveryDriverOnce(options: {
+interface MeshDeliveryDriverOnceOptions {
   senderPeerId: string;
   sharedSecret?: string;
   batchLimit: number;
   json: boolean;
-}): Promise<MeshDeliveryPassReport> {
+  print?: Print;
+}
+
+export async function runMeshDeliveryDriverOnce(
+  options: MeshDeliveryDriverOnceOptions
+): Promise<MeshDeliveryPassReport> {
   const report = await runMeshDeliveryPass({
     senderPeerId: options.senderPeerId,
     sharedSecret: options.sharedSecret,
     batchLimit: options.batchLimit,
   });
   if (options.json) {
-    console.log(JSON.stringify(report, null, 2));
+    if (options.print) options.print(report);
+    else logger.info(JSON.stringify(report, null, 2));
   } else {
-    logger.info(formatMeshDeliveryPassReport(report));
+    const print = options.print ?? ((value: unknown) => logger.info(String(value)));
+    print(formatMeshDeliveryPassReport(report));
     for (const failure of report.failures) {
-      logger.warn(`[mesh-delivery]   ${failure.delivery_id}: ${failure.reason}`);
+      print(`[mesh-delivery]   ${failure.delivery_id}: ${failure.reason}`);
     }
   }
   return report;
 }
 
-async function main(): Promise<void> {
-  const argv = createStandardYargs()
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
+  const argv = createStandardYargs(['node', 'mesh_delivery_driver', ...args])
     .option('limit', { type: 'number', default: 10, describe: 'Max deliveries per pass' })
     .option('loop', {
       type: 'boolean',
@@ -60,18 +67,16 @@ async function main(): Promise<void> {
 
   const senderPeerId = (getRegisteredEnvText('KYBERION_MESH_PEER_ID') || '').trim();
   if (!senderPeerId) {
-    logger.error(
+    throw new ScriptExitError(
+      2,
       "[mesh-delivery] KYBERION_MESH_PEER_ID is not set. Set it to this host's peer id from the peer network catalog."
     );
-    process.exitCode = 2;
-    return;
   }
   const sharedSecret = getRegisteredEnvText('KYBERION_MESH_SHARED_SECRET') || undefined;
 
   const locked = await acquireLock(DRIVER_LOCK_ID, 1000);
   if (!locked) {
     logger.warn('[mesh-delivery] another driver instance holds the lock; exiting (single-writer).');
-    process.exitCode = 0;
     return;
   }
 
@@ -89,6 +94,7 @@ async function main(): Promise<void> {
         sharedSecret,
         batchLimit: Number(argv.limit) || 10,
         json: Boolean(argv.json),
+        print,
       });
       if (!argv.loop) break;
       const idle = report.claimed === 0;
@@ -100,12 +106,14 @@ async function main(): Promise<void> {
   }
 }
 
+export const runMeshDeliveryDriver = defineScript({
+  name: 'mesh:delivery-driver',
+  flags: [],
+  run: ({ argv, print }) => main(argv, print),
+});
+
 if (
   isDirectScript(import.meta.url, 'mesh_delivery_driver.ts') ||
   isDirectScript(import.meta.url, 'mesh_delivery_driver.js')
-) {
-  main().catch((err) => {
-    logger.error(err instanceof Error ? err.message : String(err));
-    process.exitCode = 1;
-  });
-}
+)
+  void runMeshDeliveryDriver();

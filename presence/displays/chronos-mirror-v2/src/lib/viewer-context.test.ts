@@ -10,6 +10,7 @@ describe('viewer-context', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.doUnmock('@agent/core');
+    vi.doUnmock('@agent/core/chronos-access-registry');
   });
 
   it('resolves loopback compatibility access to all tenants', async () => {
@@ -37,8 +38,10 @@ describe('viewer-context', () => {
   });
 
   it('binds an unregistered API token to the server tenant', async () => {
-    vi.doMock('@agent/core', async () => ({
-      ...(await vi.importActual<typeof import('@agent/core')>('@agent/core')),
+    vi.doMock('@agent/core/chronos-access-registry', async () => ({
+      ...(await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
+        '@agent/core/chronos-access-registry'
+      )),
       readChronosTokenRegistrations: () => [],
     }));
     vi.stubEnv('KYBERION_API_TOKEN', 'known-token');
@@ -57,8 +60,10 @@ describe('viewer-context', () => {
   });
 
   it('rejects a remote unregistered token without a server tenant', async () => {
-    vi.doMock('@agent/core', async () => ({
-      ...(await vi.importActual<typeof import('@agent/core')>('@agent/core')),
+    vi.doMock('@agent/core/chronos-access-registry', async () => ({
+      ...(await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
+        '@agent/core/chronos-access-registry'
+      )),
       readChronosTokenRegistrations: () => [],
     }));
     vi.stubEnv('KYBERION_API_TOKEN', 'known-token');

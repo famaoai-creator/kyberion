@@ -1,5 +1,13 @@
 import { MissionEvidenceDoc } from './mission-evidence-doc.js';
 import { resolveIdentityContext } from './authority.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+
+const VOICE_CONSENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-consent.schema.json'
+);
 
 export interface VoiceConsentRecord {
   consent: 'granted' | 'revoked';
@@ -12,6 +20,80 @@ export interface VoiceConsentRecord {
   revoked_at?: string;
   expires_at?: string;
   audit_event_id?: string;
+}
+
+export interface VoiceConsentValidationOptions {
+  missionId: string;
+  tenantSlug?: string;
+  nowMs?: number;
+}
+
+export interface VoiceConsentValidationResult {
+  allowed: boolean;
+  reason?: string;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+/** Validate the mission-scoped consent record without reading or writing files. */
+export function validateVoiceConsentRecord(
+  value: unknown,
+  options: VoiceConsentValidationOptions
+): VoiceConsentValidationResult {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { allowed: false, reason: 'voice-consent.json is malformed: expected an object' };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.consent !== 'granted') {
+    return {
+      allowed: false,
+      reason: `voice-consent.json present but consent != 'granted' (got '${String(record.consent)}')`,
+    };
+  }
+
+  const consentMissionId = normalizeOptionalString(record.mission_id);
+  const operatorHandle = normalizeOptionalString(record.operator_handle);
+  if (!consentMissionId || !operatorHandle) {
+    return {
+      allowed: false,
+      reason: 'voice-consent.json is malformed: mission_id and operator_handle are required',
+    };
+  }
+  if (consentMissionId !== options.missionId) {
+    return {
+      allowed: false,
+      reason: `voice-consent.json mission_id '${consentMissionId}' does not match active mission '${options.missionId}'`,
+    };
+  }
+
+  const expiresAt = normalizeOptionalString(record.expires_at);
+  if (expiresAt) {
+    const expiresMs = Date.parse(expiresAt);
+    if (!Number.isFinite(expiresMs)) {
+      return { allowed: false, reason: `voice-consent.json expires_at is invalid: ${expiresAt}` };
+    }
+    if (expiresMs <= (options.nowMs ?? Date.now())) {
+      return { allowed: false, reason: `voice-consent.json expired at ${expiresAt}` };
+    }
+  }
+
+  const activeTenant = normalizeOptionalString(options.tenantSlug);
+  if (activeTenant) {
+    const consentTenant = normalizeOptionalString(record.tenant_slug);
+    if (consentTenant !== activeTenant) {
+      return {
+        allowed: false,
+        reason: `voice-consent.json tenant_slug '${consentTenant ?? 'missing'}' does not match active tenant '${activeTenant}'`,
+      };
+    }
+  }
+
+  return { allowed: true };
 }
 
 export function isVoiceConsentRecord(doc: unknown): doc is VoiceConsentRecord {
@@ -32,7 +114,27 @@ function consentDoc(missionId: string): MissionEvidenceDoc<VoiceConsentRecord> {
     filename: 'voice-consent.json',
     agent_id: 'voice-consent',
     validate: isVoiceConsentRecord,
+    schema: VOICE_CONSENT_SCHEMA_PATH,
+    catalog_id: 'voice-consent',
   });
+}
+
+/** Load an existing consent artifact through its repository and schema boundary. */
+export function loadVoiceConsentAtPath(filePath: string): VoiceConsentRecord {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[VOICE_CONSENT] consent record must be a regular file: ${filePath}`);
+  }
+  try {
+    return defineCatalog<VoiceConsentRecord>({
+      id: 'voice-consent',
+      path: safePath,
+      schema: VOICE_CONSENT_SCHEMA_PATH,
+    }).load();
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`voice-consent.json is malformed: ${reason}`);
+  }
 }
 
 export function grantVoiceConsent(options: {
@@ -58,7 +160,7 @@ export function grantVoiceConsent(options: {
     consent: 'granted',
     mission_id: options.missionId,
     operator_handle: options.operator,
-    granted_at: new Date().toISOString(),
+    granted_at: nowIso(),
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
     ...(options.expiresAt ? { expires_at: options.expiresAt } : {}),
     ...(options.scope ? { scope: options.scope } : {}),
@@ -83,7 +185,7 @@ export function revokeVoiceConsent(missionId: string, note?: string): VoiceConse
   const record: VoiceConsentRecord = {
     ...existing,
     consent: 'revoked',
-    revoked_at: new Date().toISOString(),
+    revoked_at: nowIso(),
     ...(note ? { note } : {}),
   };
   const { audit_event_id } = doc.write(record, {

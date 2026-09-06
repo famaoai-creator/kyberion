@@ -10,13 +10,15 @@ const mocks = vi.hoisted(() => ({
   spawnManagedProcess: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn(), success: vi.fn(), warn: vi.fn() },
   surfaceManifestDirectoryPath: vi.fn(() => '/tmp/kyberion/knowledge/product/governance/surfaces'),
-  surfaceManifestPath: vi.fn(() => '/tmp/kyberion/knowledge/product/governance/active-surfaces.json'),
+  surfaceManifestPath: vi.fn(
+    () => '/tmp/kyberion/knowledge/product/governance/active-surfaces.json'
+  ),
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual as any,
+    ...(actual as any),
     loadSurfaceManifest: mocks.loadSurfaceManifest,
     loadSurfaceState: mocks.loadSurfaceState,
     validateServiceAuth: mocks.validateServiceAuth,
@@ -27,6 +29,30 @@ vi.mock('@agent/core', async (importOriginal) => {
     surfaceManifestPath: mocks.surfaceManifestPath,
   };
 });
+
+vi.mock('@agent/core/surface-runtime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/surface-runtime')>();
+  return {
+    ...actual,
+    loadSurfaceManifest: mocks.loadSurfaceManifest,
+    loadSurfaceState: mocks.loadSurfaceState,
+    surfaceManifestDirectoryPath: mocks.surfaceManifestDirectoryPath,
+    surfaceManifestPath: mocks.surfaceManifestPath,
+  };
+});
+
+vi.mock('@agent/core/service-validator', () => ({
+  inspectServiceAuth: mocks.inspectServiceAuth,
+}));
+
+vi.mock('@agent/core/managed-process', () => ({
+  spawnManagedProcess: mocks.spawnManagedProcess,
+}));
+
+vi.mock('@agent/core/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/core')>()),
+  logger: mocks.logger,
+}));
 
 describe('surface_runtime: startSurfaceById with auth validation', () => {
   beforeEach(() => {
@@ -39,12 +65,14 @@ describe('surface_runtime: startSurfaceById with auth validation', () => {
 
     const manifest = {
       version: 1,
-      surfaces: [{
-        id: 'auth-surface',
-        enabled: true,
-        service_id: 'test-service',
-        preset_path: 'test-preset.json'
-      }]
+      surfaces: [
+        {
+          id: 'auth-surface',
+          enabled: true,
+          service_id: 'test-service',
+          preset_path: 'test-preset.json',
+        },
+      ],
     };
     mocks.loadSurfaceManifest.mockReturnValue(manifest);
     mocks.inspectServiceAuth.mockReturnValue({
@@ -64,7 +92,9 @@ describe('surface_runtime: startSurfaceById with auth validation', () => {
 
     expect(result.status).toBe('skipped_auth_required');
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
-    expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('Auth validation failed for auth-surface'));
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Auth validation failed for auth-surface')
+    );
   });
 
   it('should surface auth readiness details in setup report', async () => {
@@ -73,7 +103,13 @@ describe('surface_runtime: startSurfaceById with auth validation', () => {
     mocks.loadSurfaceManifest.mockReturnValue({
       version: 1,
       surfaces: [
-        { id: 'slack-bridge', kind: 'gateway', enabled: true, service_id: 'slack', preset_path: 'slack.json' },
+        {
+          id: 'slack-bridge',
+          kind: 'gateway',
+          enabled: true,
+          service_id: 'slack',
+          preset_path: 'slack.json',
+        },
         { id: 'imessage-bridge', kind: 'service', enabled: true },
       ],
     });

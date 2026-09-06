@@ -1,14 +1,13 @@
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
 import {
   createPeerRuntimeRecoveryApprovalRequest,
-  createStandardYargs,
-  getRegisteredEnv,
-  logger,
   resumePeerRuntimeFromQuarantine,
-} from '@agent/core';
+} from '@agent/core/peer-runtime-recovery';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []) {
+  const argv = await createStandardYargs(['node', 'peer_runtime_recovery', ...args])
     .command('request', 'Create a human approval request for quarantined peer runtime')
     .command('resume', 'Resume quarantined peer runtime after approval and heartbeat checks')
     .option('tenant-id', {
@@ -35,19 +34,12 @@ async function main(): Promise<void> {
       requestedBy,
       approvalChannel: String(argv['approval-channel']),
     });
-    console.log(
-      JSON.stringify(
-        {
-          approval_id: approval.id,
-          approval_channel: approval.storageChannel,
-          status: approval.status,
-          next: `pnpm cli approve ${approval.id} ${approval.storageChannel}`,
-        },
-        null,
-        2
-      )
-    );
-    return;
+    return {
+      approval_id: approval.id,
+      approval_channel: approval.storageChannel,
+      status: approval.status,
+      next: `pnpm kyberion approve ${approval.id} ${approval.storageChannel}`,
+    };
   }
   if (command !== 'resume') throw new Error(`Unknown command: ${command}`);
   const approvalId = String(argv['approval-id'] || '').trim();
@@ -58,15 +50,16 @@ async function main(): Promise<void> {
     approvalRequestId: approvalId,
     approvalChannel: String(argv['approval-channel']),
   });
-  logger.success(`[peer-runtime-recovery] resumed ${result.tenant_id}`);
-  console.log(JSON.stringify(result, null, 2));
+  return result;
 }
 
 export const runPeerRuntimeRecovery = defineScript({
   name: 'peer:runtime-recovery',
   flags: [],
-  run() {
-    return main();
+  run: async ({ argv, print }) => {
+    const result = await main(argv);
+    print(result);
+    return result;
   },
 });
 

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "plugin-pack-registry.schema.json",
+  "title": "Managed plugin pack registry",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": "1" },
+    "packs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pack_id": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "minLength": 1 },
+          "ref": { "type": "string", "minLength": 1 },
+          "sync_mode": { "type": "string", "enum": ["pinned", "tracked"] },
+          "commit": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["active", "archived"] },
+          "imported_at": { "type": "string", "format": "date-time" },
+          "plugins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "plugin_id": { "type": "string", "minLength": 1 },
+                "status": { "type": "string", "enum": ["active", "archived"] },
+                "activation_status": { "type": "string", "minLength": 1 },
+                "archived_at": { "type": "string", "format": "date-time" }
+              },
+              "required": ["plugin_id", "status", "activation_status"]
+            }
+          }
+        },
+        "required": ["pack_id", "url", "sync_mode", "status", "imported_at", "plugins"]
+      }
+    }
+  },
+  "required": ["version", "packs"]
+}

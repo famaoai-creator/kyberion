@@ -1,0 +1,44 @@
+{
+  "$id": "https://kyberion.internal/schemas/env-registry.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kyberion environment registry",
+  "type": "object",
+  "required": ["version", "description", "entries"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "category", "type", "required", "description", "documented"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^KYBERION_[A-Z0-9_]+$" },
+          "category": {
+            "type": "string",
+            "enum": ["secret", "path", "flag", "tuning", "provider", "runtime"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["string", "boolean", "number", "enum", "path"]
+          },
+          "enum": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "required": { "type": "boolean" },
+          "default": { "type": ["string", "null"] },
+          "subsystem": { "type": "string" },
+          "description": { "type": "string" },
+          "documented": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

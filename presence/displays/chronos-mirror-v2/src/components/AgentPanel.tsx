@@ -2,71 +2,41 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, RefreshCw, Cpu, X, FileText, Terminal, RotateCcw } from 'lucide-react';
-import { resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
+import { resolveChronosLocale, uxTextOr } from '../lib/ux-vocabulary';
+import {
+  parseAgentHealthResponse,
+  type ClientAgentHealthResponse,
+  type ClientAgentRecord,
+} from '../lib/agent-health-response';
+import {
+  parseAgentManifestsResponse,
+  type ClientAgentManifest,
+} from '../lib/agent-manifests-response';
+import { parseAgentProvidersResponse } from '../lib/agent-providers-response';
+import {
+  parseManualCancelResponse,
+  parseManualCommandStatusResponse,
+  parseManualExecutionResponse,
+  parseManualPeekResponse,
+  parseManualQueuedResponse,
+  type ClientManualDriveAction,
+  type ClientManualExecutionStatus,
+} from '../lib/agent-manual-response';
+import { parseAgentLogsResponse } from '../lib/agent-logs-response';
+import {
+  parseAgentRefreshResponse,
+  parseAgentRestartResponse,
+  parseAgentShutdownResponse,
+  parseAgentSpawnResponse,
+} from '../lib/agent-control-response';
 import { KyberionDonut } from './KyberionCharts';
 
-interface AgentRecord {
-  agentId: string;
-  provider: string;
-  modelId: string;
-  status: string;
-  capabilities: string[];
-  trustScore: number | null;
-  uptimeMs: number | null;
-  idleMs: number | null;
-  runtime: {
-    kind: string;
-    state: string;
-    pid?: number;
-    idleForMs: number;
-    shutdownPolicy: string;
-  } | null;
-  metrics: {
-    turnCount: number;
-    errorCount: number;
-    restartCount: number;
-    refreshCount: number;
-    totalPromptChars: number;
-    totalResponseChars: number;
-    usage?: {
-      totalTokens?: number;
-      inputTokens?: number;
-      outputTokens?: number;
-    };
-  } | null;
-  process: {
-    rssKb?: number;
-    cpuPercent?: number;
-  } | null;
-  supportsSoftRefresh: boolean;
-  providerRuntime?: Record<string, unknown>;
-  providerResolution?: {
-    preferredProvider?: string;
-    preferredModelId?: string;
-    strategy?: string;
-    availableProviders?: string[];
-  } | null;
-}
-
-interface HealthSnapshot {
-  total: number;
-  ready: number;
-  busy: number;
-  error: number;
-}
+type AgentRecord = ClientAgentRecord;
+type HealthSnapshot = Pick<ClientAgentHealthResponse, 'total' | 'ready' | 'busy' | 'error'>;
 
 type ChronosAccessRole = 'readonly' | 'localadmin';
 
-interface ManifestEntry {
-  agentId: string;
-  provider: string;
-  modelId: string;
-  capabilities: string[];
-  trustRequired: number;
-  requiresEnv: string[];
-  providerStrategy?: string;
-  fallbackProviders?: string[];
-}
+type ManifestEntry = ClientAgentManifest;
 
 interface ProviderOption {
   value: string;
@@ -75,6 +45,16 @@ interface ProviderOption {
   installed: boolean;
   version: string | null;
   protocol: string;
+}
+
+type ManualDriveAction = ClientManualDriveAction;
+
+interface ManualDriveCommand {
+  commandId: string;
+  state: 'queued' | 'running' | 'completed' | 'cancelled';
+  status?: ClientManualExecutionStatus;
+  approval?: { status: 'approved' | 'pending' | 'denied'; request_id?: string; message?: string };
+  resumesCommandId?: string;
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -123,15 +103,22 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const [viewingLogs, setViewingLogs] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ ts: number; type: string; content: string }[]>([]);
   const [mutatingAgent, setMutatingAgent] = useState<string | null>(null);
+  const [manualActions, setManualActions] = useState<Record<string, ManualDriveAction | null>>({});
+  const [manualCommands, setManualCommands] = useState<
+    Record<string, ManualDriveCommand | undefined>
+  >({});
+  const [manualBusy, setManualBusy] = useState<Record<string, boolean>>({});
+  const [manualErrors, setManualErrors] = useState<Record<string, string | undefined>>({});
 
   const fetchAgents = useCallback(async () => {
     try {
       const res = await fetch('/api/agents');
       if (res.ok) {
-        const data = await res.json();
-        setAgents(data.agents || []);
+        const data = parseAgentHealthResponse(await res.json());
+        if (!data) return;
+        setAgents(data.agents);
         setHealth(data);
-        setAccessRole(data.accessRole || 'readonly');
+        setAccessRole(data.accessRole);
       }
     } catch (_) {
       /* best-effort: failure here must not break the primary flow */
@@ -142,9 +129,10 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     try {
       const res = await fetch('/api/agents?manifests=true');
       if (res.ok) {
-        const data = await res.json();
-        setManifests(data.manifests || []);
-        setAccessRole(data.accessRole || 'readonly');
+        const data = parseAgentManifestsResponse(await res.json());
+        if (!data) return;
+        setManifests(data.manifests);
+        setAccessRole(data.accessRole);
       }
     } catch (_) {
       /* best-effort: failure here must not break the primary flow */
@@ -155,17 +143,18 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     try {
       const res = await fetch('/api/agents?providers=true');
       if (res.ok) {
-        const data = await res.json();
-        const opts: ProviderOption[] = (data.providers || []).map((p: any) => ({
+        const data = parseAgentProvidersResponse(await res.json());
+        if (!data) return;
+        const opts: ProviderOption[] = data.providers.map((p) => ({
           value: p.provider,
           label: PROVIDER_LABELS[p.provider] || p.provider,
-          models: p.models || [],
+          models: p.models,
           installed: p.installed,
           version: p.installed && p.version && !p.version.includes('Error') ? p.version : null,
           protocol: p.protocol,
         }));
         setProviders(opts);
-        setAccessRole(data.accessRole || 'readonly');
+        setAccessRole(data.accessRole);
         // Auto-select first available provider if none selected
         setSpawnProvider((prev) => {
           if (prev) return prev;
@@ -220,14 +209,15 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         body: JSON.stringify(body),
       });
       if (res.ok) {
+        const parsed = parseAgentSpawnResponse(await res.json());
+        if (!parsed) throw new Error('Agent spawn returned an invalid response.');
         setShowSpawn(false);
         setSpawnPrompt('');
         setSpawnProviderStrategy('adaptive');
         setSpawnFallbackProviders('');
         await fetchAgents();
       } else {
-        const err = await res.json();
-        alert(err.error || 'Spawn failed');
+        alert('Spawn failed');
       }
     } catch (_) {
       /* best-effort: failure here must not break the primary flow */
@@ -243,8 +233,9 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         body: JSON.stringify({ action: 'logs', agentId, limit: 100 }),
       });
       if (res.ok) {
-        const data = await res.json();
-        setLogs(data.logs || []);
+        const data = parseAgentLogsResponse(await res.json());
+        if (!data || data.agentId !== agentId) return;
+        setLogs(data.logs);
       }
     } catch (_) {
       /* best-effort: failure here must not break the primary flow */
@@ -259,11 +250,15 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const handleShutdown = async (agentId: string) => {
     try {
       setMutatingAgent(agentId);
-      await fetch('/api/agents', {
+      const response = await fetch('/api/agents', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agentId }),
       });
+      if (!response.ok) throw new Error('Agent shutdown failed');
+      const parsed = parseAgentShutdownResponse(await response.json());
+      if (!parsed || parsed.agentId !== agentId)
+        throw new Error('Agent shutdown returned an invalid response.');
       await fetchAgents();
     } catch (_) {
       /* best-effort cleanup */
@@ -274,11 +269,19 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const handleAgentAction = async (agentId: string, action: 'refresh' | 'restart') => {
     try {
       setMutatingAgent(agentId);
-      await fetch('/api/agents', {
+      const response = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, agentId }),
       });
+      if (!response.ok) throw new Error(`Agent ${action} failed`);
+      const payload = await response.json();
+      const parsed =
+        action === 'refresh'
+          ? parseAgentRefreshResponse(payload)
+          : parseAgentRestartResponse(payload);
+      if (!parsed || parsed.agentId !== agentId)
+        throw new Error(`Agent ${action} returned an invalid response.`);
       await fetchAgents();
       if (viewingLogs === agentId) {
         await fetchLogs(agentId);
@@ -287,6 +290,214 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
       /* best-effort: failure here must not break the primary flow */
     }
     setMutatingAgent(null);
+  };
+
+  const inspectManualAction = async (agentId: string) => {
+    setManualBusy((current) => ({ ...current, [agentId]: true }));
+    try {
+      const response = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'manual_peek', agentId }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setManualActions((current) => ({ ...current, [agentId]: null }));
+        setManualErrors((current) => ({
+          ...current,
+          [agentId]:
+            response.status === 409
+              ? 'Manual drive is not available for this runtime.'
+              : 'Manual action inspection failed.',
+        }));
+        return;
+      }
+      const parsed = parseManualPeekResponse(payload);
+      if (!parsed || parsed.agentId !== agentId) {
+        throw new Error('Manual action inspection returned an invalid response.');
+      }
+      setManualActions((current) => ({ ...current, [agentId]: parsed.action }));
+      setManualErrors((current) => ({ ...current, [agentId]: undefined }));
+    } catch (error) {
+      setManualErrors((current) => ({
+        ...current,
+        [agentId]: error instanceof Error ? error.message : String(error),
+      }));
+    } finally {
+      setManualBusy((current) => ({ ...current, [agentId]: false }));
+    }
+  };
+
+  const pollManualCommand = async (agentId: string, commandId: string) => {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      try {
+        const response = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'manual_status', agentId, commandId }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error('Manual command status failed');
+        const parsed = parseManualCommandStatusResponse(payload);
+        if (!parsed || parsed.agentId !== agentId || parsed.commandId !== commandId) {
+          throw new Error('Manual command status returned an invalid response.');
+        }
+        const command: ManualDriveCommand = {
+          commandId,
+          state: parsed.state,
+          ...(parsed.actionStatus ? { status: parsed.actionStatus } : {}),
+          ...(parsed.approval ? { approval: parsed.approval } : {}),
+          ...(parsed.resumesCommandId ? { resumesCommandId: parsed.resumesCommandId } : {}),
+        };
+        setManualCommands((current) => ({ ...current, [agentId]: command }));
+        if (command.state === 'completed' || command.state === 'cancelled') {
+          await inspectManualAction(agentId);
+          return;
+        }
+      } catch (error) {
+        setManualErrors((current) => ({
+          ...current,
+          [agentId]: error instanceof Error ? error.message : String(error),
+        }));
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  };
+
+  const executeManualAction = async (agentId: string) => {
+    const action = manualActions[agentId];
+    if (!action) return;
+    setManualBusy((current) => ({ ...current, [agentId]: true }));
+    try {
+      const response = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'manual_execute', agentId, actionId: action.action_id }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error('Manual action execution failed');
+      if (response.status === 202) {
+        const parsed = parseManualQueuedResponse(payload);
+        if (!parsed || parsed.agentId !== agentId) {
+          throw new Error('Manual action queue returned an invalid response.');
+        }
+        setManualCommands((current) => ({
+          ...current,
+          [agentId]: {
+            commandId: parsed.commandId,
+            state: 'queued',
+            ...(parsed.resumesCommandId ? { resumesCommandId: parsed.resumesCommandId } : {}),
+          },
+        }));
+        void pollManualCommand(agentId, parsed.commandId);
+      } else {
+        const parsed = parseManualExecutionResponse(payload);
+        if (!parsed || parsed.agentId !== agentId) {
+          throw new Error('Manual action execution returned an invalid response.');
+        }
+        setManualActions((current) => ({ ...current, [agentId]: parsed.action || null }));
+        setManualCommands((current) => ({
+          ...current,
+          [agentId]: parsed.status
+            ? {
+                commandId: 'local',
+                state: 'completed',
+                status: parsed.status,
+                ...(parsed.approval ? { approval: parsed.approval } : {}),
+              }
+            : undefined,
+        }));
+      }
+      setManualErrors((current) => ({ ...current, [agentId]: undefined }));
+    } catch (error) {
+      setManualErrors((current) => ({
+        ...current,
+        [agentId]: error instanceof Error ? error.message : String(error),
+      }));
+    } finally {
+      setManualBusy((current) => ({ ...current, [agentId]: false }));
+    }
+  };
+
+  const cancelManualCommand = async (agentId: string) => {
+    const command = manualCommands[agentId];
+    if (!command || command.commandId === 'local') return;
+    setManualBusy((current) => ({ ...current, [agentId]: true }));
+    try {
+      const response = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'manual_cancel', agentId, commandId: command.commandId }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error('Manual command cancellation failed');
+      const parsed = parseManualCancelResponse(payload);
+      if (!parsed || parsed.agentId !== agentId || parsed.commandId !== command.commandId) {
+        throw new Error('Manual command cancellation returned an invalid response.');
+      }
+      if (parsed.status === 'cancelled') {
+        setManualCommands((current) => ({
+          ...current,
+          [agentId]: { ...command, state: 'cancelled' },
+        }));
+      }
+      setManualErrors((current) => ({ ...current, [agentId]: undefined }));
+    } catch (error) {
+      setManualErrors((current) => ({
+        ...current,
+        [agentId]: error instanceof Error ? error.message : String(error),
+      }));
+    } finally {
+      setManualBusy((current) => ({ ...current, [agentId]: false }));
+    }
+  };
+
+  const resumeManualCommand = async (agentId: string) => {
+    const command = manualCommands[agentId];
+    if (!command || command.commandId === 'local' || command.status !== 'awaiting_approval') return;
+    setManualBusy((current) => ({ ...current, [agentId]: true }));
+    try {
+      const response = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'manual_resume', agentId, commandId: command.commandId }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error('Manual command resume failed');
+      if (response.status === 202) {
+        const parsed = parseManualQueuedResponse(payload);
+        if (
+          !parsed ||
+          parsed.agentId !== agentId ||
+          parsed.resumesCommandId !== command.commandId
+        ) {
+          throw new Error('Manual command resume returned an invalid response.');
+        }
+        setManualCommands((current) => ({
+          ...current,
+          [agentId]: {
+            commandId: parsed.commandId,
+            state: 'queued',
+            ...(parsed.resumesCommandId ? { resumesCommandId: parsed.resumesCommandId } : {}),
+          },
+        }));
+        void pollManualCommand(agentId, parsed.commandId);
+      } else {
+        const parsed = parseManualExecutionResponse(payload);
+        if (!parsed || parsed.agentId !== agentId) {
+          throw new Error('Manual command resume returned an invalid response.');
+        }
+      }
+      setManualErrors((current) => ({ ...current, [agentId]: undefined }));
+    } catch (error) {
+      setManualErrors((current) => ({
+        ...current,
+        [agentId]: error instanceof Error ? error.message : String(error),
+      }));
+    } finally {
+      setManualBusy((current) => ({ ...current, [agentId]: false }));
+    }
   };
 
   if (!isOpen) return null;
@@ -425,6 +636,82 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     <div className="text-[8px] uppercase tracking-widest opacity-40">
                       {agent.status}
                     </div>
+                    {accessRole === 'localadmin' && (
+                      <div className="flex items-center gap-1.5 text-[8px]">
+                        <button
+                          type="button"
+                          onClick={() => void inspectManualAction(agent.agentId)}
+                          disabled={manualBusy[agent.agentId]}
+                          className="rounded border kb-border-subtle px-1.5 py-1 kb-text-secondary hover:kb-surface-accent disabled:opacity-30"
+                          title="Inspect the next safe manual-drive action"
+                        >
+                          {manualBusy[agent.agentId] ? '…' : 'Next'}
+                        </button>
+                        {manualActions[agent.agentId] ? (
+                          <button
+                            type="button"
+                            onClick={() => void executeManualAction(agent.agentId)}
+                            disabled={
+                              manualBusy[agent.agentId] ||
+                              manualActions[agent.agentId]?.status !== 'ready' ||
+                              Boolean(
+                                manualCommands[agent.agentId] &&
+                                manualCommands[agent.agentId]?.state !== 'completed' &&
+                                manualCommands[agent.agentId]?.state !== 'cancelled'
+                              )
+                            }
+                            className="rounded border kb-status-warning-border kb-status-warning-surface px-1.5 py-1 kb-status-warning disabled:opacity-30"
+                            title={manualActions[agent.agentId]?.title}
+                          >
+                            Step
+                          </button>
+                        ) : null}
+                        {manualCommands[agent.agentId]?.state === 'completed' &&
+                        manualCommands[agent.agentId]?.status === 'awaiting_approval' ? (
+                          <button
+                            type="button"
+                            onClick={() => void resumeManualCommand(agent.agentId)}
+                            disabled={manualBusy[agent.agentId]}
+                            className="rounded border kb-status-warning-border kb-status-warning-surface px-1.5 py-1 kb-status-warning disabled:opacity-30"
+                            title="Re-run the approval gate for this manual command"
+                          >
+                            Resume
+                          </button>
+                        ) : null}
+                        {manualCommands[agent.agentId] &&
+                        manualCommands[agent.agentId]?.commandId !== 'local' &&
+                        manualCommands[agent.agentId]?.state !== 'completed' &&
+                        manualCommands[agent.agentId]?.state !== 'cancelled' ? (
+                          <button
+                            type="button"
+                            onClick={() => void cancelManualCommand(agent.agentId)}
+                            disabled={manualBusy[agent.agentId]}
+                            className="rounded border kb-status-negative-border kb-status-negative-surface px-1.5 py-1 kb-status-negative disabled:opacity-30"
+                            title="Cancel pending durable manual command"
+                          >
+                            Cancel
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
+                    {manualActions[agent.agentId] ||
+                    manualCommands[agent.agentId] ||
+                    manualErrors[agent.agentId] ? (
+                      <div className="basis-full ml-5 text-[8px] font-mono opacity-60">
+                        {manualActions[agent.agentId]
+                          ? `manual: ${manualActions[agent.agentId]?.title} (${manualActions[agent.agentId]?.status})`
+                          : null}
+                        {manualCommands[agent.agentId]
+                          ? ` · command ${manualCommands[agent.agentId]?.state}${manualCommands[agent.agentId]?.status ? `/${manualCommands[agent.agentId]?.status}` : ''}`
+                          : null}
+                        {manualErrors[agent.agentId] ? (
+                          <span className="kb-status-negative">
+                            {' '}
+                            · {manualErrors[agent.agentId]}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <button
                       onClick={() => handleAgentAction(agent.agentId, 'refresh')}
                       disabled={

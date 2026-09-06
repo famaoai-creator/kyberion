@@ -44,6 +44,8 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/secure-io.ts',
   'libs/core/shell-claude-cli-backend.ts',
   'libs/core/shell-grok-cli-backend.ts',
+  'libs/core/cursor-cli-reasoning-backend.ts',
+  'libs/core/opencode-cli-reasoning-backend.ts',
   'libs/core/silero-vad-bridge.ts',
   'libs/core/shell-streaming-stt-bridge.ts',
   'libs/core/shell-streaming-tts-bridge.ts',

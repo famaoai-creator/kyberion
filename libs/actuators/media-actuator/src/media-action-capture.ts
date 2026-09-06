@@ -1,14 +1,15 @@
+import { logger } from '@agent/core/core';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeReadFile,
   safeExistsSync,
   safeExecResult,
-  pathResolver,
-  pptxUtils,
-  xlsxUtils,
-  docxUtils,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import * as pptxUtils from '@agent/core/pptx-utils';
+import * as xlsxUtils from '@agent/core/xlsx-utils';
+import * as docxUtils from '@agent/core/docx-utils';
+import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   distillPdfDesign,
   extractPptxSlides,
@@ -20,6 +21,7 @@ import { projectXlsxDesign } from './xlsx-extract-projection.js';
 import * as path from 'node:path';
 
 import { cloneJsonValue, loadJsonValue } from './media-layout-runtime.js';
+import { parseMediaBridgeResponse, parsePdfSplitBridgeResponse } from './media-bridge-response.js';
 
 function assertInProjectRoot(filePath: string, label: string): string {
   const rootDir = pathResolver.rootDir();
@@ -27,13 +29,22 @@ function assertInProjectRoot(filePath: string, label: string): string {
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new Error(`${label}: path must stay under the Kyberion project root: ${filePath}`);
   }
-  return filePath;
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
 }
 
 function resolvePdfPath(value: any, resolve: Function, label: string): string {
   const rootDir = pathResolver.rootDir();
-  const resolved = path.resolve(rootDir, resolve(value));
+  const resolved = path.resolve(rootDir, String(resolve(value) || '').trim());
   return assertInProjectRoot(resolved, label);
+}
+
+function resolveMediaInputPath(value: any, resolve: Function, label: string): string {
+  const rootDir = pathResolver.rootDir();
+  const requested = String(resolve(value) || '').trim();
+  if (!requested) throw new Error(`${label}: path is required`);
+  return assertSafeRepositoryPath(path.resolve(rootDir, requested), {
+    allowMissingLeaf: true,
+  });
 }
 
 function resolvePdfOutPath(params: any, resolve: Function, command: string): string {
@@ -84,7 +95,12 @@ function runPdfOpsBridge(
   }
   let parsed: any = {};
   try {
-    parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}');
+    parsed = parseMediaBridgeResponse(
+      parseSafeJsonInput(
+        String(execResult.stdout || '').trim() || '{}',
+        `pdf_${command} bridge response`
+      )
+    );
   } catch {
     parsed = {};
   }
@@ -188,12 +204,12 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'json_read': {
-      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveMediaInputPath(params.path, resolve, 'json_read');
       const parsed = loadJsonValue(sourcePath);
       return { ...ctx, [params.export_as || 'last_json']: parsed };
     }
     case 'pptx_extract': {
-      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveMediaInputPath(params.path, resolve, 'pptx_extract');
       const assetsDir = pathResolver.sharedTmp(`actuators/media-actuator/assets_${Date.now()}`);
       const design = await pptxUtils.distillPptxDesign(sourcePath, assetsDir);
       const ocrEnabled = params.ocr === true || params.ocr?.enabled === true;
@@ -210,7 +226,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       };
     }
     case 'pptx_slide_text': {
-      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveMediaInputPath(params.path, resolve, 'pptx_slide_text');
       let slides: any[] = extractPptxSlides(sourcePath);
       if (params.ocr === true || params.ocr?.enabled === true) {
         const assetsDir = pathResolver.sharedTmp(
@@ -229,7 +245,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       return { ...ctx, [params.export_as || 'last_pptx_slides']: slides };
     }
     case 'xlsx_extract': {
-      const xlsxPath = path.resolve(rootDir, resolve(params.path));
+      const xlsxPath = resolveMediaInputPath(params.path, resolve, 'xlsx_extract');
       const xlsxDesign = await xlsxUtils.distillXlsxDesign(xlsxPath);
       // Token-efficient projection: when a sheet/range/values_only filter is given,
       // emit a slim values-only structure (no styles) so a downstream reasoning step
@@ -247,12 +263,12 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       return { ...ctx, [params.export_as || 'last_xlsx_design']: output };
     }
     case 'docx_extract': {
-      const docxPath = path.resolve(rootDir, resolve(params.path));
+      const docxPath = resolveMediaInputPath(params.path, resolve, 'docx_extract');
       const docxDesign = await docxUtils.distillDocxDesign(docxPath);
       return { ...ctx, [params.export_as || 'last_docx_design']: docxDesign };
     }
     case 'pdf_extract': {
-      const pdfPath = path.resolve(rootDir, resolve(params.path));
+      const pdfPath = resolveMediaInputPath(params.path, resolve, 'pdf_extract');
       let pdfDesign = await distillPdfDesign(pdfPath, { aesthetic: params.aesthetic !== false });
       try {
         const extractedText = await mediaPdfHelpers.extractCleanerPdfText(pdfPath);
@@ -314,7 +330,12 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       }
       let parsed: any = {};
       try {
-        parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}');
+        parsed = parsePdfSplitBridgeResponse(
+          parseSafeJsonInput(
+            String(execResult.stdout || '').trim() || '{}',
+            'pdf_split bridge response'
+          )
+        );
       } catch {
         parsed = {};
       }
@@ -326,9 +347,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         throw new Error(`pdf_split failed: ${detail}`);
       }
       // Return repo-relative paths so the result stays portable if persisted downstream.
-      const pages = (Array.isArray(parsed.pages) ? parsed.pages : []).map((p: string) =>
-        pathResolver.toRepoRelative(p)
-      );
+      const pages = (parsed.pages as string[]).map((page) => pathResolver.toRepoRelative(page));
       return {
         ...ctx,
         [params.export_as || 'pdf_pages']: {
@@ -572,7 +591,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         const md = protocolToMarkdown(ctx[params.from]);
         return { ...ctx, [exportKey]: md };
       }
-      const filePath = path.resolve(rootDir, resolve(params.path));
+      const filePath = resolveMediaInputPath(params.path, resolve, 'document_digest');
       const ext = path.extname(filePath).toLowerCase();
       if (ext === '.txt' || ext === '.md') {
         const markdown = safeReadFile(filePath, { encoding: 'utf8' });

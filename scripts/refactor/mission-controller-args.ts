@@ -1,13 +1,13 @@
 import * as path from 'node:path';
+import { loadProjectRecord } from '@agent/core/project-registry';
+import { loadProjectTrackRecord } from '@agent/core/project-track-registry';
+import { assertManagedProjectTrackScope } from '@agent/core/project-management';
 import {
-  loadProjectRecord,
-  loadProjectTrackRecord,
-  pathResolver,
-  assertManagedProjectTrackScope,
   resolveMissionExecutionSurface,
-  validateWritePermission,
-} from '@agent/core';
-import type { MissionExecutionSurface } from '@agent/core';
+  type MissionExecutionSurface,
+} from '@agent/core/mission-execution-surface';
+import { validateWritePermission } from '@agent/core/tier-guard';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
@@ -21,6 +21,67 @@ import {
 } from './mission-project-ledger.js';
 import type { MissionRelationships } from './mission-types.js';
 import { currentProcessArgv } from '../lib/harness.js';
+import { parseSafeJsonObjectInput } from '../lib/json-input.js';
+
+const MISSION_TIERS = ['personal', 'confidential', 'public'] as const;
+
+const TICKET_TARGETS = ['workitem', 'github', 'jira'] as const;
+const DISPATCH_MODES = ['auto', 'agent', 'subagent'] as const;
+const WORK_ITEM_STATUSES = [
+  'backlog',
+  'ready',
+  'in_progress',
+  'blocked',
+  'review',
+  'done',
+  'archived',
+] as const;
+const WORK_ITEM_SOURCES = ['local', 'github', 'jira', 'peer'] as const;
+const FINAL_STATUSES = ['review', 'done'] as const;
+
+function getAllowedOption<T extends string>(
+  flag: string,
+  argv: string[],
+  allowed: readonly T[]
+): T | undefined {
+  const value = getOptionValue(flag, argv);
+  if (value === undefined) return undefined;
+  if ((allowed as readonly string[]).includes(value)) return value as T;
+  throw new Error(`${flag} must be one of: ${allowed.join(', ')}`);
+}
+
+function getAllowedCsvOption<T extends string>(
+  flag: string,
+  argv: string[],
+  allowed: readonly T[],
+  fallback: readonly T[]
+): T[] {
+  const values = parseCsvOption(flag, argv);
+  if (!values) return [...fallback];
+  const invalid = values.filter((value) => !(allowed as readonly string[]).includes(value));
+  if (invalid.length > 0) {
+    throw new Error(`${flag} contains unsupported value(s): ${invalid.join(', ')}`);
+  }
+  return values as T[];
+}
+
+function getOptionalInteger(flag: string, argv: string[]): number | undefined {
+  const raw = getOptionValue(flag, argv);
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${flag} must be a non-negative integer`);
+  }
+  return value;
+}
+
+function getMissionTier(value: string | undefined): (typeof MISSION_TIERS)[number] | undefined {
+  if (value === undefined) return undefined;
+  if ((MISSION_TIERS as readonly string[]).includes(value)) {
+    return value as (typeof MISSION_TIERS)[number];
+  }
+  throw new Error(`mission tier must be one of: ${MISSION_TIERS.join(', ')}`);
+}
 
 export interface ResolvedMissionCliInput {
   tier?: 'personal' | 'confidential' | 'public';
@@ -55,7 +116,7 @@ export function resolveMissionStartCreateInputFromArgv(
   const arg7 = positionalArgs[7];
   const namedStartCreateOptions = extractMissionStartCreateOptionsFromArgv(argv);
   const relationships = normalizeRelationships(
-    JSON.parse(arg7 || '{}'),
+    parseSafeJsonObjectInput(arg7, 'legacy mission relationships') || {},
     namedStartCreateOptions.relationships || {}
   );
   if (relationships?.project?.project_id && !relationships.track?.track_id) {
@@ -79,7 +140,7 @@ export function resolveMissionStartCreateInputFromArgv(
   const projectPath = relationships?.project?.project_path;
 
   return {
-    tier: namedStartCreateOptions.tier || (arg2 as any),
+    tier: namedStartCreateOptions.tier || getMissionTier(arg2),
     tenantId: namedStartCreateOptions.tenantId || arg3,
     organizationId: namedStartCreateOptions.organizationId,
     ...(namedStartCreateOptions.tenantSlug
@@ -178,16 +239,16 @@ export function resolveMissionTicketDispatchOptionsFromArgv(
   github?: { owner?: string; repo?: string };
   jira?: { domain?: string; projectKey?: string };
 } {
-  const targets = parseCsvOption('--ticket-targets', argv) || ['workitem', 'github', 'jira'];
-  const liveTargets = parseCsvOption('--live-ticket-targets', argv) || [];
+  const targets = getAllowedCsvOption('--ticket-targets', argv, TICKET_TARGETS, TICKET_TARGETS);
+  const liveTargets = getAllowedCsvOption('--live-ticket-targets', argv, TICKET_TARGETS, []);
   const githubOwner = getOptionValue('--github-owner', argv);
   const githubRepo = getOptionValue('--github-repo', argv);
   const jiraDomain = getOptionValue('--jira-domain', argv);
   const jiraProjectKey = getOptionValue('--jira-project-key', argv);
 
   return {
-    targets: (targets.length > 0 ? targets : ['workitem']) as Array<'workitem' | 'github' | 'jira'>,
-    liveTargets: liveTargets as Array<'workitem' | 'github' | 'jira'>,
+    targets: targets.length > 0 ? targets : ['workitem'],
+    liveTargets,
     github: githubOwner || githubRepo ? { owner: githubOwner, repo: githubRepo } : undefined,
     jira:
       jiraDomain || jiraProjectKey ? { domain: jiraDomain, projectKey: jiraProjectKey } : undefined,
@@ -206,7 +267,7 @@ export function resolveMissionWorkItemDispatchOptionsFromArgv(
   finalStatus: 'review' | 'done';
   rounds?: number;
 } {
-  const mode = (getOptionValue('--dispatch-mode', argv) || 'auto') as 'auto' | 'agent' | 'subagent';
+  const mode = getAllowedOption('--dispatch-mode', argv, DISPATCH_MODES) || 'auto';
   const executionSurfaceRaw = getOptionValue('--dispatch-execution-surface', argv);
   const reviewExecutionSurfaceRaw = getOptionValue('--dispatch-review-execution-surface', argv);
   const executionSurface = executionSurfaceRaw
@@ -215,23 +276,20 @@ export function resolveMissionWorkItemDispatchOptionsFromArgv(
   const reviewExecutionSurface = reviewExecutionSurfaceRaw
     ? resolveMissionExecutionSurface({ requested: reviewExecutionSurfaceRaw }).surface
     : undefined;
-  const limitRaw = getOptionValue('--dispatch-limit', argv);
-  const statusesRaw = parseCsvOption('--dispatch-statuses', argv) || ['ready'];
-  const sourcesRaw = parseCsvOption('--dispatch-sources', argv) || ['local'];
-  const finalStatus = (getOptionValue('--dispatch-final-status', argv) || 'review') as
-    'review' | 'done';
-  const roundsRaw = getOptionValue('--dispatch-rounds', argv);
+  const limit = getOptionalInteger('--dispatch-limit', argv);
+  const statuses = getAllowedCsvOption('--dispatch-statuses', argv, WORK_ITEM_STATUSES, ['ready']);
+  const sources = getAllowedCsvOption('--dispatch-sources', argv, WORK_ITEM_SOURCES, ['local']);
+  const finalStatus = getAllowedOption('--dispatch-final-status', argv, FINAL_STATUSES) || 'review';
+  const rounds = getOptionalInteger('--dispatch-rounds', argv);
 
   return {
     mode,
     ...(executionSurface ? { executionSurface } : {}),
     ...(reviewExecutionSurface ? { reviewExecutionSurface } : {}),
-    ...(roundsRaw ? { rounds: Number(roundsRaw) } : {}),
-    ...(limitRaw ? { limit: Number(limitRaw) } : {}),
-    statuses: statusesRaw as Array<
-      'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'
-    >,
-    sources: sourcesRaw as Array<'local' | 'github' | 'jira' | 'peer'>,
+    ...(rounds !== undefined ? { rounds } : {}),
+    ...(limit !== undefined ? { limit } : {}),
+    statuses,
+    sources,
     finalStatus,
   };
 }

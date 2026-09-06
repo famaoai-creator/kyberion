@@ -1,7 +1,10 @@
 import { loadPeerNetworkCatalog, type PeerNetworkPeerRecord } from './peer-messaging.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJsonLines } from './foundation/json.js';
+import { normalizeIso } from './foundation/time.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
   MeshCapabilityAdvertisement,
@@ -87,23 +90,15 @@ function runtimePath(tenantId: string, segment: string): string {
   return `${meshHubRuntimeRoot(tenantId)}/${segment}`;
 }
 
-function normalizeIso(value?: string | Date): string {
-  const input = value ?? new Date();
-  const date = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`invalid_iso_timestamp:${String(value)}`);
-  }
-  return date.toISOString();
-}
-
 function readJsonlRecords<T>(logicalPath: string): T[] {
-  if (!safeExistsSync(logicalPath)) return [];
-  const raw = String(safeReadFile(logicalPath, { encoding: 'utf8' }) ?? '');
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+  const safePath = assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`mesh peer directory JSONL must be a regular file: ${safePath}`);
+  }
+  return readJsonLines<T>(safePath);
 }
 
 function latestByPeerId<T extends { peer_id: string }>(records: T[]): Map<string, T> {
@@ -271,7 +266,7 @@ function getCurrentSnapshot(tenantId: string, peerId: string): MeshPeerDirectory
   }
 
   const presence = currentPresence(
-    normalizeIso(),
+    normalizeIso(undefined),
     latestByPeerId(loadPresence(tenantId)).get(peerId) || undefined
   );
   const capabilityMap = latestCapabilityAds(loadCapabilities(tenantId));

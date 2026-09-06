@@ -10,6 +10,7 @@ import {
   loadJsonIfPresent,
   safeExec,
   safeExecResult,
+  assertSafeRepositoryPath,
   safeReadFile,
   safeWriteFile,
   sanitizePath,
@@ -69,6 +70,48 @@ describe('secure-io core', () => {
       expect(() =>
         safeReadFile(path.join(process.cwd(), 'knowledge/personal/connections/slack.json'))
       ).toThrow('[SENSITIVE_PATH_DENIED]');
+    });
+  });
+
+  describe('assertSafeRepositoryPath', () => {
+    it('rejects repository paths that traverse a symbolic link', () => {
+      const targetDir = path.join(tmpDir, 'target');
+      const linkDir = path.join(tmpDir, 'linked');
+      fs.mkdirSync(targetDir);
+      fs.symlinkSync(targetDir, linkDir, 'dir');
+
+      expect(() =>
+        assertSafeRepositoryPath(path.relative(process.cwd(), path.join(linkDir, 'x.txt')), {
+          allowMissingLeaf: true,
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    });
+
+    it('allows an explicitly opted-in final symlink without allowing traversal through it', () => {
+      const targetDir = path.join(tmpDir, 'target');
+      const linkDir = path.join(tmpDir, 'linked');
+      fs.mkdirSync(targetDir);
+      fs.symlinkSync(targetDir, linkDir, 'dir');
+
+      expect(
+        assertSafeRepositoryPath(path.relative(process.cwd(), linkDir), {
+          allowSymlinkLeaf: true,
+        })
+      ).toBe(linkDir);
+      expect(() =>
+        assertSafeRepositoryPath(path.relative(process.cwd(), path.join(linkDir, 'x.txt')), {
+          allowMissingLeaf: true,
+          allowSymlinkLeaf: true,
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    });
+
+    it('allows a missing leaf while keeping the path inside the repository', () => {
+      const filePath = path.relative(process.cwd(), path.join(tmpDir, 'new.txt'));
+      expect(assertSafeRepositoryPath(filePath, { allowMissingLeaf: true })).toBe(
+        path.join(process.cwd(), filePath)
+      );
+      expect(() => assertSafeRepositoryPath(filePath)).toThrow('does not exist');
     });
   });
 
@@ -153,6 +196,14 @@ describe('secure-io core', () => {
       const testFile = path.join(tmpDir, 'payload.json');
       fs.writeFileSync(testFile, JSON.stringify({ hello: 'world' }));
       expect(loadJson<{ hello: string }>(testFile)).toEqual({ hello: 'world' });
+    });
+
+    it('rejects dangerous JSON keys before exposing the parsed value', () => {
+      const testFile = path.join(tmpDir, 'dangerous.json');
+      fs.writeFileSync(testFile, '{"__proto__":{"polluted":true}}');
+
+      expect(() => loadJson(testFile)).toThrow('contains a dangerous JSON key');
+      expect(loadJsonIfPresent(testFile)).toBeNull();
     });
 
     it('preserves root $schema metadata for catalog read-modify-write flows', () => {

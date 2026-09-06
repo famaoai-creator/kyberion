@@ -20,28 +20,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - uses: actions/setup-node@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # The full gate set includes the browser-backed Chronos contrast check.
-      # Keep browser binaries out of dependency installation by default, then
-      # provision the exact Chromium runtime required by this CI job.
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+          install-playwright: 'true'
 
       - name: Build project
         run: pnpm run build
 
+      # PI-12: prove the source distribution is self-contained in a clean
+      # governed staging directory and publish a checksum downstream can pin.
+      - name: Verify source archive and clean install
+        run: |
+          pnpm run release:source-archive -- --ref "${GITHUB_SHA}" --output active/shared/exports/ci/kyberion-source.tar.gz
+          pnpm run release:source-archive -- --check --output active/shared/exports/ci/kyberion-source.tar.gz
+          pnpm kyberion release install-smoke --ref "${GITHUB_SHA}"
+      - name: Upload source archive evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyberion-source-archive
+          path: |
+            active/shared/exports/ci/kyberion-source.tar.gz
+            active/shared/exports/ci/SHA256SUMS
+          if-no-files-found: error
+
       - name: Run manifest-driven full checks
+        env:
+          # The tenant-registry gate verifies the personal-tier tenant spine.
+          # Give the governed checker its read authority explicitly instead of
+          # relying on a developer shell's ambient role.
+          KYBERION_PERSONA: worker
+          MISSION_ROLE: mission_controller
         run: pnpm run check -- --scope full
 
       # After build: the checker imports @agent/core, which resolves to the
@@ -55,7 +65,7 @@ jobs:
         run: pnpm run lint
 
       - name: Format check
-        run: pnpm run format:check:ci
+        run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml .github/actions/setup-kyberion/action.yml
 
       - name: TypeScript type check
         run: pnpm run typecheck
@@ -97,33 +107,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - uses: actions/setup-node@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
 
       - name: Build clean checkout
         run: pnpm build
 
       - name: Run documented first-win sequence
         run: |
-          pnpm prereq:check
+          pnpm env:bootstrap --manifest kyberion-toolchain
           pnpm doctor
           pnpm pipeline --input pipelines/verify-session.json
           test -s active/shared/tmp/first-win-session.png
 
       - name: Validate first-win contract
-        run: pnpm run check:first-win-smoke
+        run: pnpm run check -- --scope full --only first-win-docs
+
+      - name: Validate first-win artifact contract
+        run: pnpm run check -- --scope full --only first-win-smoke
 
   intent-smoke:
     runs-on: ubuntu-latest
@@ -132,30 +135,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - uses: actions/setup-node@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build project
         run: pnpm run build
 
       - name: Run lightweight intent smoke suite
-        run: pnpm run smoke:intent -- --output /tmp/intent-smoke
+        run: pnpm kyberion smoke intent --output active/shared/tmp/intent-smoke
 
       - name: Upload intent smoke logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: intent-smoke-logs
-          path: /tmp/intent-smoke
+          path: active/shared/tmp/intent-smoke
           retention-days: 14
 
   test:
@@ -169,13 +165,13 @@ jobs:
           - test-suite: smoke
             command: pnpm run test
           - test-suite: core
-            command: pnpm exec vitest run libs/core/ --coverage
+            command: pnpm test -- --suite core --coverage
           - test-suite: actuators
-            command: pnpm run test:actuators
+            command: pnpm test -- --suite actuators
           - test-suite: scripts
-            command: pnpm run test:scripts
+            command: pnpm test -- --suite scripts
           - test-suite: integration
-            command: pnpm run test:integration
+            command: pnpm test -- --suite integration
     steps:
       - uses: actions/checkout@v4
 
@@ -197,17 +193,10 @@ jobs:
             -o Acquire::https::Timeout=30 \
             -o DPkg::Lock::Timeout=60 install -y -qq fonts-noto-cjk
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - uses: actions/setup-node@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build project
         run: pnpm run build
@@ -232,17 +221,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - uses: actions/setup-node@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build project
         run: pnpm run build

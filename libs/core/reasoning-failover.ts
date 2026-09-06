@@ -1,7 +1,17 @@
 import { appendJsonLine } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { nowIso, parseIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, loadJson, safeUnlink, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeLstat,
+  safeUnlink,
+  safeWriteFile,
+} from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -44,13 +54,95 @@ export interface ReasoningFailoverMarker {
 const EVENTS_RELATIVE_PATH = 'active/shared/runtime/reasoning-failover-events.jsonl';
 const MARKER_RELATIVE_PATH = 'active/shared/runtime/state/reasoning-failover.json';
 const ERROR_SUMMARY_MAX_CHARS = 200;
+const MARKER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/reasoning-failover-marker.schema.json'
+);
+
+function assertExactKeys(
+  record: Record<string, unknown>,
+  expected: readonly string[],
+  label: string
+): void {
+  const expectedKeys = new Set(expected);
+  const unknown = Object.keys(record).filter((key) => !expectedKeys.has(key));
+  if (unknown.length > 0) {
+    throw new Error(`${label} contains unknown field(s): ${unknown.join(', ')}`);
+  }
+}
+
+function parseRequiredString(value: unknown, label: string): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+  return value;
+}
+
+function parseOptionalString(value: unknown, label: string): string | undefined {
+  return value === undefined ? undefined : parseRequiredString(value, label);
+}
+
+function parseTimestamp(value: unknown, label: string): string {
+  const timestamp = parseRequiredString(value, label);
+  try {
+    parseIso(timestamp);
+  } catch {
+    throw new Error(`${label} must be a valid ISO timestamp`);
+  }
+  return timestamp;
+}
+
+export function parseReasoningFailoverMarker(value: unknown): ReasoningFailoverMarker {
+  const record = parseSafeJsonObjectValue(value, 'reasoning failover marker');
+  assertExactKeys(
+    record,
+    ['from_mode', 'to_mode', 'provider_from', 'provider_to', 'method', 'at'],
+    'reasoning failover marker'
+  );
+  const providerFrom = parseOptionalString(
+    record.provider_from,
+    'reasoning failover marker.provider_from'
+  );
+  const providerTo = parseOptionalString(
+    record.provider_to,
+    'reasoning failover marker.provider_to'
+  );
+  return {
+    from_mode: parseRequiredString(record.from_mode, 'reasoning failover marker.from_mode'),
+    to_mode: parseRequiredString(record.to_mode, 'reasoning failover marker.to_mode'),
+    ...(providerFrom !== undefined ? { provider_from: providerFrom } : {}),
+    ...(providerTo !== undefined ? { provider_to: providerTo } : {}),
+    method: parseRequiredString(record.method, 'reasoning failover marker.method'),
+    at: parseTimestamp(record.at, 'reasoning failover marker.at'),
+  };
+}
 
 export function reasoningFailoverEventsPath(): string {
-  return pathResolver.rootResolve(EVENTS_RELATIVE_PATH);
+  return assertSafeRepositoryPath(pathResolver.rootResolve(EVENTS_RELATIVE_PATH), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function reasoningFailoverMarkerPath(): string {
-  return pathResolver.rootResolve(MARKER_RELATIVE_PATH);
+  return assertSafeRepositoryPath(pathResolver.rootResolve(MARKER_RELATIVE_PATH), {
+    allowMissingLeaf: true,
+  });
+}
+
+/** Load the latest failover marker through its schema and file boundary. */
+export function loadReasoningFailoverMarkerAtPath(
+  filePath = reasoningFailoverMarkerPath()
+): ReasoningFailoverMarker {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeExistsSync(safeFilePath)) throw new Error('reasoning failover marker is missing');
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[REASONING_FAILOVER] marker must be a regular file: ${filePath}`);
+  }
+  const validated = defineCatalog<ReasoningFailoverMarker>({
+    id: 'reasoning-failover-marker',
+    path: safeFilePath,
+    schema: MARKER_SCHEMA_PATH,
+  }).load();
+  return parseReasoningFailoverMarker(validated);
 }
 
 export function truncateErrorSummary(message: string): string {
@@ -67,7 +159,7 @@ export function appendReasoningFailoverEvent(
     const eventsPath = reasoningFailoverEventsPath();
     safeMkdir(path.dirname(eventsPath), { recursive: true });
     const record: ReasoningFailoverEvent = {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       ...event,
       error_summary: truncateErrorSummary(event.error_summary),
     };
@@ -83,7 +175,7 @@ export function markReasoningFailover(marker: Omit<ReasoningFailoverMarker, 'at'
   try {
     const markerPath = reasoningFailoverMarkerPath();
     safeMkdir(path.dirname(markerPath), { recursive: true });
-    const full: ReasoningFailoverMarker = { ...marker, at: new Date().toISOString() };
+    const full = parseReasoningFailoverMarker({ ...marker, at: nowIso() });
     safeWriteFile(markerPath, `${JSON.stringify(full, null, 2)}\n`);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -105,11 +197,7 @@ export function readReasoningFailover(): ReasoningFailoverMarker | null {
   try {
     const markerPath = reasoningFailoverMarkerPath();
     if (!safeExistsSync(markerPath)) return null;
-    const parsed = loadJson<Partial<ReasoningFailoverMarker>>(markerPath);
-    if (parsed && typeof parsed.from_mode === 'string' && typeof parsed.to_mode === 'string') {
-      return parsed as ReasoningFailoverMarker;
-    }
-    return null;
+    return loadReasoningFailoverMarkerAtPath(markerPath);
   } catch {
     return null;
   }

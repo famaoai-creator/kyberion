@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { z } from 'zod';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import { AgyCliBackend, buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 import { AgySdkAdapter } from './agy-sdk-adapter.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -30,6 +32,7 @@ vi.mock('./delegation-concurrency.js', () => ({
   }),
   withWallClockBudget: withWallClockBudgetMock,
   DelegationWallClockExceededError: class DelegationWallClockExceededError extends Error {},
+  registerKillSwitchTerminationRegistrar: vi.fn(),
 }));
 
 function createChild(stdoutText: string, stderrText = '', exitCode = 0): any {
@@ -51,6 +54,16 @@ function createChild(stdoutText: string, stderrText = '', exitCode = 0): any {
 }
 
 describe('agy-cli-backend', () => {
+  it('routes AGY CLI environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/agy-cli-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
     delete process.env.KYBERION_AGY_CLI_BIN;
@@ -110,6 +123,22 @@ describe('agy-cli-backend', () => {
       expect.arrayContaining(['--model', 'gemini-3.7-flash']),
       expect.anything()
     );
+  });
+
+  it('rejects dangerous keys in structured AGY CLI output before schema access', async () => {
+    spawnMock.mockReturnValueOnce(
+      createChild('{"structured_output":{"constructor":{"polluted":true}}}')
+    );
+
+    const backend = new AgyCliBackend({ model: 'agy' });
+
+    await expect(
+      backend.runStructured({
+        systemPrompt: 'Return a result.',
+        userPrompt: 'hello',
+        schema: z.object({ answer: z.string() }),
+      })
+    ).rejects.toThrow('agy-cli JSON output contains a dangerous JSON key');
   });
 
   it('exposes a valid native subagent adopter via AGY session harness', async () => {
@@ -351,6 +380,25 @@ describe('agy-cli-backend', () => {
       await expect(backend.prompt('hello', { profile: 'explorer' })).rejects.toThrow(
         /permission profile "explorer" refused/
       );
+      expect(spawnMock).not.toHaveBeenCalled();
+    });
+
+    it('ambient read-only sandbox refuses before an unprofiled AGY delegation can spawn', async () => {
+      const backend = new AgyCliBackend({
+        bin: 'agy',
+        model: 'agy',
+        sandbox: true,
+        logFile: '/tmp/agy-cli.log',
+      });
+      const policy = resolveSandboxPolicy({
+        provider: 'agy',
+        mode: 'read-only',
+        networkAccess: true,
+      });
+
+      await expect(
+        withSandboxPolicy(policy, () => backend.prompt('inspect the thing'))
+      ).rejects.toThrow('SANDBOX_POLICY_PARTIAL');
       expect(spawnMock).not.toHaveBeenCalled();
     });
 

@@ -46,5 +46,33 @@ describe('computer-surface a2ui messages', () => {
         },
       })
     ).toBe(false);
+    expect(
+      validate({
+        updateDataModel: {
+          surfaceId: 'computer-surface',
+          data: {},
+          unexpectedField: true,
+        },
+      })
+    ).toBe(false);
+    expect(
+      validate({
+        updateComponents: {
+          surfaceId: 'computer-surface',
+          components: [{ id: 'button-1', type: 'button' }],
+        },
+      })
+    ).toBe(false);
+  });
+
+  it('rejects traversal-shaped computer session ids before persistence', () => {
+    expect(() =>
+      buildComputerSurfaceMessages({
+        sessionId: '../outside',
+        executor: 'terminal',
+        status: 'running',
+        latestAction: 'spawn',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });

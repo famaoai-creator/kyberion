@@ -10,7 +10,9 @@
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/pnpm</string>
-    <string>agent-runtime:daemon</string>
+    <string>kyberion</string>
+    <string>agent-runtime</string>
+    <string>daemon</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>

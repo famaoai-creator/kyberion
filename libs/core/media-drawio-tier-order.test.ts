@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { loadMediaDrawioTierOrderCatalog, resolveMediaDrawioTierRank } from './media-drawio-tier-order.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
+import {
+  loadMediaDrawioTierOrderCatalog,
+  resolveMediaDrawioTierRank,
+} from './media-drawio-tier-order.js';
 
 describe('media-drawio-tier-order', () => {
+  it('uses the canonical catalog without a duplicated fallback definition', () => {
+    const source = safeReadFile(pathResolver.rootResolve('libs/core/media-drawio-tier-order.ts'), {
+      encoding: 'utf8',
+    }) as string;
+    expect(source).not.toContain('FALLBACK_CATALOG');
+  });
+
   it('resolves drawio tier order from knowledge', () => {
     const catalog = loadMediaDrawioTierOrderCatalog();
 

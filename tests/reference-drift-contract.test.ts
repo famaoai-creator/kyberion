@@ -38,7 +38,7 @@ describe('reference drift contract', () => {
       expect(contents).not.toContain(ref);
     }
     expect(contents).toContain('vital_check.js');
-    expect(contents).toContain('onboard:apply');
+    expect(contents).toContain('onboard apply');
     expect(contents).toContain('doc-examples');
   });
 

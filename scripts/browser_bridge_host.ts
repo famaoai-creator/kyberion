@@ -15,49 +15,65 @@
  */
 
 import { Buffer } from 'node:buffer';
+import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import {
   buildBrowserExtensionPipelineCandidate,
-  applyProcedureDelta,
-  classifyFailure,
-  compileBrowserRecording,
   compileBrowserRecordingToPipeline,
-  promoteBrowserProcedure,
-  createProcedureDelta,
-  dispatchProcedure,
   enforceBrowserExtensionApproval,
   extendLeaseForMfa,
   issueBrowserExtensionLease,
-  loadProcedureDelta,
   segmentRecording,
   subRecordingForSegment,
   preflightBrowserExtensionSession,
   persistBrowserExtensionReceipt,
-  collectProcedureUserInputs,
-  loadProcedures,
-  resolveAllowlistedRecordingRef,
-  resolveProcedure,
-  saveProcedureDelta,
-  pathResolver,
-  safeWriteFile,
-  safeMkdir,
-  auditChain,
-  createDistillCandidateRecord,
-  saveDistillCandidateRecord,
   validateBrowserExtensionReceipt,
   validateBrowserExtensionRecording,
   validateBrowserExtensionObservation,
   validateBrowserExtensionSessionRequest,
-  withExecutionContext,
   persistBrowserExtensionObservation,
   loadBrowserExtensionObservations,
-  getReasoningBackend,
-  delegateTaskWithUntrustedData,
-  type BrowserExtensionRecording,
-  type BrowserExtensionLease,
-  type BrowserExtensionSessionRequest,
-  type ProcedureEntry,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+  loadBrowserExtensionRecordingAtPath,
+} from '@agent/core/browser-extension-bridge';
+import {
+  applyProcedureDelta,
+  classifyFailure,
+  createProcedureDelta,
+  loadProcedureDelta,
+  saveProcedureDelta,
+} from '@agent/core/procedure-self-repair';
+import { compileBrowserRecording } from '@agent/core/browser-recording-compiler';
+import { promoteBrowserProcedure } from '@agent/core/browser-procedure-promotion';
+import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
+import { collectProcedureUserInputs } from '@agent/core/procedure-inputs';
+import {
+  loadProcedures,
+  resolveAllowlistedRecordingRef,
+  resolveProcedure,
+} from '@agent/core/procedure-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { auditChain } from '@agent/core/audit-chain';
+import {
+  createDistillCandidateRecord,
+  saveDistillCandidateRecord,
+} from '@agent/core/distill-candidate-registry';
+import { withExecutionContext } from '@agent/core/authority';
+import { getReasoningBackend, delegateTaskWithUntrustedData } from '@agent/core/reasoning-backend';
+import type {
+  BrowserExtensionRecording,
+  BrowserExtensionLease,
+  BrowserExtensionSessionRequest,
+} from '@agent/core/browser-extension-bridge';
+import type { ProcedureEntry } from '@agent/core/procedure-types';
+import { nowIso } from '@agent/core/foundation';
+import { formatWireError } from '@agent/core/wire-error';
+import { parseBrowserBridgeMessage } from './browser-bridge-input.js';
 
 /** Load + allowlist-guard + validate a browser procedure's backing recording. */
 function loadBrowserProcedure(procedureId: string): {
@@ -77,17 +93,16 @@ function loadBrowserProcedure(procedureId: string): {
         return {
           error: `Procedure "${procedureId}" has no allowlisted recording_ref (expected a path under an allowlisted shared or personal browser recordings store)`,
         };
-      let raw: unknown;
+      if (!safeExistsSync(recordingPath) || !safeLstat(recordingPath).isFile()) {
+        return { error: `Procedure "${procedureId}" recording must be an existing regular file` };
+      }
       try {
-        raw = readJson<unknown>(recordingPath);
+        return { entry, recording: loadBrowserExtensionRecordingAtPath(recordingPath) };
       } catch (err) {
         return {
-          error: `Failed to load recording: ${err instanceof Error ? err.message : String(err)}`,
+          error: formatWireError(err, 'Failed to load recording'),
         };
       }
-      const rec = validateBrowserExtensionRecording(raw);
-      if (!rec.value) return { error: rec.errors.join('; ') };
-      return { entry, recording: rec.value };
     },
     'sovereign'
   );
@@ -444,7 +459,7 @@ function handleSaveRecording(message: any): HostResponse {
   } catch (err) {
     return {
       ok: false,
-      error: `failed to save recording: ${err instanceof Error ? err.message : String(err)}`,
+      error: formatWireError(err, 'Failed to save recording'),
     };
   }
   return { ok: true, recording_ref: rel, recording_id: recording.value.recording_id };
@@ -482,7 +497,9 @@ function handlePromoteProcedure(message: any): HostResponse {
       try {
         safeMkdir(pathResolver.knowledge('personal/browser-recordings'), { recursive: true });
         safeWriteFile(
-          pathResolver.rootResolve(recordingRef),
+          assertSafeRepositoryPath(pathResolver.rootResolve(recordingRef), {
+            allowMissingLeaf: true,
+          }),
           `${JSON.stringify(recording.value, null, 2)}\n`
         );
         const promoted = promoteBrowserProcedure({
@@ -512,7 +529,7 @@ function handlePromoteProcedure(message: any): HostResponse {
           procedure: promoted.procedureEntry,
         };
       } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        return { ok: false, error: formatWireError(err) };
       }
     },
     'sovereign'
@@ -531,7 +548,7 @@ function handleApplyProcedureDelta(message: any): HostResponse {
   if (!procedureId || !deltaPath)
     return { ok: false, error: 'apply_procedure_delta requires procedure_id and delta_path' };
 
-  const delta = loadProcedureDelta(deltaPath);
+  const delta = loadProcedureDelta(deltaPath, procedureId);
   if (!delta) return { ok: false, error: `delta not found: ${deltaPath}` };
 
   const base = loadBrowserProcedure(procedureId);
@@ -541,16 +558,16 @@ function handleApplyProcedureDelta(message: any): HostResponse {
   const deltaRecAbs = resolveAllowlistedRecordingRef(delta.delta_recording_ref);
   if (!deltaRecAbs)
     return { ok: false, error: 'delta_recording_ref is not in the allowlisted recordings store' };
+  if (!safeExistsSync(deltaRecAbs) || !safeLstat(deltaRecAbs).isFile()) {
+    return { ok: false, error: 'delta recording must be an existing regular file' };
+  }
   let deltaRecording;
   try {
-    const parsed = validateBrowserExtensionRecording(readJson<unknown>(deltaRecAbs));
-    if (!parsed.value)
-      return { ok: false, error: `delta recording invalid: ${parsed.errors.join('; ')}` };
-    deltaRecording = parsed.value;
+    deltaRecording = loadBrowserExtensionRecordingAtPath(deltaRecAbs);
   } catch (err) {
     return {
       ok: false,
-      error: `failed to load delta recording: ${err instanceof Error ? err.message : String(err)}`,
+      error: formatWireError(err, 'Failed to load delta recording'),
     };
   }
 
@@ -828,16 +845,16 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   } catch (err) {
     return {
       ok: false,
-      error: `分析バックエンドの実行に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      error: formatWireError(err, '分析バックエンドの実行に失敗しました'),
     };
   }
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = nowIso().replace(/[:.]/g, '-');
   const reportRel = `knowledge/personal/browser-reports/${procedureId.replace(/[^A-Za-z0-9._-]/g, '_')}/${stamp}.md`;
   const report = [
     `# Observation report: ${procedureId}`,
     '',
-    `- generated_at: ${new Date().toISOString()}`,
+    `- generated_at: ${nowIso()}`,
     `- observations: ${observations.length} (latest: ${observations[observations.length - 1].captured_at})`,
     `- question: ${question}`,
     '',
@@ -854,7 +871,12 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
           ),
           { recursive: true }
         );
-        safeWriteFile(pathResolver.rootResolve(reportRel), report);
+        safeWriteFile(
+          assertSafeRepositoryPath(pathResolver.rootResolve(reportRel), {
+            allowMissingLeaf: true,
+          }),
+          report
+        );
         try {
           auditChain.record({
             agentId: 'browser-bridge',
@@ -873,7 +895,7 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   } catch (err) {
     return {
       ok: false,
-      error: `レポートの保存に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      error: formatWireError(err, 'レポートの保存に失敗しました'),
     };
   }
 
@@ -936,44 +958,60 @@ function writeFrame(payload: HostResponse): Promise<void> {
   });
 }
 
-let inbox = Buffer.alloc(0);
-let inputEnded = false;
-let pendingResponses = 0;
+function startBrowserBridgeHost(): void {
+  let inbox = Buffer.alloc(0);
+  let inputEnded = false;
+  let pendingResponses = 0;
 
-function exitWhenDrained(): void {
-  // Native Messaging one-shot calls may close stdin immediately after sending
-  // the request. Let stdout finish and allow Node to exit naturally; an
-  // explicit process.exit can make Chrome report "Native host has exited"
-  // before it has consumed the response frame.
-  if (inputEnded && pendingResponses === 0) process.stdin.pause();
-}
-
-function drain(): void {
-  while (inbox.length >= 4) {
-    const length = inbox.readUInt32LE(0);
-    if (inbox.length < 4 + length) return;
-    const body = inbox.subarray(4, 4 + length);
-    inbox = inbox.subarray(4 + length);
-    pendingResponses += 1;
-    Promise.resolve()
-      .then(() => handle(JSON.parse(body.toString('utf8'))))
-      .then((response) => writeFrame(response))
-      .catch((error) =>
-        writeFrame({ ok: false, error: error instanceof Error ? error.message : String(error) })
-      )
-      .finally(() => {
-        pendingResponses -= 1;
-        exitWhenDrained();
-      });
+  function exitWhenDrained(): void {
+    // Native Messaging one-shot calls may close stdin immediately after sending
+    // the request. Let stdout finish and allow Node to exit naturally; an
+    // explicit process.exit can make Chrome report "Native host has exited"
+    // before it has consumed the response frame.
+    if (inputEnded && pendingResponses === 0) process.stdin.pause();
   }
+
+  function drain(): void {
+    while (inbox.length >= 4) {
+      const length = inbox.readUInt32LE(0);
+      if (inbox.length < 4 + length) return;
+      const body = inbox.subarray(4, 4 + length);
+      inbox = inbox.subarray(4 + length);
+      pendingResponses += 1;
+      Promise.resolve()
+        .then(() => handle(parseBrowserBridgeMessage(body.toString('utf8'))))
+        .then((response) => writeFrame(response))
+        .catch((error) =>
+          writeFrame({ ok: false, error: formatWireError(error, 'Browser bridge request failed') })
+        )
+        .finally(() => {
+          pendingResponses -= 1;
+          exitWhenDrained();
+        });
+    }
+  }
+
+  process.stdin.on('data', (chunk: Buffer) => {
+    inbox = Buffer.concat([inbox, chunk]);
+    drain();
+  });
+  process.stdin.on('end', () => {
+    inputEnded = true;
+    exitWhenDrained();
+  });
+  process.stdin.on('error', () => setProcessExitCode(1));
 }
 
-process.stdin.on('data', (chunk: Buffer) => {
-  inbox = Buffer.concat([inbox, chunk]);
-  drain();
+const runBrowserBridgeHost = defineScript({
+  name: 'browser-bridge-host',
+  flags: [],
+  run() {
+    startBrowserBridgeHost();
+  },
 });
-process.stdin.on('end', () => {
-  inputEnded = true;
-  exitWhenDrained();
-});
-process.stdin.on('error', () => (process.exitCode = 1));
+
+if (
+  isDirectScript(import.meta.url, 'browser_bridge_host.ts') ||
+  isDirectScript(import.meta.url, 'browser_bridge_host.js')
+)
+  void runBrowserBridgeHost();

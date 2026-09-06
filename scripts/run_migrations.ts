@@ -15,16 +15,15 @@
 
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readJson } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readMigrationState, writeMigrationState } from '@agent/core/migration-state';
 import {
-  logger,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
-  safeMkdir,
   safeReaddir,
   safeStat,
-  safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -36,10 +35,6 @@ interface MigrationModule {
   rollback?: (opts: { dryRun: boolean }) => Promise<void> | void;
 }
 
-interface MigrationState {
-  applied: string[];
-}
-
 interface RunnerOptions {
   dir: string;
   statePath: string;
@@ -49,21 +44,29 @@ interface RunnerOptions {
 }
 
 function resolveMigrationDir(input: string | undefined): string {
-  if (!input || input.trim().length === 0) return pathResolver.rootResolve('migration');
-  return path.isAbsolute(input) ? input : pathResolver.rootResolve(input);
+  if (!input || input.trim().length === 0) {
+    return assertSafeRepositoryPath(pathResolver.rootResolve('migration'), {
+      allowMissingLeaf: true,
+    });
+  }
+  return assertSafeRepositoryPath(pathResolver.resolve(input), { allowMissingLeaf: true });
 }
 
 function resolveStatePath(input: string | undefined): string {
-  if (!input || input.trim().length === 0)
-    return pathResolver.shared('runtime/migrations.applied.json');
-  return path.isAbsolute(input) ? input : pathResolver.rootResolve(input);
+  if (!input || input.trim().length === 0) {
+    return assertSafeRepositoryPath(pathResolver.shared('runtime/migrations.applied.json'), {
+      allowMissingLeaf: true,
+    });
+  }
+  return assertSafeRepositoryPath(pathResolver.resolve(input), { allowMissingLeaf: true });
 }
 
 function listMigrationFiles(dir: string): string[] {
-  if (!safeExistsSync(dir)) return [];
+  const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDir)) return [];
   const entries: string[] = [];
-  for (const name of safeReaddir(dir)) {
-    const filePath = path.join(dir, name);
+  for (const name of safeReaddir(safeDir)) {
+    const filePath = assertSafeRepositoryPath(path.join(safeDir, name));
     const stat = safeStat(filePath);
     if (!stat.isFile()) continue;
     if (!/\.(ts|js|mjs|cjs)$/.test(name)) continue;
@@ -71,26 +74,6 @@ function listMigrationFiles(dir: string): string[] {
     entries.push(filePath);
   }
   return entries.sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
-}
-
-function readState(statePath: string): MigrationState {
-  if (!safeExistsSync(statePath)) return { applied: [] };
-  try {
-    const parsed = readJson<{ applied?: unknown }>(statePath);
-    if (Array.isArray(parsed.applied)) {
-      return { applied: parsed.applied.filter((value: unknown) => typeof value === 'string') };
-    }
-  } catch (err: any) {
-    throw new Error(`Failed to read migration state at ${statePath}: ${err?.message ?? err}`);
-  }
-  return { applied: [] };
-}
-
-function writeState(statePath: string, state: MigrationState): void {
-  safeMkdir(path.dirname(statePath), { recursive: true });
-  safeWriteFile(statePath, `${JSON.stringify({ applied: state.applied }, null, 2)}\n`, {
-    encoding: 'utf8',
-  });
 }
 
 async function loadMigrationModule(filePath: string): Promise<MigrationModule> {
@@ -133,8 +116,10 @@ async function rollbackMigration(filePath: string, dryRun: boolean): Promise<Mig
 export async function runMigrations(
   opts: RunnerOptions
 ): Promise<{ applied: string[]; pending: string[] }> {
-  const files = listMigrationFiles(opts.dir);
-  const state = readState(opts.statePath);
+  const migrationDir = assertSafeRepositoryPath(opts.dir, { allowMissingLeaf: true });
+  const statePath = assertSafeRepositoryPath(opts.statePath, { allowMissingLeaf: true });
+  const files = listMigrationFiles(migrationDir);
+  const state = readMigrationState(statePath);
   const applied = new Set(state.applied);
   const pendingFiles = files.filter((file) => !applied.has(migrationIdFromFile(file)));
   const pending = pendingFiles.map(migrationIdFromFile);
@@ -157,13 +142,13 @@ export async function runMigrations(
     const targetFile = files.find((file) => migrationIdFromFile(file) === latestAppliedId);
     if (!targetFile) {
       throw new Error(
-        `Cannot rollback ${latestAppliedId}: migration script not found in ${opts.dir}`
+        `Cannot rollback ${latestAppliedId}: migration script not found in ${migrationDir}`
       );
     }
     await rollbackMigration(targetFile, opts.dryRun);
     if (!opts.dryRun) {
       state.applied = state.applied.filter((id) => id !== latestAppliedId);
-      writeState(opts.statePath, state);
+      writeMigrationState(statePath, state);
     }
     return { applied: state.applied, pending };
   }
@@ -177,7 +162,7 @@ export async function runMigrations(
     const migration = await runMigration(file, opts.dryRun);
     if (!opts.dryRun) {
       state.applied.push(migration.id);
-      writeState(opts.statePath, state);
+      writeMigrationState(statePath, state);
     }
   }
 
@@ -185,8 +170,11 @@ export async function runMigrations(
   return { applied: state.applied, pending };
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
+  const argv = await createStandardYargs(['node', 'run_migrations', ...args])
     .option('dir', { type: 'string' })
     .option('state', { type: 'string' })
     .option('dry-run', { type: 'boolean', default: false })
@@ -205,6 +193,7 @@ async function main(): Promise<void> {
   if (result.pending.length > 0 && !argv['dry-run'] && !argv.rollback && !argv.list) {
     logger.info(`Applied ${result.pending.length} migration(s).`);
   }
+  print(result);
 }
 
 if (
@@ -212,12 +201,17 @@ if (
   isDirectScript(import.meta.url, 'run_migrations.js')
 ) {
   void defineScript({
-    name: 'migrations:run',
-    flags: [],
-    run() {
-      return main();
+    name: 'migration',
+    flags: ['json', 'dry-run', 'quiet'],
+    run({ argv, print }) {
+      return main(argv, print);
     },
   })();
 }
 
-export { main as runMigrationsCli, listMigrationFiles, readState, writeState };
+export {
+  main as runMigrationsCli,
+  listMigrationFiles,
+  readMigrationState as readState,
+  writeMigrationState as writeState,
+};

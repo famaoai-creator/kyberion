@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "knowledge/product/schemas/delegated-task-record.schema.json",
+  "title": "Delegated task resumable record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "delegation_id": { "type": "string", "minLength": 1 },
+    "kind": { "const": "delegated_task" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["started", "completed", "failed", "cancelled"] },
+    "owner": { "type": "string", "minLength": 1 },
+    "instruction": { "type": "string", "minLength": 1 },
+    "context": { "type": "string" },
+    "context_ref": { "type": "string", "minLength": 1 },
+    "backend_name": { "type": "string", "minLength": 1 },
+    "result_summary": { "type": "string" },
+    "error": { "type": "string" },
+    "background": { "type": "boolean" },
+    "resumed_from": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "continuable": { "type": "boolean" },
+    "child_session_id": { "type": "string", "minLength": 1 },
+    "activation_count": { "type": "integer", "minimum": 0 },
+    "activation_id": { "type": "string", "minLength": 1 },
+    "activated_at": { "type": "string", "format": "date-time" },
+    "activation_status": { "enum": ["pending", "claimed", "completed", "failed"] },
+    "activation_completed_at": { "type": "string", "format": "date-time" },
+    "activation_result_delegation_id": { "type": "string", "minLength": 1 },
+    "activation_failure": { "$ref": "#/$defs/activationFailure" },
+    "child_report": { "$ref": "#/$defs/childReport" },
+    "settlement": { "$ref": "#/$defs/settlement" },
+    "gap_phases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/gapPhase" }
+    }
+  },
+  "required": ["delegation_id", "kind", "created_at", "status", "owner", "instruction"],
+  "$defs": {
+    "activationFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "const": "owner" },
+        "activation_id": { "type": "string", "minLength": 1 },
+        "failed_at": { "type": "string", "format": "date-time" },
+        "error": { "type": "string", "minLength": 1 }
+      },
+      "required": ["source", "activation_id", "failed_at", "error"]
+    },
+    "childReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "const": "child" },
+        "delegation_id": { "type": "string", "minLength": 1 },
+        "child_session_id": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string" },
+        "error": { "type": "string" }
+      },
+      "required": ["source", "delegation_id"]
+    },
+    "settlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "const": "owner" },
+        "report_delegation_id": { "type": "string", "minLength": 1 },
+        "settled_at": { "type": "string", "format": "date-time" },
+        "status": { "enum": ["completed", "failed", "cancelled"] }
+      },
+      "required": ["source", "report_delegation_id", "settled_at", "status"]
+    },
+    "gapPhase": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": { "type": "string", "minLength": 1 },
+        "ms": { "type": "number", "minimum": 0 }
+      },
+      "required": ["phase", "ms"]
+    }
+  }
+}

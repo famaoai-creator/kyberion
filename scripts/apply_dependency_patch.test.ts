@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import {
   pathResolver,
   safeExistsSync,
@@ -11,6 +12,7 @@ import {
 import {
   applyDependencyPatch,
   bumpDependencySpec,
+  readDependencyPatchTextFile,
   type PatchCommandResult,
   type PatchExecRunner,
 } from './apply_dependency_patch.js';
@@ -90,6 +92,12 @@ afterEach(() => {
 });
 
 describe('bumpDependencySpec', () => {
+  it('rejects a directory replacement before backup parsing', () => {
+    expect(() => readDependencyPatchTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('preserves the range operator and finds devDependencies', () => {
     const pkg = readRootPackage();
     expect(bumpDependencySpec(pkg, 'leftpad', '1.0.1')).toEqual({
@@ -107,6 +115,31 @@ describe('bumpDependencySpec', () => {
 });
 
 describe('applyDependencyPatch', () => {
+  it('rejects dangerous package manifest JSON before planning a patch', () => {
+    safeWriteFile(path.join(testRoot, 'package.json'), '{"__proto__":{"polluted":true}}');
+
+    expect(() =>
+      applyDependencyPatch({
+        packageName: 'leftpad',
+        targetVersion: '1.0.1',
+        apply: false,
+        rootDir: testRoot,
+        ledgerPath,
+        backupRoot,
+        runner: new FakeRunner(() => ok),
+        gates: GATES,
+      })
+    ).toThrow(/dangerous JSON key/);
+  });
+
+  it('keeps command output behind the shared printer boundary', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/apply_dependency_patch.ts'));
+
+    expect(source).toContain('print: Print');
+    expect(source).not.toContain('console.log');
+    expect(source).toContain('nowIso, readTextFile');
+  });
+
   it('propose mode records the plan without touching files', () => {
     const runner = new FakeRunner(() => ok);
     const outcome = applyDependencyPatch({

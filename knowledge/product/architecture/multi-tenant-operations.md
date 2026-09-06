@@ -187,7 +187,7 @@ explicit deferrals with their compensating controls.
 - [ ] Author `tenant-scope-policy.json` listing every tenant, its
       `confidential_prefixes`, eligible personas, and per-tenant adapter
       defaults.
-- [ ] CI validation: `pnpm run check:contract-schemas` covers
+- [ ] CI validation: `pnpm run check -- --scope full --only contract-schemas` covers
       `tenant-scope-policy.json`. PRs that add a tenant must update
       both the policy file and the schema.
 - [ ] Tenant slug regex (`^[a-z][a-z0-9-]{1,30}$`) added to a hygiene

@@ -213,10 +213,7 @@ describe('operator learning schemas', () => {
     expect(proposal.recommended_tier).toBe('personal');
     expect(proposal.requires_approval).toBe(true);
     expect(proposal.promotion_decision.eligible).toBe(false);
-    expect(proposal.candidate_updates.terminology?.observed_terms).toEqual([
-      '成長戦略',
-      '比較',
-    ]);
+    expect(proposal.candidate_updates.terminology?.observed_terms).toEqual(['成長戦略', '比較']);
     expect(proposal.candidate_updates.recurring_tasks).toEqual([
       { family: 'executive_strategy', sample_count: 1 },
     ]);
@@ -310,5 +307,31 @@ describe('operator learning schemas', () => {
     expect(stored.candidate_updates.recurring_tasks).toEqual([
       { family: 'executive_strategy', sample_count: 1 },
     ]);
+  });
+
+  it('rejects a promotion record that does not satisfy its persisted schema', () => {
+    const proposal = buildOperatorLearningProposal({
+      profile: {
+        ...profile,
+        learning: { ...profile.learning, min_samples_to_promote: 1 },
+      },
+      requestLogs: [
+        {
+          ...requestLog,
+          verification: { ...requestLog.verification, result: 'satisfied' },
+        },
+      ],
+      now: '2026-04-29T10:00:00.000Z',
+    });
+
+    expect(() =>
+      promoteOperatorLearningProposal({
+        proposal: { ...proposal, summary: '' },
+        approvedBy: 'operator',
+        approvedAt: '2026-04-29T10:05:00.000Z',
+        dryRun: false,
+        outputPath: pathResolver.sharedTmp('operator-learning-tests/invalid-record.json'),
+      })
+    ).toThrow(/Invalid catalog operator-learning-promotion-record/u);
   });
 });

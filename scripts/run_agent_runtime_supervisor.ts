@@ -1,4 +1,6 @@
-import { logger, processMissionTeamPrewarmRequest, killSwitch } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { processMissionTeamPrewarmRequest } from '@agent/core/agent-runtime-supervisor';
+import { killSwitch } from '@agent/core/kill-switch';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function parseRequestPath(argv: string[]): string {

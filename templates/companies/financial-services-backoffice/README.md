@@ -15,7 +15,7 @@ CEO のみ `held_by: human`(最終決裁は人間)。他ポジションはエー
 ## 使い方
 
 ```bash
-pnpm company:bootstrap --vertical financial-services-backoffice --slug <会社スラッグ> --name "<会社名>"
+pnpm onboard company bootstrap --vertical financial-services-backoffice --slug <会社スラッグ> --name "<会社名>"
 export KYBERION_CUSTOMER=<会社スラッグ>
 node dist/scripts/mission_controller.js organization-profile --summary
 ```

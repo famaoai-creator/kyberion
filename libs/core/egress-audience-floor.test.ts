@@ -4,7 +4,7 @@ import {
   evaluateEgressPolicy,
   evaluateAudienceEgress,
   normalizeEgressHost,
-  resetEgressPolicyCache,
+  _resetEgressPolicyCacheForTests,
 } from './egress-policy.js';
 import {
   findAudienceFloorViolations,
@@ -118,13 +118,13 @@ describe('audience egress floor (QM-11)', () => {
     const policyPath = pathResolver.sharedTmp(`qm11-egress-policy-${Date.now()}.json`);
     afterEach(() => {
       delete process.env.KYBERION_EGRESS_POLICY_PATH;
-      resetEgressPolicyCache();
+      _resetEgressPolicyCacheForTests();
       safeRmSync(policyPath, { force: true });
     });
     const usePolicy = (policy: Record<string, unknown>) => {
       safeWriteFile(policyPath, JSON.stringify(policy));
       process.env.KYBERION_EGRESS_POLICY_PATH = policyPath;
-      resetEgressPolicyCache();
+      _resetEgressPolicyCacheForTests();
     };
 
     it('link_allowed_domains survives load normalization and activates the operator', () => {

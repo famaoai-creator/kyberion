@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   clearPendingIntent,
   getPendingIntentPath,
+  loadPendingIntentAtPath,
   loadPendingIntent,
   savePendingIntent,
 } from './pending-intent-store.js';
@@ -34,6 +35,9 @@ describe('pending-intent-store', () => {
     expect(getPendingIntentPath('corr-pending-001')).toContain('pending-intents');
     expect(loadPendingIntent('corr-pending-001')?.source_text).toBe(record.source_text);
     expect(loadPendingIntent('corr-pending-001')?.required_inputs).toEqual(['audience', 'format']);
+    expect(() =>
+      loadPendingIntentAtPath(getPendingIntentPath('corr-pending-001'), 'other-correlation')
+    ).toThrow('PENDING_INTENT_SCOPE_MISMATCH');
 
     clearPendingIntent('corr-pending-001');
     expect(loadPendingIntent('corr-pending-001')).toBeNull();
@@ -62,6 +66,33 @@ describe('pending-intent-store', () => {
 
     expect(loadPendingIntent(correlationId)).toBeNull();
     expect(safeExistsSync(getPendingIntentPath(correlationId))).toBe(false);
+  });
+
+  it('rejects unknown persisted fields and non-file records at the loader boundary', () => {
+    const correlationId = 'corr-pending-schema';
+    const filePath = getPendingIntentPath(correlationId);
+    const now = new Date().toISOString();
+    safeWriteFile(
+      filePath,
+      JSON.stringify({
+        kind: 'pending-intent',
+        correlation_id: correlationId,
+        created_at: now,
+        updated_at: now,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+        source_text: 'schema check',
+        required_inputs: [],
+        unexpected: true,
+      })
+    );
+    expect(loadPendingIntent(correlationId)).toBeNull();
+
+    const directoryId = 'corr-pending-directory';
+    const directoryPath = getPendingIntentPath(directoryId);
+    safeMkdir(directoryPath, { recursive: true });
+    expect(() => loadPendingIntentAtPath(directoryPath, directoryId)).toThrow(
+      'record must be a regular file'
+    );
   });
 
   it('treats strong correction utterances as corrections', () => {

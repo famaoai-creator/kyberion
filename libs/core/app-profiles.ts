@@ -8,6 +8,7 @@ export {
   validateWebAppProfile,
   validateWebAppProfileIndex,
 } from './mobile-profile-validators.js';
+export { loadMobileAppProfileIndex, loadWebAppProfileIndex } from './app-profile-index-loader.js';
 export type {
   MobileAppProfileRecord,
   WebAppProfileIndex,

@@ -1,8 +1,10 @@
 /** KS-16: semantic static checks for knowledge scope choke points. */
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge-scope-check-policy';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface KnowledgeScopeCheckConfig {
   max_direct_tenant_env_reads: number;
@@ -16,23 +18,22 @@ const sourceExtensions = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', 
 const DEFAULT_CONFIG: KnowledgeScopeCheckConfig = { max_direct_tenant_env_reads: 26 };
 const CONFIG_PATH = path.join(root, 'knowledge/product/governance/knowledge-scope-check.json');
 
-function loadConfig(): KnowledgeScopeCheckConfig {
-  if (!safeExistsSync(CONFIG_PATH)) return DEFAULT_CONFIG;
-  try {
-    const parsed = JSON.parse(
-      String(safeReadFile(CONFIG_PATH, { encoding: 'utf8' }))
-    ) as Partial<KnowledgeScopeCheckConfig>;
-    return {
-      ...DEFAULT_CONFIG,
-      ...parsed,
-      max_direct_tenant_env_reads:
-        typeof parsed.max_direct_tenant_env_reads === 'number'
-          ? parsed.max_direct_tenant_env_reads
-          : DEFAULT_CONFIG.max_direct_tenant_env_reads,
-    };
-  } catch {
-    return DEFAULT_CONFIG;
+export function readKnowledgeScopeTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
   }
+  return readTextFile(filePath);
+}
+
+function loadConfig(): KnowledgeScopeCheckConfig {
+  const parsed = loadKnowledgeScopeCheckPolicy(CONFIG_PATH);
+  if (!parsed) return DEFAULT_CONFIG;
+  return {
+    ...DEFAULT_CONFIG,
+    max_direct_tenant_env_reads: parsed.max_direct_tenant_env_reads,
+    confidential_scope_allowlist: parsed.confidential_scope_allowlist,
+    scoped_runtime_writer_files: parsed.scoped_runtime_writer_files,
+  };
 }
 
 function removeComments(source: string): string {
@@ -147,7 +148,7 @@ function collectSources(): Array<{ file: string; source: string }> {
       if (relativeFile === 'scripts/check_knowledge_scope_boundaries.ts') continue;
       files.push({
         file: relativeFile,
-        source: String(safeReadFile(file, { encoding: 'utf8' }) || ''),
+        source: readKnowledgeScopeTextFile(file),
       });
     }
   }
@@ -169,12 +170,13 @@ export const runCheckKnowledgeScopeBoundaries = defineScript({
   run(context) {
     const findings = scan();
     if (findings.length > 0) {
-      console.error('[check_knowledge_scope_boundaries] FAILED');
-      for (const finding of findings) console.error(`- ${finding}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...findings.map((finding) => `- ${finding}`)].join('\n')
+      );
     }
     context.print('[check_knowledge_scope_boundaries] OK');
+    return { findings };
   },
 });
 

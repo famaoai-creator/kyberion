@@ -11,6 +11,33 @@ vi.mock('./core.js', () => ({
 }));
 
 describe('executeAdfSteps', () => {
+  it('blocks approval-gated steps before invoking the handler', async () => {
+    let called = false;
+    const execution = executeAdfSteps(
+      [
+        {
+          type: 'apply',
+          op: 'demo:mutate',
+          params: {},
+          budget: { approval_required: true },
+        },
+      ],
+      {},
+      { maxSteps: 10, timeoutMs: 10_000, hasHuman: false },
+      {
+        capture: async (_op, _params, ctx) => ctx,
+        transform: async (_op, _params, ctx) => ctx,
+        apply: async (_op, _params, ctx) => {
+          called = true;
+          return ctx;
+        },
+      }
+    );
+
+    await expect(execution).rejects.toThrow('[HUMAN_REQUIRED]');
+    expect(called).toBe(false);
+  });
+
   it('executes declared graph nodes with a completion-driven frontier', async () => {
     const events: string[] = [];
     const result = await executeAdfSteps(

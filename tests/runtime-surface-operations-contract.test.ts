@@ -9,22 +9,18 @@ function read(relPath: string): string {
 }
 
 describe('Runtime surface operations contract', () => {
-  it('exposes surface lifecycle scripts from package.json', () => {
+  it('exposes one governed surface lifecycle entrypoint from package.json', () => {
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
-    for (const action of ['reconcile', 'status', 'repair']) {
-      const script = pkg.scripts[`surfaces:${action}`];
-      expect(script).toContain('scripts/run_with_env.ts');
-      expect(script).toContain('KYBERION_PERSONA=worker');
-      expect(script).toContain('SYSTEM_ROLE=surface_runtime');
-      expect(script).toContain(`--action ${action}`);
-    }
+    expect(pkg.scripts.surfaces).toContain('scripts/run_with_env.ts');
+    expect(pkg.scripts.surfaces).toContain('KYBERION_PERSONA=worker');
+    expect(pkg.scripts.surfaces).toContain('SYSTEM_ROLE=surface_runtime');
+    expect(pkg.scripts.surfaces).toContain('dist/scripts/surface_runtime.js');
+    for (const action of ['setup', 'reconcile', 'status', 'repair', 'start', 'stop'])
+      expect(pkg.scripts[`surfaces:${action}`]).toBeUndefined();
     expect(pkg.scripts['channels:list']).toBe('node dist/scripts/channel_directory.js');
-    expect(pkg.scripts.bootstrap).toBe(
-      'pnpm build && node dist/scripts/surface_runtime.js --action reconcile'
-    );
-    expect(pkg.scripts['dashboard:onboarding']).toBe(
-      'node dist/scripts/sovereign_dashboard.js --once --focus onboarding'
-    );
+    expect(pkg.scripts.bootstrap).toBe('pnpm build && pnpm surfaces reconcile');
+    expect(pkg.scripts.dashboard).toBe('node dist/scripts/sovereign_dashboard.js');
+    expect(pkg.scripts['dashboard:onboarding']).toBeUndefined();
   });
 
   it('includes surface checks in the vital pipeline', () => {
@@ -47,10 +43,10 @@ describe('Runtime surface operations contract', () => {
       'Focused view: onboarding setup, connection review, tenant context, starter mission.'
     );
     expect(dashboard).toContain('RUNTIME SURFACES');
-    expect(onboarding).toContain('pnpm surfaces:reconcile');
+    expect(onboarding).toContain('pnpm surfaces reconcile');
     expect(operatorGuide).toContain('discord-bridge');
     expect(operatorGuide).toContain('telegram-bridge');
-    expect(operatorGuide).toContain('pnpm surfaces:start -- --surface <surface-id>');
+    expect(operatorGuide).toContain('pnpm surfaces start -- --surface <surface-id>');
   });
 
   it('includes troubleshooting diagnostics in surface runtime status', () => {
@@ -58,7 +54,7 @@ describe('Runtime surface operations contract', () => {
     const lifecycleModel = read(
       'knowledge/product/architecture/runtime-surface-lifecycle-model.md'
     );
-    expect(surfaceRuntime).toContain("from '@agent/core'");
+    expect(surfaceRuntime).toContain("from '@agent/core/surface-runtime'");
     expect(surfaceRuntime).toContain('recentLogTail');
     expect(surfaceRuntime).toContain('diagnostics');
     expect(surfaceRuntime).toContain('lastKnownState');

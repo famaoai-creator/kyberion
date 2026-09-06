@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import type { ChronosThemeMode } from '../lib/chronos-theme';
+import { parseJsonRecord } from '../lib/json-record';
 
 export type QuickAction = {
   label: string;
@@ -137,10 +138,8 @@ export function loadOperatorLayoutPrefs(): {
   try {
     const raw = window.localStorage.getItem(OPERATOR_LAYOUT_PREFS_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<{
-      focusedOperatorView: string | null;
-      missionIntelligenceFocus: string | null;
-    }>;
+    const parsed = parseJsonRecord(raw);
+    if (!parsed) return null;
     return {
       focusedOperatorView:
         typeof parsed.focusedOperatorView === 'string' ? parsed.focusedOperatorView : null,

@@ -13,6 +13,7 @@
   "include": [
     "*.ts",
     "foundation/**/*.ts",
+    "native-pptx-engine/**/*.ts",
     "src/**/*.ts",
     "src/types/**/*.ts",
     "src/types/actuator-pipeline-bundle.ts",

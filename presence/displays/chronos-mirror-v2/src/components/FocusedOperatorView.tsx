@@ -2,11 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { findLatestMissionHandoff, type MissionAssetCategory } from '../lib/mission-progress';
-import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
+import {
+  findLatestMissionHandoff,
+  type MissionAssetCategory,
+} from '../lib/mission-progress-client';
+import { buildAttentionItems } from '../lib/operator-console';
 import { buildRuntimeTopologyGraph } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
-import { chronosSpeechLocale, resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
+import { chronosSpeechLocale, resolveChronosLocale, uxTextOr } from '../lib/ux-vocabulary';
+import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
+import { parseFocusedOperatorResponse } from '../lib/focused-operator-response';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import { TraceViewer } from './TraceViewer';
 import {
@@ -18,7 +23,6 @@ import {
   graphNodePalette,
   isEditableHotkeyTarget,
   loadFocusedOperatorSelectedSessionId,
-  normalizePayload,
   pickDefaultSessionId,
   resolveComputerSessionHotkeySelection,
   RUNTIME_GRAPH_NODE_HEIGHT,
@@ -90,65 +94,43 @@ export function FocusedOperatorView({
 
   useEffect(() => {
     let alive = true;
-    const load = async () => {
-      try {
+    const scheduler = new LiveSyncScheduler<Payload>({
+      fetchSnapshot: async () => {
         const res = await fetch(
           `/api/intelligence${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`,
           { cache: 'no-store' }
         );
-        const body = await res.json();
+        const payload = parseFocusedOperatorResponse(await res.json().catch(() => null));
+        if (!res.ok || !payload) throw new Error('Invalid operator view response');
+        return payload;
+      },
+      onSnapshot: (snapshot) => {
         if (!alive) return;
-        if (!res.ok) {
-          setError(body.error || 'Failed to load operator view');
-          return;
-        }
-        setData(normalizePayload(body));
+        setData(snapshot);
         setError(null);
-      } catch (err: any) {
-        if (alive) setError(err.message || 'Failed to load operator view');
-      }
-    };
-    load();
-    const timer = setInterval(load, 15000);
-    const source = new EventSource(
-      `/api/intelligence/stream${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`
-    );
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as Partial<Payload>;
-        if (!alive) return;
-        setData((current) =>
-          current
-            ? normalizePayload({
-                ...current,
-                recentEvents: Array.isArray(payload.recentEvents)
-                  ? payload.recentEvents
-                  : current.recentEvents,
-                a2aHandoffs: Array.isArray(payload.a2aHandoffs)
-                  ? payload.a2aHandoffs
-                  : current.a2aHandoffs,
-                ownerSummaries: Array.isArray(payload.ownerSummaries)
-                  ? payload.ownerSummaries
-                  : current.ownerSummaries,
-                secretApprovals: Array.isArray(payload.secretApprovals)
-                  ? payload.secretApprovals
-                  : current.secretApprovals,
-                runtimeTopology: payload.runtimeTopology || current.runtimeTopology,
-                runtime: payload.runtime || current.runtime,
-              })
-            : current
-        );
-      } catch {
-        // Ignore malformed SSE payloads and rely on polling fallback.
-      }
-    };
-    source.onerror = () => {
-      source.close();
-    };
+      },
+      onError: (err) => {
+        if (alive) setError(err instanceof Error ? err.message : String(err));
+      },
+      revisionOf: (snapshot) => snapshot.revision,
+      isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
+    });
+    void scheduler.refresh().catch(() => undefined);
+    const source =
+      typeof window !== 'undefined'
+        ? new EventSource(
+            `/api/intelligence/stream${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`
+          )
+        : null;
+    source?.addEventListener('message', () => scheduler.invalidate());
+    source?.addEventListener('error', () => scheduler.invalidate());
+    const unbindVisibility = bindVisibilityToLiveSync(scheduler);
+    scheduler.start();
     return () => {
       alive = false;
-      clearInterval(timer);
-      source.close();
+      source?.close();
+      unbindVisibility();
+      scheduler.stop();
     };
   }, [tenant, viewId]);
 
@@ -1159,7 +1141,7 @@ export function FocusedOperatorView({
                 <div className="mt-3 text-[10px] leading-5 kb-text-muted">
                   Terminal approval:{' '}
                   <span className="font-mono kb-text-secondary">
-                    npm run cli -- approve {request.id}
+                    pnpm kyberion approve {request.id}
                   </span>
                 </div>
               </div>

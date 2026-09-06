@@ -1,3 +1,5 @@
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+
 /** Resolve Claude CLI auth status from its cheap, non-interactive probe. */
 export function isClaudeCliAuthenticated(input: {
   ok: boolean;
@@ -8,8 +10,8 @@ export function isClaudeCliAuthenticated(input: {
   const stdout = input.stdout?.trim() || '';
   if (stdout) {
     try {
-      const parsed = JSON.parse(stdout) as { loggedIn?: unknown };
-      if (typeof parsed.loggedIn === 'boolean') return parsed.loggedIn;
+      const parsed = parseSafeJsonObjectInput(stdout, 'Claude CLI auth status');
+      if (typeof parsed?.loggedIn === 'boolean') return parsed.loggedIn;
     } catch {
       // Older or customized Claude CLIs may emit human-readable status text.
     }

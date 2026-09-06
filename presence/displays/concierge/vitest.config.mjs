@@ -9,6 +9,10 @@ export default defineConfig({
     alias: [
       { find: /^@agent\/core$/, replacement: resolve(here, '../../../libs/core/index.ts') },
       {
+        find: /^@agent\/core\/foundation$/,
+        replacement: resolve(here, '../../../libs/core/foundation/index.ts'),
+      },
+      {
         find: /^@agent\/core\/(.+)$/,
         replacement: resolve(here, '../../../libs/core/$1.ts'),
       },

@@ -11,14 +11,14 @@ _Before writing code, the AI must understand the intent and the existing system.
 1.  **Map the Terrain**: Use `codebase-mapper` (as a read-only probe) to get a high-level view.
 
     ```bash
-    npm run cli -- run codebase-mapper -- --dir .
+    pnpm kyberion run codebase-mapper -- --dir .
     ```
 
     _Prompt:_ "Here is the project structure. Where should I add the new 'UserAuthentication' feature? Create a Task Board for this."
 
 2.  **Understand Data**: Use `schema-inspector` to read DB/API definitions.
     ```bash
-    npm run cli -- run schema-inspector -- --dir .
+    pnpm kyberion run schema-inspector -- --dir .
     ```
     _Prompt:_ "Based on this schema, write a SQL query to fetch active users."
 
@@ -35,7 +35,7 @@ _Ensure the code works as expected._
 
 1.  **Run Tests**: Use `test-genie` to execute the suite.
     ```bash
-    npm run cli -- run test-genie -- --dir .
+    pnpm kyberion run test-genie -- --dir .
     ```
     _Prompt:_ "Here is the test output. Fix the failing test cases."
 
@@ -49,7 +49,7 @@ _Self-correction before human review._
     ```
 2.  **Self-Review**: Use `local-reviewer` to analyze the diff.
     ```bash
-    npm run cli -- run local-reviewer
+    pnpm kyberion run local-reviewer
     ```
     _Prompt:_ "Review these changes for security flaws and code style issues. Suggest improvements."
 
@@ -59,7 +59,7 @@ _When things go wrong. If an unexpected error occurs during execution, trigger a
 
 1.  **Analyze Logs**: Use `log-analyst` to read runtime errors.
     ```bash
-    npm run cli -- run log-analyst -- --file server.log
+    pnpm kyberion run log-analyst -- --file server.log
     ```
     _Prompt:_ "Here is the error log. What caused the crash and how do I fix it?"
 
@@ -67,14 +67,14 @@ _When things go wrong. If an unexpected error occurs during execution, trigger a
 
 ## 🛠 Skill Quick Reference
 
-| Skill                | Usage                                 | Purpose                          |
-| -------------------- | ------------------------------------- | -------------------------------- |
-| **Codebase Mapper**  | `npm run cli -- run codebase-mapper`  | Visualize directory structure.   |
-| **Schema Inspector** | `npm run cli -- run schema-inspector` | Read SQL/OpenAPI/Prisma schemas. |
-| **Test Genie**       | `npm run cli -- run test-genie`       | Run tests and capture output.    |
-| **Local Reviewer**   | `npm run cli -- run local-reviewer`   | Analyze staged git changes.      |
-| **Log Analyst**      | `npm run cli -- run log-analyst`      | Read last N lines of a log file. |
-| **Doc-to-Text**      | `npm run cli -- run doc-to-text`      | Read specs/docs (PDF/Office).    |
+| Skill                | Usage                                | Purpose                          |
+| -------------------- | ------------------------------------ | -------------------------------- |
+| **Codebase Mapper**  | `pnpm kyberion run codebase-mapper`  | Visualize directory structure.   |
+| **Schema Inspector** | `pnpm kyberion run schema-inspector` | Read SQL/OpenAPI/Prisma schemas. |
+| **Test Genie**       | `pnpm kyberion run test-genie`       | Run tests and capture output.    |
+| **Local Reviewer**   | `pnpm kyberion run local-reviewer`   | Analyze staged git changes.      |
+| **Log Analyst**      | `pnpm kyberion run log-analyst`      | Read last N lines of a log file. |
+| **Doc-to-Text**      | `pnpm kyberion run doc-to-text`      | Read specs/docs (PDF/Office).    |
 
 ## Automation Mapping (MO-01 / MO-02)
 

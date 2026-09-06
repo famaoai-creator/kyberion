@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "model-role-feedback.schema.json",
+  "title": "Model role feedback",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["feedback_id", "model_id", "team_role", "rating", "source", "recorded_at"],
+  "properties": {
+    "feedback_id": { "type": "string", "minLength": 1 },
+    "model_id": { "type": "string", "minLength": 1 },
+    "team_role": { "type": "string", "minLength": 1 },
+    "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "comment": { "type": "string", "maxLength": 2000 },
+    "source": { "enum": ["user", "operator"] },
+    "recorded_at": { "type": "string", "format": "date-time" }
+  }
+}

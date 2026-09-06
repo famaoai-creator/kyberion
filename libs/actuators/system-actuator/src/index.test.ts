@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const safeExec = vi.fn(() => '');
@@ -36,6 +37,20 @@ const safeWriteFile = vi.fn();
 const safeMkdir = vi.fn();
 const safeExistsSync = vi.fn(() => false);
 const safeStat = vi.fn(() => ({ isDirectory: () => false }));
+const assertSafeRepositoryPath = vi.fn(
+  (filePath: string, options?: { rootDir?: string }): string => {
+    const resolved = path.resolve(String(filePath));
+    const roots = [options?.rootDir || '/tmp/kyberion', process.cwd()].map((root) =>
+      path.resolve(root)
+    );
+    if (!roots.some((root) => resolved === root || resolved.startsWith(`${root}${path.sep}`))) {
+      throw new Error(
+        `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+      );
+    }
+    return resolved;
+  }
+);
 const resolveActiveProfileRoot = vi.fn(() => '/tmp/active-profile');
 const derivePipelineStatus = vi.fn((results: Array<{ status: string }>) =>
   results.every((r) => r.status === 'success') ? 'succeeded' : 'failed'
@@ -833,6 +848,12 @@ const emitComputerSurfacePatch = vi.fn();
 const createApprovalRequest = vi.fn(() => ({ id: 'approval-123', status: 'pending' }));
 const loadApprovalRequest = vi.fn(() => null);
 const classifyError = vi.fn(() => ({ category: 'timeout' }));
+const reconcileConfigFallbacks = vi.fn(() => ({ status: 'ok' }));
+const reconcileUnclassifiedErrors = vi.fn(() => ({ status: 'ok' }));
+const reconcileUnhandledIntents = vi.fn(() => ({ status: 'ok' }));
+const collectAuditVerifyReport = vi.fn(() => ({ ok: true }));
+const runMemoryPromotionQueueSummary = vi.fn(() => ({ status: 'ok' }));
+const runTaskModelRoutingSummary = vi.fn(() => ({ status: 'ok' }));
 const retry = vi.fn(async (fn: any) => fn());
 const resolveDesktopLaunchAdapter = vi.fn(() => ({
   open: (target: string, cwd?: string) =>
@@ -843,10 +864,19 @@ const resolveDesktopLaunchAdapter = vi.fn(() => ({
     ),
 }));
 const pathResolver = {
-  rootDir: vi.fn(() => '/tmp/kyberion'),
-  rootResolve: vi.fn((p: string) => `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`),
+  rootDir: vi.fn(() => process.cwd()),
+  rootResolve: vi.fn((p: string) =>
+    String(p).includes('report.html') || String(p).includes('canonical-recording.mp4')
+      ? `${process.cwd()}/${String(p).replace(/^\/+/, '')}`
+      : `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`
+  ),
   shared: vi.fn((p = '') => `/tmp/kyberion/active/shared/${String(p).replace(/^\/+/, '')}`),
-  knowledge: vi.fn((p = '') => `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`),
+  sharedTmp: vi.fn((p = '') => `/tmp/kyberion/active/shared/tmp/${String(p).replace(/^\/+/, '')}`),
+  knowledge: vi.fn((p = '') =>
+    String(p).includes('schemas/')
+      ? `${process.cwd()}/knowledge/${String(p).replace(/^\/+/, '')}`
+      : `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`
+  ),
   active: vi.fn((p = '') => `/tmp/kyberion/active/${String(p).replace(/^\/+/, '')}`),
   vault: vi.fn((p = '') => `/tmp/kyberion/.vault/${String(p).replace(/^\/+/, '')}`),
   resolve: vi.fn((p = '') =>
@@ -862,6 +892,27 @@ const pathResolver = {
         ? { path: String(p), foreign: true }
         : { path: String(p), foreign: false }
   ),
+};
+
+const testLogger = { error: vi.fn(), info: vi.fn(), warn: vi.fn() };
+const testCore = {
+  logger: testLogger,
+  runOpPreflight,
+  safeExec,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  safeExistsSync,
+  safeStat,
+  closeChromeTabByUrl,
+  closeChromeTabByTitle,
+  loadApprovalRequest,
+  emptyFinderTrash,
+  createApprovalRequest,
+  revealFinderPath,
+  openFinderPath,
+  clickAt,
+  resolveActiveProfileRoot,
 };
 
 // Contract-faithful mini engine for the fake core (AR-01): sequential
@@ -921,7 +972,7 @@ const executeAdfSteps = async (
 
 vi.mock('@agent/core', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core')),
-  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+  logger: testLogger,
   safeReadFile,
   loadJson,
   safeWriteFile,
@@ -1054,7 +1105,182 @@ vi.mock('@agent/core/fs-utils', () => ({
 
 vi.mock('@agent/core/secure-io', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/secure-io')),
+  assertSafeRepositoryPath,
+  safeReadFile,
+  loadJson,
+  safeWriteFile,
+  safeMkdir,
+  safeExistsSync,
+  safeExec,
   safeStat,
+}));
+
+vi.mock('@agent/core/core', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/core')),
+  logger: testLogger,
+}));
+vi.mock('@agent/core/path-resolver', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/path-resolver')),
+  pathResolver,
+}));
+vi.mock('@agent/core/adf-engine', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/adf-engine')),
+  executeAdfSteps,
+}));
+vi.mock('@agent/core/op-preflight-defaults', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/op-preflight-defaults')),
+  ensureDefaultOpPreflight,
+}));
+vi.mock('@agent/core/op-preflight', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/op-preflight')),
+  runOpPreflight,
+}));
+vi.mock('@agent/core/op-input-contracts', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/op-input-contracts')),
+  getOpInputContract,
+  validateOpInput,
+}));
+vi.mock('@agent/core/desktop-launch-adapter', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/desktop-launch-adapter')),
+  resolveDesktopLaunchAdapter,
+}));
+vi.mock('@agent/core/logic-utils', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/logic-utils')),
+  resolveVars,
+  evaluateCondition,
+  getPathValue,
+}));
+vi.mock('@agent/core/async-utils', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/async-utils')),
+  retry,
+}));
+vi.mock('@agent/core/recovery-policy', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/recovery-policy')),
+  createGovernedRetryOptionsBuilder: vi.fn(() => vi.fn(() => ({}))),
+}));
+vi.mock('@agent/core/execution-bounds', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/execution-bounds')),
+  withinLoopBounds,
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+  DEFAULT_MAX_LOOP_ITERATIONS,
+  assertExecutionBounds,
+}));
+vi.mock('@agent/core/profile-root', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/profile-root')),
+  resolveActiveProfileRoot,
+}));
+vi.mock('@agent/core/actuator-op-registry', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/actuator-op-registry')),
+  buildUnknownActuatorOpError,
+}));
+vi.mock('@agent/core/virtual-media-device-control-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>(
+    '@agent/core/virtual-media-device-control-bridge'
+  )),
+  createVirtualMediaDeviceControlBridge,
+}));
+vi.mock('@agent/core/virtual-device-inventory-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>(
+    '@agent/core/virtual-device-inventory-bridge'
+  )),
+  createVirtualDeviceInventoryBridge,
+}));
+vi.mock('@agent/core/virtual-audio-output-playback-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>(
+    '@agent/core/virtual-audio-output-playback-bridge'
+  )),
+  createVirtualAudioOutputPlaybackBridge,
+}));
+vi.mock('@agent/core/virtual-audio-input-recording-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>(
+    '@agent/core/virtual-audio-input-recording-bridge'
+  )),
+  createVirtualAudioInputRecordingBridge,
+}));
+vi.mock('@agent/core/virtual-input-device-inventory-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>(
+    '@agent/core/virtual-input-device-inventory-bridge'
+  )),
+  createVirtualInputDeviceInventoryBridge,
+}));
+vi.mock('@agent/core/virtual-camera-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/virtual-camera-bridge')),
+  createVirtualCameraBridge,
+}));
+vi.mock('@agent/core/virtual-camera-injection-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>(
+    '@agent/core/virtual-camera-injection-bridge'
+  )),
+  createVirtualCameraInjectionBridge,
+}));
+vi.mock('@agent/core/screen-capture-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/screen-capture-bridge')),
+  createScreenCaptureBridge,
+}));
+vi.mock('@agent/core/screen-recording-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/screen-recording-bridge')),
+  createScreenRecordingBridge,
+}));
+vi.mock('@agent/core/screen-frame-redaction', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/screen-frame-redaction')),
+  redactScreenVideoFrame: vi.fn(async (frame: any) => frame),
+  redactScreenCaptureFile: vi.fn(async (_input: string, _output: string) => undefined),
+}));
+vi.mock('@agent/core/screen-display-inventory-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>(
+    '@agent/core/screen-display-inventory-bridge'
+  )),
+  createScreenDisplayInventoryBridge,
+}));
+vi.mock('@agent/core/tool-runtime-registry', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/tool-runtime-registry')),
+  listToolRuntimeInventory,
+}));
+vi.mock('@agent/core/service-runtime-registry', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/service-runtime-registry')),
+  listServiceRuntimeInventory,
+}));
+vi.mock('@agent/core/reconcile-ops', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/reconcile-ops')),
+  reconcileConfigFallbacks,
+  reconcileUnclassifiedErrors,
+  reconcileUnhandledIntents,
+}));
+vi.mock('@agent/core/report-ops', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/report-ops')),
+  collectAuditVerifyReport,
+  runMemoryPromotionQueueSummary,
+  runTaskModelRoutingSummary,
+}));
+vi.mock('@agent/core/video-frame-bus', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/video-frame-bus')),
+  StubVideoFrameBus,
+}));
+vi.mock('@agent/core/video-frame-archive', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/video-frame-archive')),
+  writeVideoFrameBusToMp4,
+  pipeMp4ToVideoFrameBus,
+}));
+vi.mock('@agent/core/ledger', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/ledger')),
+  ledger: { verifyIntegrity: vi.fn(() => true) },
+}));
+vi.mock('@agent/core/project-registry', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/project-registry')),
+  listProjectRecords: vi.fn(() => []),
+}));
+vi.mock('@agent/core/platform', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/platform')),
+  platform: { listRunningApps: vi.fn(async () => []) },
+}));
+vi.mock('@agent/core/voice-synth', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/voice-synth')),
+  say: vi.fn(async () => undefined),
+}));
+vi.mock('@agent/core/macos-automation-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/macos-automation-bridge')),
+  macosAutomationBridge,
 }));
 
 vi.mock('@agent/shared-vision', () => ({
@@ -1077,7 +1303,7 @@ function restorePlatform() {
   });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   safeExec.mockImplementation(() => '');
   safeReadFile.mockImplementation(() => '{}');
@@ -1108,13 +1334,16 @@ beforeEach(() => {
       content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
     })
   );
+  const { installFocusTargetStoreTestIo } = await import('../tests/system-focus-io.test.js');
+  await installFocusTargetStoreTestIo({ loadJson, safeReadFile, safeWriteFile, safeExistsSync });
   restorePlatform();
 });
 
 describe('system-actuator reconcile admission', () => {
   it('blocks direct reconcile before reading the strategy when preflight denies it', async () => {
-    const core = await import('@agent/core');
-    vi.mocked(core.runOpPreflight).mockResolvedValueOnce({
+    const preflight = await import('@agent/core/op-preflight');
+    const secureIo = await import('@agent/core/secure-io');
+    vi.mocked(preflight.runOpPreflight).mockResolvedValueOnce({
       decision: 'block',
       reason: 'test system admission denial',
       terminate: true,
@@ -1124,18 +1353,21 @@ describe('system-actuator reconcile admission', () => {
     });
 
     const { handleAction } = await import('./index');
+    vi.mocked(secureIo.safeReadFile).mockClear();
     await expect(
       handleAction({
         action: 'reconcile',
         strategy_path: 'knowledge/product/governance/system-strategy.json',
       })
     ).rejects.toThrow('[OP_PREFLIGHT_BLOCK] test system admission denial');
-    expect(core.safeReadFile).not.toHaveBeenCalled();
-    expect(core.ensureDefaultOpPreflight).toHaveBeenCalled();
+    expect(secureIo.safeReadFile).not.toHaveBeenCalled();
+    expect(
+      (await import('@agent/core/op-preflight-defaults')).ensureDefaultOpPreflight
+    ).toHaveBeenCalled();
   });
 
   it('blocks computer interaction before invoking OS automation when preflight denies it', async () => {
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.runOpPreflight).mockResolvedValueOnce({
       decision: 'block',
       reason: 'test computer interaction denial',
@@ -1155,12 +1387,30 @@ describe('system-actuator reconcile admission', () => {
     ).rejects.toThrow('[OP_PREFLIGHT_BLOCK] test computer interaction denial');
     expect(core.clickAt).not.toHaveBeenCalled();
   });
+
+  it('rejects a malformed persisted reconcile strategy before executing a step', async () => {
+    const secureIo = await import('@agent/core/secure-io');
+    vi.mocked(secureIo.safeExistsSync).mockReturnValue(true);
+    vi.spyOn(secureIo, 'safeLstat').mockReturnValue({ isFile: () => true } as never);
+    vi.mocked(secureIo.safeReadFile).mockReturnValue(
+      JSON.stringify({ strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }] })
+    );
+
+    const { handleAction } = await import('./index');
+    await expect(
+      handleAction({
+        action: 'reconcile',
+        strategy_path: 'libs/actuators/system-actuator/manifest.json',
+      })
+    ).rejects.toThrow('system strategy.strategies[0].pipeline[0].params must be a JSON object');
+    expect(testCore.safeExec).not.toHaveBeenCalled();
+  });
 });
 
 describe('system-actuator computer_interaction adapter', () => {
   it('detects the currently focused input element', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.safeExec).mockReturnValueOnce(
       'Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue'
     );
@@ -1184,7 +1434,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('remembers the currently focused target', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.safeExec).mockReturnValueOnce(
       'Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue'
     );
@@ -1207,7 +1457,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('fails typing when focused element is not editable', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.safeExec).mockReturnValueOnce(
       'Codex\nCurrent Chat\nAXTextArea\nChat Input\nfalse'
     );
@@ -1226,7 +1476,9 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('persists pipeline context to rootDir-based context_path', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = await import('@agent/core/secure-io');
+    vi.mocked(core.safeExistsSync).mockReturnValue(true);
+    vi.spyOn(core, 'safeLstat').mockReturnValue({ isFile: () => true } as never);
     vi.mocked(core.safeReadFile).mockImplementation((filePath: string) =>
       String(filePath).includes('active/shared/tmp/input.json') ? '{"a":1}' : '{}'
     );
@@ -1251,7 +1503,7 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.status).toBe('succeeded');
     expect(result.context.parsed.a).toBe(1);
     expect(core.safeWriteFile).toHaveBeenCalledWith(
-      '/tmp/kyberion/active/shared/tmp/system-context.json',
+      `${process.cwd()}/active/shared/tmp/system-context.json`,
       expect.stringContaining('"parsed"')
     );
   });
@@ -1259,7 +1511,7 @@ describe('system-actuator computer_interaction adapter', () => {
   it('activates an application before keyboard input when target.application is present', async () => {
     mockDarwinPlatform();
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
 
     await handleAction({
       version: '0.1',
@@ -1285,7 +1537,7 @@ describe('system-actuator computer_interaction adapter', () => {
   it('supports explicit activate_application actions', async () => {
     mockDarwinPlatform();
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
 
     await handleAction({
       version: '0.1',
@@ -1306,7 +1558,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('submits the focused input with enter', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.safeExec).mockReturnValueOnce(
       'Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue'
     );
@@ -1328,7 +1580,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('uses paste strategy for focused input typing by default', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.safeExec).mockReturnValueOnce(
       'Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue'
     );
@@ -1351,7 +1603,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('guards against focus target drift before typing', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.safeExistsSync).mockReturnValue(true);
     vi.mocked(core.safeReadFile).mockReturnValue(
       JSON.stringify({
@@ -1385,7 +1637,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('allows window title prefix matching for remembered targets', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.safeExistsSync).mockReturnValue(true);
     vi.mocked(core.safeReadFile).mockReturnValue(
       JSON.stringify({
@@ -1421,7 +1673,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('retries after re-activating the remembered application before failing guard', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.safeExistsSync).mockReturnValue(true);
     vi.mocked(core.safeReadFile).mockReturnValue(
       JSON.stringify({
@@ -1477,7 +1729,7 @@ describe('system-actuator computer_interaction adapter', () => {
   it('maps voice input toggle into the system pipeline', async () => {
     mockDarwinPlatform();
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
 
     const result = await handleAction({
       version: '0.1',
@@ -1594,7 +1846,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('blocks close_tab_by_url and creates an approval request when none is supplied', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.closeChromeTabByUrl).mockClear();
 
     const result = await handleAction({
@@ -1618,7 +1870,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('closes a Chrome tab by url when approval is present', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.loadApprovalRequest).mockReturnValue({ status: 'approved' } as any);
 
     const result = await handleAction({
@@ -1641,7 +1893,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('executes empty_trash through the Finder adapter', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.loadApprovalRequest).mockReturnValue({ status: 'approved' } as any);
     const result = await handleAction({
       version: '0.1',
@@ -1658,7 +1910,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('blocks empty_trash and creates an approval request when none is supplied', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.emptyFinderTrash).mockClear();
 
     const result = await handleAction({
@@ -1678,7 +1930,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('blocks close_tab_by_title and creates an approval request when none is supplied', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.closeChromeTabByTitle).mockClear();
 
     const result = await handleAction({
@@ -1703,7 +1955,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('closes a Chrome tab by title when approval is present', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.loadApprovalRequest).mockReturnValue({ status: 'approved' } as any);
 
     const result = await handleAction({
@@ -1726,7 +1978,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('reveals a path through Finder', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
 
     const result = await handleAction({
       version: '0.1',
@@ -1743,7 +1995,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('opens a path through Finder', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
 
     const result = await handleAction({
       version: '0.1',
@@ -1840,7 +2092,7 @@ describe('system-actuator computer_interaction adapter', () => {
 
   it('handles screenshot via pipeline API', async () => {
     const { handleAction } = await import('./index');
-    const core = await import('@agent/core');
+    const core = testCore;
     vi.mocked(core.safeExistsSync).mockReturnValue(true);
 
     const result = await handleAction({
@@ -1857,11 +2109,40 @@ describe('system-actuator computer_interaction adapter', () => {
 
 describe('system-actuator new OS automation ops (pipeline mode)', () => {
   describe('capture ops', () => {
+    it('probe: allows an explicitly opted-in final symlink for read-only health checks', async () => {
+      const { handleAction } = await import('./index');
+      testCore.safeExistsSync.mockReturnValue(true);
+      testCore.safeStat.mockReturnValue({ isDirectory: () => true });
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'probe',
+            params: { path: 'node_modules', allow_symlink_leaf: true, export_as: 'node_modules' },
+          },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.node_modules).toEqual({
+        path: 'node_modules',
+        exists: true,
+        kind: 'dir',
+      });
+      expect(assertSafeRepositoryPath).toHaveBeenCalledWith(
+        expect.stringContaining(`${path.sep}node_modules`),
+        { allowMissingLeaf: true, allowSymlinkLeaf: true }
+      );
+    });
+
     it('probe_active_profile: resolves relative paths against the active profile', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = await import('@agent/core/profile-root');
+      const secureIo = await import('@agent/core/secure-io');
       vi.mocked(core.resolveActiveProfileRoot).mockReturnValue('/tmp/customer/acme');
-      vi.mocked(core.safeExistsSync).mockReturnValue(true);
+      vi.mocked(secureIo.safeExistsSync).mockReturnValue(true);
 
       const result = await handleAction({
         action: 'pipeline',
@@ -1875,7 +2156,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect(core.safeExistsSync).toHaveBeenCalledWith('/tmp/customer/acme/my-identity.json');
+      expect(secureIo.safeExistsSync).toHaveBeenCalledWith('/tmp/customer/acme/my-identity.json');
       expect(result.context.identity).toEqual({
         path: 'my-identity.json',
         exists: true,
@@ -1899,7 +2180,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
     it('screenshot: creates dir when missing and returns path', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = await import('@agent/core/secure-io');
       vi.mocked(core.safeExistsSync).mockReturnValueOnce(false);
 
       const result = await handleAction({
@@ -1916,7 +2197,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
     it('screenshot: uses custom path param', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = await import('@agent/core/secure-io');
       vi.mocked(core.safeExistsSync).mockReturnValue(true);
 
       const result = await handleAction({
@@ -1936,7 +2217,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
     it('screenshot: defaults to primary display when display_index is omitted', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = await import('@agent/core/secure-io');
       vi.mocked(core.safeExistsSync).mockReturnValue(true);
 
       const result = await handleAction({
@@ -1954,7 +2235,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
     it('screenshot: resolves display_name to a display index', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = testCore;
       vi.mocked(core.safeExistsSync).mockReturnValue(true);
 
       const result = await handleAction({
@@ -1978,7 +2259,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
     it('screenshot: activates application and captures the focused window', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = testCore;
       vi.mocked(core.safeExistsSync).mockReturnValue(true);
 
       const result = await handleAction({
@@ -2003,7 +2284,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
     it('screenshot: selects a named application window when window_title is provided', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = testCore;
       vi.mocked(core.safeExistsSync).mockReturnValue(true);
 
       const result = await handleAction({
@@ -2032,7 +2313,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
     it('record_screen: writes a bounded MP4 through the canonical recording bridge', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = await import('@agent/core/secure-io');
       vi.mocked(core.safeExistsSync).mockReturnValue(true);
 
       const result = await handleAction({
@@ -2110,7 +2391,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
     it('screen_mp4_roundtrip: records and reimports screen frames', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = testCore;
       vi.mocked(core.safeExistsSync).mockReturnValue(true);
 
       const result = await handleAction({
@@ -2615,7 +2896,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
     it('system_notify: calls systemNotify with title, message and subtitle', async () => {
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = await import('@agent/core/core');
 
       const result = await handleAction({
         action: 'pipeline',
@@ -2738,7 +3019,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
     it('open_file: opens file within repo root on darwin', async () => {
       mockDarwinPlatform();
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = testCore;
 
       const result = await handleAction({
         action: 'pipeline',
@@ -2759,7 +3040,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
     it('voice_input_toggle: sends the macOS dictation key code', async () => {
       mockDarwinPlatform();
       const { handleAction } = await import('./index');
-      const core = await import('@agent/core');
+      const core = testCore;
 
       const result = await handleAction({
         action: 'pipeline',
@@ -2836,7 +3117,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('failed');
-      expect(result.results[0].error).toMatch(/repo root/);
+      expect(result.results[0].error).toMatch(/(?:repo|repository) root/);
     });
 
     it('open_file: throws when path param is missing', async () => {

@@ -4,7 +4,13 @@ import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import * as pathResolver from './path-resolver.js';
 import { slugify } from './foundation/text.js';
 import { escapeHtml } from './text-escaping.js';
-import { safeCopyFileSync, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeCopyFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   applySceneComposition,
   applySceneMotion,
@@ -30,10 +36,13 @@ export function compileVideoCompositionADF(
   options?: { bundleDir?: string }
 ): VideoCompositionRenderPlan {
   const policy = getVideoRenderRuntimePolicy();
-  const bundleDir = pathResolver.rootResolve(
-    options?.bundleDir ||
-      adf.output.bundle_dir ||
-      buildDefaultBundleDir(adf, policy.bundle.default_bundle_root)
+  const bundleDir = assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      options?.bundleDir ||
+        adf.output.bundle_dir ||
+        buildDefaultBundleDir(adf, policy.bundle.default_bundle_root)
+    ),
+    { allowMissingLeaf: true }
   );
   const compositionId = slugify(adf.intent || adf.title || 'video-composition');
   const backgroundColor = adf.composition.background_color || '#0B1020';
@@ -64,11 +73,21 @@ export function compileVideoCompositionADF(
     ...compiledScenes.map((scene) => path.join(bundleDir, scene.output_html)),
   ];
 
-  if (adf.audio?.narration_ref) {
-    artifactRefs.push(pathResolver.rootResolve(adf.audio.narration_ref));
+  const narrationRef = adf.audio?.narration_ref
+    ? assertSafeRepositoryPath(pathResolver.rootResolve(adf.audio.narration_ref), {
+        allowMissingLeaf: true,
+      })
+    : undefined;
+  const musicRef = adf.audio?.music_ref
+    ? assertSafeRepositoryPath(pathResolver.rootResolve(adf.audio.music_ref), {
+        allowMissingLeaf: true,
+      })
+    : undefined;
+  if (narrationRef) {
+    artifactRefs.push(narrationRef);
   }
-  if (adf.audio?.music_ref) {
-    artifactRefs.push(pathResolver.rootResolve(adf.audio.music_ref));
+  if (musicRef) {
+    artifactRefs.push(musicRef);
   }
 
   return {
@@ -77,10 +96,8 @@ export function compileVideoCompositionADF(
     composition_id: compositionId,
     source_kind: 'video-composition-adf',
     title: adf.title || adf.intent || 'Kyberion Video Composition',
-    narration_ref: adf.audio?.narration_ref
-      ? pathResolver.rootResolve(adf.audio.narration_ref)
-      : undefined,
-    music_ref: adf.audio?.music_ref ? pathResolver.rootResolve(adf.audio.music_ref) : undefined,
+    ...(narrationRef ? { narration_ref: narrationRef } : {}),
+    ...(musicRef ? { music_ref: musicRef } : {}),
     duration_sec: adf.composition.duration_sec,
     fps: adf.composition.fps,
     width: adf.composition.width,
@@ -181,6 +198,11 @@ function compileScene(
     }
   }
 
+  const assetRefs = mergeSceneAssetRefs(scene.asset_refs || [], extractAvatarAssetRefs(scene));
+  for (const asset of assetRefs) {
+    assertSafeRepositoryPath(pathResolver.rootResolve(asset.path), { allowMissingLeaf: true });
+  }
+
   return {
     scene_id: scene.scene_id,
     role,
@@ -191,7 +213,7 @@ function compileScene(
     output_html: path.join('compositions', `${sceneKey}.html`),
     required_content_fields: template.required_content_fields,
     content: { ...scene.content },
-    asset_refs: mergeSceneAssetRefs(scene.asset_refs || [], extractAvatarAssetRefs(scene)),
+    asset_refs: assetRefs,
   };
 }
 
@@ -1368,7 +1390,9 @@ function copySceneAssets(bundleDir: string, assetRefs: VideoCompositionAssetRef[
   const assetsDir = path.join(bundleDir, 'assets');
   safeMkdir(assetsDir, { recursive: true });
   for (const asset of assetRefs) {
-    const sourcePath = pathResolver.rootResolve(asset.path);
+    const sourcePath = assertSafeRepositoryPath(pathResolver.rootResolve(asset.path), {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(sourcePath)) continue;
     const targetPath = path.resolve(assetsDir, safeAssetName(sourcePath));
     if (!safeExistsSync(targetPath)) {

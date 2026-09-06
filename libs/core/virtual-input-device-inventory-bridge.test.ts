@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createVirtualInputDeviceInventoryBridge, VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID } from './virtual-input-device-inventory-bridge.js';
+import {
+  createVirtualInputDeviceInventoryBridge,
+  parseWindowsInputDeviceRows,
+  VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID,
+} from './virtual-input-device-inventory-bridge.js';
 
 function makeCommandRunner() {
   return (command: string, args: string[]) => {
@@ -35,6 +39,13 @@ describe('createVirtualInputDeviceInventoryBridge', () => {
       configurable: true,
       value: originalPlatform,
     });
+  });
+
+  it('rejects non-record Windows input device rows', () => {
+    expect(parseWindowsInputDeviceRows([null, 'invalid', { FriendlyName: 'Keyboard' }])).toEqual([
+      { FriendlyName: 'Keyboard' },
+    ]);
+    expect(parseWindowsInputDeviceRows('invalid')).toEqual([]);
   });
 
   it('scans keyboard and mouse candidates from hidutil', async () => {

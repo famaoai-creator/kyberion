@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/service-provider-catalog.schema.json",
+  "title": "Service Provider Catalog",
+  "type": "object",
+  "required": ["version", "providers"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "notes": { "type": "array", "items": { "type": "string" } },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "aliases", "topics", "url_template"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "aliases": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "topics": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "url_template": { "type": "string", "minLength": 1 },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { nowIso } from './foundation/time.js';
 
 export interface IntentBody {
   goal: string;
@@ -146,7 +147,7 @@ export function computeIntentDelta(
     mission_id: from.mission_id,
     from_snapshot: from.snapshot_id,
     to_snapshot: to.snapshot_id,
-    computed_at: new Date().toISOString(),
+    computed_at: nowIso(),
     changes,
     drift_score: driftScore,
     drift_verdict: classifyDrift(driftScore, thresholds),

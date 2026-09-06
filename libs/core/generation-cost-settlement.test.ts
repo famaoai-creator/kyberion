@@ -1,9 +1,13 @@
+import * as path from 'node:path';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { MetricsCollector } from './metrics.js';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync } from './secure-io.js';
+import { physicalScopedPath } from './physical-namespace.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
+  GENERATION_COST_SETTLEMENT_ROOT,
   listGenerationCostSettlements,
+  loadGenerationCostSettlementAtPath,
   settleGenerationProviderCost,
 } from './generation-cost-settlement.js';
 
@@ -93,6 +97,83 @@ describe('generation cost settlement', () => {
     expect(settled.status).toBe('settled');
     expect(settled.actual_cost_usd).toBe(0.2);
     expect(collectorEntries()).toHaveLength(1);
+  });
+
+  it('loads a settlement through schema, job, and physical scope bindings', () => {
+    const jobId = 'generation-job-loader';
+    const settlement = settleGenerationProviderCost(
+      {
+        job_id: jobId,
+        action: 'generate_video',
+        status: 'succeeded',
+        scope: tenantScope,
+        result: { actual_cost_usd: 0.75 },
+      },
+      { rootDir: testRoot, metricsCollector: new MetricsCollector({ metricsDir }) }
+    );
+    const filePath = path.join(
+      testRoot,
+      physicalScopedPath(GENERATION_COST_SETTLEMENT_ROOT, tenantScope, `${jobId}.json`)
+    );
+
+    expect(
+      loadGenerationCostSettlementAtPath(filePath, {
+        jobId,
+        scope: tenantScope,
+        rootDir: testRoot,
+      })
+    ).toEqual(settlement);
+    expect(() => loadGenerationCostSettlementAtPath(filePath, { jobId: 'other-job' })).toThrow(
+      'job scope mismatch'
+    );
+  });
+
+  it('rejects malformed and non-file settlement records before listing them', () => {
+    const jobId = 'generation-job-invalid';
+    const settlement = settleGenerationProviderCost(
+      {
+        job_id: jobId,
+        action: 'generate_music',
+        status: 'failed',
+        scope: tenantScope,
+        result: { actual_cost_usd: 0.25 },
+      },
+      { rootDir: testRoot, metricsCollector: new MetricsCollector({ metricsDir }) }
+    );
+    const filePath = path.join(
+      testRoot,
+      physicalScopedPath(GENERATION_COST_SETTLEMENT_ROOT, tenantScope, `${jobId}.json`)
+    );
+    safeWriteFile(filePath, JSON.stringify({ ...settlement, unexpected: true }));
+    expect(() => loadGenerationCostSettlementAtPath(filePath, { rootDir: testRoot })).toThrow(
+      'Invalid catalog generation-cost-settlement'
+    );
+    expect(listGenerationCostSettlements({ rootDir: testRoot })).toHaveLength(0);
+
+    const directoryPath = path.join(testRoot, 'settlement-directory.json');
+    safeMkdir(directoryPath, { recursive: true });
+    try {
+      expect(() =>
+        loadGenerationCostSettlementAtPath(directoryPath, { rootDir: testRoot })
+      ).toThrow('settlement must be a regular file');
+    } finally {
+      safeRmSync(directoryPath, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects an external settlement root before writing provider cost', () => {
+    expect(() =>
+      settleGenerationProviderCost(
+        {
+          job_id: 'generation-job-external',
+          action: 'generate_video',
+          status: 'succeeded',
+          scope: tenantScope,
+          result: { actual_cost_usd: 1 },
+        },
+        { rootDir: '/tmp' }
+      )
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });
 

@@ -10,12 +10,41 @@ import {
   registerEnvironmentCapabilityProbe,
   resolveCapabilityInstall,
   resetEnvironmentCapabilityProbeRegistry,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
   verifyManifestSignature,
   verifyReady,
+  withExecutionContextAsync,
   type EnvironmentManifest,
 } from './index.js';
+import { readNodeEnginesRangeFromFile } from './environment-capability-probes.js';
 
 const ROOT = pathResolver.rootDir();
+
+describe('environment capability resource loaders', () => {
+  const fixtureRoot = pathResolver.sharedTmp('environment-node-range-loader-test');
+
+  afterEach(() => {
+    safeRmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it('reads the node range only from a governed regular file', () => {
+    const filePath = path.join(fixtureRoot, 'package.json');
+    safeWriteFile(filePath, JSON.stringify({ engines: { node: '>=24.0.0' } }), { mkdir: true });
+
+    expect(readNodeEnginesRangeFromFile(filePath)).toBe('>=24.0.0');
+  });
+
+  it('rejects directory and repository-external node range paths', () => {
+    const directoryPath = path.join(fixtureRoot, 'package.json');
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(readNodeEnginesRangeFromFile(directoryPath)).toBeNull();
+    expect(readNodeEnginesRangeFromFile('/tmp/kyberion-package.json')).toBeNull();
+  });
+});
 
 describe('probeManifest', () => {
   beforeEach(() => {
@@ -140,6 +169,79 @@ describe('probeManifest', () => {
     expect(fs.existsSync(marker)).toBe(false);
     expect(process.env.UNTRUSTED_MODULE_RAN).toBeUndefined();
   });
+
+  it('rejects mission-evidence traversal and symlink filenames before reading JSON', async () => {
+    const missionId = 'MSN-ENV-PROBE-PATH-001';
+    const missionDir = path.join(ROOT, 'active/missions/confidential', missionId);
+    const evidenceDir = path.join(missionDir, 'evidence');
+    const outside = path.join(ROOT, 'active/shared/tmp/environment-capability-probe-outside.json');
+    const symlink = path.join(evidenceDir, 'linked.json');
+    await withExecutionContextAsync('mission_controller', async () => {
+      safeMkdir(evidenceDir, { recursive: true });
+      safeWriteFile(path.join(missionDir, 'mission-state.json'), JSON.stringify({ missionId }));
+      safeWriteFile(outside, JSON.stringify({ ready: true }));
+      safeSymlinkSync(outside, symlink);
+      try {
+        const manifest: EnvironmentManifest = {
+          manifest_id: 'unit-test-mission-evidence-paths',
+          version: 'test',
+          capabilities: [
+            {
+              capability_id: 'cap.traversal',
+              kind: 'mission-evidence',
+              description: 'reject traversal',
+              required_for: ['test'],
+              probe: { kind: 'mission-evidence', filename: '../shared.json' },
+            },
+            {
+              capability_id: 'cap.symlink',
+              kind: 'mission-evidence',
+              description: 'reject symlink',
+              required_for: ['test'],
+              probe: { kind: 'mission-evidence', filename: 'linked.json' },
+            },
+          ],
+        };
+        const statuses = await probeManifest(manifest, { mission_id: missionId });
+        expect(statuses[0]).toMatchObject({ satisfied: false });
+        expect(statuses[0]?.reason).toContain('single repository-local file name');
+        expect(statuses[1]).toMatchObject({ satisfied: false });
+        expect(statuses[1]?.reason).toContain('path rejected');
+      } finally {
+        safeRmSync(missionDir, { recursive: true, force: true });
+        safeRmSync(outside, { force: true });
+      }
+    });
+  });
+
+  it('does not treat a mission-evidence directory as a satisfied file probe', async () => {
+    const missionId = 'MSN-ENV-PROBE-DIRECTORY-001';
+    const missionDir = path.join(ROOT, 'active/missions/confidential', missionId);
+    const evidenceDir = path.join(missionDir, 'evidence');
+    await withExecutionContextAsync('mission_controller', async () => {
+      safeMkdir(path.join(evidenceDir, 'ready.json'), { recursive: true });
+      try {
+        const manifest: EnvironmentManifest = {
+          manifest_id: 'unit-test-mission-evidence-directory',
+          version: 'test',
+          capabilities: [
+            {
+              capability_id: 'cap.directory',
+              kind: 'mission-evidence',
+              description: 'reject directory',
+              required_for: ['test'],
+              probe: { kind: 'mission-evidence', filename: 'ready.json' },
+            },
+          ],
+        };
+        const statuses = await probeManifest(manifest, { mission_id: missionId });
+        expect(statuses[0]).toMatchObject({ satisfied: false });
+        expect(statuses[0]?.reason).toContain('not a regular file');
+      } finally {
+        safeRmSync(missionDir, { recursive: true, force: true });
+      }
+    });
+  });
 });
 
 describe('platform-specific environment installers', () => {
@@ -253,6 +355,17 @@ describe('verifyReady', () => {
     };
     const report = verifyReady(manifest, { mission_id: FIX_MISSION });
     expect(report.ready).toBe(false);
+  });
+
+  it('rejects a manifest id that could escape the receipt directory', () => {
+    const manifest = {
+      manifest_id: '../outside',
+      version: 'test',
+      capabilities: [],
+    } as unknown as EnvironmentManifest;
+    expect(() => verifyReady(manifest, { mission_id: FIX_MISSION })).toThrow(
+      'invalid manifest id for receipt path'
+    );
   });
 
   it('reports ready=true after a successful bootstrap', async () => {
@@ -440,6 +553,24 @@ describe('verifyReady', () => {
     delete process.env.PROBE_VERIFY_READY;
   });
 
+  it('rejects receipts with unknown persisted fields', async () => {
+    process.env.PROBE_VERIFY_READY = 'set';
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-manifest-i4',
+      version: 'test',
+      capabilities: [],
+    };
+    await bootstrapManifest(manifest, { mission_id: FIX_MISSION, apply: true });
+    const receipt = JSON.parse(fs.readFileSync(receiptPath(manifest.manifest_id), 'utf8'));
+    receipt.unexpected = true;
+    fs.writeFileSync(receiptPath(manifest.manifest_id), JSON.stringify(receipt, null, 2));
+
+    const report = verifyReady(manifest, { mission_id: FIX_MISSION });
+    expect(report.ready).toBe(false);
+    expect(report.missing).toHaveLength(0);
+    delete process.env.PROBE_VERIFY_READY;
+  });
+
   it('blocks on required unsatisfied capabilities but not optional ones', async () => {
     delete process.env.PROBE_VERIFY_REQUIRED_MISSING;
     delete process.env.PROBE_VERIFY_OPTIONAL_MISSING;
@@ -496,9 +627,12 @@ describe('loadEnvironmentManifest', () => {
       for (const gate of expected) {
         expect(commands).toContain(`pnpm -s check -- --only ${gate}`);
       }
+      if (id === 'schema-integrity') {
+        expect(commands).toContain('pnpm -s run check -- --scope pr --only esm');
+      }
       expect(
         commands.some((command) =>
-          /run check:(contract-schemas|catalogs|governance-rules|tier-hygiene)/u.test(command)
+          /run check:(contract-schemas|catalogs|governance-rules|tier-hygiene|esm)/u.test(command)
         )
       ).toBe(false);
     }
@@ -523,6 +657,29 @@ describe('loadEnvironmentManifest', () => {
       );
     } finally {
       fs.rmSync(link, { force: true });
+    }
+  });
+
+  it('rejects schema-invalid and non-regular manifest files before use', () => {
+    const dir = path.join(ROOT, 'knowledge/product/governance/environment-manifests');
+    const invalid = path.join(dir, 'unit-test-schema-invalid.json');
+    const directory = path.join(dir, 'unit-test-directory.json');
+    const source = JSON.parse(
+      fs.readFileSync(path.join(dir, 'reasoning-backend.json'), 'utf8')
+    ) as Record<string, unknown>;
+    source.unexpected = true;
+    fs.writeFileSync(invalid, JSON.stringify(source));
+    fs.mkdirSync(directory, { recursive: true });
+    try {
+      expect(() => loadEnvironmentManifest('unit-test-schema-invalid')).toThrow(
+        /Invalid catalog environment-capability-manifest/
+      );
+      expect(() => loadEnvironmentManifest('unit-test-directory')).toThrow(
+        /must be a regular file/
+      );
+    } finally {
+      fs.rmSync(invalid, { force: true });
+      fs.rmSync(directory, { recursive: true, force: true });
     }
   });
 });

@@ -14,6 +14,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { logger } from '../core.js';
+import { nowIso } from '../foundation/time.js';
 import type { DeployInput, DeployResult, DeploymentAdapter } from '../deployment-adapter.js';
 
 export interface MobileBetaAdapterOptions {
@@ -32,7 +33,7 @@ export class MobileBetaDeploymentAdapter implements DeploymentAdapter {
   constructor(private readonly options: MobileBetaAdapterOptions) {}
 
   async deploy(input: DeployInput): Promise<DeployResult> {
-    const startedAt = new Date().toISOString();
+    const startedAt = nowIso();
     const lane = this.options.lane || 'beta';
     try {
       execFileSync('fastlane', ['--version'], {

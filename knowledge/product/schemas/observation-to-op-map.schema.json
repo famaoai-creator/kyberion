@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "observation-to-op-map.schema.json",
+  "title": "Observation to actuator operation mapping",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "entries"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": "observation-to-op.v1" },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/mapping" }
+    }
+  },
+  "$defs": {
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "signals", "preferred_ops", "fallback_ops"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "signals": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "preferred_ops": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "fallback_ops": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

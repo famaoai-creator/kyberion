@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.dev/schemas/video-motion-patterns.schema.json",
+  "title": "Video Motion Pattern Catalog",
+  "description": "Curated motion vocabulary selected by the reasoning layer and normalized by the video compiler.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "eases", "entrance", "midscene", "role_defaults", "transitions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "_meta": { "type": "string" },
+    "eases": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "properties": { "_meta": { "type": "string" } }
+    },
+    "entrance": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/definitions/entrance_pattern" },
+      "properties": { "_meta": { "type": "string" } }
+    },
+    "midscene": {
+      "type": "object",
+      "minProperties": 2,
+      "additionalProperties": { "$ref": "#/definitions/midscene_pattern" },
+      "properties": { "_meta": { "type": "string" } }
+    },
+    "role_defaults": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/definitions/role_default" },
+      "properties": { "_meta": { "type": "string" } }
+    },
+    "transitions": { "$ref": "#/definitions/transitions" }
+  },
+  "definitions": {
+    "entrance_pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "keyframes", "duration_sec", "offset_sec", "default_ease"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "keyframes": { "type": "string", "minLength": 1 },
+        "duration_sec": { "type": "number", "exclusiveMinimum": 0 },
+        "offset_sec": { "type": "number", "minimum": 0 },
+        "default_ease": { "type": "string", "minLength": 1 }
+      }
+    },
+    "midscene_pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "keyframes", "duration_sec", "default_ease"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "keyframes": { "type": "string", "minLength": 1 },
+        "duration_sec": { "type": "number", "exclusiveMinimum": 0 },
+        "stagger_sec": { "type": "number", "minimum": 0 },
+        "default_ease": { "type": "string", "minLength": 1 },
+        "alternate": { "type": "boolean" }
+      }
+    },
+    "role_default": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entrance", "midscene"],
+      "properties": {
+        "entrance": { "type": "string", "minLength": 1 },
+        "midscene": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "transitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default",
+        "max_non_cut_per_video",
+        "min_duration_sec",
+        "preferred_duration_sec"
+      ],
+      "properties": {
+        "_meta": { "type": "string" },
+        "default": { "type": "string", "minLength": 1 },
+        "max_non_cut_per_video": { "type": "integer", "minimum": 0 },
+        "min_duration_sec": { "type": "number", "exclusiveMinimum": 0 },
+        "preferred_duration_sec": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}

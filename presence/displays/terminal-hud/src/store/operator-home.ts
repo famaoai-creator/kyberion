@@ -1,11 +1,10 @@
 import {
   collectOperatorHomeSummary,
-  currentScope,
-  pathResolver,
   type OperatorHomeScopeFilter,
   type OperatorHomeSummary,
-  type ScopeContext,
-} from '@agent/core';
+} from '@agent/core/operator-home-summary';
+import { currentScope, type ScopeContext } from '@agent/core/scope-context';
+import { pathResolver } from '@agent/core/path-resolver';
 
 export interface OperatorHomePacket {
   summary: OperatorHomeSummary;

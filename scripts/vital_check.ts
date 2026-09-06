@@ -1,14 +1,10 @@
 import * as path from 'node:path';
-import yargs from 'yargs';
-import {
-  pathResolver,
-  resolveActiveProfileRoot,
-  safeExistsSync,
-  safeReadFile,
-  safeReaddir,
-  safeStat,
-  buildAgentCollaborationProjection,
-} from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface CheckResult {
@@ -17,6 +13,9 @@ interface CheckResult {
   status: 'ok' | 'missing' | 'error';
   detail?: string;
 }
+
+export const VITAL_CHECK_USAGE =
+  'Usage: pnpm kyberion vital [--format=json|text] [--exit-on-missing]';
 
 export function fileCheck(
   id: string,
@@ -54,7 +53,7 @@ export function activeMissionCount(): number {
               stack.push(full);
             } else if (stat.isFile() && entryName === 'mission-state.json') {
               try {
-                const txt = safeReadFile(full, { encoding: 'utf8' }) as string;
+                const txt = readTextFile(full);
                 if (/"status"\s*:\s*"active"/.test(txt)) count += 1;
               } catch {
                 // skip unreadable state files
@@ -127,7 +126,7 @@ export function buildVitalReport() {
   };
 
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     overall: summary.missing === 0 && summary.error === 0 ? 'healthy' : 'attention',
     summary,
     checks,
@@ -147,32 +146,41 @@ export function buildVitalReport() {
   };
 }
 
-async function main(args: string[] = []): Promise<number> {
-  const argv = await yargs(args)
+export async function formatVitalReport(
+  report: ReturnType<typeof buildVitalReport>
+): Promise<string> {
+  return report.checks
+    .map((check) => {
+      const icon = check.status === 'ok' ? '✅' : check.status === 'missing' ? '⚠️ ' : '❌';
+      return `${icon} ${check.label}: ${check.status.toUpperCase()}${check.detail ? ` (${check.detail})` : ''}`;
+    })
+    .concat([`🚀 Active Missions: ${report.active_mission_count}`, `Overall: ${report.overall}`])
+    .join('\n');
+}
+
+export async function main(args: string[] = []): Promise<{
+  report?: ReturnType<typeof buildVitalReport>;
+  status: number;
+  text?: string;
+  help?: string;
+}> {
+  if (args.includes('--help') || args.includes('-h')) {
+    return { status: 0, help: VITAL_CHECK_USAGE };
+  }
+
+  const argv = await createStandardYargs(['node', 'vital_check', ...args])
     .option('format', { type: 'string', choices: ['json', 'text'] as const, default: 'json' })
     .option('exit-on-missing', { type: 'boolean', default: true })
+    .option('json', { type: 'boolean', default: false })
     .strict()
     .parse();
 
   const result = buildVitalReport();
-
-  if (argv.format === 'json') {
-    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-  } else {
-    for (const c of result.checks) {
-      const icon = c.status === 'ok' ? '✅' : c.status === 'missing' ? '⚠️ ' : '❌';
-      console.log(
-        `${icon} ${c.label}: ${c.status.toUpperCase()}${c.detail ? ` (${c.detail})` : ''}`
-      );
-    }
-    console.log(`🚀 Active Missions: ${result.active_mission_count}`);
-    console.log(`Overall: ${result.overall}`);
-  }
-
-  if (argv['exit-on-missing'] && result.overall !== 'healthy') {
-    return 3;
-  }
-  return 0;
+  return {
+    report: result,
+    status: argv['exit-on-missing'] && result.overall !== 'healthy' ? 3 : 0,
+    ...(argv.format === 'text' && !argv.json ? { text: await formatVitalReport(result) } : {}),
+  };
 }
 
 if (
@@ -181,10 +189,11 @@ if (
 )
   void defineScript({
     name: 'vital:check',
-    flags: [],
+    flags: ['json'],
     async run(context) {
-      const status = await main(context.argv);
-      if (status !== 0)
-        throw new ScriptExitError(status, `vital:check failed with exit code ${status}`);
+      const result = await main(context.argv);
+      if (result.help) context.print(context.json ? result : result.help);
+      else if (result.report) context.print(result.text ?? result.report);
+      if (result.status !== 0) throw new ScriptExitError(result.status, '', true, result);
     },
   })();

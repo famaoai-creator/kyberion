@@ -15,15 +15,13 @@ import { importExternalWorkItem } from './work-coordination.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { findMissionPath } from './path-resolver.js';
 import type { MissionState } from './mission-types.js';
-import {
-  countWords as countWordsFromDispatchIO,
-  ensureDirectory,
-  readJsonFile,
-  writeJsonFile,
-} from './mission-dispatch-io.js';
+import { nowIso } from './foundation/time.js';
+import { countWords as countWordsFromDispatchIO, ensureDirectory } from './mission-dispatch-io.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { recordTask } from './mission-maintenance.js';
 import { loadProjectRecord } from './project-registry.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+import { loadMissionTicketDispatchManifestAtPath } from './mission-ticket-dispatch-manifest.js';
 
 export type MissionTicketDispatchTarget = 'workitem' | 'github' | 'jira';
 
@@ -52,6 +50,7 @@ export interface MissionTicketDispatchRecord {
   live_results: Record<string, unknown>;
   status: 'created' | 'updated' | 'skipped' | 'deferred' | 'failed';
   notes: string[];
+  [key: string]: unknown;
 }
 
 export interface MissionTicketDispatchManifest {
@@ -92,10 +91,11 @@ interface PlannedTask {
 
 function readPlannedTasks(missionPath: string): PlannedTask[] {
   const nextTasksPath = nodePath.join(missionPath, 'NEXT_TASKS.json');
-  if (!safeExistsSync(nextTasksPath)) return [];
   try {
-    const parsed = readJsonFile<PlannedTask[]>(nextTasksPath);
-    return Array.isArray(parsed) ? parsed : [];
+    return (loadMissionNextTaskObjectsAtPath(
+      nextTasksPath,
+      nodePath.basename(nodePath.resolve(missionPath))
+    ) || []) as PlannedTask[];
   } catch (_) {
     return [];
   }
@@ -195,8 +195,7 @@ function loadExistingManifest(missionPath: string): MissionTicketDispatchManifes
   const path = manifestPath(missionPath);
   if (!safeExistsSync(path)) return null;
   try {
-    const parsed = readJsonFile<MissionTicketDispatchManifest>(path);
-    return parsed && typeof parsed === 'object' ? parsed : null;
+    return loadMissionTicketDispatchManifestAtPath(path);
   } catch (_) {
     return null;
   }
@@ -405,11 +404,11 @@ export async function dispatchMissionTickets(
           ? `https://github.com/${options.github.owner}/${options.github.repo}`
           : undefined,
       html_url: undefined,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
       draft: false,
     };
     if (status !== 'failed' && targets.includes('github')) {
-      writeDispatchArtifact(githubArtifactPath, githubPayload);
+      writeDispatchArtifact(githubArtifactPath, githubPayload, { missionId, missionPath });
       ticketFiles.push(githubArtifactPath);
       if (liveTargets.includes('github')) {
         if (!options.github?.owner || !options.github?.repo) {
@@ -475,11 +474,11 @@ export async function dispatchMissionTickets(
           ? { accountId: resolvedAgentId, displayName: resolvedAgentId }
           : undefined,
         project: { key: jiraProjectKey, id: jiraProjectKey },
-        updated: new Date().toISOString(),
+        updated: nowIso(),
       },
     };
     if (status !== 'failed' && targets.includes('jira')) {
-      writeDispatchArtifact(jiraArtifactPath, jiraPayload);
+      writeDispatchArtifact(jiraArtifactPath, jiraPayload, { missionId, missionPath });
       ticketFiles.push(jiraArtifactPath);
       if (liveTargets.includes('jira')) {
         if (!options.jira?.projectKey || !options.jira?.domain) {
@@ -538,7 +537,7 @@ export async function dispatchMissionTickets(
       const nextTask = {
         ...allTasks[taskIndex],
         ticket_dispatch: {
-          registered_at: new Date().toISOString(),
+          registered_at: nowIso(),
           manifest_path: manifestPath(missionPath),
           work_item_id: workItemId,
           targets,
@@ -593,8 +592,8 @@ export async function dispatchMissionTickets(
     track_id: projectLink.track_id,
     tier: state.tier,
     tenant_slug: state.tenant_slug,
-    created_at: existingManifest?.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: existingManifest?.created_at || nowIso(),
+    updated_at: nowIso(),
     targets,
     live_targets: liveTargets,
     ticket_count: records.length,
@@ -604,8 +603,8 @@ export async function dispatchMissionTickets(
   const manifestFilePath = manifestPath(missionPath);
   manifest.manifest_path = manifestFilePath;
   manifest.event_path = ticketEventPath(missionPath);
-  writeJsonFile(manifestFilePath, manifest);
-  writeJsonFile(nextTasksPath, allTasks);
+  writeDispatchArtifact(manifestFilePath, manifest, { missionId, missionPath });
+  writeDispatchArtifact(nextTasksPath, allTasks, { missionId, missionPath });
 
   ledger.record('MISSION_TICKETS_REGISTERED', {
     mission_id: missionId,

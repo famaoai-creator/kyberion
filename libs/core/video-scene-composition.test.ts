@@ -242,6 +242,17 @@ describe('authorSceneCompositions', () => {
     expect(compositions).toHaveLength(2);
   });
 
+  it('degrades when a model reply contains a dangerous JSON key', async () => {
+    const compositions = await authorSceneCompositions({
+      title: 'T',
+      story: 'S',
+      scenes: SCENES,
+      generate: async () => '{"scenes":[],"meta":{"__proto__":{}}}',
+    });
+    expect(compositions).toHaveLength(2);
+    expect(compositions.every((composition) => composition.resolution?.degraded)).toBe(true);
+  });
+
   it('cannot be made to reference another scene content key', async () => {
     const compositions = await authorSceneCompositions({
       title: 'T',

@@ -1,7 +1,16 @@
 import * as path from 'node:path';
-import { buildSafeExecEnv, safeExec, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  buildSafeExecEnv,
+  safeExec,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { AudioDeviceLeaseManager, type AudioDeviceLease } from './audio-device-lease.js';
 import { pathResolver } from './path-resolver.js';
+import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 import {
   createVirtualDeviceInventoryBridge,
@@ -135,7 +144,7 @@ function resolveAudioPlaybackAdapter(platform: NodeJS.Platform): AudioPlaybackAd
 
 function tonePathFor(deviceName: string): string {
   const safeName = deviceName.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'output';
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = nowIso().replace(/[:.]/g, '-');
   return path.join(DEFAULT_TONE_DIR, `${safeName}-${stamp}.wav`);
 }
 
@@ -168,7 +177,7 @@ function writeSineToneWav(
   writeString(36, 'data');
   writeUInt32LE(40, dataSize);
 
-  const amplitude = Math.max(0, Math.min(1, opts.volume)) * 0x7fff;
+  const amplitude = clamp(opts.volume, 0, 1) * 0x7fff;
   let offset = 44;
   for (let i = 0; i < frameCount; i += 1) {
     const sample = Math.round(
@@ -277,8 +286,10 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     }
 
     const playbackPath = request?.source_path
-      ? pathResolver.rootResolve(request.source_path)
-      : pathResolver.sharedTmp(tonePathFor(selectedOutputs[0]));
+      ? assertSafeRepositoryPath(pathResolver.rootResolve(request.source_path))
+      : assertSafeRepositoryPath(pathResolver.sharedTmp(tonePathFor(selectedOutputs[0])), {
+          allowMissingLeaf: true,
+        });
     if (!request?.source_path) {
       writeSineToneWav(playbackPath, {
         frequencyHz: this.opts.tone_frequency_hz ?? DEFAULT_TONE_FREQUENCY_HZ,
@@ -291,7 +302,9 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     const leaseManager = new AudioDeviceLeaseManager();
     const swiftBin = this.opts.swift_bin ?? DEFAULT_SWIFT_BIN;
     const powershellBin = this.opts.powershell_bin ?? DEFAULT_POWERSHELL_BIN;
-    const script = pathResolver.rootResolve('libs/core/virtual-audio-output-playback.swift');
+    const script = assertSafeRepositoryPath(
+      pathResolver.rootResolve('libs/core/virtual-audio-output-playback.swift')
+    );
 
     for (const outputName of selectedOutputs) {
       const candidate = inventory.inventory.audio_outputs.find(

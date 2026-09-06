@@ -1,4 +1,5 @@
 import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
+import { t } from './t.js';
 import type {
   SurfaceConversationResult,
   SurfaceDelegationResult,
@@ -115,6 +116,7 @@ function buildTaskSessionReply(params: {
   handoffIntentId?: string;
   kind?: string;
   completionSummary?: string[];
+  approvalRequired?: boolean;
   serviceOptions?: Array<
     | string
     | {
@@ -172,6 +174,14 @@ function buildTaskSessionReply(params: {
         ? `確認したい点があります: ${readableMissing}`
         : `必要な情報があります: ${readableMissing}`
     );
+  }
+
+  const unresolvedInputs = (params.missingInputs || []).filter(
+    (input) => input !== 'approval_confirmation' && input !== 'dual_key_confirmation'
+  );
+  if (params.approvalRequired && unresolvedInputs.length === 0) {
+    lines.push(t('dock.intent_resolution.waiting_approval', undefined, 'ja'));
+    lines.push(t('dock.intent_resolution.approval_action', undefined, 'ja'));
   }
 
   const serviceOptions = params.serviceOptions || [];

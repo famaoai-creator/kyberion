@@ -1,4 +1,6 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 /**
  * Plugin packs — git-imported plugin collections (QM-07, ported from qm's
  * skill-pack store).
@@ -32,16 +34,18 @@ import { appendJsonLine, readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
+  safeLstat,
   safeWriteFile,
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   installPluginManaged,
   listManagedPlugins,
@@ -73,6 +77,16 @@ export interface PluginPackRegistry {
   packs: PluginPackRecord[];
 }
 
+const PLUGIN_PACK_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/plugin-pack-registry.schema.json'
+);
+
+const pluginPackRegistryCatalog = defineCatalog<PluginPackRegistry>({
+  id: 'plugin-pack-registry',
+  path: PLUGIN_PACK_REGISTRY_SCHEMA_PATH,
+  schema: PLUGIN_PACK_REGISTRY_SCHEMA_PATH,
+});
+
 export interface PackImportRecord {
   pack_id: string;
   at: string;
@@ -84,6 +98,53 @@ export interface PackImportRecord {
   archived: string[];
   skipped: Array<{ plugin_id: string; reason: string }>;
   error?: string;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function normalizeSkippedEntry(value: unknown): { plugin_id: string; reason: string } | undefined {
+  if (!isRecord(value)) return undefined;
+  return typeof value.plugin_id === 'string' && typeof value.reason === 'string'
+    ? { plugin_id: value.plugin_id, reason: value.reason }
+    : undefined;
+}
+
+/** Normalize persisted pack-import telemetry before exposing it to callers. */
+export function normalizePackImportRecord(value: unknown): PackImportRecord | undefined {
+  if (!isRecord(value)) return undefined;
+  if (
+    typeof value.pack_id !== 'string' ||
+    typeof value.at !== 'string' ||
+    typeof value.ok !== 'boolean' ||
+    typeof value.url !== 'string' ||
+    !isStringArray(value.installed) ||
+    !isStringArray(value.archived) ||
+    !Array.isArray(value.skipped)
+  ) {
+    return undefined;
+  }
+  const skipped = value.skipped.flatMap((entry) => {
+    const normalized = normalizeSkippedEntry(entry);
+    return normalized ? [normalized] : [];
+  });
+  if (skipped.length !== value.skipped.length) return undefined;
+  for (const field of ['ref', 'commit', 'error'] as const) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return undefined;
+  }
+  return {
+    pack_id: value.pack_id,
+    at: value.at,
+    ok: value.ok,
+    url: value.url,
+    ...(typeof value.ref === 'string' ? { ref: value.ref } : {}),
+    ...(typeof value.commit === 'string' ? { commit: value.commit } : {}),
+    installed: value.installed,
+    archived: value.archived,
+    skipped,
+    ...(typeof value.error === 'string' ? { error: value.error } : {}),
+  };
 }
 
 export interface ImportPluginPackParams {
@@ -107,34 +168,52 @@ export interface ImportPluginPackResult {
 }
 
 function registryDir(override?: string): string {
-  return override || pathResolver.shared('plugins');
+  return assertSafeRepositoryPath(override || pathResolver.shared('plugins'), {
+    allowMissingLeaf: true,
+  });
 }
 
 function registryPath(override?: string): string {
-  return path.join(registryDir(override), 'packs.json');
+  return assertSafeRepositoryPath(path.join(registryDir(override), 'packs.json'), {
+    allowMissingLeaf: true,
+  });
 }
 
 function importLogPath(override?: string): string {
-  return path.join(registryDir(override), 'pack-imports.jsonl');
+  return assertSafeRepositoryPath(path.join(registryDir(override), 'pack-imports.jsonl'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function loadPluginPackRegistry(override?: string): PluginPackRegistry {
   const file = registryPath(override);
   if (!safeExistsSync(file)) return { version: '1', packs: [] };
   try {
-    const parsed = readJson<Partial<PluginPackRegistry>>(file);
-    if (parsed && parsed.version === '1' && Array.isArray(parsed.packs)) {
-      return parsed as PluginPackRegistry;
-    }
+    return loadPluginPackRegistryAtPath(file);
   } catch (error) {
     logger.warn(`[plugin-pack] unreadable pack registry (starting empty): ${error}`);
   }
   return { version: '1', packs: [] };
 }
 
+/** Load a persisted pack registry through its strict schema and file boundary. */
+export function loadPluginPackRegistryAtPath(filePath: string): PluginPackRegistry {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[PLUGIN_PACK_REGISTRY] registry must be a regular file: ${filePath}`);
+  }
+  return defineCatalog<PluginPackRegistry>({
+    id: 'plugin-pack-registry',
+    path: safeFilePath,
+    schema: PLUGIN_PACK_REGISTRY_SCHEMA_PATH,
+  }).load();
+}
+
 function saveRegistry(registry: PluginPackRegistry, override?: string): void {
+  const file = registryPath(override);
+  const validated = pluginPackRegistryCatalog.validate(registry, file);
   safeMkdir(registryDir(override), { recursive: true });
-  safeWriteFile(registryPath(override), JSON.stringify(registry, null, 2));
+  safeWriteFile(file, JSON.stringify(validated, null, 2));
 }
 
 function appendImportRecord(record: PackImportRecord, override?: string): void {
@@ -166,18 +245,17 @@ function appendImportRecord(record: PackImportRecord, override?: string): void {
 
 export function listPackImportRecords(limit = 50, override?: string): PackImportRecord[] {
   const file = importLogPath(override);
-  if (!safeExistsSync(file)) return [];
-  const records: PackImportRecord[] = [];
-  for (const line of String(safeReadFile(file, { encoding: 'utf8' })).split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      records.push(JSON.parse(trimmed) as PackImportRecord);
-    } catch {
-      logger.warn('[plugin-pack] skipping unparseable import record line');
-    }
-  }
-  return records.slice(-limit);
+  if (!safeExistsSync(file) || !safeLstat(file).isFile()) return [];
+  return readJsonLines<PackImportRecord>(file, {
+    onMalformed: (error) => {
+      logger.warn(`[plugin-pack] skipping malformed import record line: ${String(error)}`);
+    },
+    map(value) {
+      const record = normalizePackImportRecord(value);
+      if (!record) throw new Error('plugin pack import record is invalid');
+      return record;
+    },
+  }).slice(-limit);
 }
 
 const IP_LITERAL = /^(?:\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-fA-F:]+\])$/;
@@ -243,16 +321,27 @@ function defaultFetcher(
 // Agent Plugins v1 portable root manifest.
 const MANIFEST_NAMES = ['plugin-manifest.json', '.claude-plugin/plugin.json', 'plugin.json'];
 
+function manifestPathFor(dir: string, name: string): string | null {
+  try {
+    const manifestPath = assertSafeRepositoryPath(path.join(dir, name));
+    if (!safeExistsSync(manifestPath) || !safeLstat(manifestPath).isFile()) return null;
+    return manifestPath;
+  } catch {
+    return null;
+  }
+}
+
 function hasManifest(dir: string): boolean {
-  return MANIFEST_NAMES.some((name) => safeExistsSync(path.join(dir, name)));
+  return MANIFEST_NAMES.some((name) => manifestPathFor(dir, name) !== null);
 }
 
 function manifestPluginId(dir: string): string | undefined {
   for (const name of MANIFEST_NAMES) {
-    const manifestPath = path.join(dir, name);
-    if (!safeExistsSync(manifestPath)) continue;
+    const manifestPath = manifestPathFor(dir, name);
+    if (!manifestPath) continue;
     try {
-      const parsed = readJson<Record<string, unknown>>(manifestPath);
+      const parsed = readJson<unknown>(manifestPath);
+      if (!isRecord(parsed)) continue;
       const candidate =
         typeof parsed.plugin_id === 'string'
           ? parsed.plugin_id.trim()
@@ -330,7 +419,7 @@ export function importPluginPack(params: ImportPluginPackParams): ImportPluginPa
   }
   const beforeFingerprint = packFingerprint(before);
 
-  const now = new Date().toISOString();
+  const now = nowIso();
   const importRecord: PackImportRecord = {
     pack_id: packId,
     at: now,
@@ -347,7 +436,10 @@ export function importPluginPack(params: ImportPluginPackParams): ImportPluginPa
   try {
     let commit: string | undefined;
     if (!isLocal) {
-      fetchDir = pathResolver.sharedTmp(`plugin-pack-${packId}-${Date.now().toString(36)}`);
+      fetchDir = assertSafeRepositoryPath(
+        pathResolver.sharedTmp(`plugin-pack-${packId}-${Date.now().toString(36)}`),
+        { allowMissingLeaf: true }
+      );
       cleanup = true;
       const fetched = (params.fetcher ?? defaultFetcher)(url, params.ref, fetchDir);
       commit = fetched.commit;

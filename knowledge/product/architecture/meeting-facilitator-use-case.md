@@ -102,7 +102,7 @@ After every run, a summary is printed:
 | `wisdom:execute_self_action_items`             | Iterate `operator_self` pending items; dispatch via `delegateTask`; transition to completed / blocked                                                                                                                             |
 | `wisdom:track_pending_action_items`            | Iterate `team_member` pending items; emit reminders; record into the store                                                                                                                                                        |
 | `meeting-actuator` (existing, hardened)        | `join / leave / speak / listen / chat / status` with **voice consent gate** on `speak`, `meeting.<verb>` audit emission, and `join_backend` tagging for the internal browser backend                                              |
-| `meeting-browser-driver` (internal)            | Playwright join backend behind `meeting-actuator`; owns web-meeting entry while `AudioBus` carries captured audio                                                                                                                 |
+| `meeting-browser-driver` (internal)            | Playwright join backend behind `meeting-actuator`; owns web-meeting entry and live-caption capture (`transcriptInput`) into `[mm:ss] Speaker: text` transcript files for `meeting:normalize_transcript`                           |
 | `pipelines/meeting-facilitation-workflow.json` | Stage 1 wiring                                                                                                                                                                                                                    |
 | `pipelines/action-item-execute-self.json`      | Stage 2 wiring                                                                                                                                                                                                                    |
 | `pipelines/action-item-tracking.json`          | Stage 3 wiring (cron-able)                                                                                                                                                                                                        |
@@ -124,8 +124,8 @@ The use case implies authority that the operator must explicitly delegate:
   malformed, wrong-mission, or wrong-tenant consent fails closed before
   audio capture or speech proceeds.
 - **Dry-run before real meeting** — use
-  `pnpm cli preview pipelines/meeting-proxy-workflow.json` and
-  `pnpm run test:meeting-dry-run` to validate workflow structure,
+  `pnpm kyberion preview pipelines/meeting-proxy-workflow.json` and
+  `pnpm test -- --suite meeting-dry-run` to validate workflow structure,
   consent gates, host allowlist, and redaction without opening a call.
 - **Voice profile registration** — the synthesized voice itself must be
   a `voice-profile-registry.json` entry whose source samples were
@@ -194,6 +194,129 @@ KYBERION_REASONING_BACKEND=claude-cli \
     --listen-sec 5 \
     --skip-tracking
 ```
+
+## 6b. Live-join setup (browser-playwright + captions)
+
+Capture is the platforms' own live captions scraped from the DOM —
+no audio loopback, headless-capable. Per-run flow:
+`meeting:join` (or `listen` with a `url`) → pre-join UI → captions
+toggle (best effort) → poll caption regions every 3s →
+`[mm:ss] Speaker: text` transcript file → existing
+`meeting-followup` pipeline. Zero cues ⇒ `partial_state: true`
+with `partial_reason`, never a silent empty transcript.
+
+Join backends (`meeting:join` / `listen` param `join_backend`):
+
+- `playwright` (default) — headless browser via
+  `libs/actuators/meeting-browser-driver`. Best for unattended
+  Chronos runs. Risks: bot detection, lobby admission, selector
+  drift (override via `in_meeting_selectors_override` in
+  `libs/actuators/meeting-browser-driver/src/selectors.ts`).
+- `chrome-extension` — the operator's own signed-in Chrome through
+  `tools/meet-copilot-extension` over `ws://127.0.0.1:8779`.
+  No bot rejection, no cookie juggling. Requires: extension loaded
+  in Chrome, a Meet/Teams/Zoom tab open, and
+  `KYBERION_MEET_EXTENSION_TOKEN` (32+ chars, same value as the
+  extension's `meetCopilotAuthToken` in Chrome storage).
+  Missing extension/token fails closed with setup guidance.
+- `auto` — try the extension with a 20s connect timeout, fall back
+  to Playwright. Good default when the operator may or may not be
+  at their desk.
+
+- **Login**: guest links that admit by name work with
+  `display_name` only. Host-auth meetings need a signed-in session:
+  launch once with a persistent profile
+  (`user_data_dir` + `profile_directory`, or `account_slug` cookie
+  jar), sign in manually, later runs reuse it. `headed: true`
+  runs a visible Chromium for debugging selectors.
+- **Admission**: guest joins that need host approval wait at most
+  `step_timeout_ms` (≥30s) for the join button; lobby timeout
+  surfaces as `meeting.join_failed`.
+- **Captions must exist**: host-disabled captions / transcription
+  means nothing to scrape — the transcript stays empty and the
+  run reports `partial_state`.
+- **Out of scope**: bot-detection evasion, in-meeting chat send,
+  system-audio recording (use `voice:transcribe` on recordings
+  instead), vendor bot SDKs.
+
+## 6c. Declared meeting gestures (kyberion-specified operations)
+
+Beyond observe-and-summarize, the extension accepts declared verbs
+from the driver over the WS control channel
+(`tools/meet-copilot-extension/background.js` `CONTROL_COMMANDS`):
+
+| Verb                                         | Content action          | Notes                                                                                                                           |
+| -------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `join / leave / set_mic / set_camera / chat` | pre-existing            | —                                                                                                                               |
+| `raise_hand`                                 | toggle-aware hand raise | no-op when already raised; ack event `raised_hand`                                                                              |
+| `admit [name]`                               | waiting-room admission  | admit-all when offered, else visible buttons; name narrows by row text (best effort); ack event `admitted` with count for audit |
+
+Driver surface: `MeetingSession.raiseHand()` / `admit(name?)`
+(`libs/core/meeting-session-types.ts`, optional — Playwright
+sessions omit them). `meeting:join` accepts `raise_hand: true`
+(join → raise → capture → leave) for listen-only presence.
+
+Guardrails:
+
+- `raise_hand` is safe to automate (visible, reversible).
+- `admit` exercises **host authority** — treat like an approval
+  gate: coordinator policy must explicitly allow it per mission,
+  and every admission lands in the audit chain with the count.
+- Verbs are allowlisted at both ends (background `CONTROL_COMMANDS`
+  - content message switch); anything else is dropped, never
+    executed. No free-form element clicking from the driver side —
+    general browser operation stays in `browser-actuator`.
+- Interactive mid-meeting verbs: `meeting:participate` reads
+  `status | raise-hand | admit [name] | chat <text> | leave | help`
+  from stdin while the coordinator owns the session
+  (`scripts/meeting_commands.ts`; TTY by default,
+  `--interactive-commands=false` to disable). `admit` additionally
+  requires `--allow-admit` per run and every verb lands in the
+  trace (`meeting_participation.*`). Coordinator exposes the live
+  session via `MeetingParticipationOptions.onSession`.
+
+## 8. Avatar presence (hear / teach / appear)
+
+Guided dialogue ops (`libs/actuators/meeting-actuator/src/meeting-guided-dialogue.ts`):
+
+- `meeting:hearing_session {topic, counterparty_label?, context?, answers?}` —
+  customer requirements hearing. Without `answers` it returns an
+  ordered question script; with answers it extracts `{requirements,
+open_questions, next_questions}`. Re-invoke with accumulated
+  answers for multi-turn hearings.
+- `meeting:tutor_session {material|material_path, learner_label?, goal?, answers?}` —
+  gentle teaching. Without `answers` it returns sectioned
+  explanations with comprehension checks; with answers it grades
+  kindly (`struggling|progressing|solid`) and fills gaps.
+
+Talking-avatar video (`voice:render_talking_avatar`):
+
+- Inputs: `portrait_path` (PNG/JPG; or `avatar_name` from the
+  presence registry) + `text` (offline `say` TTS on macOS) or
+  `audio_path`. Output: 720p H264+AAC MP4 with Ken Burns drift,
+  volume-driven mouth, and periodic blinks (VTuber-lite,
+  PIL+numpy+ffmpeg only — no model download).
+- Face geometry (`mouth_x/y/w`, `eyes_y`) is tunable per avatar;
+  illustrated front-facing portraits work best.
+
+Camera output (`voice:output_to_virtual_camera`):
+
+- Thin dispatcher over the `camera-output-bridge` seam
+  (`libs/core/camera-output-bridge.ts`): capability-declared,
+  probe-gated, named backends — the same adopter pattern as the
+  voice-side bridges. `backend` selects explicitly (`obs-virtual-cam`
+  today; `auto` takes the first probed-available backend and never
+  silently stubs). New camera solutions (v4l2 loopback, …) register
+  a backend instead of changing the op.
+- OBS backend (`obs-virtual-cam`,
+  `libs/core/obs-virtual-camera-output.ts`): obs-websocket v5 over
+  the `ws` package only — ensures scene + looping `ffmpeg_source`,
+  switches to it, starts the virtual camera.
+  `KYBERION_OBS_WS_PASSWORD` must match the OBS server password.
+- Setup: install OBS Studio → start Virtual Camera → enable
+  Settings → WebSocket Server → set Server Password → select
+  "OBS Virtual Camera" as the Meet/Teams/Zoom camera (once).
+  Without OBS every call fails closed with setup guidance.
 
 ## 7. Reference
 

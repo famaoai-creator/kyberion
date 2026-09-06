@@ -1,4 +1,6 @@
 import { safeExecResult } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export const SCREEN_DISPLAY_INVENTORY_BRIDGE_ID = 'screen-display-inventory-bridge' as const;
 
@@ -37,7 +39,10 @@ export interface ScreenDisplayInventoryOptions {
   platform?: NodeJS.Platform;
   system_profiler_bin?: string;
   xrandr_bin?: string;
-  command_runner?: (command: string, args: string[]) => {
+  command_runner?: (
+    command: string,
+    args: string[]
+  ) => {
     stdout: string;
     stderr: string;
     status: number | null;
@@ -58,7 +63,7 @@ function emptyInventory(): ScreenDisplayInventory {
 function runCommand(
   opts: ScreenDisplayInventoryOptions,
   command: string,
-  args: string[],
+  args: string[]
 ): { stdout: string; stderr: string; status: number | null; error?: Error } {
   if (opts.command_runner) return opts.command_runner(command, args);
   return safeExecResult(command, args, { maxOutputMB: 4 });
@@ -72,53 +77,62 @@ function parseResolution(text: string): { width?: number; height?: number } {
   return Number.isFinite(width) && Number.isFinite(height) ? { width, height } : {};
 }
 
+export function parseSystemProfilerDisplayItems(
+  payload: unknown
+): Array<{ section: Record<string, unknown>; device: Record<string, unknown> }> {
+  if (!isRecord(payload) || !Array.isArray(payload.SPDisplaysDataType)) return [];
+  return payload.SPDisplaysDataType.filter(isRecord).flatMap((section) => {
+    const rawItems = Array.isArray(section._items)
+      ? section._items
+      : Array.isArray(section.spdisplays_ndrvs)
+        ? section.spdisplays_ndrvs
+        : [];
+    return rawItems.filter(isRecord).map((device) => ({ section, device }));
+  });
+}
+
 function collectMacDisplays(
   opts: ScreenDisplayInventoryOptions,
   runtimePlatform: NodeJS.Platform,
-  bin: string,
+  bin: string
 ): ScreenDisplayRecord[] {
   const result = runCommand(opts, bin, ['SPDisplaysDataType', '-json']);
   const records: ScreenDisplayRecord[] = [];
   try {
-    const payload = JSON.parse(result.stdout || '{}');
-    const sections = Array.isArray((payload as any)?.SPDisplaysDataType) ? (payload as any).SPDisplaysDataType : [];
+    const payload: unknown = parseSafeJsonInput(
+      result.stdout || '{}',
+      'screen display inventory response'
+    );
     let index = 0;
-    for (const section of sections) {
-      const items = Array.isArray(section?._items)
-        ? section._items
-        : Array.isArray(section?.spdisplays_ndrvs)
-          ? section.spdisplays_ndrvs
-          : [];
-      for (const device of items) {
-        const name = String(
-          device?._name
-          || device?.spdisplays_display_name
-          || device?.spdisplays_display_product_name
-          || device?.spdisplays_vendor
-          || section?._name
-          || ''
-        ).trim();
-        const displayName = name || `Display ${index + 1}`;
-        const resolution = `${device?.spdisplays_resolution || device?.spdisplays_pixels || device?.spdisplays_display_resolution || ''}`;
-        const parsed = parseResolution(resolution);
-        records.push({
-          index,
-          name: displayName,
-          platform: runtimePlatform,
-          source: 'system_profiler',
-          available: true,
-          primary: Boolean(device?.spdisplays_main),
-          width: parsed.width,
-          height: parsed.height,
-          details: {
-            vendor: device?.spdisplays_vendor || undefined,
-            model: device?.spdisplays_model || undefined,
-            mirror: device?.spdisplays_mirror || undefined,
-            resolution: resolution || undefined,
-          },
-        });
-        index += 1;
-      }
+    for (const { section, device } of parseSystemProfilerDisplayItems(payload)) {
+      const name = String(
+        device._name ||
+          device.spdisplays_display_name ||
+          device.spdisplays_display_product_name ||
+          device.spdisplays_vendor ||
+          section._name ||
+          ''
+      ).trim();
+      const displayName = name || `Display ${index + 1}`;
+      const resolution = `${device.spdisplays_resolution || device.spdisplays_pixels || device.spdisplays_display_resolution || ''}`;
+      const parsed = parseResolution(resolution);
+      records.push({
+        index,
+        name: displayName,
+        platform: runtimePlatform,
+        source: 'system_profiler',
+        available: true,
+        primary: Boolean(device.spdisplays_main),
+        width: parsed.width,
+        height: parsed.height,
+        details: {
+          vendor: device.spdisplays_vendor || undefined,
+          model: device.spdisplays_model || undefined,
+          mirror: device.spdisplays_mirror || undefined,
+          resolution: resolution || undefined,
+        },
+      });
+      index += 1;
     }
     if (records.length === 0) {
       records.push({
@@ -146,7 +160,7 @@ function collectMacDisplays(
 function collectLinuxDisplays(
   opts: ScreenDisplayInventoryOptions,
   runtimePlatform: NodeJS.Platform,
-  bin: string,
+  bin: string
 ): ScreenDisplayRecord[] {
   const result = runCommand(opts, bin, ['--query']);
   const text = `${result.stdout}\n${result.stderr}`;
@@ -195,9 +209,17 @@ export class ScreenDisplayInventoryBridgeImpl implements ScreenDisplayInventoryB
     const inventory = emptyInventory();
     const runtimePlatform = this.opts.platform ?? process.platform;
     if (runtimePlatform === 'darwin') {
-      inventory.displays = collectMacDisplays(this.opts, runtimePlatform, this.opts.system_profiler_bin ?? DEFAULT_SYSTEM_PROFILER);
+      inventory.displays = collectMacDisplays(
+        this.opts,
+        runtimePlatform,
+        this.opts.system_profiler_bin ?? DEFAULT_SYSTEM_PROFILER
+      );
     } else if (runtimePlatform === 'linux') {
-      inventory.displays = collectLinuxDisplays(this.opts, runtimePlatform, this.opts.xrandr_bin ?? DEFAULT_XRANDR);
+      inventory.displays = collectLinuxDisplays(
+        this.opts,
+        runtimePlatform,
+        this.opts.xrandr_bin ?? DEFAULT_XRANDR
+      );
     } else {
       inventory.notes.push(`unsupported platform: ${runtimePlatform}`);
       inventory.displays.push({
@@ -215,7 +237,7 @@ export class ScreenDisplayInventoryBridgeImpl implements ScreenDisplayInventoryB
   async probe(): Promise<ScreenDisplayInventoryProbe> {
     const inventory = await this.scan();
     const available = inventory.displays.length > 0;
-      return {
+    return {
       bridge_id: SCREEN_DISPLAY_INVENTORY_BRIDGE_ID,
       platform: this.opts.platform ?? process.platform,
       available,
@@ -226,7 +248,7 @@ export class ScreenDisplayInventoryBridgeImpl implements ScreenDisplayInventoryB
 }
 
 export function createScreenDisplayInventoryBridge(
-  opts: ScreenDisplayInventoryOptions = {},
+  opts: ScreenDisplayInventoryOptions = {}
 ): ScreenDisplayInventoryBridge {
   return new ScreenDisplayInventoryBridgeImpl(opts);
 }

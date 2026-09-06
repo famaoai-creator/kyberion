@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   inspectLlmResolution,
+  parseLlmResponse,
   registerStructuredRunner,
   resolveLlmConfig,
   runStructuredLlmProfile,
@@ -21,6 +22,14 @@ describe('mission-llm resolution', () => {
     } else {
       process.env.KYBERION_WISDOM_LLM_PROFILE = originalProfile;
     }
+  });
+
+  it('requires a JSON object envelope before parsing the LLM result', () => {
+    expect(parseLlmResponse(JSON.stringify({ result: JSON.stringify({ answer: 1 }) }))).toEqual({
+      answer: 1,
+    });
+    expect(() => parseLlmResponse('null')).toThrow('envelope must be a JSON object');
+    expect(() => parseLlmResponse('[]')).toThrow('envelope must be a JSON object');
   });
 
   const policy = {

@@ -293,7 +293,7 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
   // changed mission-creation/start behavior. SO-01 replaced those reads with
   // explicit options; this test proves `start` no longer depends on argv.
   const RUN_ID = Date.now();
-  const CUSTOMER_SLUG = `so01-argv-independence-${RUN_ID}`;
+  const CUSTOMER_SLUG = `so01-argv-${RUN_ID}`;
   const PROFILE_ROOT = path.join(pathResolver.rootDir(), 'customer', CUSTOMER_SLUG);
   const missionIdArgvPolluted = `MSN-SO01-ARGV-A-${RUN_ID}`;
   const missionIdArgvClean = `MSN-SO01-ARGV-B-${RUN_ID}`;

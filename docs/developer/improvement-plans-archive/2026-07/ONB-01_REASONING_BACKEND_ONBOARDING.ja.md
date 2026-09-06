@@ -33,7 +33,7 @@ status: archived
 - **完了済み**: `pnpm doctor` の reasoning backend 不在時 next action を、行き止まりになり得る `pnpm env:bootstrap --manifest reasoning-backend --apply` ではなく、実行可能な `pnpm reasoning:setup` と具体的な backend 選択肢へ誘導する。
 - **完了済み**: 未設定のまま stub backend が `prompt` / `delegateTask` の実作業応答に使われた場合、`[STUB]` 応答の前に `pnpm reasoning:setup` を促すユーザー可視警告を付与する。明示的な `KYBERION_REASONING_BACKEND=stub` の deterministic/offline 運用では従来通り警告を抑制する。
 - **完了済み**: `pnpm onboard` に `reasoning` フェーズを追加し、identity 後に real backend を検出する。未設定時は `pnpm reasoning:setup` を案内し、対話環境では stub-only 継続を明示確認するまで Welcome に進まない。結果は `onboarding-state.json` と summary に保存する。
-- **完了済み**: Path B (`pnpm onboard:apply`) も reasoning 状態を検出し、state/summary/JSON result に保存する。非対話フローでは設定変更はせず、現状を機械可読に報告する。
+- **完了済み**: Path B (`pnpm onboard apply`) も reasoning 状態を検出し、state/summary/JSON result に保存する。非対話フローでは設定変更はせず、現状を機械可読に報告する。
 - **完了済み**: `docs/INITIALIZATION.md` には `pnpm reasoning:setup` を初期化手順に組み込み済み。
 - **完了済み**: `pnpm reasoning:setup` の対話的な設定書き込み処理を実装し、指定されたバックエンドを `.env.local` に保存するようにした。
 
@@ -49,7 +49,7 @@ status: archived
 
 1. `onboarding_wizard.ts` に reasoning フェーズ(identity の後、services の前あたり)を追加: `probeReasoningBackend` で現状を検出し、未設定なら選択肢を提示(ローカル `claude` CLI があれば「これを使う」を既定に、無ければ API キー手順)。設定を試み、疎通確認(小さな real 呼び出し)まで行う。
 2. 疎通できない場合は「スタブで続行(実作業不可・後で設定)」を明示選択させ、`state` に `reasoning_backend: stub` を記録。**"Welcome aboard" の前に現状を正直に伝える**(UX-01 の正直さ原則)。
-3. Path B(`onboard:apply`)にもバックエンド状態の検証・報告を追加。
+3. Path B(`onboard apply`)にもバックエンド状態の検証・報告を追加。
 4. UX-03 の ja/en テンプレートに新プロンプトを載せる。
 5. テスト: 一時環境で backend あり/なしのオンボード分岐。
 

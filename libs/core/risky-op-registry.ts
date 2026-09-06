@@ -10,50 +10,13 @@
  * reference from a single place.
  */
 
-import { randomUUID } from 'node:crypto';
-import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
-import type { ApprovalActionDescriptor, ApprovalRequestSource } from './approval-store.js';
-import type { TraceContext } from './src/trace.js';
+import { requireApprovalForOp } from './risky-op-approval-implementation.js';
+import { registerRiskyApprovalHandler } from './risky-op-approval-port.js';
+import { RISKY_OPS, type RiskyOpId } from './risky-op-ids.js';
 
-/** Canonical op IDs for risky operations enforced by the approval gate. */
-export const RISKY_OPS = {
-  SECRET_GRANT_ACCESS: 'secret:grant_access',
-  AUTH_GRANT_AUTHORITY: 'auth:grant_authority',
-  CONFIG_UPDATE: 'config:update',
-  VAULT_WRITE: 'vault:write',
-  CLAUDE_BROWSER_INTERACTIVE: 'claude:browser_interactive',
-  CLAUDE_DOCUMENT_GENERATION: 'claude:document_generation',
-  BROWSER_EXTENSION_EXECUTE: 'browser:extension_execute',
-  DESKTOP_DESTRUCTIVE_ACTION: 'desktop:destructive_action',
-} as const;
+export { RISKY_OPS, type RiskyOpId } from './risky-op-ids.js';
 
-export type RiskyOpId = (typeof RISKY_OPS)[keyof typeof RISKY_OPS];
-
-export interface RequireApprovalParams {
-  opId: RiskyOpId | string;
-  agentId: string;
-  /** Caller's correlation id. Auto-generated if omitted. */
-  correlationId?: string;
-  /** Typically 'cli', 'slack', or a specific surface channel id. */
-  channel?: string;
-  /** Operation-specific details surfaced to the approver. */
-  payload?: Record<string, unknown>;
-  /** Pre-built approval draft. Auto-generated when omitted. */
-  draft?: {
-    title: string;
-    summary: string;
-    severity?: 'low' | 'medium' | 'high';
-  };
-  /** Pipeline trace context — threaded into the approval gate for event emission. */
-  trace?: TraceContext;
-  /** Optional session-cache descriptor; the concrete payload remains hash-bound. */
-  actionDescriptor?: ApprovalActionDescriptor;
-  source?: ApprovalRequestSource;
-  /** Trusted caller-side human presence signal for non-interactive runs. */
-  hasHuman?: boolean;
-  hasUI?: boolean;
-  nonInteractive?: boolean;
-}
+export type { RequireApprovalParams } from './risky-op-approval-implementation.js';
 
 /**
  * Gate a risky operation. Returns the approval decision; callers must
@@ -72,26 +35,11 @@ export interface RequireApprovalParams {
  * resolveApprovalPolicy. Ops not listed there fall through with
  * requires_approval=false.
  */
-export function requireApprovalForOp(params: RequireApprovalParams): ApprovalGateResult {
-  const correlationId = params.correlationId ?? randomUUID();
-  return enforceApprovalGate({
-    operationId: params.opId,
-    agentId: params.agentId,
-    correlationId,
-    channel: params.channel ?? 'system',
-    intentId: params.opId,
-    payload: params.payload,
-    draft: params.draft,
-    trace: params.trace,
-    actionDescriptor: params.actionDescriptor,
-    source: params.source,
-    ...(params.hasHuman !== undefined ? { hasHuman: params.hasHuman } : {}),
-    ...(params.hasUI !== undefined ? { hasUI: params.hasUI } : {}),
-    ...(params.nonInteractive !== undefined ? { nonInteractive: params.nonInteractive } : {}),
-  });
-}
+export { requireApprovalForOp } from './risky-op-approval-implementation.js';
 
 /** Whether an op id is one the registry explicitly recognises. */
 export function isKnownRiskyOp(opId: string): opId is RiskyOpId {
   return (Object.values(RISKY_OPS) as string[]).includes(opId);
 }
+
+registerRiskyApprovalHandler(requireApprovalForOp);

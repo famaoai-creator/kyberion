@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { safeWriteFile } from './secure-io.js';
 import {
   advanceAiDlcPhase,
   createAiDlcPhaseState,
   loadAiDlcPhaseState,
+  loadAiDlcPhaseStateAtPath,
   resumeAiDlcPhaseState,
   saveAiDlcPhaseState,
   tripAiDlcCircuitBreaker,
@@ -127,6 +129,15 @@ describe('aidlc-phase-state (HO-02 Task 1)', () => {
     expect(loadAiDlcPhaseState('MSN-NONE', baseDir)).toBeNull();
   });
 
+  it('rejects traversal mission ids and external persistence roots', () => {
+    expect(() => saveAiDlcPhaseState(createAiDlcPhaseState('../outside'), '/tmp')).toThrow(
+      /invalid mission id/i
+    );
+    expect(() => saveAiDlcPhaseState(createAiDlcPhaseState('MSN-AIDLC-EXTERNAL'), '/tmp')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
   it('cleanly resumes a stopped state while retaining failure context', () => {
     const baseDir = path.join(
       pathResolver.active('shared/tmp/tests'),
@@ -155,5 +166,40 @@ describe('aidlc-phase-state (HO-02 Task 1)', () => {
     expect(loadAiDlcPhaseState('MSN-AIDLC-RESUME', baseDir)?.last_resumed_at).toBe(
       '2026-07-11T12:05:00.000Z'
     );
+  });
+
+  it('rejects schema-invalid and cross-mission persisted state', () => {
+    const baseDir = path.join(
+      pathResolver.active('shared/tmp/tests'),
+      `aidlc-invalid-${Date.now()}`
+    );
+    const missionId = 'MSN-AIDLC-SCOPE-001';
+    const filePath = saveAiDlcPhaseState(createAiDlcPhaseState(missionId, { now: NOW }), baseDir);
+
+    safeWriteFile(
+      filePath,
+      JSON.stringify({ ...createAiDlcPhaseState(missionId, { now: NOW }), mission_id: 'MSN-OTHER' })
+    );
+    expect(() => loadAiDlcPhaseStateAtPath(filePath, missionId)).toThrow(
+      '[AIDLC_PHASE_STATE_SCOPE_MISMATCH]'
+    );
+
+    safeWriteFile(
+      filePath,
+      JSON.stringify({ ...createAiDlcPhaseState(missionId, { now: NOW }), attempts: null })
+    );
+    expect(loadAiDlcPhaseState(missionId, baseDir)).toBeNull();
+  });
+
+  it('rejects schema-invalid state before persisting it', () => {
+    const baseDir = path.join(
+      pathResolver.active('shared/tmp/tests'),
+      `aidlc-save-invalid-${Date.now()}`
+    );
+    const state = createAiDlcPhaseState('MSN-AIDLC-SAVE-INVALID', { now: NOW });
+
+    expect(() =>
+      saveAiDlcPhaseState({ ...state, attempts: null } as unknown as typeof state, baseDir)
+    ).toThrow(/Invalid catalog aidlc-phase-state/);
   });
 });

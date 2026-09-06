@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { listActiveDelegatedTaskRecords } from '@agent/core/delegated-task-observability';
 import {
   getDelegationConcurrencyStats,
-  listActiveDelegatedTaskRecords,
   peekPersistedDelegationChildrenRegistry,
-} from '@agent/core';
+} from '@agent/core/delegation-concurrency';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,8 @@ function elapsedSeconds(createdAt: string): number {
 }
 
 export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   try {
     const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
     const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
@@ -54,9 +57,6 @@ export function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error, 500);
   }
 }

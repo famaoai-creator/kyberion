@@ -1,20 +1,22 @@
 import {
-  evaluateArchitectureReadyGate,
-  evaluateCustomerSignoffGate,
-  evaluateQaReadyGate,
-  evaluateRequirementsCompletenessGate,
-  getReasoningBackend,
-  loadJson,
-  pathResolver,
   readDesignSpec,
-  readRequirementsDraft,
-  safeExistsSync,
-  safeReadFile,
+  readDesignSpecAtPath,
   saveDesignSpec,
-  saveRequirementsDraft,
+  evaluateArchitectureReadyGate,
+  evaluateQaReadyGate,
   saveTestPlan,
-} from '@agent/core';
-import type { RequirementsDraft, SoftwareQualityContract } from '@agent/core';
+} from '@agent/core/sdlc-artifact-store';
+import {
+  evaluateCustomerSignoffGate,
+  evaluateRequirementsCompletenessGate,
+  readRequirementsDraft,
+  readRequirementsDraftAtPath,
+  saveRequirementsDraft,
+} from '@agent/core/requirements-draft-store';
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import type { SoftwareQualityContract } from '@agent/core/software-quality';
 
 export interface ExtractRequirementsInput {
   mission_id: string;
@@ -29,12 +31,16 @@ export interface ExtractRequirementsInput {
   prior_draft_ref?: string;
 }
 
+function resolveRepositoryInput(ref: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
+}
+
 export async function extractRequirements(input: ExtractRequirementsInput) {
   if (!input.mission_id || !input.project_name || !input.source_path) {
     throw new Error('[extract_requirements] requires mission_id, project_name, and source_path');
   }
   const backend = getReasoningBackend();
-  const sourceAbs = pathResolver.rootResolve(input.source_path);
+  const sourceAbs = resolveRepositoryInput(input.source_path);
   if (!safeExistsSync(sourceAbs)) {
     throw new Error(`[extract_requirements] source not found: ${input.source_path}`);
   }
@@ -42,9 +48,9 @@ export async function extractRequirements(input: ExtractRequirementsInput) {
 
   let priorDraft: unknown;
   if (input.prior_draft_ref) {
-    const priorAbs = pathResolver.rootResolve(input.prior_draft_ref);
+    const priorAbs = resolveRepositoryInput(input.prior_draft_ref);
     if (safeExistsSync(priorAbs)) {
-      priorDraft = loadJson<unknown>(priorAbs);
+      priorDraft = readRequirementsDraftAtPath(priorAbs);
     }
   }
 
@@ -98,10 +104,9 @@ export async function extractDesignSpec(input: {
   const requirementsPath =
     input.requirements_draft_path ??
     `active/missions/${input.mission_id}/evidence/requirements-draft.json`;
-  const abs = pathResolver.rootResolve(requirementsPath);
-  const requirementsDraft = safeExistsSync(abs)
-    ? loadJson<unknown>(abs)
-    : readRequirementsDraft(input.mission_id);
+  const abs = resolveRepositoryInput(requirementsPath);
+  const requirementsDraft =
+    readRequirementsDraftAtPath(abs) ?? readRequirementsDraft(input.mission_id);
   if (!requirementsDraft) {
     throw new Error(`[extract_design_spec] requirements draft not found at ${requirementsPath}`);
   }
@@ -137,19 +142,20 @@ export async function extractTestPlan(input: {
     throw new Error('[extract_test_plan] requires mission_id and project_name');
   }
   const backend = getReasoningBackend();
+  const requirementsDraftPath = input.requirements_draft_path
+    ? resolveRepositoryInput(input.requirements_draft_path)
+    : undefined;
   const requirementsDraft =
     readRequirementsDraft(input.mission_id) ??
-    (input.requirements_draft_path &&
-    safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
-      ? loadJson<RequirementsDraft>(pathResolver.rootResolve(input.requirements_draft_path))
-      : null);
+    (requirementsDraftPath ? readRequirementsDraftAtPath(requirementsDraftPath) : null);
   if (!requirementsDraft) throw new Error('[extract_test_plan] requirements draft not found');
 
+  const designSpecPath = input.design_spec_path
+    ? resolveRepositoryInput(input.design_spec_path)
+    : undefined;
   const designSpec =
     readDesignSpec(input.mission_id) ??
-    (input.design_spec_path && safeExistsSync(pathResolver.rootResolve(input.design_spec_path))
-      ? loadJson<unknown>(pathResolver.rootResolve(input.design_spec_path))
-      : undefined);
+    (designSpecPath ? readDesignSpecAtPath(designSpecPath) : undefined);
   const extracted = await backend.extractTestPlan({
     requirementsDraft,
     designSpec,
@@ -186,7 +192,7 @@ export async function deriveTestInventory(input: {
   additional_context?: string;
   project_id?: string;
 }) {
-  const { deriveTestInventory: derive } = await import('@agent/core');
+  const { deriveTestInventory: derive } = await import('@agent/core/software-quality-operations');
   return derive({
     contract: input.contract,
     systemTags: input.system_tags,

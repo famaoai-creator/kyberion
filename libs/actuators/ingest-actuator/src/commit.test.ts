@@ -9,19 +9,18 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { assetLineage, deriveAssetId, readAssetLedger } from '@agent/core/ingest-asset-ledger';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  assetLineage,
-  deriveAssetId,
-  pathResolver,
-  readAssetLedger,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
-  validateWritePermission,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
+import { validateWritePermission } from '@agent/core/tier-guard';
 import { commitIngest, INGEST_COMMIT_ROLE } from './commit.js';
 import { dedupContent } from './dedup.js';
 import { handleAction } from './index.js';
@@ -145,6 +144,30 @@ describe('ingest:commit fail-closed path guard (DA-05 acceptance 1)', () => {
         path_options: options,
       })
     ).toThrow(/has no profile/);
+  });
+
+  it('rejects a tenant landing path that traverses a symlinked directory', () => {
+    const tenantRoot = path.join(fixtureRoot, 'knowledge/confidential/acme-corp');
+    const linkedReports = path.join(tenantRoot, 'reports');
+    const target = path.join(fixtureRoot, 'external-landing-target');
+    safeMkdir(tenantRoot, { recursive: true });
+    safeMkdir(target, { recursive: true });
+    safeSymlinkSync(target, linkedReports, 'dir');
+
+    try {
+      const card = normalizedCard('# Card\n\nBody.');
+      expect(() =>
+        commitIngest({
+          tenant_slug: 'acme-corp',
+          normalized: card,
+          now: NOW,
+          path_options: options,
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(linkedReports, { force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
   });
 
   it('refuses anonymous ingests (no ingested_by and no identity context)', () => {

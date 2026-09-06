@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AgyAdapter, ClaudeAdapter, CodexAdapter, CodexAppServerAdapter } from './agent-adapter.js';
+import { normalizeCodexAppServerMessage } from './agent-codex-app-server-adapter.js';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { pathResolver } from './path-resolver.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
+import { readTextFile } from './foundation/text.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeSymlinkSync } from './secure-io.js';
 
 const codexMocks = vi.hoisted(() => ({
   resolveCodexBinary: vi.fn(),
@@ -136,6 +141,19 @@ describe('AgyAdapter', () => {
     );
   });
 
+  it('ambient AGY read-only policy refuses before the legacy adapter spawns', async () => {
+    const policy = resolveSandboxPolicy({
+      provider: 'agy',
+      mode: 'read-only',
+      networkAccess: true,
+    });
+
+    const response = await withSandboxPolicy(policy, () => adapter.ask('inspect this'));
+
+    expect(response.stopReason).toBe('error');
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it('passes effort to the Claude CLI when configured', async () => {
     const child = Object.assign(new EventEmitter(), {
       stdout: new PassThrough(),
@@ -188,7 +206,19 @@ describe('AgyAdapter', () => {
   });
 });
 
+describe('GeminiWisdomEnhancer path boundary', () => {
+  it('revalidates the evolution directory and each lesson before reading', async () => {
+    const source = readTextFile(pathResolver.rootResolve('libs/core/agent-adapter.ts'));
+    expect(source).toContain('assertSafeRepositoryPath(');
+    expect(source).toContain('const wisdomFile = assertSafeRepositoryPath');
+    expect(source).toContain('safeLstat(wisdomFile).isFile()');
+    expect(source).toContain('[GEMINI_WISDOM_RESOURCE]');
+  });
+});
+
 describe('CodexAdapter', () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it('runs the legacy Codex CLI through an asynchronous child process', async () => {
     mockSpawnedCli(JSON.stringify({ message: 'codex response' }));
 
@@ -201,6 +231,59 @@ describe('CodexAdapter', () => {
       ['codex', 'exec', '--json', expect.stringContaining('Say hello')],
       expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
     );
+  });
+
+  it('fails closed when the Codex JSON response root is not an object', async () => {
+    mockSpawnedCli('[]');
+
+    const response = await new CodexAdapter().ask('Say hello');
+
+    expect(response).toEqual(expect.objectContaining({ text: '', stopReason: 'error' }));
+  });
+
+  it('projects an ambient read-only policy into the legacy Codex CLI argv', async () => {
+    mockSpawnedCli(JSON.stringify({ message: 'codex response' }));
+    const policy = resolveSandboxPolicy({
+      provider: 'codex',
+      mode: 'read-only',
+      networkAccess: true,
+    });
+
+    await withSandboxPolicy(policy, () => new CodexAdapter().ask('inspect this'));
+
+    expect(spawn).toHaveBeenCalledWith(
+      'npx',
+      [
+        'codex',
+        'exec',
+        '--sandbox',
+        'read-only',
+        '--json',
+        expect.stringContaining('inspect this'),
+      ],
+      expect.anything()
+    );
+  });
+});
+
+describe('ClaudeAdapter sandbox context', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('overrides a broad legacy permission option under an ambient read-only policy', async () => {
+    mockSpawnedCli(JSON.stringify({ result: 'claude response' }));
+    const policy = resolveSandboxPolicy({
+      provider: 'claude',
+      mode: 'read-only',
+      networkAccess: true,
+    });
+
+    await withSandboxPolicy(policy, () =>
+      new ClaudeAdapter({ permissionMode: 'bypassPermissions' }).ask('inspect this')
+    );
+
+    const [, args] = vi.mocked(spawn).mock.calls[0] ?? [];
+    expect(args).toEqual(expect.arrayContaining(['--permission-mode', 'default']));
+    expect(args).not.toContain('bypassPermissions');
   });
 });
 
@@ -217,6 +300,55 @@ describe('ClaudeAdapter tool restrictions', () => {
 });
 
 describe('CodexAppServerAdapter', () => {
+  it('normalizes JSON-RPC response and request envelopes', () => {
+    expect(
+      normalizeCodexAppServerMessage({
+        jsonrpc: '2.0',
+        id: 1,
+        result: { thread: { id: 'thread-1' } },
+      })
+    ).toEqual({ jsonrpc: '2.0', id: 1, result: { thread: { id: 'thread-1' } } });
+    expect(
+      normalizeCodexAppServerMessage({
+        jsonrpc: '2.0',
+        id: 'req-1',
+        method: 'turn/start',
+        params: {},
+      })
+    ).toEqual({ jsonrpc: '2.0', id: 'req-1', method: 'turn/start', params: {} });
+  });
+
+  it('rejects malformed JSON-RPC envelopes before dispatch', () => {
+    expect(normalizeCodexAppServerMessage(null)).toBeNull();
+    expect(normalizeCodexAppServerMessage([])).toBeNull();
+    expect(normalizeCodexAppServerMessage({ id: 1 })).toBeNull();
+    expect(normalizeCodexAppServerMessage({ id: 1, result: {}, error: {} })).toBeNull();
+    expect(normalizeCodexAppServerMessage({ method: 'turn/start', params: [] })).toBeNull();
+    expect(normalizeCodexAppServerMessage({ jsonrpc: '1.0', method: 'turn/start' })).toBeNull();
+    expect(
+      normalizeCodexAppServerMessage({ method: 'turn/start', error: { code: 'bad' } })
+    ).toBeNull();
+  });
+
+  it('rejects symlinked read-only paths and cwd before approval or spawn', async () => {
+    const suffix = `codex-app-server-scope-${process.pid}`;
+    const target = pathResolver.sharedTmp(`${suffix}-target`);
+    const link = pathResolver.sharedTmp(`${suffix}-link`);
+    safeMkdir(target);
+    safeSymlinkSync(target, link, 'dir');
+    try {
+      const adapter = new CodexAppServerAdapter({ cwd: link, timeoutMs: 1000 });
+      expect((adapter as any).isPathAllowed(`${link}/input.txt`, pathResolver.rootDir())).toBe(
+        false
+      );
+      await expect(adapter.boot()).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+      expect(codexMocks.resolveCodexBinary).not.toHaveBeenCalled();
+    } finally {
+      safeRmSync(link, { recursive: true, force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
+  });
+
   it('boots with the injected resolved binary and preserves startup diagnostics', async () => {
     const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const child = Object.assign(new EventEmitter(), {

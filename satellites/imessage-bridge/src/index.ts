@@ -1,50 +1,64 @@
 import express from 'express';
-import { installProcessGuards } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import { pathToFileURL } from 'node:url';
-
-// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
-installProcessGuards('imessage-bridge');
+import { installProcessGuards } from '@agent/core/process-guards';
+import { defineScript, isDirectScript } from '@agent/core/script-harness';
+import { getRegisteredEnvText, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { t } from '@agent/core/t';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import * as pathResolver from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import {
-  resolveOperatorLocale,
-  scheduleBridgeProcessingNote,
-  createStandardYargs,
-  logger,
-  pathResolver,
+  formatChannelThreadContext,
+  runChannelTurn,
+  type ChannelAdapter,
+} from '@agent/core/channel-adapter';
+import {
+  chunkSurfaceMessage,
+  buildBridgeEmptyReplyText,
+  postBridgeError,
+} from '@agent/core/bridge-error-reply';
+import { createSurfaceOutboxDrainGuard, drainSurfaceOutbox } from '@agent/core/surface-delivery';
+import {
+  resolveMissionProposalReply,
+  stashMissionProposalForConfirmation,
+} from '@agent/core/surface-mission-proposals';
+import {
+  buildSurfaceApprovalText,
+  createSurfaceApprovalRequest,
+  resolveSurfaceApprovalReply,
+  runSurfaceMessageConversation,
+} from '@agent/core/channel-surface';
+import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
+import {
   describeIMessageBridgeHealth,
+  sendIMessage,
+  buildIMessageReplyRequest,
+  advanceIMessagePollCursor,
+  type IMessageSendRequest,
+  type IMessageProcessingResult,
+} from '@agent/core/imessage-bridge';
+import {
+  getRecentIMessages,
+  getIMessageHistory,
+  formatIMessageAttachmentSummary,
+  formatIMessageTapbackSummary,
+  shouldProcessIMessage,
+  stripLeadingIMessageWakeWord,
+  type IMessageStimulus,
+} from '@agent/core/imessage-utils';
+import {
   downloadBlueBubblesAttachment,
   parseBlueBubblesWebhook,
   resolveBlueBubblesConfig,
   sendBlueBubblesAttachment,
   sendBlueBubblesText,
-  sendIMessage,
-  buildIMessageReplyRequest,
-  createSurfaceOutboxDrainGuard,
-  drainSurfaceOutbox,
-  getRecentIMessages,
-  getIMessageHistory,
-  formatIMessageAttachmentSummary,
-  formatIMessageTapbackSummary,
-  chunkSurfaceMessage,
-  shouldProcessIMessage,
-  stripLeadingIMessageWakeWord,
-  runSurfaceMessageConversation,
-  runChannelTurn,
-  type ChannelAdapter,
-  buildBridgeEmptyReplyText,
-  postBridgeError,
-  resolveMissionProposalReply,
-  stashMissionProposalForConfirmation,
-  buildSurfaceApprovalText,
-  createSurfaceApprovalRequest,
-  resolveSurfaceApprovalReply,
-  evaluateSurfaceActorAccess,
   verifyBlueBubblesWebhookSecret,
-  advanceIMessagePollCursor,
-  type IMessageSendRequest,
-  type IMessageProcessingResult,
-  type IMessageStimulus,
-} from '@agent/core';
+} from '@agent/core/bluebubbles-adapter';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('imessage-bridge');
+import { scheduleBridgeProcessingNote } from '@agent/core/bridge-typing';
 
 interface BridgeInput {
   action?: string;
@@ -55,6 +69,10 @@ interface BridgeInput {
 }
 
 const IMESSAGE_SURFACE_AGENT_ID = 'imessage-surface-agent';
+
+function errorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 const MAX_IMESSAGE_ATTACHMENTS = 8;
 let lastSeenRowId = 0;
 
@@ -105,9 +123,61 @@ function isDarwin(): boolean {
   return process.platform === 'darwin';
 }
 
+export function parseIMessageBridgeInput(value: unknown): BridgeInput {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('request body must be a JSON object');
+  }
+  const record = value as Record<string, unknown>;
+  for (const field of ['action', 'recipient', 'text', 'serviceName']) {
+    if (record[field] !== undefined && typeof record[field] !== 'string') {
+      throw new Error(`${field} must be a string`);
+    }
+  }
+  if (
+    record.attachments !== undefined &&
+    (!Array.isArray(record.attachments) ||
+      record.attachments.some((attachment) => typeof attachment !== 'string'))
+  ) {
+    throw new Error('attachments must be an array of strings');
+  }
+  return {
+    ...(typeof record.action === 'string' ? { action: record.action } : {}),
+    ...(typeof record.recipient === 'string' ? { recipient: record.recipient } : {}),
+    ...(typeof record.text === 'string' ? { text: record.text } : {}),
+    ...(typeof record.serviceName === 'string' ? { serviceName: record.serviceName } : {}),
+    ...(Array.isArray(record.attachments) ? { attachments: record.attachments as string[] } : {}),
+  };
+}
+
+export function readIMessageHeader(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+export function resolveBlueBubblesWebhookSecret(input: {
+  secret?: unknown;
+  authorization?: unknown;
+}): string | undefined {
+  const directSecret = readIMessageHeader(input.secret);
+  if (directSecret) return directSecret;
+
+  const authorization = readIMessageHeader(input.authorization);
+  const bearer = authorization?.match(/^Bearer\s+(.+)$/iu)?.[1];
+  return readIMessageHeader(bearer);
+}
+
+export function resolveIMessageBridgeInputPath(inputPath: string): string {
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(inputPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
+    throw new Error(`iMessage bridge input must be an existing regular file: ${inputPath}`);
+  }
+  return resolved;
+}
+
 function parseInputFile(inputPath: string): BridgeInput {
-  const resolved = pathResolver.rootResolve(inputPath);
-  return readJson<BridgeInput>(resolved);
+  const resolved = resolveIMessageBridgeInputPath(inputPath);
+  return parseIMessageBridgeInput(readJson<unknown>(resolved));
 }
 
 async function handleSend(request: IMessageSendRequest) {
@@ -177,15 +247,22 @@ function buildThreadContext(message: {
     .slice(-6);
   if (history.length === 0) return '';
 
-  return [
-    'Recent iMessage thread context:',
-    ...history.map((entry) => {
-      const attachmentText = formatIMessageAttachmentSummary(entry.attachments);
-      return `${entry.isFromMe ? 'Assistant' : `User (${entry.sender})`}: ${[entry.text, attachmentText].filter(Boolean).join('\n')}`;
-    }),
-    '',
-    `Current incoming message: ${[message.text, formatIMessageAttachmentSummary(message.attachments)].filter(Boolean).join('\n')}`,
-  ].join('\n');
+  // The shared surface runtime appends the current incoming message after
+  // threadContext. Keep this provider formatter limited to prior turns so
+  // iMessage cannot submit the current message twice.
+  return (
+    formatChannelThreadContext(
+      'iMessage',
+      history.map((entry) => ({
+        role: entry.isFromMe ? ('assistant' as const) : ('user' as const),
+        authorLabel: entry.sender,
+        text: [entry.text, formatIMessageAttachmentSummary(entry.attachments)]
+          .filter(Boolean)
+          .join('\n'),
+      })),
+      resolveOperatorLocale()
+    ) || ''
+  );
 }
 
 function buildIncomingIMessageText(message: {
@@ -226,7 +303,12 @@ export function buildIMessageChannelAdapter(msg: IMessageStimulus): ChannelAdapt
     // only if processing outlives 5s (quick replies stay clean).
     typing: () => {
       const processingNote = scheduleBridgeProcessingNote('imessage-bridge', () =>
-        sendIMessageText(buildIMessageReplyRequest(msg, '処理中です。少々お待ちください…'))
+        sendIMessageText(
+          buildIMessageReplyRequest(
+            msg,
+            t('bridge:processing_note', undefined, resolveOperatorLocale())
+          )
+        )
       );
       return { stop: () => processingNote.cancel() };
     },
@@ -319,6 +401,7 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
       channel: msg.chatId,
       thread: msg.chatId,
       text: incomingText,
+      locale: resolveOperatorLocale(),
     });
   } catch (error) {
     releaseDedupKey();
@@ -341,11 +424,13 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
         text: incomingText,
         channel: msg.chatId,
         threadTs: msg.id,
+        locale: resolveOperatorLocale(),
         attachments: msg.attachments,
       },
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'imessage',
+          locale: resolveOperatorLocale(),
           text: incomingText,
           channel: msg.chatId,
           threadTs: msg.id,
@@ -372,9 +457,11 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
               channel: msg.chatId,
               thread: msg.chatId,
               proposal: missionProposal,
+              locale: resolveOperatorLocale(),
               sourceText: incomingText,
               routingDecision: result.routingDecision,
               fallbackSummary: result.text,
+              intentResolution: result.intentResolution,
             });
             await sendIMessageText(buildIMessageReplyRequest(msg, prompt));
             return;
@@ -391,7 +478,9 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
                 draft,
                 sourceText: incomingText,
               });
-              return buildSurfaceApprovalText('imessage', record);
+              return buildSurfaceApprovalText('imessage', record, result.intentResolution, {
+                locale: resolveOperatorLocale(),
+              });
             });
             await sendIMessageText(buildIMessageReplyRequest(msg, approvalTexts.join('\n\n')));
             return;
@@ -449,15 +538,18 @@ async function pollIMessages() {
       if (nextCursor === lastSeenRowId && result === 'failed') break;
       lastSeenRowId = nextCursor;
     }
-  } catch (err: any) {
-    logger.error(`❌ [iMessageBridge] Poll failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`❌ [iMessageBridge] Poll failed: ${errorDetail(err)}`);
   }
 }
 
-async function main() {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []) {
+  const argv = await createStandardYargs(args)
     .option('input', { alias: 'i', type: 'string' })
-    .option('port', { type: 'number', default: Number(process.env.IMESSAGE_BRIDGE_PORT || '3034') })
+    .option('port', {
+      type: 'number',
+      default: Number(getRegisteredEnvText('IMESSAGE_BRIDGE_PORT') || '3034'),
+    })
     .option('poll', {
       type: 'boolean',
       default: true,
@@ -525,14 +617,22 @@ async function main() {
       res.status(503).json({ ok: false, error: 'bluebubbles_webhook_secret_not_configured' });
       return;
     }
-    const authorization = String(req.get('authorization') || '');
-    const bearer = authorization.match(/^Bearer\s+(.+)$/iu)?.[1];
-    const providedSecret = req.get('x-kyberion-bluebubbles-secret') || bearer;
+    const providedSecret = resolveBlueBubblesWebhookSecret({
+      authorization: req.get('authorization'),
+      secret: req.get('x-kyberion-bluebubbles-secret'),
+    });
     if (!verifyBlueBubblesWebhookSecret(config.webhookSecret, providedSecret)) {
       res.status(401).json({ ok: false, error: 'invalid_webhook_secret' });
       return;
     }
-    const message = parseBlueBubblesWebhook(req.body);
+    let webhookBody: Record<string, unknown>;
+    try {
+      webhookBody = parseSafeJsonObjectValue(req.body, 'BlueBubbles webhook body');
+    } catch {
+      res.status(400).json({ ok: false, error: 'invalid_webhook_payload' });
+      return;
+    }
+    const message = parseBlueBubblesWebhook(webhookBody);
     if (!message) {
       res.status(202).json({ ok: true, accepted: false, reason: 'ignored_event' });
       return;
@@ -557,23 +657,25 @@ async function main() {
 
   app.post('/send', async (req, res) => {
     try {
-      const body = (req.body || {}) as BridgeInput;
+      const body = parseIMessageBridgeInput(
+        parseSafeJsonObjectValue(req.body ?? {}, 'iMessage request body')
+      );
       const result = await handleSend({
-        recipient: String(body.recipient || ''),
-        text: String(body.text || ''),
+        recipient: body.recipient || '',
+        text: body.text || '',
         serviceName: body.serviceName,
         attachments: body.attachments,
       });
       res.json({ ok: true, result });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(400).json({
         ok: false,
-        error: error?.message || String(error),
+        error: errorDetail(error),
       });
     }
   });
 
-  const port = Number(argv.port || process.env.IMESSAGE_BRIDGE_PORT || 3034);
+  const port = Number(argv.port || getRegisteredEnvText('IMESSAGE_BRIDGE_PORT') || 3034);
   app.listen(port, '127.0.0.1', () => {
     logger.success(`📨 [iMessageBridge] listening on http://127.0.0.1:${port}`);
   });
@@ -583,14 +685,15 @@ async function main() {
 // starts the bridge, so importing this module in a test cannot start the HTTP
 // listener or the poll loop — and a leaked VITEST env cannot silently no-op a
 // real start.
-const directEntry = process.argv[1]
-  ? pathToFileURL(process.argv[1]).href === import.meta.url
-  : false;
-if (directEntry && !process.env.VITEST) {
-  main().catch((error) => {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
+const directEntry = isDirectScript(import.meta.url, 'satellites/imessage-bridge/src/index.ts');
+const runIMessageBridge = defineScript({
+  name: 'imessage-bridge',
+  async run({ argv }) {
+    await main(['node', 'satellites/imessage-bridge/src/index.ts', ...argv]);
+  },
+});
+if (directEntry && !getRegisteredEnvText('VITEST')) {
+  void runIMessageBridge();
 } else if (directEntry) {
   logger.warn('[iMessageBridge] VITEST is set — suppressing the direct-entry start.');
 }

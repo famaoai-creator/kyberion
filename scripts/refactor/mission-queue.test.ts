@@ -9,8 +9,10 @@ import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
 } from '@agent/core';
-import { enqueueMission } from './mission-queue.js';
+import { dispatchNextQueuedMission, enqueueMission } from './mission-queue.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -35,5 +37,63 @@ describe('mission-queue', () => {
     );
     const valid = validate(entry);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('skips malformed records when selecting the next mission', async () => {
+    safeWriteFile(
+      QUEUE_PATH,
+      [
+        '[]',
+        JSON.stringify({
+          mission_id: 'MSN-BAD',
+          tier: 'confidential',
+          priority: 'urgent',
+          status: 'pending',
+          enqueued_at: new Date().toISOString(),
+          dependencies: [],
+        }),
+        JSON.stringify({
+          mission_id: 'MSN-GOOD',
+          tier: 'confidential',
+          priority: 1,
+          status: 'pending',
+          enqueued_at: new Date().toISOString(),
+          dependencies: [],
+        }),
+      ].join('\n') + '\n'
+    );
+
+    const dispatched: string[] = [];
+    await dispatchNextQueuedMission(
+      QUEUE_PATH,
+      () => ({ ok: true, missing: [] }),
+      async (missionId) => {
+        dispatched.push(missionId);
+      }
+    );
+
+    expect(dispatched).toEqual(['MSN-GOOD']);
+  });
+
+  it('rejects a symlinked queue before reading or appending it', async () => {
+    const targetPath = path.join(QUEUE_DIR, `mission-queue-target-${Date.now()}.jsonl`);
+    const linkPath = path.join(QUEUE_DIR, `mission-queue-link-${Date.now()}.jsonl`);
+    safeWriteFile(targetPath, '');
+    safeSymlinkSync(targetPath, linkPath);
+    try {
+      await expect(enqueueMission(linkPath, 'MSN-SYMLINK', 'confidential')).rejects.toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+      await expect(
+        dispatchNextQueuedMission(
+          linkPath,
+          () => ({ ok: true, missing: [] }),
+          async () => undefined
+        )
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(linkPath, { force: true });
+      safeRmSync(targetPath, { force: true });
+    }
   });
 });

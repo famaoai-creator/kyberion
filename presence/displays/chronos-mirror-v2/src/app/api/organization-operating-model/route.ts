@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildOrganizationManagementView, listTenantProfileSlugs } from '@agent/core';
+import { buildOrganizationManagementView } from '@agent/core/organization-operating-model-management';
+import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
 import { resolveCompany } from '@agent/core/company';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
@@ -9,6 +10,7 @@ import {
   withViewerExecutionContext,
   ViewerContextError,
 } from '../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../lib/request-input';
 
 /**
  * Read-only organization control-plane projection for Chronos Mirror.
@@ -28,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const viewer = resolvedViewer.context;
-    const requestedTenant = req.nextUrl.searchParams.get('tenant') || undefined;
+    const requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
     const tenantSlugs = strictViewerScopeTenantSlugs(viewer, requestedTenant);
     const selectedTenant =
       requestedTenant ||

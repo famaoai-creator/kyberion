@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/desktop-promotion-transaction.schema.json",
+  "title": "Desktop promotion transaction",
+  "description": "Crash-recovery marker for the atomic desktop procedure promotion flow.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "procedure_id",
+    "pipeline_path",
+    "catalog_path",
+    "pipeline_sha256",
+    "catalog_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "desktop-promotion-transaction.v1" },
+    "status": { "enum": ["prepared", "committed"] },
+    "procedure_id": { "type": "string", "minLength": 1 },
+    "pipeline_path": { "type": "string", "minLength": 1 },
+    "catalog_path": { "type": "string", "minLength": 1 },
+    "pipeline_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "catalog_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "pipeline_backup_path": { "type": "string", "minLength": 1 },
+    "catalog_backup_path": { "type": "string", "minLength": 1 },
+    "pipeline_existed": { "type": "boolean" },
+    "catalog_existed": { "type": "boolean" }
+  }
+}

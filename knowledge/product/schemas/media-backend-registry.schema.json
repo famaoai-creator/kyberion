@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "media-backend-registry.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "default_backend_ids": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": { "type": "string", "minLength": 1 },
+        "voice": { "type": "string", "minLength": 1 },
+        "video": { "type": "string", "minLength": 1 },
+        "music": { "type": "string", "minLength": 1 }
+      },
+      "required": ["image", "voice", "video", "music"]
+    },
+    "backends": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "backend_id": { "type": "string", "minLength": 1 },
+          "modality": { "type": "string", "enum": ["image", "voice", "video", "music"] },
+          "display_name": { "type": "string", "minLength": 1 },
+          "kind": {
+            "type": "string",
+            "enum": ["service_preset", "api", "cli", "local", "agent_tool"]
+          },
+          "provider": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["active", "shadow", "disabled"] },
+          "platforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "enum": ["any", "darwin", "linux", "win32"] }
+          },
+          "supports": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "artifact_formats": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "async": { "type": "boolean" },
+              "playback": { "type": "boolean" },
+              "mux_audio": { "type": "boolean" }
+            }
+          },
+          "service_id": { "type": "string", "minLength": 1 },
+          "action": { "type": "string", "minLength": 1 },
+          "model": { "type": "string", "minLength": 1 },
+          "api_key_env": { "type": "string", "minLength": 1 },
+          "endpoint_env": { "type": "string", "minLength": 1 },
+          "command": { "type": "string", "minLength": 1 },
+          "args": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "fallback_backend_id": { "type": "string", "minLength": 1 },
+          "notes": { "type": "string" }
+        },
+        "required": [
+          "backend_id",
+          "modality",
+          "display_name",
+          "kind",
+          "provider",
+          "status",
+          "platforms",
+          "supports"
+        ]
+      }
+    }
+  },
+  "required": ["version", "default_backend_ids", "backends"]
+}

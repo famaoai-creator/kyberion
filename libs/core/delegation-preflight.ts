@@ -1,8 +1,5 @@
-import type { ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { createAjv } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson } from './secure-io.js';
 import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 
 type UnknownScopeBehavior = 'allow_with_warning' | 'block';
@@ -36,19 +33,16 @@ export interface DelegationPreflightResult {
   warnings: string[];
 }
 
-const ajv = createAjv();
 const PATH_SCOPE_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/path-scope-policy.schema.json'
 );
 const PATH_SCOPE_POLICY_PATH = pathResolver.knowledge('product/governance/path-scope-policy.json');
 
-let pathScopePolicyValidateFn: ValidateFunction | null = null;
-
-function ensurePathScopePolicyValidator(): ValidateFunction {
-  if (pathScopePolicyValidateFn) return pathScopePolicyValidateFn;
-  pathScopePolicyValidateFn = compileSchemaFromPath(ajv, PATH_SCOPE_POLICY_SCHEMA_PATH);
-  return pathScopePolicyValidateFn;
-}
+const pathScopePolicyCatalog = defineCatalog<PathScopePolicyFile>({
+  id: 'path-scope-policy',
+  path: PATH_SCOPE_POLICY_PATH,
+  schema: PATH_SCOPE_POLICY_SCHEMA_PATH,
+});
 
 function normalizePath(value: string): string {
   return value
@@ -59,15 +53,7 @@ function normalizePath(value: string): string {
 }
 
 function loadPathScopePolicy(): PathScopePolicyFile {
-  const parsed = loadJson<PathScopePolicyFile>(PATH_SCOPE_POLICY_PATH);
-  const validate = ensurePathScopePolicyValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid path-scope-policy: ${errors}`);
-  }
-  return parsed;
+  return pathScopePolicyCatalog.load();
 }
 
 export function inferTaskTargetPath(task: {

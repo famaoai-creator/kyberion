@@ -1,7 +1,10 @@
 import { logger } from './core.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExec,
+  assertSafeRepositoryPath,
   safeReadFile,
   safeReaddir,
   safeStat,
@@ -49,6 +52,7 @@ import {
 } from './completion-token-budget.js';
 import { StablePrefixGuard, type StablePrefixSnapshot } from './prompt-cache-discipline.js';
 import type { ReasoningToolName, SamplingParams } from './reasoning-route-resolver.js';
+import type { ConstrainedSampling } from './backend-capability-profile.js';
 
 export type LocalLlmProviderPreset =
   'generic' | 'ollama' | 'vllm' | 'lmstudio' | 'llamacpp' | 'mlx' | 'localai';
@@ -141,6 +145,14 @@ interface ChatCompletionRequest {
   presence_penalty?: number;
   frequency_penalty?: number;
   stop?: string | string[];
+  response_format?: {
+    type: 'json_schema';
+    json_schema: {
+      name: string;
+      strict: boolean;
+      schema: Record<string, unknown>;
+    };
+  };
 }
 
 interface ChatCompletionResponse {
@@ -150,6 +162,141 @@ interface ChatCompletionResponse {
   error?: {
     message?: string;
   };
+}
+
+const CHAT_ROLES = new Set<ChatRole>(['system', 'user', 'assistant', 'tool']);
+
+function parseChatMessage(value: unknown, label: string): ChatMessage | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, label);
+    if (typeof record.role !== 'string' || !CHAT_ROLES.has(record.role as ChatRole)) return null;
+
+    let content: ChatMessageContent | undefined;
+    if (record.content === null || record.content === undefined) {
+      content = record.content as null | undefined;
+    } else if (typeof record.content === 'string') {
+      content = record.content;
+    } else if (Array.isArray(record.content)) {
+      const parts: ChatContentPart[] = [];
+      for (const [index, part] of record.content.entries()) {
+        const parsedPart = parseSafeJsonObjectValue(part, `${label}.content[${index}]`);
+        if (parsedPart.type === 'text' && typeof parsedPart.text === 'string') {
+          parts.push({ type: 'text', text: parsedPart.text });
+          continue;
+        }
+        if (parsedPart.type === 'image_url') {
+          const imageUrl = parseSafeJsonObjectValue(
+            parsedPart.image_url,
+            `${label}.content[${index}].image_url`
+          );
+          if (
+            typeof imageUrl.url === 'string' &&
+            (imageUrl.detail === undefined ||
+              imageUrl.detail === 'auto' ||
+              imageUrl.detail === 'low' ||
+              imageUrl.detail === 'high')
+          ) {
+            parts.push({
+              type: 'image_url',
+              image_url: {
+                url: imageUrl.url,
+                ...(imageUrl.detail !== undefined
+                  ? { detail: imageUrl.detail as 'auto' | 'low' | 'high' }
+                  : {}),
+              },
+            });
+            continue;
+          }
+        }
+        return null;
+      }
+      content = parts;
+    } else {
+      return null;
+    }
+
+    let toolCalls: ChatMessage['tool_calls'];
+    if (record.tool_calls !== undefined) {
+      if (!Array.isArray(record.tool_calls)) return null;
+      toolCalls = [];
+      for (const [index, call] of record.tool_calls.entries()) {
+        const parsedCall = parseSafeJsonObjectValue(call, `${label}.tool_calls[${index}]`);
+        const fn = parseSafeJsonObjectValue(
+          parsedCall.function,
+          `${label}.tool_calls[${index}].function`
+        );
+        if (
+          typeof parsedCall.id !== 'string' ||
+          parsedCall.type !== 'function' ||
+          typeof fn.name !== 'string' ||
+          typeof fn.arguments !== 'string'
+        ) {
+          return null;
+        }
+        toolCalls.push({
+          id: parsedCall.id,
+          type: 'function',
+          function: { name: fn.name, arguments: fn.arguments },
+        });
+      }
+    }
+
+    return {
+      role: record.role as ChatRole,
+      ...(content !== undefined ? { content } : {}),
+      ...(toolCalls !== undefined ? { tool_calls: toolCalls } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseChatCompletionPayload(value: unknown): ChatCompletionResponse | null {
+  try {
+    const root = parseSafeJsonObjectValue(value, 'OpenAI-compatible response');
+    let error: ChatCompletionResponse['error'];
+    if (root.error !== undefined) {
+      const parsedError = parseSafeJsonObjectValue(root.error, 'OpenAI-compatible response.error');
+      if (typeof parsedError.message !== 'string') return null;
+      error = { message: parsedError.message };
+    }
+    if (root.choices === undefined) return error ? { choices: [], error } : null;
+    if (!Array.isArray(root.choices)) return null;
+    const choices: ChatCompletionResponse['choices'] = [];
+    for (const [index, choice] of root.choices.entries()) {
+      const parsedChoice = parseSafeJsonObjectValue(
+        choice,
+        `OpenAI-compatible response.choices[${index}]`
+      );
+      const message = parseChatMessage(
+        parsedChoice.message,
+        `OpenAI-compatible response.choices[${index}].message`
+      );
+      if (!message) return null;
+      choices.push({ message });
+    }
+    return { choices, ...(error ? { error } : {}) };
+  } catch {
+    return null;
+  }
+}
+
+function parseChatCompletionDelta(value: unknown): string | null {
+  try {
+    const root = parseSafeJsonObjectValue(value, 'OpenAI-compatible streaming response');
+    if (!Array.isArray(root.choices) || !root.choices[0]) return null;
+    const choice = parseSafeJsonObjectValue(
+      root.choices[0],
+      'OpenAI-compatible streaming response.choices[0]'
+    );
+    const delta = parseSafeJsonObjectValue(
+      choice.delta,
+      'OpenAI-compatible streaming response.choices[0].delta'
+    );
+    return typeof delta.content === 'string' ? delta.content : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeBaseUrl(baseURL: string, providerPreset?: LocalLlmProviderPreset): string {
@@ -383,7 +530,7 @@ function createProvidedToolDefinitions(
 
 function safeJsonParse(text: string): unknown {
   try {
-    return JSON.parse(text);
+    return parseSafeJsonInput(text, 'OpenAI-compatible response');
   } catch {
     return null;
   }
@@ -552,6 +699,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       useTools?: boolean;
       signal?: AbortSignal;
       toolDefinitions?: readonly ToolDefinition[];
+      constrainedSampling?: ConstrainedSampling;
     } = {}
   ): Promise<ChatCompletionResponse> {
     if (opts.signal?.aborted) {
@@ -584,6 +732,21 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         : {}),
       ...this.samplingParams,
     };
+    if (opts.constrainedSampling) {
+      if ('grammar' in opts.constrainedSampling) {
+        throw new Error(
+          '[openai-compatible] grammar constrained sampling is not supported by this adapter'
+        );
+      }
+      body.response_format = {
+        type: 'json_schema',
+        json_schema: {
+          name: 'kyberion_structured_output',
+          strict: opts.constrainedSampling.strict === 'require',
+          schema: opts.constrainedSampling.jsonSchema,
+        },
+      };
+    }
     const maxTokens = this.completionBudget(body);
     if (maxTokens !== undefined) body.max_tokens = maxTokens;
 
@@ -595,7 +758,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     });
 
     const text = await response.text();
-    const parsed = safeJsonParse(text) as ChatCompletionResponse | null;
+    const parsed = parseChatCompletionPayload(safeJsonParse(text));
     if (!response.ok) {
       const message = parsed?.error?.message || text || `HTTP ${response.status}`;
       throw new Error(`[openai-compatible] chat completion failed: ${message}`);
@@ -639,7 +802,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     });
     if (!response.ok) {
       const text = await response.text();
-      const parsed = safeJsonParse(text) as ChatCompletionResponse | null;
+      const parsed = parseChatCompletionPayload(safeJsonParse(text));
       throw new Error(
         `[openai-compatible] streaming chat completion failed: ${parsed?.error?.message || text || `HTTP ${response.status}`}`
       );
@@ -654,11 +817,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       if (!trimmed.startsWith('data:')) return null;
       const data = trimmed.slice(5).trim();
       if (!data || data === '[DONE]') return null;
-      const parsed = safeJsonParse(data) as {
-        choices?: Array<{ delta?: { content?: unknown } }>;
-      } | null;
-      const content = parsed?.choices?.[0]?.delta?.content;
-      return typeof content === 'string' ? content : null;
+      return parseChatCompletionDelta(safeJsonParse(data));
     };
 
     for (;;) {
@@ -681,21 +840,33 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     if (!this.toolsEnabled || !this.allowedTools.has(name as ReasoningToolName)) {
       return `Error: Tool ${name} is not enabled for this reasoning route.`;
     }
-    const args = (safeJsonParse(rawArguments) as Record<string, unknown>) || {};
+    let args: Record<string, unknown>;
+    try {
+      args = parseSafeJsonObjectValue(
+        safeJsonParse(rawArguments),
+        `OpenAI-compatible tool '${name}' arguments`
+      );
+    } catch {
+      return `Error: Tool ${name} arguments must be a JSON object.`;
+    }
     logger.info(`[LOCAL_LLM] Tool Call: ${name}(${JSON.stringify(redactSensitiveObject(args))})`);
 
     try {
       switch (name) {
         case 'read_file':
-          return String(safeReadFile(String(args.path ?? '')));
-        case 'write_file':
-          safeWriteFile(String(args.path ?? ''), String(args.content ?? ''), {
+          return readTextFile(assertSafeRepositoryPath(String(args.path ?? '')));
+        case 'write_file': {
+          const filePath = assertSafeRepositoryPath(String(args.path ?? ''), {
+            allowMissingLeaf: true,
+          });
+          safeWriteFile(filePath, String(args.content ?? ''), {
             mkdir: true,
             encoding: 'utf8',
           });
           return 'Success: File written.';
+        }
         case 'list_directory':
-          return JSON.stringify(safeReaddir(String(args.path ?? '')));
+          return JSON.stringify(safeReaddir(assertSafeRepositoryPath(String(args.path ?? ''))));
         case 'shell_exec':
           return safeExec('bash', ['-lc', String(args.command ?? '')], {
             cwd: pathResolver.rootDir(),
@@ -710,9 +881,12 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
 
   private async completePromptMessages(
     messages: ChatMessage[],
-    signal?: AbortSignal
+    options?: Pick<ReasoningCallOptions, 'signal' | 'constrainedSampling'>
   ): Promise<string> {
-    let response = await this.fetchChatCompletion(messages, { signal });
+    let response = await this.fetchChatCompletion(messages, {
+      signal: options?.signal,
+      constrainedSampling: options?.constrainedSampling,
+    });
     let message = response.choices[0].message;
     let guardrailState = createToolLoopGuardrailState();
     // KD-08: record the stable-prefix baseline for this turn before any tool
@@ -749,7 +923,10 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         });
       }
       prefixGuard.assertStable(this.stablePrefixSnapshot(messages));
-      response = await this.fetchChatCompletion(messages, { signal });
+      response = await this.fetchChatCompletion(messages, {
+        signal: options?.signal,
+        constrainedSampling: options?.constrainedSampling,
+      });
       message = response.choices[0].message;
     }
 
@@ -787,7 +964,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
           .join('\n\n'),
       },
     ];
-    return this.completePromptMessages(messages, optionsWithSignal?.signal);
+    return this.completePromptMessages(messages, optionsWithSignal);
   }
 
   async promptWithImages(
@@ -810,7 +987,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         content: [...imageContentParts(images), { type: 'text', text: prompt }],
       },
     ];
-    return this.completePromptMessages(messages, options?.signal);
+    return this.completePromptMessages(messages, options);
   }
 
   /**

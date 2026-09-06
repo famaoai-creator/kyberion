@@ -104,6 +104,18 @@ describe('scan_dependency_vulns', () => {
     expect(result.findings[0]?.package_name).toBe('evil_dep');
     expect(result.findings[0]?.reachability).toBe(0);
   });
+
+  it('fails closed when audit or outdated output has a non-object root', () => {
+    const result = scanDependencyVulnerabilitiesFromInputs({
+      auditJson: JSON.stringify([{ vulnerabilities: { should_not_be_read: {} } }]),
+      outdatedJson: JSON.stringify(['not-an-object']),
+      workspaceRoot: pathResolver.rootDir(),
+      ledgerPath,
+    });
+
+    expect(result.scanned_packages).toBe(0);
+    expect(result.findings).toEqual([]);
+  });
 });
 
 function finding(
@@ -158,6 +170,7 @@ describe('defer re-evaluation loop (Task 4)', () => {
       JSON.stringify({ kind: 'patch_apply', package_name: 'x', status: 'patched' }),
       JSON.stringify({ kind: 'patch_apply', package_name: 'y', status: 'patched' }),
       JSON.stringify({ kind: 'patch_apply', package_name: 'y', status: 'rolled_back' }),
+      '{"findings":[{"package_name":"unsafe","__proto__":{"polluted":true}}]}',
       'not json',
     ];
     safeWriteFile(ledgerPath, `${lines.join('\n')}\n`);
@@ -165,6 +178,7 @@ describe('defer re-evaluation loop (Task 4)', () => {
     const state = readPreviousLedgerState(ledgerPath);
     expect(state.findings.get('a')?.latest_version).toBe('1.2.0');
     expect([...state.patched]).toEqual(['x']);
+    expect(state.findings.has('unsafe')).toBe(false);
   });
 
   it('reports reevaluations and unresolved counts across two scans', () => {
@@ -203,5 +217,30 @@ describe('defer re-evaluation loop (Task 4)', () => {
         trigger: 'new_version_available',
       }),
     ]);
+  });
+});
+
+describe('vulnerability ledger shape boundary', () => {
+  it('skips malformed findings instead of letting them affect re-evaluation', () => {
+    const ledgerPath = pathResolver.sharedTmp('vuln-ledger-tests/malformed-ledger.jsonl');
+    safeMkdir(pathResolver.sharedTmp('vuln-ledger-tests'), { recursive: true });
+    safeWriteFile(
+      ledgerPath,
+      [
+        JSON.stringify({
+          findings: [
+            finding({ package_name: 'valid-package' }),
+            { package_name: 'bad-package', decision: 'defer', reachability: '1' },
+            ['not-a-finding'],
+          ],
+        }),
+        JSON.stringify({ findings: 'not-an-array' }),
+        '[]',
+      ].join('\n')
+    );
+
+    const state = readPreviousLedgerState(ledgerPath);
+
+    expect([...state.findings.keys()]).toEqual(['valid-package']);
   });
 });

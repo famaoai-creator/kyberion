@@ -6,7 +6,8 @@
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import { sensoryMemory } from './sensory-memory.js';
 import { createLogger } from './logger.js';
 
@@ -25,12 +26,24 @@ export interface DynamicPolicy {
   };
 }
 
+interface DynamicPolicyFile {
+  version: string;
+  policies: DynamicPolicy[];
+}
+
+const POLICY_PATH = pathResolver.resolve('knowledge/product/governance/dynamic-policies.json');
+const POLICY_SCHEMA_PATH = pathResolver.resolve(
+  'knowledge/product/schemas/dynamic-permission-policy.schema.json'
+);
+const dynamicPolicyCatalog = defineCatalog<DynamicPolicyFile>({
+  id: 'dynamic-permission-policy',
+  path: POLICY_PATH,
+  schema: POLICY_SCHEMA_PATH,
+});
+
 class DynamicPermissionGuard {
   private static instance: DynamicPermissionGuard;
   private policies: DynamicPolicy[] = [];
-  private readonly POLICY_PATH = pathResolver.resolve(
-    'knowledge/product/governance/dynamic-policies.json'
-  );
 
   private constructor() {
     this.loadPolicies();
@@ -44,11 +57,14 @@ class DynamicPermissionGuard {
   }
 
   public loadPolicies() {
-    if (!safeExistsSync(this.POLICY_PATH)) return;
+    if (!safeExistsSync(POLICY_PATH)) {
+      this.policies = [];
+      return;
+    }
     try {
-      const content = safeReadFile(this.POLICY_PATH, { encoding: 'utf8' }) as string;
-      this.policies = JSON.parse(content).policies;
+      this.policies = dynamicPolicyCatalog.load().policies;
     } catch (err) {
+      this.policies = [];
       // Fail-closed (no dynamic grants), but never silently: operators must see why grants vanished.
       logger.warn(`dynamic-policies.json unreadable — no dynamic grants active: ${err}`);
     }

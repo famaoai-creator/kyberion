@@ -1,6 +1,15 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { writeGovernedArtifactJson } from './artifact-store.js';
 import * as customerResolver from './customer-resolver.js';
@@ -14,6 +23,9 @@ import type {
 } from './channel-surface-types.js';
 
 const TEXT_MODAL_FIELDS: OnboardingField[] = ['name', 'primary_domain', 'vision'];
+const SLACK_ONBOARDING_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/slack-onboarding-state.schema.json'
+);
 
 function profileRoot(): string {
   return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
@@ -87,8 +99,19 @@ export function isEnvironmentInitialized(): boolean {
 
 function loadOnboardingState(channel: string, threadTs: string): OnboardingState | null {
   const resolved = pathResolver.resolve(onboardingStateLogicalPath(channel, threadTs));
-  if (!safeExistsSync(resolved)) return null;
-  return loadJson<OnboardingState>(resolved);
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeResolved) || !safeLstat(safeResolved).isFile()) return null;
+  const state = defineCatalog<OnboardingState>({
+    id: 'slack-onboarding-state',
+    path: safeResolved,
+    schema: SLACK_ONBOARDING_STATE_SCHEMA_PATH,
+  }).load();
+  if (state.channel !== channel || state.threadTs !== threadTs) {
+    throw new Error(
+      `[SLACK_ONBOARDING_SCOPE_MISMATCH] state belongs to ${state.channel}/${state.threadTs}, expected ${channel}/${threadTs}`
+    );
+  }
+  return state;
 }
 
 export function getSlackOnboardingState(channel: string, threadTs: string): OnboardingState | null {
@@ -137,7 +160,36 @@ function serializeOnboardingAction(payload: SlackOnboardingActionPayload): strin
 }
 
 export function parseSlackOnboardingAction(value: string): SlackOnboardingActionPayload {
-  return JSON.parse(value) as SlackOnboardingActionPayload;
+  const parsed = parseSafeJsonObjectInput(value, 'Slack onboarding action');
+  const fields: OnboardingField[] = [
+    'name',
+    'language',
+    'interaction_style',
+    'primary_domain',
+    'vision',
+    'agent_id',
+  ];
+  if (
+    !parsed ||
+    typeof parsed.channel !== 'string' ||
+    !parsed.channel.trim() ||
+    typeof parsed.threadTs !== 'string' ||
+    !parsed.threadTs.trim() ||
+    typeof parsed.field !== 'string' ||
+    !fields.includes(parsed.field as OnboardingField)
+  ) {
+    throw new Error('Slack onboarding action has an invalid channel, threadTs, or field');
+  }
+  if (parsed.answer !== undefined && typeof parsed.answer !== 'string') {
+    throw new Error('Slack onboarding action answer must be a string');
+  }
+  const answer = parsed.answer as string | undefined;
+  return {
+    channel: parsed.channel,
+    threadTs: parsed.threadTs,
+    field: parsed.field as OnboardingField,
+    ...(answer !== undefined ? { answer } : {}),
+  };
 }
 
 export function buildSlackOnboardingPrompt(
@@ -265,7 +317,7 @@ function persistOnboardingIdentity(state: OnboardingState): void {
   const primaryDomain = state.answers.primary_domain || 'General';
   const vision = state.answers.vision || 'Build a high-fidelity Kyberion environment.';
   const agentId = (state.answers.agent_id || 'KYBERION-PRIME').trim().toUpperCase();
-  const now = new Date().toISOString();
+  const now = nowIso();
   withExecutionContext('sovereign_concierge', () => {
     const root = profileRoot();
     safeMkdir(root, { recursive: true });
@@ -319,7 +371,7 @@ export function handleSlackOnboardingTurn(params: {
       currentField: 'name',
       answers: {},
       completed: false,
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso(),
     };
     saveOnboardingState(state);
     return {
@@ -335,7 +387,7 @@ export function handleSlackOnboardingTurn(params: {
   if (!state.completed) {
     state.answers[state.currentField] = normalizeOnboardingAnswer(state.currentField, params.text);
     const nextField = nextOnboardingField(state.currentField);
-    state.updatedAt = new Date().toISOString();
+    state.updatedAt = nowIso();
     if (!nextField) {
       state.completed = true;
       saveOnboardingState(state);

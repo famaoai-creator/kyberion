@@ -2,14 +2,16 @@ import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
+import { loadServicePidRegistryAtPath } from './service-pid-registry.js';
 import { logger } from './core.js';
-import { createAjv } from './foundation/ajv.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
+import { nowIso } from './foundation/time.js';
 import {
-  loadJson,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -17,7 +19,12 @@ import {
   buildOrganizationWorkLoopSummary,
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
-import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
+import {
+  loadResolvedStandardIntentCatalog,
+  resolveIntentResolutionPacket,
+  type IntentResolutionOptions,
+  type IntentResolutionPacket,
+} from './intent-resolution.js';
 import { resolveAnalysisExecutionContract } from './analysis-contract.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
 import {
@@ -157,7 +164,6 @@ interface ValidationResult<T> {
   value?: T;
 }
 
-const ajv = createAjv();
 const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('product/schemas/task-session.schema.json');
 const TASK_SESSION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/task-session-policy.schema.json'
@@ -166,14 +172,19 @@ const TASK_SESSION_POLICY_PATH = pathResolver.knowledge(
   'product/governance/task-session-policy.json'
 );
 const SERVICE_PID_FILE = pathResolver.shared('services-pids.json');
-const SURFACE_MANIFEST_DIR = pathResolver.knowledge('product/governance/surfaces');
-const SURFACE_STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
+
+function taskSessionCatalog(filePath: string) {
+  return defineCatalog<TaskSession>({
+    id: 'task-session',
+    path: filePath,
+    schema: TASK_SESSION_SCHEMA_PATH,
+  });
+}
 
 let taskSessionValidateFn: ValidateFunction | null = null;
-let taskSessionPolicyValidateFn: ValidateFunction | null = null;
 function ensureTaskSessionValidator(): ValidateFunction {
   if (taskSessionValidateFn) return taskSessionValidateFn;
-  taskSessionValidateFn = compileSchemaFromPath(ajv, TASK_SESSION_SCHEMA_PATH);
+  taskSessionValidateFn = compileSchema(TASK_SESSION_SCHEMA_PATH);
   return taskSessionValidateFn;
 }
 
@@ -205,19 +216,14 @@ type TaskSessionPolicyFile = {
   intents: TaskSessionIntentPolicy[];
 };
 
-function ensureTaskSessionPolicyValidator(): ValidateFunction {
-  if (taskSessionPolicyValidateFn) return taskSessionPolicyValidateFn;
-  taskSessionPolicyValidateFn = compileSchemaFromPath(ajv, TASK_SESSION_POLICY_SCHEMA_PATH);
-  return taskSessionPolicyValidateFn;
-}
+const taskSessionPolicyCatalog = defineCatalog<TaskSessionPolicyFile>({
+  id: 'task-session-policy',
+  path: TASK_SESSION_POLICY_PATH,
+  schema: TASK_SESSION_POLICY_SCHEMA_PATH,
+});
 
 function loadTaskSessionPolicy(): TaskSessionPolicyFile {
-  const value = loadJson<TaskSessionPolicyFile>(TASK_SESSION_POLICY_PATH);
-  const validate = ensureTaskSessionPolicyValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid task-session-policy: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value;
+  return taskSessionPolicyCatalog.load();
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
@@ -227,11 +233,19 @@ function errorsFrom(validate: ValidateFunction): string[] {
 }
 
 function taskSessionDir(rootDir = pathResolver.rootDir()): string {
-  return path.resolve(rootDir, 'active/shared/runtime/task-sessions');
+  return assertSafeRepositoryPath(path.resolve(rootDir, 'active/shared/runtime/task-sessions'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function taskSessionPath(sessionId: string, rootDir = pathResolver.rootDir()): string {
-  return `${taskSessionDir(rootDir)}/${sessionId}.json`;
+  const normalized = String(sessionId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('[TASK_SESSION_ID] session id must be a single path segment');
+  }
+  return assertSafeRepositoryPath(path.join(taskSessionDir(rootDir), `${normalized}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function collectTaskSessionEvidenceRefs(session: TaskSession): string[] {
@@ -287,16 +301,8 @@ function recordTaskSessionCompletionLearning(session: TaskSession): void {
   }
 }
 
-function extractServiceNameFromUtterance(trimmed: string): string | undefined {
-  const serviceMatch =
-    trimmed.match(
-      /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(?:再起動|restart|起動|停止|stop|status|状態|ログ)/i
-    ) || trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
-  return serviceMatch?.[1];
-}
-
 function isRunningPid(pid: unknown): pid is number {
-  if (typeof pid !== 'number' || !Number.isFinite(pid)) return false;
+  if (typeof pid !== 'number' || !Number.isSafeInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -306,9 +312,10 @@ function isRunningPid(pid: unknown): pid is number {
 }
 
 function loadRunningServiceIds(): string[] {
-  if (!safeExistsSync(SERVICE_PID_FILE)) return [];
   try {
-    const parsed = loadJson<Record<string, unknown>>(SERVICE_PID_FILE);
+    const safePidFile = assertSafeRepositoryPath(SERVICE_PID_FILE);
+    const parsed = loadServicePidRegistryAtPath(safePidFile);
+    if (!parsed) return [];
     return Object.entries(parsed)
       .filter(([, pid]) => isRunningPid(pid))
       .map(([serviceId]) => serviceId)
@@ -328,14 +335,11 @@ type SurfaceStartableChoice = {
 };
 
 function loadSurfaceStateRunningIds(): Set<string> {
-  if (!safeExistsSync(SURFACE_STATE_PATH)) return new Set();
   try {
-    const parsed = loadJson<{
-      surfaces?: Record<string, { pid?: unknown }>;
-    }>(SURFACE_STATE_PATH);
+    const parsed = loadSurfaceState();
     return new Set(
-      Object.entries(parsed.surfaces || {})
-        .filter(([, record]) => isRunningPid(record?.pid))
+      Object.entries(parsed.surfaces)
+        .filter(([, record]) => isRunningPid(record.pid))
         .map(([surfaceId]) => surfaceId)
     );
   } catch {
@@ -344,42 +348,29 @@ function loadSurfaceStateRunningIds(): Set<string> {
 }
 
 function loadStartableServiceChoices(): SurfaceStartableChoice[] {
-  if (!safeExistsSync(SURFACE_MANIFEST_DIR)) return [];
   const runningIds = loadSurfaceStateRunningIds();
-  return safeReaddir(SURFACE_MANIFEST_DIR)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .flatMap((entry) => {
-      try {
-        const manifest = loadJson<{ surfaces?: Array<Record<string, unknown>> }>(
-          pathResolver.knowledge(`product/governance/surfaces/${entry}`)
-        );
-        return (manifest.surfaces || [])
-          .filter((surface) => surface && surface.enabled !== false)
-          .map((surface) => {
-            const serviceName = String(surface.id || '').trim();
-            return {
-              service_name: serviceName,
-              surface_id: serviceName,
-              description:
-                typeof surface.description === 'string' ? surface.description : undefined,
-              kind: typeof surface.kind === 'string' ? surface.kind : undefined,
-              startup_mode:
-                typeof surface.startupMode === 'string' ? surface.startupMode : undefined,
-              service_id: typeof surface.service_id === 'string' ? surface.service_id : undefined,
-            } satisfies SurfaceStartableChoice;
-          })
-          .filter(
-            (choice) =>
-              choice.service_name &&
-              choice.startup_mode === 'background' &&
-              !runningIds.has(choice.surface_id)
-          );
-      } catch {
-        return [];
-      }
-    })
-    .sort((left, right) => left.service_name.localeCompare(right.service_name));
+  try {
+    const manifest = loadSurfaceManifest();
+    const choices = manifest.surfaces
+      .filter((surface) => surface.enabled !== false)
+      .map((surface) => {
+        const serviceName = surface.id.trim();
+        return {
+          service_name: serviceName,
+          surface_id: serviceName,
+          description: surface.description,
+          kind: surface.kind,
+          startup_mode: surface.startupMode,
+          service_id: surface.service_id,
+        } satisfies SurfaceStartableChoice;
+      })
+      .filter(
+        (choice) => choice.startup_mode === 'background' && !runningIds.has(choice.surface_id)
+      );
+    return choices.sort((left, right) => left.service_name.localeCompare(right.service_name));
+  } catch {
+    return [];
+  }
 }
 
 function inferRequiresApproval(input: {
@@ -388,19 +379,29 @@ function inferRequiresApproval(input: {
   payload?: TaskSession['payload'];
   workLoop?: OrganizationWorkLoopSummary;
 }): boolean {
-  if (typeof input.requiresApproval === 'boolean') return input.requiresApproval;
-  if (input.workLoop?.authority?.requires_approval === true) return true;
+  // A policy-derived approval requirement is a safety floor. An explicit
+  // false must not be able to bypass a dangerous intent's resolved policy.
   if (input.payload?.approval_required === true) return true;
-  return (
+  if (input.workLoop?.authority?.requires_approval === true) return true;
+  if (input.requiresApproval === true) return true;
+  if (
     Array.isArray(input.requirements?.missing) &&
-    input.requirements.missing.includes('approval_confirmation')
-  );
+    input.requirements.missing.some(
+      (requirement) =>
+        requirement === 'approval_confirmation' || requirement === 'dual_key_confirmation'
+    )
+  ) {
+    return true;
+  }
+  if (input.requiresApproval === false) return false;
+  return false;
 }
 
 function applyApprovalPolicy(
   intentId: string,
   payload: Record<string, unknown>,
-  requirements: NonNullable<TaskSession['requirements']>
+  requirements: NonNullable<TaskSession['requirements']>,
+  options: { includeMetadata?: boolean } = {}
 ): {
   payload: Record<string, unknown>;
   requirements: {
@@ -419,8 +420,12 @@ function applyApprovalPolicy(
   return {
     payload: {
       ...payload,
-      approval_required: policy.requiresApproval,
-      approval_rule_id: policy.matchedRuleId,
+      ...(options.includeMetadata === false
+        ? {}
+        : {
+            approval_required: policy.requiresApproval,
+            approval_rule_id: policy.matchedRuleId,
+          }),
     },
     requirements: nextRequirements,
   };
@@ -444,9 +449,40 @@ export function createTaskSession(input: {
   workLoop?: OrganizationWorkLoopSummary;
   outcomeContract?: OutcomeContract;
 }): TaskSession {
-  const now = new Date().toISOString();
-  const requiresApproval = inferRequiresApproval(input);
+  const now = nowIso();
   const correlationId = input.correlationId;
+  const baseRequirements = input.requirements || { missing: [], collected: {} };
+  const basePayload = input.intentId
+    ? {
+        ...(input.payload || {}),
+        ...(input.intentId ? { intent_id: input.intentId } : {}),
+      }
+    : input.payload;
+  const approvalPolicy = input.intentId
+    ? resolveApprovalPolicy({ intentId: input.intentId, payload: basePayload || {} })
+    : undefined;
+  const approvalApplied = input.intentId
+    ? applyApprovalPolicy(input.intentId, basePayload || {}, baseRequirements, {
+        // Conditional task-session payload schemas intentionally reject
+        // generic policy metadata. Keep the policy in control/requirements;
+        // specialized builders may still opt into the metadata fields.
+        includeMetadata: false,
+      })
+    : { payload: basePayload, requirements: baseRequirements };
+  const requirements = approvalApplied.requirements;
+  const payload = approvalApplied.payload;
+  const requiresApproval = inferRequiresApproval({
+    ...input,
+    // Approval is monotone at this boundary: keep an explicit caller request
+    // and a policy-required request. Policy requirements below also prevent
+    // an explicit false from bypassing a dangerous intent.
+    requiresApproval:
+      input.requiresApproval === true || approvalPolicy?.requiresApproval === true
+        ? true
+        : input.requiresApproval,
+    requirements,
+    payload,
+  });
   const workLoop =
     input.workLoop ||
     buildOrganizationWorkLoopSummary({
@@ -484,13 +520,6 @@ export function createTaskSession(input: {
     verificationMethod: outcomeContract.verification_method,
   });
 
-  const payload = input.intentId
-    ? {
-        ...(input.payload || {}),
-        ...(input.intentId ? { intent_id: input.intentId } : {}),
-      }
-    : input.payload;
-
   return {
     session_id: provisionalSessionId,
     correlation_id: correlationId,
@@ -501,11 +530,11 @@ export function createTaskSession(input: {
     goal: input.goal,
     project_context: input.projectContext,
     work_loop: workLoop,
-    requirements: input.requirements,
+    requirements,
     control: {
       interruptible: true,
       requires_approval: requiresApproval,
-      awaiting_user_input: Boolean(input.requirements?.missing?.length),
+      awaiting_user_input: Boolean(requirements?.missing?.length),
     },
     outcome_contract: normalizedOutcomeContract,
     history: [],
@@ -650,7 +679,10 @@ function deriveBookingCategory(trimmed: string): BookingCategory | 'default' {
 }
 
 // ─── Dynamic Task Intent Registry ──────────────────────────────────────────────
-export type TaskSessionIntentBuilder = (trimmed: string) => TaskSessionIntent;
+export type TaskSessionIntentBuilder = (
+  trimmed: string,
+  resolvedPacket?: IntentResolutionPacket
+) => TaskSessionIntent;
 
 const taskIntentBuilderSeam = createSeam<TaskSessionIntentBuilder>({
   key: 'task-intent-builder',
@@ -717,9 +749,9 @@ registerTaskIntentBuilder('evolve-agent-harness', (trimmed) => {
     },
   };
 });
-registerTaskIntentBuilder('inspect-service', (trimmed) => {
+registerTaskIntentBuilder('inspect-service', (trimmed, resolvedPacket) => {
   const base = buildPolicyBackedIntent('inspect-service', trimmed);
-  const serviceMatch = extractServiceNameFromUtterance(trimmed);
+  const serviceMatch = resolvedPacket?.selected_parameters?.service_name;
   const intent: TaskSessionIntent = {
     ...base,
     requirements: {
@@ -743,9 +775,9 @@ registerTaskIntentBuilder('inspect-service', (trimmed) => {
     payload: approvalApplied.payload,
   };
 });
-registerTaskIntentBuilder('stop-service', (trimmed) => {
+registerTaskIntentBuilder('stop-service', (trimmed, resolvedPacket) => {
   const base = buildPolicyBackedIntent('stop-service', trimmed);
-  const serviceName = extractServiceNameFromUtterance(trimmed);
+  const serviceName = resolvedPacket?.selected_parameters?.service_name;
   const activeServices = loadRunningServiceIds();
   const intent: TaskSessionIntent = {
     ...base,
@@ -780,9 +812,9 @@ registerTaskIntentBuilder('stop-service', (trimmed) => {
     payload: approvalApplied.payload,
   };
 });
-registerTaskIntentBuilder('start-service', (trimmed) => {
+registerTaskIntentBuilder('start-service', (trimmed, resolvedPacket) => {
   const base = buildPolicyBackedIntent('start-service', trimmed);
-  const serviceName = extractServiceNameFromUtterance(trimmed);
+  const serviceName = resolvedPacket?.selected_parameters?.service_name;
   const startableServices = loadStartableServiceChoices();
   const intent: TaskSessionIntent = {
     ...base,
@@ -817,9 +849,9 @@ registerTaskIntentBuilder('start-service', (trimmed) => {
     payload: approvalApplied.payload,
   };
 });
-registerTaskIntentBuilder('restart-service', (trimmed) => {
+registerTaskIntentBuilder('restart-service', (trimmed, resolvedPacket) => {
   const base = buildPolicyBackedIntent('restart-service', trimmed);
-  const serviceName = extractServiceNameFromUtterance(trimmed);
+  const serviceName = resolvedPacket?.selected_parameters?.service_name;
   const intent: TaskSessionIntent = {
     ...base,
     requirements: {
@@ -1077,16 +1109,20 @@ registerTaskIntentBuilder('fetch-external-data', (trimmed) => {
   };
 });
 
-export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent | null {
+export function classifyTaskSessionIntent(
+  utterance: string,
+  resolvedPacket?: IntentResolutionPacket,
+  options: IntentResolutionOptions = {}
+): TaskSessionIntent | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;
-  const packet = resolveIntentResolutionPacket(trimmed);
+  const packet = resolvedPacket || resolveIntentResolutionPacket(trimmed, options);
   const intentId = packet.selected_intent_id;
   const builder = intentId ? getTaskIntentBuilder(intentId) : undefined;
-  if (builder) return builder(trimmed);
+  if (builder) return builder(trimmed, packet);
   if (!intentId) return null;
 
-  const intent = loadStandardIntentCatalog().find((entry) => entry.id === intentId);
+  const intent = loadResolvedStandardIntentCatalog(options).find((entry) => entry.id === intentId);
   if (intent?.resolution?.shape !== 'task_session') return null;
   try {
     const built = buildPolicyBackedIntent(intentId, trimmed);
@@ -1120,6 +1156,9 @@ export function validateTaskSession(session: unknown): ValidationResult<TaskSess
 }
 
 export function saveTaskSession(session: TaskSession, options: { rootDir?: string } = {}): string {
+  const rootDir = options.rootDir || pathResolver.rootDir();
+  const directory = taskSessionDir(rootDir);
+  const filePath = taskSessionPath(session.session_id, rootDir);
   if (session.status === 'completed') {
     const evidenceRefs = collectTaskSessionEvidenceRefs(session);
     const evidenceTexts = collectTaskSessionEvidenceTexts(session);
@@ -1155,17 +1194,23 @@ export function saveTaskSession(session: TaskSession, options: { rootDir?: strin
       throw new Error(`Cannot complete task session: ${completionValidation.reason}`);
     }
   }
-  const result = validateTaskSession(session);
+  let canonicalSession: TaskSession;
+  try {
+    canonicalSession = taskSessionCatalog(filePath).validate(session, filePath);
+  } catch (error) {
+    throw new Error(
+      `Invalid task session: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
+  }
+  const result = validateTaskSession(canonicalSession);
   if (!result.valid) {
     throw new Error(`Invalid task session: ${result.errors.join('; ')}`);
   }
-  const rootDir = options.rootDir || pathResolver.rootDir();
-  const directory = taskSessionDir(rootDir);
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
-  const filePath = taskSessionPath(session.session_id, rootDir);
-  safeWriteFile(filePath, JSON.stringify(session, null, 2));
-  if (session.status === 'completed') {
-    recordTaskSessionCompletionLearning(session);
+  safeWriteFile(filePath, `${JSON.stringify(canonicalSession, null, 2)}\n`);
+  if (canonicalSession.status === 'completed') {
+    recordTaskSessionCompletionLearning(canonicalSession);
   }
   return filePath;
 }
@@ -1174,10 +1219,24 @@ export function loadTaskSession(
   sessionId: string,
   options: { rootDir?: string } = {}
 ): TaskSession | null {
-  const filePath = taskSessionPath(sessionId, options.rootDir || pathResolver.rootDir());
-  if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as TaskSession;
+  let filePath: string;
+  try {
+    filePath = taskSessionPath(sessionId, options.rootDir || pathResolver.rootDir());
+    if (!safeExistsSync(filePath)) return null;
+  } catch {
+    return null;
+  }
+  let parsed: TaskSession;
+  try {
+    assertSafeRepositoryPath(filePath);
+    parsed = taskSessionCatalog(filePath).load();
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    logger.warn(
+      `[TASK_SESSION] Invalid session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
   const result = validateTaskSession(parsed);
   if (!result.valid) {
     logger.warn(`[TASK_SESSION] Invalid session ${sessionId}: ${result.errors.join('; ')}`);
@@ -1245,13 +1304,13 @@ export function reopenTaskSession(
       ...(session.payload || {}),
       ...(input.payload || {}),
       reopened_from_session_id: session.session_id,
-      reopened_at: new Date().toISOString(),
+      reopened_at: nowIso(),
       reopen_reason: input.reason,
     },
   });
   if (!reopened) return null;
   recordTaskSessionHistory(sessionId, {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     type: 'control',
     text: `Session reopened: ${input.reason}`,
   });
@@ -1268,7 +1327,7 @@ export function updateTaskSession(
     ...session,
     ...patch,
     session_id: session.session_id,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   saveTaskSession(next);
   return next;
@@ -1281,7 +1340,7 @@ export function recordTaskSessionHistory(
   const session = loadTaskSession(sessionId);
   if (!session) return null;
   session.history = [...session.history, entry].slice(-50);
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   saveTaskSession(session);
   return session;
 }

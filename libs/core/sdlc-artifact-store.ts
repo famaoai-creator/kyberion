@@ -10,8 +10,11 @@
  */
 
 import * as path from 'node:path';
-import { missionEvidenceDir } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { missionEvidenceDir, pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import type {
   DecomposedTaskPlan,
   ExtractedDesignSpec,
@@ -21,6 +24,9 @@ import type {
 const DESIGN_FILE = 'design-spec.json';
 const TEST_PLAN_FILE = 'test-plan.json';
 const TASK_PLAN_FILE = 'task-plan.json';
+const DESIGN_SCHEMA_PATH = pathResolver.knowledge('product/schemas/design-spec.schema.json');
+const TEST_PLAN_SCHEMA_PATH = pathResolver.knowledge('product/schemas/test-plan.schema.json');
+const TASK_PLAN_SCHEMA_PATH = pathResolver.knowledge('product/schemas/task-plan.schema.json');
 
 export interface DesignSpec extends ExtractedDesignSpec {
   version: string;
@@ -49,7 +55,7 @@ export interface TaskPlan extends DecomposedTaskPlan {
 function artifactPath(missionId: string, filename: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
-  return path.join(dir, filename);
+  return assertSafeRepositoryPath(path.join(dir, filename), { allowMissingLeaf: true });
 }
 
 function bumpVersion(previous?: string): string {
@@ -59,16 +65,45 @@ function bumpVersion(previous?: string): string {
   return `v${parseInt(match[1], 10) + 1}`;
 }
 
-function readArtifact<T>(missionId: string, filename: string): T | null {
+function readArtifact<T>(missionId: string, filename: string, schemaPath?: string): T | null {
   const file = artifactPath(missionId, filename);
-  if (!file || !safeExistsSync(file)) return null;
-  return loadJson<T>(file);
+  return file ? readArtifactAtPath<T>(file, filename, schemaPath) : null;
 }
 
-function writeArtifact(missionId: string, filename: string, data: unknown): string {
+function readArtifactAtPath<T>(filePath: string, filename: string, schemaPath?: string): T | null {
+  const file = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(file)) return null;
+  if (schemaPath) {
+    return defineCatalog<T>({
+      id: `sdlc-${filename.replace(/\.json$/u, '')}`,
+      path: file,
+      schema: schemaPath,
+    }).load();
+  }
+  return readJson<T>(file);
+}
+
+function writeArtifact(
+  missionId: string,
+  filename: string,
+  data: unknown,
+  schemaPath?: string
+): string {
   const file = artifactPath(missionId, filename);
   if (!file) {
     throw new Error(`[sdlc-artifact-store] mission evidence dir not found for ${missionId}`);
+  }
+  if (schemaPath) {
+    const validated = defineCatalog({
+      id: `sdlc-${filename.replace(/\.json$/u, '')}`,
+      path: file,
+      schema: schemaPath,
+    }).validate(data, file);
+    safeWriteFile(file, `${JSON.stringify(validated, null, 2)}\n`, {
+      encoding: 'utf8',
+      mkdir: true,
+    });
+    return file;
   }
   safeWriteFile(file, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
   return file;
@@ -86,7 +121,12 @@ export interface SaveDesignSpecParams {
 }
 
 export function readDesignSpec(missionId: string): DesignSpec | null {
-  return readArtifact<DesignSpec>(missionId, DESIGN_FILE);
+  return readArtifact<DesignSpec>(missionId, DESIGN_FILE, DESIGN_SCHEMA_PATH);
+}
+
+/** Load an explicitly supplied design spec through the canonical schema boundary. */
+export function readDesignSpecAtPath(filePath: string): DesignSpec | null {
+  return readArtifactAtPath<DesignSpec>(filePath, DESIGN_FILE, DESIGN_SCHEMA_PATH);
 }
 
 export function saveDesignSpec(params: SaveDesignSpecParams): DesignSpec {
@@ -97,10 +137,10 @@ export function saveDesignSpec(params: SaveDesignSpecParams): DesignSpec {
     version,
     project_name: params.projectName,
     ...(params.sourceRefs ? { source_refs: params.sourceRefs } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(params.generatedBy ? { generated_by: params.generatedBy } : {}),
   };
-  writeArtifact(params.missionId, DESIGN_FILE, spec);
+  writeArtifact(params.missionId, DESIGN_FILE, spec, DESIGN_SCHEMA_PATH);
   return spec;
 }
 
@@ -116,7 +156,7 @@ export interface SaveTestPlanParams {
 }
 
 export function readTestPlan(missionId: string): TestPlan | null {
-  return readArtifact<TestPlan>(missionId, TEST_PLAN_FILE);
+  return readArtifact<TestPlan>(missionId, TEST_PLAN_FILE, TEST_PLAN_SCHEMA_PATH);
 }
 
 export function saveTestPlan(params: SaveTestPlanParams): TestPlan {
@@ -127,10 +167,10 @@ export function saveTestPlan(params: SaveTestPlanParams): TestPlan {
     version,
     project_name: params.projectName,
     ...(params.sourceRefs ? { source_refs: params.sourceRefs } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(params.generatedBy ? { generated_by: params.generatedBy } : {}),
   };
-  writeArtifact(params.missionId, TEST_PLAN_FILE, plan);
+  writeArtifact(params.missionId, TEST_PLAN_FILE, plan, TEST_PLAN_SCHEMA_PATH);
   return plan;
 }
 
@@ -146,7 +186,7 @@ export interface SaveTaskPlanParams {
 }
 
 export function readTaskPlan(missionId: string): TaskPlan | null {
-  return readArtifact<TaskPlan>(missionId, TASK_PLAN_FILE);
+  return readArtifact<TaskPlan>(missionId, TASK_PLAN_FILE, TASK_PLAN_SCHEMA_PATH);
 }
 
 export function saveTaskPlan(params: SaveTaskPlanParams): TaskPlan {
@@ -157,10 +197,10 @@ export function saveTaskPlan(params: SaveTaskPlanParams): TaskPlan {
     version,
     project_name: params.projectName,
     ...(params.sourceRefs ? { source_refs: params.sourceRefs } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(params.generatedBy ? { generated_by: params.generatedBy } : {}),
   };
-  writeArtifact(params.missionId, TASK_PLAN_FILE, plan);
+  writeArtifact(params.missionId, TASK_PLAN_FILE, plan, TASK_PLAN_SCHEMA_PATH);
   return plan;
 }
 

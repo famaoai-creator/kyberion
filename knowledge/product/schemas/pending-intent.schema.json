@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/pending-intent.schema.json",
+  "title": "Pending intent",
+  "description": "Persisted clarification state used to resume an incomplete surface intent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "correlation_id",
+    "created_at",
+    "updated_at",
+    "expires_at",
+    "source_text",
+    "required_inputs"
+  ],
+  "properties": {
+    "kind": { "const": "pending-intent" },
+    "correlation_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "source_text": { "type": "string" },
+    "intent_id": { "type": "string", "minLength": 1 },
+    "required_inputs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "source_surface": { "type": "string", "minLength": 1 },
+    "thread_context": { "type": "string" },
+    "clarification_packet": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "runtime_context": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

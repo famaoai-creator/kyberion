@@ -46,6 +46,73 @@ const AI_EVENTS = { summary: 'ai_summary', insights: 'ai_insights', suggestions:
 let transcript = [];
 let persistTimer = null;
 
+const CONTROL_COMMANDS = new Set([
+  'session',
+  'join',
+  'set_mic',
+  'set_camera',
+  'chat',
+  'raise_hand',
+  'admit',
+  'screen_context',
+  'leave',
+]);
+const DANGEROUS_JSON_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isPlainRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasSafeJsonKeys(value) {
+  if (Array.isArray(value)) return value.every(hasSafeJsonKeys);
+  if (!isPlainRecord(value)) return true;
+  return Object.entries(value).every(
+    ([key, nested]) => !DANGEROUS_JSON_KEYS.has(key) && hasSafeJsonKeys(nested)
+  );
+}
+
+function isOptionalString(value) {
+  return value === undefined || typeof value === 'string';
+}
+
+function isOptionalBoolean(value) {
+  return value === undefined || typeof value === 'boolean';
+}
+
+function parseControlMessage(raw) {
+  let value;
+  try {
+    value = JSON.parse(String(raw));
+  } catch {
+    return null;
+  }
+  if (!isPlainRecord(value) || !hasSafeJsonKeys(value) || typeof value.cmd !== 'string')
+    return null;
+  if (!CONTROL_COMMANDS.has(value.cmd) || !isOptionalString(value.control_token)) return null;
+
+  if (value.cmd === 'session') return value;
+  if (value.cmd === 'join') {
+    return isOptionalString(value.url) &&
+      isOptionalString(value.display_name) &&
+      isOptionalBoolean(value.mic) &&
+      isOptionalBoolean(value.camera) &&
+      isOptionalBoolean(value.captions)
+      ? value
+      : null;
+  }
+  if (value.cmd === 'set_mic' || value.cmd === 'set_camera') {
+    return typeof value.on === 'boolean' ? value : null;
+  }
+  if (value.cmd === 'chat') return typeof value.text === 'string' ? value : null;
+  if (value.cmd === 'raise_hand') return value;
+  if (value.cmd === 'admit')
+    return typeof value.name === 'string' || value.name === undefined ? value : null;
+  if (value.cmd === 'screen_context') {
+    return typeof value.text === 'string' && isOptionalString(value.provider) ? value : null;
+  }
+  return value;
+}
+
 function sessionStore() {
   // chrome.storage.session is unavailable on older Chrome and in tests.
   return chrome.storage && chrome.storage.session ? chrome.storage.session : null;
@@ -256,6 +323,22 @@ async function handleCommand(msg) {
       await relayToContent(tab.id, { type: 'meet:set_camera', on: msg.on });
     else if (msg.cmd === 'chat')
       await relayToContent(tab.id, { type: 'meet:chat', text: msg.text });
+    else if (msg.cmd === 'raise_hand') {
+      const resp = await relayToContent(tab.id, { type: 'meet:raise_hand' });
+      sendEvent({
+        event: 'raised_hand',
+        ok: Boolean(resp && resp.ok),
+        already: Boolean(resp && resp.already),
+      });
+    } else if (msg.cmd === 'admit') {
+      const resp = await relayToContent(tab.id, { type: 'meet:admit', name: msg.name });
+      sendEvent({
+        event: 'admitted',
+        ok: Boolean(resp && resp.ok),
+        admitted: typeof resp?.admitted === 'number' ? resp.admitted : 0,
+        ...(typeof msg.name === 'string' && msg.name ? { name: msg.name } : {}),
+      });
+    }
     // The driver returns OCR text that has already passed the governed PII
     // scrubber; the panel only ever sees this, never the frame it came from.
     else if (msg.cmd === 'screen_context') {
@@ -307,13 +390,8 @@ async function connect() {
     keepaliveTimer = setInterval(() => sendEvent({ event: 'ping', t: Date.now() }), 20000);
   };
   ws.onmessage = (e) => {
-    let msg;
-    try {
-      msg = JSON.parse(e.data);
-    } catch {
-      return;
-    }
-    if (msg && msg.cmd) handleCommand(msg);
+    const msg = parseControlMessage(e.data);
+    if (msg) void handleCommand(msg);
   };
   ws.onclose = () => {
     uiState.wsConnected = false;

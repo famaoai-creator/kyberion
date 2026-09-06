@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
 import { resolveFinancialModel, type FinancialModel } from './financial-model.js';
 import { resolveOkrTracker, type OkrTracker } from './okr-tracker.js';
+import { loadFinanceControllerCostReportAtPath } from './finance-controller-cost-report.js';
 
 export interface FinanceControllerCostReport {
   totalCostUsd: number | null;
@@ -75,10 +75,6 @@ function toNumber(value: unknown): number | null {
   return null;
 }
 
-function readJsonIfPresent<T>(filePath: string): T | null {
-  return loadOptionalJson<T>(filePath);
-}
-
 function resolveCostReport(baseDir: string): FinanceControllerCostReport | null {
   const candidates = [
     path.join(baseDir, 'evidence', 'cost-report.json'),
@@ -86,7 +82,12 @@ function resolveCostReport(baseDir: string): FinanceControllerCostReport | null 
     path.join(baseDir, 'active', 'shared', 'tmp', 'cost-report.json'),
   ];
   for (const candidate of candidates) {
-    const parsed = readJsonIfPresent<Record<string, unknown>>(candidate);
+    let parsed: Record<string, unknown> | null;
+    try {
+      parsed = loadFinanceControllerCostReportAtPath(candidate);
+    } catch {
+      parsed = null;
+    }
     if (!parsed) continue;
     const totals = (parsed.totals as Record<string, unknown> | undefined) || parsed;
     const nestedUsage =
@@ -99,24 +100,39 @@ function resolveCostReport(baseDir: string): FinanceControllerCostReport | null 
         totals.total_cost_usd ??
         totals.costUsd ??
         totals.cost_usd ??
+        totals.total_usd ??
+        parsed.totalCostUsd ??
+        parsed.total_cost_usd ??
+        parsed.costUsd ??
+        parsed.cost_usd ??
+        parsed.total_usd ??
         nestedUsage.totalCostUsd ??
-        nestedUsage.total_cost_usd
+        nestedUsage.total_cost_usd ??
+        nestedUsage.costUsd ??
+        nestedUsage.cost_usd ??
+        nestedUsage.total_usd
     );
     const totalTokens = toNumber(
       totals.totalTokens ??
         totals.total_tokens ??
+        parsed.totalTokens ??
+        parsed.total_tokens ??
         nestedUsage.totalTokens ??
         nestedUsage.total_tokens
     );
     const promptTokens = toNumber(
       totals.promptTokens ??
         totals.prompt_tokens ??
+        parsed.promptTokens ??
+        parsed.prompt_tokens ??
         nestedUsage.promptTokens ??
         nestedUsage.prompt_tokens
     );
     const completionTokens = toNumber(
       totals.completionTokens ??
         totals.completion_tokens ??
+        parsed.completionTokens ??
+        parsed.completion_tokens ??
         nestedUsage.completionTokens ??
         nestedUsage.completion_tokens
     );

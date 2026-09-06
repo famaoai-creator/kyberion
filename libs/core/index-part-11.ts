@@ -73,6 +73,8 @@ export type {
 
 export * from './software-quality-operations.js';
 
+export * from './software-quality-report-reader.js';
+
 export * from './source-analysis.js';
 
 export * from './agentic-source-review.js';
@@ -95,6 +97,10 @@ export {
   evaluateAcceptanceCriteria,
   evaluateDefinitionOfDone,
   evaluateTestTraceability,
+  parseSoftwareQualityContract,
+  parseTestInventoryItem,
+  parseTestInventory,
+  parseTestExecutionRecord,
   createDefectCandidates,
   buildSoftwareQualityReport,
 } from './software-quality.js';

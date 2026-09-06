@@ -8,10 +8,10 @@
  * script generates a macOS LaunchAgent so launchd restarts it.
  *
  * Modes:
- *   pnpm chronos:install                 # dry-run: print plist + exact steps
- *   pnpm chronos:install -- --apply      # stage plist + run launchctl
- *   pnpm chronos:uninstall               # dry-run: print bootout steps
- *   pnpm chronos:uninstall -- --apply    # bootout + remove the plist
+ *   pnpm kyberion chronos install                 # dry-run: print plist + exact steps
+ *   pnpm kyberion chronos install --apply         # stage plist + run launchctl
+ *   pnpm kyberion chronos uninstall               # dry-run: print bootout steps
+ *   pnpm kyberion chronos uninstall --apply       # bootout + remove the plist
  *
  * secure-io note: $HOME/Library/LaunchAgents is outside the secure-io write
  * roots, so --apply never writes there via file I/O. The plist is staged
@@ -21,16 +21,12 @@
  */
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {
-  createStandardYargs,
-  escapeXml,
-  logger,
-  pathResolver,
-  safeExecResult,
-  safeExistsSync,
-  safeWriteFile,
-} from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { escapeXml } from '@agent/core/text-escaping';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExecResult, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const CHRONOS_LAUNCHD_LABEL = 'com.kyberion.chronos';
 
@@ -123,25 +119,30 @@ function runOrThrow(command: string, args: string[], tolerateFailure = false): v
   throw new Error(message);
 }
 
-function printManualSteps(plist: string, target: string, uid: string): void {
-  console.log('--- LaunchAgent plist (generated) ---');
-  console.log(plist);
-  console.log('--- Install steps (dry-run: nothing was changed) ---');
-  console.log(`1. Save the plist above to: ${target}`);
-  console.log(`2. launchctl bootstrap gui/${uid} ${target}`);
-  console.log(`3. Verify: launchctl print gui/${uid}/${CHRONOS_LAUNCHD_LABEL} | head`);
-  console.log('   (heartbeat: active/shared/runtime/heartbeats/chronos-daemon.json)');
-  console.log('');
-  console.log(
-    'Or run: pnpm chronos:install -- --apply  (if the flag is not forwarded: node dist/scripts/install_chronos_launchd.js --apply)'
-  );
-  console.log(
-    `Uninstall later: launchctl bootout gui/${uid}/${CHRONOS_LAUNCHD_LABEL} && rm ${target}`
+function printManualSteps(
+  plist: string,
+  target: string,
+  uid: string,
+  print: (value: unknown) => void
+): void {
+  print(
+    [
+      '--- LaunchAgent plist (generated) ---',
+      plist,
+      '--- Install steps (dry-run: nothing was changed) ---',
+      `1. Save the plist above to: ${target}`,
+      `2. launchctl bootstrap gui/${uid} ${target}`,
+      `3. Verify: launchctl print gui/${uid}/${CHRONOS_LAUNCHD_LABEL} | head`,
+      '   (heartbeat: active/shared/runtime/heartbeats/chronos-daemon.json)',
+      '',
+      'Or run: pnpm kyberion chronos install --apply  (if the flag is not forwarded: node dist/scripts/install_chronos_launchd.js --apply)',
+      `Uninstall later: launchctl bootout gui/${uid}/${CHRONOS_LAUNCHD_LABEL} && rm ${target}`,
+    ].join('\n')
   );
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(args: string[], print: (value: unknown) => void): Promise<void> {
+  const argv = await createStandardYargs(['node', 'install_chronos_launchd', ...args])
     .option('apply', {
       type: 'boolean',
       default: false,
@@ -163,11 +164,15 @@ async function main(): Promise<void> {
 
   if (argv.uninstall) {
     if (!argv.apply) {
-      console.log('--- Uninstall steps (dry-run: nothing was changed) ---');
-      console.log(`1. launchctl bootout gui/${uid}/${CHRONOS_LAUNCHD_LABEL}`);
-      console.log(`2. rm ${target}`);
-      console.log('');
-      console.log('Or run: pnpm chronos:uninstall -- --apply');
+      print(
+        [
+          '--- Uninstall steps (dry-run: nothing was changed) ---',
+          `1. launchctl bootout gui/${uid}/${CHRONOS_LAUNCHD_LABEL}`,
+          `2. rm ${target}`,
+          '',
+          'Or run: pnpm kyberion chronos uninstall --apply',
+        ].join('\n')
+      );
       return;
     }
     if (process.platform !== 'darwin') {
@@ -182,7 +187,7 @@ async function main(): Promise<void> {
   }
 
   if (!argv.apply) {
-    printManualSteps(plist, target, uid);
+    printManualSteps(plist, target, uid, print);
     return;
   }
 
@@ -215,12 +220,14 @@ async function main(): Promise<void> {
   );
 }
 
+export const runInstallChronosLaunchd = defineScript({
+  name: 'chronos:install',
+  flags: [],
+  run: ({ argv, print }) => main(argv, print),
+});
+
 if (
   isDirectScript(import.meta.url, 'install_chronos_launchd.ts') ||
   isDirectScript(import.meta.url, 'install_chronos_launchd.js')
-) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exitCode = 1;
-  });
-}
+)
+  void runInstallChronosLaunchd();

@@ -11,20 +11,10 @@ export interface DocumentContentsPolicyCatalog {
 const CATALOG_PATH = pathResolver.knowledge('product/governance/document-contents-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/document-contents-policy.schema.json');
 
-const FALLBACK_CATALOG: DocumentContentsPolicyCatalog = {
-  version: '1.0.0',
-  title_by_locale: {
-    ja: '目次',
-    default: 'Contents',
-  },
-  subtitle: 'Document navigation',
-};
-
 const catalog = defineCatalog<DocumentContentsPolicyCatalog>({
   id: 'document-contents-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadDocumentContentsPolicyCatalog(): DocumentContentsPolicyCatalog {
@@ -45,8 +35,4 @@ export function resolveDocumentContentsLabel(locale?: string): string {
 
 export function resolveDocumentContentsSubtitle(): string {
   return loadDocumentContentsPolicyCatalog().subtitle || 'Document navigation';
-}
-
-export function resetDocumentContentsPolicyCatalogCache(): void {
-  catalog.reset();
 }

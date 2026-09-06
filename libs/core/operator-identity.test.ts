@@ -1,7 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { resolveOperatorLocale } from './operator-identity.js';
+import * as path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
+
+const { resolveActiveProfileRootMock } = vi.hoisted(() => ({
+  resolveActiveProfileRootMock: vi.fn(),
+}));
+
+vi.mock('./profile-root.js', () => ({
+  resolveActiveProfileRoot: resolveActiveProfileRootMock,
+}));
+
+import { resolveOperatorDisplayName, resolveOperatorLocale } from './operator-identity.js';
 import { _resetLocaleModuleStateForTests } from './locale.js';
 import { SUPPORTED_LOCALES } from './locale-normalize.js';
+
+const TEST_PROFILE_ROOT = pathResolver.sharedTmp('operator-identity-test');
 
 // I18N-01: resolveOperatorLocale is now a thin wrapper over the unified
 // resolveLocale() precedence chain (identity → KYBERION_LOCALE →
@@ -12,6 +27,7 @@ describe('resolveOperatorLocale', () => {
   const savedLang = process.env.LANG;
 
   beforeEach(() => {
+    resolveActiveProfileRootMock.mockReturnValue(TEST_PROFILE_ROOT);
     delete process.env.KYBERION_LOCALE;
     delete process.env.KYBERION_UI_LOCALE;
     _resetLocaleModuleStateForTests();
@@ -24,6 +40,33 @@ describe('resolveOperatorLocale', () => {
     if (savedLang === undefined) delete process.env.LANG;
     else process.env.LANG = savedLang;
     _resetLocaleModuleStateForTests();
+    try {
+      safeRmSync(TEST_PROFILE_ROOT, { recursive: true, force: true });
+    } catch {
+      // The fixture may not have been created.
+    }
+  });
+
+  it('falls back when the operator identity is reached through a symlink', () => {
+    const targetPath = path.join(TEST_PROFILE_ROOT, 'identity-outside.json');
+    const linkedPath = path.join(TEST_PROFILE_ROOT, 'my-identity.json');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(TEST_PROFILE_ROOT, { recursive: true });
+      safeWriteFile(targetPath, JSON.stringify({ name: 'untrusted-name' }));
+      safeSymlinkSync(targetPath, linkedPath);
+      expect(resolveOperatorDisplayName('fallback-name')).toBe('fallback-name');
+    });
+  });
+
+  it('falls back when the persisted identity root or name has the wrong shape', () => {
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(TEST_PROFILE_ROOT, { recursive: true });
+      const identityPath = path.join(TEST_PROFILE_ROOT, 'my-identity.json');
+      safeWriteFile(identityPath, '[]');
+      expect(resolveOperatorDisplayName('fallback-name')).toBe('fallback-name');
+      safeWriteFile(identityPath, JSON.stringify({ name: { unexpected: true } }));
+      expect(resolveOperatorDisplayName('fallback-name')).toBe('fallback-name');
+    });
   });
 
   it('honors the KYBERION_LOCALE env override (this repo checkout has no identity language set)', () => {

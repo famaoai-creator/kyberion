@@ -4,6 +4,8 @@ import {
   safeExistsSync,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
+  safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
 import {
@@ -14,6 +16,7 @@ import {
   queueMissionMemoryPromotionCandidate,
   updateMemoryPromotionCandidateStatus,
 } from './memory-promotion-queue.js';
+import { pathResolver } from './path-resolver.js';
 
 // Keep the aggregate read from discovering the repository's real tenant
 // shards during this queue-unit suite.
@@ -297,5 +300,31 @@ describe('memory-promotion-queue', () => {
     const rows = listMemoryPromotionCandidates();
     expect(rows).toHaveLength(2);
     expect(rows.every((row) => row.status === 'rejected')).toBe(true);
+  });
+
+  it('rejects a queue override outside the repository', () => {
+    const originalOverride = process.env.KYBERION_MEMORY_QUEUE_PATH;
+    process.env.KYBERION_MEMORY_QUEUE_PATH = '/tmp/memory-promotion-queue-external.jsonl';
+    try {
+      expect(() => memoryPromotionQueuePath()).toThrow('[RESOURCE_PATH_SCOPE]');
+    } finally {
+      process.env.KYBERION_MEMORY_QUEUE_PATH = originalOverride;
+    }
+  });
+
+  it('rejects a queue override that traverses a symbolic link', () => {
+    const targetPath = pathResolver.sharedTmp(`memory-queue-target-${process.pid}.jsonl`);
+    const linkPath = pathResolver.sharedTmp(`memory-queue-link-${process.pid}.jsonl`);
+    safeWriteFile(targetPath, '');
+    safeSymlinkSync(targetPath, linkPath);
+    const originalOverride = process.env.KYBERION_MEMORY_QUEUE_PATH;
+    process.env.KYBERION_MEMORY_QUEUE_PATH = linkPath;
+    try {
+      expect(() => listMemoryPromotionCandidates()).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      process.env.KYBERION_MEMORY_QUEUE_PATH = originalOverride;
+      safeUnlinkSync(linkPath);
+      safeRmSync(targetPath, { force: true });
+    }
   });
 });

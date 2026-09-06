@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/i18n-coverage-history.schema.json",
+  "title": "I18n coverage history",
+  "description": "Persisted per-locale coverage snapshot used for regression alerts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["recorded_at", "locales"],
+  "properties": {
+    "recorded_at": { "type": "string", "format": "date-time" },
+    "locales": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "number", "minimum": 0, "maximum": 100 }
+    }
+  }
+}

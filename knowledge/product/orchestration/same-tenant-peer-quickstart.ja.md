@@ -129,7 +129,7 @@ pnpm peer:conversation send-message \
   --text "こちらから見えています。応答できますか？"
 ```
 
-この通常メッセージは相手 peer の conversation responder が同期的に処理し、ACK を返します。Mesh Hub の collaboration request を送る場合は、`handoff` メッセージに型付き `collaboration_request` を付けます。受信側では proposal になり、`peer:collaboration accept` を実行するまで mission や actuator は動きません。
+この通常メッセージは相手 peer の conversation responder が同期的に処理し、ACK を返します。Mesh Hub の collaboration request を送る場合は、`handoff` メッセージに型付き `collaboration_request` を付けます。受信側では proposal になり、`pnpm kyberion peer collaboration accept` を実行するまで mission や actuator は動きません。
 
 ## つまずいたときの判断
 

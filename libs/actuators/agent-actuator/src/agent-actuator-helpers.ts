@@ -1,9 +1,11 @@
+import { logger } from '@agent/core/core';
+import { agentRegistry } from '@agent/core/agent-registry';
+import { a2aBridge, type A2AMessage } from '@agent/core/a2a-bridge';
 import {
-  logger,
-  agentRegistry,
-  a2aBridge,
   resolveMissionTeamPlan,
   getMissionTeamAssignment,
+} from '@agent/core/mission-team-plan-composer';
+import {
   ensureMissionTeamRuntimeViaSupervisor,
   enqueueMissionTeamPrewarmRequest,
   startAgentRuntimeSupervisorForRequest,
@@ -15,6 +17,8 @@ import {
   refreshAgentRuntime,
   restartAgentRuntime,
   askAgentRuntime,
+} from '@agent/core/agent-runtime-supervisor';
+import {
   ensureAgentRuntimeViaDaemon,
   askAgentRuntimeViaDaemon,
   getAgentRuntimeStatusViaDaemon,
@@ -22,17 +26,18 @@ import {
   shutdownAgentRuntimeViaDaemon,
   refreshAgentRuntimeViaDaemon,
   restartAgentRuntimeViaDaemon,
-  getAgentExecutionPort,
+} from '@agent/core/agent-runtime-supervisor-client';
+import { getAgentExecutionPort, type AgentTaskEnvelope } from '@agent/core/agent-execution-port';
+import {
   delegateCoordinatedAgentTask,
-  pathResolver,
-  buildGovernedRetryOptions,
-  retry,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
-import type { AgentProvider } from '@agent/core/agent-registry';
-import type { AgentTaskEnvelope, CoordinatedAgentTaskEnvelope } from '@agent/core';
-import type { A2AMessage } from '@agent/core/a2a-bridge';
+  type CoordinatedAgentTaskEnvelope,
+} from '@agent/core/coordinated-agent-execution-port';
+import * as pathResolver from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import type { AgentProvider, AgentRecord } from '@agent/core/agent-registry';
 
 const AGENT_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/agent-actuator/manifest.json');
 const DEFAULT_AGENT_RETRY = {
@@ -75,10 +80,11 @@ export interface AgentAction {
     trustRequired?: number;
     query?: string;
     envelope?: A2AMessage;
-    filter?: { status?: string; provider?: string };
+    filter?: Partial<Pick<AgentRecord, 'status' | 'provider'>>;
     teamRole?: string;
     export_as?: string;
   };
+  context?: Record<string, unknown>;
 }
 
 export interface AgentPipelineDispatch {
@@ -87,18 +93,15 @@ export interface AgentPipelineDispatch {
   context?: Record<string, unknown>;
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: AGENT_MANIFEST_PATH,
-    defaults: DEFAULT_AGENT_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: AGENT_MANIFEST_PATH,
+  defaults: DEFAULT_AGENT_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
   const { action } = input;
-  const ctx = (input as AgentPipelineDispatch).context || {};
+  const ctx = input.context || {};
 
   if (action === 'pipeline') {
     const dispatch = input as AgentPipelineDispatch;
@@ -109,7 +112,7 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     return handleAction({
       action: step.op as AgentAction['action'],
       params: step.params,
-      ...({ context: ctx } as any),
+      context: ctx,
     });
   }
 
@@ -199,7 +202,7 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         }
         agentRegistry.updateStatus(params.agentId, 'ready');
         return { status: 'ok', agentId: params.agentId, response };
-      } catch (e: any) {
+      } catch (e: unknown) {
         agentRegistry.updateStatus(params.agentId, 'error');
         throw e;
       }
@@ -236,7 +239,7 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     }
 
     case 'list': {
-      const agents = agentRegistry.list(params.filter as any);
+      const agents = agentRegistry.list(params.filter);
       return { status: 'ok', agents, count: agents.length };
     }
 

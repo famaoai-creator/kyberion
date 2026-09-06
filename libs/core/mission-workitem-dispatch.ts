@@ -7,6 +7,7 @@ import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { getWorkItem, updateWorkItem, type WorkItemStatus } from './work-coordination.js';
 import { formatCognitiveRouteDecision } from './cognitive-routing.js';
@@ -15,7 +16,6 @@ import { findMissionPath } from './path-resolver.js';
 import { deriveAgentNhiId } from './agent-identity.js';
 import { issueTaskGrantBestEffort } from './task-scoped-grants.js';
 import type { MissionState } from './mission-types.js';
-import { writeJsonFile as writeJsonFileFromDispatchIO } from './mission-dispatch-io.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { evaluatePhaseEntryGate } from './mission-process-planning.js';
 import { recordTask } from './mission-maintenance.js';
@@ -209,6 +209,7 @@ async function dispatchMissionWorkItemsRound(
       });
       updateNextTasksReflection(
         missionPath,
+        missionId,
         artifactReviewContext.reviewTaskId,
         {
           result_status: 'blocked',
@@ -340,7 +341,7 @@ async function dispatchMissionWorkItemsRound(
         assigneePeerId: assigneePeerId || item.assignee_peer_id,
         metadata: {
           ...(item.metadata || {}),
-          last_dispatch_at: new Date().toISOString(),
+          last_dispatch_at: nowIso(),
           last_dispatch_mission_id: missionId,
           last_dispatch_error: reason,
           response_wait_status: reason.includes('[WORKITEM_RESPONSE_TIMEOUT]')
@@ -497,16 +498,20 @@ async function dispatchMissionWorkItemsRound(
       record.notes.push('needs_input');
     }
     if (clarificationPacket && clarificationPacketPath) {
-      writeDispatchArtifact(clarificationPacketPath, {
-        mission_id: missionId,
-        item_id: item.item_id,
-        task_result: response.taskResult,
-        clarification_packet: clarificationPacket,
-        clarification_packet_path: clarificationPacketPath,
-        needs: taskResultNeeds,
-        status: 'needs_input',
-        written_at: new Date().toISOString(),
-      });
+      writeDispatchArtifact(
+        clarificationPacketPath,
+        {
+          mission_id: missionId,
+          item_id: item.item_id,
+          task_result: response.taskResult,
+          clarification_packet: clarificationPacket,
+          clarification_packet_path: clarificationPacketPath,
+          needs: taskResultNeeds,
+          status: 'needs_input',
+          written_at: nowIso(),
+        },
+        { missionId, missionPath }
+      );
       record.clarification_packet = clarificationPacket;
       record.clarification_packet_path = clarificationPacketPath;
       record.notes.push(`clarification packet: ${clarificationPacketPath}`);
@@ -575,7 +580,7 @@ async function dispatchMissionWorkItemsRound(
       taskResultRepairs: response.repairs,
       taskResultRepairRequiresReview: response.repairRequiresReview,
     });
-    writeDispatchArtifact(artifact.filePath, artifact.payload);
+    writeDispatchArtifact(artifact.filePath, artifact.payload, { missionId, missionPath });
     record.response_path = artifact.filePath;
     record.response_excerpt = response.responseText.slice(0, 400);
     record.context_pack_id = dispatchContext.contextPackId;
@@ -612,7 +617,7 @@ async function dispatchMissionWorkItemsRound(
       record.reflection_path = reflection.reflectionPath;
     }
     record.reflection_excerpt = record.response_excerpt;
-    record.reflected_at = new Date().toISOString();
+    record.reflected_at = nowIso();
     record.ticket_state_after = reflection.ticketState;
     record.notes.push(...reflection.notes);
 
@@ -627,7 +632,7 @@ async function dispatchMissionWorkItemsRound(
       assigneePeerId: assigneePeerId || item.assignee_peer_id,
       metadata: {
         ...currentMetadata,
-        last_dispatch_at: new Date().toISOString(),
+        last_dispatch_at: nowIso(),
         last_dispatch_mode: response.executionMode,
         execution_surface: executionSurfaceDecision.surface,
         execution_surface_used: response.executionSurfaceUsed,
@@ -770,8 +775,8 @@ async function dispatchMissionWorkItemsRound(
     mission_type: state.mission_type,
     tier: state.tier,
     tenant_slug: state.tenant_slug,
-    created_at: existingManifest?.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: existingManifest?.created_at || nowIso(),
+    updated_at: nowIso(),
     mode,
     final_status: finalStatus,
     work_item_count: records.length,
@@ -781,7 +786,7 @@ async function dispatchMissionWorkItemsRound(
   const manifestFilePath = manifestPath(missionPath);
   manifest.manifest_path = manifestFilePath;
   manifest.event_path = dispatchEventPath(missionPath);
-  writeJsonFileFromDispatchIO(manifestFilePath, manifest);
+  writeDispatchArtifact(manifestFilePath, manifest, { missionId, missionPath });
 
   appendDispatchEvent(dispatchEventPath(missionPath), {
     event: 'dispatch_completed',

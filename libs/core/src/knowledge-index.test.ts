@@ -25,10 +25,24 @@ vi.mock('../secure-io.js', () => ({
     /* no-op in tests */
   },
   safeStat: (p: string) => fs.statSync(p),
+  safeLstat: (p: string) => fs.lstatSync(p),
+  assertSafeRepositoryPath: (p: string) => p,
   safeUnlinkSync: () => {
     /* no-op in tests */
   },
 }));
+
+vi.mock('../foundation/json.js', () => ({
+  parseSafeJsonInput: (raw: string) => JSON.parse(raw),
+}));
+
+vi.mock('../foundation/text.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../foundation/text.js')>();
+  return {
+    ...actual,
+    readTextFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+  };
+});
 
 import {
   buildKnowledgeIndex,
@@ -41,6 +55,7 @@ import {
 import { registerEmbeddingBackend } from '../embedding-backend.js';
 
 const TEST_ROOT = '/tmp/test-knowledge-base';
+const OUTSIDE_ROOT = '/tmp/test-knowledge-outside';
 const HINTS_DIR = path.join(TEST_ROOT, 'public/procedures/hints');
 
 function ensureDir(dir: string) {
@@ -50,6 +65,9 @@ function ensureDir(dir: string) {
 function cleanup() {
   if (fs.existsSync(TEST_ROOT)) {
     fs.rmSync(TEST_ROOT, { recursive: true, force: true });
+  }
+  if (fs.existsSync(OUTSIDE_ROOT)) {
+    fs.rmSync(OUTSIDE_ROOT, { recursive: true, force: true });
   }
 }
 
@@ -88,6 +106,28 @@ describe('knowledge-index', () => {
       expect(browserHint!.tags).toEqual(['browser']);
     });
 
+    it('skips unsafe or malformed persisted hint records', async () => {
+      fs.writeFileSync(
+        path.join(HINTS_DIR, 'unsafe-hints.json'),
+        JSON.stringify([
+          {
+            topic: 'unsafe',
+            hint: 'must not enter the index',
+            confidence: 0.9,
+            ['__proto__']: { poisoned: true },
+          },
+          { topic: 'invalid confidence', hint: 'must not enter the index', confidence: 2 },
+          { topic: 'invalid tags', hint: 'must not enter the index', tags: ['ok', 7] },
+          { topic: 'valid', hint: 'enters the index', confidence: 0.75, tags: ['safe'] },
+        ])
+      );
+
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+
+      expect(index.hints.map((hint) => hint.topic)).toEqual(['valid']);
+      expect(index.hints[0]).toMatchObject({ confidence: 0.75, tags: ['safe'] });
+    });
+
     it('promotes markdown frontmatter and taxonomy defaults into ranking metadata', async () => {
       const proceduresDir = path.join(TEST_ROOT, 'public/procedures');
       ensureDir(proceduresDir);
@@ -110,6 +150,39 @@ describe('knowledge-index', () => {
         doc_authority: 'recipe',
         scope: 'global',
       });
+    });
+
+    it('skips a markdown symlink that points outside the scanner project root', async () => {
+      const proceduresDir = path.join(TEST_ROOT, 'public/procedures');
+      const outsideFile = path.join(OUTSIDE_ROOT, 'secret.md');
+      ensureDir(proceduresDir);
+      ensureDir(OUTSIDE_ROOT);
+      fs.writeFileSync(
+        outsideFile,
+        ['---', 'title: External secret', '---', '', 'Do not index this file.'].join('\n')
+      );
+      fs.symlinkSync(outsideFile, path.join(proceduresDir, 'linked-secret.md'));
+
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+
+      expect(index.hints.some((hint) => hint.source.includes('linked-secret'))).toBe(false);
+    });
+
+    it('skips a directory that only looks like a markdown document', async () => {
+      const proceduresDir = path.join(TEST_ROOT, 'public/procedures');
+      ensureDir(path.join(proceduresDir, 'directory.md'));
+
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+
+      expect(index.hints.some((hint) => hint.source.includes('directory.md'))).toBe(false);
+    });
+
+    it('skips a directory that only looks like a JSON hint file', async () => {
+      ensureDir(path.join(HINTS_DIR, 'directory.json'));
+
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+
+      expect(index.hints.some((hint) => hint.source.includes('directory.json'))).toBe(false);
     });
   });
 

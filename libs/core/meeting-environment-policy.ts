@@ -250,8 +250,3 @@ export function resolveMeetingEnvironment(
     questions: questions as MeetingEnvironmentSelection['questions'],
   };
 }
-
-export function resetMeetingEnvironmentPolicyCache(): void {
-  cachedPolicy = null;
-  cachedPolicyPath = null;
-}

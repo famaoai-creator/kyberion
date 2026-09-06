@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import * as path from 'node:path';
 import {
   DEFAULT_VISUAL_DIRECTION,
   generateVideoVisualDirection,
+  loadVideoVisualPatternCatalog,
   normalizeVideoVisualDirection,
   visualDirectionToCssVars,
 } from './video-visual-direction.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const PORTRAIT = { width: 1080, height: 1920 };
 const LANDSCAPE = { width: 1920, height: 1080 };
@@ -99,5 +103,34 @@ describe('video visual direction (agy short-video quality)', () => {
     expect(thrown.palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
     expect(thrown.typography.headline_px).toBe(68);
     expect(thrown.resolution?.degraded).toBe(true);
+  });
+
+  it('degrades when a model reply contains a dangerous JSON key', async () => {
+    const direction = await generateVideoVisualDirection({
+      title: 'T',
+      story: 'S',
+      frame: PORTRAIT,
+      generate: async () => '{"pattern_id":"warm-documentary","meta":{"__proto__":{}}}',
+    });
+    expect(direction.resolution?.degraded).toBe(true);
+    expect(direction.palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
+  });
+
+  it('rejects a pattern catalog that is schema-invalid', () => {
+    const rootDir = pathResolver.sharedTmp('video-visual-pattern-catalog-tests');
+    const catalogDir = path.join(rootDir, 'knowledge/public/design-patterns/media-templates');
+    try {
+      safeMkdir(catalogDir, { recursive: true });
+      safeWriteFile(
+        path.join(catalogDir, 'video-visual-patterns.json'),
+        JSON.stringify({ version: '1.0.0', description: 'invalid', patterns: {} })
+      );
+
+      expect(() => loadVideoVisualPatternCatalog(rootDir)).toThrow(
+        'Invalid catalog video-visual-patterns'
+      );
+    } finally {
+      safeRmSync(rootDir, { recursive: true, force: true });
+    }
   });
 });

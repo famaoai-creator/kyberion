@@ -413,4 +413,12 @@ describe('mission-orchestration-worker KP-05 dispatch tracing', { timeout: 60_00
     const traces = await readMissionTaskDispatchTraces();
     expect(traces).toHaveLength(0);
   });
+
+  it('ignores an unsafe trace directory override and keeps the default sink', async () => {
+    process.env.KYBERION_MISSION_TASK_TRACE_DIR = '/tmp/external-mission-traces';
+    const { missionTaskTraceDirOverride } =
+      await import('./mission-orchestration-worker-part-dispatch-context.js');
+
+    expect(missionTaskTraceDirOverride()).toBeUndefined();
+  });
 });

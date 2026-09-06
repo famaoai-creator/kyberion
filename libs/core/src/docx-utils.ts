@@ -5,6 +5,7 @@
  */
 import JSZip from 'jszip';
 import { safeReadFile } from '../secure-io.js';
+import { nowIso } from '../foundation/time.js';
 import type {
   DocxDesignProtocol,
   DocxTheme,
@@ -915,7 +916,7 @@ export async function distillDocxDesign(filePath: string): Promise<DocxDesignPro
 
   return {
     version: '1.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     theme,
     styles,
     numbering,

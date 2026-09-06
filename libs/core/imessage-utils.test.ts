@@ -15,6 +15,8 @@ import {
   formatIMessageTapbackSummary,
   normalizeIMessageAttachments,
   normalizeIMessageTapback,
+  parseIMessageChat,
+  parseIMessageHistoryEntry,
   shouldProcessIMessage,
 } from './imessage-utils.js';
 
@@ -71,6 +73,31 @@ describe('imessage differential polling', () => {
         },
       ])
     ).toContain('- photo.heic (image/heic, 42 bytes)');
+  });
+
+  it('rejects malformed imsg chat and history records at the external boundary', () => {
+    expect(parseIMessageChat({ id: 'chat-1', is_group: false })).toMatchObject({ id: 'chat-1' });
+    expect(parseIMessageChat([])).toBeUndefined();
+    expect(
+      parseIMessageHistoryEntry({
+        id: 7,
+        created_at: '2026-07-18 05:00:00',
+        chat_identifier: 'chat-1',
+        text: 'hello',
+      })
+    ).toMatchObject({ id: '7', chatId: 'chat-1', text: 'hello' });
+    expect(
+      parseIMessageHistoryEntry({ id: 8, created_at: '2026-07-18 05:00:00', chat_identifier: [] })
+    ).toBeUndefined();
+  });
+
+  it('skips malformed imsg lines while retaining valid chat/history rows', () => {
+    mocks.safeExec.mockImplementation((command: string, args: string[]) => {
+      if (args[0] === 'chats') return '{bad}\n' + JSON.stringify({ id: 'chat-1' });
+      return '{bad}\n' + JSON.stringify({ id: 7, created_at: '2026-07-18 05:00:00' });
+    });
+    expect(getRecentIMessages(0, 10)).toHaveLength(1);
+    expect(getRecentIMessages(0, 10)[0]).toMatchObject({ id: '7', chatId: 'chat-1' });
   });
 
   it('keeps an absolute database attachment path available for governed transfer', () => {

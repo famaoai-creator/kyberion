@@ -1,4 +1,4 @@
-import { a2aBridge } from './a2a-bridge.js';
+import { getA2ARoute } from './a2a-route-port.js';
 import { logger } from './core.js';
 import { deriveAgentNhiId } from './agent-identity.js';
 import {
@@ -39,6 +39,8 @@ import type {
 import { createDelegationHandle, type DelegationHandle } from './delegated-task-observability.js';
 import { runOpPreflight } from './op-preflight.js';
 import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 /** Default tier for an in-session delegation that does not name one (backward compatible). */
 const DEFAULT_SUBAGENT_PROFILE = 'implementer';
@@ -215,7 +217,7 @@ export class InSessionDispatcher implements AgentDispatcher {
     this.pendingRepeatReminder = undefined;
 
     try {
-      const result = await backend.generateWithTools(fullPrompt, [invokeAgentTool]);
+      const result = await backend.generateWithTools(fullPrompt, [invokeAgentTool], options);
       const toolCall = result.toolCalls?.find((tc) => tc.name === 'invoke_agent');
       if (toolCall) {
         const decision = advanceToolCallRepeatGovernor(
@@ -230,7 +232,6 @@ export class InSessionDispatcher implements AgentDispatcher {
           logger.error(
             `[agent-dispatch:in-session] invoke_agent repeated ${decision.streak}x with identical arguments — breaking the loop via process-spawn fallback.`
           );
-          const { recordGovernanceAction } = await import('./kill-switch.js');
           recordGovernanceAction(
             'agent-dispatch:in-session',
             'tool_call_repeat_force_stop',
@@ -288,7 +289,11 @@ export class InSessionDispatcher implements AgentDispatcher {
   /** Route the task to a sub-agent within the same process via the A2A bridge. */
   private async routeToSubAgent(agentName: string, prompt: string): Promise<string> {
     logger.info(`[agent-dispatch:in-session] Waking up sub-agent: ${agentName} via A2A Bridge...`);
-    const response = await a2aBridge.route({
+    const route = getA2ARoute();
+    if (!route) {
+      throw new Error('[A2A_ROUTE_UNAVAILABLE] A2A route is not registered');
+    }
+    const response = await route({
       a2a_version: '1.1',
       header: {
         msg_id: `insession-${Date.now()}`,
@@ -601,7 +606,11 @@ function resolveDelegationTier(options?: ReasoningCallOptions): DelegationCapabi
  */
 function resolveBestEffortDelegationActor(): string {
   const role =
-    String(process.env.SYSTEM_ROLE || process.env.MISSION_ROLE || 'delegating-agent')
+    String(
+      getRegisteredEnvText('SYSTEM_ROLE') ||
+        getRegisteredEnvText('MISSION_ROLE') ||
+        'delegating-agent'
+    )
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -786,9 +795,13 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
       if (text) yield text;
     })();
   }
-  generateWithTools(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult> {
-    if (this.base.generateWithTools) return this.base.generateWithTools(prompt, tools);
-    return this.base.prompt(prompt).then((text) => ({ text }));
+  generateWithTools(
+    prompt: string,
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ): Promise<GenerateWithToolsResult> {
+    if (this.base.generateWithTools) return this.base.generateWithTools(prompt, tools, options);
+    return this.base.prompt(prompt, options).then((text) => ({ text }));
   }
 }
 
@@ -799,8 +812,12 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
  * the more capable / more governed of the two opt-ins.
  */
 export function selectAgentDispatcher(env: NodeJS.ProcessEnv = process.env): AgentDispatcher {
-  if (env.KYBERION_HARNESS_SUBAGENT === '1') return new HarnessSubagentDispatcher();
-  if (env.KYBERION_IN_SESSION_SUBAGENT === '1') return new InSessionDispatcher();
+  if (getRegisteredEnvText('KYBERION_HARNESS_SUBAGENT', { env }) === '1') {
+    return new HarnessSubagentDispatcher();
+  }
+  if (getRegisteredEnvText('KYBERION_IN_SESSION_SUBAGENT', { env }) === '1') {
+    return new InSessionDispatcher();
+  }
   return new ProcessSpawnDispatcher();
 }
 
@@ -813,11 +830,11 @@ export function maybeWrapWithDispatcher(
   backend: ReasoningBackend,
   env: NodeJS.ProcessEnv = process.env
 ): ReasoningBackend {
-  if (env.KYBERION_HARNESS_SUBAGENT === '1') {
+  if (getRegisteredEnvText('KYBERION_HARNESS_SUBAGENT', { env }) === '1') {
     logger.success('[agent-dispatch] ⚡ Harness sub-agent dispatch enabled (CT-02)');
     return new DispatchingReasoningBackend(backend, new HarnessSubagentDispatcher());
   }
-  if (env.KYBERION_IN_SESSION_SUBAGENT === '1') {
+  if (getRegisteredEnvText('KYBERION_IN_SESSION_SUBAGENT', { env }) === '1') {
     logger.success('[agent-dispatch] ⚡ In-Session sub-agent dispatch enabled');
     return new DispatchingReasoningBackend(backend, new InSessionDispatcher());
   }

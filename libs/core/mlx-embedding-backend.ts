@@ -15,6 +15,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { rootResolve } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
@@ -27,6 +29,45 @@ export interface MlxEmbeddingBackendOptions {
   pythonBin?: string;
   model?: string;
   dimensions?: number;
+}
+
+export interface MlxEmbeddingResponse {
+  vectors?: number[][];
+  error?: string;
+}
+
+/** Normalize one response emitted by the MLX embedding subprocess. */
+export function normalizeMlxEmbeddingResponse(value: unknown): MlxEmbeddingResponse | null {
+  if (!isRecord(value)) return null;
+
+  const error = value.error;
+  let normalizedError: string | undefined;
+  if (error !== undefined) {
+    if (typeof error !== 'string') return null;
+    normalizedError = error;
+  }
+
+  const vectors = value.vectors;
+  let normalizedVectors: number[][] | undefined;
+  if (vectors !== undefined) {
+    if (!Array.isArray(vectors)) return null;
+    normalizedVectors = [];
+    for (const vector of vectors) {
+      if (
+        !Array.isArray(vector) ||
+        vector.some((component) => typeof component !== 'number' || !Number.isFinite(component))
+      ) {
+        return null;
+      }
+      normalizedVectors.push(vector);
+    }
+  }
+
+  if (normalizedError === undefined && normalizedVectors === undefined) return null;
+  return {
+    ...(normalizedVectors !== undefined ? { vectors: normalizedVectors } : {}),
+    ...(normalizedError !== undefined ? { error: normalizedError } : {}),
+  };
 }
 
 export class MlxEmbeddingBackend implements EmbeddingBackend {
@@ -72,9 +113,14 @@ export class MlxEmbeddingBackend implements EmbeddingBackend {
 
     for (const line of stdout.trim().split('\n').reverse()) {
       try {
-        const parsed = JSON.parse(line) as { vectors?: number[][]; error?: string };
-        if (parsed.error) throw new Error(`[mlx-embedding] ${parsed.error}`);
-        if (parsed.vectors) return parsed.vectors.map((v) => new Float32Array(v));
+        const parsed = normalizeMlxEmbeddingResponse(
+          parseSafeJsonInput(line, 'MLX embedding response')
+        );
+        if (!parsed) continue;
+        if (parsed.error !== undefined) throw new Error(`[mlx-embedding] ${parsed.error}`);
+        if (parsed.vectors !== undefined) {
+          return parsed.vectors.map((vector) => new Float32Array(vector));
+        }
       } catch (e) {
         if (e instanceof SyntaxError) continue;
         throw e;
@@ -99,7 +145,7 @@ export function probeMlxEmbeddingBackend(env: NodeJS.ProcessEnv = process.env): 
   const scriptPath = rootResolve('scripts/mlx_embed.py');
   return {
     available: process.platform === 'darwin' && safeExistsSync(scriptPath),
-    model: env.KYBERION_MLX_EMBED_MODEL ?? DEFAULT_MODEL,
+    model: getRegisteredEnvText('KYBERION_MLX_EMBED_MODEL', { env }) ?? DEFAULT_MODEL,
     scriptPath,
   };
 }

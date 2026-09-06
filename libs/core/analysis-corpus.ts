@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 export interface AnalysisCorpusSnippet {
   ref: string;
@@ -17,10 +18,24 @@ export interface AnalysisRefRankingInput {
 }
 
 function isAllowedAnalysisRef(ref: string): boolean {
-  return (
-    ref.startsWith('knowledge/') ||
-    ref.startsWith('active/projects/')
-  );
+  const normalized = ref.replaceAll('\\', '/');
+  return normalized.startsWith('knowledge/') || normalized.startsWith('active/projects/');
+}
+
+/**
+ * Analysis refs become model-visible excerpts, so lexical allowlisting is not
+ * enough: an in-repository symlink must not redirect the read to another
+ * scope. Keep the existing two logical roots, then apply the shared physical
+ * repository/component boundary immediately before reading.
+ */
+function resolveSafeAnalysisRef(ref: string): string | null {
+  const normalized = ref.replaceAll('\\', '/');
+  if (!isAllowedAnalysisRef(normalized)) return null;
+  try {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(normalized));
+  } catch {
+    return null;
+  }
 }
 
 function stripFrontmatter(raw: string): string {
@@ -36,7 +51,7 @@ function summarizeContent(raw: string): { title: string; excerpt: string } {
     .map((line) => line.trim())
     .filter(Boolean);
   const heading = content.find((line) => line.startsWith('# '));
-  const title = heading ? heading.replace(/^#\s+/, '') : (content[0] || 'Reference');
+  const title = heading ? heading.replace(/^#\s+/, '') : content[0] || 'Reference';
   const excerpt = content
     .filter((line) => !line.startsWith('#'))
     .slice(0, 4)
@@ -58,11 +73,21 @@ function tokenizeFreeText(input?: string): string[] {
 
 function scoreRef(ref: string, input: Omit<AnalysisRefRankingInput, 'refs'>): number {
   const lowerRef = ref.toLowerCase();
-  const projectId = String(input.projectId || '').trim().toLowerCase();
-  const trackId = String(input.trackId || '').trim().toLowerCase();
-  const reviewTarget = String(input.reviewTarget || '').trim().toLowerCase();
-  const targetScope = String(input.targetScope || '').trim().toLowerCase();
-  const reviewTargetValue = reviewTarget.includes(':') ? reviewTarget.split(':').slice(1).join(':') : reviewTarget;
+  const projectId = String(input.projectId || '')
+    .trim()
+    .toLowerCase();
+  const trackId = String(input.trackId || '')
+    .trim()
+    .toLowerCase();
+  const reviewTarget = String(input.reviewTarget || '')
+    .trim()
+    .toLowerCase();
+  const targetScope = String(input.targetScope || '')
+    .trim()
+    .toLowerCase();
+  const reviewTargetValue = reviewTarget.includes(':')
+    ? reviewTarget.split(':').slice(1).join(':')
+    : reviewTarget;
   let score = 0;
 
   if (reviewTargetValue && lowerRef.includes(reviewTargetValue)) score += 120;
@@ -82,21 +107,21 @@ function scoreRef(ref: string, input: Omit<AnalysisRefRankingInput, 'refs'>): nu
 }
 
 export function rankAnalysisRefs(input: AnalysisRefRankingInput): string[] {
-  return [...input.refs]
-    .sort((left, right) => {
-      const scoreDiff = scoreRef(right, input) - scoreRef(left, input);
-      if (scoreDiff !== 0) return scoreDiff;
-      return left.localeCompare(right);
-    });
+  return [...input.refs].sort((left, right) => {
+    const scoreDiff = scoreRef(right, input) - scoreRef(left, input);
+    if (scoreDiff !== 0) return scoreDiff;
+    return left.localeCompare(right);
+  });
 }
 
 export function buildAnalysisCorpusSnippets(refs: string[], limit = 5): AnalysisCorpusSnippet[] {
   const snippets: AnalysisCorpusSnippet[] = [];
   for (const ref of refs) {
-    if (!isAllowedAnalysisRef(ref)) continue;
+    const resolved = resolveSafeAnalysisRef(ref);
+    if (!resolved) continue;
     try {
-      const resolved = pathResolver.rootResolve(ref);
-      const raw = safeReadFile(resolved, { encoding: 'utf8' }) as string;
+      if (!safeLstat(resolved).isFile()) continue;
+      const raw = readTextFile(resolved);
       const summary = summarizeContent(raw);
       snippets.push({
         ref,

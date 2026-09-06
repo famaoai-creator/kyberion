@@ -65,6 +65,18 @@ describe('approval-policy', () => {
     expect(result.matchedRuleId).toBe('customer-override');
   });
 
+  it('fails closed when the active policy violates its schema', async () => {
+    const customerPolicyPath = pathResolver.sharedTmp(`invalid-customer-policy-${Date.now()}.json`);
+    safeWriteFile(customerPolicyPath, JSON.stringify({ defaults: { requires_approval: false } }));
+
+    mocks.customerRoot.mockReturnValue(customerPolicyPath);
+    vi.resetModules();
+    const mod = await import('./approval-policy.js');
+
+    expect(() => mod.loadApprovalPolicy()).toThrow(/Invalid catalog approval-policy/);
+    mocks.customerRoot.mockReturnValue(null);
+  });
+
   it('fails closed for dangerous shell-style operations even without a matching rule', () => {
     const result = resolveApprovalPolicy({
       intentId: 'run_shell',

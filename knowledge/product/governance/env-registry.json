@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/env-registry.schema.json",
   "version": "1.0.0",
   "description": "Canonical registry of KYBERION_* environment variables (OP-05). Regenerate with pnpm generate:env-registry; curated fields are preserved.",
   "entries": [
@@ -8,96 +8,97 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Shared secret used to sign and verify A2A envelopes; values stay in the secret store.",
+      "documented": true
     },
     {
       "name": "KYBERION_A2A_SIGNATURE",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["warn", "enforce"],
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "A2A envelope signature policy: warn audits missing signatures while enforce rejects unsigned or unknown-sender messages.",
+      "documented": true
     },
     {
       "name": "KYBERION_A2UI_BRIDGE_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional A2UI rendering bridge endpoint used by the presence actuator; keep it on an approved local or trusted surface and do not treat it as an authorization boundary.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_BOOT_READY_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Milliseconds an agent adapter waits for a newly started runtime to become ready before failing the boot request.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Logical agent identity attached to runtime, task, and audit records; use a stable non-secret identifier.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_IDLE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Milliseconds an inactive agent runtime may remain before lifecycle cleanup; the default is 20 minutes.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_INFLIGHT_LIMIT",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Maximum concurrent requests admitted for one agent runtime; excess work receives a bounded busy response.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_RING",
-      "category": "runtime",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Numeric policy ring supplied to operation-policy evaluation; higher rings may have stricter execution rules.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Bind host for the agent runtime supervisor daemon; the default is loopback so the local control endpoint is not exposed remotely by omission.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Lock-file path used to prevent duplicate agent runtime supervisor daemons; keep it in the governed runtime area.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "TCP port for the agent runtime supervisor when transport is tcp; zero permits the operating system to select a port.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Unix-domain socket path for local agent runtime supervisor RPC; keep it under the governed runtime area.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN",
@@ -111,26 +112,27 @@
     {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["unix", "tcp"],
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Transport used by the agent runtime supervisor; unix is the local default, while tcp requires an explicitly controlled host and port.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_TIER",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Execution authority tier propagated to secure-io and policy checks; child processes may downgrade but must not use it to bypass governed access.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGENT_TURN_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Maximum milliseconds allowed for one agent conversation turn before the mediator returns a timeout.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_AGENT",
@@ -146,40 +148,40 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for agy cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_CLI_LOG_FILE",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for agy cli log file; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_CLI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model name passed to the AGY CLI backend.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_CLI_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for agy cli timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_SANDBOX",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for agy sandbox; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_SDK_API_KEY",
@@ -187,7 +189,7 @@
       "type": "string",
       "required": false,
       "description": "Internal bridge transport for the Antigravity SDK API key; prefer GEMINI_API_KEY or GOOGLE_API_KEY in the parent environment.",
-      "documented": false,
+      "documented": true,
       "subsystem": "reasoning"
     },
     {
@@ -196,7 +198,7 @@
       "type": "string",
       "required": false,
       "description": "Working directory passed from the AGY SDK adapter to its Python bridge.",
-      "documented": false,
+      "documented": true,
       "subsystem": "reasoning"
     },
     {
@@ -278,32 +280,32 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Fast model override for the Anthropic API route.",
+      "documented": true
     },
     {
       "name": "KYBERION_ANTHROPIC_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model override for the Anthropic API route.",
+      "documented": true
     },
     {
       "name": "KYBERION_ANTHROPIC_NATIVE_DEFERRED_TOOLS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for anthropic native deferred tools; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_ANTIGRAVITY_CLI_BIN",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for antigravity cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_API_TOKEN",
@@ -319,96 +321,97 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for apple fm; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_APPLE_FM_SAMPLE_AUDIO",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for apple fm sample audio; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIO_BUS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for audio bus; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIO_DEVICE_UID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for audio device uid; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIO_PERMISSION_CONFIRMED",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Operator acknowledgement that the meeting preflight microphone permission was confirmed for this session; use 1 only after the OS permission check succeeds.",
+      "documented": true,
+      "subsystem": "meeting"
     },
     {
       "name": "KYBERION_AUDIO_RECORD_COMMAND",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Local microphone capture command used by the voice sample recorder; it receives governed template values such as output and duration and is not a general-purpose user command entrypoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIT_CHAIN_KEY",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "HMAC key used to authenticate the append-only audit chain; values stay in the secret store.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIT_CONTINUITY_ENFORCE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for audit continuity enforce; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIT_FORWARDER_COMMAND",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional shell sink for forwarding audit events after the governed audit sink records them locally; use an explicitly approved command.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIT_FORWARDER_HEADERS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for audit forwarder headers; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIT_FORWARDER_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for audit forwarder timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIT_FORWARDER_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional HTTP destination for forwarding audit events; outbound delivery remains subject to the egress policy and local audit persistence is authoritative.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUTO_SEAL",
@@ -424,128 +427,129 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for the autonomous-operations policy catalog; the selected catalog remains schema-validated before an operation is admitted.",
+      "documented": true,
+      "subsystem": "governance"
     },
     {
       "name": "KYBERION_BACKUP_PASSPHRASE",
-      "category": "runtime",
+      "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Passphrase used to encrypt and restore backup archives; keep it in an external secret manager and never store it in the archive or registry.",
+      "documented": true
     },
     {
       "name": "KYBERION_BEST_OF_N",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for best of n; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BEST_OF_PROVIDERS_LIVE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for best of providers live; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLACKHOLE_DEVICE_LABEL",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for blackhole device label; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLACKHOLE_INPUT_UID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for blackhole input uid; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLACKHOLE_OUTPUT_UID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for blackhole output uid; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLACKHOLE_SCRIPT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for blackhole script; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLUEBUBBLES_PASSWORD",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Password used to authenticate requests to the BlueBubbles server.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLUEBUBBLES_SEND_METHOD",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for bluebubbles send method; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLUEBUBBLES_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Base URL of the local or approved BlueBubbles bridge used for iMessage operations; it configures transport only and does not grant tenant access.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLUEBUBBLES_WEBHOOK_SECRET",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Shared secret used to authenticate inbound BlueBubbles webhook requests.",
+      "documented": true
     },
     {
       "name": "KYBERION_BRAND_FONT_STACK",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for brand font stack; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BRAND_MONO_STACK",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for brand mono stack; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CHRONOS_IDLE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for chronos idle timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_AGENT_TOOLS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for claude agent tools; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_CLI_BIN",
@@ -561,40 +565,40 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for claude cli extra args; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_CLI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model name passed to the Claude CLI backend.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_CLI_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for claude cli timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_FAST_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Compatibility-alias fast model override for Claude routes.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Compatibility-alias model override for Claude routes.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_NATIVE_SUBAGENT",
@@ -608,218 +612,260 @@
     {
       "name": "KYBERION_CODEX_APPROVAL",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["strict", "relaxed"],
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "strict",
+      "description": "Approval mode for the Codex app-server adapter; strict keeps the governed approval path and relaxed permits provider-side relaxed approvals.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_CLI_BIN",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Explicit executable path for the Codex CLI query backend; when unset, the backend resolves an acceptable Codex binary from the host.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_CLI_EXTRA_ARGS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Whitespace-separated extra arguments appended to Codex CLI query invocations.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_CLI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model name passed to the Codex CLI backend.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_CLI_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Timeout in milliseconds for a Codex CLI query; unset keeps the adapter default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_INSTANCES",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Comma-separated Codex instance identifiers used by provider-health routing to track independent quotas and demotions.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_MODE",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["app-server", "exec", "legacy"],
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "app-server",
+      "description": "Codex transport mode; app-server uses the JSON-RPC adapter, while exec and legacy select the CLI adapter.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier used by the Codex agent and intent compiler routes.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_MODEL_PROVIDER",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Provider hint paired with the Codex model identifier for app-server execution.",
+      "documented": true
     },
     {
       "name": "KYBERION_COMFY_BASE_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Base URL for the ComfyUI image or video generation provider; requests must remain within the governed provider and egress boundaries.",
+      "documented": true
     },
     {
       "name": "KYBERION_COMFY_OUTPUT_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for comfy output dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_COMPUTER_SURFACE_PRINCIPAL",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for computer surface principal; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for confidential operator learning dispatch registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXT_BUFFER_TOKENS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for context buffer tokens; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXT_PACK_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for context pack id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXT_RESERVE_TOKENS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for context reserve tokens; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXT_WINDOW_TOKENS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for context window tokens; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for contextual intent learning path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for contextual intent memory path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_COPILOT_CLI_BIN",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for copilot cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_COPILOT_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model name requested from the Copilot ACP backend.",
+      "documented": true
     },
     {
       "name": "KYBERION_CURATION_ARCHIVE_HISTORY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for curation archive history path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CURATION_REPORT_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional output path for the knowledge curation report; use a governed shared runtime or report location rather than a tenant-unscoped data directory.",
+      "documented": true,
+      "subsystem": "knowledge"
     },
     {
       "name": "KYBERION_CURATION_SCAN_ROOTS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for curation scan roots; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CURATION_SLO_CONFIG_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for curation slo config path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CURATION_TAXONOMY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for curation taxonomy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CURATION_TENANT_ROOTDIR",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Test and controlled-operation root override for tenant curation ledger discovery; it is resolved through the governed root resolver and must not be used to widen tenant scope.",
+      "documented": true,
+      "subsystem": "knowledge"
+    },
+    {
+      "name": "KYBERION_CURSOR_CLI_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for the Cursor Agent CLI binary (`cursor-agent`); leave unset to resolve from PATH.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CURSOR_CLI_EXTRA_ARGS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional whitespace-separated extra argv passed to cursor-agent headless invocations.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CURSOR_CLI_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Model id for the Cursor Agent CLI reasoning backend; defaults to auto (Free-plan compatible).",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CURSOR_CLI_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Optional wall-clock timeout in milliseconds for a single cursor-agent reasoning call; leave unset to use the governed default.",
+      "documented": true,
+      "subsystem": "reasoning"
     },
     {
       "name": "KYBERION_CUSTOMER",
@@ -832,195 +878,197 @@
     },
     {
       "name": "KYBERION_DELEGATION_DEPTH",
-      "category": "runtime",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Delegation hop depth propagated to child processes for policy limits; operator-started roots default to zero.",
+      "documented": true
     },
     {
       "name": "KYBERION_DELEGATION_KILL_GRACE_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Milliseconds between SIGTERM and SIGKILL when a delegated child exceeds its wall-clock budget; the default is 5 seconds.",
+      "documented": true
     },
     {
       "name": "KYBERION_DELEGATION_MAX_CONCURRENCY",
-      "category": "runtime",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Global maximum number of concurrent delegated tasks admitted by the process semaphore; the default is 4.",
+      "documented": true
     },
     {
       "name": "KYBERION_DELEGATION_NOTIFICATIONS_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override path for durable delegation notifications; keep it inside the governed shared runtime area.",
+      "documented": true
     },
     {
       "name": "KYBERION_DELEGATION_PROVIDER_CAPS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional JSON object mapping provider ids to positive concurrency caps, for example {\"claude\":3}; invalid JSON is ignored.",
+      "documented": true
     },
     {
       "name": "KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY",
-      "category": "runtime",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Default maximum concurrent delegated tasks per provider when no provider-specific cap is configured; the default is 2.",
+      "documented": true
     },
     {
       "name": "KYBERION_DELEGATION_STORE_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Directory for durable delegation task records; keep it within governed shared runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_DELEGATION_SUMMARY_RETRY",
-      "category": "runtime",
-      "type": "string",
+      "category": "flag",
+      "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Enables the continuation retry when a delegated final summary is too brief; set false, 0, or off only for controlled compatibility runs.",
+      "documented": true
     },
     {
       "name": "KYBERION_DELEGATION_TRACE_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override path for delegated-task trace records used for observability and replay; keep it in governed runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_DELEGATION_WALL_CLOCK_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Wall-clock budget per delegated task before timeout and child termination; the default is 10 minutes.",
+      "documented": true
     },
     {
       "name": "KYBERION_DEPLOY_COMMAND",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional shell deployment adapter command for CI/CD dispatch; real deployment remains behind the deployment approval gate and explicit configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_DEPLOY_CONFIG_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for deploy config path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_DEPLOY_PROJECT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for deploy project; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_DEPLOY_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for deploy timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_DEPLOYMENT_PROJECT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for deployment project; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Disable the agent runtime supervisor daemon for controlled local or test runs.",
+      "documented": true
     },
     {
       "name": "KYBERION_DISABLE_EMBEDDINGS",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Disable embedding generation and use the non-semantic retrieval path.",
+      "documented": true
     },
     {
       "name": "KYBERION_DISPATCH_MAX_ROUNDS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for dispatch max rounds; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_DRAFT_REFINE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for draft refine; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_EGRESS_POLICY",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Network egress policy override; use warn to observe or enforce to reject destinations outside the governed allowlist. The policy file remains authoritative for domains.",
+      "documented": true,
+      "subsystem": "governance"
     },
     {
       "name": "KYBERION_EGRESS_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path to the governed egress-policy catalog; keep it in an approved knowledge or deployment configuration location.",
+      "documented": true,
+      "subsystem": "governance"
     },
     {
       "name": "KYBERION_EMAIL_FROM",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for email from; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_ENABLE_SERVICE_ACTUATE_TOOL",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Enable the service-actuate tool for trusted operators after capability approval.",
+      "documented": true
     },
     {
       "name": "KYBERION_ENTITY_GOVERNANCE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for entity governance; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS",
@@ -1053,96 +1101,99 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for first win live; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_FLUID_AUDIO_STT_COMMAND",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Local FluidAudio/Parakeet JSON bridge command for speech-to-text; the bridge receives a governed audio path and returns structured transcription output.",
+      "documented": true
     },
     {
       "name": "KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "300000",
+      "description": "Optional timeout in milliseconds for the FluidAudio/Parakeet batch STT bridge; unset uses the shell bridge default of five minutes.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_FORMAT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for format; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_GATE_OVERRIDE_SIGNATURE",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["warn", "enforce"],
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Human-override signature policy: warn observes missing or invalid gate signatures while enforce rejects them.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_CLI_BIN",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for gemini cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_CLI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model name passed to the Gemini CLI backend.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_CLI_TIMEOUT",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for gemini cli timeout; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_FAST_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Fast model override for the Gemini route.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier used by the Gemini API and routing fallback.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_TTS_VOICE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for gemini tts voice; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional Gemini API base URL override; leave unset for the provider default and use only an endpoint permitted by the egress policy.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_VIDEO_API_KEY",
@@ -1167,24 +1218,24 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for generation schedule interval ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_GLOBAL_INFLIGHT_LIMIT",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for global inflight limit; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_GOAL_LOOP_MAX_ROUNDS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for goal loop max rounds; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_GROK_API_KEY",
@@ -1215,208 +1266,208 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for grok cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_GROK_CLI_EXTRA_ARGS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for grok cli extra args; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_GROK_CLI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model name passed to the Grok Build CLI backend.",
+      "documented": true
     },
     {
       "name": "KYBERION_GROK_CLI_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for grok cli timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_HARNESS_SUBAGENT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for harness subagent; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_HINTS_ARCHIVE_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for hints archive dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_HINTS_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for hints path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_HISTORY_SEARCH_DB",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for history search db; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_HOST_AGENT_ACTIVE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for host agent active; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_IMESSAGE_WAKE_WORD",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for imessage wake word; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_IN_SESSION_SUBAGENT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for in session subagent; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_INGEST_QUOTA_TEST",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for ingest quota test; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_INJECTION_SCOPE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for injection scope; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_INJECTION_SUSPECTED",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for injection suspected; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_COMPILER_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Explicit model override for intent contract compilation.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_COMPILER_MODEL_PROVIDER",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Provider hint paired with the intent compiler model override.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_COMPILER_PROVIDER",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Provider route selected for intent contract compilation.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_CONTRACT_MEMORY_EXPORT_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for exported intent-contract memory artifacts; the global default is active/shared/exports/intent-contract-memory and tenant runs remain physically scoped.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_CONTRACT_MEMORY_REPORT_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the intent-contract memory sync report; the global default is active/shared/runtime/reports/intent-contract-memory-sync-latest.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the global intent-contract memory runtime file; relative values resolve from the repository root and tenant-scoped runs use their physical scope path.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the intent-contract memory schema used by the sync command; the default is knowledge/product/schemas/intent-contract-memory.schema.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the governance seed used by intent-contract memory sync; tenant-scoped memory cannot be promoted into the global seed without the governed brokered path.",
+      "documented": true
     },
     {
       "name": "KYBERION_KI_CACHE_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for ki cache dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_KI_CACHE_MAX_MB",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for ki cache max mb; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_KILL_SWITCH_INTERVAL_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for kill switch interval ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_DELIVERY_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for knowledge feedback delivery logs; the default is active/shared/runtime/feedback-loop/knowledge-delivery and scoped runs append under their tenant or mission path.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_FEEDBACK_DIR",
@@ -1431,128 +1482,129 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the knowledge feedback policy catalog; unsafe paths are rejected and the canonical product governance policy remains the fallback.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_REFS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Comma-separated knowledge references attached to ambient reasoning visibility for the active mission context.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_SCOPE_HEALTH_HISTORY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the knowledge-scope health history report; the default is active/shared/runtime/feedback-loop/knowledge-scope-health.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_SCOPE_RECONCILIATION_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the knowledge-scope reconciliation report; the default is active/shared/runtime/reports/knowledge-scope-reconciliation-latest.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_TIER",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Knowledge tier hint propagated into pipeline facet resolution; accepted values are public, confidential, and personal, with invalid values falling back to public.",
+      "documented": true,
+      "subsystem": "knowledge"
     },
     {
       "name": "KYBERION_KNOWLEDGE_USAGE_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for aggregated knowledge usage and yield data; the default is active/shared/runtime/feedback-loop/knowledge-usage/usage.json and scoped reads preserve tenant containment.",
+      "documented": true
     },
     {
       "name": "KYBERION_LIVE_BLACKHOLE_TEST",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for live blackhole test; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_LLAMACPP_KEY",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "API key for the llama.cpp OpenAI-compatible backend, when authentication is enabled.",
+      "documented": true
     },
     {
       "name": "KYBERION_LLAMACPP_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier sent to the llama.cpp OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_LLAMACPP_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Base URL for the llama.cpp OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_LLM_CONCURRENCY",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for llm concurrency; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_LM_STUDIO_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Compatibility-alias model identifier sent to the LM Studio endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_LM_STUDIO_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Compatibility-alias base URL for the LM Studio OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_LMSTUDIO_KEY",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "API key for the LM Studio OpenAI-compatible backend, when authentication is enabled.",
+      "documented": true
     },
     {
       "name": "KYBERION_LMSTUDIO_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier sent to the LM Studio OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_LMSTUDIO_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Base URL for the LM Studio OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_LOCAL_LLM_KEY",
@@ -1595,32 +1647,32 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "API key for the LocalAI OpenAI-compatible backend, when authentication is enabled.",
+      "documented": true
     },
     {
       "name": "KYBERION_LOCALAI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier sent to the LocalAI OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_LOCALAI_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Base URL for the LocalAI OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_LOCALE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for locale; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_LOCALHOST_AUTOADMIN",
@@ -1636,8 +1688,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for managed python version; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_MANIFEST_SIGNING_KEY",
@@ -1689,128 +1741,131 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for media backend probe ttl ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_MEDIA_BACKEND_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for media backend registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MEET_EXTENSION_TOKEN",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Pre-shared token used to authenticate the Chrome meeting extension bridge.",
+      "documented": true
     },
     {
       "name": "KYBERION_MEMORY_AUTOPROMOTE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for memory autopromote; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_MEMORY_QUEUE_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for memory queue path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_HUB_OBSERVABILITY_ROOT",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for mesh hub observability root; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_HUB_RUNTIME_ROOT",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for mesh hub runtime root; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_NAMESPACE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for mesh namespace; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_PEER_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for mesh peer id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_SHARED_SECRET",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Shared secret used to authenticate mesh delivery and peer coordination.",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier passed to the local mflux image-generation backend; it selects the model and does not configure a remote provider endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_PACKAGE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "mflux",
+      "description": "Package specification supplied to the local mflux runner; use this to select a pinned or locally available package build.",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_QUANTIZE",
       "category": "runtime",
-      "type": "string",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "8",
+      "description": "Positive quantization level passed to the local mflux image-generation runner; defaults to 8.",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_SEED",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional deterministic seed passed to the local mflux image-generation runner.",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_STEPS",
       "category": "runtime",
-      "type": "string",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Positive diffusion step count for local mflux generation; the default is mode-dependent (4 for schnell and 20 for dev).",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "1800000",
+      "description": "Maximum local mflux generation time in milliseconds; defaults to 30 minutes.",
+      "documented": true
     },
     {
       "name": "KYBERION_MINIMAX_VIDEO_API_KEY",
@@ -1835,40 +1890,40 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for mission task trace dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MLX_EMBED_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Hugging Face model identifier used by the MLX embedding backend.",
+      "documented": true
     },
     {
       "name": "KYBERION_MLX_KEY",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "API key for the MLX OpenAI-compatible backend, when authentication is enabled.",
+      "documented": true
     },
     {
       "name": "KYBERION_MLX_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier sent to the MLX-LM OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_MLX_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Base URL for the MLX-LM OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_MLX_WHISPER_MODEL",
@@ -1884,128 +1939,139 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for mos principal; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_NEMOTRON_KEY",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "API key for the Nemotron OpenAI-compatible backend, when authentication is enabled.",
+      "documented": true
     },
     {
       "name": "KYBERION_NEMOTRON_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier sent to the Nemotron OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_NEMOTRON_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Base URL for the Nemotron OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_NHI_ACTOR",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Non-human identity actor verification mode: off disables checks, warn audits violations, and enforce rejects unregistered, suspended, or retired actors; the default is warn.",
+      "documented": true,
+      "subsystem": "identity"
     },
     {
       "name": "KYBERION_NHI_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for nhi id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_NON_INTERACTIVE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for non interactive; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_OAUTH_CALLBACK_HOST",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Bind host for the local OAuth callback surface; the default is loopback and a remote host should be used only with an explicitly secured deployment.",
+      "documented": true
     },
     {
       "name": "KYBERION_OAUTH_CALLBACK_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for oauth callback path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_OAUTH_CALLBACK_PORT",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Local TCP port for the OAuth callback surface; the default is 8787 and remote binding still requires the callback host and deployment security controls.",
+      "documented": true,
+      "subsystem": "oauth"
     },
     {
       "name": "KYBERION_OAUTH_SERVICE_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for oauth service id; leave unset to use the built-in configuration.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_OBS_WS_PASSWORD",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "OBS Studio WebSocket server password for the talking-avatar virtual-camera output; must match OBS Settings → General → WebSocket Server → Server Password.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_OLLAMA_KEY",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "API key for the Ollama OpenAI-compatible backend, when authentication is enabled.",
+      "documented": true
     },
     {
       "name": "KYBERION_OLLAMA_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model name sent to the Ollama OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_OLLAMA_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Base URL for the Ollama OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_ONBOARDING_NON_INTERACTIVE_OK",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for onboarding non interactive ok; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_OPENAI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier used as the OpenAI vision route fallback.",
+      "documented": true
     },
     {
       "name": "KYBERION_OPENAI_VIDEO_API_KEY",
@@ -2030,8 +2096,44 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier used for OpenAI-compatible vision requests.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_OPENCODE_CLI_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for the OpenCode CLI binary (`opencode`); leave unset to resolve from PATH.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_OPENCODE_CLI_EXTRA_ARGS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional whitespace-separated extra argv passed to opencode headless invocations.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_OPENCODE_CLI_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Model id in provider/model form for the OpenCode CLI reasoning backend; defaults to opencode/muse-spark-1.3-contributor-free.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_OPENCODE_CLI_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Optional wall-clock timeout in milliseconds for a single opencode reasoning call; leave unset to use the governed default.",
+      "documented": true,
+      "subsystem": "reasoning"
     },
     {
       "name": "KYBERION_OPENROUTER_COST_POLICY",
@@ -2091,72 +2193,72 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for operator learning dispatch registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_OPS_ALERT_WEBHOOK_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional webhook destination for operational alerts; delivery is attempted only when configured and remains subject to egress policy, while the local alert ledger remains the source of record.",
+      "documented": true
     },
     {
       "name": "KYBERION_ORGANIZATION_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for organization id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_OS_GUARDED_SURFACE_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "URL of the guarded OS decision surface shown to a human when an operating-system action is held; it is a presentation link, not an authorization input.",
+      "documented": true
     },
     {
       "name": "KYBERION_PEER_HOST",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Bind host for the peer messaging and peer conversation servers; the default is loopback and remote binding requires the mesh transport security configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PEER_KEY_REF",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Secret reference recorded in peer enrollment; it identifies the secret without storing its value.",
+      "documented": true
     },
     {
       "name": "KYBERION_PEER_NETWORK_CATALOG",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for peer network catalog; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PEER_PORT",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for peer port; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_PEER_SHARED_SECRET",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "HMAC shared secret used to authenticate peer messaging.",
+      "documented": true
     },
     {
       "name": "KYBERION_PERSONA",
@@ -2172,104 +2274,104 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for personal operator learning dispatch registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for personal presentation preference registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for personal surface query config path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for personal voice profile registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PHASE_GATE_MODE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for phase gate mode; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PIPELINE_FALLBACK_ACTIVE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for pipeline fallback active; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PREFIX",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for prefix; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PRESENCE_AVATAR_PROFILES_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for presence avatar profiles path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for presentation preference registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROJECT_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for project id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROJECT_NAME",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for project name; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROJECT_ROOT",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for project root; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_CAPABILITY_PROBE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for provider capability probe; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_CAPABILITY_REFRESH",
@@ -2284,40 +2386,41 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for provider capability routing; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_DEMOTION_TTL_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for provider demotion ttl ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_DISCOVERY_REFRESH",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for provider discovery refresh; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_EGRESS_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for provider egress policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_ENV_ALLOWLIST",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Provider child-process environment policy; allowlisting is enabled by default, while 0 is an explicit diagnostic escape hatch that passes through the parent environment.",
+      "documented": true,
+      "subsystem": "reasoning"
     },
     {
       "name": "KYBERION_PROVIDER_HEALTH_STATE_PATH",
@@ -2333,24 +2436,24 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for provider priority; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PTC_CHILD",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for ptc child; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PTY_IDLE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for pty idle timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_PYTHON",
@@ -2375,8 +2478,9 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Explicitly enables the shell_exec tool for reasoning profiles that request it; only the literal true enables the capability and the shell policy still applies.",
+      "documented": true,
+      "subsystem": "reasoning"
     },
     {
       "name": "KYBERION_REASONING_BACKEND",
@@ -2392,56 +2496,56 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for reasoning in place retries; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_REASONING_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Global fallback model override for reasoning routes.",
+      "documented": true
     },
     {
       "name": "KYBERION_REASONING_PROFILE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for reasoning profile; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_REASONING_RETRY_BASE_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for reasoning retry base ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_REMINDER_CC_AFTER_N",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for reminder cc after n; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_RESTRICTED_ACTIONS_POLICY",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for restricted actions policy; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_RESTRICTED_APPROVED_ITEMS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for restricted approved items; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_ROOT",
@@ -2457,8 +2561,8 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for runtime sweep interval ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_RUNWAY_API_KEY",
@@ -2498,187 +2602,190 @@
     },
     {
       "name": "KYBERION_SECRET_RESOLVER_COMMAND",
-      "category": "secret",
+      "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Command used by the secret resolver to obtain named secrets.",
+      "documented": true
     },
     {
       "name": "KYBERION_SECRET_RESOLVER_TIMEOUT_MS",
-      "category": "secret",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Timeout in milliseconds for the external secret resolver command.",
+      "documented": true
     },
     {
       "name": "KYBERION_SECURITY_POSTURE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Security-screen posture override; accepted values are dangerous, auto, and strict. Invalid values are ignored and the schema-validated posture catalog is used.",
+      "documented": true,
+      "subsystem": "security"
     },
     {
       "name": "KYBERION_SECURITY_QUARANTINE_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for security quarantine dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SECURITY_QUARANTINE_MAX_BYTES",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for security quarantine max bytes; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_ENDPOINTS_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service endpoints dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_ENDPOINTS_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service endpoints path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_PRESETS_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service presets dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service runtime policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_RUNTIME_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service runtime registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SHARE_GRANTS_HMAC_KEY",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "HMAC key used to sign and verify share-grant records.",
+      "documented": true
     },
     {
       "name": "KYBERION_SHARE_GRANTS_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for share grants path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SHELL_COMMAND_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path to the shell-command policy catalog used for command admission and injection-suspected restrictions; the policy is loaded through the governed catalog boundary.",
+      "documented": true,
+      "subsystem": "security"
     },
     {
       "name": "KYBERION_SILERO_VAD_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Filesystem path to the Silero VAD ONNX model used by the local realtime voice bridge; when unset, the voice loop uses its configured fallback VAD path.",
+      "documented": true
     },
     {
       "name": "KYBERION_SILERO_VAD_PYTHON",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional Python executable for the Silero VAD bridge; fallback order is the managed silero runtime, then KYBERION_PYTHON_BIN, then python3.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_SKIP_TYPE_RATCHET",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Skip type-ratchet validation for controlled image or context build runs; CI still enforces the ratchet.",
+      "documented": true
     },
     {
       "name": "KYBERION_SMTP_HOST",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "SMTP host that activates the email actuator SMTP mode; pair it with the separately managed SMTP credentials and keep outbound delivery within the approved egress boundary.",
+      "documented": true
     },
     {
       "name": "KYBERION_SMTP_PASS",
-      "category": "runtime",
+      "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "SMTP password or app token used by the email actuator; provide it through the secret store and keep it out of logs and configuration artifacts.",
+      "documented": true
     },
     {
       "name": "KYBERION_SMTP_PORT",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "TCP port used by the email actuator SMTP backend; use the port required by the approved mail service, commonly 465 or 587.",
+      "documented": true
     },
     {
       "name": "KYBERION_SMTP_USER",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "SMTP username used by the email actuator; keep account identity configuration aligned with the approved outbound mail service.",
+      "documented": true
     },
     {
       "name": "KYBERION_SOVEREIGN_SECRET",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Secret used by the sovereign pulse guard to sign and verify control payloads.",
+      "documented": true
     },
     {
       "name": "KYBERION_SPEAKER_FAIRNESS_MUST_THRESHOLD",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for speaker fairness must threshold; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SPEAKER_FAIRNESS_TOTAL_THRESHOLD",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for speaker fairness total threshold; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SPEND_GUARD_TEST",
@@ -2694,39 +2801,45 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "stub",
+      "description": "Streaming speech-to-text bridge id selected by the realtime loop; unset uses the deterministic stub, while installed shell or managed bridges may be selected explicitly.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_STREAMING_TTS_BRIDGE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "stub",
+      "description": "Streaming text-to-speech bridge id selected by the realtime loop; unset uses the PCM stub and an installed shell or provider bridge can be selected explicitly.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_STT_ARGS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional comma-separated arguments appended to the shell streaming STT command; values are trimmed and empty items are ignored.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_STT_CAPABILITIES",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional JSON object describing shell STT capabilities, such as timestamps, granularity, and local_only; invalid or unsafe shapes are ignored at the bridge boundary.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_STT_COMMAND",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "Speech-to-text bridge command override.",
+      "description": "Speech-to-text bridge command override. Supports {{audio}} and {{language}} placeholders; stdout is the transcript. macOS Apple Silicon example: whisperkit-cli transcribe --audio-path {{audio}} --language {{language}} (model auto-downloads on first run).",
       "documented": true,
       "subsystem": "voice"
     },
@@ -2769,32 +2882,39 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional repository-safe model directory used by local STT adapter selection, including faster-whisper and Whisper model availability checks.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_STT_OUTPUT_FORMAT",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["text", "json"],
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "text",
+      "description": "Output format expected from the explicit shell STT command; `json` enables structured text/capabilities/segments parsing, while text keeps stdout as the transcript.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_STT_PRIORITY",
-      "category": "runtime",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Numeric priority assigned to the explicit shell STT bridge when multiple speech-to-text bridges are registered; higher-level selection may use this value for ordering.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_STT_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "300000",
+      "description": "Optional timeout in milliseconds for the explicit shell batch STT bridge; unset uses the bridge default of five minutes.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_STT_WINDOW_SEC",
@@ -2809,8 +2929,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for style keys; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SUDO",
@@ -2826,8 +2946,8 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Key used by the system prelude for privileged sudo coordination; values stay in the secret store.",
+      "documented": true
     },
     {
       "name": "KYBERION_SUDO_SCOPE",
@@ -2843,80 +2963,84 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "JSON actor allowlist keyed by surface (for example {\"telegram\":[\"actor-id\"]}); an invalid configured value fails closed for the affected surface.",
+      "documented": true,
+      "subsystem": "surface"
     },
     {
       "name": "KYBERION_SURFACE_QUERY_CONFIG_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for surface query config path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SURFACE_QUERY_PHASE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for surface query phase; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SURFACE_QUERY_ROLE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Fallback role selector for surface-query provider resolution; a request or server-resolved context role takes precedence and this value does not grant authorization.",
+      "documented": true,
+      "subsystem": "surface"
     },
     {
       "name": "KYBERION_TASK_GRANTS_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for task grants path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TASK_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for task id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TASK_MODEL_ROUTING",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Task model-hint policy: advisory records routing hints without changing the manifest choice, while enforce applies a validated task model hint when present.",
+      "documented": true,
+      "subsystem": "reasoning"
     },
     {
       "name": "KYBERION_TASK_SCENARIO_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for task scenario dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TELEMETRY",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for telemetry; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TEN_VAD_PYTHON",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional Python executable for the TEN VAD bridge; unset uses KYBERION_PYTHON_BIN when available and otherwise python3.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_TENANT",
@@ -2932,120 +3056,115 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional governed root for tenant design assets used by the Chronos tenant-design route; viewer-resolved tenant scope still controls which customer data is selected.",
+      "documented": true,
+      "subsystem": "surface"
     },
     {
       "name": "KYBERION_TENANT_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Legacy tenant identifier fallback used by peer and surface entrypoints; prefer the canonical KYBERION_TENANT slug and server-resolved viewer scope where available.",
+      "documented": true,
+      "subsystem": "scope"
     },
     {
       "name": "KYBERION_TENANT_SCOPE_REQUIRED",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_TERMINAL_ALLOW_REMOTE",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
+      "description": "Tenant binding policy for confidential work; strict (or the boolean value 1/true where supported) rejects an unbound tenant, while warn records the migration warning.",
+      "documented": true,
+      "subsystem": "scope"
     },
     {
       "name": "KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for terminal disconnect timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_TERMINAL_HOST",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Bind host for the terminal bridge; the default is loopback so terminal control is not exposed remotely by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_TERMINAL_RESTORE_RUNTIME",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for terminal restore runtime; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TERMINAL_SESSION_RETENTION_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for terminal session retention ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_TERMINAL_TOKEN",
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Bearer token used to authenticate the terminal bridge.",
+      "documented": true
     },
     {
       "name": "KYBERION_TEST_OBSERVABILITY_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for test observability dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TIER",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for tier; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TIMEZONE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for timezone; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for tool actuator routing policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TOOL_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for tool runtime policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TOOL_RUNTIME_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for tool runtime registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TRUST_PROXY",
@@ -3061,80 +3180,83 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional comma-separated arguments appended to the shell streaming TTS command; values are trimmed and empty items are ignored.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_TTS_COMMAND",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional streaming text-to-speech executable for realtime voice and meeting flows; it reads newline-delimited UTF-8 text and emits PCM audio through the governed bridge.",
+      "documented": true
     },
     {
       "name": "KYBERION_TTS_PLAY_COMMAND",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional PCM playback command used by the streaming TTS bridge; it overrides the platform default player and remains a local runtime configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TUI_DISABLE_AUDIT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for tui disable audit; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_UI_LOCALE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for ui locale; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_VAD",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "energy",
+      "description": "VAD backend id used by the voice loop; `energy` is built in and unavailable or unknown neural backends degrade to energy with a surfaced reason.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_VIDEO_COMPOSITION_TEMPLATE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for video composition template registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_VIDEO_RENDER_RUN_MODE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for video render run mode; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for video render runtime policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_VIEWER_PRINCIPAL",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for viewer principal; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_VIEWER_SCOPE",
@@ -3150,200 +3272,193 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "API key for the vLLM OpenAI-compatible backend, when authentication is enabled.",
+      "documented": true
     },
     {
       "name": "KYBERION_VLLM_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier sent to the vLLM OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_VLLM_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Base URL for the vLLM OpenAI-compatible endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_BRIDGE_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path to the Python voice-learning bridge; when unset, the bundled voice-actuator bridge is used.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_ENGINE_REGISTRY_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Directory override for the split voice-engine registry files; used with the canonical registry path when present.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_ENGINE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Explicit voice-engine registry path; the selected file is validated against the voice-engine schema before use.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_HUB_TTS_CONFIG_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the voice-hub text-to-speech language configuration; the default is knowledge/product/presence/voice-hub-tts.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_LANGUAGE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Language hint passed to the Python voice bridge; when unset, the unified locale resolver supplies the language.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_OUTPUT_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Directory for generated Python voice artifacts; the default is active/shared/tmp/voice-out under the current repository.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_PLAY_BLACKHOLE",
       "category": "runtime",
-      "type": "string",
+      "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Set to 1 to send Python voice output through the configured BlackHole playback bridge; it has no effect without KYBERION_BLACKHOLE_SCRIPT.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_PROFILE_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Voice profile identifier forwarded to the Python/TTS bridge; the Python bridge is not installed unless this value is present.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_PROFILE_REGISTRY_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Directory override for split voice-profile registry files; canonical overlays remain enabled when no explicit registry file is selected.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_PROFILE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Explicit base voice-profile registry path; selecting it disables the automatic personal and customer overlay lookup.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the voice runtime policy catalog; the default is knowledge/product/governance/voice-runtime-policy.json and invalid input falls back conservatively.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_VOICE_TIER",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the voice sample-ingestion policy catalog; the selected file is schema-validated before profile registration.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_UPGRADE_ALIAS",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["cloud", "local"],
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Compatibility alias for the voice upgrade target; cloud selects tier 1 and local selects tier 2 when no explicit CLI target is supplied.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_AI",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for windows ai; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_AI_ENDPOINT",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Foundry Local or other approved Windows local AI endpoint used by the Windows assistance bridge; keep the endpoint local or explicitly allowlisted.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_AI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Model identifier selected by the Windows local AI bridge; it is paired with KYBERION_WINDOWS_AI_ENDPOINT and does not itself grant external access.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_AUMID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for windows aumid; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_IMAGE_GENERATOR",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for windows image generator; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_STT_BACKEND",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Selects the Windows speech-to-text backend, such as faster_whisper, for the local voice actuator; the selected backend must be installed and available in the governed runtime.",
+      "documented": true
     },
     {
       "name": "KYBERION_WISDOM_LLM_PROFILE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for wisdom llm profile; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WORK_COORDINATION_NAMESPACE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for work coordination namespace; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS",

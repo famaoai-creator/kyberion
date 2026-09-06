@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 import {
   consumeTenantBudget,
   inspectTenantBudget,
@@ -6,15 +8,22 @@ import {
   TenantRateLimitExceededError,
   _resetTenantRateLimitStateForTests,
   _resetTenantRateLimitPolicyCacheForTests,
+  normalizeTenantRateLimitLockRecord,
 } from './tenant-rate-limiter.js';
 
 describe('tenant-rate-limiter (IP-29)', () => {
+  const lockPath = pathResolver.rootResolve(
+    'active/shared/runtime/tenant-rate-limit-state.json.lock'
+  );
+  const externalLockPath = pathResolver.sharedTmp('tenant-rate-limit-external.lock');
   let savedTenant: string | undefined;
   let savedPersona: string | undefined;
 
   beforeEach(() => {
     savedTenant = process.env.KYBERION_TENANT;
     savedPersona = process.env.KYBERION_PERSONA;
+    safeRmSync(lockPath, { recursive: true, force: true });
+    safeRmSync(externalLockPath, { recursive: true, force: true });
     _resetTenantRateLimitStateForTests();
     _resetTenantRateLimitPolicyCacheForTests();
   });
@@ -24,8 +33,52 @@ describe('tenant-rate-limiter (IP-29)', () => {
     else process.env.KYBERION_TENANT = savedTenant;
     if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = savedPersona;
+    safeRmSync(lockPath, { recursive: true, force: true });
+    safeRmSync(externalLockPath, { recursive: true, force: true });
     _resetTenantRateLimitStateForTests();
     _resetTenantRateLimitPolicyCacheForTests();
+  });
+
+  it('normalizes lock records and rejects unsafe PID shapes', () => {
+    expect(
+      normalizeTenantRateLimitLockRecord({ pid: 42, created_at: '2026-09-01T00:00:00Z' })
+    ).toEqual({
+      pid: 42,
+      created_at: '2026-09-01T00:00:00Z',
+    });
+    expect(normalizeTenantRateLimitLockRecord({ pid: 0 })).toBeNull();
+    expect(normalizeTenantRateLimitLockRecord({ pid: 1.5 })).toBeNull();
+    expect(normalizeTenantRateLimitLockRecord({ pid: Number.NaN })).toBeNull();
+    expect(normalizeTenantRateLimitLockRecord({ pid: '42' })).toBeNull();
+    expect(normalizeTenantRateLimitLockRecord([])).toBeNull();
+  });
+
+  it('does not read through a symlinked lock file before reclaiming it', () => {
+    safeWriteFile(
+      externalLockPath,
+      JSON.stringify({ pid: process.pid, created_at: '2026-09-06T00:00:00.000Z' })
+    );
+    safeSymlinkSync(externalLockPath, lockPath, 'file');
+
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'worker';
+    expect(consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toMatchObject({
+      allowed: true,
+    });
+    expect(safeReadFile(externalLockPath, { encoding: 'utf8' })).toContain(String(process.pid));
+    expect(() => safeReadFile(lockPath, { encoding: 'utf8' })).toThrow();
+
+    safeRmSync(externalLockPath, { recursive: true, force: true });
+  });
+
+  it('reclaims a malformed lock through the stale-lock path', () => {
+    safeWriteFile(lockPath, '{');
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'worker';
+
+    expect(consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toMatchObject({
+      allowed: true,
+    });
   });
 
   it('passes through when no tenant slug is bound (tenant-agnostic)', () => {
@@ -113,5 +166,35 @@ describe('tenant-rate-limiter (IP-29)', () => {
       expect(caught.code).toBe('TENANT_RATE_LIMIT_EXCEEDED');
       expect(caught.retryAfterMs).toBeGreaterThanOrEqual(0);
     }
+  });
+
+  it('rejects schema-invalid persisted state instead of resetting quota history', () => {
+    safeWriteFile(
+      pathResolver.rootResolve('active/shared/runtime/tenant-rate-limit-state.json'),
+      JSON.stringify({ tenants: { 'acme-corp': { tokens: 'not-a-number', updated_at: 'bad' } } })
+    );
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'worker';
+
+    expect(() => consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toThrow(
+      'Invalid catalog tenant-rate-limit-state'
+    );
+  });
+
+  it('persists a canonical state payload after quota enforcement', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'worker';
+    consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 });
+
+    const persisted = JSON.parse(
+      String(
+        safeReadFile(
+          pathResolver.rootResolve('active/shared/runtime/tenant-rate-limit-state.json'),
+          { encoding: 'utf8' }
+        )
+      )
+    ) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.tenants).toHaveProperty('acme-corp');
   });
 });

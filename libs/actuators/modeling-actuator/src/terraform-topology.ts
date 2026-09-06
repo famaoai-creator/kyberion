@@ -1,5 +1,11 @@
 import * as path from 'node:path';
-import { safeExistsSync, safeLstat, safeReadFile, safeReaddir, safeStat } from '@agent/core';
+import {
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeReaddir,
+  safeStat,
+} from '@agent/core/secure-io';
 import type { TerraformBlock, TerraformTopologyIr } from './topology-ir.js';
 
 function shouldSkipTerraformDir(name: string): boolean {
@@ -34,7 +40,8 @@ function findMatchingBrace(text: string, openIndex: number): number {
 function parseBlocks(filePath: string, exampleRoot: string): TerraformBlock[] {
   const content = String(safeReadFile(filePath, { encoding: 'utf8' }));
   const blocks: TerraformBlock[] = [];
-  const blockRegex = /(provider|resource|data|module|output|variable|terraform)\s+"([^"]+)"(?:\s+"([^"]+)")?\s*\{/g;
+  const blockRegex =
+    /(provider|resource|data|module|output|variable|terraform)\s+"([^"]+)"(?:\s+"([^"]+)")?\s*\{/g;
   for (const match of content.matchAll(blockRegex)) {
     const openIndex = (match.index || 0) + match[0].length - 1;
     const closeIndex = findMatchingBrace(content, openIndex);
@@ -42,15 +49,22 @@ function parseBlocks(filePath: string, exampleRoot: string): TerraformBlock[] {
     const kind = match[1];
     const type = match[2];
     const name = match[3] || '';
-    const relDir = path.relative(exampleRoot, path.dirname(filePath)).replaceAll(path.sep, '/') || '.';
+    const relDir =
+      path.relative(exampleRoot, path.dirname(filePath)).replaceAll(path.sep, '/') || '.';
     const baseId =
-      kind === 'resource' ? `resource.${type}.${name}` :
-      kind === 'data' ? `data.${type}.${name}` :
-      kind === 'module' ? `module.${type}` :
-      kind === 'provider' ? `provider.${type}` :
-      kind === 'terraform' ? 'terraform.root' :
-      kind === 'output' ? `output.${type}` :
-      `variable.${type}`;
+      kind === 'resource'
+        ? `resource.${type}.${name}`
+        : kind === 'data'
+          ? `data.${type}.${name}`
+          : kind === 'module'
+            ? `module.${type}`
+            : kind === 'provider'
+              ? `provider.${type}`
+              : kind === 'terraform'
+                ? 'terraform.root'
+                : kind === 'output'
+                  ? `output.${type}`
+                  : `variable.${type}`;
     blocks.push({ kind, type, name, id: `${relDir}::${baseId}`, dir: relDir, body, filePath });
   }
 
@@ -88,7 +102,10 @@ function collectModuleSourceDirs(exampleRoot: string, blocks: TerraformBlock[]):
   return [...dirs].sort();
 }
 
-function collectExternalModuleSourceBlocks(exampleRoot: string, rootBlocks: TerraformBlock[]): TerraformBlock[] {
+function collectExternalModuleSourceBlocks(
+  exampleRoot: string,
+  rootBlocks: TerraformBlock[]
+): TerraformBlock[] {
   const moduleSourceDirs = collectModuleSourceDirs(exampleRoot, rootBlocks);
   const blocks: TerraformBlock[] = [];
   for (const relSourceDir of moduleSourceDirs) {
@@ -107,7 +124,7 @@ function isWithinModuleSourceDir(dir: string, moduleSourceDirs: string[]): boole
 
 function toCallerBlocksBySource(
   exampleRoot: string,
-  runtimeBlocks: TerraformBlock[],
+  runtimeBlocks: TerraformBlock[]
 ): Record<string, TerraformBlock[]> {
   const buckets = new Map<string, TerraformBlock[]>();
   for (const block of runtimeBlocks.filter((item) => item.kind === 'module')) {
@@ -120,7 +137,10 @@ function toCallerBlocksBySource(
   return Object.fromEntries([...buckets.entries()].map(([key, value]) => [key, value]));
 }
 
-export function terraformToTopologyIr(exampleRoot: string, options: { title?: string } = {}): TerraformTopologyIr {
+export function terraformToTopologyIr(
+  exampleRoot: string,
+  options: { title?: string } = {}
+): TerraformTopologyIr {
   if (!safeExistsSync(exampleRoot) || !safeStat(exampleRoot).isDirectory()) {
     throw new Error(`Terraform root not found: ${exampleRoot}`);
   }
@@ -132,7 +152,7 @@ export function terraformToTopologyIr(exampleRoot: string, options: { title?: st
   const rootBlocks = tfFiles.flatMap((filePath) => parseBlocks(filePath, exampleRoot));
   const externalModuleSourceBlocks = collectExternalModuleSourceBlocks(exampleRoot, rootBlocks);
   const allBlocks = [...rootBlocks, ...externalModuleSourceBlocks].filter((block) =>
-    ['provider', 'resource', 'data', 'module', 'backend', 'variable', 'output'].includes(block.kind),
+    ['provider', 'resource', 'data', 'module', 'backend', 'variable', 'output'].includes(block.kind)
   );
   const title = options.title || path.basename(exampleRoot);
   const moduleSourceDirs = collectModuleSourceDirs(exampleRoot, allBlocks);
@@ -155,6 +175,9 @@ export function terraformToTopologyIr(exampleRoot: string, options: { title?: st
   };
 }
 
-export function resolveTerraformModuleSourceDir(block: TerraformBlock, exampleRoot: string): string | null {
+export function resolveTerraformModuleSourceDir(
+  block: TerraformBlock,
+  exampleRoot: string
+): string | null {
   return resolveModuleSourceDir(block, exampleRoot);
 }

@@ -13,16 +13,17 @@
  */
 
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
   safeStat,
   safeWriteFile,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+} from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
+import { readSafeJsonValueFile } from './lib/json-input.js';
 
 interface ShellViolation {
   file: string;
@@ -31,7 +32,7 @@ interface ShellViolation {
 }
 
 const ROOT = pathResolver.rootDir();
-const BASELINE_PATH = pathResolver.rootResolve('scripts/pipeline-shell-independence.baseline.json');
+const BASELINE_PATH = resolveCiGateBaselinePath('pipeline-shell-independence');
 const PIPELINE_ROOTS = [
   path.join(ROOT, 'pipelines'),
   path.join(ROOT, 'pipelines', 'fragments'),
@@ -189,7 +190,7 @@ export function scanPipelineShellIndependence(
   const violations: ShellViolation[] = [];
   for (const file of files) {
     if (!safeExistsSync(file)) continue;
-    const data = readJson<unknown>(file);
+    const data = readSafeJsonValueFile<unknown>(file, `pipeline ${path.relative(ROOT, file)}`);
     scanValue(file, data, violations);
     scanScriptWrappers(file, data, violations);
   }
@@ -202,7 +203,7 @@ function violationKey(violation: ShellViolation): string {
 
 function loadBaseline(): ShellViolation[] {
   if (!safeExistsSync(BASELINE_PATH)) return [];
-  const parsed = readJson<unknown>(BASELINE_PATH);
+  const parsed = readSafeJsonValueFile<unknown>(BASELINE_PATH, 'pipeline shell baseline');
   if (!parsed || typeof parsed !== 'object') return [];
   const violations = (parsed as Record<string, unknown>).violations;
   if (!Array.isArray(violations)) return [];
@@ -270,15 +271,19 @@ export const runCheckPipelineShellIndependence = defineScript({
       );
     }
     if (violations.length > 0) {
-      console.error('[check:pipeline-shell-independence] violations detected:');
-      for (const violation of violations) {
-        console.error(
-          `- ${path.relative(ROOT, violation.file)} :: ${violation.pattern} :: ${JSON.stringify(violation.match)}`
-        );
-      }
-      throw new Error(`${violations.length} pipeline shell independence violation(s)`);
+      throw new ScriptExitError(
+        1,
+        [
+          'violations detected:',
+          ...violations.map(
+            (violation) =>
+              `- ${path.relative(ROOT, violation.file)} :: ${violation.pattern} :: ${JSON.stringify(violation.match)}`
+          ),
+        ].join('\n')
+      );
     }
     context.print('[check:pipeline-shell-independence] OK');
+    return { violations };
   },
 });
 

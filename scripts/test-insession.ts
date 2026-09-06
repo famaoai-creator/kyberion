@@ -1,7 +1,11 @@
-import { installReasoningBackends, getReasoningBackend, logger } from '@agent/core';
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import { logger } from '@agent/core/core';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function test() {
+type Print = (value: unknown) => void;
+
+async function test(print: Print = () => undefined) {
   logger.info('--- Initializing Native Gemini CLI Backend ---');
   // Install the reasoning backend forcing gemini-cli mode
   const installed = installReasoningBackends({ mode: 'gemini-cli' });
@@ -19,7 +23,7 @@ async function test() {
       '「こんにちは」と返事をしてください。他の言葉は不要です。'
     );
     logger.info('\n--- Sub-agent Result ---');
-    console.log(result);
+    print(result);
   } catch (err: unknown) {
     const error = err as { message?: string };
     logger.error(`Error during delegation: ${error.message || String(err)}`);
@@ -29,8 +33,8 @@ async function test() {
 export const runInSessionTest = defineScript({
   name: 'test-insession',
   flags: [],
-  run() {
-    return test();
+  run({ print }) {
+    return test(print);
   },
 });
 

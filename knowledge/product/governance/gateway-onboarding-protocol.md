@@ -34,12 +34,12 @@ last_updated: 2026-05-04
 - **内容**: **主権者（ユーザー）の明示的な介入**により、APIトークン等の機密情報を安全に登録する。
 - **実務**: `secret-guard` または専用の OAuth フローを介し、service-integration config mission から、情報を `knowledge/personal/` ティア（個人機密）または対象 tenant の confidential namespace に隔離して保存する。
 - **ガバナンス**: Kyberion は勝手にアカウントを作成せず、主権者から預かった「鍵」のみを使用する。
-- **補助**: `pnpm surfaces:setup` で不足する secret、CLI 代替、ホスト管理 surface を先に確認できる。
+- **補助**: `pnpm surfaces setup` で不足する secret、CLI 代替、ホスト管理 surface を先に確認できる。
 
 ### Phase 4: 権限移譲と起動 (Mission Activation)
 
 - **内容**: サービスを実際に起動し、メッセージの送受信を開始する。
-- **実務**: `pnpm surfaces:setup` で認証準備を確認した後に `pnpm surfaces:reconcile` を実行。システムは「コード」「設定」「鍵」「scope binding」が全て揃っていることを検証し、バックグラウンドプロセスを立ち上げる。起動・停止・再接続の receipt を残す。
+- **実務**: `pnpm surfaces setup` で認証準備を確認した後に `pnpm surfaces reconcile` を実行。システムは「コード」「設定」「鍵」「scope binding」が全て揃っていることを検証し、バックグラウンドプロセスを立ち上げる。起動・停止・再接続の receipt を残す。
 - **ガバナンス**: 全ての通信はログに記録され、ガバナンスポリシー（Tier衛生）の監視を受ける。
 
 ## 3. ユーザー依頼のシナリオ (Example Intents)
@@ -55,7 +55,7 @@ last_updated: 2026-05-04
 ## 4. 運用上の注意
 
 - **データの隔離**: ゲートウェイを介して届いたメッセージは、その重要度に応じて適切なナレッジティア（Confidential / Personal）に振り分けられる必要がある。
-- **ゾンビプロセスの防止**: プロセスが異常終了した場合は、`pnpm surfaces:reconcile` が自動で Phase 4 を再試行し、回復を試みる。
+- **ゾンビプロセスの防止**: プロセスが異常終了した場合は、`pnpm surfaces reconcile` が自動で Phase 4 を再試行し、回復を試みる。
 
 ---
 

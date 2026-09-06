@@ -14,17 +14,10 @@ const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/document-outline-label-policy.schema.json'
 );
 
-const FALLBACK_CATALOG: DocumentOutlineLabelPolicyCatalog = {
-  version: '1.0.0',
-  report_summary_title: 'Summary',
-  report_section_title: 'Section',
-};
-
 const catalog = defineCatalog<DocumentOutlineLabelPolicyCatalog>({
   id: 'document-outline-label-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadDocumentOutlineLabelPolicyCatalog(): DocumentOutlineLabelPolicyCatalog {
@@ -37,8 +30,4 @@ export function resolveReportSummaryTitle(): string {
 
 export function resolveReportSectionTitle(): string {
   return loadDocumentOutlineLabelPolicyCatalog().report_section_title || 'Section';
-}
-
-export function resetDocumentOutlineLabelPolicyCatalogCache(): void {
-  catalog.reset();
 }

@@ -3,7 +3,8 @@
 // shared pools, so every entry is strictly additive: pipelines reached them
 // via explicit step roles, and determineActuatorStepType threw unknown-op.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const VISION_SCHEMA = {
   type: 'object',
@@ -37,7 +38,7 @@ export const VISION_ACTUATOR_TRANSFORM_OPS = [] as const;
 
 export const VISION_ACTUATOR_APPLY_OPS = [] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   return {
     op,
     kind,
@@ -46,7 +47,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...VISION_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...VISION_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

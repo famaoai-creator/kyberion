@@ -6,11 +6,13 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { findMissionPath } from './path-resolver.js';
+import { loadMissionManagementConfig } from './mission-management-config.js';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -31,26 +33,38 @@ import {
  * anchor input) still pass through `active/shared/tmp/` and are removed
  * before returning.
  */
-export function missionSealArchiveDir(missionId: string): string {
-  const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
-  let archiveSubPath = 'active/archive/missions';
-  if (safeExistsSync(configPath)) {
-    try {
-      const config = readJson<{ directories?: { archive?: string } }>(configPath);
-      archiveSubPath = config.directories?.archive || archiveSubPath;
-    } catch (_) {
-      /* fall back to the default archive dir */
-    }
+function assertMissionIdPathSegment(missionId: string): string {
+  const normalized = String(missionId || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(normalized)) {
+    throw new Error('[MISSION_SEAL_SCOPE] mission id must be a single path segment');
   }
-  return path.join(pathResolver.rootResolve(archiveSubPath), missionId, 'seal');
+  return normalized;
+}
+
+export function missionSealArchiveDir(missionId: string): string {
+  const safeMissionId = assertMissionIdPathSegment(missionId);
+  let archiveSubPath = 'active/archive/missions';
+  const config = loadMissionManagementConfig();
+  archiveSubPath = config?.directories.archive || archiveSubPath;
+  return assertSafeRepositoryPath(
+    path.join(pathResolver.rootResolve(archiveSubPath), safeMissionId, 'seal'),
+    { allowMissingLeaf: true }
+  );
 }
 
 export async function sealMission(id: string): Promise<string | undefined> {
-  const upperId = id.toUpperCase();
+  const upperId = assertMissionIdPathSegment(id.toUpperCase());
   const missionDir = findMissionPath(upperId);
   if (!missionDir) return;
+  try {
+    assertSafeRepositoryPath(missionDir);
+  } catch (error: any) {
+    logger.error(`Mission ${upperId} path rejected: ${error?.message || String(error)}`);
+    return;
+  }
 
   const pubKeyPath = pathResolver.vault('keys/sovereign-public.pem');
+  assertSafeRepositoryPath(pubKeyPath, { allowMissingLeaf: true });
   if (!safeExistsSync(pubKeyPath)) {
     logger.warn('⚠️ [SovereignSeal] Public key not found. Skipping encryption.');
     return;
@@ -60,12 +74,23 @@ export async function sealMission(id: string): Promise<string | undefined> {
 
   const archivePath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.tar.gz`);
   const symKeyPath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.key`);
-  if (!safeExistsSync(path.dirname(archivePath))) {
-    safeMkdir(path.dirname(archivePath), { recursive: true });
+  const safeArchivePath = assertSafeRepositoryPath(archivePath, { allowMissingLeaf: true });
+  const safeSymKeyPath = assertSafeRepositoryPath(symKeyPath, { allowMissingLeaf: true });
+  const safeArchiveDir = assertSafeRepositoryPath(path.dirname(safeArchivePath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(safeArchiveDir)) {
+    safeMkdir(safeArchiveDir, { recursive: true });
   }
-  const sealDir = path.join(missionDir, 'seal');
-  const encKeyPath = path.join(sealDir, `${upperId}.key.enc`);
-  const encryptedPath = path.join(sealDir, `${upperId}.enc`);
+  const sealDir = assertSafeRepositoryPath(path.join(missionDir, 'seal'), {
+    allowMissingLeaf: true,
+  });
+  const encKeyPath = assertSafeRepositoryPath(path.join(sealDir, `${upperId}.key.enc`), {
+    allowMissingLeaf: true,
+  });
+  const encryptedPath = assertSafeRepositoryPath(path.join(sealDir, `${upperId}.enc`), {
+    allowMissingLeaf: true,
+  });
 
   try {
     // A re-seal replaces the previous seal, and the tarball is taken before
@@ -73,23 +98,23 @@ export async function sealMission(id: string): Promise<string | undefined> {
     if (safeExistsSync(sealDir)) safeRmSync(sealDir, { recursive: true, force: true });
     safeExec('tar', [
       '-czf',
-      archivePath,
+      safeArchivePath,
       '-C',
       path.dirname(missionDir),
       path.basename(missionDir),
     ]);
     if (!safeExistsSync(sealDir)) safeMkdir(sealDir, { recursive: true });
-    safeExec('openssl', ['rand', '-out', symKeyPath, '32']);
+    safeExec('openssl', ['rand', '-out', safeSymKeyPath, '32']);
     safeExec('openssl', [
       'enc',
       '-aes-256-cbc',
       '-salt',
       '-in',
-      archivePath,
+      safeArchivePath,
       '-out',
       encryptedPath,
       '-pass',
-      `file:${symKeyPath}`,
+      `file:${safeSymKeyPath}`,
       '-pbkdf2',
     ]);
     safeExec('openssl', [
@@ -99,10 +124,21 @@ export async function sealMission(id: string): Promise<string | undefined> {
       '-inkey',
       pubKeyPath,
       '-in',
-      symKeyPath,
+      safeSymKeyPath,
       '-out',
       encKeyPath,
     ]);
+
+    if (!safeLstat(encryptedPath).isFile()) {
+      throw new Error(
+        `[MISSION_SEAL_RESOURCE] encrypted archive must be a regular file: ${encryptedPath}`
+      );
+    }
+    if (!safeLstat(encKeyPath).isFile()) {
+      throw new Error(
+        `[MISSION_SEAL_RESOURCE] encrypted key must be a regular file: ${encKeyPath}`
+      );
+    }
 
     logger.success(
       `✅ Mission ${upperId} sealed cryptographically (Encrypted key: ${path.basename(encKeyPath)}).`
@@ -112,8 +148,9 @@ export async function sealMission(id: string): Promise<string | undefined> {
     const fileBuffer = safeReadFile(encryptedPath, { encoding: null }) as Buffer;
     const hash = createHash('sha256').update(fileBuffer).digest('hex');
 
-    const anchorInput = pathResolver.sharedTmp(
-      `missions/${upperId}/anchor-${upperId}-${Date.now()}.json`
+    const anchorInput = assertSafeRepositoryPath(
+      pathResolver.sharedTmp(`missions/${upperId}/anchor-${upperId}-${Date.now()}.json`),
+      { allowMissingLeaf: true }
     );
     safeWriteFile(
       anchorInput,
@@ -134,8 +171,8 @@ export async function sealMission(id: string): Promise<string | undefined> {
     }
     safeUnlinkSync(anchorInput);
 
-    safeUnlinkSync(archivePath);
-    safeUnlinkSync(symKeyPath);
+    safeUnlinkSync(safeArchivePath);
+    safeUnlinkSync(safeSymKeyPath);
 
     return encryptedPath;
   } catch (err: any) {

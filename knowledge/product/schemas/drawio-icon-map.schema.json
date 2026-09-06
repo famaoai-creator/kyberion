@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "drawio-icon-map.schema.json",
+  "title": "Draw.io Icon Map",
+  "description": "Repository-backed Draw.io icon resources used by diagram rendering.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["resources"],
+  "properties": {
+    "resources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "label": { "type": "string" },
+          "fillColor": { "type": "string" },
+          "strokeColor": { "type": "string" },
+          "accentColor": { "type": "string" },
+          "asset_path": { "type": "string" },
+          "asset_candidates": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "data_uri": { "type": "string" }
+        }
+      }
+    }
+  }
+}

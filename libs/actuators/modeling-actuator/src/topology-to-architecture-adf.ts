@@ -1,5 +1,6 @@
 import * as path from 'node:path';
-import { safeExistsSync, safeLstat, safeReadFile, safeReaddir, slugify } from '@agent/core';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { slugify } from '@agent/core/foundation';
 import type { TerraformBlock, TerraformTopologyIr } from './topology-ir.js';
 import { resolveTerraformModuleSourceDir } from './terraform-topology.js';
 

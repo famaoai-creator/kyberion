@@ -15,6 +15,7 @@ import { sendOpsAlert } from './ops-alert.js';
 import { withLock } from './src/lock-utils.js';
 import { resolveCustomerBinding } from './customer-channel-binding.js';
 import { resolveTenant } from './tenant-registry.js';
+import { clamp } from './foundation/text.js';
 
 export interface SurfaceOutboxRetryDecision {
   attempt_count: number;
@@ -222,8 +223,8 @@ export function planSurfaceOutboxRetry(
 
   const initial = Math.max(1, policy.initial_delay_ms ?? DEFAULT_INITIAL_DELAY_MS);
   const maximum = Math.max(initial, policy.max_delay_ms ?? DEFAULT_MAX_DELAY_MS);
-  const exponential = Math.min(maximum, initial * 2 ** Math.max(0, attempt_count - 1));
-  const delay = Math.min(maximum, Math.max(exponential, failure.retry_after_ms || 0));
+  const exponential = clamp(initial * 2 ** Math.max(0, attempt_count - 1), initial, maximum);
+  const delay = clamp(Math.max(exponential, failure.retry_after_ms || 0), exponential, maximum);
   return {
     attempt_count,
     dead_letter,

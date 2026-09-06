@@ -8,6 +8,8 @@
  */
 
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { validateUrl } from './secure-io.js';
 import {
   OpenAiCompatibleBackend,
@@ -20,11 +22,17 @@ export const GROK_API_DEFAULT_BASE_URL = 'https://api.x.ai/v1';
 export const GROK_API_DEFAULT_MODEL = 'grok-4.6';
 
 export function resolveGrokApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return env.XAI_API_KEY?.trim() || env.KYBERION_GROK_API_KEY?.trim() || undefined;
+  return (
+    getRegisteredEnvText('XAI_API_KEY', { env })?.trim() ||
+    getRegisteredEnvText('KYBERION_GROK_API_KEY', { env })?.trim() ||
+    undefined
+  );
 }
 
 export function resolveGrokApiBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
-  return env.KYBERION_GROK_API_URL?.trim() || GROK_API_DEFAULT_BASE_URL;
+  return (
+    getRegisteredEnvText('KYBERION_GROK_API_URL', { env })?.trim() || GROK_API_DEFAULT_BASE_URL
+  );
 }
 
 export function resolveGrokApiModel(
@@ -33,8 +41,8 @@ export function resolveGrokApiModel(
 ): string {
   return (
     modelOverride?.trim() ||
-    env.KYBERION_GROK_API_MODEL?.trim() ||
-    env.KYBERION_REASONING_MODEL?.trim() ||
+    getRegisteredEnvText('KYBERION_GROK_API_MODEL', { env })?.trim() ||
+    getRegisteredEnvText('KYBERION_REASONING_MODEL', { env })?.trim() ||
     GROK_API_DEFAULT_MODEL
   );
 }
@@ -94,14 +102,14 @@ export async function probeGrokApiBackendAvailability(
           reason: `xAI Grok API probe returned HTTP ${response.status}`,
         };
       }
-      const payload = (await response.json().catch(() => null)) as {
-        data?: Array<{ id?: unknown }>;
-      } | null;
-      const modelIds = Array.isArray(payload?.data)
-        ? payload.data
-            .map((model) => (typeof model?.id === 'string' ? model.id.trim() : ''))
-            .filter(Boolean)
-        : [];
+      const payload = await response.json().catch(() => null);
+      const modelIds = parseGrokModelIds(payload);
+      if (!modelIds) {
+        return {
+          available: false,
+          reason: 'xAI Grok API /models response was malformed',
+        };
+      }
       const selectedModel = resolveGrokApiModel(env).replace(/^xai:/u, '');
       if (!modelIds.includes(selectedModel)) {
         return {
@@ -123,4 +131,23 @@ export async function probeGrokApiBackendAvailability(
 
 function normalizeTrailingSlash(baseURL: string): string {
   return baseURL.endsWith('/') ? baseURL : `${baseURL}/`;
+}
+
+function parseGrokModelIds(payload: unknown): string[] | null {
+  try {
+    const root = parseSafeJsonObjectValue(payload, 'xAI Grok API /models response');
+    if (!Array.isArray(root.data)) return null;
+    const modelIds: string[] = [];
+    for (const [index, model] of root.data.entries()) {
+      const record = parseSafeJsonObjectValue(
+        model,
+        `xAI Grok API /models response.data[${index}]`
+      );
+      if (typeof record.id !== 'string' || !record.id.trim()) return null;
+      modelIds.push(record.id.trim());
+    }
+    return modelIds;
+  } catch {
+    return null;
+  }
 }

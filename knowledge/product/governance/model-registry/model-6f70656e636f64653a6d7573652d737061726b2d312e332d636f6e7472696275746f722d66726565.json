@@ -1,0 +1,22 @@
+{
+  "model_id": "opencode:muse-spark-1.3-contributor-free",
+  "provider": "opencode",
+  "family": "muse-spark",
+  "status": "candidate",
+  "tier": "standard",
+  "execution_tier": "standard",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "secondary",
+    "analysis": "secondary",
+    "coding": "secondary"
+  },
+  "cost_band": "low",
+  "latency_band": "medium",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "medium",
+  "multilingual_confidence": "medium",
+  "reasoning_confidence": "medium",
+  "capability_tags": ["agentic_coding", "tool_use", "structured_output"],
+  "notes": "OpenCode provider model; candidate until the local auth session and structured-output behavior are verified on the target host."
+}

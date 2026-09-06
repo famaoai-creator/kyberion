@@ -97,6 +97,63 @@ describe('surface-response-blocks', () => {
     ]);
   });
 
+  it('rejects surface blocks containing dangerous JSON keys', () => {
+    const parsed = extractSurfaceBlocks(
+      ['```a2a', '{"header":{"__proto__":{}}}', '```'].join('\n')
+    );
+    expect(parsed.a2aMessages).toHaveLength(0);
+    expect(parsed.surfaceParseErrors.join(' ')).toContain('dangerous JSON key');
+  });
+
+  it('does not promote malformed structured blocks into executable proposals', () => {
+    const raw = [
+      '```a2ui',
+      '[]',
+      '```',
+      '```a2ui',
+      '{"updateComponents":{"surfaceId":"s1","components":[{"id":"c1","type":"unknown","props":{}}]}}',
+      '```',
+      '```approval',
+      '{"title":[],"summary":"approve"}',
+      '```',
+      '```nerve_route',
+      '{"intent":"delegate_task","team_role":42}',
+      '```',
+      '```mission_proposal',
+      '{"intent":"create_mission","tier":"private"}',
+      '```',
+      'done',
+    ].join('\n');
+
+    const parsed = extractSurfaceBlocks(raw);
+    expect(parsed.a2uiMessages).toHaveLength(0);
+    expect(parsed.approvalRequests).toHaveLength(0);
+    expect(parsed.routingProposals).toHaveLength(0);
+    expect(parsed.missionProposals).toHaveLength(0);
+    expect(parsed.surfaceParseErrors).toHaveLength(5);
+    expect(parsed.text).toBe('done');
+  });
+
+  it('keeps valid approval and mission blocks after normalization', () => {
+    const raw = [
+      '```approval',
+      '{"title":"Publish","summary":"Review external effect","severity":"high"}',
+      '```',
+      '```mission_proposal',
+      '{"intent":"create_mission","summary":"Investigate","tier":"confidential"}',
+      '```',
+      'done',
+    ].join('\n');
+
+    const parsed = extractSurfaceBlocks(raw);
+    expect(parsed.approvalRequests).toEqual([
+      { title: 'Publish', summary: 'Review external effect', severity: 'high' },
+    ]);
+    expect(parsed.missionProposals).toEqual([
+      { intent: 'create_mission', summary: 'Investigate', tier: 'confidential' },
+    ]);
+  });
+
   it('rejects malformed task result blocks', () => {
     const raw = [
       '```task_result',

@@ -1,4 +1,4 @@
-import { secureFetch } from '@agent/core';
+import { secureFetch } from '@agent/core/network';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export interface ComfyUiFetchRequest {

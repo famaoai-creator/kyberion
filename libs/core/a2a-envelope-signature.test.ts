@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   canonicalA2AEnvelopeContent,
-  resetA2ASecretCache,
+  _resetA2ASecretCacheForTests,
   resolveA2ASecret,
   resolveA2ASignatureMode,
   signA2AContent,
@@ -15,7 +17,7 @@ describe('a2a-envelope-signature (AA-03)', () => {
   beforeEach(() => {
     process.env.KYBERION_A2A_SECRET = 'test-secret-key';
     delete process.env.KYBERION_A2A_SIGNATURE;
-    resetA2ASecretCache();
+    _resetA2ASecretCacheForTests();
   });
 
   afterEach(() => {
@@ -23,14 +25,14 @@ describe('a2a-envelope-signature (AA-03)', () => {
     else process.env.KYBERION_A2A_SECRET = savedSecret;
     if (savedMode === undefined) delete process.env.KYBERION_A2A_SIGNATURE;
     else process.env.KYBERION_A2A_SIGNATURE = savedMode;
-    resetA2ASecretCache();
+    _resetA2ASecretCacheForTests();
   });
 
   it('signs and verifies with the shared secret (cross-process equivalent)', () => {
     const { signature, sig_alg } = signA2AContent('hello');
     expect(sig_alg).toBe('hmac-sha256');
     // simulate another process resolving the same env secret
-    resetA2ASecretCache();
+    _resetA2ASecretCacheForTests();
     expect(verifyA2AContent('hello', signature)).toEqual({ valid: true });
   });
 
@@ -39,7 +41,7 @@ describe('a2a-envelope-signature (AA-03)', () => {
     expect(verifyA2AContent('tampered', signature).valid).toBe(false);
 
     process.env.KYBERION_A2A_SECRET = 'a-different-key';
-    resetA2ASecretCache();
+    _resetA2ASecretCacheForTests();
     const verdict = verifyA2AContent('hello', signature);
     expect(verdict.valid).toBe(false);
     expect(verdict.reason).toBe('signature mismatch');
@@ -55,6 +57,16 @@ describe('a2a-envelope-signature (AA-03)', () => {
 
   it('resolves env secrets without touching the persisted key file', () => {
     expect(resolveA2ASecret()).toBe('test-secret-key');
+  });
+
+  it('fails closed when the persisted secret resource is not a regular file', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/a2a-envelope-signature.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('safeLstat(secretPath).isFile()');
+    expect(source).toContain('[A2A_SECRET_RESOURCE]');
   });
 
   it('defaults to warn mode; enforce only when explicitly set', () => {

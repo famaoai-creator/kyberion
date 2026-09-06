@@ -1,15 +1,16 @@
 import type { ValidateFunction } from 'ajv';
-import * as addFormatsModule from 'ajv-formats';
 import path from 'node:path';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { requiresProjectTrust } from './trust-requiring-resources.js';
 import type { DesktopRecordingStep } from './desktop-recording.js';
 
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 let validator: ValidateFunction | null = null;
+const DESKTOP_PIPELINE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/desktop-pipeline.schema.json'
+);
 
 export interface DesktopPipelineStep {
   step_id: string;
@@ -39,12 +40,7 @@ export interface DesktopPipelineValidationResult {
 
 function getValidator(): ValidateFunction {
   if (!validator) {
-    const ajv = createAjv();
-    addFormats(ajv);
-    validator = compileSchemaFromPath(
-      ajv,
-      pathResolver.knowledge('product/schemas/desktop-pipeline.schema.json')
-    );
+    validator = compileSchema(DESKTOP_PIPELINE_SCHEMA_PATH);
   }
   return validator;
 }
@@ -71,6 +67,48 @@ export function resolveDesktopPipelineRef(ref: string | undefined): string | nul
   return absolute.startsWith(`${root}${path.sep}`) ? absolute : null;
 }
 
+/** Reject symlink traversal even after the caller has resolved project trust. */
+export function assertDesktopPipelineResourcePath(
+  filePath: string,
+  rootDir = pathResolver.rootResolve('pipelines/desktop')
+): void {
+  const root = path.resolve(rootDir);
+  const absolute = path.resolve(filePath);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[DESKTOP_PIPELINE_SCOPE] pipeline path is outside the allowlisted root: ${filePath}`
+    );
+  }
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    if (!safeExistsSync(current)) break;
+    if (safeLstat(current).isSymbolicLink()) {
+      throw new Error(
+        `[DESKTOP_PIPELINE_SCOPE] pipeline path cannot traverse a symbolic link: ${relative}`
+      );
+    }
+  }
+}
+
+function desktopPipelineCatalogAtPath(filePath: string) {
+  return defineCatalog<DesktopPipeline>({
+    id: 'desktop-pipeline',
+    path: filePath,
+    schema: DESKTOP_PIPELINE_SCHEMA_PATH,
+  });
+}
+
+/** Load one persisted desktop pipeline through the canonical schema boundary. */
+export function loadDesktopPipelineAtPath(filePath: string): DesktopPipeline {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[DESKTOP_PIPELINE] pipeline must be a regular file: ${filePath}`);
+  }
+  return desktopPipelineCatalogAtPath(safeFilePath).load();
+}
+
 export function loadDesktopPipeline(
   ref: string | undefined,
   options: { trustResolved?: boolean } = {}
@@ -78,7 +116,7 @@ export function loadDesktopPipeline(
   const absolute = resolveDesktopPipelineRef(ref);
   if (!absolute) return { valid: false, errors: ['desktop pipeline_ref is not allowlisted'] };
   const relative = path.relative(pathResolver.rootDir(), absolute).replaceAll('\\', '/');
-  if (options.trustResolved === false && requiresProjectTrust(relative)) {
+  if (options.trustResolved !== true && requiresProjectTrust(relative)) {
     return {
       valid: false,
       errors: [
@@ -87,8 +125,8 @@ export function loadDesktopPipeline(
     };
   }
   try {
-    const raw = loadJson<unknown>(absolute);
-    return validateDesktopPipeline(raw);
+    assertDesktopPipelineResourcePath(absolute);
+    return { valid: true, errors: [], value: loadDesktopPipelineAtPath(absolute) };
   } catch (error) {
     return {
       valid: false,

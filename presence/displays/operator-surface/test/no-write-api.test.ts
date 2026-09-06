@@ -88,6 +88,14 @@ describe('MOS no-write-API contract', () => {
     ).toEqual([]);
   });
 
+  it('keeps MOS environment checks behind the registered accessor', () => {
+    const auditMos = safeReadFile(path.join(SRC, 'lib/audit-mos.ts'), {
+      encoding: 'utf8',
+    }) as string;
+    expect(auditMos).toContain("getRegisteredEnvText('NODE_ENV')");
+    expect(auditMos).not.toContain('process.env.NODE_ENV');
+  });
+
   it('only audit-mos.ts may reference auditChain.record', () => {
     const files = walk(SRC);
     const offenders: string[] = [];

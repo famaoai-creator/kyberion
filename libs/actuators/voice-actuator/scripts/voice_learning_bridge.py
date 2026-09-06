@@ -20,6 +20,7 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from json_boundary import JsonInputError, parse_json_object
 
 PROFILE_CACHE_ROOT = Path("active/shared/runtime/voice-profiles")
 PROFILE_REGISTRY_PATH = Path("knowledge/personal/voice/profile-registry.json")
@@ -38,14 +39,16 @@ def _load_profile_meta(profile_id: str) -> dict | None:
     meta_path = _profile_cache_path(profile_id)
     if meta_path.exists():
         try:
-            return json.loads(meta_path.read_text(encoding="utf-8"))
+            return parse_json_object(meta_path.read_text(encoding="utf-8"), "voice profile metadata")
         except Exception:
             pass
 
     # Fall back to profile registry (sample_refs → best_sample)
     if PROFILE_REGISTRY_PATH.exists():
         try:
-            registry = json.loads(PROFILE_REGISTRY_PATH.read_text(encoding="utf-8"))
+            registry = parse_json_object(
+                PROFILE_REGISTRY_PATH.read_text(encoding="utf-8"), "voice profile registry"
+            )
             for profile in registry.get("profiles", []):
                 if profile.get("profile_id") == profile_id:
                     sample_refs = profile.get("sample_refs", [])
@@ -356,8 +359,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw, "voice learning input")
+    except JsonInputError as exc:
         print(json.dumps({"status": "error", "error": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 

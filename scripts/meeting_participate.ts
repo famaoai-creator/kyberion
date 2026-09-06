@@ -23,38 +23,42 @@
  *     --max-minutes 30
  */
 
+import { EnergyVad } from '@agent/core/voice-activity-detector';
+import { MeetingParticipationCoordinator } from '@agent/core/meeting-participation-coordinator';
 import {
-  EnergyVad,
-  MeetingParticipationCoordinator,
   StubMeetingJoinDriver,
   getMeetingJoinDriver,
-  installInRoomMeetingJoinDriver,
-  installChromeExtensionMeetingJoinDriver,
-  getStreamingSttBridge,
-  getStreamingTtsBridge,
-  getVoiceProfileRegistry,
-  installShellStreamingSttBridgeFromEnv,
-  installShellStreamingTtsBridgeFromEnv,
-  loadEnvironmentManifest,
-  logger,
   registerMeetingJoinDriver,
-  resolveAudioBus,
-  verifyReady,
-  TraceContext,
-  finalizeAndPersist,
-  pathResolver,
-  type AudioFormat,
-  type ConversationAgent,
-  type MeetingJoinDriver,
-  type MeetingTarget,
-  type TranscriptChunk,
-  getReasoningBackend,
-  resolveMeetingParticipationRuntimePlan,
   validateMeetingTarget,
-} from '@agent/core';
+  type MeetingJoinDriver,
+} from '@agent/core/meeting-join-driver';
+import { installInRoomMeetingJoinDriver } from '@agent/core/in-room-meeting-driver';
+import { installChromeExtensionMeetingJoinDriver } from '@agent/core/chrome-extension-meeting-driver';
+import { getStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
+import { getStreamingTtsBridge } from '@agent/core/streaming-tts-bridge';
+import { getVoiceProfileRegistry } from '@agent/core/voice-profile-registry';
+import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell-streaming-stt-bridge';
+import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell-streaming-tts-bridge';
+import { loadEnvironmentManifest, verifyReady } from '@agent/core/environment-capability';
+import { resolveAudioBus } from '@agent/core/audio-bus-resolver';
+import { resolveMeetingParticipationRuntimePlan } from '@agent/core/meeting-participation-runtime-plan';
+import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
+import { pathResolver } from '@agent/core/path-resolver';
+import { logger } from '@agent/core/core';
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { setRegisteredEnv } from '@agent/core/foundation';
+import type {
+  AudioFormat,
+  MeetingSession,
+  MeetingTarget,
+  TranscriptChunk,
+} from '@agent/core/meeting-session-types';
+import { startMeetingCommandLoop } from './meeting_commands.js';
+import type { ConversationAgent } from '@agent/core/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathToFileURL } from 'node:url';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
+import { parseSafeJsonObjectInput } from './lib/json-input.js';
 // Side-effect imports register the audio-bus capability probes so the
 // participation-runtime manifest can resolve `audio-bus.blackhole` etc.
 import '@agent/core/blackhole-audio-bus';
@@ -91,7 +95,7 @@ class ReasoningBackendAgent implements ConversationAgent {
       const raw = await this.backend.delegateTask(prompt, `meeting:${this.missionId}`);
       const json = extractFirstJson(raw);
       const speech = typeof json?.speech === 'string' ? json.speech : '';
-      const leave = Boolean(json?.leave);
+      const leave = json?.leave === true;
       return speech || leave ? { ...(speech ? { speech } : {}), leave } : {};
     } catch (err: any) {
       logger.warn(`[participate-cli] backend.delegateTask failed: ${err?.message ?? err}`);
@@ -100,12 +104,12 @@ class ReasoningBackendAgent implements ConversationAgent {
   }
 }
 
-function extractFirstJson(text: string): any {
+export function extractFirstJson(text: string): Record<string, unknown> | null {
   const trimmed = text.trim();
   const fenced = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
   const raw = fenced ? fenced[1] : trimmed;
   try {
-    return JSON.parse(raw);
+    return parseSafeJsonObjectInput(raw, 'meeting agent response') || null;
   } catch {
     return null;
   }
@@ -333,8 +337,8 @@ export function shouldResolveMeetingParticipationVoiceProfile(input: {
   return input.runtimePlan.require_voice_profile || Boolean(input.voiceProfileId?.trim());
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'meeting_participate', ...args])
     .option('mission', { type: 'string', demandOption: true })
     .option('meeting-url', { type: 'string' })
     .option('platform', { type: 'string', default: 'auto' })
@@ -379,17 +383,28 @@ async function main(): Promise<void> {
     .option('barge-in-rms-multiplier', { type: 'number', default: 2.5 })
     .option('barge-in-min-duration-ms', { type: 'number', default: 160 })
     .option('headed', { type: 'boolean', default: false })
+    .option('interactive-commands', {
+      type: 'boolean',
+      describe:
+        'read mid-meeting verbs (status, raise-hand, admit, chat, leave) from stdin; defaults to on when stdin is a TTY',
+    })
+    .option('allow-admit', {
+      type: 'boolean',
+      default: false,
+      describe: 'grant host authority for the admit verb in this run (audited)',
+    })
     .option('account-slug', { type: 'string', default: 'default' })
     .option('skip-bootstrap-check', { type: 'boolean', default: false })
     .parseSync();
 
   const missionId = String(argv.mission);
-  process.env.MISSION_ID = missionId;
+  setRegisteredEnv('MISSION_ID', missionId);
   const trace = new TraceContext(`meeting_participate:${missionId}`, {
     missionId,
     actuator: 'meeting-participate',
   });
   let exitCode = 0;
+  let commandLoop: ReturnType<typeof startMeetingCommandLoop> | null = null;
 
   try {
     // Fail-closed on missing environment-capability receipt unless the
@@ -547,6 +562,31 @@ async function main(): Promise<void> {
       trace,
     });
 
+    // Interactive verbs: the coordinator owns the session loop, so hold
+    // the live session here and let stdin drive declared gestures.
+    let liveSession: MeetingSession | null = null;
+    const interactiveOpt = argv['interactive-commands'];
+    const interactive =
+      typeof interactiveOpt === 'boolean' ? interactiveOpt : Boolean(process.stdin.isTTY);
+    const commandLoopInteractive = interactive
+      ? startMeetingCommandLoop({
+          context: {
+            getSession: () => liveSession,
+            allowAdmit: Boolean(argv['allow-admit']),
+            onOutput: (message: string) => logger.info(`[participate-cmd] ${message}`),
+            onTrace: (event: string, detail?: Record<string, unknown>) => {
+              trace.addEvent(event, (detail ?? {}) as Record<string, string | number | boolean>);
+            },
+          },
+        })
+      : null;
+    commandLoop = commandLoopInteractive;
+    if (commandLoop) {
+      logger.info(
+        '[participate-cli] interactive commands on (status, raise-hand, admit, chat, leave)'
+      );
+    }
+
     logger.info(
       `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform} voice_profile=${voiceProfile?.profile_id ?? 'not_required'})`
     );
@@ -565,7 +605,12 @@ async function main(): Promise<void> {
       barge_in_min_duration_ms: Math.max(20, Number(argv['barge-in-min-duration-ms'])),
       transcript_source:
         runtimePlan.transport_mode === 'captions_first' ? 'driver_captions' : 'stt',
+      onSession: (session) => {
+        liveSession = session;
+      },
     });
+    commandLoop?.stop();
+    await commandLoop?.done.catch(() => undefined);
     logger.info('');
     logger.info(`📋 Participation report:`);
     logger.info(`   session_id: ${report.session_id}`);
@@ -581,22 +626,26 @@ async function main(): Promise<void> {
     logger.error(err?.message ?? String(err));
     exitCode = 1;
   } finally {
+    commandLoop?.stop();
     const persisted = finalizeAndPersist(trace);
     logger.info(`📋 meeting_participate trace: ${persisted.path}`);
     if (exitCode !== 0) {
-      process.exitCode = exitCode;
+      setProcessExitCode(exitCode);
     }
   }
 }
+
+const runMeetingParticipateScript = defineScript({
+  name: 'meeting:participate',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
 
 if (
   isDirectScript(import.meta.url, 'meeting_participate.ts') ||
   isDirectScript(import.meta.url, 'meeting_participate.js')
 ) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exitCode = 1;
-  });
+  void runMeetingParticipateScript();
 }
 
 export { main as runMeetingParticipate };

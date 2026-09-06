@@ -144,11 +144,11 @@ For hands-free dictation on macOS, use `system:voice_input_toggle` as the fallba
 
 ### Background Bridges
 
-Use `pnpm prereq:check` first when you want to confirm the local toolchain needed to build and run Kyberion from source. Then use `pnpm surfaces:setup` when you want to confirm which credentials, CLI fallbacks, or host permissions are missing. After that, use `pnpm surfaces:reconcile` when you want Kyberion to bring managed bridges and surfaces up to the manifest-defined state.
+Use `pnpm env:bootstrap --manifest kyberion-toolchain` first when you want to confirm the local toolchain needed to build and run Kyberion from source. Then use `pnpm surfaces setup` when you want to confirm which credentials, CLI fallbacks, or host permissions are missing. After that, use `pnpm surfaces reconcile` when you want Kyberion to bring managed bridges and surfaces up to the manifest-defined state.
 
 Use `pnpm services:setup` when you want the external service catalog to tell you which presets still need customer/personal connection files or authentication secrets. Use `pnpm reasoning:setup` when you want the reasoning backend decision to be explicit before `doctor` or `env:bootstrap` runs. The reasoning setup now distinguishes `claude-cli`, `anthropic`, `codex-cli`, `gemini-cli`, `nemotron-api`, `local`, and `stub`, so OpenAI-compatible Nemotron endpoints are visible before bootstrap chooses a backend.
 
-Use `pnpm setup:report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
+Use `pnpm kyberion setup report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
 
 `pnpm doctor` includes the baseline runtime and reasoning backend manifest checks; use it when you want the consolidated readiness view rather than a domain-specific setup report.
 
@@ -204,9 +204,9 @@ default. After confirming the same candidate and tenant scope, use
 all matching records together; approval and promotion never bypass the
 duplicate blocker.
 
-Use `pnpm surfaces:setup` to inspect auth readiness, `pnpm surfaces:status` to inspect state, and `pnpm surfaces:start -- --surface <surface-id>` or `pnpm surfaces:stop -- --surface <surface-id>` for a specific managed surface.
+Use `pnpm surfaces setup` to inspect auth readiness, `pnpm surfaces status` to inspect state, and `pnpm surfaces start -- --surface <surface-id>` or `pnpm surfaces stop -- --surface <surface-id>` for a specific managed surface.
 
-Use `pnpm surfaces:repair -- --surface <surface-id>` when a surface is tracked but unhealthy or stale and you want Kyberion to restart it without doing a full reconcile.
+Use `pnpm surfaces repair -- --surface <surface-id>` when a surface is tracked but unhealthy or stale and you want Kyberion to restart it without doing a full reconcile.
 
 ### Voice Onboarding
 
@@ -297,7 +297,7 @@ For Google Workspace email and Meet work:
   - create a Google Meet space with the authenticated Google account
 - `gws schema meet.spaces.create`
   - inspect the exact request shape before creating a Meet space
-- `pnpm gws:meet:create -- --json '{}'`
+- `pnpm kyberion gws meet-create --json '{}'`
   - Kyberion wrapper for creating a Google Meet space from the terminal
 
 ### Email Triage Quick Start
@@ -313,10 +313,10 @@ Use this when you want the shortest path from inbox triage to a sent reply.
 
 #### CLI
 
-1. Run `pnpm cli -- email status`.
-2. Run `pnpm cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md`.
-3. Inspect the latest output with `pnpm cli -- email latest-draft`.
-4. Create a Gmail draft with `pnpm cli -- email deliver --draft-mode --body-file <path>`.
+1. Run `pnpm kyberion email status`.
+2. Run `pnpm kyberion email draft --triage-file active/shared/tmp/email-inbox-triage.md`.
+3. Inspect the latest output with `pnpm kyberion email latest-draft`.
+4. Create a Gmail draft with `pnpm kyberion email deliver --draft-mode --body-file <path>`.
 5. Add `--approved` only when you really want to send it.
 
 #### Notes
@@ -500,7 +500,7 @@ pnpm build
 pnpm onboard
 pnpm doctor
 pnpm capabilities
-pnpm dashboard:onboarding
+pnpm dashboard -- --once --focus onboarding
 ```
 
 ### Organization operating model(組織・目標・サービスの登録)
@@ -517,7 +517,7 @@ KYBERION_PERSONA=sovereign pnpm organization status --organization-id <id> --tie
 (JSON 手編集は不変条件違反)。各 authoring コマンドは `--dry-run` で保存前の
 レコードを確認でき、`--apply` で保存する。confidential tier は `--tenant-slug`
 必須。読み書きとも authority ゲートがあるため `KYBERION_PERSONA=sovereign` で
-実行する。`pnpm org` は別物(role/authority ツール)なので注意。
+実行する。role/authority の authoring は `pnpm organization role ...` から実行する。
 
 ### Mission hygiene(未開始ミッションの整理)
 
@@ -565,9 +565,9 @@ deal stage に応じて自動でモードが切り替わる: 営業(inquiry〜co
 ### Surface lifecycle
 
 ```bash
-pnpm surfaces:reconcile
-pnpm surfaces:status
-pnpm surfaces:stop
+pnpm surfaces reconcile
+pnpm surfaces status
+pnpm surfaces stop
 ```
 
 ### Chronos
@@ -580,9 +580,9 @@ pnpm chronos:dev
 ### Capability discovery
 
 ```bash
-pnpm run cli -- list
-pnpm run cli -- search browser
-pnpm run cli -- info browser-actuator
+pnpm run kyberion -- list
+pnpm run kyberion -- search browser
+pnpm run kyberion -- info browser-actuator
 ```
 
 ### Direct mission control
@@ -718,7 +718,7 @@ iOS/Android アプリの AI-DLC/SDLC を回す標準手順(コピペ可):
 
 ```bash
 # 0. 前提チェック(配布まで見るなら --full)
-pnpm app:preflight --platform android        # or ios / all
+pnpm kyberion doctor -- --runtime app --platform android        # or ios / all
 
 # 1. code_change ミッションを作成(レビュー必須クラス)
 pnpm mission create --type code_change --goal "FixtureApp にログイン機能を追加"

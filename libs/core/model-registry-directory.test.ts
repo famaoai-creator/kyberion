@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from './path-resolver.js';
@@ -18,6 +19,26 @@ afterEach(() => {
 describe('model-registry-directory', () => {
   it('returns null when the canonical directory is absent', () => {
     expect(readModelRegistryDirectory(path.join(TEST_ROOT, 'missing'))).toBeNull();
+  });
+
+  it('rejects a registry directory reached through a symbolic link', () => {
+    safeMkdir(TEST_ROOT, { recursive: true });
+    const target = path.join(TEST_ROOT, 'target');
+    const linked = path.join(TEST_ROOT, 'linked');
+    safeMkdir(target, { recursive: true });
+    safeWriteFile(
+      path.join(target, 'index.json'),
+      JSON.stringify({
+        version: '1.0.0',
+        default_model_id: 'vendor:a',
+        model_order: ['vendor:a'],
+      })
+    );
+    // Fixture setup intentionally uses node:fs so the test can create the
+    // malicious input that secure-io must reject.
+    fs.symlinkSync(target, linked, 'dir');
+
+    expect(() => readModelRegistryDirectory(linked)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
   it('uses an injective portable filename encoding', () => {

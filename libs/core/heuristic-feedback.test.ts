@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
 vi.mock('./path-resolver.js', async () => {
@@ -18,13 +17,15 @@ vi.mock('./policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
-import { rootResolve } from './path-resolver.js';
+import { pathResolver, rootResolve } from './path-resolver.js';
+import { safeSymlinkSync, safeUnlinkSync } from './secure-io.js';
 import {
   listHeuristics,
   readHeuristic,
   scoreValidity,
   summarizeHeuristics,
   validateHeuristic,
+  writeHeuristicAtPath,
   type HeuristicEntry,
 } from './heuristic-feedback.js';
 
@@ -33,7 +34,9 @@ describe('heuristic-feedback', () => {
   const mockResolve = rootResolve as unknown as ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'heuristics-'));
+    tmpDir = pathResolver.sharedTmp(`heuristics-${process.pid}`);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.mkdirSync(tmpDir, { recursive: true });
     mockResolve.mockImplementation((rel: string) => path.join(tmpDir, rel));
   });
 
@@ -72,16 +75,16 @@ describe('heuristic-feedback', () => {
 
     it('averages metric_score with base', () => {
       expect(
-        scoreValidity({ mission_id: 'm', completed_at: 't', result: 'success', metric_score: 0.6 }),
+        scoreValidity({ mission_id: 'm', completed_at: 't', result: 'success', metric_score: 0.6 })
       ).toBe(0.8);
     });
 
     it('ignores out-of-range metric_score', () => {
       expect(
-        scoreValidity({ mission_id: 'm', completed_at: 't', result: 'success', metric_score: 1.5 }),
+        scoreValidity({ mission_id: 'm', completed_at: 't', result: 'success', metric_score: 1.5 })
       ).toBe(1);
       expect(
-        scoreValidity({ mission_id: 'm', completed_at: 't', result: 'failure', metric_score: -1 }),
+        scoreValidity({ mission_id: 'm', completed_at: 't', result: 'failure', metric_score: -1 })
       ).toBe(0);
     });
   });
@@ -116,14 +119,46 @@ describe('heuristic-feedback', () => {
         validateHeuristic({
           entryId: 'missing',
           outcome: { mission_id: 'x', completed_at: 't', result: 'success' },
-        }),
+        })
       ).toThrow(/not found/);
     });
+  });
+
+  it('persists the catalog-normalized heuristic payload', () => {
+    const file = path.join(tmpDir, 'knowledge/confidential/heuristics', 'normalized.json');
+    const entry = seed({ id: 'normalized' });
+    entry.$schema = 'governance-metadata';
+
+    const persisted = writeHeuristicAtPath(file, entry);
+
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).not.toHaveProperty('$schema');
   });
 
   describe('read helpers', () => {
     it('returns null for missing entry', () => {
       expect(readHeuristic('nope')).toBeNull();
+    });
+
+    it('rejects a schema-invalid persisted entry', () => {
+      const dir = path.join(tmpDir, 'knowledge/confidential/heuristics');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'broken.json'), JSON.stringify({ id: 'broken' }));
+
+      expect(() => readHeuristic('broken')).toThrow(/Invalid catalog heuristic-entry/);
+    });
+
+    it('rejects a heuristics directory that traverses a symbolic link', () => {
+      const realDir = path.join(tmpDir, 'real-heuristics');
+      const linkedDir = path.join(tmpDir, 'knowledge/confidential/heuristics');
+      fs.mkdirSync(realDir, { recursive: true });
+      fs.mkdirSync(path.dirname(linkedDir), { recursive: true });
+      safeSymlinkSync(realDir, linkedDir, 'dir');
+      try {
+        expect(() => readHeuristic('linked')).toThrow('[RESOURCE_PATH_SYMLINK]');
+      } finally {
+        safeUnlinkSync(linkedDir);
+      }
     });
 
     it('lists all entries', () => {

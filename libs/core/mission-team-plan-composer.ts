@@ -1,5 +1,9 @@
 import * as path from 'node:path';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 import * as pathResolver from './path-resolver.js';
 import {
   selectAgentForTeamRole,
@@ -48,6 +52,34 @@ export interface MissionTeamPlan {
   generated_at: string;
   team_governance?: MissionTeamGovernance;
   assignments: MissionTeamAssignment[];
+}
+
+const MISSION_TEAM_PLAN_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-team-plan.schema.json'
+);
+
+function missionTeamPlanCatalog(filePath: string) {
+  return defineCatalog<MissionTeamPlan>({
+    id: 'mission-team-plan',
+    path: filePath,
+    schema: MISSION_TEAM_PLAN_SCHEMA_PATH,
+  });
+}
+
+/** Load one persisted team plan through the shared schema and mission boundary. */
+export function loadMissionTeamPlanAtPath(filePath: string, missionId: string): MissionTeamPlan {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[MISSION_TEAM_PLAN] plan must be a regular file: ${filePath}`);
+  }
+  const plan = missionTeamPlanCatalog(safeFilePath).load();
+  const expectedMissionId = missionId.trim().toUpperCase();
+  if (plan.mission_id.trim().toUpperCase() !== expectedMissionId) {
+    throw new Error(
+      `[MISSION_TEAM_PLAN_SCOPE_MISMATCH] plan belongs to ${plan.mission_id}, expected ${expectedMissionId}`
+    );
+  }
+  return plan;
 }
 
 export interface MissionTeamOrganizationProfileSummary {
@@ -111,16 +143,16 @@ export interface ResolveMissionTeamOptions {
 function loadMissionTenantSlug(missionId: string): string | undefined {
   const missionPath = pathResolver.findMissionPath(missionId.toUpperCase());
   if (!missionPath) return undefined;
-  const statePath = path.join(missionPath, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return undefined;
+  let statePath: string;
   try {
-    const state = loadJson<{ tenant_slug?: unknown }>(statePath);
-    return typeof state?.tenant_slug === 'string' && state.tenant_slug.trim()
-      ? state.tenant_slug.trim()
-      : undefined;
+    statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
+      allowMissingLeaf: false,
+    });
   } catch {
     return undefined;
   }
+  if (!safeExistsSync(statePath)) return undefined;
+  return loadMissionStateAtPath(statePath)?.tenant_slug?.trim() || undefined;
 }
 
 function resolveAvailableTeamProviders(): string[] {
@@ -482,7 +514,7 @@ export function composeMissionTeamPlan(input: {
     organization_profile: summarizeMissionOrganizationProfile(organizationProfile),
     organization_chart: organizationChart,
     mission_classification: missionClassification,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     team_governance: buildTeamGovernance(template, assignments),
     assignments,
   };
@@ -526,21 +558,32 @@ export function enrichMissionTeamPlanWithOrganizationProfile(
 }
 
 export function writeMissionTeamPlan(missionDir: string, plan: MissionTeamPlan): string {
-  const targetPath = path.join(missionDir, 'team-composition.json');
-  safeWriteFile(targetPath, JSON.stringify(plan, null, 2));
+  const targetPath = assertSafeRepositoryPath(path.join(missionDir, 'team-composition.json'), {
+    allowMissingLeaf: true,
+  });
+  const safeMissionPath = assertSafeRepositoryPath(missionDir, { allowMissingLeaf: true });
+  writeProvisionedJson({
+    missionId: plan.mission_id,
+    filePath: targetPath,
+    targetPath: path.relative(safeMissionPath, targetPath).split(path.sep).join('/'),
+    missionPathHint: safeMissionPath,
+    provisioned: provisionMissionEntry(plan),
+  });
   return targetPath;
 }
 
 export function getMissionTeamPlanPath(missionId: string): string | null {
   const missionPath = pathResolver.findMissionPath(missionId.toUpperCase());
   if (!missionPath) return null;
-  return path.join(missionPath, 'team-composition.json');
+  return assertSafeRepositoryPath(path.join(missionPath, 'team-composition.json'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
   const planPath = getMissionTeamPlanPath(missionId);
   if (!planPath || !safeExistsSync(planPath)) return null;
-  const plan = loadJson<MissionTeamPlan>(planPath);
+  const plan = loadMissionTeamPlanAtPath(planPath, missionId);
   const expectedTenant = loadMissionTenantSlug(missionId);
   if (
     expectedTenant &&

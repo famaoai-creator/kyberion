@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/track-creation-policy.schema.json",
   "version": "1.0.0",
   "description": "Defines when and how to create a Track, and which lifecycle model to apply.",
   "track_types": {

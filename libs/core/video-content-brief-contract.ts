@@ -3,7 +3,8 @@ import type { VideoCompositionSceneRole } from './video-composition-contract.js'
 import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video-design-system.js';
 import { resolveTenantDesign } from './tenant-design-resolver.js';
 import { resolveCreativeDesign } from './creative-design-resolver.js';
-import { webThemePackToCssVars, type WebThemePack } from './web-design-system.js';
+import { isWebThemePack, webThemePackToCssVars } from './web-design-system.js';
+import { clamp } from './foundation/text.js';
 
 export type VideoPresentationMode = 'howto' | 'promo' | 'vtuber';
 
@@ -805,16 +806,6 @@ function resolveVideoTenantDesign(brief: VideoContentBrief) {
   });
 }
 
-function isWebThemePack(value: unknown): value is WebThemePack {
-  return Boolean(
-    value &&
-    typeof value === 'object' &&
-    typeof (value as WebThemePack).theme === 'object' &&
-    typeof (value as WebThemePack).theme?.colors === 'object' &&
-    typeof (value as WebThemePack).theme?.fonts === 'object'
-  );
-}
-
 function inferLayoutVariant(
   presentationMode: VideoPresentationMode,
   role: VideoCompositionSceneRole,
@@ -934,7 +925,7 @@ function distributeDurations(total: number, weights: number[], readingSec?: numb
   const budgets = weights.map((weight, index) => {
     const reading = readingSec?.[index] ?? 0;
     if (reading <= 0) return weight;
-    return Math.min(READING_CEILING_SEC, Math.max(READING_FLOOR_SEC, reading));
+    return clamp(reading, READING_FLOOR_SEC, READING_CEILING_SEC);
   });
   const totalBudget = budgets.reduce((sum, value) => sum + value, 0) || 1;
   const durations = budgets.map((budget) => roundTo2((total * budget) / totalBudget));
@@ -966,11 +957,11 @@ function sumStoryboardDuration(storyboard: VideoStoryboard): number {
 }
 
 function clampDuration(value: number): number {
-  return Math.max(3, Math.min(300, value));
+  return clamp(value, 3, 300);
 }
 
 function clampFps(value: number): number {
-  return Math.max(1, Math.min(60, Math.round(value)));
+  return clamp(Math.round(value), 1, 60);
 }
 
 function roundTo2(value: number): number {
@@ -982,7 +973,7 @@ function capitalize(value: string): string {
 }
 
 function clampDimension(value: number): number {
-  return Math.max(320, Math.min(7680, Math.round(value)));
+  return clamp(Math.round(value), 320, 7680);
 }
 
 function normalizeAspectRatio(value: string): string | undefined {

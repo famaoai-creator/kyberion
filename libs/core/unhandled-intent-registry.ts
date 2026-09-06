@@ -1,5 +1,7 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { nowIso } from './foundation/time.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import * as nodePath from 'node:path';
 import { createLogger } from './logger.js';
 const logger = createLogger('unhandled-intent-registry');
@@ -44,11 +46,23 @@ function registryPath(): string {
   return nodePath.join(pathResolver.rootDir(), REGISTRY_RELATIVE);
 }
 
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/unhandled-intent-registry.schema.json'
+);
+
+function registryCatalogAtPath(filePath: string) {
+  return defineCatalog<UnhandledIntentRegistry>({
+    id: 'unhandled-intent-registry',
+    path: filePath,
+    schema: REGISTRY_SCHEMA_PATH,
+    fallback: { version: '1.0.0', entries: [] },
+    fallbackOnInvalid: true,
+  });
+}
+
 function readRegistry(): UnhandledIntentRegistry {
   try {
-    const p = registryPath();
-    if (!safeExistsSync(p)) return { version: '1.0.0', entries: [] };
-    return loadJson<UnhandledIntentRegistry>(p);
+    return registryCatalogAtPath(registryPath()).load();
   } catch {
     return { version: '1.0.0', entries: [] };
   }
@@ -56,10 +70,22 @@ function readRegistry(): UnhandledIntentRegistry {
 
 function writeRegistry(registry: UnhandledIntentRegistry): void {
   try {
-    safeWriteFile(registryPath(), JSON.stringify(registry, null, 2));
+    writeUnhandledIntentRegistryAtPath(registryPath(), registry);
   } catch {
     /* observability must never break the caller */
   }
+}
+
+export function writeUnhandledIntentRegistryAtPath(
+  filePath: string,
+  registry: UnhandledIntentRegistry
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = registryCatalogAtPath(safePath).validate(registry, safePath);
+  const dir = nodePath.dirname(safePath);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2));
+  return safePath;
 }
 
 function dedupeKey(
@@ -141,7 +167,7 @@ export function markIntentsReconciled(keys: string[]): void {
   try {
     const set = new Set(keys);
     const registry = readRegistry();
-    const now = new Date().toISOString();
+    const now = nowIso();
     for (const entry of registry.entries) {
       const k = entry.intent_id ?? entry.utterance_samples[0] ?? '';
       if (set.has(k)) {

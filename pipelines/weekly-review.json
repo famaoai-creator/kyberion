@@ -28,6 +28,28 @@
       }
     },
     {
+      "id": "check_memory_consolidation",
+      "role": "source",
+      "op": "working-memory:consolidation-status",
+      "produces": {
+        "channel": "memory_consolidation_status",
+        "type": "MemoryConsolidationStatus"
+      },
+      "params": {
+        "mdPath": "active/personal/MEMORY.md",
+        "export_as": "memory_consolidation_status"
+      }
+    },
+    {
+      "id": "log_memory_consolidation",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "memory_consolidation_status",
+      "params": {
+        "message": "[WEEKLY-REVIEW] personal memory consolidation due={{memory_consolidation_status.due}} bullets={{memory_consolidation_status.bullet_count}} threshold={{memory_consolidation_status.threshold}}."
+      }
+    },
+    {
       "id": "reconcile_unhandled_intents",
       "role": "source",
       "op": "system:reconcile_unhandled_intents",

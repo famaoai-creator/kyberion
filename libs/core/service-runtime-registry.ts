@@ -1,9 +1,16 @@
 import * as path from 'node:path';
-import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { nowIso } from './foundation/time.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { secureFetch } from './network.js';
 import { getServiceEndpointRecord } from './service-binding.js';
 import { getAdapterDefault } from './adapter-default-preferences.js';
@@ -121,82 +128,40 @@ const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/service-runtime-registry.json'
 );
 const STATE_VERSION = '1.0.0';
+const SERVICE_RUNTIME_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-runtime-state.schema.json'
+);
 
-const FALLBACK_REGISTRY: ServiceRuntimeRegistry = {
-  version: 'fallback',
-  default_service_id: 'comfyui',
-  services: [
-    {
-      service_id: 'comfyui',
-      display_name: 'ComfyUI Local Service Runtime',
-      kind: 'local_service',
-      status: 'active',
-      platforms: ['darwin', 'linux', 'win32'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      default_base_url: 'http://127.0.0.1:8188',
-      trial_probe: {
-        kind: 'http',
-        method: 'GET',
-        path: 'system_stats',
-        description: 'Probe the local ComfyUI service statistics endpoint.',
-      },
-      install_plan: {
-        kind: 'service_preset',
-        preset_path: 'knowledge/product/orchestration/service-presets/comfyui.json',
-        description: 'Use the ComfyUI service preset to provision or connect the local runtime.',
-      },
-      installed_probe: {
-        kind: 'http',
-        method: 'GET',
-        path: 'system_stats',
-        description: 'Re-check the ComfyUI service after provisioning.',
-      },
-      managed_service_subpath: 'service-runtimes/comfyui',
-      service_endpoint_path: 'knowledge/product/orchestration/service-endpoints/comfyui.json',
-      service_preset_path: 'knowledge/product/orchestration/service-presets/comfyui.json',
-      notes:
-        'ComfyUI is managed as a service runtime so availability, provisioning intent, and managed location can be tracked separately from media-generation routing.',
-    },
-  ],
-};
+const serviceRuntimeStateCatalog = defineCatalog<ServiceRuntimeState>({
+  id: 'service-runtime-state',
+  path: SERVICE_RUNTIME_STATE_SCHEMA_PATH,
+  schema: SERVICE_RUNTIME_STATE_SCHEMA_PATH,
+});
 
 let cachedRegistryPath: string | null = null;
 let cachedRegistry: ServiceRuntimeRegistry | null = null;
 
 function getRegistryPath(): string {
-  return (
-    getRegisteredEnvText('KYBERION_SERVICE_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
+  return assertSafeRepositoryPath(
+    getRegisteredEnvText('KYBERION_SERVICE_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH,
+    { allowMissingLeaf: true }
   );
 }
 
-function loadRegistryFromPath(registryPath: string): ServiceRuntimeRegistry {
-  const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<ServiceRuntimeRegistry>(raw, 'service runtime registry');
-}
+const serviceRuntimeRegistryCatalog = defineCatalog<ServiceRuntimeRegistry>({
+  id: 'service-runtime-registry',
+  path: getRegistryPath,
+  schema: pathResolver.knowledge('product/schemas/service-runtime-registry.schema.json'),
+});
 
 function getRegistry(): ServiceRuntimeRegistry {
   const registryPath = getRegistryPath();
   if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
 
-  if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
-
-  try {
-    const parsed = loadRegistryFromPath(registryPath);
-    cachedRegistryPath = registryPath;
-    cachedRegistry = parsed;
-    return parsed;
-  } catch (error: any) {
-    logger.warn(
-      `[SERVICE_RUNTIME_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
-    );
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
+  const parsed = serviceRuntimeRegistryCatalog.load();
+  cachedRegistryPath = registryPath;
+  cachedRegistry = parsed;
+  return parsed;
 }
 
 function isSupportedPlatform(record: ServiceRuntimeRecord, platform: NodeJS.Platform): boolean {
@@ -212,20 +177,91 @@ function normalizeServiceId(serviceId?: string): string {
 
 function resolveManagedServicePath(record: ServiceRuntimeRecord): string {
   const subPath = record.managed_service_subpath || `service-runtimes/${record.service_id}`;
-  return path.join(resolveServiceRuntimeRoot(getServiceRuntimePolicy()), subPath);
+  if (path.isAbsolute(subPath)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] managed service subpath must be relative: ${subPath}`);
+  }
+  const root = resolveServiceRuntimeRoot(getServiceRuntimePolicy());
+  const candidate = path.resolve(root, subPath);
+  const relative = path.relative(root, candidate).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] managed service subpath escapes its root: ${subPath}`);
+  }
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 function resolveStatePath(record: ServiceRuntimeRecord): string {
   return path.join(resolveManagedServicePath(record), 'state.json');
 }
 
-function loadStateFromPath(statePath: string): ServiceRuntimeState | null {
+function parseServiceRuntimeState(
+  value: unknown,
+  statePath: string,
+  serviceId: string
+): ServiceRuntimeState {
+  const record = serviceRuntimeStateCatalog.validate(value, statePath);
+  if (record.version !== STATE_VERSION) {
+    throw new Error('service runtime state version is invalid');
+  }
+  if (record.service_id !== serviceId) {
+    throw new Error('service runtime state service scope mismatch');
+  }
+  const expectedManagedPath = path.dirname(path.resolve(statePath));
+  const managedPath = assertSafeRepositoryPath(record.managed_service_path, {
+    allowMissingLeaf: true,
+  });
+  if (path.resolve(managedPath) !== expectedManagedPath) {
+    throw new Error('service runtime state managed path mismatch');
+  }
+  let provenance: ServiceRuntimeState['provenance'];
+  if (record.provenance !== undefined) {
+    const command = record.provenance.command;
+    const args = record.provenance.args;
+    const notes = record.provenance.notes;
+    provenance = {
+      action: record.provenance.action,
+      ...(typeof command === 'string' ? { command } : {}),
+      ...(Array.isArray(args) ? { args: args as string[] } : {}),
+      ...(typeof notes === 'string' ? { notes } : {}),
+    };
+  }
+
+  const baseUrl = record.base_url;
+  const installedAt = record.installed_at;
+  const pinnedAt = record.pinned_at;
+
+  return {
+    version: record.version,
+    service_id: record.service_id,
+    status: record.status,
+    ...(typeof baseUrl === 'string' ? { base_url: baseUrl } : {}),
+    managed_service_path: managedPath,
+    ...(typeof installedAt === 'string' ? { installed_at: installedAt } : {}),
+    ...(typeof pinnedAt === 'string' ? { pinned_at: pinnedAt } : {}),
+    ...(provenance ? { provenance } : {}),
+  };
+}
+
+/** Load a service runtime state through schema, regular-file, and service binding checks. */
+export function loadServiceRuntimeStateAtPath(
+  statePath: string,
+  serviceId: string
+): ServiceRuntimeState {
+  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeStatePath).isFile()) {
+    throw new Error(`[SERVICE_RUNTIME_STATE] state must be a regular file: ${statePath}`);
+  }
+  const value = defineCatalog<ServiceRuntimeState>({
+    id: 'service-runtime-state',
+    path: safeStatePath,
+    schema: SERVICE_RUNTIME_STATE_SCHEMA_PATH,
+  }).load();
+  return parseServiceRuntimeState(value, safeStatePath, serviceId);
+}
+
+function loadStateFromPath(statePath: string, serviceId: string): ServiceRuntimeState | null {
   if (!safeExistsSync(statePath)) return null;
   try {
-    return safeJsonParse<ServiceRuntimeState>(
-      safeReadFile(statePath, { encoding: 'utf8' }) as string,
-      'service runtime state'
-    );
+    return loadServiceRuntimeStateAtPath(statePath, serviceId);
   } catch {
     return null;
   }
@@ -247,9 +283,10 @@ function writeState(
     provenance: state.provenance,
   };
   const statePath = resolveStatePath(record);
+  const validated = parseServiceRuntimeState(resolvedState, statePath, record.service_id);
   safeMkdir(path.dirname(statePath), { recursive: true });
-  safeWriteFile(statePath, JSON.stringify(resolvedState, null, 2));
-  return resolvedState;
+  safeWriteFile(statePath, JSON.stringify(validated, null, 2));
+  return validated;
 }
 
 function resolveBaseUrl(record: ServiceRuntimeRecord, state: ServiceRuntimeState | null): string {
@@ -258,7 +295,7 @@ function resolveBaseUrl(record: ServiceRuntimeRecord, state: ServiceRuntimeState
     `KYBERION_${record.service_id.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_BASE_URL`,
   ];
   for (const envKey of envCandidates) {
-    const value = process.env[envKey]?.trim();
+    const value = getRegisteredEnvText(envKey)?.trim();
     if (value) return value;
   }
   const endpointBase = getServiceEndpointRecord(record.service_id)?.base_url?.trim();
@@ -328,9 +365,10 @@ async function runHttpProbe(
   }
 }
 
-export function resetServiceRuntimeRegistryCache(): void {
+export function _resetServiceRuntimeRegistryCacheForTests(): void {
   cachedRegistryPath = null;
   cachedRegistry = null;
+  serviceRuntimeRegistryCatalog.reset();
 }
 
 export function getServiceRuntimeRegistry(): ServiceRuntimeRegistry {
@@ -376,7 +414,7 @@ export async function resolveServiceRuntimeForPlatform(
 
   const managedServicePath = resolveManagedServicePath(service);
   const statePath = resolveStatePath(service);
-  const state = loadStateFromPath(statePath);
+  const state = loadStateFromPath(statePath, service.service_id);
   const selectedProbe = resolveProbe(service, requestedMode);
   const selectedPlan = resolvePlan(service, requestedMode);
   const selectedAction = selectAction(state, requestedMode);
@@ -524,7 +562,7 @@ export async function getServiceRuntimeInventoryItem(
 export function getServiceRuntimeState(serviceId: string): ServiceRuntimeState | null {
   const record = getServiceRuntimeRecord(serviceId);
   if (!record) return null;
-  return loadStateFromPath(resolveStatePath(record));
+  return loadStateFromPath(resolveStatePath(record), record.service_id);
 }
 
 export function markServiceRuntimeInstalled(
@@ -539,7 +577,7 @@ export function markServiceRuntimeInstalled(
   const state = writeState(record, {
     status: 'installed',
     base_url: baseUrl,
-    installed_at: new Date().toISOString(),
+    installed_at: nowIso(),
     provenance: {
       action: 'install',
       notes,
@@ -560,7 +598,7 @@ export function markServiceRuntimePinned(
   const state = writeState(record, {
     status: 'pinned',
     base_url: baseUrl,
-    pinned_at: new Date().toISOString(),
+    pinned_at: nowIso(),
     provenance: {
       action: 'pin',
       notes,

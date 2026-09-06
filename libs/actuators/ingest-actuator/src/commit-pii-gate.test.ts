@@ -19,19 +19,21 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { auditChain } from '@agent/core/audit-chain';
+import { enqueueTierPromotionCandidate } from '@agent/core/ingest-tier-gate';
 import {
-  auditChain,
-  enqueueTierPromotionCandidate,
   loadMemoryPromotionCandidate,
-  pathResolver,
-  readAssetLedger,
+  updateMemoryPromotionCandidateStatus,
+} from '@agent/core/memory-promotion-queue';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readAssetLedger } from '@agent/core/ingest-asset-ledger';
+import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-  updateMemoryPromotionCandidateStatus,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { commitIngest } from './commit.js';
 import { normalizeCard, type NormalizeCardResult } from './normalize-card.js';
 import { parseDocument } from './parse-document.js';

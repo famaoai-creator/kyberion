@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "publication-verification.schema.json",
+  "title": "Marketing publication verification",
+  "description": "Hash-bound G6 verification artifact for a local publication dry-run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "gate_id",
+    "status",
+    "reasons",
+    "evidence",
+    "approval_id",
+    "shared_approval_request_id",
+    "artifact_hashes",
+    "sensitive_data_scan",
+    "rendered_artifact",
+    "network_access",
+    "counts_as_publication"
+  ],
+  "properties": {
+    "gate_id": { "const": "G6" },
+    "status": { "enum": ["passed", "failed"] },
+    "reasons": { "type": "array", "items": { "type": "string" } },
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "approval_id": { "type": "string", "minLength": 1 },
+    "shared_approval_request_id": { "type": "string", "minLength": 1 },
+    "artifact_hashes": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/artifact_binding" }
+    },
+    "sensitive_data_scan": { "$ref": "#/$defs/sensitive_data_scan" },
+    "rendered_artifact": { "type": "string", "minLength": 1 },
+    "network_access": { "const": false },
+    "counts_as_publication": { "const": false }
+  },
+  "$defs": {
+    "artifact_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "sensitive_finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "location"],
+      "properties": {
+        "category": { "type": "string", "minLength": 1 },
+        "location": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sensitive_data_scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pii_findings", "secret_findings", "passed"],
+      "properties": {
+        "pii_findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sensitive_finding" }
+        },
+        "secret_findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sensitive_finding" }
+        },
+        "passed": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -18,22 +18,10 @@ const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/provider-cli-capability-report-policy.schema.json'
 );
 
-const FALLBACK_CATALOG: ProviderCliCapabilityReportPolicyCatalog = {
-  version: '1.0.0',
-  title: 'Provider CLI Capability Report',
-  summary_title: 'Summary',
-  capability_inventory_title: 'Capability Inventory',
-  provider_title_prefix: 'By Provider',
-  missing_adapter_title: 'Missing Adapter Coverage',
-  missing_adapter_message:
-    'The following capabilities are registered but do not yet have a matching adapter profile:',
-};
-
 const catalog = defineCatalog<ProviderCliCapabilityReportPolicyCatalog>({
   id: 'provider-cli-capability-report-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadProviderCliCapabilityReportPolicyCatalog(): ProviderCliCapabilityReportPolicyCatalog {
@@ -42,8 +30,4 @@ export function loadProviderCliCapabilityReportPolicyCatalog(): ProviderCliCapab
 
 export function resolveProviderCliCapabilityReportPolicy(): ProviderCliCapabilityReportPolicyCatalog {
   return loadProviderCliCapabilityReportPolicyCatalog();
-}
-
-export function resetProviderCliCapabilityReportPolicyCatalogCache(): void {
-  catalog.reset();
 }

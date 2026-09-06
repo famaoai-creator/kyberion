@@ -1,20 +1,17 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { nowIso } from '@agent/core/foundation';
 import { describeTaskRun } from './task_run.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
-
-type TaskScenario = {
-  id: string;
-  title: string;
-  first_run: { questions: string[] };
-  repeat_run: { profile_input?: string };
-  approval_boundary: {
-    required_for: string[];
-    default_action: 'draft-only' | 'notify-only' | 'requires-human-approval';
-  };
-};
+import { loadTaskScenario, type TaskScenario } from './lib/task-scenario.js';
 
 type SmokeAnswers = Record<string, Record<string, string>>;
 
@@ -38,7 +35,9 @@ const BUILTIN_ANSWERS: SmokeAnswers = {
 };
 
 function scenarioPath(scenarioId: string): string {
-  return path.join(SCENARIO_DIR, `${scenarioId}.json`);
+  return assertSafeRepositoryPath(path.join(SCENARIO_DIR, `${scenarioId}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function loadScenario(scenarioId: string): TaskScenario {
@@ -46,7 +45,10 @@ function loadScenario(scenarioId: string): TaskScenario {
   if (!safeExistsSync(filePath)) {
     throw new Error(`Unknown TaskScenario: ${scenarioId}`);
   }
-  return readJson<TaskScenario>(filePath);
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`TaskScenario must be a regular file: ${scenarioId}`);
+  }
+  return loadTaskScenario(filePath);
 }
 
 function buildSmokeProfile(
@@ -61,7 +63,7 @@ function buildSmokeProfile(
   return {
     scenario_id: scenario.id,
     scenario_title: scenario.title,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     answers,
     first_run_answers: firstRunAnswers,
     repeat_run: scenario.repeat_run,
@@ -70,13 +72,18 @@ function buildSmokeProfile(
 }
 
 function profilePathForScenario(scenarioId: string): string {
-  return path.join(SMOKE_PROFILE_DIR, `${scenarioId}.json`);
+  return assertSafeRepositoryPath(path.join(SMOKE_PROFILE_DIR, `${scenarioId}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
-export async function main(argv: string[] = []): Promise<void> {
+export async function main(
+  argv: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
   const scenarioId = argv.find((arg) => !arg.startsWith('--'));
   if (!scenarioId) {
-    throw new Error('Usage: pnpm task:smoke <scenario-id>');
+    throw new Error('Usage: pnpm kyberion task smoke <scenario-id>');
   }
 
   const scenario = loadScenario(scenarioId);
@@ -86,24 +93,26 @@ export async function main(argv: string[] = []): Promise<void> {
   }
 
   const profilePath = profilePathForScenario(scenario.id);
-  safeMkdir(SMOKE_PROFILE_DIR, { recursive: true });
+  safeMkdir(assertSafeRepositoryPath(SMOKE_PROFILE_DIR, { allowMissingLeaf: true }), {
+    recursive: true,
+  });
   safeWriteFile(profilePath, `${JSON.stringify(buildSmokeProfile(scenario, answers), null, 2)}\n`);
 
-  console.log(`TaskScenario smoke: ${scenario.id}`);
-  console.log('Phase 1: list');
-  console.log(`- Title: ${scenario.title}`);
-  console.log(`- Profile target: ${profilePath}`);
-  console.log('Phase 2: init');
-  console.log(`- Fixture answers loaded: ${Object.keys(answers).length}`);
-  console.log('Phase 3: run');
-  console.log(describeTaskRun(scenario.id, profilePath, { allowExternalProfilePath: true }));
-  console.log(`TaskScenario smoke passed: ${scenario.id}`);
+  print(`TaskScenario smoke: ${scenario.id}`);
+  print('Phase 1: list');
+  print(`- Title: ${scenario.title}`);
+  print(`- Profile target: ${profilePath}`);
+  print('Phase 2: init');
+  print(`- Fixture answers loaded: ${Object.keys(answers).length}`);
+  print('Phase 3: run');
+  print(describeTaskRun(scenario.id, profilePath, { allowExternalProfilePath: true }));
+  print(`TaskScenario smoke passed: ${scenario.id}`);
 }
 
 const script = defineScript({
   name: 'task:smoke',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'task_smoke.ts') ||

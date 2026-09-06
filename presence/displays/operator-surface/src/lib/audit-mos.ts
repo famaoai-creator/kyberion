@@ -13,7 +13,8 @@
  * importing `auditChain.record` directly will trip the test.
  */
 
-import { auditChain } from '@agent/core';
+import { auditChain } from '@agent/core/audit-chain';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 // Next.js resolves this source module directly; a `.js` suffix makes webpack
 // look for a physical JavaScript file instead of the colocated TypeScript file.
 import { getTenantScope } from './data';
@@ -52,7 +53,7 @@ export function emitMosRead(event: MosReadEvent): void {
   } catch (err) {
     // Audit failures must not block rendering. The hash-chain is
     // authoritative on disk; the in-process emit is best-effort.
-    if (process.env.NODE_ENV !== 'production') {
+    if (getRegisteredEnvText('NODE_ENV') !== 'production') {
       // eslint-disable-next-line no-console
       console.warn('[mos] failed to emit mos.read audit event', err);
     }

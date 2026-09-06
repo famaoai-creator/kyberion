@@ -6,7 +6,8 @@
  * to do. A run-shape that downstream steps ignore would be decoration.
  */
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeMkdir, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import path from 'node:path';
 import { handleAction } from './index.js';
 

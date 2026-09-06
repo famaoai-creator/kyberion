@@ -2,6 +2,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promoteServiceProcedure } from './service-procedure-promotion.js';
 import { serviceRecordingContentHash, type ServiceRecording } from './service-recording.js';
 import * as secureIo from './secure-io.js';
+import * as foundationJson from './foundation/json.js';
+import { getFoundationIo, registerFoundationIo } from './foundation/io.js';
+
+// defineCatalog reads presence through FoundationIo rather than secure-io's
+// exports directly, so spying on secureIo.safeExistsSync alone does not
+// reach the catalog's exists()/stat() checks — the registered io object
+// captured a direct reference to the real function at module load. Patch
+// the live registration instead, and restore it after each test.
+function overrideFoundationIoExists(matchesRecording: (filePath: string) => boolean): void {
+  const original = getFoundationIo();
+  registerFoundationIo({
+    ...original,
+    exists: (filePath) => (matchesRecording(filePath) ? true : original.exists(filePath)),
+    stat: (filePath) =>
+      matchesRecording(filePath) ? { mtimeMs: 1, size: 1 } : original.stat(filePath),
+  });
+}
 
 const recording: ServiceRecording = {
   schema_version: 'service-recording.v1',
@@ -29,7 +46,12 @@ const recording: ServiceRecording = {
 recording.review!.content_hash = serviceRecordingContentHash(recording);
 
 describe('promoteServiceProcedure', () => {
-  afterEach(() => vi.restoreAllMocks());
+  const originalFoundationIo = getFoundationIo();
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    registerFoundationIo(originalFoundationIo);
+  });
 
   it('promotes an approved recording into a non-draft pipeline and personal catalog', () => {
     const actualRead = secureIo.safeReadFile;
@@ -37,10 +59,18 @@ describe('promoteServiceProcedure', () => {
       if (filePath.includes('service-promotion-test.json')) return JSON.stringify(recording);
       return actualRead(filePath, options);
     });
+    overrideFoundationIoExists((filePath) => filePath.includes('service-promotion-test.json'));
     vi.spyOn(secureIo, 'safeExistsSync').mockReturnValue(false);
-    vi.spyOn(secureIo, 'loadJson').mockImplementation((filePath) => {
+    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
       if (filePath.includes('service-promotion-test.json')) return recording;
       return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
+    });
+    const actualLstat = secureIo.safeLstat;
+    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
+      if (filePath.includes('service-promotion-test.json')) {
+        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
+      }
+      return actualLstat(filePath);
     });
     const mkdir = vi.spyOn(secureIo, 'safeMkdir').mockImplementation(() => undefined as any);
     const write = vi.spyOn(secureIo, 'safeWriteFile').mockImplementation(() => undefined);
@@ -77,11 +107,19 @@ describe('promoteServiceProcedure', () => {
       }
       return actualRead(filePath, options);
     });
-    vi.spyOn(secureIo, 'loadJson').mockImplementation((filePath) => {
+    overrideFoundationIoExists((filePath) => filePath.includes('service-promotion-test.json'));
+    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
       if (filePath.includes('service-promotion-test.json')) {
         return { ...recording, review: { ...recording.review, status: 'pending' } };
       }
       return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
+    });
+    const actualLstat = secureIo.safeLstat;
+    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
+      if (filePath.includes('service-promotion-test.json')) {
+        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
+      }
+      return actualLstat(filePath);
     });
 
     expect(() =>

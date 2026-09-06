@@ -11,6 +11,10 @@ import {
   evaluateDefinitionOfReady,
   evaluateQualityContract,
   evaluateTestTraceability,
+  parseSoftwareQualityContract,
+  parseTestExecutionRecord,
+  parseTestInventoryItem,
+  parseTestInventory,
   type SoftwareQualityContract,
   type TestInventory,
 } from './software-quality.js';
@@ -74,6 +78,73 @@ function inventory(): TestInventory {
 }
 
 describe('software quality lifecycle', () => {
+  it('rejects malformed contract and inventory payloads before evaluation', () => {
+    expect(parseSoftwareQualityContract({ ...contract(), unexpected: true })).toBeNull();
+    expect(
+      parseSoftwareQualityContract({
+        ...contract(),
+        dor: [{ ...contract().dor[0], status: 'unknown' }],
+      })
+    ).toBeNull();
+    expect(
+      parseSoftwareQualityContract({
+        ...contract(),
+        waivers: [
+          {
+            waiver_id: 'W-1',
+            check_refs: ['DOD-1'],
+            reason: 'Temporary exception',
+            accountable_human_id: 'human:owner',
+            expires_at: '2026-09-03',
+            compensating_controls: ['Manual review'],
+            residual_risk: 'Low',
+          },
+        ],
+      })
+    ).toBeNull();
+    expect(parseTestInventory({ ...inventory(), unexpected: true })).toBeNull();
+    expect(
+      parseTestInventoryItem({
+        ...inventory().items[0],
+        unexpected: true,
+      })
+    ).toBeNull();
+    expect(
+      parseTestInventory({
+        ...inventory(),
+        items: [
+          {
+            ...inventory().items[0],
+            viewpoint_ids: ['security.authorization', 'security.authorization'],
+          },
+        ],
+      })
+    ).toBeNull();
+    expect(
+      parseTestInventory(
+        JSON.parse('{"version":"1","project_id":"p","items":[{"__proto__":true}]}')
+      )
+    ).toBeNull();
+    const execution = {
+      version: '1.0.0',
+      run_id: 'RUN-1',
+      project_id: 'project-1',
+      subject_ref: 'git:abc123',
+      environment: 'test',
+      executor: { resource_id: 'agent:tester', resource_type: 'ai_agent' },
+      started_at: '2026-07-12T00:00:00.000Z',
+      finished_at: '2026-07-12T00:01:00.000Z',
+      results: [{ item_id: 'TEST-1', status: 'passed', evidence_refs: ['trace:1'] }],
+    };
+    expect(parseTestExecutionRecord({ ...execution, unexpected: true })).toBeNull();
+    expect(
+      parseTestExecutionRecord({
+        ...execution,
+        results: [{ ...execution.results[0], status: 'unknown' }],
+      })
+    ).toBeNull();
+  });
+
   it('keeps all QA artifacts and the viewpoint catalog schema-valid', () => {
     const ajv = new Ajv({ allErrors: true, strict: false });
     addFormats(ajv);

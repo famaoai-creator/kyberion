@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import {
   pathResolver,
   buildPublicationEffectPayload,
@@ -122,6 +123,11 @@ afterEach(() => {
 });
 
 describe('marketing publication dry-run', () => {
+  it('uses the foundation text reader for approved text artifacts', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/marketing_publish_dry_run.ts'));
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
+  });
+
   it('re-hashes approved artifacts and writes local preview verification', () => {
     const { root, approvalPath, sharedApprovalRequest } = fixture();
     const result = runMarketingPublishDryRun({
@@ -155,12 +161,39 @@ describe('marketing publication dry-run', () => {
     ).toThrow('artifact binding changed: video');
   });
 
+  it('rejects approved artifacts outside the repository boundary', () => {
+    const { root, approvalPath, sharedApprovalRequest } = fixture();
+    const approval = JSON.parse(
+      safeReadFile(approvalPath, { encoding: 'utf8' }) as string
+    ) as PublicationApproval;
+    approval.approved_artifacts.video!.path = '../package.json';
+    safeWriteFile(approvalPath, JSON.stringify(approval));
+
+    expect(() =>
+      runMarketingPublishDryRun({
+        approvalPath,
+        outputRoot: path.join(root, 'output'),
+        sharedApprovalRequest,
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a dry-run output root outside the repository boundary', () => {
+    const { root, approvalPath, sharedApprovalRequest } = fixture();
+    expect(() =>
+      runMarketingPublishDryRun({
+        approvalPath,
+        outputRoot: path.join(pathResolver.rootDir(), '..', 'kyberion-marketing-output'),
+        sharedApprovalRequest,
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('rejects unauthenticated or expired approval', () => {
     const { root, approvalPath, sharedApprovalRequest } = fixture();
     const approval = JSON.parse(
       safeReadFile(approvalPath, { encoding: 'utf8' }) as string
     ) as PublicationApproval;
-    approval.approval_decisions = [];
     approval.expires_at = '2020-01-01T00:00:00.000Z';
     safeWriteFile(approvalPath, JSON.stringify(approval));
     expect(() =>
@@ -170,6 +203,23 @@ describe('marketing publication dry-run', () => {
         sharedApprovalRequest,
       })
     ).toThrow('approval has expired');
+  });
+
+  it('rejects a schema-invalid persisted approval before publication gates', () => {
+    const { root, approvalPath, sharedApprovalRequest } = fixture();
+    const approval = JSON.parse(
+      safeReadFile(approvalPath, { encoding: 'utf8' }) as string
+    ) as PublicationApproval & { unexpected?: boolean };
+    approval.unexpected = true;
+    safeWriteFile(approvalPath, JSON.stringify(approval));
+
+    expect(() =>
+      runMarketingPublishDryRun({
+        approvalPath,
+        outputRoot: path.join(root, 'output'),
+        sharedApprovalRequest,
+      })
+    ).toThrow(/Invalid catalog publication-approval/);
   });
 
   it('rejects PII in approved publication text without logging the raw value', () => {

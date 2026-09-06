@@ -10,6 +10,7 @@ import {
   memoryCandidateVisibleToViewer,
   resolveMemoryCandidateTenant,
 } from '../../../lib/knowledge-scope';
+import { readChronosOptionalStringParam } from '../../../lib/request-input';
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -19,7 +20,7 @@ export function GET(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
   try {
-    const requestedTenant = req.nextUrl.searchParams.get('tenant') || undefined;
+    const requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
     const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
     const candidates = listMemoryPromotionCandidates()
       .filter((candidate) =>

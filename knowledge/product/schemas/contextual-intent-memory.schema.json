@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "knowledge/product/schemas/contextual-intent-memory.schema.json",
+  "title": "Contextual intent memory",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "schedule": { "$ref": "#/$defs/schedule" },
+    "approval": { "$ref": "#/$defs/approval" }
+  },
+  "required": ["version"],
+  "$defs": {
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_calendar_source": {
+          "type": "string",
+          "enum": [
+            "operator_default_calendar",
+            "google_calendar",
+            "outlook_calendar",
+            "browser_calendar"
+          ]
+        },
+        "default_calendar_name": { "type": "string" },
+        "last_confirmed_at": { "type": "string", "format": "date-time" },
+        "last_seen_utterance": { "type": "string" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_approval_system": { "type": "string" },
+        "default_approval_scope": { "type": "string" },
+        "last_confirmed_at": { "type": "string", "format": "date-time" },
+        "last_seen_utterance": { "type": "string" }
+      }
+    }
+  }
+}

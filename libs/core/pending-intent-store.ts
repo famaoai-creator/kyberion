@@ -1,8 +1,11 @@
 import * as path from 'node:path';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
-  loadJson,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeRmSync,
@@ -27,6 +30,23 @@ export interface PendingIntentRecord {
 
 const PENDING_INTENT_SUBDIR = 'pending-intents';
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+const PENDING_INTENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/pending-intent.schema.json'
+);
+
+const pendingIntentCatalog = defineCatalog<PendingIntentRecord>({
+  id: 'pending-intent',
+  path: PENDING_INTENT_SCHEMA_PATH,
+  schema: PENDING_INTENT_SCHEMA_PATH,
+});
+
+function pendingIntentCatalogAtPath(filePath: string) {
+  return defineCatalog<PendingIntentRecord>({
+    id: 'pending-intent',
+    path: filePath,
+    schema: PENDING_INTENT_SCHEMA_PATH,
+  });
+}
 
 function normalizeSegment(value: string): string {
   return (
@@ -38,13 +58,18 @@ function normalizeSegment(value: string): string {
 }
 
 export function getPendingIntentPath(correlationId: string): string {
-  return pathResolver.sharedTmp(
-    path.join(PENDING_INTENT_SUBDIR, `${normalizeSegment(correlationId)}.json`)
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(
+      path.join(PENDING_INTENT_SUBDIR, `${normalizeSegment(correlationId)}.json`)
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
 function ensurePendingIntentDir(): void {
-  const dir = pathResolver.sharedTmp(PENDING_INTENT_SUBDIR);
+  const dir = assertSafeRepositoryPath(pathResolver.sharedTmp(PENDING_INTENT_SUBDIR), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
 }
 
@@ -54,25 +79,17 @@ function isExpired(record: PendingIntentRecord, now = Date.now()): boolean {
 }
 
 function normalizePendingIntent(value: unknown): PendingIntentRecord | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as PendingIntentRecord;
-  if (
-    record.kind !== 'pending-intent' ||
-    typeof record.correlation_id !== 'string' ||
-    typeof record.created_at !== 'string' ||
-    typeof record.updated_at !== 'string' ||
-    typeof record.expires_at !== 'string' ||
-    typeof record.source_text !== 'string'
-  ) {
+  try {
+    const record = pendingIntentCatalog.validate(value, 'pending intent');
+    return {
+      ...record,
+      required_inputs: Array.from(
+        new Set(record.required_inputs.map((item) => item.trim()).filter(Boolean))
+      ),
+    };
+  } catch {
     return null;
   }
-  const requiredInputs = Array.isArray(record.required_inputs)
-    ? record.required_inputs.map((item) => String(item).trim()).filter(Boolean)
-    : [];
-  return {
-    ...record,
-    required_inputs: requiredInputs,
-  };
 }
 
 export function savePendingIntent(
@@ -84,14 +101,15 @@ export function savePendingIntent(
   }
 ): PendingIntentRecord {
   ensurePendingIntentDir();
-  const now = new Date().toISOString();
   const ttlMs = Math.max(60_000, input.ttlMs ?? DEFAULT_TTL_MS);
+  const currentTime = new Date();
+  const now = nowIso(currentTime);
   const record: PendingIntentRecord = {
     kind: 'pending-intent',
     correlation_id: input.correlation_id,
     created_at: input.created_at || now,
     updated_at: input.updated_at || now,
-    expires_at: input.expires_at || new Date(Date.now() + ttlMs).toISOString(),
+    expires_at: input.expires_at || nowIso(new Date(currentTime.getTime() + ttlMs)),
     source_text: input.source_text,
     intent_id: input.intent_id,
     required_inputs: Array.from(
@@ -102,29 +120,49 @@ export function savePendingIntent(
     clarification_packet: input.clarification_packet,
     runtime_context: input.runtime_context,
   };
-  safeWriteFile(getPendingIntentPath(record.correlation_id), JSON.stringify(record, null, 2));
+  const filePath = getPendingIntentPath(record.correlation_id);
+  const validated = pendingIntentCatalog.validate(record, filePath);
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  return validated;
+}
+
+/** Load one persisted pending intent through schema, regular-file, and correlation binding. */
+export function loadPendingIntentAtPath(
+  filePath: string,
+  expectedCorrelationId?: string
+): PendingIntentRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[PENDING_INTENT] record must be a regular file: ${filePath}`);
+  }
+  const record = normalizePendingIntent(pendingIntentCatalogAtPath(safeFilePath).load());
+  if (!record) throw new Error(`[PENDING_INTENT] invalid record at ${filePath}`);
+  if (expectedCorrelationId !== undefined && record.correlation_id !== expectedCorrelationId) {
+    throw new Error(
+      `[PENDING_INTENT_SCOPE_MISMATCH] record belongs to ${record.correlation_id}, expected ${expectedCorrelationId}`
+    );
+  }
   return record;
 }
 
 export function loadPendingIntent(correlationId: string): PendingIntentRecord | null {
   const filePath = getPendingIntentPath(correlationId);
   if (!safeExistsSync(filePath)) return null;
-  let parsed: PendingIntentRecord | null = null;
   try {
-    parsed = normalizePendingIntent(loadJson<unknown>(filePath));
+    const parsed = loadPendingIntentAtPath(filePath, correlationId);
+    if (isExpired(parsed)) {
+      clearPendingIntent(correlationId);
+      return null;
+    }
+    return parsed;
   } catch {
-    clearPendingIntent(correlationId);
+    try {
+      clearPendingIntent(correlationId);
+    } catch {
+      // A malformed path is non-blocking; the next janitor pass can remove it.
+    }
     return null;
   }
-  if (!parsed) {
-    clearPendingIntent(correlationId);
-    return null;
-  }
-  if (isExpired(parsed)) {
-    clearPendingIntent(correlationId);
-    return null;
-  }
-  return parsed;
 }
 
 export function clearPendingIntent(correlationId: string): void {
@@ -134,7 +172,9 @@ export function clearPendingIntent(correlationId: string): void {
 }
 
 export function listPendingIntents(): PendingIntentRecord[] {
-  const dir = pathResolver.sharedTmp(PENDING_INTENT_SUBDIR);
+  const dir = assertSafeRepositoryPath(pathResolver.sharedTmp(PENDING_INTENT_SUBDIR), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))

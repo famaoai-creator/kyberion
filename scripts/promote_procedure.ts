@@ -19,17 +19,24 @@
  *     [--status active]
  */
 
+import { auditChain } from '@agent/core/audit-chain';
+import { compileBrowserRecording } from '@agent/core/browser-recording-compiler';
 import {
-  auditChain,
-  compileBrowserRecording,
   invalidateProcedureCache,
+  readProcedureCatalog,
   resolveAllowlistedRecordingRef,
+  validateProcedureCatalog,
+} from '@agent/core/procedure-registry';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
   safeWriteFile,
-  validateBrowserExtensionRecording,
-  pathResolver,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import type { ProcedureCatalog, ProcedureEntry } from '@agent/core';
+} from '@agent/core/secure-io';
+import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
+import type { ProcedureEntry } from '@agent/core/procedure-types';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const CATALOG_PATH = 'knowledge/product/orchestration/procedures.json';
@@ -78,7 +85,7 @@ export function main(argv: string[] = []): void {
   // mission-gated). Promotion is registration of a re-executable procedure, so
   // it should run within a mission. We don't hard-fail without one (to keep the
   // pipeline runnable in dev), but we warn and record what we got for audit.
-  const missionId = args['mission-id'] || process.env.MISSION_ID || '';
+  const missionId = args['mission-id'] || getRegisteredEnvText('MISSION_ID') || '';
   if (!missionId) {
     process.stderr.write(
       '[promote-procedure] WARNING: no --mission-id / MISSION_ID — promotion is not mission-attributed. ' +
@@ -99,10 +106,13 @@ export function main(argv: string[] = []): void {
   if (!recordingAbs) {
     fail(`--recording "${recordingRef}" is not inside the allowlisted recordings store`);
   }
+  if (!safeExistsSync(recordingAbs) || !safeLstat(recordingAbs).isFile()) {
+    fail(`--recording "${recordingRef}" must be an existing regular file`);
+  }
 
   let intentPhrases: string[];
   try {
-    const parsed = intentPhrasesRaw ? JSON.parse(intentPhrasesRaw) : [];
+    const parsed = parseSafeJsonInput(intentPhrasesRaw || '[]', '--intent-phrases');
     if (
       !Array.isArray(parsed) ||
       parsed.some((p) => typeof p !== 'string') ||
@@ -116,19 +126,17 @@ export function main(argv: string[] = []): void {
   }
 
   // Load + schema-validate the recording (data, never code).
-  let rawRecording: unknown;
+  let recording: ReturnType<typeof loadBrowserExtensionRecordingAtPath>;
   try {
-    rawRecording = readJson<unknown>(recordingAbs);
+    recording = loadBrowserExtensionRecordingAtPath(recordingAbs);
   } catch (err) {
     return fail(`failed to read recording: ${err instanceof Error ? err.message : String(err)}`);
   }
-  const recording = validateBrowserExtensionRecording(rawRecording);
-  if (!recording.value) fail(`recording failed validation: ${recording.errors.join('; ')}`);
-  if (recording.value.review?.status !== 'approved') {
+  if (recording.review?.status !== 'approved') {
     fail('recording review must be "approved" before promotion');
   }
 
-  const compiled = compileBrowserRecording(recording.value, {
+  const compiled = compileBrowserRecording(recording, {
     procedureId,
     intentPhrases,
     recordingRef,
@@ -136,20 +144,26 @@ export function main(argv: string[] = []): void {
   });
 
   // Load the catalog through secure-io, dedupe by id, append, write back.
-  const catalogAbs = pathResolver.rootResolve(CATALOG_PATH);
-  let catalog: ProcedureCatalog;
-  try {
-    catalog = readJson<ProcedureCatalog>(catalogAbs);
-  } catch {
-    catalog = { schema_version: 'procedures.v1', procedures: [] };
+  const catalogAbs = assertSafeRepositoryPath(pathResolver.rootResolve(CATALOG_PATH), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(catalogAbs) && !safeLstat(catalogAbs).isFile()) {
+    fail(`procedure catalog must be a regular file: ${catalogAbs}`);
   }
-  if (!Array.isArray(catalog.procedures)) catalog.procedures = [];
+  let catalog = { schema_version: 'procedures.v1' as const, procedures: [] as ProcedureEntry[] };
+  try {
+    catalog = readProcedureCatalog(catalogAbs);
+  } catch {
+    // Preserve the promotion command's bootstrap behavior when the optional
+    // public catalog has not been provisioned yet or is unreadable.
+  }
   if (catalog.procedures.some((p) => p.procedure_id === procedureId)) {
     fail(`procedure_id "${procedureId}" already exists in the catalog`);
   }
   catalog.procedures.push(compiled.procedureEntry);
 
-  safeWriteFile(catalogAbs, `${JSON.stringify(catalog, null, 2)}\n`);
+  const validatedCatalog = validateProcedureCatalog(catalog, catalogAbs);
+  safeWriteFile(catalogAbs, `${JSON.stringify(validatedCatalog, null, 2)}\n`);
   invalidateProcedureCache();
 
   // Governed audit trail for the promotion.

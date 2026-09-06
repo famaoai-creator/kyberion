@@ -1,7 +1,9 @@
 import { resolveCreativeDesign, type ResolvedCreativeDesign } from './creative-design-resolver.js';
 import { webThemePackToCssVars, type WebThemePack } from './web-design-system.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { slugify } from './foundation/text.js';
 import { escapeHtml } from './text-escaping.js';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * E2E-02 Task 6: campaign planner — one brief, one resolved design, N deliverables.
@@ -25,6 +27,22 @@ export interface CampaignBrief {
   deliverables: CampaignDeliverableKind[];
   key_messages: string[];
   sections?: Array<{ heading: string; body?: string[] }>;
+}
+
+const CAMPAIGN_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/campaign-brief.schema.json'
+);
+const CAMPAIGN_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/campaign-manifest.schema.json'
+);
+
+/** Load a persisted campaign brief through its canonical schema boundary. */
+export function loadCampaignBriefAtPath(filePath: string): CampaignBrief {
+  return defineCatalog<CampaignBrief>({
+    id: 'campaign-brief',
+    path: filePath,
+    schema: CAMPAIGN_BRIEF_SCHEMA_PATH,
+  }).load();
 }
 
 export interface CampaignPlanEntry {
@@ -55,6 +73,18 @@ export interface CampaignManifest {
     detail?: string;
   }>;
   generated_by: string;
+}
+
+/** Validate the execution manifest before a campaign runner persists it. */
+export function validateCampaignManifest(
+  value: unknown,
+  sourcePath = 'campaign-manifest'
+): CampaignManifest {
+  return defineCatalog<CampaignManifest>({
+    id: 'campaign-manifest',
+    path: sourcePath,
+    schema: CAMPAIGN_MANIFEST_SCHEMA_PATH,
+  }).validate(value, sourcePath);
 }
 
 export interface CampaignPlan {

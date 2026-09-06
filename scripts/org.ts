@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
+import { loadApprovalRequest } from '@agent/core/approval-store';
 import {
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-  safeWriteFile,
-  loadApprovalRequest,
-} from '@agent/core';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
+  loadAuthorityRoleIndex as loadGovernedAuthorityRoleIndex,
+  loadTeamRoleIndex as loadGovernedTeamRoleIndex,
+} from '@agent/core/mission-team-index';
+import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
+import { defineCatalog, nowIso, type GovernedCatalog } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 type Persona =
   'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
@@ -61,6 +62,28 @@ type RoleWriteAccess = {
   default_allow?: string[];
   roles?: Record<string, { allow?: string[] }>;
 };
+
+type RoleAuthorityMap = {
+  version?: string;
+  description?: string;
+  system_roles?: RoleAuthorityEntry[];
+  mission_roles?: RoleAuthorityEntry[];
+  context_roles?: RoleAuthorityEntry[];
+};
+
+const ROLE_AUTHORITY_MAP_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/role-authority-map.schema.json'
+);
+const SECURITY_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/security-policy.schema.json'
+);
+const ROLE_WRITE_ACCESS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/role-write-access.schema.json'
+);
+
+const roleAuthorityMapCatalogs = new Map<string, GovernedCatalog<RoleAuthorityMap>>();
+const securityPolicyCatalogs = new Map<string, GovernedCatalog<SecurityPolicy>>();
+const roleWriteAccessCatalogs = new Map<string, GovernedCatalog<RoleWriteAccess>>();
 
 type OrgRoleCreateOptions = {
   name: string;
@@ -184,8 +207,8 @@ const DOMAIN_TEMPLATES: Record<
 function helpText(): string {
   return [
     'Usage:',
-    '  pnpm org role create --name <display-name> --domain <domain> [--authority <authority-role-id>]',
-    '  pnpm org role promote --role <role-id> --authority <authority-role-id>',
+    '  pnpm organization role create --name <display-name> --domain <domain> [--authority <authority-role-id>]',
+    '  pnpm organization role promote --role <role-id> --authority <authority-role-id>',
     '',
     'Options:',
     '  --name <name>                 Display name for the new role.',
@@ -252,7 +275,7 @@ function parseArgs(argv: string[]): OrgCommand {
         },
       };
     }
-    throw new Error('Unsupported command. Use: pnpm org role create ...');
+    throw new Error('Unsupported command. Use: pnpm organization role create ...');
   }
 
   const options: Record<string, unknown> = {
@@ -324,12 +347,61 @@ function unique(values: string[]): string[] {
   );
 }
 
-function readJson<T>(filePath: string): T {
-  return readFoundationJson<T>(filePath);
+function roleAuthorityMapCatalog(filePath: string): GovernedCatalog<RoleAuthorityMap> {
+  const existing = roleAuthorityMapCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<RoleAuthorityMap>({
+    id: 'role-authority-map',
+    path: filePath,
+    schema: ROLE_AUTHORITY_MAP_SCHEMA_PATH,
+    fallback: () => ({
+      version: '1.0.0',
+      description: 'Maps knowledge roles to execution mode, persona, and authority_role.',
+      system_roles: [],
+      mission_roles: [],
+      context_roles: [],
+    }),
+  });
+  roleAuthorityMapCatalogs.set(filePath, catalog);
+  return catalog;
 }
 
-function readJsonIfExists<T>(filePath: string): T | null {
-  return safeExistsSync(filePath) ? readJson<T>(filePath) : null;
+function securityPolicyCatalog(filePath: string): GovernedCatalog<SecurityPolicy> {
+  const existing = securityPolicyCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<SecurityPolicy>({
+    id: 'security-policy',
+    path: filePath,
+    schema: SECURITY_POLICY_SCHEMA_PATH,
+    fallback: () => ({
+      version: '1.0.0',
+      default_allow: [],
+      tier_restrictions: {},
+      persona_permissions: {},
+      authority_role_permissions: {},
+    }),
+  });
+  securityPolicyCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
+function roleWriteAccessCatalog(filePath: string): GovernedCatalog<RoleWriteAccess> {
+  const existing = roleWriteAccessCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<RoleWriteAccess>({
+    id: 'role-write-access',
+    path: filePath,
+    schema: ROLE_WRITE_ACCESS_SCHEMA_PATH,
+    fallback: () => ({ version: '1.0.0', default_allow: [], roles: {} }),
+  });
+  roleWriteAccessCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
+function resetOrgCatalog(filePath: string): void {
+  roleAuthorityMapCatalogs.get(filePath)?.reset();
+  securityPolicyCatalogs.get(filePath)?.reset();
+  roleWriteAccessCatalogs.get(filePath)?.reset();
 }
 
 function writeJson(filePath: string, payload: unknown): void {
@@ -366,10 +438,7 @@ function resolveAuthorityRoleRecord(
   authorityRoleId: string,
   input: OrgRoleCreateOptions
 ): AuthorityRoleRecord {
-  const authorityDir = path.join(rootDir, 'knowledge', 'product', 'governance', 'authority-roles');
-  const existing = readJsonIfExists<AuthorityRoleRecord>(
-    path.join(authorityDir, `${authorityRoleId}.json`)
-  );
+  const existing = loadAuthorityRoleDirectory(rootDir)[authorityRoleId];
   const template = resolveDomainTemplate(input.domain);
 
   const writeScopes = unique([
@@ -493,7 +562,7 @@ title: Role Procedure: ${toTitleCase(input.name)}
 tags: [role, ${input.teamRoleId}, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: ${new Date().toISOString().slice(0, 10)}
+last_updated: ${nowIso().slice(0, 10)}
 kind: role
 scope: global
 authority: advisory
@@ -539,7 +608,7 @@ category: Roles
 tags: [roles, ${input.teamRoleId}, mission]
 importance: 7
 author: Ecosystem Architect
-last_updated: ${new Date().toISOString().slice(0, 10)}
+last_updated: ${nowIso().slice(0, 10)}
 ---
 
 # ${toTitleCase(input.name)} Mission Statement
@@ -566,28 +635,10 @@ function loadAuthorityRoleDirectory(rootDir: string): Record<string, AuthorityRo
     'governance',
     'authority-role-index.json'
   );
-  if (safeExistsSync(directory)) {
-    const files = safeReaddir(directory)
-      .filter((entry) => entry.endsWith('.json'))
-      .sort();
-    if (files.length) {
-      const roles: Record<string, AuthorityRoleRecord> = {};
-      for (const file of files) {
-        const payload = readJson<AuthorityRoleRecord & { role: string }>(
-          path.join(directory, file)
-        );
-        roles[payload.role] = (() => {
-          const { role: _role, ...record } = payload;
-          return record;
-        })();
-      }
-      return roles;
-    }
-  }
-  const snapshotPayload = readJsonIfExists<{
-    authority_roles?: Record<string, AuthorityRoleRecord>;
-  }>(snapshot);
-  return snapshotPayload?.authority_roles ? { ...snapshotPayload.authority_roles } : {};
+  const hasDirectoryEntries =
+    safeExistsSync(directory) && safeReaddir(directory).some((entry) => entry.endsWith('.json'));
+  if (!hasDirectoryEntries && !safeExistsSync(snapshot)) return {};
+  return loadGovernedAuthorityRoleIndex(rootDir);
 }
 
 function writeAuthorityRoleBundle(
@@ -629,26 +680,10 @@ function loadTeamRoleDirectory(rootDir: string): Record<string, TeamRoleRecord> 
     'orchestration',
     'team-role-index.json'
   );
-  if (safeExistsSync(directory)) {
-    const files = safeReaddir(directory)
-      .filter((entry) => entry.endsWith('.json'))
-      .sort();
-    if (files.length) {
-      const roles: Record<string, TeamRoleRecord> = {};
-      for (const file of files) {
-        const payload = readJson<TeamRoleRecord & { role: string }>(path.join(directory, file));
-        roles[payload.role] = (() => {
-          const { role: _role, ...record } = payload;
-          return record;
-        })();
-      }
-      return roles;
-    }
-  }
-  const snapshotPayload = readJsonIfExists<{ team_roles?: Record<string, TeamRoleRecord> }>(
-    snapshot
-  );
-  return snapshotPayload?.team_roles ? { ...snapshotPayload.team_roles } : {};
+  const hasDirectoryEntries =
+    safeExistsSync(directory) && safeReaddir(directory).some((entry) => entry.endsWith('.json'));
+  if (!hasDirectoryEntries && !safeExistsSync(snapshot)) return {};
+  return loadGovernedTeamRoleIndex(rootDir);
 }
 
 function writeTeamRoleBundle(rootDir: string, roleId: string, record: TeamRoleRecord): void {
@@ -674,13 +709,7 @@ function syncTeamRoleSnapshot(rootDir: string, roles: Record<string, TeamRoleRec
   writeJson(snapshot, { version: '1.0.0', team_roles });
 }
 
-function loadRoleAuthorityMap(rootDir: string): {
-  version?: string;
-  description?: string;
-  system_roles?: RoleAuthorityEntry[];
-  mission_roles?: RoleAuthorityEntry[];
-  context_roles?: RoleAuthorityEntry[];
-} {
+function loadRoleAuthorityMap(rootDir: string): RoleAuthorityMap {
   const filePath = path.join(
     rootDir,
     'knowledge',
@@ -688,15 +717,7 @@ function loadRoleAuthorityMap(rootDir: string): {
     'governance',
     'role-authority-map.json'
   );
-  return (
-    readJsonIfExists(filePath) ?? {
-      version: '1.0.0',
-      description: 'Maps knowledge roles to execution mode, persona, and authority_role.',
-      system_roles: [],
-      mission_roles: [],
-      context_roles: [],
-    }
-  );
+  return roleAuthorityMapCatalog(filePath).load();
 }
 
 function upsertRoleAuthorityMap(rootDir: string, entry: RoleAuthorityEntry): void {
@@ -717,19 +738,12 @@ function upsertRoleAuthorityMap(rootDir: string, entry: RoleAuthorityEntry): voi
     left.role.localeCompare(right.role)
   );
   writeJson(filePath, map);
+  resetOrgCatalog(filePath);
 }
 
 function loadSecurityPolicy(rootDir: string): SecurityPolicy {
   const filePath = path.join(rootDir, 'knowledge', 'product', 'governance', 'security-policy.json');
-  return (
-    readJsonIfExists<SecurityPolicy>(filePath) ?? {
-      version: '1.0.0',
-      default_allow: [],
-      tier_restrictions: {},
-      persona_permissions: {},
-      authority_role_permissions: {},
-    }
-  );
+  return securityPolicyCatalog(filePath).load();
 }
 
 function loadRoleWriteAccess(rootDir: string): RoleWriteAccess {
@@ -740,13 +754,7 @@ function loadRoleWriteAccess(rootDir: string): RoleWriteAccess {
     'governance',
     'role-write-access.json'
   );
-  return (
-    readJsonIfExists<RoleWriteAccess>(filePath) ?? {
-      version: '1.0.0',
-      default_allow: [],
-      roles: {},
-    }
-  );
+  return roleWriteAccessCatalog(filePath).load();
 }
 
 function upsertRoleWriteAccess(rootDir: string, roleId: string, scopes: string[]): void {
@@ -761,6 +769,7 @@ function upsertRoleWriteAccess(rootDir: string, roleId: string, scopes: string[]
   access.roles = access.roles || {};
   access.roles[roleId] = { allow: unique(scopes) };
   writeJson(filePath, access);
+  resetOrgCatalog(filePath);
 }
 
 function assertSecurityPolicyApproval(approvalId?: string): void {
@@ -805,6 +814,7 @@ function upsertSecurityPolicy(
     allow_write: [...record.write_scopes],
   };
   writeJson(filePath, policy);
+  resetOrgCatalog(filePath);
 }
 
 function writeRoleDocs(
@@ -852,7 +862,7 @@ function writePromotionNotes(
     `- Allowed actuators: ${updatedAuthority.allowed_actuators.join(', ') || '(none)'}`,
     `- Tier access: ${updatedAuthority.tier_access.join(', ') || '(none)'}`,
     ``,
-    `This file records the explicit advise-to-act promotion applied by \`pnpm org role promote\`.`,
+    `This file records the explicit advise-to-act promotion applied by \`pnpm organization role promote\`.`,
   ].join('\n');
   safeWriteFile(path.join(roleDir, 'PROMOTION.md'), `${promotionNotes}\n`);
 }
@@ -995,14 +1005,17 @@ export function createRoleBundle(
   };
 }
 
-function printResult(result: Record<string, unknown>): void {
-  console.log(JSON.stringify(result, null, 2));
+function printResult(result: Record<string, unknown>, print: Print): void {
+  print(JSON.stringify(result, null, 2));
 }
 
-export async function main(argv = currentProcessArgv().slice(2)): Promise<void> {
+export async function main(
+  argv = currentProcessArgv().slice(2),
+  print: Print = () => undefined
+): Promise<void> {
   const command = parseArgs(argv);
   if (command.kind === 'help') {
-    console.log(helpText());
+    print(helpText());
     return;
   }
 
@@ -1046,13 +1059,13 @@ export async function main(argv = currentProcessArgv().slice(2)): Promise<void> 
             approvalId: command.options.approvalId as string | undefined,
           })
         );
-  printResult(result);
+  printResult(result, print);
 }
 
 export const runOrg = defineScript({
   name: 'organization:org',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (isDirectScript(import.meta.url, 'org.ts') || isDirectScript(import.meta.url, 'org.js'))

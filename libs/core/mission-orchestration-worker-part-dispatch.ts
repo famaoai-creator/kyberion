@@ -39,13 +39,19 @@ import {
 } from './worker-goal.js';
 import { WorkerStateJournal } from './worker-state-journal.js';
 import { getDefaultWorkerEventStream, type WorkerEventStream } from './worker-event-stream.js';
-import { missionDir } from './path-resolver.js';
 import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import { type DeliveredKnowledgeRef } from './src/knowledge-feedback-loop.js';
 import { TraceContext, persistTrace } from './src/trace.js';
 import { createGapRecorder, sanitizeGapSamples, type GapRecorder } from './gap-phase.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
+import { safeExistsSync } from './secure-io.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
+import {
+  createApprovalBackedManualDriveGate,
+  type ManualDriveApprovalGate,
+} from './agent-runtime-manual-drive.js';
+import type { ContextSecurityScope } from './context-security-scope.js';
+import type { EventScopeInput } from './event-scope.js';
 export { resolveMissionPlanningPacket } from './mission-orchestration-planning.js';
 
 export {
@@ -69,6 +75,7 @@ import {
 import {
   recordMissionContextTask,
   recordMissionVisiblePrompt,
+  resolvedMissionDir,
 } from './mission-orchestration-worker-part-context.js';
 import type { DispatchMissionTaskOutcome } from './mission-orchestration-worker-part-context.js';
 import {
@@ -151,7 +158,7 @@ export function cascadeBlockedDependents(tasks: PlannedNextTask[]): string[] {
 // ---------------------------------------------------------------------------
 // KD-01 adoption: opt-in goal-driven execution mode for the mission worker.
 //
-// A work item may set `goal_driven: true` (and optionally `goal_budget`) to run
+// A work item may set `goal_driven: true` (and optionally `drive` / `goal_budget`) to run
 // its objective through the autonomous multi-turn goal loop instead of the
 // single-shot dispatch. This wires `runGoalDrivenLoop` to the REAL worker seams
 // the mission worker already uses — `getReasoningBackend()` (via the driver's
@@ -185,6 +192,24 @@ export interface GoalDrivenWorkItemSeams {
   now?: () => string;
   /** PI-15/DH-10: ordered model-entry admission hooks. */
   preStep?: readonly GoalPreStepHook[];
+  /** PI-14: optional live step-driver registration for this worker. */
+  manualDrive?: RunGoalDrivenLoopOptions['manualDrive'];
+}
+
+/**
+ * Return whether a goal-driven task has a persisted paused goal that an
+ * explicit mission-resume ceremony may continue. A missing journal is a fresh
+ * task, not a resume target; journal corruption is allowed to surface so the
+ * recovery path fails closed instead of starting a second goal.
+ */
+export function isGoalDrivenTaskResumable(missionId: string, task: PlannedNextTask): boolean {
+  if (task.goal_driven !== true) return false;
+  const journalPath = goalJournalPath(missionId, task.task_id);
+  if (!safeExistsSync(journalPath)) return false;
+  const restored = new WorkerStateJournal({ journalPath }).restore().goal;
+  return (
+    restored?.goalId === goalIdForWorkItem(missionId, task.task_id) && restored.state === 'paused'
+  );
 }
 
 export interface GoalDrivenWorkItemResult {
@@ -212,10 +237,79 @@ export function goalIdForWorkItem(missionId: string, taskId: string): string {
 
 /** Mission-local KD-03 journal path (per work item). Created lazily on first append. */
 export function goalJournalPath(missionId: string, taskId: string): string {
+  const missionPath = resolvedMissionDir(missionId);
   const safeTaskId = String(taskId)
     .replace(/[^A-Za-z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return `${missionDir(missionId, 'public')}/coordination/goal-journal-${safeTaskId || 'task'}.jsonl`;
+  return `${missionPath}/coordination/goal-journal-${safeTaskId || 'task'}.jsonl`;
+}
+
+/**
+ * Resolve the authoritative context-pack scope for a manual goal driver.
+ * Manual control is an operator-visible capability, so a missing or
+ * cross-mission security scope must stop dispatch rather than fall back to a
+ * process/system scope.
+ */
+export function resolveManualGoalDriveScope(input: {
+  missionId: string;
+  taskId: string;
+  agentId: string;
+  securityScope?: ContextSecurityScope;
+}): EventScopeInput {
+  const securityScope = input.securityScope;
+  const tenantCandidate =
+    typeof securityScope?.tenant_slug === 'string'
+      ? securityScope.tenant_slug
+      : typeof securityScope?.tenant_id === 'string'
+        ? securityScope.tenant_id
+        : '';
+  const tenantSlug = tenantCandidate.trim();
+  if (!securityScope || !tenantSlug || typeof securityScope.mission_id !== 'string') {
+    throw new Error(
+      `[MANUAL_DRIVE_SCOPE_REQUIRED] manual task ${input.taskId} requires a tenant-scoped context pack`
+    );
+  }
+  if (securityScope.mission_id.trim().toUpperCase() !== input.missionId.trim().toUpperCase()) {
+    throw new Error(
+      `[MANUAL_DRIVE_SCOPE_MISMATCH] context pack mission does not match ${input.missionId}`
+    );
+  }
+  return {
+    scope_kind: 'mission',
+    tier: securityScope.write_tier,
+    tenant_slug: tenantSlug,
+    mission_id: securityScope.mission_id,
+    ...(securityScope.organization_id ? { organization_id: securityScope.organization_id } : {}),
+    ...(securityScope.project_id ? { project_id: securityScope.project_id } : {}),
+    task_id: input.taskId,
+    session_id: `goal-${input.missionId}-${input.taskId}`,
+    nhi_id: input.agentId,
+  };
+}
+
+function buildMissionManualDriveApprovalGate(input: {
+  missionId: string;
+  taskId: string;
+  agentId: string;
+}): ManualDriveApprovalGate {
+  return createApprovalBackedManualDriveGate(({ action, approval_payload }) => ({
+    operationId: action.operation_id || `goal:${input.taskId}`,
+    agentId: input.agentId,
+    callerRole: 'mission_worker',
+    correlationId: action.action_id,
+    channel: 'mission-worker',
+    ...(approval_payload ? { payload: approval_payload } : {}),
+    source: {
+      missionId: input.missionId,
+      taskId: input.taskId,
+      agentId: input.agentId,
+    },
+    draft: {
+      title: `Review ${action.operation_id || 'goal action'}`,
+      summary: `Manual approval is required before ${action.operation_id || 'the goal action'} executes.`,
+      severity: 'medium',
+    },
+  }));
 }
 
 /** Convert opt-in work-item budgets into a driver budget (never invented). */
@@ -318,6 +412,7 @@ export async function runGoalDrivenWorkItem(input: {
     ...(input.onPromptVisible ? { onPromptVisible: input.onPromptVisible } : {}),
     ...(input.shouldStopAfterTurn ? { shouldStopAfterTurn: input.shouldStopAfterTurn } : {}),
     ...(input.preStep ? { preStep: input.preStep } : {}),
+    ...(seams.manualDrive ? { manualDrive: seams.manualDrive } : {}),
     ...(input.inputQueue
       ? {
           getTurnPrompt: async () =>
@@ -428,9 +523,17 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
       missionStateRaw && typeof missionStateRaw === 'object'
         ? (missionStateRaw as Record<string, unknown>).tier
         : undefined;
+    const tenantSlug =
+      missionStateRaw && typeof missionStateRaw === 'object'
+        ? String((missionStateRaw as Record<string, unknown>).tenant_slug || '').trim() || undefined
+        : undefined;
     const provisioned = await provisionTaskKnowledge({
       form: 'system_prompt',
-      missionPath: missionDir(input.missionId, 'public'),
+      missionPath: resolvedMissionDir(
+        input.missionId,
+        (tier as 'personal' | 'confidential' | 'public') || 'public',
+        tenantSlug
+      ),
       missionId: input.missionId,
       tier: (tier as 'personal' | 'confidential' | 'public') || 'public',
       recipientKind: 'agent',
@@ -466,6 +569,7 @@ export async function dispatchGoalDrivenMissionTask(
   input: {
     missionId: string;
     task: PlannedNextTask;
+    resumeGoalDriven?: boolean;
     teamRole: string;
     assignment: {
       agent_id: string;
@@ -492,22 +596,9 @@ export async function dispatchGoalDrivenMissionTask(
       task_id: input.task.task_id,
       mission_id: input.missionId,
       goal_driven: true,
+      ...(input.task.drive ? { drive: input.task.drive } : {}),
     },
   });
-  const claimed = claimWorkItem({
-    itemId: workItem.item_id,
-    actorPeerId: 'mission-orchestration-worker',
-    purpose: `goal-driven dispatch ${input.missionId}/${input.task.task_id}`,
-    expectedVersion: workItem.version,
-    idempotencyKey: workItemSourceRef,
-    metadata: {
-      mission_id: input.missionId,
-      task_id: input.task.task_id,
-      team_role: input.teamRole,
-      goal_driven: true,
-    },
-  });
-
   // KP-01: provision the mission context pack as a stable system-prompt
   // prefix for the goal loop. Fail-open — see provisionGoalDrivenTaskKnowledge.
   const { systemPrompt, contextPackId, securityScope, deliveredKnowledgeRefs } =
@@ -522,6 +613,43 @@ export async function dispatchGoalDrivenMissionTask(
   // the dispatch trace's knowledgeRefs are non-empty for this path too — see
   // attachDeliveredKnowledgeRefs.
   attachDeliveredKnowledgeRefs(traceCtx, deliveredKnowledgeRefs);
+
+  const manualDrive =
+    input.task.drive === 'manual'
+      ? {
+          mode: 'step' as const,
+          agentId: input.assignment.agent_id,
+          scope: resolveManualGoalDriveScope({
+            missionId: input.missionId,
+            taskId: input.task.task_id,
+            agentId: input.assignment.agent_id,
+            securityScope,
+          }),
+          durableControl: true,
+          approvalGate: buildMissionManualDriveApprovalGate({
+            missionId: input.missionId,
+            taskId: input.task.task_id,
+            agentId: input.assignment.agent_id,
+          }),
+        }
+      : undefined;
+
+  // Claim only after the manual execution scope has been resolved. A failed
+  // scope/context-pack admission must not leave an unowned WorkItem lease.
+  const claimed = claimWorkItem({
+    itemId: workItem.item_id,
+    actorPeerId: 'mission-orchestration-worker',
+    purpose: `goal-driven dispatch ${input.missionId}/${input.task.task_id}`,
+    expectedVersion: workItem.version,
+    idempotencyKey: workItemSourceRef,
+    metadata: {
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      goal_driven: true,
+      ...(input.task.drive ? { drive: input.task.drive } : {}),
+    },
+  });
 
   const outcome = await runGoalDrivenWorkItem({
     missionId: input.missionId,
@@ -542,6 +670,8 @@ export async function dispatchGoalDrivenMissionTask(
         task: input.task.task_id,
         session: goalIdForWorkItem(input.missionId, input.task.task_id),
       },
+      ...(manualDrive ? { manualDrive } : {}),
+      ...(input.resumeGoalDriven ? { resume: true } : {}),
     },
     onPromptVisible: (content, form) =>
       recordMissionVisiblePrompt({
@@ -701,6 +831,8 @@ export function finalizeMissionTaskTrace(
 export interface DispatchPlannedMissionTaskInput {
   missionId: string;
   task: PlannedNextTask;
+  /** Explicit mission-resume ceremony; never inferred from a normal dispatch. */
+  resumeGoalDriven?: boolean;
   teamRole: string;
   assignment: {
     agent_id: string;
@@ -883,6 +1015,7 @@ export async function dispatchPlannedMissionTask(
           {
             missionId: input.missionId,
             task: input.task,
+            ...(input.resumeGoalDriven ? { resumeGoalDriven: true } : {}),
             teamRole: input.teamRole,
             assignment: input.assignment,
           },

@@ -18,15 +18,7 @@ import {
   Type,
   Ruler,
 } from 'lucide-react';
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createChronosWebDesignSystem } from '@agent/core/web-design-system';
 import { AgentOpsBoards } from '../components/AgentOpsBoards';
@@ -65,7 +57,6 @@ import {
   setChronosLocalePreference,
   uxMessage,
   uxText,
-  type SupportedLocale,
 } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 import {
@@ -87,6 +78,29 @@ import {
   resolveChronosThemeMode,
   type ChronosThemeMode,
 } from '../lib/chronos-theme';
+import { parseTenantDesignResponse } from '../lib/tenant-design-response';
+import { parseDeliverablesResponse, type ClientDeliverable } from '../lib/deliverables-response';
+import {
+  parseMissionHistoryResponse,
+  type ClientMissionHistoryEntry,
+} from '../lib/mission-history-response';
+import { parseCostSummaryResponse } from '../lib/cost-summary-response';
+import type { CostSummary } from '../lib/su-surface-data';
+import {
+  parseConnectionsResponse,
+  type ClientConnectionReviewItem,
+} from '../lib/connections-response';
+import {
+  parseOperatorHomeResponse,
+  type ClientOperatorHomeSummary,
+} from '../lib/operator-home-response';
+import { parsePlanPreviewResponse, type ClientPlanPreview } from '../lib/plan-preview-response';
+import { parseDeliverableReviewResponse } from '../lib/deliverable-review-response';
+import { parseConnectionReviewResponse } from '../lib/connection-review-response';
+import {
+  parseMissionApprovalResponse,
+  parseMissionProposalResponse,
+} from '../lib/agent-mutation-response';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -119,11 +133,11 @@ function ChronosMirrorV2Content() {
   const [planMissionType, setPlanMissionType] = useState('proposal-brief');
   const [planPersona, setPlanPersona] = useState('operator');
   const [planTier, setPlanTier] = useState<'personal' | 'confidential' | 'public'>('confidential');
-  const [planPreview, setPlanPreview] = useState<any | null>(null);
+  const [planPreview, setPlanPreview] = useState<ClientPlanPreview | null>(null);
   const [planPreviewError, setPlanPreviewError] = useState<string | null>(null);
   const [planPreviewBusy, setPlanPreviewBusy] = useState(false);
   const [planPreviewSignature, setPlanPreviewSignature] = useState<string | null>(null);
-  const [deliverables, setDeliverables] = useState<any[]>([]);
+  const [deliverables, setDeliverables] = useState<ClientDeliverable[]>([]);
   const [deliverablesError, setDeliverablesError] = useState<string | null>(null);
   const [deliverablesQuery, setDeliverablesQuery] = useState('');
   const [deliverablesRefreshTick, setDeliverablesRefreshTick] = useState(0);
@@ -137,10 +151,12 @@ function ChronosMirrorV2Content() {
   const [deliverableAskWhyVerdict, setDeliverableAskWhyVerdict] = useState<
     'reject' | 'request-changes' | null
   >(null);
-  const [operatorHomeSummary, setOperatorHomeSummary] = useState<any | null>(null);
+  const [operatorHomeSummary, setOperatorHomeSummary] = useState<ClientOperatorHomeSummary | null>(
+    null
+  );
   const [operatorHomeError, setOperatorHomeError] = useState<string | null>(null);
   const [operatorHomeRefreshTick, setOperatorHomeRefreshTick] = useState(0);
-  const [missionHistory, setMissionHistory] = useState<any[]>([]);
+  const [missionHistory, setMissionHistory] = useState<ClientMissionHistoryEntry[]>([]);
   const [missionHistoryError, setMissionHistoryError] = useState<string | null>(null);
   const [missionHistoryQuery, setMissionHistoryQuery] = useState('');
   // Defaulting to 'completed' made this panel read "No missions match the
@@ -149,12 +165,12 @@ function ChronosMirrorV2Content() {
   const [missionHistoryStatus, setMissionHistoryStatus] = useState('');
   const [missionHistoryTier, setMissionHistoryTier] = useState('');
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
-  const [costSummary, setCostSummary] = useState<any | null>(null);
+  const [costSummary, setCostSummary] = useState<CostSummary | null>(null);
   const [costSummaryError, setCostSummaryError] = useState<string | null>(null);
   const [planApprovalBusy, setPlanApprovalBusy] = useState(false);
   const [planApprovalMessage, setPlanApprovalMessage] = useState<string | null>(null);
   const [planApprovalSessionId, setPlanApprovalSessionId] = useState<string | null>(null);
-  const [connections, setConnections] = useState<any[]>([]);
+  const [connections, setConnections] = useState<ClientConnectionReviewItem[]>([]);
   const [connectionsError, setConnectionsError] = useState<string | null>(null);
   const [connectionsQuery, setConnectionsQuery] = useState('');
   const [connectionReviewBusyId, setConnectionReviewBusyId] = useState<string | null>(null);
@@ -236,11 +252,13 @@ function ChronosMirrorV2Content() {
         if (!response.ok) {
           throw new Error(`deliverables ${response.status}`);
         }
-        return (await response.json()) as { deliverables?: any[] };
+        const parsed = parseDeliverablesResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid deliverables response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setDeliverables(Array.isArray(payload.deliverables) ? payload.deliverables : []);
+        setDeliverables(payload.deliverables);
         setDeliverablesError(null);
       })
       .catch((error) => {
@@ -266,11 +284,13 @@ function ChronosMirrorV2Content() {
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`missions ${response.status}`);
-        return (await response.json()) as { missions?: any[] };
+        const parsed = parseMissionHistoryResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid mission history response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setMissionHistory(Array.isArray(payload.missions) ? payload.missions : []);
+        setMissionHistory(payload.missions);
         setMissionHistoryError(null);
       })
       .catch((error) => {
@@ -294,11 +314,13 @@ function ChronosMirrorV2Content() {
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`cost ${response.status}`);
-        return (await response.json()) as { summary?: any };
+        const parsed = parseCostSummaryResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid cost summary response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setCostSummary(payload.summary || null);
+        setCostSummary(payload.summary);
         setCostSummaryError(null);
       })
       .catch((error) => {
@@ -318,11 +340,13 @@ function ChronosMirrorV2Content() {
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`connections ${response.status}`);
-        return (await response.json()) as { connections?: any[] };
+        const parsed = parseConnectionsResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid connections response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setConnections(Array.isArray(payload.connections) ? payload.connections : []);
+        setConnections(payload.connections);
         setConnectionsError(null);
       })
       .catch((error) => {
@@ -345,11 +369,13 @@ function ChronosMirrorV2Content() {
     )
       .then(async (response) => {
         if (!response.ok) throw new Error(`operator-home ${response.status}`);
-        return (await response.json()) as { summary?: any };
+        const parsed = parseOperatorHomeResponse(await response.json().catch(() => null));
+        if (!parsed) throw new Error('Invalid operator home response');
+        return parsed;
       })
       .then((payload) => {
         if (cancelled) return;
-        setOperatorHomeSummary(payload.summary || null);
+        setOperatorHomeSummary(payload.summary);
         setOperatorHomeError(null);
       })
       .catch((error) => {
@@ -602,11 +628,13 @@ function ChronosMirrorV2Content() {
           locale: locale,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'plan preview failed');
-      setPlanPreview(payload.preview);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('plan preview failed');
+      const parsed = parsePlanPreviewResponse(payload);
+      if (!parsed) throw new Error('Invalid plan preview response');
+      setPlanPreview(parsed.preview);
       setPlanPreviewSignature(currentPlanPreviewSignature);
-      setPlanApprovalSessionId(payload.preview?.missionId || null);
+      setPlanApprovalSessionId(parsed.preview.missionId);
       setPlanApprovalMessage(null);
     } catch (error) {
       setPlanPreview(null);
@@ -648,8 +676,10 @@ function ChronosMirrorV2Content() {
           requesterId: 'chronos-ui',
         }),
       });
-      const proposalPayload = await proposalResponse.json();
-      if (!proposalResponse.ok) throw new Error(proposalPayload.error || 'mission proposal failed');
+      const proposalPayload = await proposalResponse.json().catch(() => null);
+      if (!proposalResponse.ok) throw new Error('mission proposal failed');
+      const proposal = parseMissionProposalResponse(proposalPayload);
+      if (!proposal) throw new Error('Invalid mission proposal response');
 
       const confirmResponse = await fetch('/api/agent', {
         method: 'POST',
@@ -661,14 +691,12 @@ function ChronosMirrorV2Content() {
           requesterId: 'chronos-ui',
         }),
       });
-      const confirmPayload = await confirmResponse.json();
-      if (!confirmResponse.ok) throw new Error(confirmPayload.error || 'mission approval failed');
+      const confirmPayload = await confirmResponse.json().catch(() => null);
+      if (!confirmResponse.ok) throw new Error('mission approval failed');
+      const approval = parseMissionApprovalResponse(confirmPayload);
 
-      setPlanApprovalMessage(
-        confirmPayload.mission?.missionId
-          ? `Started ${confirmPayload.mission.missionId}`
-          : 'Mission started'
-      );
+      if (!approval) throw new Error('Invalid mission approval response');
+      setPlanApprovalMessage(`Started ${approval.mission.missionId}`);
       setOperatorHomeRefreshTick((value) => value + 1);
     } catch (error) {
       setPlanApprovalMessage(error instanceof Error ? error.message : String(error));
@@ -716,13 +744,15 @@ function ChronosMirrorV2Content() {
             reasonCategory: options?.reasonCategory,
           }),
         });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'deliverable review failed');
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error('deliverable review failed');
+        const parsed = parseDeliverableReviewResponse(payload);
+        if (!parsed) throw new Error('Invalid deliverable review response');
         setDeliverableReviewComment('');
         refreshDeliverables();
         setOperatorHomeRefreshTick((value) => value + 1);
-        if (payload.state?.current_artifact_id) {
-          setSelectedDeliverableId(payload.state.current_artifact_id);
+        if (parsed.state.current_artifact_id) {
+          setSelectedDeliverableId(parsed.state.current_artifact_id);
         }
       } catch (error) {
         setDeliverableReviewError(error instanceof Error ? error.message : String(error));
@@ -747,16 +777,18 @@ function ChronosMirrorV2Content() {
             tenant,
           }),
         });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'connection review failed');
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error('connection review failed');
+        const parsed = parseConnectionReviewResponse(payload);
+        if (!parsed) throw new Error('Invalid connection review response');
         setConnections((current) =>
           current.map((entry) =>
             entry.binding_id === bindingId
               ? {
                   ...entry,
-                  reviewAction: payload.review?.action,
-                  reviewNote: payload.review?.note,
-                  reviewedAt: payload.review?.reviewed_at,
+                  reviewAction: parsed.review.action,
+                  reviewNote: parsed.review.note,
+                  reviewedAt: parsed.review.reviewed_at,
                 }
               : entry
           )
@@ -1290,15 +1322,11 @@ function TenantDesignBridge({
     void fetch(`/api/tenant-design?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) return null;
-        return (await response.json()) as {
-          source?: string;
-          brand_name?: string | null;
-          css_vars?: Record<string, string>;
-        };
+        return parseTenantDesignResponse(await response.json().catch(() => null));
       })
       .then((payload) => {
         if (!payload) return;
-        onResolveRef.current(payload.css_vars || {}, payload.brand_name || payload.source || null);
+        onResolveRef.current(payload.css_vars, payload.brand_name || payload.source || null);
       })
       .catch(() => {});
     return () => controller.abort();

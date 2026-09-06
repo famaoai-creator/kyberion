@@ -1,21 +1,23 @@
+import { logger } from '@agent/core/core';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
   safeReaddir,
-  executeAdfSteps,
-  TraceContext,
-  persistTrace,
-  pathResolver,
-  getPathValue,
-  retry,
-  buildGovernedRetryOptions,
-  processUntrustedContent,
-  decideFromObservation,
-  executeLlmDecideOp,
-  getSecret,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/adf-engine';
+import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
+import { TraceContext, persistTrace } from '@agent/core/trace';
+import { pathResolver } from '@agent/core/path-resolver';
+import { getPathValue } from '@agent/core/logic-utils';
+import { retry } from '@agent/core/async-utils';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { processUntrustedContent } from '@agent/core/untrusted-content';
+import { decideFromObservation, executeLlmDecideOp } from '@agent/core/semantic-decide';
+import { getSecret } from '@agent/core/secret-guard';
+import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { opControl } from './browser-control-helpers.js';
@@ -33,7 +35,7 @@ import {
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
+  params: Record<string, unknown>;
 }
 
 export interface BrowserRuntime {
@@ -89,6 +91,20 @@ const DEFAULT_BROWSER_RETRY = {
   jitter: true,
 };
 
+const buildBrowserRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: BROWSER_MANIFEST_PATH,
+  defaults: DEFAULT_BROWSER_RETRY,
+  fallbackCategories: ['network', 'timeout', 'resource_unavailable'],
+  additionalShouldRetry: (error) =>
+    /selector|not visible|strict mode violation|detached/i.test(error.message),
+});
+
+function resolveBrowserRepositoryPath(ref: unknown, allowMissingLeaf = true): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(String(ref || '').trim()), {
+    allowMissingLeaf,
+  });
+}
+
 function buildRetryOptions(stepParams: Record<string, any>) {
   const explicitRetry =
     stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
@@ -98,14 +114,7 @@ function buildRetryOptions(stepParams: Record<string, any>) {
     explicitRetry.maxRetries = Number(stepParams.max_retries);
   if (stepParams?.retry_delay_ms !== undefined)
     explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
-  return buildGovernedRetryOptions({
-    manifestPath: BROWSER_MANIFEST_PATH,
-    defaults: DEFAULT_BROWSER_RETRY,
-    override: explicitRetry,
-    fallbackCategories: ['network', 'timeout', 'resource_unavailable'],
-    additionalShouldRetry: (error) =>
-      /selector|not visible|strict mode violation|detached/i.test(error.message),
-  });
+  return buildBrowserRetryOptions(explicitRetry);
 }
 
 export async function executePipeline(
@@ -114,19 +123,27 @@ export async function executePipeline(
   options: any,
   initialCtx: any = {}
 ) {
-  const MAX_STEPS = options.max_steps || 1000;
+  const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || 300000;
 
-  const userDataDir = pathResolver.rootResolve(
+  const userDataDir = resolveBrowserRepositoryPath(
     options.user_data_dir || path.join(BROWSER_RUNTIME_DIR, sessionId)
   );
   if (!safeExistsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
   if (!safeExistsSync(BROWSER_SESSION_DIR)) safeMkdir(BROWSER_SESSION_DIR, { recursive: true });
-  const sessionMetadataPath = path.join(BROWSER_SESSION_DIR, `${sessionId}.json`);
+  const sessionMetadataPath = assertSafeRepositoryPath(
+    path.join(BROWSER_SESSION_DIR, `${sessionId}.json`),
+    { allowMissingLeaf: true }
+  );
 
-  const tracePath = path.join(EVIDENCE_DIR, `trace_${sessionId}_${Date.now()}.zip`);
-  const videoDir = path.join(EVIDENCE_DIR, 'videos', sessionId);
-  const resolvedVideoDir = pathResolver.rootResolve(options.video_artifact_dir || videoDir);
+  const tracePath = assertSafeRepositoryPath(
+    path.join(EVIDENCE_DIR, `trace_${sessionId}_${Date.now()}.zip`),
+    { allowMissingLeaf: true }
+  );
+  const videoDir = assertSafeRepositoryPath(path.join(EVIDENCE_DIR, 'videos', sessionId), {
+    allowMissingLeaf: true,
+  });
+  const resolvedVideoDir = resolveBrowserRepositoryPath(options.video_artifact_dir || videoDir);
   if (options.record_video && !safeExistsSync(resolvedVideoDir))
     safeMkdir(resolvedVideoDir, { recursive: true });
 
@@ -165,8 +182,8 @@ export async function executePipeline(
     action_trail: Array.isArray(initialCtx?.action_trail)
       ? initialCtx.action_trail
       : browserRuntimeHelpers.loadBrowserActionTrail(sessionId),
-    action_trail_max: Math.max(1, Math.min(2000, Number(options.action_trail_max || 200))),
-    timestamp: new Date().toISOString(),
+    action_trail_max: clamp(Number(options.action_trail_max || 200), 1, 2000),
+    timestamp: nowIso(),
   };
 
   const traceCtx = new TraceContext(`browser-pipeline:${sessionId}`, {
@@ -175,20 +192,21 @@ export async function executePipeline(
   });
 
   // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
-  // (executeAdfSteps). on_error recovery is now the engine's native
+  // (runAdfActuatorPipeline). on_error recovery is now the engine's native
   // handleStepError path; spans / screenshot artifacts / action-trail events
   // are injected via engine step hooks. Two deliberate semantic changes:
   // nested control failures propagate (AR-06 no-silent-failure), and nested
   // steps (control sub-pipelines, on_error fallbacks) now emit trace spans.
   const trailDepths: number[] = [];
-  const hooks = {
-    beforeStep: (step: any, stepNumber: number, stepCtx: any) => {
+  const hooks: AdfStepHooks = {
+    beforeStep: (step, stepNumber, stepCtx) => {
       trailDepths.push(Array.isArray(stepCtx.action_trail) ? stepCtx.action_trail.length : 0);
+      const stepId = isRecord(step) && typeof step.id === 'string' ? step.id : undefined;
       traceCtx.startSpan(`${step.type}:${step.op}`, {
-        stepId: step.id || `step-${stepNumber}`,
+        stepId: stepId || `step-${stepNumber}`,
       });
     },
-    afterStep: (step: any, _stepNumber: number, stepCtx: any, outcome: any) => {
+    afterStep: (step, _stepNumber, stepCtx, outcome: AdfStepOutcome) => {
       const trailBefore = trailDepths.pop() ?? 0;
       if (outcome.status === 'failed' || outcome.status === 'recovered') {
         traceCtx.endSpan('error', outcome.error);
@@ -196,16 +214,23 @@ export async function executePipeline(
       }
 
       if (step.op === 'screenshot') {
+        const stepParams = isRecord(step.params) ? step.params : {};
+        const stepId = isRecord(step) && typeof step.id === 'string' ? step.id : 'screenshot';
         const screenshotPath =
-          stepCtx.last_screenshot || stepCtx[step.params?.export_as || 'last_screenshot'];
-        if (screenshotPath) {
-          traceCtx.addArtifact('screenshot', screenshotPath, step.id || 'screenshot');
+          stepCtx.last_screenshot ||
+          (typeof stepParams.export_as === 'string'
+            ? stepCtx[stepParams.export_as]
+            : stepCtx.last_screenshot);
+        if (typeof screenshotPath === 'string' && screenshotPath) {
+          traceCtx.addArtifact('screenshot', screenshotPath, stepId);
         }
       }
 
       // Emit each new browser action as a trace event so the trail is queryable in Chronos
-      if (Array.isArray(stepCtx.action_trail) && stepCtx.action_trail.length > trailBefore) {
-        for (const act of (stepCtx.action_trail as any[]).slice(trailBefore)) {
+      const actionTrail = Array.isArray(stepCtx.action_trail) ? stepCtx.action_trail : [];
+      if (actionTrail.length > trailBefore) {
+        for (const act of actionTrail.slice(trailBefore)) {
+          if (!isRecord(act)) continue;
           const attrs: Record<string, string | number | boolean> = {
             kind: String(act.kind || ''),
             op: String(act.op || ''),
@@ -226,13 +251,14 @@ export async function executePipeline(
     },
   };
 
-  let engineResult!: Awaited<ReturnType<typeof executeAdfSteps>>;
+  let engineResult!: Awaited<ReturnType<typeof runAdfActuatorPipeline>>;
   try {
-    engineResult = await executeAdfSteps(
-      steps as Parameters<typeof executeAdfSteps>[0],
-      ctx,
-      { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
-      {
+    engineResult = await runAdfActuatorPipeline({
+      actuatorId: 'browser',
+      steps,
+      context: ctx,
+      options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+      handlers: {
         capture: (op, params, stepCtx, resolveFn) =>
           opCapture(op, params, runtime, stepCtx, resolveFn),
         transform: (op, params, stepCtx, resolveFn) => opTransform(op, params, stepCtx, resolveFn),
@@ -240,8 +266,8 @@ export async function executePipeline(
         control: (op, params, stepCtx, runSteps, resolveFn) =>
           opControl(op, params, runtime, stepCtx, runSteps, resolveFn),
       },
-      hooks
-    );
+      hooks,
+    });
     ctx = engineResult.context;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -254,7 +280,7 @@ export async function executePipeline(
     ctx.failure_bundle_path = browserRuntimeHelpers.saveFailureBundle(sessionId, {
       schema_version: 'browser-failure-bundle.v1',
       session_id: sessionId,
-      created_at: new Date().toISOString(),
+      created_at: nowIso(),
       error: ctx.error,
       url: ctx.last_url || null,
       title: ctx.last_snapshot?.title || null,
@@ -283,7 +309,7 @@ export async function executePipeline(
       ctx.failure_bundle_path = browserRuntimeHelpers.saveFailureBundle(sessionId, {
         schema_version: 'browser-failure-bundle.v1',
         session_id: sessionId,
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
         error: ctx.error,
         url: ctx.last_url || null,
         title: ctx.last_snapshot?.title || null,
@@ -319,7 +345,7 @@ export async function executePipeline(
       active_tab_id: runtime.activeTabId,
       tab_count: runtime.tabs.size,
       tabs: ctx.browser_tabs,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
       last_trace_path: ctx.last_trace_path,
       last_video_paths: undefined,
       video_output_dir: videoRecordingEnabled ? resolvedVideoDir : undefined,
@@ -349,7 +375,7 @@ export async function executePipeline(
         active_tab_id: runtime.activeTabId,
         tab_count: runtime.tabs.size,
         tabs: ctx.browser_tabs,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso(),
         last_trace_path: ctx.last_trace_path,
         last_video_paths: finalizedVideoPaths,
         video_output_dir: videoRecordingEnabled ? resolvedVideoDir : undefined,
@@ -379,8 +405,8 @@ export async function executePipeline(
   try {
     const persistedTracePath = persistTrace(trace);
     ctx.trace_persisted_path = persistedTracePath;
-  } catch (err: any) {
-    logger.warn(`[BROWSER_PIPELINE] Failed to persist trace: ${err?.message || err}`);
+  } catch (err: unknown) {
+    logger.warn(`[BROWSER_PIPELINE] Failed to persist trace: ${errorMessage(err)}`);
   }
 
   return {
@@ -389,6 +415,10 @@ export async function executePipeline(
     context: ctx,
     total_steps: engineResult.total_steps,
   };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function opCapture(
@@ -492,7 +522,7 @@ async function opCapture(
     }
     case 'action_trail': {
       const source = browserRuntimeHelpers.readRecordedActions(ctx, params.from);
-      const trail = source.slice(-Math.max(1, Math.min(2000, Number(params.limit || 50))));
+      const trail = source.slice(-clamp(Number(params.limit || 50), 1, 2000));
       return browserRuntimeHelpers.recordBrowserAction(
         { ...ctx, last_capture: trail, [params.export_as || 'action_trail']: trail },
         { kind: 'capture', op: 'action_trail', tab_id: runtime.activeTabId }
@@ -527,7 +557,7 @@ async function opCapture(
         }
       );
     case 'screenshot': {
-      const outPath = pathResolver.rootResolve(
+      const outPath = resolveBrowserRepositoryPath(
         resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`)
       );
       logger.info(`📸 [BROWSER] Taking screenshot to: ${outPath}`);
@@ -664,7 +694,7 @@ async function opCapture(
         browserSessionId: resolve(params.browser_session_id || ctx.session_id || 'default'),
         preferPersistentContext: params.prefer_persistent_context !== false,
       });
-      const outPath = params.path ? pathResolver.rootResolve(resolve(params.path)) : undefined;
+      const outPath = params.path ? resolveBrowserRepositoryPath(resolve(params.path)) : undefined;
       if (outPath) {
         if (!safeExistsSync(path.dirname(outPath)))
           safeMkdir(path.dirname(outPath), { recursive: true });
@@ -721,7 +751,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'export_playwright': {
       const trail = browserRuntimeHelpers.readRecordedActions(ctx, params.from);
-      const outPath = pathResolver.rootResolve(
+      const outPath = resolveBrowserRepositoryPath(
         resolve(
           params.path ||
             `active/shared/tmp/browser/${ctx.session_id || 'default'}-playwright.spec.ts`
@@ -737,7 +767,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'export_adf': {
       const trail = browserRuntimeHelpers.readRecordedActions(ctx, params.from);
-      const outPath = pathResolver.rootResolve(
+      const outPath = resolveBrowserRepositoryPath(
         resolve(
           params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-pipeline.json`
         )
@@ -753,7 +783,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const bundle = {
         schema_version: 'browser-failure-bundle.v1',
         session_id: ctx.session_id || 'default',
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
         error: ctx.error || ctx.last_error || null,
         url: ctx.last_url || ctx.last_snapshot?.url || null,
         title: ctx.last_snapshot?.title || null,
@@ -1205,8 +1235,8 @@ async function opApply(
     }
     case 'scroll': {
       const delta = params.delta || {};
-      const x = Math.max(-5000, Math.min(5000, Number(params.x ?? delta.x ?? 0)));
-      const y = Math.max(-5000, Math.min(5000, Number(params.y ?? delta.y ?? 0)));
+      const x = clamp(Number(params.x ?? delta.x ?? 0), -5000, 5000);
+      const y = clamp(Number(params.y ?? delta.y ?? 0), -5000, 5000);
       await page.mouse.wheel(x, y);
       return browserRuntimeHelpers.recordBrowserAction(ctx, {
         kind: 'apply',

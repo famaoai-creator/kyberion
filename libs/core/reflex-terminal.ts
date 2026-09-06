@@ -9,6 +9,7 @@ import { ptyEngine } from './pty-engine.js';
 import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { stripAnsi } from './ansi-utils.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 
 const logger = createLogger('reflex-terminal');
 
@@ -82,7 +83,7 @@ export class ReflexTerminal {
         skill: skillName,
         status: 'success',
         data: { message: cleanText },
-        metadata: { timestamp: new Date().toISOString(), duration_ms: 0 },
+        metadata: { timestamp: nowIso(), duration_ms: 0 },
       };
       const dir = path.dirname(this.feedbackPath);
       if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });

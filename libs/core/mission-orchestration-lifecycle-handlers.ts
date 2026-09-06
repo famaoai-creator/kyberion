@@ -40,10 +40,12 @@ import { safeExec } from './secure-io.js';
 import type { PlanningPacket } from './channel-surface.js';
 import type {
   MissionControlPayload,
+  MissionWorkerRecoveryPayload,
   PlannedNextTask,
   SlackPayload,
   SurfaceControlPayload,
 } from './mission-orchestration-worker-contracts.js';
+import type { MissionDispatchOptions } from './mission-orchestration-worker-part-results.js';
 
 const MISSION_CONTROLLER_TIMEOUT_MS = 600_000;
 
@@ -63,7 +65,8 @@ export interface MissionLifecycleHandlerDeps {
   reconcileMissionProgress: (missionId: string) => void;
   dispatchMissionNextTasks: (
     missionId: string,
-    graphRunId?: string
+    graphRunId?: string,
+    options?: MissionDispatchOptions
   ) => Promise<Array<{ task_id: string; team_role: string; agent_id: string }>>;
   emitWorkerTransitionSnapshot: (missionId: string, stageKey: string, goalHint?: string) => void;
   summarizeMissionTaskOutcomes: (missionId: string) => {
@@ -557,6 +560,10 @@ export async function handleMissionControlRequested(
           next_event_id: replayPlan.next_event?.event_id,
           next_event_type: replayPlan.next_event?.event_type,
           replay_count: replayPlan.replay_count,
+          recovery_required: replayPlan.recovery_required,
+          recovery_reason: replayPlan.recovery_reason,
+          unverified_provisioned_entry_count: replayPlan.unverified_provisioned_entries.length,
+          missing_provisioned_entry_count: replayPlan.missing_provisioned_entries.length,
           recovered_task_count: recovery.reissued_count,
           waiting_task_count: recovery.waiting_count,
         });
@@ -593,6 +600,34 @@ export async function handleMissionControlRequested(
     operation,
     why: 'Event-driven mission control action executed by the orchestration worker.',
   });
+}
+
+/**
+ * Recovery ceremony owned by the mission worker, not the provider runtime
+ * supervisor. The dispatch layer selects only tasks with a persisted paused
+ * goal journal and passes the explicit resume bit to the goal driver.
+ */
+export async function handleMissionWorkerRecoveryRequested(
+  event: MissionOrchestrationEvent<MissionWorkerRecoveryPayload>,
+  deps: MissionLifecycleHandlerDeps
+): Promise<void> {
+  if (event.payload.operation !== 'resume_goal_driven') {
+    throw new Error(`Unsupported mission worker recovery operation: ${event.payload.operation}`);
+  }
+  const dispatched = await deps.dispatchMissionNextTasks(event.mission_id, event.event_id, {
+    resumeGoalDriven: true,
+  });
+  emitMissionOrchestrationObservation({
+    decision: 'mission_worker_recovery_completed',
+    event_type: event.event_type,
+    event_id: event.event_id,
+    mission_id: event.mission_id,
+    requested_by: event.requested_by,
+    recovered_task_count: dispatched.length,
+    recovered_task_ids: dispatched.map((task) => task.task_id),
+    recovery_kind: 'goal_driven_resume',
+  });
+  await shutdownAllAgentRuntimes('mission_worker_recovery');
 }
 
 export async function handleSurfaceControlRequested(

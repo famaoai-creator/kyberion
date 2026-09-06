@@ -1,7 +1,6 @@
-import type { ValidateFunction } from 'ajv';
-import { loadJson } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 export interface PipelineStepResult {
   op: string;
@@ -173,28 +172,46 @@ export interface PipelineAdf {
   schedule?: PipelineSchedule;
 }
 
-let validatePipelineFn: ValidateFunction | null = null;
+const PIPELINE_ADF_SCHEMA_PATH = pathResolver.knowledge('product/schemas/pipeline-adf.schema.json');
+const pipelineAdfCatalog = defineCatalog<PipelineAdf>({
+  id: 'pipeline-adf',
+  path: () => PIPELINE_ADF_SCHEMA_PATH,
+  schema: PIPELINE_ADF_SCHEMA_PATH,
+});
 
-function getPipelineValidator() {
-  if (validatePipelineFn) return validatePipelineFn;
+function pipelineAdfCatalogAtPath(filePath: string) {
+  return defineCatalog<PipelineAdf>({
+    id: 'pipeline-adf',
+    path: filePath,
+    schema: PIPELINE_ADF_SCHEMA_PATH,
+  });
+}
 
-  const schemaPath = pathResolver.knowledge('product/schemas/pipeline-adf.schema.json');
-  const schema = loadJson<Record<string, unknown>>(schemaPath);
-  const ajv = createAjv();
-  validatePipelineFn = ajv.compile(schema);
-  return validatePipelineFn;
+function invalidPipelineAdf(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  const details = message.replace(/^Invalid catalog pipeline-adf at [^:]+:\s*/u, '');
+  throw new Error(`Invalid pipeline ADF: ${details}`);
 }
 
 export function validatePipelineAdf(input: unknown): PipelineAdf {
-  const validate = getPipelineValidator();
-  const valid = validate(input);
-  if (!valid) {
-    const details = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`)
-      .join('; ');
-    throw new Error(`Invalid pipeline ADF: ${details}`);
+  try {
+    return pipelineAdfCatalog.validate(input, 'pipeline ADF');
+  } catch (error) {
+    return invalidPipelineAdf(error);
   }
-  return input as PipelineAdf;
+}
+
+/** Load one persisted pipeline ADF through the canonical schema boundary. */
+export function loadPipelineAdfAtPath(filePath: string): PipelineAdf {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[PIPELINE_ADF] pipeline must be a regular file: ${filePath}`);
+  }
+  try {
+    return pipelineAdfCatalogAtPath(safeFilePath).load();
+  } catch (error) {
+    return invalidPipelineAdf(error);
+  }
 }
 
 export function derivePipelineStatus(results: PipelineStepResult[]): 'succeeded' | 'failed' {

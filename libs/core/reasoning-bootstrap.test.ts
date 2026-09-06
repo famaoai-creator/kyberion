@@ -10,6 +10,7 @@ import {
   resetReasoningBootstrap,
 } from './reasoning-bootstrap.js';
 import { getVoiceBridge, resetVoiceBridge } from './voice-bridge.js';
+import { coreSeamCatalog } from './seam.js';
 
 const mockProviders = vi.hoisted(() => {
   const defaultProviders = [
@@ -450,5 +451,13 @@ describe('consultCapabilityBrokerForMode (GAP2: broker wired into reasoning sele
     // With no pin, the broker either resolves fresh-but-unpinned or fails; both
     // paths must return the original mode unchanged.
     expect(consultCapabilityBrokerForMode('claude-cli')).toBe('claude-cli');
+  });
+
+  it('publishes the policy selection path in the reasoning seam binding metadata', () => {
+    expect(installReasoningBackends({ mode: 'codex-cli', force: true })).toBe(true);
+    const binding = coreSeamCatalog.list().find((entry) => entry.key === 'reasoning-backend');
+    expect(binding?.providers).toHaveLength(1);
+    expect(binding?.providers[0]?.metadata.reason).toContain('requested mode=codex-cli');
+    expect(binding?.providers[0]?.metadata.reason).not.toContain('CODEX_CLI');
   });
 });

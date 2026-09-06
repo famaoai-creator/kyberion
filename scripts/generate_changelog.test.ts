@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { resolveChangelogPolicy } from '@agent/core';
-import { classify, parseCommit, renderSection } from './generate_changelog.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+import {
+  buildPrependedChangelog,
+  classify,
+  main,
+  parseCommit,
+  readChangelogTextFile,
+  renderSection,
+} from './generate_changelog.js';
 
 describe('generate_changelog', () => {
   it('parses conventional commits and preserves breaking markers', () => {
@@ -57,5 +66,48 @@ describe('generate_changelog', () => {
     const section = renderSection([], 'v1.0.0', 'HEAD');
     expect(section).toContain('v1.0.0');
     expect(section).toContain('HEAD');
+  });
+
+  it('preserves the Unreleased insertion contract without performing I/O', () => {
+    expect(
+      buildPrependedChangelog('# Changelog\n\n## [Unreleased]\n\n## [1.0.0]\n', '### Fixes\n')
+    ).toBe('# Changelog\n\n## [Unreleased]\n\n### Fixes\n\n\n## [1.0.0]\n');
+    expect(buildPrependedChangelog(null, '### Fixes\n')).toBe(
+      '# Changelog\n\n## [Unreleased]\n\n### Fixes\n'
+    );
+  });
+
+  it('uses the governed command boundary and returns structured report data', async () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/generate_changelog.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain("from 'node:child_process'");
+    expect(source).toContain("safeExec('git'");
+    expect(source).toContain('readTextFile');
+    expect(source).toContain('readChangelogTextFile(filePath: string)');
+    expect(source).not.toContain('safeReadFile(CHANGELOG_PATH');
+
+    process.exitCode = undefined;
+    const report = await main(['--from', 'HEAD', '--to', 'HEAD', '--json', '--quiet']);
+
+    expect(report).toMatchObject({ from: 'HEAD', to: 'HEAD', count: 0 });
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('rejects a directory before reading the changelog', () => {
+    expect(() => readChangelogTextFile(pathResolver.rootResolve('docs'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
+  it('keeps prepend read-only in dry-run mode', async () => {
+    const changelogPath = pathResolver.rootResolve('CHANGELOG.md');
+    const before = String(safeReadFile(changelogPath, { encoding: 'utf8' }));
+
+    process.exitCode = undefined;
+    await main(['--from', 'HEAD', '--to', 'HEAD', '--prepend', '--dry-run', '--quiet']);
+
+    expect(String(safeReadFile(changelogPath, { encoding: 'utf8' }))).toBe(before);
+    expect(process.exitCode).toBeUndefined();
   });
 });

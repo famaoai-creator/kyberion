@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
 export interface ServiceBootstrapCatalogEntry {
@@ -32,14 +33,12 @@ const publicCatalog = defineCatalog<ServiceBootstrapCatalog>({
   id: 'service-bootstrap-catalog.public',
   path: PUBLIC_CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: { version: '1.0.0', entries: [] },
 });
 
 const personalCatalog = defineCatalog<ServiceBootstrapCatalog>({
   id: 'service-bootstrap-catalog.personal',
   path: PERSONAL_CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: { version: '1.0.0', entries: [] },
 });
 
 function mergeCatalogs(
@@ -57,7 +56,9 @@ function mergeCatalogs(
 
 export function loadServiceBootstrapCatalog(): ServiceBootstrapCatalog {
   const base = publicCatalog.load();
-  const personal = personalCatalog.load();
+  const personal = safeExistsSync(PERSONAL_CATALOG_PATH)
+    ? personalCatalog.load()
+    : { version: base.version, entries: [] };
   return mergeCatalogs(base, {
     ...personal,
     version: personal.version || base.version,
@@ -95,9 +96,4 @@ export function getDefaultServiceIdForSurface(surface: string): string | null {
     (entry.default_for_surfaces || []).includes(normalized)
   );
   return matched?.service_id || null;
-}
-
-export function resetServiceBootstrapCatalogCache(): void {
-  publicCatalog.reset();
-  personalCatalog.reset();
 }

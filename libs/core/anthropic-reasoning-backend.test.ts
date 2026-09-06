@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   AnthropicReasoningBackend,
   deriveAnthropicCacheStats,
@@ -11,6 +13,16 @@ import { metrics } from './metrics.js';
 describe('AnthropicReasoningBackend', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it('routes SDK usage mission attribution through the governed environment accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/anthropic-reasoning-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toContain('process.env.MISSION_ID');
+    expect(source).toContain("getRegisteredEnvText('MISSION_ID')");
   });
 
   it('maps effort hints to extended-thinking budgets', async () => {

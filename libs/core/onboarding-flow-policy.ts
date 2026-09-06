@@ -44,36 +44,10 @@ export interface OnboardingFlowPolicyCatalog {
 const CATALOG_PATH = pathResolver.knowledge('product/governance/onboarding-flow-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/onboarding-flow-policy.schema.json');
 
-const FALLBACK_CATALOG: OnboardingFlowPolicyCatalog = {
-  version: '1.0.0',
-  phase_titles: {
-    identity: { en: 'Identity & Purpose', ja: 'アイデンティティと目的' },
-    services: { en: 'Infrastructure & Services', ja: 'インフラとサービス' },
-    tenants: { en: 'Multi-Tenant Registration', ja: 'マルチテナント登録' },
-    tutorial: { en: 'Hands-on Tutorial', ja: 'ハンズオン・チュートリアル' },
-    summary: { en: 'Summary', ja: 'サマリ' },
-  },
-  tutorial_plan_title: {
-    en: 'Onboarding Tutorial Plan',
-    ja: 'オンボーディング・チュートリアル計画',
-  },
-  tutorial_next_step_title: { en: 'Suggested next step', ja: '推奨される次のステップ' },
-  tutorial_skipped_message: {
-    en: 'Tutorial skipped during onboarding.',
-    ja: 'オンボーディング中にチュートリアルはスキップされました。',
-  },
-  tutorial_default_summary: {
-    en: 'Demonstrate the initial Kyberion setup with a safe dry-run.',
-    ja: '安全な dry-run で Kyberion の初期セットアップを実演します。',
-  },
-  complete_message: { en: 'Onboarding complete.', ja: 'オンボーディング完了。' },
-};
-
 const catalog = defineCatalog<OnboardingFlowPolicyCatalog>({
   id: 'onboarding-flow-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadOnboardingFlowPolicyCatalog(): OnboardingFlowPolicyCatalog {
@@ -82,8 +56,4 @@ export function loadOnboardingFlowPolicyCatalog(): OnboardingFlowPolicyCatalog {
 
 export function resolveOnboardingFlowPolicy(): OnboardingFlowPolicyCatalog {
   return loadOnboardingFlowPolicyCatalog();
-}
-
-export function resetOnboardingFlowPolicyCatalogCache(): void {
-  catalog.reset();
 }

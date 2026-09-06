@@ -1,11 +1,26 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 import {
   createAssistantCompilerRequest,
+  getAssistantCompilerRequestPath,
+  getAssistantCompilerResultPath,
   normalizeAssistantCompilerResult,
   validateAssistantCompilerRequest,
+  writeAssistantCompilerRequest,
+  writeAssistantCompilerResult,
 } from './assistant-compiler-request.js';
+import { safeReadFile } from './secure-io.js';
 
 describe('assistant compiler request', () => {
+  it('rejects request ids that could escape the governed temporary stores', () => {
+    expect(() => getAssistantCompilerRequestPath('../escape')).toThrow(
+      '[ASSISTANT_COMPILER_REQUEST_ID]'
+    );
+    expect(() => getAssistantCompilerResultPath('nested/result')).toThrow(
+      '[ASSISTANT_COMPILER_REQUEST_ID]'
+    );
+  });
+
   it('creates a raw compiler request without local contract generation', () => {
     const { request, requestPath } = createAssistantCompilerRequest({
       source: { origin: 'cli', channel: 'run_intent' },
@@ -27,6 +42,41 @@ describe('assistant compiler request', () => {
     expect(request.expected_output.write_back_path.replaceAll('\\', '/')).toContain(
       '/active/shared/tmp/assistant-compiler-results/'
     );
+  });
+
+  it('persists canonical request and result payloads inside governed stores', () => {
+    const { request, requestPath } = createAssistantCompilerRequest({
+      source: { origin: 'cli', channel: 'run_intent' },
+      sourceText: 'requirements',
+    });
+    const requestWithMetadata = {
+      ...request,
+      $schema: 'https://kyberion.local/schemas/assistant-compiler-request.schema.json',
+    } as typeof request;
+    writeAssistantCompilerRequest(requestWithMetadata);
+    expect(JSON.parse(String(safeReadFile(requestPath))).$schema).toBeUndefined();
+
+    const result = normalizeAssistantCompilerResult(request, {});
+    const resultPath = writeAssistantCompilerResult({
+      ...result,
+      $schema: 'https://kyberion.local/schemas/assistant-compiler-result.schema.json',
+    } as typeof result);
+    expect(JSON.parse(String(safeReadFile(resultPath))).$schema).toBeUndefined();
+  });
+
+  it('rejects result output paths outside the governed result store', () => {
+    const { request } = createAssistantCompilerRequest({
+      source: { origin: 'cli', channel: 'run_intent' },
+      sourceText: 'requirements',
+    });
+    const result = normalizeAssistantCompilerResult(request, {});
+
+    expect(() =>
+      writeAssistantCompilerResult(
+        result,
+        pathResolver.sharedTmp('assistant-compiler-not-results.json')
+      )
+    ).toThrow('[ASSISTANT_COMPILER_RESULT_SCOPE]');
   });
 
   it('normalizes loose sub-agent output into a governed compiler result', () => {

@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "voice-tts-config.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "defaultLanguage": { "type": "string", "minLength": 1 },
+    "languages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "voice": { "type": "string", "minLength": 1 },
+          "rate": { "type": "number", "exclusiveMinimum": 0 },
+          "requestIdToken": { "type": "string" },
+          "urlToken": { "type": "string" }
+        },
+        "required": ["voice", "rate"]
+      }
+    }
+  }
+}

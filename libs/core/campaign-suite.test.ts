@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildCampaignPlan, type CampaignBrief } from './campaign-suite.js';
+import {
+  buildCampaignPlan,
+  type CampaignBrief,
+  validateCampaignManifest,
+} from './campaign-suite.js';
 
 function brief(title: string): CampaignBrief {
   return {
@@ -33,6 +37,16 @@ describe('buildCampaignPlan output paths (IP-09: canonical slugify)', () => {
     const deck = plan.entries.find((e) => e.kind === 'deck')!;
     expect((deck.action_input.steps as any[])[0].params.path).toBe(
       'active/shared/tmp/campaign-suite-test/deck/campaign.pptx'
+    );
+  });
+
+  it('rejects unknown persisted campaign manifest fields', () => {
+    const manifest = buildCampaignPlan(brief('Governed manifest'), {
+      outputRoot: 'active/shared/tmp/campaign-suite-test',
+    }).manifest;
+
+    expect(() => validateCampaignManifest({ ...manifest, unexpected: true })).toThrow(
+      'Invalid catalog campaign-manifest'
     );
   });
 });

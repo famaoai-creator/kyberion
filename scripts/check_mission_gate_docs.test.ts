@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   collectMissionGateDocViolations,
   collectMissionGateDocumentPaths,
@@ -6,6 +7,16 @@ import {
 } from './check_mission_gate_docs.js';
 
 describe('check_mission_gate_docs', () => {
+  it('uses the foundation text reader for mission-gate documents', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_mission_gate_docs.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   it('accepts current operator-facing guidance', () => {
     expect(
       collectMissionGateDocViolations({
@@ -27,7 +38,7 @@ describe('check_mission_gate_docs', () => {
     const paths = collectMissionGateDocumentPaths();
     expect(paths).toContain('docs/INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md');
     expect(paths).toContain(
-      'docs/developer/improvement-plans-2026-08/CLOUDFLARE_OS_ADOPTION_PLAN_2026-08-09.ja.md'
+      'docs/developer/improvement-plans-archive/2026-08/CLOUDFLARE_OS_ADOPTION_PLAN_2026-08-09.ja.md'
     );
     expect(paths).not.toContain(
       'docs/developer/improvement-plans-archive/2026-08/MISSION_GATE_COHERENCE_PLAN_2026-08-10.ja.md'

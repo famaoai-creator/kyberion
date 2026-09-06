@@ -1,4 +1,4 @@
-import type { CloudflareOsSurfaceSnapshot } from '@agent/core';
+import type { CloudflareOsSurfaceSnapshot } from '@agent/core/cloudflare-os-surface';
 import type { CSSProperties } from 'react';
 
 export default function OsControlPlanePanel({

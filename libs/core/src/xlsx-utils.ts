@@ -1,6 +1,7 @@
 import * as path from 'path';
 import JSZip from 'jszip';
 import { safeReadFile } from '../secure-io.js';
+import { nowIso } from '../foundation/time.js';
 import {
   XlsxDesignProtocol, XlsxWorksheet, XlsxRow, XlsxCell, XlsxColumn,
   XlsxFont, XlsxFill, XlsxBorder, XlsxBorderEdge,
@@ -948,7 +949,7 @@ export async function distillXlsxDesign(filePath: string): Promise<XlsxDesignPro
 
   return {
     version: '1.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     theme,
     styles,
     sharedStrings,

@@ -42,15 +42,7 @@
     },
     "identity": {
       "type": "object",
-      "required": [
-        "name",
-        "language",
-        "interaction_style",
-        "primary_domain",
-        "vision",
-        "agent_id",
-        "persona"
-      ],
+      "required": ["name", "language", "interaction_style", "primary_domain", "vision", "agent_id"],
       "properties": {
         "name": { "type": "string" },
         "language": { "type": "string" },

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
@@ -11,11 +12,12 @@ import {
   resetReasoningBackend,
   stubReasoningBackend,
 } from './reasoning-backend.js';
-import { resetVoiceEngineRegistryCache } from './voice-engine-registry.js';
+import { _resetVoiceEngineRegistryCacheForTests } from './voice-engine-registry.js';
 import { resetVoiceProfileRegistryCache } from './voice-profile-registry.js';
 import {
   ensureRealtimeVoiceConversationSession,
   buildRealtimeVoiceGenerationPayload,
+  loadRealtimeVoiceConversationSessionAtPath,
   normalizeRealtimeVoiceReply,
   runRealtimeVoiceConversationTurn,
   streamRealtimeAssistantReply,
@@ -35,7 +37,7 @@ describe('realtime voice conversation', () => {
     delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH;
     delete process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH;
     resetVoiceProfileRegistryCache();
-    resetVoiceEngineRegistryCache();
+    _resetVoiceEngineRegistryCacheForTests();
     resetSpeechToTextBridge();
     resetReasoningBackend();
   });
@@ -95,6 +97,55 @@ describe('realtime voice conversation', () => {
 
     expect(generated.payload.delivery).toMatchObject({ format: 'wav' });
     expect(generated.artifactPath).toMatch(/\.wav$/u);
+  });
+
+  it('rejects traversal-shaped session ids and request tags before artifact generation', () => {
+    expect(() =>
+      buildRealtimeVoiceGenerationPayload({
+        sessionId: '../outside',
+        profileId: 'unused',
+        language: 'ja',
+        text: 'こんにちは。',
+        deliveryMode: 'artifact',
+        personalVoiceMode: 'allow_fallback',
+      })
+    ).toThrow(/single path segment/u);
+
+    expect(() =>
+      buildRealtimeVoiceGenerationPayload({
+        sessionId: 'rtc-safe',
+        requestTag: '../outside',
+        profileId: 'unused',
+        language: 'ja',
+        text: 'こんにちは。',
+        deliveryMode: 'artifact',
+        personalVoiceMode: 'allow_fallback',
+      })
+    ).toThrow(/requestTag must be a single path segment/u);
+  });
+
+  it('rejects schema-invalid and filename-mismatched persisted sessions', () => {
+    const sessionDir = pathResolver.shared('runtime/realtime-voice-conversations');
+    safeMkdir(sessionDir, { recursive: true });
+    const filePath = path.join(sessionDir, 'rtc-scope.json');
+    const session = {
+      session_id: 'rtc-scope',
+      created_at: '2026-07-11T12:00:00.000Z',
+      updated_at: '2026-07-11T12:00:00.000Z',
+      assistant_name: 'Kyberion',
+      profile_id: 'me-ja',
+      language: 'ja',
+      transcript: [],
+    };
+    safeWriteFile(filePath, JSON.stringify({ ...session, session_id: 'rtc-other' }));
+    expect(() => loadRealtimeVoiceConversationSessionAtPath(filePath, 'rtc-scope')).toThrow(
+      '[REALTIME_VOICE_SESSION_SCOPE_MISMATCH]'
+    );
+
+    safeWriteFile(filePath, JSON.stringify({ ...session, transcript: null }));
+    expect(() => loadRealtimeVoiceConversationSessionAtPath(filePath, 'rtc-scope')).toThrow(
+      /Invalid catalog realtime-voice-conversation-session/
+    );
   });
 
   it('creates a session and runs a turn using active personal voice profile', async () => {

@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cowork-sync-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "cowork_to_kyberion", "kyberion_to_cowork", "conflict_resolution"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "cowork_to_kyberion": { "$ref": "#/$defs/ingestPolicy" },
+    "kyberion_to_cowork": { "$ref": "#/$defs/supplyPolicy" },
+    "conflict_resolution": { "$ref": "#/$defs/conflictResolution" }
+  },
+  "$defs": {
+    "kindRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern", "proposed_kind"],
+      "properties": {
+        "comment": { "type": "string" },
+        "pattern": { "type": "string", "minLength": 1 },
+        "proposed_kind": {
+          "type": "string",
+          "enum": [
+            "sop",
+            "template",
+            "heuristic",
+            "risk_rule",
+            "clarification_prompt",
+            "archive_advisory"
+          ]
+        }
+      }
+    },
+    "tierRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_path_pattern", "assigned_tier", "ratification_required"],
+      "properties": {
+        "comment": { "type": "string" },
+        "source_path_pattern": { "type": "string", "minLength": 1 },
+        "assigned_tier": { "type": "string", "enum": ["public", "confidential", "personal"] },
+        "ratification_required": { "type": "boolean" }
+      }
+    },
+    "ingestPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_sensitivity_tier",
+        "default_ratification_required",
+        "kind_inference",
+        "tier_assignment"
+      ],
+      "properties": {
+        "description": { "type": "string" },
+        "default_sensitivity_tier": {
+          "type": "string",
+          "enum": ["public", "confidential", "personal"]
+        },
+        "default_ratification_required": { "type": "boolean" },
+        "source_type": { "type": "string", "enum": ["artifact"] },
+        "kind_inference": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/kindRule" }
+        },
+        "tier_assignment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rules", "default"],
+          "properties": {
+            "rules": { "type": "array", "items": { "$ref": "#/$defs/tierRule" } },
+            "default": { "type": "string", "enum": ["public", "confidential", "personal"] }
+          }
+        },
+        "leakage_prevention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["block_promotion_if_evidence_refs_contain"],
+          "properties": {
+            "block_promotion_if_evidence_refs_contain": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "comment": { "type": "string" }
+          }
+        },
+        "idempotency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["strategy"],
+          "properties": {
+            "strategy": { "type": "string", "minLength": 1 },
+            "comment": { "type": "string" }
+          }
+        }
+      }
+    },
+    "supplyPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_tiers", "domains", "delivery"],
+      "properties": {
+        "description": { "type": "string" },
+        "allowed_tiers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "enum": ["public", "confidential", "personal"] }
+        },
+        "comment": { "type": "string" },
+        "domains": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "delivery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["channel", "format", "max_hints_per_sync", "idempotency"],
+          "properties": {
+            "channel": { "type": "string", "minLength": 1 },
+            "format": { "type": "string", "minLength": 1 },
+            "max_hints_per_sync": { "type": "integer", "minimum": 1 },
+            "idempotency": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["strategy", "state_file"],
+              "properties": {
+                "strategy": { "type": "string", "minLength": 1 },
+                "state_file": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "feedback_loop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["description", "source_path", "enabled"],
+          "properties": {
+            "description": { "type": "string" },
+            "source_path": { "type": "string", "minLength": 1 },
+            "enabled": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "conflictResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "overwrite_requires_approval"],
+      "properties": {
+        "strategy": { "type": "string", "minLength": 1 },
+        "overwrite_requires_approval": { "type": "boolean" },
+        "comment": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,7 +1,8 @@
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -64,43 +65,60 @@ describe('organization discovery report schemas', () => {
     addFormats(ajv);
 
     const organizationProfileSchema = readSchema('organization-profile.schema.json');
-    ajv.addSchema(organizationProfileSchema, 'https://kyberion.local/schemas/organization-profile.schema.json');
+    ajv.addSchema(
+      organizationProfileSchema,
+      'https://kyberion.local/schemas/organization-profile.schema.json'
+    );
 
     const organizationProfileReportSchema = readSchema('organization-profile-report.schema.json');
     const organizationProfileExample = JSON.parse(
       safeReadFile(
         pathResolver.knowledge('product/schemas/organization-profile-report.example.json'),
-        { encoding: 'utf8' },
-      ) as string,
+        { encoding: 'utf8' }
+      ) as string
     );
-    expect(ajv.validate(organizationProfileReportSchema, organizationProfileExample), JSON.stringify(ajv.errors || [])).toBe(true);
+    expect(
+      ajv.validate(organizationProfileReportSchema, organizationProfileExample),
+      JSON.stringify(ajv.errors || [])
+    ).toBe(true);
 
     const organizationProfilesReportSchema = readSchema('organization-profiles-report.schema.json');
     const organizationProfilesExample = JSON.parse(
       safeReadFile(
         pathResolver.knowledge('product/schemas/organization-profiles-report.example.json'),
-        { encoding: 'utf8' },
-      ) as string,
+        { encoding: 'utf8' }
+      ) as string
     );
-    expect(ajv.validate(organizationProfilesReportSchema, organizationProfilesExample), JSON.stringify(ajv.errors || [])).toBe(true);
+    expect(
+      ajv.validate(organizationProfilesReportSchema, organizationProfilesExample),
+      JSON.stringify(ajv.errors || [])
+    ).toBe(true);
 
     const organizationCatalogReportSchema = readSchema('organization-catalog-report.schema.json');
     const organizationCatalogExample = JSON.parse(
       safeReadFile(
         pathResolver.knowledge('product/schemas/organization-catalog-report.example.json'),
-        { encoding: 'utf8' },
-      ) as string,
+        { encoding: 'utf8' }
+      ) as string
     );
-    expect(ajv.validate(organizationCatalogReportSchema, organizationCatalogExample), JSON.stringify(ajv.errors || [])).toBe(true);
+    expect(
+      ajv.validate(organizationCatalogReportSchema, organizationCatalogExample),
+      JSON.stringify(ajv.errors || [])
+    ).toBe(true);
 
-    const organizationDiscoveryReportSchema = readSchema('organization-discovery-report.schema.json');
+    const organizationDiscoveryReportSchema = readSchema(
+      'organization-discovery-report.schema.json'
+    );
     const organizationDiscoveryExample = JSON.parse(
       safeReadFile(
         pathResolver.knowledge('product/schemas/organization-discovery-report.example.json'),
-        { encoding: 'utf8' },
-      ) as string,
+        { encoding: 'utf8' }
+      ) as string
     );
     expect(organizationDiscoveryExample.examples).toHaveLength(4);
-    expect(ajv.validate(organizationDiscoveryReportSchema, organizationDiscoveryExample), JSON.stringify(ajv.errors || [])).toBe(true);
+    expect(
+      ajv.validate(organizationDiscoveryReportSchema, organizationDiscoveryExample),
+      JSON.stringify(ajv.errors || [])
+    ).toBe(true);
   });
 });

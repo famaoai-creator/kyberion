@@ -9,7 +9,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   EXCEPTIONS_RELATIVE_PATH,
@@ -83,7 +83,7 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
   function seedExceptions(exceptions: Array<{ slug: string; reason: string }>): void {
     const file = path.join(fixtureRoot, EXCEPTIONS_RELATIVE_PATH);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ exceptions }));
+    fs.writeFileSync(file, JSON.stringify({ _meta: 'test fixture', exceptions }));
   }
 
   const options = () => ({ rootDir: fixtureRoot, env: EMPTY_ENV });
@@ -116,6 +116,20 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     expect(output).toContain('[check:tenant-registry] OK');
   });
 
+  it('does not follow a symlinked customer stance directory', () => {
+    seedProfile('acme-corp');
+    const customerBase = path.join(fixtureRoot, 'customer');
+    const outside = path.join(fixtureRoot, 'outside-customer');
+    fs.mkdirSync(path.join(outside, 'tenants'), { recursive: true });
+    fs.writeFileSync(path.join(outside, 'tenants', 'ghost-co.json'), '{}');
+    fs.mkdirSync(customerBase, { recursive: true });
+    fs.symlinkSync(outside, path.join(customerBase, 'linked-customer'), 'dir');
+
+    const systems = collectTenantSystems(options());
+
+    expect(systems.customerTenantProfiles).toEqual([]);
+  });
+
   it('flags a customer tenant profile facet with no tenant profile as drift', () => {
     seedProfile('acme-corp');
     seedCustomerTenantProfile('acme-corp', 'ghost-co');
@@ -132,6 +146,28 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     const { exitCode, output } = runCheck(options());
     expect(exitCode).toBe(1);
     expect(output).toContain("'ghost-co' is known to confidential index but has no tenant profile");
+  });
+
+  it('fails closed when the confidential index violates its governed schema', () => {
+    seedProfile('acme-corp');
+    const indexPath = path.join(fixtureRoot, 'knowledge', 'confidential', 'tenants', 'index.json');
+    fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+    fs.writeFileSync(
+      indexPath,
+      JSON.stringify({
+        tenants: [
+          {
+            id: 'acme-corp',
+            override_path: 'knowledge/confidential/acme-corp/design/tenant-override.json',
+            unexpected: true,
+          },
+        ],
+      })
+    );
+
+    expect(() => collectTenantSystems(options())).toThrow(
+      'Invalid catalog tenant-design-override-index'
+    );
   });
 
   it('flags an invalid slug (e.g. _template) without an exception as drift', () => {
@@ -155,12 +191,12 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     expect(exitCode).toBe(0);
   });
 
-  it('rejects exceptions without a reason', () => {
+  it('rejects schema-invalid exceptions without a reason', () => {
     seedCustomerTenantProfile('acme-corp', 'ghost-co');
     seedExceptions([{ slug: 'ghost-co', reason: '' }]);
     const { exitCode, output } = runCheck(options());
     expect(exitCode).toBe(1);
-    expect(output).toContain("'ghost-co' has no reason");
+    expect(output).toContain('Invalid catalog tenant-registry-exceptions');
   });
 
   it('rejects duplicate exception entries', () => {

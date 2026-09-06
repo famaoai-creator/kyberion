@@ -1,4 +1,10 @@
-import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 
 const MAX_TAIL_BYTES = 2 * 1024 * 1024;
 
@@ -9,12 +15,13 @@ const MAX_TAIL_BYTES = 2 * 1024 * 1024;
  */
 export function tailLines(filePath: string, maxLines: number): string[] {
   try {
-    if (!safeExistsSync(filePath)) return [];
-    const stat = safeStat(filePath);
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
+    const stat = safeLstat(safePath);
     if (stat.size > MAX_TAIL_BYTES) {
       return [`[tail skipped: ${Math.round(stat.size / 1024 / 1024)}MB > cap]`];
     }
-    const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    const content = safeReadFile(safePath, { encoding: 'utf8' }) as string;
     const lines = content.split('\n').filter((line) => line.trim().length > 0);
     return lines.slice(-maxLines);
   } catch {
@@ -22,11 +29,14 @@ export function tailLines(filePath: string, maxLines: number): string[] {
   }
 }
 
-export function tailJsonl<T>(filePath: string, maxLines: number): T[] {
+export type JsonlParser<T> = (value: unknown) => T | null;
+
+export function tailJsonl<T>(filePath: string, maxLines: number, parse: JsonlParser<T>): T[] {
   const parsed: T[] = [];
   for (const line of tailLines(filePath, maxLines)) {
     try {
-      parsed.push(JSON.parse(line) as T);
+      const value = parse(parseSafeJsonInput(line, 'terminal HUD JSONL entry'));
+      if (value !== null) parsed.push(value);
     } catch {
       // skip malformed lines; append-only JSONL may have a partial last line
     }

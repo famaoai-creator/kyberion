@@ -5,9 +5,14 @@ import { listArtifactRecords } from './artifact-record.js';
 import { buildNextAction, type NextAction } from './next-action.js';
 import { listInboxEntries, type DeliverableInboxEntry } from './deliverable-inbox.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadSoftwareQualityReportAtPath } from './software-quality-report-reader.js';
 import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 import { buildNhiLedgerReport } from './nhi-lifecycle-governance.js';
+import { loadMissionManagementConfig } from './mission-management-config.js';
+import { nowIso } from './foundation/time.js';
+import { t } from './t.js';
 
 export interface OperatorHomeMissionItem {
   missionId: string;
@@ -178,53 +183,50 @@ function collectNhiLedgerSummary(): OperatorHomeNhiLedgerSummary | undefined {
 }
 
 function collectQualitySummary(): OperatorHomeQualitySummary | undefined {
-  const reportPath = pathResolver.shared('runtime/qa/latest-quality-report.json');
+  let reportPath: string;
+  try {
+    reportPath = assertSafeRepositoryPath(
+      pathResolver.shared('runtime/qa/latest-quality-report.json'),
+      { allowMissingLeaf: true }
+    );
+  } catch {
+    return undefined;
+  }
   if (!safeExistsSync(reportPath)) return undefined;
   try {
-    const report = loadJson<{
-      report_id?: string;
-      project_id?: string;
-      subject_ref?: string;
-      recommendation?: OperatorHomeQualitySummary['recommendation'];
-      human_decision?: OperatorHomeQualitySummary['humanDecision'];
-      accountable_human_id?: string;
-      generated_at?: string;
-      residual_risks?: string[];
-      evidence_refs?: string[];
-    }>(reportPath);
-    if (!report.report_id || !report.recommendation || !report.accountable_human_id)
-      return undefined;
+    const report = loadSoftwareQualityReportAtPath(reportPath);
     return {
       reportId: report.report_id,
-      projectId: report.project_id ?? '',
-      subjectRef: report.subject_ref ?? '',
+      projectId: report.project_id,
+      subjectRef: report.subject_ref,
       recommendation: report.recommendation,
-      humanDecision: report.human_decision ?? 'pending',
+      humanDecision: report.human_decision,
       accountableHumanId: report.accountable_human_id,
-      generatedAt: report.generated_at ?? '',
-      residualRisks: report.residual_risks ?? [],
-      evidenceRefs: report.evidence_refs ?? [],
+      generatedAt: report.generated_at,
+      residualRisks: report.residual_risks,
+      evidenceRefs: report.evidence_refs,
     };
   } catch {
     return undefined;
   }
 }
 
+function safeOptionalRepositoryPath(filePath: string): string | undefined {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return undefined;
+  }
+}
+
 function readMissionManagementDirs(): string[] {
-  const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
-  if (safeExistsSync(configPath)) {
-    try {
-      const raw = loadJson<{
-        directories?: Record<string, string>;
-      }>(configPath);
-      const dirs = raw.directories || {};
-      return ['personal', 'confidential', 'public']
-        .map((tier) => dirs[tier])
-        .filter((value): value is string => Boolean(value))
-        .map((value) => pathResolver.rootResolve(value));
-    } catch {
-      // fall back to defaults
-    }
+  const config = loadMissionManagementConfig();
+  if (config) {
+    return ['personal', 'confidential', 'public']
+      .map((tier) => config.directories[tier])
+      .filter((value): value is string => Boolean(value))
+      .map((value) => safeOptionalRepositoryPath(pathResolver.rootResolve(value)))
+      .filter((value): value is string => Boolean(value));
   }
 
   return [
@@ -232,7 +234,9 @@ function readMissionManagementDirs(): string[] {
     pathResolver.active('missions/confidential'),
     pathResolver.knowledge('personal/missions'),
     pathResolver.active('archive/missions'),
-  ];
+  ]
+    .map(safeOptionalRepositoryPath)
+    .filter((value): value is string => Boolean(value));
 }
 
 function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMissionItem[] {
@@ -242,30 +246,12 @@ function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMiss
     if (!safeExistsSync(root)) continue;
     try {
       for (const entry of safeReaddir(root)) {
-        const statePath = path.join(root, entry, 'mission-state.json');
+        const statePath = safeOptionalRepositoryPath(path.join(root, entry, 'mission-state.json'));
+        if (!statePath) continue;
         if (!safeExistsSync(statePath)) continue;
         try {
-          const state = loadJson<{
-            mission_id: string;
-            status: string;
-            tier: 'personal' | 'confidential' | 'public';
-            mission_type?: string;
-            tenant_id?: string;
-            tenant_slug?: string;
-            organization_id?: string;
-            project_id?: string;
-            assigned_persona?: string;
-            relationships?: {
-              organization?: { organization_id?: string };
-              project?: { project_id?: string };
-              track?: { track_id?: string; track_name?: string };
-            };
-            history?: Array<{ ts: string; event: string }>;
-            intent?: {
-              goal_summary?: string;
-              success_condition?: string;
-            };
-          }>(statePath);
+          const state = loadMissionStateAtPath(statePath) as
+            (ReturnType<typeof loadMissionStateAtPath> & { project_id?: string }) | null;
           if (!state?.mission_id) continue;
           const organizationId =
             state.organization_id || state.relationships?.organization?.organization_id;
@@ -444,7 +430,7 @@ function collectActionQueue(
       missionId: mission.missionId,
       status: mission.status,
       priority: 100,
-      nextAction: 'Inspect and recover the mission',
+      nextAction: t('operator_home:queue.recover_mission'),
     });
   }
   for (const approval of approvals) {
@@ -455,7 +441,7 @@ function collectActionQueue(
       missionId: approval.requestedByContext?.missionId,
       status: approval.status,
       priority: approval.severity === 'high' ? 95 : 80,
-      nextAction: 'Review and decide',
+      nextAction: t('operator_home:queue.review_decide'),
     });
   }
   for (const entry of inboxEntries.filter(
@@ -469,7 +455,9 @@ function collectActionQueue(
       status: entry.status,
       priority: entry.status === 'changes_requested' ? 85 : 60,
       nextAction:
-        entry.status === 'changes_requested' ? 'Review requested changes' : 'Review deliverable',
+        entry.status === 'changes_requested'
+          ? t('operator_home:queue.review_changes')
+          : t('operator_home:queue.review_deliverable'),
     });
   }
   return items.sort(
@@ -557,56 +545,65 @@ export function collectOperatorHomeSummary(
       : pendingApprovals.length > 0 || unreadInbox > 0 || pendingQualityDecisions > 0
         ? 'attention'
         : 'ready';
-  const statusLabel =
-    status === 'blocked' ? 'blocked' : status === 'attention' ? 'attention required' : 'ready';
+  const statusLabel = t(`operator_home:status.${status}`);
   const statusDetail =
     status === 'blocked'
-      ? `${blockedMissions.length} mission(s) are paused or failed.`
+      ? t('operator_home:status_detail.blocked', { count: blockedMissions.length })
       : status === 'attention'
-        ? `${pendingApprovals.length} approval(s), ${unreadInbox} inbox item(s), and ${pendingQualityDecisions} quality decision(s) need attention.`
-        : 'No blocking issues detected.';
+        ? t('operator_home:status_detail.attention', {
+            approvals: pendingApprovals.length,
+            inbox: unreadInbox,
+            quality: pendingQualityDecisions,
+          })
+        : t('operator_home:status_detail.ready');
 
   const nextAction =
     blockedMissions.length > 0
       ? buildNextAction({
-          title: 'Inspect blocked missions',
-          next_action_key: 'chronos:chronos_home_action_blocked',
-          reason: `${blockedMissions.length} mission(s) need recovery before the surface should be treated as clear.`,
+          title: t('operator_home:next_action.inspect_blocked'),
+          next_action_key: 'operator_home:next_action.inspect_blocked',
+          reason: t('operator_home:next_action_reason.blocked', { count: blockedMissions.length }),
           next_action_type: 'inspect_artifact',
           suggested_command: 'pnpm mission list --active',
         })
       : pendingApprovals.length > 0
         ? buildNextAction({
-            title: 'Review the approval queue',
-            next_action_key: 'chronos:chronos_home_action_approvals',
-            reason: `${pendingApprovals.length} approval request(s) are waiting for operator review.`,
+            title: t('operator_home:next_action.review_approvals'),
+            next_action_key: 'operator_home:next_action.review_approvals',
+            reason: t('operator_home:next_action_reason.approvals', {
+              count: pendingApprovals.length,
+            }),
             next_action_type: 'run_command',
             suggested_command: 'pnpm kyberion approvals',
           })
         : pendingQualityDecisions > 0
           ? buildNextAction({
-              title: 'Review the software quality recommendation',
-              reason: `${qualitySummary?.recommendation ?? 'unknown'} is awaiting the accountable human decision.`,
+              title: t('operator_home:next_action.review_quality'),
+              next_action_key: 'operator_home:next_action.review_quality',
+              reason: t('operator_home:next_action_reason.quality', {
+                recommendation: qualitySummary?.recommendation ?? 'unknown',
+              }),
               next_action_type: 'inspect_artifact',
               suggested_command: 'pnpm quality:report -- --help',
             })
           : unreadInbox > 0
             ? buildNextAction({
-                title: 'Acknowledge new deliverables',
-                next_action_key: 'chronos:chronos_home_action_inbox',
-                reason: `${unreadInbox} inbox item(s) were delivered and are still unread.`,
+                title: t('operator_home:next_action.acknowledge_inbox'),
+                next_action_key: 'operator_home:next_action.acknowledge_inbox',
+                reason: t('operator_home:next_action_reason.inbox', { count: unreadInbox }),
                 next_action_type: 'inspect_artifact',
                 suggested_command: 'pnpm kyberion inbox',
               })
             : buildNextAction({
-                title: 'Keep monitoring the surface',
-                reason: 'No immediate operator action is pending.',
+                title: t('operator_home:next_action.monitor'),
+                next_action_key: 'operator_home:next_action.monitor',
+                reason: t('operator_home:next_action_reason.monitor'),
                 next_action_type: 'open_docs',
                 suggested_command: 'pnpm doctor',
               });
 
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     status,
     statusLabel,
     statusDetail,

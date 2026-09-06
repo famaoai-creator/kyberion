@@ -1,8 +1,8 @@
-import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
   createDistillCandidateRecord,
   listDistillCandidateRecords,
@@ -199,36 +199,29 @@ export function parseExecutionFeedbackText(text: string): ExecutionFeedbackInput
   };
 }
 
-let validateFn: ValidateFunction | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(FEEDBACK_SCHEMA_PATH);
-  return validateFn;
-}
-
 function defaultStore(): ExecutionFeedbackStore {
   return { version: '1.0.0', entries: [] };
 }
 
+const executionFeedbackCatalog: GovernedCatalog<ExecutionFeedbackStore> = defineCatalog({
+  id: 'execution-feedback',
+  path: FEEDBACK_STORE_PATH,
+  schema: FEEDBACK_SCHEMA_PATH,
+});
+
 function validateStore(store: unknown): ExecutionFeedbackStore {
-  const validate = ensureValidator();
-  if (!validate(store)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid execution feedback store: ${errors}`);
+  try {
+    return executionFeedbackCatalog.validate(store, FEEDBACK_STORE_PATH);
+  } catch (error) {
+    throw new Error(
+      `Invalid execution feedback store: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
-  return store as ExecutionFeedbackStore;
 }
 
 function loadStoreFromDisk(): ExecutionFeedbackStore {
   if (!safeExistsSync(FEEDBACK_STORE_PATH)) return defaultStore();
-  try {
-    return validateStore(loadJson(FEEDBACK_STORE_PATH));
-  } catch {
-    return defaultStore();
-  }
+  return executionFeedbackCatalog.load();
 }
 
 function normalizeFeedbackText(value: string | undefined): string | undefined {
@@ -254,7 +247,7 @@ export function recordExecutionFeedback(input: ExecutionFeedbackInput): Executio
     intent_id: input.intent_id.trim(),
     outcome: input.outcome,
     source: input.source || 'user',
-    recorded_at: new Date().toISOString(),
+    recorded_at: nowIso(),
     ...(input.correlation_id?.trim() ? { correlation_id: input.correlation_id.trim() } : {}),
     ...(input.surface?.trim() ? { surface: input.surface.trim() } : {}),
     ...(normalizeFeedbackText(input.comment)
@@ -342,15 +335,12 @@ export function validateExecutionFeedback(value: unknown): {
   errors: string[];
   value?: ExecutionFeedbackStore;
 } {
-  const validate = ensureValidator();
-  const valid = Boolean(validate(value));
-  return {
-    valid,
-    errors: valid
-      ? []
-      : (validate.errors || []).map(
-          (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
-        ),
-    value: valid ? (value as ExecutionFeedbackStore) : undefined,
-  };
+  try {
+    return { valid: true, errors: [], value: executionFeedbackCatalog.validate(value) };
+  } catch (error) {
+    return {
+      valid: false,
+      errors: [error instanceof Error ? error.message : String(error)],
+    };
+  }
 }

@@ -14,6 +14,8 @@ const RUNTIME_MODEL_ENV_OVERRIDES: Readonly<Record<RuntimeModelRole, readonly st
   'openai-vision': ['KYBERION_OPENAI_VISION_MODEL', 'KYBERION_OPENAI_MODEL'],
   'codex-default': ['KYBERION_CODEX_MODEL'],
   'copilot-default': ['KYBERION_COPILOT_MODEL'],
+  'cursor-default': ['KYBERION_CURSOR_CLI_MODEL'],
+  'opencode-default': ['KYBERION_OPENCODE_CLI_MODEL'],
 };
 
 export function resolveRuntimeModelId(

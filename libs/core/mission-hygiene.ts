@@ -1,7 +1,14 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
+import { loadStateAtPath } from './mission-state.js';
+import type { MissionState } from './mission-types.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import {
+  loadMissionNextTaskRecordsAtPath,
+  type MissionNextTaskRecord,
+} from './mission-next-task-reader.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { notifyOperator } from './operator-notifications.js';
 import { loadOrganizationProfile } from './organization-profile.js';
@@ -53,13 +60,27 @@ export interface MissionHygieneReport {
   thresholds: { stale_days: number; abandoned_days: number };
 }
 
-function readJson<T>(filePath: string): T | null {
+function readMissionTaskRecords(filePath: string): MissionNextTaskRecord[] {
   try {
-    if (!safeExistsSync(filePath)) return null;
-    return loadJson<T>(filePath);
+    const safePath = safeMissionPath(filePath);
+    if (!safePath || !safeExistsSync(safePath)) return [];
+    return loadMissionNextTaskRecordsAtPath(safePath, path.basename(path.dirname(safePath))) || [];
+  } catch {
+    return [];
+  }
+}
+
+function safeMissionPath(filePath: string): string | null {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   } catch {
     return null;
   }
+}
+
+function safePathExists(filePath: string): boolean {
+  const safePath = safeMissionPath(filePath);
+  return safePath !== null && safeExistsSync(safePath);
 }
 
 function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
@@ -71,17 +92,21 @@ function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
   ];
   const found: Array<{ missionPath: string; tier: string }> = [];
   for (const root of roots) {
-    if (!safeExistsSync(root.dir)) continue;
+    const safeRoot = safeMissionPath(root.dir);
+    if (!safeRoot || !safeExistsSync(safeRoot)) continue;
     let entries: string[] = [];
     try {
-      entries = safeReaddir(root.dir);
+      entries = safeReaddir(safeRoot);
     } catch {
       continue;
     }
     for (const entry of entries) {
       if (['public', 'confidential', 'personal', 'ephemeral'].includes(entry)) continue;
-      const missionPath = path.join(root.dir, entry);
-      if (safeExistsSync(path.join(missionPath, 'mission-state.json'))) {
+      const missionPath = safeMissionPath(path.join(safeRoot, entry));
+      const statePath = missionPath
+        ? safeMissionPath(path.join(missionPath, 'mission-state.json'))
+        : null;
+      if (missionPath && statePath && safeExistsSync(statePath)) {
         found.push({ missionPath, tier: root.tier });
       }
     }
@@ -97,11 +122,9 @@ function missionAgeDays(history: Array<{ ts?: string }> | undefined): number | n
   return Math.floor((Date.now() - created) / (24 * 60 * 60 * 1000));
 }
 
-function scopedMissionFields(state: {
-  organization_id?: unknown;
-  tenant_slug?: unknown;
-  context?: unknown;
-}): Pick<PlannedMissionFinding, 'organization_id' | 'tenant_slug'> {
+function scopedMissionFields(
+  state: Pick<MissionState, 'organization_id' | 'tenant_slug' | 'context'>
+): Pick<PlannedMissionFinding, 'organization_id' | 'tenant_slug'> {
   const context =
     state.context && typeof state.context === 'object'
       ? (state.context as Record<string, unknown>)
@@ -129,8 +152,7 @@ function classifyPlanned(missionPath: string): {
   task_count: number;
   recommendation: string;
 } {
-  const tasks =
-    readJson<Array<Record<string, unknown>>>(path.join(missionPath, 'NEXT_TASKS.json')) || [];
+  const tasks = readMissionTaskRecords(path.join(missionPath, 'NEXT_TASKS.json'));
   if (tasks.length === 0) {
     return {
       reason: 'design_missing',
@@ -140,8 +162,8 @@ function classifyPlanned(missionPath: string): {
     };
   }
   const dispatched =
-    safeExistsSync(path.join(missionPath, 'coordination', 'tickets', 'dispatch-manifest.json')) ||
-    safeExistsSync(path.join(missionPath, 'evidence', 'workitem-dispatch-manifest.json'));
+    safePathExists(path.join(missionPath, 'coordination', 'tickets', 'dispatch-manifest.json')) ||
+    safePathExists(path.join(missionPath, 'evidence', 'workitem-dispatch-manifest.json'));
   if (!dispatched) {
     return {
       reason: 'ready_not_started',
@@ -170,21 +192,14 @@ export function collectMissionHygieneReport(
   let plannedTotal = 0;
 
   for (const { missionPath, tier } of listMissionDirs()) {
-    const state = readJson<{
-      mission_id?: string;
-      status?: string;
-      organization_id?: string;
-      tenant_slug?: string;
-      context?: Record<string, unknown>;
-      history?: Array<{ ts?: string }>;
-    }>(path.join(missionPath, 'mission-state.json'));
+    const statePath = safeMissionPath(path.join(missionPath, 'mission-state.json'));
+    const state = statePath ? loadStateAtPath(statePath) : null;
     if (!state?.mission_id) continue;
-    const status = String(state.status || '');
+    const status = state.status;
     if (status === 'active' || status === 'distilling') {
       const ageDays = missionAgeDays(state.history);
       if (ageDays !== null && ageDays >= staleDays) {
-        const tasks =
-          readJson<Array<Record<string, unknown>>>(path.join(missionPath, 'NEXT_TASKS.json')) || [];
+        const tasks = readMissionTaskRecords(path.join(missionPath, 'NEXT_TASKS.json'));
         const distilling = status === 'distilling';
         const finding: PlannedMissionFinding = {
           mission_id: state.mission_id,
@@ -220,7 +235,7 @@ export function collectMissionHygieneReport(
   const byAge = (a: PlannedMissionFinding, b: PlannedMissionFinding) =>
     (b.age_days ?? Number.MAX_SAFE_INTEGER) - (a.age_days ?? Number.MAX_SAFE_INTEGER);
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     planned_total: plannedTotal,
     stale: stale.sort(byAge),
     abandoned: abandoned.sort(byAge),
@@ -272,7 +287,7 @@ function enqueueMissionHygieneLearning(actionable: PlannedMissionFinding[]): voi
       });
   }
 
-  const generatedAt = new Date().toISOString();
+  const generatedAt = nowIso();
   const day = generatedAt.slice(0, 10);
   for (const group of groups.values()) {
     const scope = group.tenantSlug || 'shared';
@@ -327,6 +342,7 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
     (finding) =>
       `- ${finding.mission_id} (${finding.age_days ?? '?'}日, ${finding.reason}): ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`
   );
+  const notificationDay = nowIso().slice(0, 10);
   sendOpsAlert({
     severity:
       report.abandoned.length > 0 || (report.distilling_stale || []).length > 0
@@ -342,7 +358,7 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
       top: top.map((finding) => finding.mission_id),
     },
     recommendation: lines.join('\n'),
-    dedupe_key: `mission-hygiene:${new Date().toISOString().slice(0, 10)}`,
+    dedupe_key: `mission-hygiene:${notificationDay}`,
   });
   try {
     await notifyOperator('question', {
@@ -352,7 +368,7 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
         '開始するか、不要なら cancel してください:',
         ...lines,
       ].join('\n'),
-      correlation_id: `mission-hygiene:${new Date().toISOString().slice(0, 10)}`,
+      correlation_id: `mission-hygiene:${notificationDay}`,
     });
   } catch (err) {
     logger.warn(

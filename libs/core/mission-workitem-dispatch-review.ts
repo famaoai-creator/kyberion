@@ -4,7 +4,8 @@
  */
 
 import * as nodePath from 'node:path';
-import { a2aBridge, type A2AMessage } from './a2a-bridge.js';
+import type { A2AMessage } from './a2a-bridge.js';
+import { getA2ARoute } from './a2a-route-port.js';
 import type { AgentExecutionPort, AgentExecutionReceipt } from './agent-execution-port.js';
 import type { AgentContextMode } from './context-boundary.js';
 import {
@@ -23,6 +24,8 @@ import {
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import {
   resolveArtifactReviewerProfile,
   type ArtifactReviewerProfile,
@@ -46,11 +49,9 @@ import type { ContextSecurityScope } from './context-security-scope.js';
 import { checkProviderEgress } from './provider-egress-gate.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import { reasoningBackendEndpoint } from './reasoning-egress-scope.js';
-import {
-  readJsonFile as readJsonFileFromDispatchIO,
-  writeJsonFile as writeJsonFileFromDispatchIO,
-} from './mission-dispatch-io.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import type { ReasoningCallOptions } from './reasoning-backend.js';
 import {
   resolveMissionExecutionSurface,
@@ -172,6 +173,7 @@ export interface MissionWorkItemDispatchRecord {
   reviewer_path?: string;
   reviewer_excerpt?: string;
   reviewer_notes?: string[];
+  written_at?: string;
   artifact_review_receipt?: string;
   drift_watchdog?: Record<string, unknown>;
   drift_watchdog_summary?: string;
@@ -267,6 +269,19 @@ export function missionNextTasksPath(missionPath: string): string {
   return nodePath.join(missionPath, 'NEXT_TASKS.json');
 }
 
+function loadReviewNextTasks(missionPath: string): Array<Record<string, unknown>> {
+  try {
+    return (
+      loadMissionNextTaskObjectsAtPath(
+        missionNextTasksPath(missionPath),
+        nodePath.basename(nodePath.resolve(missionPath))
+      ) || []
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function resolveWorkItemExecutionSurface(
   item: WorkItem,
   purpose: 'implementation' | 'review' = 'implementation',
@@ -342,10 +357,7 @@ export function resolveWorkItemArtifactReviewContext(input: {
   const taskId = getWorkItemTaskId(input.item);
   if (!taskId || (input.teamRole !== 'reviewer' && input.teamRole !== 'qa')) return null;
   const reviewerTeamRole = input.teamRole;
-  const tasks =
-    readJsonFileFromDispatchIO<WorkItemReviewPlannedTask[]>(
-      missionNextTasksPath(input.missionPath)
-    ) || [];
+  const tasks = loadReviewNextTasks(input.missionPath) as WorkItemReviewPlannedTask[];
   const reviewTask = tasks.find((task) => String(task.task_id || '') === taskId);
   const metadata = (input.item.metadata || {}) as Record<string, unknown>;
   const reviewTarget = String(reviewTask?.review_target || metadata.review_target || '').trim();
@@ -574,11 +586,12 @@ export function persistWorkItemArtifactReviewReceipt(input: {
   });
   writeDispatchArtifact(
     nodePath.join(input.missionPath, relativePath),
-    receipt as unknown as Record<string, unknown>
+    receipt as unknown as Record<string, unknown>,
+    { missionId: input.missionId, missionPath: input.missionPath }
   );
 
   const taskPath = missionNextTasksPath(input.missionPath);
-  const tasks = readJsonFileFromDispatchIO<Array<Record<string, unknown>>>(taskPath) || [];
+  const tasks = loadReviewNextTasks(input.missionPath);
   const index = tasks.findIndex(
     (task) => String(task.task_id || '') === input.context.reviewTaskId
   );
@@ -600,7 +613,10 @@ export function persistWorkItemArtifactReviewReceipt(input: {
       artifact_review_receipt: relativePath,
       review_findings: findings,
     };
-    writeJsonFileFromDispatchIO(taskPath, tasks);
+    writeDispatchArtifact(taskPath, tasks, {
+      missionId: input.missionId,
+      missionPath: input.missionPath,
+    });
   }
   return { relativePath, receipt };
 }
@@ -609,8 +625,7 @@ export function readManifest(missionPath: string): MissionWorkItemDispatchManife
   const path = manifestPath(missionPath);
   if (!safeExistsSync(path)) return null;
   try {
-    const parsed = readJsonFileFromDispatchIO<MissionWorkItemDispatchManifest>(path);
-    return parsed && typeof parsed === 'object' ? parsed : null;
+    return loadMissionWorkItemDispatchManifestAtPath(path);
   } catch (_) {
     return null;
   }
@@ -689,24 +704,58 @@ export function parseIndependentReviewerVerdict(text: string): WorkItemDispatchR
   let refuted = false;
   let rationale: string | undefined;
   let parsed: Record<string, unknown> | undefined;
+  let jsonShapeInvalid = false;
 
   if (json) {
     try {
-      const candidate = JSON.parse(json) as Record<string, unknown>;
-      parsed = candidate;
-      approved = candidate.approved === true || candidate.approved === 'true';
-      refuted = candidate.refuted === true || candidate.refuted === 'true';
-      rationale = typeof candidate.rationale === 'string' ? candidate.rationale.trim() : undefined;
-      const candidateFindings = Array.isArray(candidate.findings)
-        ? candidate.findings.map((entry) => String(entry || '').trim()).filter(Boolean)
+      const record = parseSafeJsonObjectInput(json, 'independent reviewer verdict');
+      if (!record) {
+        jsonShapeInvalid = true;
+        throw new Error('review verdict must be an object');
+      }
+      const parseBoolean = (value: unknown): boolean | undefined => {
+        if (typeof value === 'boolean') return value;
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return undefined;
+      };
+      const parsedApproved = parseBoolean(record.approved);
+      const parsedRefuted = parseBoolean(record.refuted);
+      if (
+        (Object.hasOwn(record, 'approved') && parsedApproved === undefined) ||
+        (Object.hasOwn(record, 'refuted') && parsedRefuted === undefined)
+      ) {
+        jsonShapeInvalid = true;
+        throw new Error('review verdict boolean shape');
+      }
+      if (
+        Object.hasOwn(record, 'findings') &&
+        (!Array.isArray(record.findings) ||
+          record.findings.some((entry) => typeof entry !== 'string'))
+      ) {
+        jsonShapeInvalid = true;
+        throw new Error('review verdict findings shape');
+      }
+      if (Object.hasOwn(record, 'rationale') && typeof record.rationale !== 'string') {
+        jsonShapeInvalid = true;
+        throw new Error('review verdict rationale shape');
+      }
+      parsed = record;
+      approved = parsedApproved === true;
+      refuted = parsedRefuted === true;
+      rationale = typeof record.rationale === 'string' ? record.rationale.trim() : undefined;
+      const candidateFindings = Array.isArray(record.findings)
+        ? record.findings.map((entry) => entry.trim()).filter(Boolean)
         : [];
       findings.push(...candidateFindings);
     } catch {
-      // fall through to text heuristics
+      // A structured response was present but invalid; do not let words inside
+      // the rejected JSON influence the reviewer decision.
+      jsonShapeInvalid = true;
     }
   }
 
-  if (!approved && !refuted) {
+  if (!approved && !refuted && !jsonShapeInvalid) {
     const lowered = rawText.toLowerCase();
     approved = /\bapproved\b/.test(lowered) && !/\b(reject|refut|block)\b/.test(lowered);
     refuted = /\b(refut|reject|block)\b/.test(lowered);
@@ -904,27 +953,31 @@ export async function runIndependentReviewerReview(input: {
     `workitem-review-${input.item.item_id}.json`
   );
   const reviewerExcerpt = reviewerResponseText.slice(0, 800);
-  writeDispatchArtifact(reviewerPath, {
-    mission_id: input.missionId,
-    item_id: input.item.item_id,
-    team_role: input.teamRole,
-    assignee_peer_id: input.assigneePeerId,
-    context_pack_id: contextPack.context_pack_id,
-    context_pack_path: contextPackPath,
-    task_model_hint: reviewerTaskModelHint,
-    prompt: reviewerPrompt,
-    response_text: reviewerResponseText,
-    response_excerpt: reviewerExcerpt,
-    verdict,
-    execution_surface: reviewSurfaceDecision.surface,
-    execution_surface_used: reviewerResponse.executionSurfaceUsed,
-    reviewer_agent_id: reviewerAgentId,
-    attempt_id: reviewerResponse.attemptId,
-    runtime_id: reviewerResponse.runtimeId,
-    output_ref: reviewerResponse.outputRef,
-    provider: reviewerResponse.provider,
-    written_at: new Date().toISOString(),
-  });
+  writeDispatchArtifact(
+    reviewerPath,
+    {
+      mission_id: input.missionId,
+      item_id: input.item.item_id,
+      team_role: input.teamRole,
+      assignee_peer_id: input.assigneePeerId,
+      context_pack_id: contextPack.context_pack_id,
+      context_pack_path: contextPackPath,
+      task_model_hint: reviewerTaskModelHint,
+      prompt: reviewerPrompt,
+      response_text: reviewerResponseText,
+      response_excerpt: reviewerExcerpt,
+      verdict,
+      execution_surface: reviewSurfaceDecision.surface,
+      execution_surface_used: reviewerResponse.executionSurfaceUsed,
+      reviewer_agent_id: reviewerAgentId,
+      attempt_id: reviewerResponse.attemptId,
+      runtime_id: reviewerResponse.runtimeId,
+      output_ref: reviewerResponse.outputRef,
+      provider: reviewerResponse.provider,
+      written_at: nowIso(),
+    },
+    { missionId: input.missionId, missionPath: input.missionPath }
+  );
 
   return {
     verdict,
@@ -987,7 +1040,7 @@ export async function delegateSubagentTask(input: {
   const nativeAdopter = backend.getNativeSubagentAdopter?.() ?? null;
 
   const executeText = async (): Promise<AgentExecutionReceipt> => {
-    const startedAt = new Date().toISOString();
+    const startedAt = nowIso();
     try {
       let nativeSubagent: Record<string, unknown> | undefined;
       const run = async () => {
@@ -1036,7 +1089,7 @@ export async function delegateSubagentTask(input: {
             : {}),
         status: 'succeeded',
         started_at: startedAt,
-        completed_at: new Date().toISOString(),
+        completed_at: nowIso(),
         output_ref: `${input.item.item_id}:result`,
         output,
       };
@@ -1049,7 +1102,7 @@ export async function delegateSubagentTask(input: {
         ...(input.routingOptions.model ? { model_id: String(input.routingOptions.model) } : {}),
         status: 'failed',
         started_at: startedAt,
-        completed_at: new Date().toISOString(),
+        completed_at: nowIso(),
         error: error instanceof Error ? error.message : String(error),
       };
     }
@@ -1158,6 +1211,7 @@ export async function routeToAgentOrSubagent(input: {
   const useRuntime =
     surfaceDecision.active_surface === 'agent_runtime' ||
     (!hasSurfaceConfiguration && input.mode === 'agent');
+  const defaultA2ARoute = getA2ARoute();
   // ①モデル振り分け: the per-task model hint (tier/effort from phase_kind,
   // risk, scope) rides into the backend call instead of a global env choice.
   const routingOptions = {
@@ -1220,7 +1274,7 @@ export async function routeToAgentOrSubagent(input: {
     };
   }
 
-  if (useRuntime && !input.adapters.routeA2A && !a2aBridge.route) {
+  if (useRuntime && !input.adapters.routeA2A && !defaultA2ARoute) {
     throw new Error(
       `[EXECUTION_SURFACE_UNAVAILABLE] ${surfaceDecision.surface} has no A2A/runtime route`
     );
@@ -1231,14 +1285,17 @@ export async function routeToAgentOrSubagent(input: {
   // keeps its compatibility fallback below; it must not claim an item before
   // deciding whether a failed runtime call may fall back to CLI.
   if (surfaceDecision.active_surface === 'agent_runtime') {
-    // Keep the bridge receiver bound to its instance. Extracting
-    // `a2aBridge.route` directly loses `this` and only fails on the real
-    // agent-runtime path; mocked route adapters do not expose that defect.
-    const routeA2A =
-      input.adapters.routeA2A || ((envelope: A2AMessage) => a2aBridge.route(envelope));
+    // The route port keeps this orchestration module independent from the
+    // concrete A2A bridge while preserving the bound receiver.
+    const routeA2A = input.adapters.routeA2A || defaultA2ARoute;
+    if (!routeA2A) {
+      throw new Error(
+        `[EXECUTION_SURFACE_UNAVAILABLE] ${surfaceDecision.surface} has no A2A/runtime route`
+      );
+    }
     const runtimePort: AgentExecutionPort = {
       delegate: async (request) => {
-        const startedAt = new Date().toISOString();
+        const startedAt = nowIso();
         try {
           const response = await routeA2A({
             a2a_version: '1.0',
@@ -1248,7 +1305,7 @@ export async function routeToAgentOrSubagent(input: {
               sender: 'kyberion:workitem-dispatcher',
               receiver: input.assigneePeerId,
               performative: 'request',
-              timestamp: new Date().toISOString(),
+              timestamp: nowIso(),
             },
             payload: {
               intent: 'workitem_execution',
@@ -1290,7 +1347,7 @@ export async function routeToAgentOrSubagent(input: {
             ...(runtimeId ? { runtime_id: runtimeId } : {}),
             status: 'succeeded',
             started_at: startedAt,
-            completed_at: new Date().toISOString(),
+            completed_at: nowIso(),
             output_ref: `${input.item.item_id}:result`,
             output: String(response.payload?.text || ''),
           };
@@ -1301,7 +1358,7 @@ export async function routeToAgentOrSubagent(input: {
             agent_id: request.agent_id || input.assigneePeerId || `task-agent-${request.task_id}`,
             status: 'failed',
             started_at: startedAt,
-            completed_at: new Date().toISOString(),
+            completed_at: nowIso(),
             error: error instanceof Error ? error.message : String(error),
           };
         }
@@ -1343,83 +1400,50 @@ export async function routeToAgentOrSubagent(input: {
   }
 
   try {
-    const response = input.adapters.routeA2A
-      ? await input.adapters.routeA2A({
-          a2a_version: '1.0',
-          header: {
-            msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${input.item.item_id}`,
-            sender: 'kyberion:workitem-dispatcher',
-            receiver: input.assigneePeerId,
-            performative: 'request',
-            timestamp: new Date().toISOString(),
-          },
-          payload: {
-            intent: 'workitem_execution',
-            text: prompt,
-            objective: input.item.title || input.item.item_id,
-            acceptance_criteria: acceptanceCriteria,
-            expected_outputs: [deliverable || '', targetPath || '']
-              .map((entry) => String(entry || '').trim())
-              .filter(Boolean),
-            rationale: deliverable
-              ? `Deliver ${deliverable} for ${input.item.item_id}`
-              : `Complete work item ${input.item.item_id}`,
-            prior_decisions:
-              dependencies && dependencies.length > 0
-                ? [`Dependencies: ${dependencies.join(', ')}`]
-                : undefined,
-            context: {
-              mission_id: input.missionId,
-              work_item_id: input.item.item_id,
-              team_role: input.teamRole,
-              ...(input.provider ? { provider: input.provider } : {}),
-              ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
-              execution_mode: 'workitem',
-              dispatch_timeout_ms: resolveWorkItemResponseTimeoutMs(),
-              task_model_hint: input.taskModelHint,
-              security_scope: runtimeSecurityScope,
-              context_mode: input.contextMode,
-            },
-          },
-        })
-      : await a2aBridge.route({
-          a2a_version: '1.0',
-          header: {
-            msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${input.item.item_id}`,
-            sender: 'kyberion:workitem-dispatcher',
-            receiver: input.assigneePeerId,
-            performative: 'request',
-            timestamp: new Date().toISOString(),
-          },
-          payload: {
-            intent: 'workitem_execution',
-            text: prompt,
-            objective: input.item.title || input.item.item_id,
-            acceptance_criteria: acceptanceCriteria,
-            expected_outputs: [deliverable || '', targetPath || '']
-              .map((entry) => String(entry || '').trim())
-              .filter(Boolean),
-            rationale: deliverable
-              ? `Deliver ${deliverable} for ${input.item.item_id}`
-              : `Complete work item ${input.item.item_id}`,
-            prior_decisions:
-              dependencies && dependencies.length > 0
-                ? [`Dependencies: ${dependencies.join(', ')}`]
-                : undefined,
-            context: {
-              mission_id: input.missionId,
-              work_item_id: input.item.item_id,
-              team_role: input.teamRole,
-              ...(input.provider ? { provider: input.provider } : {}),
-              ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
-              execution_mode: 'workitem',
-              task_model_hint: input.taskModelHint,
-              dispatch_timeout_ms: resolveWorkItemResponseTimeoutMs(),
-              security_scope: runtimeSecurityScope,
-              context_mode: input.contextMode,
-            },
-          },
-        });
+    const routeA2A = input.adapters.routeA2A || defaultA2ARoute;
+    if (!routeA2A) {
+      throw new Error(
+        `[EXECUTION_SURFACE_UNAVAILABLE] ${surfaceDecision.surface} has no A2A/runtime route`
+      );
+    }
+    const response = await routeA2A({
+      a2a_version: '1.0',
+      header: {
+        msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${input.item.item_id}`,
+        sender: 'kyberion:workitem-dispatcher',
+        receiver: input.assigneePeerId,
+        performative: 'request',
+        timestamp: nowIso(),
+      },
+      payload: {
+        intent: 'workitem_execution',
+        text: prompt,
+        objective: input.item.title || input.item.item_id,
+        acceptance_criteria: acceptanceCriteria,
+        expected_outputs: [deliverable || '', targetPath || '']
+          .map((entry) => String(entry || '').trim())
+          .filter(Boolean),
+        rationale: deliverable
+          ? `Deliver ${deliverable} for ${input.item.item_id}`
+          : `Complete work item ${input.item.item_id}`,
+        prior_decisions:
+          dependencies && dependencies.length > 0
+            ? [`Dependencies: ${dependencies.join(', ')}`]
+            : undefined,
+        context: {
+          mission_id: input.missionId,
+          work_item_id: input.item.item_id,
+          team_role: input.teamRole,
+          ...(input.provider ? { provider: input.provider } : {}),
+          ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
+          execution_mode: 'workitem',
+          dispatch_timeout_ms: resolveWorkItemResponseTimeoutMs(),
+          task_model_hint: input.taskModelHint,
+          security_scope: runtimeSecurityScope,
+          context_mode: input.contextMode,
+        },
+      },
+    });
     return {
       executionMode: 'agent',
       executionSurfaceUsed: 'agent_runtime',

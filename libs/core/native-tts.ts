@@ -45,12 +45,16 @@ export interface SpeakResult {
 
 const PLATFORM = process.platform as Platform;
 
-function buildCommand(text: string, opts: SpeakOptions): { cmd: string; args: string[] } | null {
+function buildCommandForPlatform(
+  platform: Platform,
+  text: string,
+  opts: SpeakOptions
+): { cmd: string; args: string[] } | null {
   // Sanitize: TTS engines should not interpret shell metachars, but we still
   // strip control characters so screen-reader-style commands can't be injected.
   const safe = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
-  switch (PLATFORM) {
+  switch (platform) {
     case 'darwin': {
       const args: string[] = [];
       if (opts.voice) args.push('-v', opts.voice);
@@ -78,6 +82,18 @@ function buildCommand(text: string, opts: SpeakOptions): { cmd: string; args: st
     default:
       return null;
   }
+}
+
+function buildCommand(text: string, opts: SpeakOptions): { cmd: string; args: string[] } | null {
+  return buildCommandForPlatform(PLATFORM, text, opts);
+}
+
+/** Build the governed OS-native command for callers that own process state. */
+export function buildNativeTtsCommand(
+  text: string,
+  opts: SpeakOptions = {}
+): { cmd: string; args: string[] } | null {
+  return buildCommand(text, opts);
 }
 
 /**
@@ -231,4 +247,4 @@ export function hasBuiltInTts(): boolean {
   return PLATFORM === 'darwin' || PLATFORM === 'win32';
 }
 
-export const __test__ = { buildCommand };
+export const __test__ = { buildCommand, buildCommandForPlatform };

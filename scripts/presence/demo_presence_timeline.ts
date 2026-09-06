@@ -1,4 +1,13 @@
-async function main() {
+import { parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+
+type Print = (value: unknown) => void;
+
+export function parsePresenceTimelineResponse(payload: unknown): Record<string, unknown> {
+  return parseSafeJsonObjectValue(payload, 'presence timeline response');
+}
+
+async function main(print: Print = () => undefined) {
   const timeline = {
     action: 'presence_timeline',
     surface_id: 'presence-studio',
@@ -31,11 +40,18 @@ async function main() {
     throw new Error(`Timeline dispatch failed: HTTP ${response.status}`);
   }
 
-  const body = await response.json();
-  console.log(JSON.stringify(body, null, 2));
+  const body = parsePresenceTimelineResponse(await response.json());
+  print(JSON.stringify(body, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+const runPresenceTimelineDemo = defineScript({
+  name: 'presence-demo-timeline',
+  flags: [],
+  run: ({ print }) => main(print),
 });
+
+if (
+  isDirectScript(import.meta.url, 'presence/demo_presence_timeline.ts') ||
+  isDirectScript(import.meta.url, 'presence/demo_presence_timeline.js')
+)
+  void runPresenceTimelineDemo();

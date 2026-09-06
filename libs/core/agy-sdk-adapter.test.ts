@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { AgySdkAdapter } from './agy-sdk-adapter.js';
+import { AgySdkAdapter, normalizeAgySdkBridgeMessage } from './agy-sdk-adapter.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 
 function fakeBridge(responseFor: (request: Record<string, unknown>) => Record<string, unknown>) {
   const child = new EventEmitter() as any;
@@ -33,6 +35,26 @@ describe('AgySdkAdapter', () => {
 
   afterEach(async () => {
     await adapter?.shutdown();
+  });
+
+  it('normalizes ready and request bridge messages', () => {
+    expect(normalizeAgySdkBridgeMessage({ event: 'ready', pid: 4321, sdk: 'test' })).toEqual({
+      event: 'ready',
+      pid: 4321,
+      sdk: 'test',
+    });
+    expect(
+      normalizeAgySdkBridgeMessage({ id: 'agy-sdk-1', ok: true, text: 'done', metadata: {} })
+    ).toEqual({ id: 'agy-sdk-1', ok: true, text: 'done', metadata: {} });
+  });
+
+  it('rejects malformed bridge message shapes', () => {
+    expect(normalizeAgySdkBridgeMessage(null)).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({})).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({ event: 'ready', pid: 0 })).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({ id: 'x', ok: 'true' })).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({ id: 'x', metadata: [] })).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({ id: 'x', text: 7 })).toBeNull();
   });
 
   it('boots the provider bridge and returns observed native-subagent metadata', async () => {
@@ -118,5 +140,17 @@ describe('AgySdkAdapter', () => {
 
     await expect(request).rejects.toThrow('[SUBAGENT_UNAVAILABLE] AGY SDK request aborted.');
     expect(cancellationSeen).toBe(true);
+  });
+
+  it('resolves SDK credentials through the registered environment boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/agy-sdk-adapter.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toContain('process.env.GEMINI_API_KEY');
+    expect(source).not.toContain('process.env.GOOGLE_API_KEY');
+    expect(source).toContain("getRegisteredEnvText('GEMINI_API_KEY')");
+    expect(source).toContain("getRegisteredEnvText('GOOGLE_API_KEY')");
   });
 });

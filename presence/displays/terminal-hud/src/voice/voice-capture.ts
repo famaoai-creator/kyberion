@@ -1,13 +1,14 @@
 import path from 'node:path';
+import { startMicCapture } from '@agent/core/mic-capture';
 import {
-  startMicCapture,
   getSpeechToTextBridge,
   installFluidAudioSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
-  pcmToWav,
-  pathResolver,
-} from '@agent/core';
-import type { MicCaptureOptions, TranscribeResult } from '@agent/core';
+  type TranscribeResult,
+} from '@agent/core/speech-to-text-bridge';
+import { pcmToWav } from '@agent/core/pcm-wav';
+import { pathResolver } from '@agent/core/path-resolver';
+import type { MicCaptureOptions } from '@agent/core/mic-capture';
 import { ensureDir, safeUnlinkSync, safeWriteFile } from '@agent/core/secure-io';
 
 export interface VoiceCaptureHandle {

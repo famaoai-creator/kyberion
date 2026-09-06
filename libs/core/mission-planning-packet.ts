@@ -5,8 +5,21 @@ import {
   PlanningReviewVerdictSchema,
   renderStructuredOutputSchemaPrompt,
 } from './structured-output-contracts.js';
-import { missionDir } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { findMissionPath, missionDir } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+
+function safeMissionArtifactPath(missionId: string, relativePath: string): string {
+  const missionPath = assertSafeRepositoryPath(
+    findMissionPath(missionId) || missionDir(missionId, 'public'),
+    { allowMissingLeaf: true }
+  );
+  return assertSafeRepositoryPath(nodePath.join(missionPath, relativePath), {
+    allowMissingLeaf: true,
+  });
+}
 
 export interface PlannerSourcePayload {
   sourceText?: string;
@@ -27,13 +40,21 @@ export interface PlanningReviewVerdict {
 export function readProcessTemplateSeededTasks(
   nextTasksPath: string
 ): Array<Record<string, unknown>> {
-  if (!safeExistsSync(nextTasksPath)) return [];
+  let safeNextTasksPath: string;
   try {
-    const parsed = loadJson<unknown>(nextTasksPath);
-    if (!Array.isArray(parsed)) return [];
+    safeNextTasksPath = assertSafeRepositoryPath(nextTasksPath, { allowMissingLeaf: true });
+  } catch {
+    return [];
+  }
+  if (!safeExistsSync(safeNextTasksPath)) return [];
+  try {
+    const parsed = loadMissionNextTaskObjectsAtPath(
+      safeNextTasksPath,
+      nodePath.basename(nodePath.dirname(safeNextTasksPath))
+    );
+    if (!parsed) return [];
     return parsed.filter(
-      (task): task is Record<string, unknown> =>
-        Boolean(task) && typeof task === 'object' && task.origin === 'process_template'
+      (task): task is Record<string, unknown> => task.origin === 'process_template'
     );
   } catch {
     return [];
@@ -45,24 +66,17 @@ export function readProcessTemplateSeededTasks(
  * prompt. Seeded tasks are fixed and must remain in the resulting plan.
  */
 export function renderProcessTemplateSkeleton(missionId: string): string {
-  const missionPath = missionDir(missionId, 'public');
-  const statePath = `${missionPath}/mission-state.json`;
+  const statePath = safeMissionArtifactPath(missionId, 'mission-state.json');
   if (!safeExistsSync(statePath)) return '';
-  let processTemplate: { workflow_id?: string; phases?: string[] } | undefined;
-  try {
-    const state = loadJson<{
-      process_template?: { workflow_id?: string; phases?: string[] };
-    }>(statePath);
-    processTemplate = state.process_template;
-  } catch {
-    return '';
-  }
+  const processTemplate = loadMissionStateAtPath(statePath)?.process_template;
   if (!processTemplate?.workflow_id) return '';
 
   const lines = [
     `Process template: ${processTemplate.workflow_id} — phases: ${(processTemplate.phases || []).join(' → ')}.`,
   ];
-  const seeded = readProcessTemplateSeededTasks(`${missionPath}/NEXT_TASKS.json`);
+  const seeded = readProcessTemplateSeededTasks(
+    safeMissionArtifactPath(missionId, 'NEXT_TASKS.json')
+  );
   if (seeded.length > 0) {
     lines.push(
       'The following tasks were seeded from the process template and are FIXED — do not drop, rename, or restructure them. Plan additional tasks around them and reference their task_ids in dependencies where appropriate:'
@@ -147,7 +161,8 @@ export function parsePlanningReviewVerdict(text: string): PlanningReviewVerdict 
 
   if (json) {
     try {
-      const candidate = JSON.parse(json) as unknown;
+      const candidate = parseSafeJsonObjectInput(json, 'planning review verdict');
+      if (!candidate) throw new Error('planning review verdict must be an object');
       const result = PlanningReviewVerdictSchema.safeParse(candidate);
       if (result.success) {
         parsed = candidate as Record<string, unknown>;
