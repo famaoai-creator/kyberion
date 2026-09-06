@@ -71,6 +71,16 @@ describe('tenant-rate-limiter (IP-29)', () => {
     safeRmSync(externalLockPath, { recursive: true, force: true });
   });
 
+  it('reclaims a malformed lock through the stale-lock path', () => {
+    safeWriteFile(lockPath, '{');
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'worker';
+
+    expect(consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toMatchObject({
+      allowed: true,
+    });
+  });
+
   it('passes through when no tenant slug is bound (tenant-agnostic)', () => {
     delete process.env.KYBERION_TENANT;
     process.env.KYBERION_PERSONA = 'worker';
