@@ -17,6 +17,24 @@ const EDGE_RUNTIME_ENV_READ_ALLOWLIST: ReadonlyMap<string, ReadonlyMap<string, n
 ]);
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
 const JSON_LOADER_RATCHET = 0;
+/**
+ * A few actuator boundaries intentionally parse data produced by an external
+ * CLI or a simulator after it has been copied into a repository-safe path.
+ * Keep those existing boundaries explicit while preventing the pattern from
+ * spreading to new source files.
+ */
+const LEGACY_JSON_BOUNDARY_ALLOWLIST: ReadonlyMap<string, number> = new Map([
+  ['libs/actuators/android-actuator/src/android-runtime-helpers.ts', 1],
+  ['libs/actuators/blockchain-actuator/src/index.ts', 1],
+  ['libs/actuators/file-actuator/src/file-pipeline-helpers.ts', 1],
+  ['libs/actuators/ios-actuator/src/ios-runtime-helpers.ts', 1],
+  ['libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts', 1],
+  ['libs/actuators/network-actuator/src/a2a-transport.ts', 1],
+  ['libs/core/secure-io.ts', 1],
+  ['presence/bridge/terminal/server.ts', 1],
+  ['presence/bridge/terminal/session-utils.ts', 1],
+  ['presence/displays/chronos-mirror-v2/src/lib/trace-feed.ts', 2],
+]);
 const JSONL_APPEND_RATCHET = 0;
 const ENV_RATCHET = 0;
 const SIMPLE_ISO_TIMESTAMP_RATCHET = 0;
@@ -31,6 +49,12 @@ export function readFoundationAdoptionTextFile(filePath: string): string {
 
 export function countSimpleIsoTimestampViolations(source: string): number {
   return [...source.matchAll(SIMPLE_ISO_TIMESTAMP_PATTERN)].length;
+}
+const LEGACY_JSON_BOUNDARY_PATTERN =
+  /safeReadFile\s*\([\s\S]{0,220}?\)[\s\S]{0,220}?parseSafeJsonInput\s*\(/gu;
+
+export function countLegacyJsonBoundaryViolations(source: string): number {
+  return [...source.matchAll(LEGACY_JSON_BOUNDARY_PATTERN)].length;
 }
 const JSONL_APPEND_PATTERN = new RegExp(
   [
@@ -61,6 +85,7 @@ function sourceFiles(): string[] {
 export function checkFoundationAdoption(files = sourceFiles()): string[] {
   const failures: string[] = [];
   let jsonLoaderViolations = 0;
+  let legacyJsonBoundaryViolations = 0;
   let jsonlAppendViolations = 0;
   let ajvViolations = 0;
   let envReads = 0;
@@ -77,6 +102,12 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
     jsonLoaderViolations += [
       ...source.matchAll(/JSON\.parse\s*\(\s*(?:String\s*\(\s*)?safeReadFile\s*\(/gu),
     ].length;
+    const legacyJsonBoundaryCount = countLegacyJsonBoundaryViolations(source);
+    const allowedLegacyJsonBoundaries = LEGACY_JSON_BOUNDARY_ALLOWLIST.get(relativePath) ?? 0;
+    legacyJsonBoundaryViolations += Math.max(
+      0,
+      legacyJsonBoundaryCount - allowedLegacyJsonBoundaries
+    );
     if (relativePath.startsWith('scripts/')) {
       simpleIsoTimestampViolations += countSimpleIsoTimestampViolations(source);
     }
@@ -111,6 +142,11 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
   if (jsonLoaderViolations > JSON_LOADER_RATCHET) {
     failures.push(
       `shared JSON loader pattern increased: ${jsonLoaderViolations} > ${JSON_LOADER_RATCHET}`
+    );
+  }
+  if (legacyJsonBoundaryViolations > 0) {
+    failures.push(
+      `legacy JSON boundary pattern increased: ${legacyJsonBoundaryViolations}; use foundation readJson/readJsonLines or document an existing external boundary`
     );
   }
   if (jsonlAppendViolations > JSONL_APPEND_RATCHET) {

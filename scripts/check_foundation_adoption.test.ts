@@ -4,6 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   checkFoundationAdoption,
+  countLegacyJsonBoundaryViolations,
   countSimpleIsoTimestampViolations,
   readFoundationAdoptionTextFile,
 } from './check_foundation_adoption.js';
@@ -46,6 +47,22 @@ describe('checkFoundationAdoption', () => {
     } finally {
       safeRmSync(filePath, { force: true });
     }
+  });
+
+  it('detects direct safeReadFile to parseSafeJsonInput boundaries', () => {
+    expect(
+      countLegacyJsonBoundaryViolations(
+        "const raw = safeReadFile('input.json', { encoding: 'utf8' });\nparseSafeJsonInput(raw, 'input');"
+      )
+    ).toBe(1);
+  });
+
+  it('keeps existing external JSON boundaries explicitly allowlisted', () => {
+    expect(
+      checkFoundationAdoption([
+        pathResolver.rootResolve('libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts'),
+      ])
+    ).toEqual([]);
   });
 
   it('rejects duplicated simple ISO timestamp construction', () => {
