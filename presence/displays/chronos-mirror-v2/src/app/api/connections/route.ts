@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { listConnectionReviewItems, recordConnectionReview } from '../../../lib/connection-review';
-import { readChronosJsonObject } from '../../../lib/request-input';
+import { readChronosJsonObject, readChronosOptionalStringParam } from '../../../lib/request-input';
 import { parseConnectionReviewInput } from './connection-review-input';
 import {
   resolveViewerContextForRequest,
@@ -24,7 +24,7 @@ export function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   try {
-    const tenant = req.nextUrl.searchParams.get('tenant') || undefined;
+    const tenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
     const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, tenant);
     return withViewerExecutionContext(resolvedViewer.context, () => {
       const connections = listConnectionReviewItems().filter(

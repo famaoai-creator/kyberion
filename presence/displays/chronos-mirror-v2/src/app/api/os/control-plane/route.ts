@@ -11,6 +11,7 @@ import {
   withViewerExecutionContext,
   type ViewerContext,
 } from '../../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 
 const cloudflareOsSurface = new CloudflareOsReadOnlySurface();
 
@@ -47,7 +48,7 @@ export function GET(req: NextRequest) {
 
   try {
     const url = new URL(req.url);
-    const missionId = url.searchParams.get('mission_id') || undefined;
+    const missionId = readChronosOptionalStringParam(url.searchParams.get('mission_id'));
     const snapshot = snapshotForViewer(resolvedViewer.context, missionId);
     return NextResponse.json(
       { ok: true, ...snapshot },

@@ -20,6 +20,19 @@ const SCOPE_ROUTES = [
   'collaboration/stream/route.ts',
   'headless/work-items/route.ts',
   'headless/collaboration/route.ts',
+  'agent-activity/route.ts',
+  'agents/route.ts',
+  'connections/route.ts',
+  'cost/route.ts',
+  'headless/operator-home/route.ts',
+  'headless/a2ui/operator-home/route.ts',
+  'missions/search/route.ts',
+  'operator-home/route.ts',
+  'organization-operating-model/route.ts',
+  'os/control-plane/route.ts',
+  'tenant-design/route.ts',
+  'intelligence/route.ts',
+  'intelligence/stream/route.ts',
 ] as const;
 
 describe('Chronos route request input boundary', () => {

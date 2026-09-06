@@ -23507,3 +23507,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos collaboration snapshot／stream、headless work-items／collaboration route、request-input boundary test、SX-09b
 - **変更**: collaboration と headless の scope query に残っていた個別既定値化を、共通 `readChronosOptionalStringParam` へ統一した。mission／tenant／organization／project／task／session／scope kind／limit は trim 済みの単一 string だけを認可・projection・SSE filterへ渡し、既存の snapshot／stream／headless envelope semanticsは維持した。
 - **検証**: request-input boundary **1 file／2 tests passed**、対象 route の ESLint、Prettier、`git diff --check`。provider 実機受入と Next runtimeを含む統合実行は継続課題である。
+
+## 2026-09-06 再レビュー実装 1718
+
+- **対象**: Chronos API全体（残存13 route）、request-input boundary test、SX-09b
+- **変更**: agent activity／agents／connections／cost、headless operator-home／A2UI、missions search、operator-home、organization operating model、OS control-plane、tenant design、intelligence snapshot／stream に残っていた query の個別既定値化を共通 `readChronosStringParam`／`readChronosOptionalStringParam` へ統一した。Chronos API **28 route** の scope／filter／limit／flag が trim 済みの単一 string 境界を通り、認可・projection・SSE・design resolutionへ渡るようにした。既存の viewer scope、tier、headless envelope、OS read-only semanticsは維持した。
+- **検証**: request-input boundary **1 file／2 tests passed**、Chronos API directory ESLint、Prettier、`git diff --check`。Next runtimeを含む統合実行とprovider実機受入はCI／環境依存の継続課題である。
