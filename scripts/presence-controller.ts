@@ -10,7 +10,13 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
+import {
+  isRecord,
+  nowIso,
+  parseSafeJsonInput,
+  readJsonLines,
+  readTextFile,
+} from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -77,13 +83,10 @@ export function perceive(): Stimulus[] {
   if (!STIMULI_PATH || !REGISTRY_PATH) return [];
 
   try {
-    const content = readTextFile(STIMULI_PATH);
-    const stimuli: Stimulus[] = content
-      .trim()
-      .split('\n')
-      .filter((l) => l.length > 0)
-      .map(parsePresenceStimulusLine)
-      .filter((s): s is Stimulus => s?.status === 'PENDING' || s?.status === 'INJECTED');
+    const stimuli = readJsonLines<Stimulus | undefined>(STIMULI_PATH, {
+      onMalformed: 'skip',
+      map: (value) => parsePresenceStimulus(value),
+    }).filter((s): s is Stimulus => s?.status === 'PENDING' || s?.status === 'INJECTED');
 
     const registry: ChannelRegistry = loadChannelRegistry();
     const priorityMap = new Map(registry.channels.map((c) => [c.id, c.priority]));
