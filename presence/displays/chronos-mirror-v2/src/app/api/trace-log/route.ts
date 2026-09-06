@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
 
-  const logicalPath = String(req.nextUrl.searchParams.get('path') || '').trim();
+  const logicalPath = req.nextUrl.searchParams.get('path')?.trim() ?? '';
   if (!logicalPath) {
     return NextResponse.json({ error: 'path is required' }, { status: 400 });
   }

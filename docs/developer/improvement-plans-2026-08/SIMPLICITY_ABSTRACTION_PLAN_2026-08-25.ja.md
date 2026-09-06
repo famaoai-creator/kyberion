@@ -23483,3 +23483,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `package.json`、`knowledge/product/governance/cli-commands.json`、`scripts/kyberion.test.ts`、PI-03／PI-11／PI-13
 - **変更**: `auth`、`check:backend-conformance`、`inventory:resource-loaders`、`check:script-integrity`、`check:improvement-plan-metadata` の5つの package alias を削除し、既存の TypeScript entrypoint を統合 CLI の module-backed command（`pnpm kyberion auth check`、`pnpm kyberion check backend-conformance`、`pnpm kyberion inventory resource-loaders`、`pnpm kyberion check script-integrity`、`pnpm kyberion check improvement-plan-metadata`）へ移した。機能本体は保持し、package script 数を **125 → 120** に戻した。
 - **検証**: CLI manifest checker、module-backed command routing test、対象 Prettier、`git diff --check`で確認した。provider の実 OS-level enforcement、依存欠落による root typecheck、残存 direct-loader の意味的な全経路確認は継続課題である。
+
+## 2026-09-06 再レビュー実装 1714
+
+- **対象**: Chronos knowledge-ref／runtime-file／trace-log route、request-input boundary test、SX-08b
+- **変更**: 3つの Next route で `URLSearchParams.get('path')` を `String(...)` で再変換していた経路を、`?.trim() ?? ''` の文字列境界へ統一した。URL query の欠落は空文字として既存の400応答へ閉じ、配列・オブジェクトを暗黙文字列化する実装を追加しない契約をテストで固定した。
+- **検証**: request-input boundary **1 file／1 test passed**、関連 route boundary tests、対象 Prettier、`git diff --check`。残る framework-specific request parsing と provider 実機受入は継続課題である。
