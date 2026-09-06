@@ -3,6 +3,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 import {
   validateDocumentationSourceMap,
   checkDocumentationSourceMap,
+  readDocumentationSourceMapTextFile,
 } from './check_documentation_source_map.js';
 
 const existingPaths = new Set([
@@ -78,6 +79,12 @@ const validManifest = {
 };
 
 describe('documentation source map', () => {
+  it('rejects a directory replacement before source-map link parsing', () => {
+    expect(() => readDocumentationSourceMapTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for documentation sources', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_documentation_source_map.ts'), {
