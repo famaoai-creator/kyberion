@@ -22979,3 +22979,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/external-hook-discovery.ts`、external-hook-discovery test、PI-03
 - **変更**: external hook config discovery の candidate pathへ operation-time の regular-file 検査を追加し、directory replacement を JSON parse／hook registrationへ到達させないようにした。既存の repository／home containment、symlink拒否、trust／approval semantics は維持した。
 - **検証**: external-hook-discovery **2 files／9 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1630
+
+- **対象**: `libs/core/core.ts`、core-file-utils test、PI-03
+- **変更**: legacy `fileUtils.readJson` の raw read 前へ operation-time の regular-file 検査を追加し、directory replacement を cache／JSON parseへ到達させないようにした。既存の cache、malformed JSON、role/session config fallback semantics は維持した。
+- **検証**: core-file-utils **2 files／2 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
