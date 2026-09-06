@@ -867,6 +867,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 の inventory checker 自体を再監査し、同一の短い read section 内にある regular-file／safe path helper 証跡の後方探索範囲を 12 行から 32 行へ拡張した。長い helper 内の既存 guard を未分類として残さない回帰を関連 **1 test file / 5 tests passed**、Prettier、`git diff --check`で確認した。semantic guard の完全な証明ではないため、needs-review の個別確認は継続する。
 - 2026-09-06: PI-03 の direct-loader inventory から、mission orchestration の provisioned artifact read／write-after-read verification を共通 `assertRegularArtifactPath` 境界へ接続し、directory replacement を JSON／text verificationへ到達させない回帰を追加した。関連 **2 files / 14 tests passed**、Prettier、`git diff --check`で確認した。needs-review の個別確認と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、ADF repair の pipeline schema read 前へ `assertRegularAdfResource` 境界を追加し、directory replacement を repair prompt の schema readへ到達させない回帰を追加した。関連 **2 files / 19 tests passed**、Prettier、`git diff --check`で確認した。needs-review の個別確認と provider CLI の実 OS-level enforcement probe は継続課題である。
+- 2026-09-06: PI-03 の direct-loader inventory から、project mission ledger の Markdown removal read 前へ operation-time の regular-file 検査を追加し、directory replacement を ledger removal に到達させない回帰を追加した。関連 **2 files / 7 tests passed**、Prettier、`git diff --check`で確認した。needs-review の個別確認と provider CLI の実 OS-level enforcement probe は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 
