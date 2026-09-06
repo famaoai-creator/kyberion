@@ -23543,3 +23543,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Presence Studio runtime-data headless overview、shared surface request reader、SX-09b
 - **変更**: headless overview／A2UI overview に残っていた tenant query の framework-specific `typeof` 判定2箇所を `readSurfaceStringParam` へ統一した。単一 string／非scalarの既存 narrowing semantics を維持し、shared reader の利用数を境界テストで固定した。
 - **検証**: Presence Studio runtime-data boundary **1 file／4 tests passed**、対象 ESLint、Prettier、`git diff --check`。外部OS/provider実機受入は継続課題である。
+
+## 2026-09-06 再レビュー実装 1724
+
+- **対象**: calendar／modeling／wisdom actuator の schema validator、SX-03
+- **変更**: foundation `createAjv()` がすでに `ajv-formats` の標準 vocabulary を登録しているため、3つの production validator に残っていた個別 `ajv-formats` import／再登録を削除した。schema path、strict validation、domain-specific error semanticsは維持した。
+- **検証**: calendar／modeling／wisdom actuator **4 files／31 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider 実機受入と未移行 loader 全件監査は継続課題である。

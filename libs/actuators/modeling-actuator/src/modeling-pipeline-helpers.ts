@@ -46,7 +46,6 @@ import {
 } from '@agent/core/software-quality';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
-import * as addFormatsModule from 'ajv-formats';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
 import { terraformToTopologyIr } from './terraform-topology.js';
 import {
@@ -77,9 +76,7 @@ export const buildRetryOptions = createGovernedRetryOptionsBuilder({
   fallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 const ajv = createAjv();
-addFormats(ajv);
 const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge(
   'product/orchestration/browser-execution-presets.json'
 );

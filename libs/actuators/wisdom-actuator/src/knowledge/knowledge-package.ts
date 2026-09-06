@@ -1,4 +1,3 @@
-import * as addFormatsModule from 'ajv-formats';
 import type { ValidateFunction } from 'ajv';
 import {
   assetProvenanceRef,
@@ -53,9 +52,7 @@ const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/knowledge-package.schema.json'
 );
-const addFormats = (addFormatsModule as any).default || addFormatsModule;
 const ajv = createAjv();
-addFormats(ajv);
 const validateSchema: ValidateFunction = compileSchemaFromPath(ajv, SCHEMA_PATH);
 
 function stableValue(value: unknown): unknown {
