@@ -904,6 +904,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、capability seams AST checkerのproduction source／generated graph本文readを`readCapabilitySeamsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをAST／graph整合判定へ到達させない回帰を追加した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミット`camera-output-bridge`に対する生成graph差分を表示したため、生成物は変更せず継続課題とした。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、channel adapter adoption checkerのbridge source本文readを`readChannelAdapterTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをadapter adoption判定へ到達させない回帰を追加した。関連 **2 files／4 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、CI gate parity checkerのworkflow本文readを`readCiGateParityTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをCI gate／workflow整合判定へ到達させない回帰を追加した。関連 **2 files／7 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、deprecated Wisdom op checkerのpipeline catalog本文readを`readDeprecatedWisdomTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをdeprecated／forwarder判定へ到達させない回帰を追加した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 
