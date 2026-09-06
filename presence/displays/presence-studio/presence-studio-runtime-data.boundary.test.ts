@@ -24,4 +24,14 @@ describe('presence studio runtime environment boundary', () => {
     expect(source).toContain("parseSafeJsonObjectValue(req.body, 'minutes session start body')");
     expect(source).toContain('presenceStudioMinutesSessionStartSchema.safeParse(requestBody)');
   });
+
+  it('does not coerce repeated or object-shaped voice profile query values', () => {
+    const source = safeReadFile(
+      fileURLToPath(new URL('./presence-studio-runtime-data.ts', import.meta.url)),
+      { encoding: 'utf8' }
+    );
+
+    expect(source).toContain('readPresenceStudioStringParam(req.query.profile_id)');
+    expect(source).not.toContain("String(req.query.profile_id || '').trim()");
+  });
 });

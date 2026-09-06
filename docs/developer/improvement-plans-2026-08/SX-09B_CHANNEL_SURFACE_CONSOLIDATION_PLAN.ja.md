@@ -450,3 +450,11 @@ route／query 共通の `readPresenceStudioStringParam` へ抽象化し、dynami
 2箇所で単一 string の trim 済み値だけを受理するようにした。既存の knowledge／runtime allowlist、safe file read、404／403 semantics は維持した。
 
 検証: Presence Studio string-parameter boundary **3 files／25 tests passed**、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー修正 46
+
+Presence Studio runtime-data の onboarding voice-sample `profile_id` query を再監査し、`String(...)`
+変換で repeated／object-shaped query 値を profile lookup と音声 sample 保存へ渡し得る残存を検出した。
+共通 `readPresenceStudioStringParam` を runtime-data の入口にも接続し、未指定値は空文字、単一 string だけを既存の onboarding path／保存契約へ渡すようにした。
+
+検証: Presence Studio runtime-data boundary **1 file／3 tests passed**、対象 ESLint、Prettier、`git diff --check`。
