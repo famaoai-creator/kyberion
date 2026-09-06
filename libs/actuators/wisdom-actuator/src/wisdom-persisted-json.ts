@@ -1,10 +1,5 @@
-import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-} from '@agent/core/secure-io';
+import { isRecord, readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -45,7 +40,7 @@ export function readWisdomJsonAtPath(filePath: string, label = 'wisdom JSON'): u
   if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
     throw new Error(`${label} must be an existing regular file: ${safePath}`);
   }
-  return parseSafeJsonInput(String(safeReadFile(safePath, { encoding: 'utf8' }) || ''), label);
+  return readJson(safePath);
 }
 
 export function readWisdomJsonObjectAtPath(

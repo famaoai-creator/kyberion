@@ -23555,3 +23555,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: code／modeling／system／process actuator の JSON loader、SX-03
 - **変更**: 4つの actuator helper に残っていた `safeReadFile` + `parseSafeJsonInput` の同型 JSON loader を foundation `readJson` へ統一した。各ドメインの regular-file 境界と既存の path validation は保持し、JSON の permission／size／dangerous-key 検査を共通 secure-io bridge に集約した。
 - **検証**: process／system／modeling actuator **3 files／27 tests passed**、対象 ESLint、Prettier、`git diff --check`。code actuator index は既存の mock manifest 不在（`/mock/root/.../manifest.json`）で9 testsが停止したため、成功数には含めていない。provider 実機受入と未移行 loader 全件監査は継続課題である。
+
+## 2026-09-06 再レビュー実装 1726
+
+- **対象**: file／orchestrator／wisdom actuator の persisted JSON loader、SX-03
+- **変更**: 3つの actuator helper に残っていた `safeReadFile` + `parseSafeJsonInput` の persisted JSON 読み込みを foundation `readJson` へ統一した。regular-file boundary、wisdom の object shape 検証、file の他の text／JSONL 読み取りは維持した。
+- **検証**: file／orchestrator／wisdom actuator **4 files／64 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider 実機受入と未移行 loader 全件監査は継続課題である。

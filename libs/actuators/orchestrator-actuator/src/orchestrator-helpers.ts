@@ -5,6 +5,7 @@ import {
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
   getRegisteredEnvText,
+  readJson,
 } from '@agent/core/foundation';
 import {
   safeReadFile,
@@ -148,7 +149,7 @@ function readOrchestratorJson(filePath: string, label: string): unknown {
   if (!isExistingRegularFile(filePath)) {
     throw new Error(`${label} must be an existing regular file: ${filePath}`);
   }
-  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
+  return readJson(filePath);
 }
 
 /**

@@ -45,6 +45,16 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeRmSync: fileMocks.safeRmSync,
 }));
 
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    readJson: vi.fn((filePath: string) =>
+      actual.parseSafeJsonInput(String(fileMocks.safeReadFile(filePath)), `JSON file ${filePath}`)
+    ),
+  };
+});
+
 vi.mock('@agent/core/async-utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
   retry: fileMocks.retry,
@@ -97,7 +107,12 @@ describe('file-actuator', () => {
     it('context_pathがdirectoryならcontextを読み込まない', async () => {
       const { safeExistsSync, safeLstat } = await import('@agent/core/secure-io');
       vi.mocked(safeExistsSync).mockReturnValue(true);
-      vi.mocked(safeLstat).mockReturnValue({ isFile: () => false } as never);
+      vi.mocked(safeLstat).mockImplementation(
+        (filePath: string) =>
+          ({
+            isFile: () => !String(filePath).includes('directory-context.json'),
+          }) as never
+      );
 
       await expect(
         handleAction({

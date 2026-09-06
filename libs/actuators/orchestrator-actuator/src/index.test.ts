@@ -288,7 +288,7 @@ describe('orchestrator-actuator', () => {
       } as unknown as Parameters<typeof handleAction>[0])
     ).rejects.toThrow('dangerous JSON key');
 
-    expect(mocks.safeReadFile).toHaveBeenCalledWith(resolvedContextPath, { encoding: 'utf8' });
+    expect(mocks.loadJson).toHaveBeenCalledWith(resolvedContextPath);
   });
 
   it('rejects a directory or invalid JSON through the read_json boundary', async () => {
