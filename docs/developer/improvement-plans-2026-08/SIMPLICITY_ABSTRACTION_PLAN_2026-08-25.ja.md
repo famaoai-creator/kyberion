@@ -23075,3 +23075,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/inventory_resource_loaders.ts`、`scripts/inventory_resource_loaders.test.ts`、PI-03
 - **変更**: resource-loader inventory が相対 import 先の barrel の `export { ... } from`／`export * from` を辿り、実装元で regular-file check を確認できる helper だけを `external-regular-file-helper` evidence として採用するようにした。package import と循環 export は安全証跡へ昇格させず、path-only helper も従来どおり未分類とした。
 - **検証**: inventory **1,347 files／184 callsites／inline 6／nearby 178／needs-review 0**、inventory **1 file／11 tests passed**、Prettier、`git diff --check`。provider 実機受入と package／barrel を跨ぐ実行時semantic flowの完全検証は継続する。
+
+## 2026-09-06 再レビュー実装 1646
+
+- **対象**: `libs/core/reasoning-backend-contracts.ts`、`libs/core/reasoning-backend.ts`、`libs/core/openai-compatible-backend.ts`／test、PI-10
+- **変更**: `delegateStructured` の能力gate後の constrained sampling request を共通 `ReasoningCallOptions` へ伝播し、OpenAI-compatible adapterが JSON Schema を `response_format.json_schema` としてprovider wireへ載せるようにした。generic adapterがgrammar形式を推測して送らないよう、未対応grammarは送信前にfail-closedとした。画像promptを含む既存options／abort伝播も維持した。
+- **検証**: OpenAI-compatible／reasoning backend **2 files／48 tests passed**、`libs/core` typecheck、対象ESLint、Prettier、`git diff --check`。実モデル別capability probeとprovider実機wire受入は継続する。

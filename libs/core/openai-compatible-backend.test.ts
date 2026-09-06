@@ -12,6 +12,8 @@ import {
   buildMlxBackendFromEnv,
   buildLocalAiBackendFromEnv,
 } from './openai-compatible-backend.js';
+import { delegateStructured } from './reasoning-backend.js';
+import { z } from 'zod';
 
 vi.mock('./secure-io.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./secure-io.js')>();
@@ -179,6 +181,61 @@ describe('openai-compatible-backend', () => {
     const firstBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(firstBody.messages[1].content).not.toContain('top-secret-token');
     expect(firstBody.messages[1].content).not.toContain('sk-test-1234567890abcdef');
+  });
+
+  it('serializes native JSON-schema constrained sampling into response_format', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { role: 'assistant', content: '{"answer":"ok"}' } }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'structured-model',
+    });
+
+    await expect(
+      delegateStructured(backend, 'Return an answer.', z.object({ answer: z.string() }), {
+        constrainedSampling: {
+          jsonSchema: { type: 'object', properties: { answer: { type: 'string' } } },
+          strict: 'require',
+        },
+        capabilityProfile: { supportsStrictTools: true, supportsGrammarTools: false },
+      })
+    ).resolves.toEqual({ answer: 'ok' });
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(request.response_format).toEqual({
+      type: 'json_schema',
+      json_schema: {
+        name: 'kyberion_structured_output',
+        strict: true,
+        schema: { type: 'object', properties: { answer: { type: 'string' } } },
+      },
+    });
+  });
+
+  it('fails closed instead of guessing a grammar wire for generic OpenAI-compatible providers', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'grammar-model',
+    });
+
+    await expect(
+      backend.delegateTask('Return JSON.', undefined, {
+        constrainedSampling: { grammar: 'root ::= object' },
+      })
+    ).rejects.toThrow(/grammar constrained sampling is not supported/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('rejects malformed chat completion message and tool-call shapes', async () => {
