@@ -1,6 +1,7 @@
 /** PI-02: reject raw exception interpolation in network-facing error replies. */
 import * as path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const root = process.cwd();
@@ -85,9 +86,16 @@ export function findWireErrorBoundaryViolations(
 
 export function scanWireErrorBoundary(): string[] {
   return WIRE_ERROR_BOUNDARY_FILES.flatMap((file) => {
-    const source = readTextFile(path.join(root, file));
+    const source = readWireErrorBoundaryTextFile(path.join(root, file));
     return findWireErrorBoundaryViolations(source, file);
   });
+}
+
+export function readWireErrorBoundaryTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 export const runCheckWireErrorBoundary = defineScript({
