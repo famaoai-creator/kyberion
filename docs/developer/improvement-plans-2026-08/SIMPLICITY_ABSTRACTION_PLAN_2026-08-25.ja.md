@@ -23759,3 +23759,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: plugin pack manifest／import-history JSON・JSONL loader、SX-03／SX-04
 - **変更**: pack discovery の manifest readerを foundation `readJson`へ、persisted import-history の行読み込みを foundation `readJsonLines`へ統一した。pack path／regular-file／symlink boundary、malformed manifest／JSONL rowのskip、import record normalization、limit projection、managed-install／archive lifecycleは維持した。
 - **検証**: plugin pack／skill plugin loader **3 files／46 tests passed**、foundation adoption **1 file／7 tests passed**、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1760
+
+- **対象**: managed plugin install の manifest JSON loader、SX-03／SX-04／security boundary
+- **変更**: managed-copy install時の regular-file確認済み manifest readerを foundation `readJson`へ統一した。JSON parse失敗をSyntaxErrorとして分類する invalid-json／unreadable diagnostics、object validation、manifest provenance／activation gate、staging lifecycleは維持した。
+- **検証**: plugin managed install／skill plugin loader／plugin pack **3 files／49 tests passed**、foundation adoption **1 file／7 tests passed**、`git diff --check`。
