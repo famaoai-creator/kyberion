@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { generateIndex, runGenerateKnowledgeIndex } from './generate_knowledge_index.js';
+import {
+  generateIndex,
+  runGenerateKnowledgeIndex,
+  validateKnowledgeFrontmatter,
+} from './generate_knowledge_index.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
@@ -25,5 +29,21 @@ describe('generate_knowledge_index', () => {
     expect(source).not.toContain('JSON.parse(content)');
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
+  });
+
+  it('requires frontmatter for non-excluded markdown knowledge', () => {
+    const reads = new Map([
+      ['product/capability-assets/diagram-renderer/README.md', '# Content-first README\n'],
+      ['product/architecture/example.md', '# Explicitly excluded architecture note\n'],
+      ['product/unknown/example.md', '# Missing metadata\n'],
+    ]);
+    const failures = validateKnowledgeFrontmatter(
+      [...reads.keys()],
+      (filePath) => reads.get(filePath.replace(`${pathResolver.knowledge('')}/`, '')) || ''
+    );
+
+    expect(failures).toEqual([
+      'product/unknown/example.md: missing YAML frontmatter and no explicit exclusion',
+    ]);
   });
 });
