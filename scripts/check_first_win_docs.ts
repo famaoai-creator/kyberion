@@ -1,5 +1,6 @@
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const FIRST_WIN_DOCS = [
@@ -16,8 +17,15 @@ export const FIRST_WIN_COMMANDS = [
   'pnpm pipeline --input pipelines/verify-session.json',
 ] as const;
 
+export function readFirstWinDocsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function read(relativePath: string): string {
-  return readTextFile(pathResolver.rootResolve(relativePath));
+  return readFirstWinDocsTextFile(pathResolver.rootResolve(relativePath));
 }
 
 function fenceIsBalanced(markdown: string): boolean {

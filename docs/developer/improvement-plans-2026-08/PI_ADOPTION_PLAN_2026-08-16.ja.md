@@ -910,6 +910,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、documentation source map checkerのentrypoint本文readを`readDocumentationSourceMapTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをsource-map link整合判定へ到達させない回帰を追加した。関連 **2 files／5 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、extension order checkerのlifecycle document本文readを`readExtensionOrderTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをlifecycle contract判定へ到達させない回帰を追加した。関連 **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、facet purity checkerのfacet document本文readを`readFacetPurityTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcross-kind content判定へ到達させない回帰を追加した。関連 **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、first-win docs checkerのREADME／Quickstart／Initialization本文readを`readFirstWinDocsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcanonical command／stage order判定へ到達させない回帰を追加した。関連 **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 
