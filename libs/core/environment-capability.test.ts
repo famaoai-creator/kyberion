@@ -627,9 +627,12 @@ describe('loadEnvironmentManifest', () => {
       for (const gate of expected) {
         expect(commands).toContain(`pnpm -s check -- --only ${gate}`);
       }
+      if (id === 'schema-integrity') {
+        expect(commands).toContain('pnpm -s run check -- --scope pr --only esm');
+      }
       expect(
         commands.some((command) =>
-          /run check:(contract-schemas|catalogs|governance-rules|tier-hygiene)/u.test(command)
+          /run check:(contract-schemas|catalogs|governance-rules|tier-hygiene|esm)/u.test(command)
         )
       ).toBe(false);
     }

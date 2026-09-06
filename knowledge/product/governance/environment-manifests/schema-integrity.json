@@ -57,7 +57,7 @@
       "probe": {
         "kind": "command",
         "command": "pnpm",
-        "args": ["-s", "run", "check:esm"]
+        "args": ["-s", "run", "check", "--", "--scope", "pr", "--only", "esm"]
       },
       "install": {
         "operator_confirmed": true,
