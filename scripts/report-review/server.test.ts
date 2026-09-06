@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { main, runReportReviewServer } from './server.js';
+import { main, readReportReviewTextFile, runReportReviewServer } from './server.js';
 
 describe('report review server harness boundary', () => {
+  it('rejects a directory replacement before report parsing', () => {
+    expect(() => readReportReviewTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('validates a target without binding in dry-run mode', async () => {
     const result = await runReportReviewServer([
       'presence/displays/presence-studio/static/onboarding.html',

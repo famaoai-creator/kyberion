@@ -18,7 +18,7 @@
  */
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { safeWriteFile, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import {
   portableProtocolServicePathRef,
@@ -38,6 +38,13 @@ export interface ReportReviewServerResult {
   artifact_ref: string;
   scope: ReturnType<typeof createReportReviewContext>['scope'];
   listening: boolean;
+}
+
+export function readReportReviewTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 export async function main(
@@ -116,7 +123,7 @@ export async function main(
     return stripBetween(stripBetween(html, CFG_OPEN, CFG_CLOSE), RV_LAYER_OPEN, RV_LAYER_CLOSE);
   }
   function serveHtml(): string {
-    let html = stripInjected(readTextFile(target));
+    let html = stripInjected(readReportReviewTextFile(target));
     const cfg = `${CFG_OPEN}<script>window.__RV_SAVE__={url:'/save',token:'${TOKEN}'};</script>${CFG_CLOSE}`;
     html = /<head[^>]*>/i.test(html)
       ? html.replace(/<head[^>]*>/i, (m) => `${m}\n${cfg}`)
@@ -176,7 +183,7 @@ export async function main(
               return;
             }
             const backup = `${target}.bak-${ts()}`;
-            safeWriteFile(backup, readTextFile(target), {
+            safeWriteFile(backup, readReportReviewTextFile(target), {
               mkdir: true,
               encoding: 'utf8',
             });
