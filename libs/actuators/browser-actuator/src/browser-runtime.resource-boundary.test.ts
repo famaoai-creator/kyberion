@@ -27,8 +27,8 @@ describe('browser runtime resource boundary', () => {
     expect(source).toContain('return safeLstat(filePath).isFile();');
     expect(source).toContain('isVitestProcess()');
     expect(source).not.toContain('process.env.VITEST');
-    expect(source).toContain('parseSafeJsonInput(');
-    expect(source).not.toContain('readJson');
+    expect(source).toContain('readJson(');
+    expect(source).not.toContain('parseSafeJsonInput(');
     expect(source).toContain('browserSessionArtifactPath(BROWSER_SNAPSHOT_DIR, sessionId');
     expect(source).toContain('completeBrowserOperatorApproval(');
   });
