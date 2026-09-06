@@ -113,6 +113,16 @@ describe('imessage bridge processing note', () => {
     );
   });
 
+  it('uses the shared safe JSON parser at Express input boundaries', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/imessage-bridge/src/index.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain("parseSafeJsonObjectValue(req.body, 'BlueBubbles webhook body')");
+    expect(source).toContain("parseSafeJsonObjectValue(req.body ?? {}, 'iMessage request body')");
+  });
+
   it('preserves valid send input without coercing its fields', () => {
     expect(
       parseIMessageBridgeInput({
