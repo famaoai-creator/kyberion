@@ -23273,3 +23273,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_facet_purity.ts`、`scripts/check_facet_purity.test.ts`、PI-03
 - **変更**: facet purity checkerのfacet document本文readを`readFacetPurityTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcross-kind content判定へ到達させないようにした。既存のfacet root、kind、purity semanticsは維持した。
 - **検証**: facet purity **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行（passed）、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1679
+
+- **対象**: `scripts/check_first_win_docs.ts`、`scripts/check_first_win_docs.test.ts`、PI-03
+- **変更**: first-win docs checkerのREADME／Quickstart／Initialization本文readを`readFirstWinDocsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcanonical command／stage order判定へ到達させないようにした。既存のfirst-win command、fence、canonical link semanticsは維持した。
+- **検証**: first-win docs **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行（3 documents OK）、`git diff --check`で確認した。
