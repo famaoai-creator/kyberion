@@ -6,7 +6,6 @@ import {
 } from '@agent/core/surface-mutation-guard';
 import {
   findChronosTokenRegistration,
-  matchesChronosToken,
   readChronosTokenRegistrations,
   type ChronosAccessRole,
   type ChronosTokenRegistration,

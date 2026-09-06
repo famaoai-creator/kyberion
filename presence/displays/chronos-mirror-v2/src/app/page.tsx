@@ -18,15 +18,7 @@ import {
   Type,
   Ruler,
 } from 'lucide-react';
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createChronosWebDesignSystem } from '@agent/core/web-design-system';
 import { AgentOpsBoards } from '../components/AgentOpsBoards';
@@ -65,7 +57,6 @@ import {
   setChronosLocalePreference,
   uxMessage,
   uxText,
-  type SupportedLocale,
 } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 import {

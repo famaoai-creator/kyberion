@@ -183,31 +183,6 @@ function collectMissionStates(): MissionState[] {
   return states;
 }
 
-function missionSearchText(
-  state: MissionState,
-  artifactKinds: string[],
-  artifactCount: number
-): string {
-  return [
-    state.mission_id,
-    state.mission_type,
-    state.assigned_persona,
-    state.tenant_id,
-    state.tenant_slug,
-    state.intent?.source_text,
-    state.intent?.goal_summary,
-    state.intent?.success_condition,
-    state.relationships?.project?.project_id,
-    state.relationships?.track?.track_id,
-    state.relationships?.track?.track_name,
-    ...artifactKinds,
-    artifactCount.toString(),
-  ]
-    .filter((value): value is string => typeof value === 'string' && value.length > 0)
-    .join(' ')
-    .toLowerCase();
-}
-
 function missionSearchTextFromEntry(item: MissionHistoryEntry): string {
   return [
     item.missionId,

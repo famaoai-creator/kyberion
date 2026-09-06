@@ -1,117 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import {
-  getChronosAccessRoleOrThrow,
-  guardRequest,
-  requireChronosAccess,
-  roleToMissionRole,
-} from '../../../lib/api-guard';
-import {
-  resolveViewerContextForRequest,
-  strictViewerScopeTenantSlugs,
-  ViewerContextError,
-  viewerErrorResponse,
-  type ViewerContext,
-} from '../../../lib/viewer-context';
 import { resolveApprovalTenant } from '../../../lib/su-surface-data';
-import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
-import { buildCompanyVisionRef, resolveCompany, type CompanyAggregate } from '@agent/core/company';
+import { buildCompanyVisionRef, type CompanyAggregate } from '@agent/core/company';
 import {
   summarizeApprovalAuditDrilldown,
   summarizeApprovalAuditTrail,
-  type ApprovalAuditDrilldownSummary,
 } from '@agent/core/approval-audit';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
-import {
-  resolveFinanceControllerDecision,
-  type FinanceControllerDecision,
-} from '@agent/core/finance-controller';
-import type { OrganizationWorkLoopSummary } from '@agent/core/work-design';
+import { resolveFinanceControllerDecision } from '@agent/core/finance-controller';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import {
-  collectA2AHandoffs,
-  collectAgentMessages,
-  type AgentMessageSummary,
-  type A2AHandoffSummary,
-} from '../../../lib/agent-message-feed';
-import {
-  collectBrowserConversationSessions,
-  collectBrowserSessions,
-  type BrowserConversationSessionSummary,
-  type BrowserSessionSummary,
-} from '../../../lib/intelligence-observations';
-import {
-  extractMissionDependencies,
-  normalizeMissionAssets,
-  parseTaskBoard,
-  summarizeNextTasks,
-} from '../../../lib/mission-progress';
-import { applyBrowserSessionControl } from '../../../lib/browser-session-control';
-import { buildRuntimeTopology } from '../../../lib/runtime-topology';
-import {
-  collectComputerSessions,
-  type ComputerSessionSummary,
-} from '../../../lib/computer-sessions';
-import {
-  buildExecutionEnv,
-  buildTrackGateReadinessSummaries,
-  buildTrackNextWorkProposal,
   assertSafeRepositoryPath,
-  clearSurfaceOutboxMessage,
-  createDistillCandidateRecord,
-  createNextActionContract,
-  decideApprovalRequest,
-  loadApprovalRequest,
-  normalizeRejectionReasonCategory,
-  enqueueSurfaceNotification,
   emitChannelSurfaceEvent,
-  emitMissionOrchestrationObservation,
-  enqueueMissionOrchestrationEvent,
   ledger,
-  listArtifactRecords,
-  listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
   listApprovalRequests,
-  listDistillCandidateRecords,
-  listMemoryPromotionCandidates,
-  listMissionSeedRecords,
-  listProjectRecords,
-  listProjectTrackRecords,
-  listServiceBindingRecords,
   listSurfaceOutboxMessages,
-  loadDistillCandidateRecord,
-  loadMissionSeedRecord,
-  loadProjectRecord,
-  loadProjectTrackRecord,
   loadSurfaceManifest,
   loadSurfaceState,
-  materializeTrackArtifactSkeleton,
   normalizeSurfaceDefinition,
   pathResolver,
-  promoteMemoryCandidateToKnowledge,
-  promotePersonalMemoryCandidates,
   probeSurfaceHealth,
-  restartAgentRuntime,
-  safeExec,
   safeExistsSync,
   safeLstat,
   safeReadFile,
-  safeReaddir,
-  safeStat,
-  saveDistillCandidateRecord,
-  saveMissionSeedRecord,
-  saveProjectRecord,
-  savePromotedMemoryRecord,
-  startMissionOrchestrationWorker,
-  stopAgentRuntime,
-  summarizeMissionSeedAssessment,
-  updateDistillCandidateRecord,
-  updateMemoryPromotionCandidateStatus,
 } from '../../../lib/intelligence-primitives';
-import { listWorkItems } from '@agent/core/work-coordination';
-import { getProjectManagementView } from '@agent/core/project-management';
-import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
 import { isRecord, readJsonLines } from '@agent/core/foundation';
 import * as intelligenceData from './intelligence-observation-data';
 import {

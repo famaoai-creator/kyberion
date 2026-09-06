@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';

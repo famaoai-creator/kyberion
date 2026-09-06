@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { nowIso } from '@agent/core/foundation';
 import { collectA2AHandoffs, collectAgentMessages } from '../../../../lib/agent-message-feed';
 import { buildRuntimeTopology } from '../../../../lib/runtime-topology';

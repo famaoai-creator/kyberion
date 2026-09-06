@@ -1,45 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
-import {
-  getChronosAccessRoleOrThrow,
-  guardRequest,
-  requireChronosAccess,
-  roleToMissionRole,
-} from '../../../lib/api-guard';
-import {
-  resolveViewerContextForRequest,
-  strictViewerScopeTenantSlugs,
-  strictViewerTier,
-  ViewerContextError,
-  viewerErrorResponse,
-  type ViewerContext,
-} from '../../../lib/viewer-context';
-import { resolveApprovalTenant } from '../../../lib/su-surface-data';
-import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
-import { buildCompanyVisionRef, resolveCompany, type CompanyAggregate } from '@agent/core/company';
-import {
-  summarizeApprovalAuditDrilldown,
-  summarizeApprovalAuditTrail,
-  type ApprovalAuditDrilldownSummary,
-} from '@agent/core/approval-audit';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
-import {
-  resolveFinanceControllerDecision,
-  type FinanceControllerDecision,
-} from '@agent/core/finance-controller';
+import { strictViewerScopeTenantSlugs, strictViewerTier } from '../../../lib/viewer-context';
+import { type CompanyAggregate } from '@agent/core/company';
+import { type ApprovalAuditDrilldownSummary } from '@agent/core/approval-audit';
+import type { FinanceControllerDecision } from '@agent/core/finance-controller';
 import type { OrganizationWorkLoopSummary } from '@agent/core/work-design';
-import { activeCustomer } from '@agent/core/customer-resolver';
+import type { A2AHandoffSummary } from '../../../lib/agent-message-feed';
 import {
-  collectA2AHandoffs,
-  collectAgentMessages,
-  type AgentMessageSummary,
-  type A2AHandoffSummary,
-} from '../../../lib/agent-message-feed';
-import {
-  collectBrowserConversationSessions,
-  collectBrowserSessions,
   type BrowserConversationSessionSummary,
   type BrowserSessionSummary,
 } from '../../../lib/intelligence-observations';
@@ -51,69 +19,20 @@ import {
   summarizeNextTasks,
 } from '../../../lib/mission-progress';
 import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission-next-task-reader';
-import { applyBrowserSessionControl } from '../../../lib/browser-session-control';
-import { buildRuntimeTopology } from '../../../lib/runtime-topology';
+import type { ComputerSessionSummary } from '../../../lib/computer-sessions';
 import {
-  collectComputerSessions,
-  type ComputerSessionSummary,
-} from '../../../lib/computer-sessions';
-import {
-  buildExecutionEnv,
-  buildTrackGateReadinessSummaries,
-  buildTrackNextWorkProposal,
-  clearSurfaceOutboxMessage,
-  createDistillCandidateRecord,
   createNextActionContract,
-  decideApprovalRequest,
-  loadApprovalRequest,
-  normalizeRejectionReasonCategory,
-  enqueueSurfaceNotification,
-  emitChannelSurfaceEvent,
-  emitMissionOrchestrationObservation,
-  enqueueMissionOrchestrationEvent,
-  ledger,
-  listArtifactRecords,
-  listAgentRuntimeLeaseSummaries,
-  listAgentRuntimeSnapshots,
-  listApprovalRequests,
-  listDistillCandidateRecords,
-  listMemoryPromotionCandidates,
-  listMissionSeedRecords,
-  listProjectRecords,
-  listProjectTrackRecords,
-  listServiceBindingRecords,
-  listSurfaceOutboxMessages,
-  loadDistillCandidateRecord,
-  loadMissionSeedRecord,
-  loadProjectRecord,
-  loadProjectTrackRecord,
-  loadSurfaceManifest,
-  loadSurfaceState,
-  materializeTrackArtifactSkeleton,
-  normalizeSurfaceDefinition,
-  pathResolver,
   assertSafeRepositoryPath,
-  promoteMemoryCandidateToKnowledge,
-  promotePersonalMemoryCandidates,
-  probeSurfaceHealth,
-  restartAgentRuntime,
-  safeExec,
+  listDistillCandidateRecords,
+  listProjectRecords,
+  loadProjectRecord,
+  pathResolver,
   safeExistsSync,
   safeLstat,
   safeReadFile,
   safeReaddir,
-  saveDistillCandidateRecord,
-  saveMissionSeedRecord,
-  saveProjectRecord,
-  savePromotedMemoryRecord,
-  startMissionOrchestrationWorker,
-  stopAgentRuntime,
-  summarizeMissionSeedAssessment,
-  updateDistillCandidateRecord,
-  updateMemoryPromotionCandidateStatus,
 } from '../../../lib/intelligence-primitives';
 import { listWorkItems } from '@agent/core/work-coordination';
-import { getProjectManagementView } from '@agent/core/project-management';
 import { listMissionsInSearchDirs, loadState, loadStateAtPath } from '@agent/core/mission-state';
 
 export interface RuntimeTopologySurfaceInput {

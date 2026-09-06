@@ -172,25 +172,6 @@ export default [
     },
   },
   {
-    // Deferred, not waived. Measured 2026-08-27 against the widened rule above;
-    // this surface holds 673 of the 840 repo-wide findings and is dominated by
-    // one mechanical pattern, so it is carved out by name
-    // (never by a blanket `off`) and shrink as each is decomposed:
-    //   presence/displays/chronos-mirror-v2  673 — a ~150-key view-model
-    //     destructure in ChronosMirrorLegacySections.tsx plus the mission
-    //     intelligence panels re-destructuring the same model.
-    // The remaining exception is intentionally limited to the Chronos
-    // view/data surface; voice-hub and Presence Studio reached zero after
-    // their legacy imports and helpers were removed.
-    // Every other file under libs/, scripts/, satellites/ and presence/ is
-    // clean and enforced. Remove an entry here once its file(s) reach zero;
-    // do not add one without a count and a decomposition reason.
-    files: ['presence/displays/chronos-mirror-v2/**/*.{ts,tsx}'],
-    rules: {
-      '@typescript-eslint/no-unused-vars': 'off',
-    },
-  },
-  {
     // Keep the editor rule on the maintained production trees. The module
     // boundary checker remains the authoritative full-graph ratchet.
     files: ['libs/**/*.ts', 'scripts/**/*.ts'],

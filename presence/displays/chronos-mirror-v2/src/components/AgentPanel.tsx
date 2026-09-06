@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, RefreshCw, Cpu, X, FileText, Terminal, RotateCcw } from 'lucide-react';
-import { resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
+import { resolveChronosLocale, uxTextOr } from '../lib/ux-vocabulary';
 import {
   parseAgentHealthResponse,
   type ClientAgentHealthResponse,

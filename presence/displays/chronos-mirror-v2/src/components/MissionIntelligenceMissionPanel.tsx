@@ -1,43 +1,19 @@
 /* Mission control cards are kept separate from the data/effect controller. */
 'use client';
 
-import {
-  Activity,
-  AlertTriangle,
-  Bot,
-  Brain,
-  GitBranch,
-  Radar,
-  Send,
-  ShieldAlert,
-} from 'lucide-react';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import {
   ActionDetailList,
   ActionGuidance,
   ActionStatusBadge,
   actionButtonClass,
-  attentionActionLabel,
-  attentionNextStepLabel,
-  attentionReasonLabel,
-  attentionSourceLabel,
-  buildApprovalWorkLoopPreview,
-  buildArtifactWorkLoopPreview,
   buildDangerousActionPrompt,
-  buildDistillCandidateWorkLoopPreview,
   buildMissionSeedWorkLoopPreview,
-  buildMissionThread,
   buildProjectWorkLoopPreview,
   getActionDefinition,
-  getGlobalSurfaceControlAction,
   getLatestMissionControlAction,
-  getLatestSurfaceControlAction,
-  messageToneClass,
-  messageTypeLabel,
-  missionActionLabel,
   missionStatusLabel,
   missionSummaryBadgeClass,
-  surfaceSummaryBadgeClass,
   toDomId,
 } from './MissionIntelligenceViewHelpers';
 import { Panel, providerResolutionSummary } from './MissionIntelligencePrimitives';
@@ -67,19 +43,10 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
     effectiveMissionId,
     learnedProjectRefs,
     learnedMissionSeedRefs,
-    deliveryExceptions,
     filteredMissions,
     filteredServiceBindings,
     filteredMissionSeedsByTrack,
     hydratedTracks,
-    missionProgress,
-    runtime,
-    runtimeLeases,
-    runtimeDoctor,
-    runtimeTopology,
-    recentSurfaceOutbox,
-    projectManagement,
-    missionSeedAssessment,
     requestDangerousAction,
     clearOutboxMessage,
     createTrackSeed,
@@ -105,9 +72,6 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
     actions.map((action) => action.disabledReason).find((reason) => Boolean(reason)) || null;
   const getAvailableMissionActions = (payload: any, missionId: string) =>
     payload.controlActionAvailability.mission[missionId] || payload.controlActionCatalog.mission;
-  const getAvailableSurfaceActions = (payload: any, surfaceId: string) =>
-    payload.controlActionAvailability.surface[surfaceId] || payload.controlActionCatalog.surface;
-
   return (
     <section className="grid gap-4 lg:grid-cols-[1.25fr,1fr,1fr]">
       <Panel

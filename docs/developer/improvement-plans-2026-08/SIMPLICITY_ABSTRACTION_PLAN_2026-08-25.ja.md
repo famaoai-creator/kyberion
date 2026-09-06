@@ -1,7 +1,7 @@
 ---
 title: SIMPLICITY ABSTRACTION PLAN 2026 08 25
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-06
+last_updated: 2026-09-07
 status: active
 ---
 
@@ -24083,3 +24083,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: vital-checkのrepository probe境界、SX-07／SX-09
 - **変更**: `system:probe` に明示的な `allow_symlink_leaf` を追加し、読み取り専用probeがrepository直下の最終symlink（workspaceの `node_modules` など）だけを検査できるようにした。中間パスのsymlink traversalは従来どおり拒否し、vital-checkへこの例外を限定適用した。静的schema・op catalog・secure-io regression testも同時に更新した。
 - **検証**: secure-io／system-actuator probe **2 files／3 tests passed**、vital-check実行、対象schema／op contract、対象ESLint、Prettier、`git diff --check`。golden snapshotは再生成していない。
+
+## 2026-09-07 再レビュー実装 1814
+
+- **対象**: Chronos Mirrorのno-unused-vars残存と例外設定、SX-02／SX-12
+- **変更**: Chronos Mirror v2で未使用だったLegacy/Shellの大規模destructure、Mission Intelligenceのpanel・API route・補助関数のimport／context値を整理し、不要な旧ローカルストレージ補助関数と検索補助関数を削除した。Approval／Distill／Memory Promotionのhandlerを親からpanelへ明示的に渡す不足も同時に修正した。これによりChronos専用のno-unused-vars例外設定を削除し、通常のproduction source lintへ復帰した。
+- **検証**: Chronos source ESLint **0 errors**、forced no-unused-vars **0 errors**、Mission Intelligence／intelligence API **7 files／29 tests passed**、agent／collaboration API **8 files／59 tests passed**、Prettier、`git diff --check`。全体typecheckは既存の`presence-studio-runtime-data.boundary.test.ts:46`における`string | Buffer`への`.match`型エラーで停止した。

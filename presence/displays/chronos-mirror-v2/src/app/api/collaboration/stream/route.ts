@@ -9,7 +9,6 @@ import {
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
-  eventScopeFromRecord,
   eventScopeMatches,
   parseEventScopeFromRecord,
   type EventScopeFilter,
