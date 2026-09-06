@@ -23225,3 +23225,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_capability_seams_ast.ts`、`scripts/check_capability_seams_ast.entrypoint.test.ts`、PI-03
 - **変更**: capability seams AST checkerのproduction source／generated graph本文readを`readCapabilitySeamsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをAST／graph整合判定へ到達させないようにした。既存のAST declaration、catalog、graph semanticsは維持した。
 - **検証**: capability seams AST **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミット`camera-output-bridge`に対する生成graph差分を表示したため、生成物は変更せず継続課題とした。
+
+## 2026-09-06 再レビュー実装 1671
+
+- **対象**: `scripts/check_channel_adapter_adoption.ts`、`scripts/check_channel_adapter_adoption.test.ts`、PI-03
+- **変更**: channel adapter adoption checkerのbridge source本文readを`readChannelAdapterTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをadapter adoption判定へ到達させないようにした。既存のformatter、delivery、approval gate semanticsは維持した。
+- **検証**: channel adapter adoption **2 files／4 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
