@@ -23777,3 +23777,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: foundation JSON readerのサイズ／label options と source-analysis package manifest、SX-03
 - **変更**: foundation `readJson`／`loadJsonIfPresent` が既存 `FoundationReadOptions`（`maxSizeMB`／`label`）をsecure-io bridgeへ伝播できるようにし、4MB上限付きの source-analysis package manifestを旧 `readTextFile` + `parseSafeJsonInput` から移行した。サイズ制限、label付きparse error、dangerous-key拒否、malformed metadataのfail-soft、source analysis IR semanticsは維持した。
 - **検証**: foundation JSON／secure-io／source-analysis **4 files／62 tests passed**、foundation adoption **1 file／7 tests passed**、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1763
+
+- **対象**: Chronos Mirror trace-feed の operation-time resource boundary、SX-04／SX-09／PI-03
+- **変更**: trace directoryの列挙時だけでなく、JSONLを読む直前にも repository path・存在・regular-file を再確認するようにした。列挙後のdirectory置換を空のfeedとしてfail-closedにし、既存のsymlink除外、malformed行skip、tenant／tier projectionは維持した。
+- **検証**: trace-feed **1 file／13 tests passed**、resource-loader inventory **1 file／12 tests passed・needs-review 0**、対象ESLint、Prettier、`git diff --check`。
