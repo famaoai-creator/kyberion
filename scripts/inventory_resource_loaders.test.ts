@@ -207,4 +207,77 @@ describe('resource loader inventory', () => {
       },
     ]);
   });
+
+  it('follows a relative barrel export to a regular-file helper', () => {
+    const importer = '/repo/libs/consumer.ts';
+    const barrel = '/repo/libs/resource-guards.ts';
+    const helper = '/repo/libs/file-guards.ts';
+    const sourceByFile = new Map([
+      [
+        importer,
+        [
+          "import { assertRegularArtifact as assertArtifact } from './resource-guards.js';",
+          'assertArtifact(filePath);',
+          'return readJson(filePath);',
+        ].join('\n'),
+      ],
+      [barrel, "export { assertRegularArtifact } from './file-guards.js';"],
+      [
+        helper,
+        [
+          'export function assertRegularArtifact(filePath: string): void {',
+          '  if (!safeLstat(filePath).isFile()) throw new Error("not a file");',
+          '}',
+        ].join('\n'),
+      ],
+    ]);
+
+    expect(
+      collectImportedRegularFileHelperNames(
+        importer,
+        sourceByFile.get(importer) ?? '',
+        sourceByFile
+      )
+    ).toEqual(new Set(['assertArtifact']));
+  });
+
+  it('follows export-star barrels but keeps package imports unclassified', () => {
+    const importer = '/repo/libs/consumer.ts';
+    const barrel = '/repo/libs/index.ts';
+    const helper = '/repo/libs/file-guards.ts';
+    const sourceByFile = new Map([
+      [
+        importer,
+        [
+          "import { assertRegularArtifact } from './index.js';",
+          'assertRegularArtifact(filePath);',
+          'return readJson(filePath);',
+        ].join('\n'),
+      ],
+      [barrel, "export * from './file-guards.js';"],
+      [
+        helper,
+        [
+          'export function assertRegularArtifact(filePath: string): void {',
+          '  if (!safeStat(filePath).isFile()) throw new Error("not a file");',
+          '}',
+        ].join('\n'),
+      ],
+    ]);
+
+    expect(
+      collectImportedRegularFileHelperNames(
+        importer,
+        sourceByFile.get(importer) ?? '',
+        sourceByFile
+      )
+    ).toEqual(new Set(['assertRegularArtifact']));
+    expect(
+      collectImportedRegularFileHelperNames(
+        importer,
+        "import { safeArtifactPath } from '@agent/core/secure-io';",
+        sourceByFile
+      )
+    ).toEqual(new Set());
+  });
 });

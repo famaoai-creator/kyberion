@@ -114,6 +114,105 @@ function resolveRelativeImportSource(
   return candidates.find((candidate) => sourceByFile.has(candidate));
 }
 
+function parseNamedBindings(bindings: string): Array<{ imported: string; exported: string }> {
+  return bindings
+    .split(',')
+    .map((binding) => binding.trim())
+    .filter(Boolean)
+    .map((binding) => {
+      const [imported, exported = imported] = binding
+        .replace(/^type\s+/u, '')
+        .split(/\s+as\s+/u)
+        .map((value) => value.trim());
+      return { imported, exported };
+    });
+}
+
+/**
+ * Resolve the regular-file helpers a module exposes through relative exports.
+ * This deliberately follows only source-visible relative modules; package
+ * barrels remain unclassified because their implementation is outside the
+ * inventory's source map.
+ */
+function collectExportedRegularFileHelperNames(
+  file: string,
+  sourceByFile: ReadonlyMap<string, string>,
+  visiting = new Set<string>()
+): Set<string> {
+  if (visiting.has(file)) return new Set();
+  const source = sourceByFile.get(file);
+  if (!source) return new Set();
+  const nextVisiting = new Set(visiting).add(file);
+  const exported = new Set<string>();
+  const localHelpers = collectRegularFileHelperNames(source);
+  for (const name of localHelpers) {
+    if (
+      new RegExp(`export\\s+(?:async\\s+)?(?:function|const|let|var)\\s+${name}\\b`, 'u').test(
+        source
+      )
+    ) {
+      exported.add(name);
+    }
+  }
+
+  const importedNames = new Map<string, string>();
+  const importPattern = /import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"]/gu;
+  for (const match of source.matchAll(importPattern)) {
+    const importedFile = resolveRelativeImportSource(file, match[2], sourceByFile);
+    if (!importedFile) continue;
+    for (const binding of parseNamedBindings(match[1])) {
+      importedNames.set(binding.exported, `${importedFile}\u0000${binding.imported}`);
+    }
+  }
+
+  const resolveFrom = (specifier: string, name: string): boolean => {
+    const importedFile = resolveRelativeImportSource(file, specifier, sourceByFile);
+    return importedFile
+      ? collectExportedRegularFileHelperNames(importedFile, sourceByFile, nextVisiting).has(name)
+      : false;
+  };
+
+  const exportFromPattern = /export\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"]/gu;
+  for (const match of source.matchAll(exportFromPattern)) {
+    for (const binding of parseNamedBindings(match[1])) {
+      if (resolveFrom(match[2], binding.imported)) exported.add(binding.exported);
+    }
+  }
+
+  const exportStarPattern = /export\s*\*\s*from\s*['"]([^'"]+)['"]/gu;
+  for (const match of source.matchAll(exportStarPattern)) {
+    for (const name of collectExportedRegularFileHelperNames(
+      resolveRelativeImportSource(file, match[1], sourceByFile) || '',
+      sourceByFile,
+      nextVisiting
+    )) {
+      exported.add(name);
+    }
+  }
+
+  const localExportPattern = /export\s*\{([\s\S]*?)\}\s*;?/gu;
+  for (const match of source.matchAll(localExportPattern)) {
+    for (const binding of parseNamedBindings(match[1])) {
+      const imported = importedNames.get(binding.imported);
+      if (!imported) {
+        if (localHelpers.has(binding.imported)) exported.add(binding.exported);
+        continue;
+      }
+      const separator = imported.indexOf('\u0000');
+      const importedFile = imported.slice(0, separator);
+      const importedName = imported.slice(separator + 1);
+      if (
+        collectExportedRegularFileHelperNames(importedFile, sourceByFile, nextVisiting).has(
+          importedName
+        )
+      ) {
+        exported.add(binding.exported);
+      }
+    }
+  }
+  return exported;
+}
+
 /**
  * Resolve only named relative imports whose target module proves a
  * regular-file check in the helper body. Package/barrel imports remain
@@ -132,7 +231,7 @@ export function collectImportedRegularFileHelperNames(
     const specifier = match[2];
     const importedFile = resolveRelativeImportSource(importer, specifier, sourceByFile);
     if (!importedFile) continue;
-    const targetNames = collectRegularFileHelperNames(sourceByFile.get(importedFile) ?? '');
+    const targetNames = collectExportedRegularFileHelperNames(importedFile, sourceByFile);
     for (const binding of bindings.split(',')) {
       const normalized = binding.replace(/\btype\s+/u, '').trim();
       if (!normalized) continue;
