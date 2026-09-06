@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 import {
   findDuplicatePackageExportKeys,
+  findMissingPackageExportTargets,
   findUnexportedCoreSubpathImports,
   readPackagingTextFile,
 } from './check_packaging_contract.js';
@@ -40,6 +41,18 @@ describe('check_packaging_contract', () => {
 }`;
 
     expect(findDuplicatePackageExportKeys(raw)).toEqual([]);
+  });
+
+  it('detects package export targets missing from the built package', () => {
+    expect(
+      findMissingPackageExportTargets(
+        {
+          './one': { types: './dist/one.d.ts', default: './dist/one.js' },
+          './two': { types: './dist/two.d.ts' },
+        },
+        new Set(['./dist/one.d.ts', './dist/two.d.ts'])
+      )
+    ).toEqual(['./one.default -> ./dist/one.js']);
   });
 
   it('detects production imports that are absent from the package exports map', () => {
