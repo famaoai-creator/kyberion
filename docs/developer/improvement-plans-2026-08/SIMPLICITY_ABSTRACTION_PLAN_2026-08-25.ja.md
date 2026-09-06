@@ -23897,3 +23897,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: mission orchestration journal の durable entry／provisioned-entry JSONL loader、SX-03／SX-09／SX-11
 - **変更**: regular-file確認済みの2つのmission journal JSONL読込を、手書きの行分割・safe JSON parseから foundation `readJsonLines`へ統一した。malformed／schema／normalization errorを従来の行番号付き `MISSION_LOG_CORRUPT` に包み、provisioned／verified phase、replay recovery、scope boundary semanticsは維持した。
 - **検証**: mission-orchestration-journal **1 file／14 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1783
+
+- **対象**: customer stance audit mirror の JSONL reader、SX-03／SX-04／SX-09
+- **変更**: mirror fileの手書き行分割・safe JSON parse・audit entry normalizationを foundation `readJsonLines`へ統一した。malformed／schema errorは既存のpath／line付き `AUDIT_MIRROR_INVALID` に包み、tenant mirrorのfingerprint／quarantine／rebuild semanticsは維持した。
+- **検証**: audit-mirror entrypoint **1 file／2 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。

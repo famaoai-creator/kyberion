@@ -29,7 +29,7 @@ import {
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import type { AuditEntry } from '@agent/core/audit-chain';
-import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
+import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const AUDIT_MIRROR_APPROVAL_CHANNEL = 'terminal';
@@ -99,21 +99,14 @@ function entryFingerprint(entries: AuditEntry[]): string {
 
 function parseMirrorFile(filePath: string, rootDir = pathResolver.rootDir()): AuditEntry[] {
   const safePath = assertSafeRepositoryPath(filePath, { rootDir });
-  const raw = readTextFile(safePath);
-  const entries: AuditEntry[] = [];
-  for (const [index, line] of raw.split(/\r?\n/).entries()) {
-    if (!line.trim()) continue;
-    try {
-      entries.push(
-        normalizePersistedAuditEntry(parseSafeJsonInput(line, `${safePath}:${index + 1}`))
-      );
-    } catch (error) {
+  return readJsonLines<AuditEntry>(safePath, {
+    map: (value) => normalizePersistedAuditEntry(value),
+    onMalformed: (error, lineNumber) => {
       throw new Error(
-        `[AUDIT_MIRROR_INVALID] ${safePath}:${index + 1} is not valid JSON: ${String(error)}`
+        `[AUDIT_MIRROR_INVALID] ${safePath}:${lineNumber} is not valid JSON: ${String(error)}`
       );
-    }
-  }
-  return entries;
+    },
+  });
 }
 
 function loadMirrorEntries(mirrorDir: string, rootDir = pathResolver.rootDir()): AuditEntry[] {

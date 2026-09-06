@@ -9,10 +9,10 @@ describe('audit mirror reconcile entrypoint', () => {
 
     expect(source).toContain('context.print(outcome.result)');
     expect(source).toContain('new ScriptExitError(');
-    expect(source).toContain('parseSafeJsonInput(line,');
+    expect(source).toContain('readJsonLines<AuditEntry>(safePath');
     expect(source).not.toContain('JSON.parse(line)');
     expect(source).not.toContain('console.log(');
-    expect(source).toContain('nowIso, parseSafeJsonInput, readTextFile');
+    expect(source).toContain('nowIso, readJsonLines');
   });
 
   it('handles help without entering the reconciliation write path', () => {
