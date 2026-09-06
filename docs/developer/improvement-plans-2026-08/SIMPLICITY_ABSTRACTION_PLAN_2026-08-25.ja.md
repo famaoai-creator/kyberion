@@ -23903,3 +23903,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: customer stance audit mirror の JSONL reader、SX-03／SX-04／SX-09
 - **変更**: mirror fileの手書き行分割・safe JSON parse・audit entry normalizationを foundation `readJsonLines`へ統一した。malformed／schema errorは既存のpath／line付き `AUDIT_MIRROR_INVALID` に包み、tenant mirrorのfingerprint／quarantine／rebuild semanticsは維持した。
 - **検証**: audit-mirror entrypoint **1 file／2 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1784
+
+- **対象**: protocol service lifecycle receipt の strict JSONL reader、SX-03／SX-09／SX-11
+- **変更**: regular-file確認済みのprotocol lifecycle receipt JSONLを foundation `readJsonLines`へ統一した。malformed JSONは従来どおり行番号付きinvalid receiptへ変換し、schema／scope validation errorはdomain validationとして従来どおり表面化する。service／tenant scopeとreceipt projection semanticsは維持した。
+- **検証**: protocol-service-lifecycle **1 file／7 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
