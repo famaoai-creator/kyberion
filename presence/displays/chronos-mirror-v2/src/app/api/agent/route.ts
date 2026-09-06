@@ -857,6 +857,9 @@ async function tryHandleChronosQuickAction(
       const securityPolicyPath = core.pathResolver.knowledge(
         'public/governance/security-policy.json'
       );
+      if (!core.safeLstat(securityPolicyPath).isFile()) {
+        throw new Error('Chronos security policy must be a regular file');
+      }
       const securityPolicy = readJson(securityPolicyPath);
       const chronosPolicy = securityPolicy.authority_role_permissions?.chronos_operator || {};
       return {
@@ -1171,6 +1174,9 @@ export async function POST(req: NextRequest) {
       sessionId,
       requesterId,
     });
+    if (!core.safeLstat(requestArtifactPath).isFile()) {
+      throw new Error('Chronos surface request artifact must be a regular file');
+    }
     const requestArtifact = parseChronosSurfaceRequestArtifact(
       readJson<unknown>(requestArtifactPath)
     );
