@@ -18,8 +18,8 @@ const EDGE_RUNTIME_ENV_READ_ALLOWLIST: ReadonlyMap<string, ReadonlyMap<string, n
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
 const JSON_LOADER_RATCHET = 0;
 /**
- * A few actuator boundaries intentionally parse data produced by an external
- * CLI or a simulator after it has been copied into a repository-safe path.
+ * A few boundaries intentionally parse external CLI, simulator, wire, or
+ * canonical secure-io data after it has crossed into a repository-safe path.
  * Keep those existing boundaries explicit while preventing the pattern from
  * spreading to new source files.
  */
@@ -50,11 +50,6 @@ const LEGACY_JSON_BOUNDARY_ALLOWLIST: ReadonlyMap<string, { count: number; reaso
       { count: 1, reason: 'encrypted A2A wire payload after decryption' },
     ],
     ['libs/core/secure-io.ts', { count: 1, reason: 'canonical secure JSON implementation' }],
-    ['presence/bridge/terminal/server.ts', { count: 1, reason: 'terminal control wire payload' }],
-    [
-      'presence/bridge/terminal/session-utils.ts',
-      { count: 1, reason: 'terminal session wire payload' },
-    ],
     [
       'presence/displays/chronos-mirror-v2/src/lib/trace-feed.ts',
       { count: 2, reason: 'legacy trace-feed JSONL entries' },

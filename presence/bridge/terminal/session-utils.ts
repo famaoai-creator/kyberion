@@ -1,10 +1,9 @@
 import * as path from 'node:path';
-import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, readJson } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
 
@@ -254,8 +253,7 @@ export function readPersistedSessionState(statePath: string): PersistedSessionSt
   try {
     const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safeStatePath) || !safeLstat(safeStatePath).isFile()) return null;
-    const content = safeReadFile(safeStatePath, { encoding: 'utf8' }) as string;
-    return parsePersistedSessionState(parseSafeJsonInput(content, 'terminal session state'));
+    return parsePersistedSessionState(readJson<unknown>(safeStatePath));
   } catch {
     return null;
   }
