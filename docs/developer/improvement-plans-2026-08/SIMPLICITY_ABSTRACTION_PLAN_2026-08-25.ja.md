@@ -23333,3 +23333,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_mission_process_bindings.ts`、`scripts/check_mission_process_bindings.test.ts`、PI-03
 - **変更**: mission process bindings checkerのphase frontmatter本文readを`readMissionProcessBindingsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをmission governance binding判定へ到達させないようにした。既存のgoverned catalog、scenario、playbook、phase semanticsは維持した。
 - **検証**: mission process bindings **2 files／3 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1689
+
+- **対象**: `scripts/check_ux_contract_docs.ts`、`scripts/check_ux_contract_docs.test.ts`、PI-03
+- **変更**: UX contract docs checkerのpublic document本文readを`readUxContractDocsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをplain-language／surface tagline判定へ到達させないようにした。既存のfront-door、vocabulary、surface role semanticsは維持した。
+- **検証**: UX contract docs **2 files／3 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。

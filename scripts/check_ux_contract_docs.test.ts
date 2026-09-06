@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { checkUxContractDocs } from './check_ux_contract_docs.js';
+import { checkUxContractDocs, readUxContractDocsTextFile } from './check_ux_contract_docs.js';
 
 describe('UX contract docs', () => {
   it('keeps the public front door in plain language', () => {
@@ -15,8 +15,15 @@ describe('UX contract docs', () => {
     );
     expect(source).toContain('loadSurfaceRoleCatalog()');
     expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain('readUxContractDocsTextFile(filePath: string)');
     expect(source).not.toContain('safeReadFile(');
     expect(source).not.toContain("pathResolver.knowledge('product/governance/surface-roles.json')");
     expect(source).not.toContain('readJson<');
+  });
+
+  it('rejects a directory before reading a contract document', () => {
+    expect(() => readUxContractDocsTextFile(pathResolver.rootResolve('docs'))).toThrow(
+      'must be a regular file'
+    );
   });
 });

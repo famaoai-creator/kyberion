@@ -1,5 +1,6 @@
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
 import { loadSurfaceRoleCatalog } from '@agent/core/surface-role-catalog';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -13,8 +14,15 @@ export const UX_CONTRACT_DOCS = [
 const INTERNAL_TERMS = /\b(?:mission|actuator|ADF|packet|ledger|capability bundle)\b/giu;
 const EXTERNAL_TERMS = [/\brequest\b/iu, /\bplan\b/iu, /\bresult\b/iu, /\bnext action\b/iu];
 
+export function readUxContractDocsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function read(relativePath: string): string {
-  return readTextFile(pathResolver.rootResolve(relativePath));
+  return readUxContractDocsTextFile(pathResolver.rootResolve(relativePath));
 }
 
 function frontDoor(markdown: string): string {
