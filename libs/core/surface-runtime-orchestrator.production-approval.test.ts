@@ -93,28 +93,34 @@ describe('surface approval wiring with the real intent and routing contracts', (
     );
   });
 
-  it.each(['slack', 'chronos', 'presence', 'imessage', 'discord', 'telegram'] as const)(
-    'keeps approval gating consistent on the %s surface',
-    async (surface) => {
-      const { runSurfaceMessageConversation } = await import('./surface-runtime-orchestrator.js');
+  it.each([
+    'slack',
+    'chronos',
+    'presence',
+    'imessage',
+    'discord',
+    'telegram',
+    'cowork',
+    'cli',
+  ] as const)('keeps approval gating consistent on the %s surface', async (surface) => {
+    const { runSurfaceMessageConversation } = await import('./surface-runtime-orchestrator.js');
 
-      const result = await runSurfaceMessageConversation({
-        surface,
-        channel: 'ops',
-        threadTs: `production-wiring-${surface}`,
-        text: 'secretを更新して',
-        actorId: 'operator-1',
-        senderAgentId: 'test-sender',
-      });
+    const result = await runSurfaceMessageConversation({
+      surface,
+      channel: 'ops',
+      threadTs: `production-wiring-${surface}`,
+      text: 'secretを更新して',
+      actorId: 'operator-1',
+      senderAgentId: 'test-sender',
+    });
 
-      expect(result.intentResolution).toMatchObject({
-        normalized_intent: 'rotate-integration-secret',
-        authority_level: 'approval_required',
-        next_action: { kind: 'request_approval' },
-      });
-      expect(result.approvalRequests).toHaveLength(1);
-      expect(result.text).toContain('承認待ちです。まだ実行していません。');
-      expect(mocks.ask).not.toHaveBeenCalled();
-    }
-  );
+    expect(result.intentResolution).toMatchObject({
+      normalized_intent: 'rotate-integration-secret',
+      authority_level: 'approval_required',
+      next_action: { kind: 'request_approval' },
+    });
+    expect(result.approvalRequests).toHaveLength(1);
+    expect(result.text).toContain('承認待ちです。まだ実行していません。');
+    expect(mocks.ask).not.toHaveBeenCalled();
+  });
 });
