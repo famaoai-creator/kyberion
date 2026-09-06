@@ -5,12 +5,19 @@ import {
   formatReasoningBackendMenu,
   listReasoningBackendChoices,
   normalizeReasoningBackendChoice,
+  readReasoningSelectionTextFile,
   readPersistedReasoningBackend,
   resolveReasoningBackendMenuSelection,
   upsertEnvVarLine,
 } from './reasoning_backend_selection.js';
 
 describe('reasoning_backend_selection', () => {
+  it('rejects a directory replacement before preference parsing', () => {
+    expect(() => readReasoningSelectionTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation reader for persisted operator preferences', () => {
     const source = readTextFile(pathResolver.rootResolve('scripts/reasoning_backend_selection.ts'));
     expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");

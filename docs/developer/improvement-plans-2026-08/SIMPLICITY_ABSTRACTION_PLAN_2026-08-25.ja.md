@@ -23183,3 +23183,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/migrate_peer_tenant_runtime.ts`、`scripts/migrate_peer_tenant_runtime.test.ts`、PI-03
 - **変更**: peer tenant migrationのplan生成／apply再検証本文readを`readMigrationTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant分割・hash再検証へ到達させないようにした。既存のtenant split、quarantine、migration plan semanticsは維持した。
 - **検証**: peer tenant migration **2 files／6 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1664
+
+- **対象**: `scripts/reasoning_backend_selection.ts`、`scripts/reasoning_backend_selection.test.ts`、PI-03
+- **変更**: reasoning backend selectionの`.env.local` preference readを`readReasoningSelectionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをbackend／persona preference解析へ到達させないようにした。既存のpolicy-derived choicesとdotenv upsert semanticsは維持した。
+- **検証**: reasoning backend selection **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
