@@ -24005,3 +24005,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Presence Studio UI vocabulary query boundary、SX-09／SX-14
 - **変更**: `/api/ui-vocabulary` の locale query を共有 `readSurfaceStringParam` 経由へ統一し、配列・object-shaped input の暗黙文字列化を防止した。単一 string 以外は既定 localeへ閉じ、catalog lookupと既存のlocale normalizationを維持した。
 - **検証**: Presence Studio route-parameter boundary **1 file／1 test passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1801
+
+- **対象**: OAuth callback surface query boundary、SX-09／SX-14
+- **変更**: OAuth callbackの5 query値を共有 `readSurfaceStringParam`へ統一し、重複・object-shaped inputの暗黙変換を防止した。OAuth completion、provider error表示、HTML escaping semanticsは維持した。
+- **検証**: OAuth callback surface **1 file／4 tests passed**、対象ESLint、Prettier、`git diff --check`。
