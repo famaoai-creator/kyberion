@@ -23159,3 +23159,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_tier_hygiene.ts`、`scripts/check_tier_hygiene.test.ts`、PI-03
 - **変更**: tier hygiene checkerのpersistent fixture／public-tier本文readを`readTierHygieneTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtier leak判定へ到達させないようにした。unreadable inputをscan対象から除外する既存semanticsは維持した。
 - **検証**: tier hygiene **2 files／2 focused tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1660
+
+- **対象**: `scripts/check_ui_ux_governance.ts`、`scripts/check_ui_ux_governance.test.ts`、PI-03
+- **変更**: UI/UX governance checkerのoperator source／generated token／dashboard本文readを`readUiUxGovernanceTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをhardcoded-color・semantic-token・status vocabulary判定へ到達させないようにした。既存のtoken欠落、raw color、dashboard status semanticsは維持した。
+- **検証**: UI/UX governance **2 files／4 tests passed**、対象ESLint、Prettier、checker direct JSON実行、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
