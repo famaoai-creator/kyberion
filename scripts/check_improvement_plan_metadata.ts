@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
-import { safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -48,8 +48,15 @@ export interface PlanFrontmatterDefaults {
   status?: PlanMetadata['status'];
 }
 
-function read(filePath: string): string {
+export function readImprovementPlanTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
   return readTextFile(filePath);
+}
+
+function read(filePath: string): string {
+  return readImprovementPlanTextFile(filePath);
 }
 
 export function parseFrontmatter(markdown: string): Record<string, string> | null {
