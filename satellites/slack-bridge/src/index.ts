@@ -384,16 +384,22 @@ async function reflectSlackPresence(params: {
 function automationRegistrationReply(
   registration: ReturnType<typeof registerAutomationBlueprint>
 ): string {
+  const locale = resolveOperatorLocale();
   const scheduled = registration.scheduled;
   if (!scheduled) {
-    return t('bridge:automation_missing_bindings', undefined, 'ja');
+    return t('bridge:automation_missing_bindings', undefined, locale);
   }
+  const timezone = scheduled.trigger.timezone ? ` (${scheduled.trigger.timezone})` : '';
   const delivery = scheduled.deliver_to
     ? ` → ${scheduled.deliver_to.surface}:${scheduled.deliver_to.channel}`
     : '';
   return [
-    `スケジュールを登録しました: ${scheduled.name}`,
-    `cron: ${scheduled.trigger.cron}${scheduled.trigger.timezone ? ` (${scheduled.trigger.timezone})` : ''}${delivery}`,
+    t('bridge:automation_registered', { name: scheduled.name }, locale),
+    t(
+      'bridge:automation_registered_cron',
+      { cron: scheduled.trigger.cron, timezone, delivery },
+      locale
+    ),
   ].join('\n');
 }
 
@@ -514,7 +520,7 @@ async function start() {
       const detail = error instanceof Error ? error.message : String(error);
       await respond({
         response_type: 'ephemeral',
-        text: `スケジュール登録を実行できませんでした: ${detail}`,
+        text: t('bridge:automation_registration_failed', { detail }, resolveOperatorLocale()),
       });
     }
   });
@@ -561,7 +567,7 @@ async function start() {
           channel: metadata.channel,
           user: metadata.actor_id,
           threadTs: metadata.thread_ts,
-          text: `スケジュール登録を実行できませんでした: ${detail}`,
+          text: t('bridge:automation_registration_failed', { detail }, resolveOperatorLocale()),
         });
       } else {
         logger.error(`❌ [SlackBridge] Automation modal handling failed: ${detail}`);
@@ -692,7 +698,7 @@ async function start() {
         const response = await client.chat.postMessage({
           channel: message.channel,
           thread_ts: threadTs,
-          text: 'ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。',
+          text: t('bridge:mission_proposal_cancelled', undefined, resolveOperatorLocale()),
         });
         recordSlackDelivery(
           artifact.correlationId,
@@ -1029,7 +1035,7 @@ async function start() {
         await client.chat.postMessage({
           channel: updated.channel,
           thread_ts: updated.threadTs,
-          text: 'どこが期待と違いましたか？(スキップ可)',
+          text: t('bridge:approval_ask_why', undefined, resolveOperatorLocale()),
           blocks: buildSlackApprovalAskWhyBlocks(updated.id),
         });
       }
@@ -1061,7 +1067,7 @@ async function start() {
         await client.chat.postMessage({
           channel,
           thread_ts: threadTs,
-          text: 'このミッション提案はすでに処理済みか期限切れです。',
+          text: t('bridge:mission_proposal_expired', undefined, resolveOperatorLocale()),
         });
         return;
       }
@@ -1071,7 +1077,11 @@ async function start() {
         await client.chat.postMessage({
           channel,
           thread_ts: threadTs,
-          text: `ミッション提案をキャンセルしました（<@${actorId}>）。`,
+          text: t(
+            'bridge:mission_proposal_cancelled_by',
+            { actor: `<@${actorId}>` },
+            resolveOperatorLocale()
+          ),
         });
         return;
       }

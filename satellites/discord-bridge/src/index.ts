@@ -455,7 +455,10 @@ export async function handleDiscordInteraction(interaction: DiscordInteractionLi
   const actorId = interaction.user.id;
   const access = evaluateSurfaceActorAccess('discord', actorId);
   if (!access.allowed) {
-    await interaction.reply({ content: 'この操作は許可されていません。', ephemeral: true });
+    await interaction.reply({
+      content: t('bridge:operation_not_allowed', undefined, resolveOperatorLocale()),
+      ephemeral: true,
+    });
     return;
   }
   const channel = interaction.channelId || '';
@@ -467,7 +470,10 @@ export async function handleDiscordInteraction(interaction: DiscordInteractionLi
     decidedBy: actorId,
   });
   if (!approvalReply.handled) {
-    await interaction.reply({ content: '未対応の操作です。', ephemeral: true });
+    await interaction.reply({
+      content: t('bridge:operation_unsupported', undefined, resolveOperatorLocale()),
+      ephemeral: true,
+    });
     return;
   }
   await interaction.reply({ content: approvalReply.reply || '', ephemeral: true });

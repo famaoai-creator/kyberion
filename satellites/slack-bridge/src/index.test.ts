@@ -71,6 +71,29 @@ describe('slack bridge channel turn', () => {
     expect(source).not.toContain('const STIMULI_PATH =');
   });
 
+  it('routes remaining automation and proposal replies through the locale catalog', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/slack-bridge/src/index.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    for (const key of [
+      'bridge:automation_registered',
+      'bridge:automation_registered_cron',
+      'bridge:automation_registration_failed',
+      'bridge:mission_proposal_cancelled',
+      'bridge:mission_proposal_expired',
+      'bridge:mission_proposal_cancelled_by',
+      'bridge:approval_ask_why',
+    ]) {
+      expect(source).toContain(key);
+    }
+    expect(source).not.toContain('スケジュール登録を実行できませんでした: ${detail}');
+    expect(source).not.toContain(
+      'ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。'
+    );
+  });
+
   it('excludes the current event from the collected thread context', async () => {
     const context = await collectSlackThreadContext(
       {

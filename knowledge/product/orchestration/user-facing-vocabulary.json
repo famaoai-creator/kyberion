@@ -4909,6 +4909,21 @@
         "ja": "スケジュール登録には追加のサービス連携が必要です。",
         "qps-ploc": "⟦Ȧḓḓïŧïőñȧŀ şėřṽïƈė ƈőññėƈŧïőñş ȧřė ñėėḓėḓ ƀėƒőřė ŧħė şƈħėḓůŀė ƈȧñ ƀė řėɠïşŧėřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
+      "automation_registered": {
+        "en": "Schedule registered: {name}",
+        "ja": "スケジュールを登録しました: {name}",
+        "qps-ploc": "⟦Şƈħėḓůŀė řėɠïşŧėřėḓ: {name} ŀőřėɱ ïṗ⟧"
+      },
+      "automation_registered_cron": {
+        "en": "cron: {cron}{timezone}{delivery}",
+        "ja": "cron: {cron}{timezone}{delivery}",
+        "qps-ploc": "⟦ƈřőñ: {cron}{timezone}{delivery} ŀőřėɱ ïṗşů⟧"
+      },
+      "automation_registration_failed": {
+        "en": "Could not register the schedule: {detail}",
+        "ja": "スケジュール登録を実行できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėɠïşŧėř ŧħė şƈħėḓůŀė: {detail} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
       "approval_approve_button": {
         "en": "Approve",
         "ja": "承認",
@@ -4998,6 +5013,31 @@
         "en": "The mission proposal was cancelled. You can propose it again whenever needed.",
         "ja": "ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。",
         "qps-ploc": "⟦Ŧħė ɱïşşïőñ ṗřőṗőşȧŀ ẇȧş ƈȧñƈėŀŀėḓ. Ẏőů ƈȧñ ṗřőṗőşė ïŧ ȧɠȧïñ ẇħėñėṽėř ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "mission_proposal_expired": {
+        "en": "This mission proposal has already been handled or has expired.",
+        "ja": "このミッション提案はすでに処理済みか期限切れです。",
+        "qps-ploc": "⟦Ŧħïş ɱïşşïőñ ṗřőṗőşȧŀ ħȧş ȧŀřėȧḓẏ ƀėėñ ħȧñḓŀėḓ őř ħȧş ėẋṗïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "mission_proposal_cancelled_by": {
+        "en": "Mission proposal cancelled by {actor}.",
+        "ja": "ミッション提案をキャンセルしました（{actor}）。",
+        "qps-ploc": "⟦Ɱïşşïőñ ṗřőṗőşȧŀ ƈȧñƈėŀŀėḓ ƀẏ {actor}. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "approval_ask_why": {
+        "en": "What did not meet expectations? (Optional)",
+        "ja": "どこが期待と違いましたか？(スキップ可)",
+        "qps-ploc": "⟦Ẇħȧŧ ḓïḓ ñőŧ ɱėėŧ ėẋṗėƈŧȧŧïőñş? (Őṗŧïőñȧŀ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "operation_not_allowed": {
+        "en": "This operation is not allowed.",
+        "ja": "この操作は許可されていません。",
+        "qps-ploc": "⟦Ŧħïş őṗėřȧŧïőñ ïş ñőŧ ȧŀŀőẇėḓ. ŀőřėɱ ïṗşů⟧"
+      },
+      "operation_unsupported": {
+        "en": "This operation is not supported.",
+        "ja": "未対応の操作です。",
+        "qps-ploc": "⟦Ŧħïş őṗėřȧŧïőñ ïş ñőŧ şůṗṗőřŧėḓ. ŀőřėɱ ïṗşů⟧"
       },
       "mission_issued_started": {
         "en": "Mission {missionId} started.",
