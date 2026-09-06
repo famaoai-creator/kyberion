@@ -1,4 +1,4 @@
-import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput, readJsonLines } from './foundation/json.js';
 import { isRecord, readTextFile } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
 import {
@@ -143,17 +143,13 @@ export function loadRecentStimuli(
   if (!isRegularStimuliJournalPath(stimuliPath)) return [];
   const { enforceTtl = true, nowMs = Date.now() } = options;
 
-  const content = readTextFile(stimuliPath, {
-    maxSizeMB: Math.ceil(STIMULI_MAX_BYTES / (1024 * 1024)),
+  const parsed = readJsonLines<NerveMessage>(stimuliPath, {
+    onMalformed: 'skip',
+    readOptions: {
+      maxSizeMB: Math.ceil(STIMULI_MAX_BYTES / (1024 * 1024)),
+    },
+    map: normalizeNerveMessage,
   });
-  const parsed = content
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .flatMap((line) => {
-      const parsed = parseNerveMessageLine(line);
-      return parsed ? [parsed] : [];
-    });
   const live = enforceTtl
     ? parsed.filter((stimulus) => !isStimulusExpired(stimulus, nowMs))
     : parsed;
