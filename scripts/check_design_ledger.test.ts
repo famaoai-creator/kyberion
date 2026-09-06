@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
-import { validateDesignLedger } from './check_design_ledger.js';
+import { readDesignLedgerTextFile, validateDesignLedger } from './check_design_ledger.js';
 
 const fixtureRoot = pathResolver.shared('tmp/design-ledger-check');
 
 describe('design ledger checker', () => {
+  it('rejects a directory replacement before frontmatter parsing', () => {
+    expect(() => readDesignLedgerTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for ledger markdown files', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_design_ledger.ts'), {
