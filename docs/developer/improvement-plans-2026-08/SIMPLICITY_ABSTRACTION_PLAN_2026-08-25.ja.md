@@ -23885,3 +23885,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: mission coordination bus の current／archive event JSONL loader、SX-03／SX-09／SX-11
 - **変更**: 各mission streamのoperation-time regular-file確認後に行う行分割・safe JSON parse・message／ack projectionを foundation `readJsonLines`へ統一した。malformed legacy row skip、mission filtering、ack dedupe、archive rotation、count／write semanticsは維持した。
 - **検証**: mission-coordination-bus **1 file／10 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1781
+
+- **対象**: pipeline run journal の strict resume JSONL loader、SX-03／SX-10／SX-11
+- **変更**: pipeline run journalの手書き行分割・safe JSON parseを foundation `readJsonLines`へ統一した。JSONLの破損・危険レコードは従来どおりresume拒否として安定したエラーを返し、migration／catalog／lifecycle payloadのdomain errorは別段階で従来どおり表面化する。空行を除く実際の行番号をcatalog sourceへ渡し、regular-file boundary、sequence／run-id検証、projection semanticsは維持した。
+- **検証**: pipeline-run-journal **1 file／8 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
