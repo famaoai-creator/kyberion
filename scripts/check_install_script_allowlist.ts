@@ -1,11 +1,19 @@
 /** PI-12: ensure pnpm build-script policy and its reasons cannot drift. */
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
 type AllowlistEntry = { allow: boolean; reason: string };
 type AllowlistFile = { schema_version: number; packages: Record<string, AllowlistEntry> };
+
+export function readWorkspaceTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error('pnpm-workspace.yaml must be a regular file');
+  }
+  return readTextFile(filePath);
+}
 
 function parseAllowBuildsYaml(source: string): Record<string, boolean> {
   const result: Record<string, boolean> = {};
@@ -30,7 +38,7 @@ export function checkInstallScriptAllowlist(): {
   findings: string[];
   packageCount: number;
 } {
-  const workspace = readTextFile(pathResolver.rootResolve('pnpm-workspace.yaml'));
+  const workspace = readWorkspaceTextFile(pathResolver.rootResolve('pnpm-workspace.yaml'));
   const allowBuilds = parseAllowBuildsYaml(workspace);
   const policy = readSafeJsonFile<AllowlistFile>(
     pathResolver.rootResolve('knowledge/product/governance/install-script-allowlist.json'),
