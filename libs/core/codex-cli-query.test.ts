@@ -11,6 +11,7 @@ import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeWriteFile: vi.fn(),
   safeReadFile: vi.fn(),
   safeRmSync: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('./secure-io.js', async () => {
   return {
     ...actual,
     safeExecResult: mocks.safeExecResult,
+    safeLstat: mocks.safeLstat,
     safeWriteFile: mocks.safeWriteFile,
     safeReadFile: mocks.safeReadFile,
     safeRmSync: mocks.safeRmSync,
@@ -204,6 +206,7 @@ describe('codex-cli-query', () => {
 
     beforeEach(() => {
       mocks.safeWriteFile.mockReset();
+      mocks.safeLstat.mockReset().mockReturnValue({ isFile: () => true });
       mocks.safeReadFile.mockReset().mockReturnValue(JSON.stringify({ ok: true }));
       mocks.safeRmSync.mockReset();
       mocks.spawnMock.mockReset();
@@ -340,6 +343,23 @@ describe('codex-cli-query', () => {
       expect(opts).toMatchObject({ provider: 'codex', budgetMs: 54321 });
       expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
       expect(typeof fn).toBe('function');
+    });
+
+    it('fails closed when the CLI output path is not a regular file', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+      mocks.safeLstat.mockImplementation((filePath: string) => ({
+        isFile: () => !filePath.includes('kyberion-codex-output-'),
+      }));
+
+      await expect(
+        runCodexCliQuery({
+          systemPrompt: 'sys',
+          userPrompt: 'usr',
+          schema: z.object({ ok: z.boolean() }),
+          options: { bin: 'codex' },
+        })
+      ).rejects.toThrow(/structured output must be a regular file/);
+      expect(mocks.safeReadFile).not.toHaveBeenCalled();
     });
   });
 });
