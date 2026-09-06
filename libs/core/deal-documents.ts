@@ -59,6 +59,15 @@ function dealDocumentPath(dir: string, fileName: string): string {
   return assertSafeRepositoryPath(path.join(dir, fileName), { allowMissingLeaf: true });
 }
 
+export function isRegularDealDocumentPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function nextVersion(dir: string, prefix: string): number {
   if (!safeExistsSync(dir)) return 1;
   try {
@@ -350,7 +359,7 @@ export async function sendDealDocumentToCustomer(input: {
     dealDocsDir(tenantSlug, input.dealId),
     `${input.kind}-v${input.version}.md`
   );
-  if (!safeExistsSync(docPath)) {
+  if (!isRegularDealDocumentPath(docPath)) {
     return {
       sent: false,
       status: 'blocked',

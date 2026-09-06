@@ -22865,3 +22865,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/environment-capability-probes.ts`、environment-capability-probes test、PI-03
 - **変更**: environment capability の audit-chain integrity probe を operation-time の regular-file 境界へ接続し、directory replacement を JSONL parse／integrity判定へ到達させないようにした。fresh checkout の不存在時は従来どおり利用可能扱いとし、既存の parse／error semantics は維持した。
 - **検証**: environment-capability-probes **2 files／26 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1611
+
+- **対象**: `libs/core/deal-documents.ts`、deal-documents test、PI-03
+- **変更**: deal document の顧客送信前 read を operation-time の `safeLstat(...).isFile()` 境界へ接続し、directory replacement を本文読込／顧客送信へ到達させないようにした。既存の document-missing／contract-review／approval semantics は維持した。
+- **検証**: deal-documents **2 files／7 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
