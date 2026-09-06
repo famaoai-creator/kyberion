@@ -37,6 +37,7 @@ const EVIDENCE_PATTERNS: readonly [string, RegExp][] = [
   ['readSafeJson', /\breadSafeJson[A-Za-z]*\s*\(/u],
   ['safeReadFile', /\bsafeReadFile\s*\(/u],
 ];
+const GUARD_LOOKBACK_LINES = 32;
 
 function toRepoRelative(filePath: string): string {
   return path.relative(pathResolver.rootDir(), filePath).split(path.sep).join('/');
@@ -47,7 +48,7 @@ function isLoaderDeclaration(line: string): boolean {
 }
 
 function nearbyEvidence(lines: readonly string[], lineIndex: number): string[] {
-  const start = Math.max(0, lineIndex - 12);
+  const start = Math.max(0, lineIndex - GUARD_LOOKBACK_LINES);
   const window = lines.slice(start, lineIndex + 1).join('\n');
   return EVIDENCE_PATTERNS.filter(([, pattern]) => pattern.test(window)).map(([name]) => name);
 }

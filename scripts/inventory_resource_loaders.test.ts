@@ -36,6 +36,24 @@ describe('resource loader inventory', () => {
     ]);
   });
 
+  it('captures a guard at the start of the same short read section', () => {
+    const source = [
+      'safeLstat(filePath);',
+      ...Array.from({ length: 20 }, () => 'const detail = true;'),
+      'return readTextFile(filePath);',
+    ].join('\n');
+
+    expect(scanResourceLoaderSource('libs/example.ts', source)).toEqual([
+      {
+        file: 'libs/example.ts',
+        line: 22,
+        loader: 'readTextFile',
+        status: 'nearby-path-guard',
+        evidence: ['safeLstat'],
+      },
+    ]);
+  });
+
   it('does not mistake loader declarations for resource reads', () => {
     expect(
       scanResourceLoaderSource(
