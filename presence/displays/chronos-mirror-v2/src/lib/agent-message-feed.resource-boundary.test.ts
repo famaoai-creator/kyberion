@@ -35,6 +35,7 @@ describe('agent message feed resource boundaries', () => {
     safeWriteFile(
       observationPath,
       [
+        '{',
         'null',
         JSON.stringify(['a2a_message_routed']),
         JSON.stringify({ event_type: 'a2a_message_routed', mission_id: 'MSN-VALID' }),

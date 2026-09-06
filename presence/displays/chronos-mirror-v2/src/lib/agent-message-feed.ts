@@ -3,12 +3,11 @@ import {
   listAgentRuntimeSnapshots,
   pathResolver,
   safeExistsSync,
-  safeReadFile,
 } from './intelligence-primitives';
 import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
-import { nowIso } from '@agent/core/foundation';
-import { optionalStringField, parseJsonRecord, stringField } from './json-record';
+import { isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
+import { optionalStringField, stringField } from './json-record';
 
 export interface AgentMessageSummary {
   ts: string;
@@ -95,12 +94,15 @@ function readObservedA2AHandoffs(options: AgentMessageFeedOptions = {}): A2AHand
     if (!safeExistsSync(safeObservationPath) || !safeLstat(safeObservationPath).isFile()) return [];
 
     const handoffs: A2AHandoffSummary[] = [];
-    const raw = safeReadFile(safeObservationPath, { encoding: 'utf8' }) as string;
-    for (const line of raw.trim().split('\n')) {
-      if (!line.trim()) continue;
+    const events = readJsonLines<Record<string, unknown>>(safeObservationPath, {
+      map: (value) => {
+        if (!isRecord(value)) throw new Error('A2A observation JSONL entry must be an object');
+        return value;
+      },
+      onMalformed: 'skip',
+    });
+    for (const event of events) {
       try {
-        const event = parseJsonRecord(line);
-        if (!event) continue;
         if (
           (stringField(event, 'decision') || stringField(event, 'event_type')) !==
           'a2a_message_routed'
