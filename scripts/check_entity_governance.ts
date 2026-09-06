@@ -3,7 +3,13 @@ import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { listProjectRecords } from '@agent/core/project-registry';
-import { safeExistsSync, safeReaddir, safeExecResult, safeStat } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+  safeExecResult,
+  safeStat,
+} from '@agent/core/secure-io';
 import { getRegisteredEnvBool, readTextFile } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -37,6 +43,13 @@ const REQUIRED_RETENTION_PATHS = [
   'active/shared/runtime/pipeline-runs',
   'active/shared/runtime/run-graphs',
 ];
+
+export function readEntityGovernanceTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function childDirectories(root: string): string[] {
   if (!safeExistsSync(root)) return [];
@@ -110,7 +123,7 @@ function collectPlanLedgerGaps(rootDir: string): string[] {
   const planDir = path.join(rootDir, 'docs/developer/improvement-plans-2026-07');
   const statusPath = path.join(planDir, 'STATUS.ja.md');
   if (!safeExistsSync(statusPath)) return ['STATUS.ja.md'];
-  const status = readTextFile(statusPath);
+  const status = readEntityGovernanceTextFile(statusPath, 'improvement plan status');
   return safeReaddir(planDir)
     .filter((entry) => entry.endsWith('.ja.md'))
     .filter((entry) => !['README.ja.md', 'STATUS.ja.md'].includes(entry))
@@ -229,7 +242,7 @@ export function collectEntityGovernanceReport(
   const planLedgerMissing = collectPlanLedgerGaps(rootDir);
   const gitIgnorePath = path.join(rootDir, '.gitignore');
   if (safeExistsSync(gitIgnorePath)) {
-    const gitIgnore = readTextFile(gitIgnorePath);
+    const gitIgnore = readEntityGovernanceTextFile(gitIgnorePath, '.gitignore');
     if (/^\*\.jsonl$/m.test(gitIgnore))
       gitBoundaryViolations.push('global *.jsonl ignore rule remains');
     if ((gitIgnore.match(/^active\/$/gm) || []).length > 1)
