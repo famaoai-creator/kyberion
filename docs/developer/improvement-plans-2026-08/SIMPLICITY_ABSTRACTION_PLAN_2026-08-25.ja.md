@@ -6440,8 +6440,8 @@ interactive dashboard、MCP／server の custom output、細粒度 command regis
 
 - `pnpm exec vitest run scripts/setup_report.entrypoint.test.ts tests/setup-report.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 11 tests passed。
 - `pnpm --filter @agent/core run build`、`pnpm run build:repo` — green。
-- `pnpm setup:report -- --json --quiet` — 依存診断の標準出力を抑制。
-- `pnpm setup:report -- --json` — 人間向け table／logger 出力を混ぜず、report JSON のみを出力。
+- `pnpm kyberion setup report -- --json --quiet` — 依存診断の標準出力を抑制。
+- `pnpm kyberion setup report -- --json` — 人間向け table／logger 出力を混ぜず、report JSON のみを出力。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
 
@@ -24017,3 +24017,15 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: CLI command registryのscript dispatch key、SX-05／SX-06
 - **変更**: 通常command registryとscript command registryの同一command衝突、およびscript command同士の重複dispatch keyを`check:cli-manifest`でfail-closedにした。実行時のregistry優先順に依存した曖昧な入口を登録段階で拒否する。既存の通常command `setup report` と衝突していた `setup:report` package aliasを削除し、ドキュメント・復旧提示・Chronos quick actionを `pnpm kyberion setup report` に統一した。
 - **検証**: CLI manifest／canonical setup report **6 files／47 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1803
+
+- **対象**: 改善計画本文の旧CLI提示、SX-05／SX-06
+- **変更**: `setup:report` package alias削除後も本文に残っていた旧形式の実行例を `pnpm kyberion setup report` へ更新し、文書が廃止済み入口を再提示しないようにした。
+- **検証**: `pnpm run check -- --scope pr --only script-integrity` passed、`pnpm kyberion setup report` の旧形式検索 **0件**。
+
+## 2026-09-06 再レビュー実装 1804
+
+- **対象**: server protocol entrypointのshared harness、SX-06
+- **変更**: scripts配下だけから参照可能だった `defineScript`／`isDirectScript`／generator harnessを `@agent/core/script-harness` として公開し、既存の `scripts/lib/harness.ts` は互換re-exportへ整理した。Telegram bridgeのlong-lived server startupを同じharnessの失敗境界・argv境界へ移行し、satelliteが `scripts/` のrootDir外実装へ直接依存しないようにした。
+- **検証**: core build、Telegram bridge build、Telegram／process-exit／CLI manifest／check runner **4 files／32 tests passed**、対象ESLint、Prettier、`git diff --check`。

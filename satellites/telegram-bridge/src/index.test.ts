@@ -7,7 +7,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { t } from '@agent/core/t';
 import * as pathResolver from '@agent/core/path-resolver';
-import { safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import type {
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
@@ -80,6 +80,22 @@ afterEach(() => {
 });
 
 describe('telegram bridge thread context', () => {
+  it('uses the shared script harness for direct server startup', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/telegram-bridge/src/index.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain(
+      "import { defineScript, isDirectScript } from '@agent/core/script-harness'"
+    );
+    expect(source).toContain("name: 'telegram-bridge'");
+    expect(source).toContain(
+      "await main(['node', 'satellites/telegram-bridge/src/index.ts', ...argv])"
+    );
+    expect(source).not.toContain('main().catch(');
+  });
+
   it('rejects malformed persisted thread history entries', () => {
     expect(parseTelegramThreadHistoryEntry(['invalid'])).toBeNull();
     expect(parseTelegramThreadHistoryEntry({ role: 'system' })).toBeNull();
