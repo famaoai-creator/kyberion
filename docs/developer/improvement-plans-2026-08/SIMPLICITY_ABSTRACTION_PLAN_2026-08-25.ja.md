@@ -23057,3 +23057,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/inventory_resource_loaders.ts`、`scripts/inventory_resource_loaders.test.ts`、PI-03
 - **変更**: resource-loader inventory が相対 import 先の helper 実装まで追跡し、helper 本体に `safeStat/safeLstat(...).isFile()` または regular-resource assertion がある場合だけ `external-regular-file-helper` evidence として採用するようにした。package／barrel import は実装を同一 inventory 内で確認できないため未分類のまま扱い、path-only helper を安全証跡へ昇格しない回帰テストを追加した。
 - **検証**: inventory **1,347 files／184 callsites／inline 6／nearby 178／needs-review 0**、inventory **1 file／9 tests passed**、Prettier、`git diff --check`。package／barrelを跨ぐsemantic flow、provider 実機受入は継続課題とする。
+
+## 2026-09-06 再レビュー実装 1643
+
+- **対象**: `package.json`、`scripts/reasoning_auth_check.ts`、entrypoint test、PI-11
+- **変更**: 既存のcredential shape／provider probe実装を重複させず、利用者向けのcanonical `pnpm auth check` を `reasoning_auth_check.ts` へ接続した。`--backend`、`--json`、`--probe`、`--quiet` は既存のshared harness経路を維持する。
+- **検証**: entrypoint **1 file／2 tests passed**、stub実行、Prettier、`git diff --check`、隔離環境root typecheck **exit 0**。通常auth checkは資格情報を出力せず、実provider検証は明示的な`--probe`経路に限定する。
