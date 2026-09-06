@@ -1,5 +1,5 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { loadGateManifest } from './run_checks.js';
 import { resolveDeclaredBaselinePath } from './lib/ci-gate-baseline.js';
@@ -14,8 +14,15 @@ const WORKFLOW_SCOPE_REFS = {
 const WORKFLOW_PATHS = [...Object.values(WORKFLOW_SCOPE_REFS), '.github/workflows/cross-os.yml'];
 const SETUP_ACTION_MARKER = 'uses: ./.github/actions/setup-kyberion';
 
+export function readCiGateParityTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function read(relativePath: string): string {
-  return readTextFile(pathResolver.rootResolve(relativePath));
+  return readCiGateParityTextFile(pathResolver.rootResolve(relativePath));
 }
 
 export function collectPnpmScriptReferences(value: string): string[] {
