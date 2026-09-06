@@ -23603,3 +23603,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: working-memory actuator の volatile knowledge index loader、SX-03
 - **変更**: `INDEX.volatile.json` の読み込みを foundation `readJson` へ統一した。volatile path／regular-file boundary、`parseVolatileIndex` の shape validation、malformed index 時の fail-closed 挙動は維持し、Markdown／journal の text loader は変更していない。
 - **検証**: working-memory index **1 file／9 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1734
+
+- **対象**: media actuator の standalone JSON loader、SX-03／SX-04
+- **変更**: media catalog loader の standalone JSON 読み込みを foundation `readJson` へ統一した。symlink／regular-file boundary、recursive discovery、confidential theme pack／design catalog の後段 validation は維持し、dynamic merge 経路は変更していない。
+- **検証**: media catalog loaders **1 file／7 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
