@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   generateIndex,
+  readKnowledgeTextFile,
   runGenerateKnowledgeIndex,
   validateKnowledgeFrontmatter,
 } from './generate_knowledge_index.js';
@@ -45,5 +46,11 @@ describe('generate_knowledge_index', () => {
     expect(failures).toEqual([
       'product/unknown/example.md: missing YAML frontmatter and no explicit exclusion',
     ]);
+  });
+
+  it('rejects a directory replacement before knowledge text parsing', () => {
+    expect(() => readKnowledgeTextFile(pathResolver.rootDir(), 'fixture')).toThrow(
+      'fixture must be a regular file'
+    );
   });
 });
