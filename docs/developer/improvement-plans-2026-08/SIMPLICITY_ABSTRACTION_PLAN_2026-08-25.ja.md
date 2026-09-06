@@ -23285,3 +23285,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_foundation_adoption.ts`、`scripts/check_foundation_adoption.test.ts`、PI-03
 - **変更**: foundation adoption checkerのproduction source本文readを`readFoundationAdoptionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfoundation adoption／ratchet判定へ到達させないようにした。既存のsource roots、ratchet、allowlist semanticsは維持した。
 - **検証**: foundation adoption **2 files／5 tests passed**、対象ESLint、Prettier、checker direct実行（OK）、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1681
+
+- **対象**: `scripts/check_i18n_hardcoding.ts`、`scripts/check_i18n_hardcoding.test.ts`、PI-03
+- **変更**: i18n hardcoding checkerのworkspace source本文readを`readI18nHardcodingTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをkana／baseline判定へ到達させないようにした。既存のscan roots、exemption、baseline ratchet semanticsは維持した。
+- **検証**: i18n hardcoding **2 files／21 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミットmeeting／voice変更に伴うbaseline差分（増加2件、stale 4件）を表示したため、baselineは変更せず継続課題とした。

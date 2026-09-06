@@ -12,6 +12,7 @@ import {
   checkI18nHardcoding,
   isExcludedFile,
   isTestFile,
+  readI18nHardcodingTextFile,
   scanFileForKanaLiterals,
 } from './check_i18n_hardcoding.js';
 
@@ -114,6 +115,12 @@ describe('isTestFile / isExcludedFile', () => {
 });
 
 describe('checkI18nHardcoding', () => {
+  it('rejects a directory replacement before workspace scanning', () => {
+    expect(() => readI18nHardcodingTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for workspace scans', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_i18n_hardcoding.ts'), {

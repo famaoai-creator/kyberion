@@ -912,6 +912,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、facet purity checkerのfacet document本文readを`readFacetPurityTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcross-kind content判定へ到達させない回帰を追加した。関連 **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、first-win docs checkerのREADME／Quickstart／Initialization本文readを`readFirstWinDocsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcanonical command／stage order判定へ到達させない回帰を追加した。関連 **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、foundation adoption checkerのproduction source本文readを`readFoundationAdoptionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfoundation adoption／ratchet判定へ到達させない回帰を追加した。関連 **2 files／5 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、i18n hardcoding checkerのworkspace source本文readを`readI18nHardcodingTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをkana／baseline判定へ到達させない回帰を追加した。関連 **2 files／21 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミットmeeting／voice変更に伴うbaseline差分（増加2件、stale 4件）を表示したため、baselineは変更せず継続課題とした。
 
 ## 7. 検証コマンド(実装時)
 
