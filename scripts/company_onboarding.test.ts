@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import {
   pathResolver,
   safeExistsSync,
@@ -7,13 +8,25 @@ import {
   safeRmSync,
   writeTenantProfile,
 } from '@agent/core';
-import { onboardAiCompany } from './company_onboarding.js';
+import { main, onboardAiCompany } from './company_onboarding.js';
 
 const rootDir = pathResolver.sharedTmp('company-onboarding-test');
 
 afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
 
 describe('AI company onboarding', () => {
+  it('uses the foundation reader for onboarding snapshots', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/company_onboarding.ts'));
+    expect(source).toContain('readTextFile');
+  });
+
+  it('emits help through the supplied harness printer', () => {
+    const print = vi.fn();
+
+    expect(main(['--help'], print)).toBe(0);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('pnpm onboard company'));
+  });
+
   it('dry-runs without writing and shows the complete next path', () => {
     const result = onboardAiCompany({
       vertical: 'saas-product-company',
@@ -25,7 +38,7 @@ describe('AI company onboarding', () => {
     });
     expect(result.status).toBe('planned');
     expect(result.writtenFiles).toHaveLength(0);
-    expect(result.nextCommands).toContain('pnpm setup:report --persona first-time-user');
+    expect(result.nextCommands).toContain('pnpm kyberion setup report --persona first-time-user');
     expect(result.nextCommands).toContain(
       'pnpm onboarding:context first-work --customer-slug acme-ai --intent "Define the first customer outcome and launch plan" --dry-run --json'
     );

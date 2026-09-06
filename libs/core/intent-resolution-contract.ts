@@ -2,47 +2,71 @@ import { createHash } from 'node:crypto';
 import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { classifyTaskSessionIntent } from './task-session.js';
+import { t } from './t.js';
+import type { SupportedLocale } from './locale-normalize.js';
 import {
-  loadStandardIntentCatalog,
+  loadResolvedStandardIntentCatalog,
   resolveIntentResolutionPacket,
   type IntentResolutionPacket,
   type StandardIntentDefinition,
 } from './intent-resolution.js';
-
-export type IntentResolutionShape =
-  'direct_answer' | 'task_session' | 'mission' | 'project_bootstrap';
-export type IntentOutcomeKind =
-  'answer' | 'artifact' | 'approval_ready_plan' | 'service_change' | 'status_report';
-export type IntentAuthorityLevel =
-  'autonomous' | 'approval_required' | 'human_clarification_required';
-
-export type IntentNextActionKind = 'request_approval' | 'provide_input' | 'continue';
-
-export interface IntentResolutionNextAction {
-  kind: IntentNextActionKind;
-  label: string;
-  consequence: string;
-}
-
-export interface IntentResolutionContract {
-  request_id: string;
-  normalized_intent: string;
-  missing_inputs: string[];
-  resolution_shape: IntentResolutionShape;
-  outcome_kind: IntentOutcomeKind;
-  authority_level: IntentAuthorityLevel;
-  next_action: IntentResolutionNextAction;
-  project_context?: {
-    project_id?: string;
-    confidence: number;
-  };
-  rationale: string;
-}
+import {
+  type IntentAuthorityLevel,
+  type IntentOutcomeKind,
+  type IntentResolutionContract,
+  type IntentResolutionNextAction,
+  type IntentResolutionShape,
+} from './intent-resolution-contract-parser.js';
+export { parseIntentResolutionContract } from './intent-resolution-contract-parser.js';
+export type {
+  IntentAuthorityLevel,
+  IntentNextActionKind,
+  IntentOutcomeKind,
+  IntentResolutionContract,
+  IntentResolutionNextAction,
+  IntentResolutionShape,
+} from './intent-resolution-contract-parser.js';
 
 export interface IntentResolutionContractOptions {
   packet?: IntentResolutionPacket;
+  locale?: SupportedLocale;
   tier?: 'personal' | 'confidential' | 'public';
   tenantId?: string;
+  overlayPaths?: string[];
+}
+
+/** Render contract enum values through the shared user-facing vocabulary. */
+export function renderIntentAuthorityLabel(
+  authority: IntentAuthorityLevel,
+  locale: SupportedLocale = 'en'
+): string {
+  if (authority === 'approval_required') {
+    return t('tui:tui_cockpit_authority_approval', undefined, locale);
+  }
+  if (authority === 'human_clarification_required') {
+    return t('tui:tui_cockpit_authority_clarification', undefined, locale);
+  }
+  return t('tui:tui_cockpit_authority_autonomous', undefined, locale);
+}
+
+/** Render contract outcome enum values through the shared user-facing vocabulary. */
+export function renderIntentOutcomeLabel(
+  outcome: IntentOutcomeKind,
+  locale: SupportedLocale = 'en'
+): string {
+  if (outcome === 'artifact') {
+    return t('tui:tui_cockpit_outcome_artifact', undefined, locale);
+  }
+  if (outcome === 'approval_ready_plan') {
+    return t('tui:tui_cockpit_outcome_approval_ready_plan', undefined, locale);
+  }
+  if (outcome === 'service_change') {
+    return t('tui:tui_cockpit_outcome_service_change', undefined, locale);
+  }
+  if (outcome === 'status_report') {
+    return t('tui:tui_cockpit_outcome_status_report', undefined, locale);
+  }
+  return t('tui:tui_cockpit_outcome_answer', undefined, locale);
 }
 
 function normalizeShape(shape?: string): IntentResolutionShape {
@@ -132,14 +156,26 @@ export function resolveIntentResolutionContract(
     resolveIntentResolutionPacket(trimmed, {
       tier: options.tier,
       tenantId: options.tenantId,
+      overlayPaths: options.overlayPaths,
     });
-  const catalog = loadStandardIntentCatalog();
+  // The packet and the contract must read the same tier/tenant-resolved
+  // catalog. Otherwise an overlay can change the selected intent's risk or
+  // intake policy while the contract still reports the base catalog policy.
+  const catalog = loadResolvedStandardIntentCatalog({
+    tier: options.tier,
+    tenantId: options.tenantId,
+    overlayPaths: options.overlayPaths,
+  });
   const selectedIntent = catalog.find((intent) => intent.id === packet.selected_intent_id);
   const selectedShape = normalizeShape(packet.selected_resolution?.shape);
   const taskSessionIntent =
     packet.selected_intent_id &&
     ['task_session', 'mission', 'project_bootstrap'].includes(selectedShape)
-      ? classifyTaskSessionIntent(trimmed)
+      ? classifyTaskSessionIntent(trimmed, packet, {
+          tier: options.tier,
+          tenantId: options.tenantId,
+          overlayPaths: options.overlayPaths,
+        })
       : undefined;
   const requiredInputs = resolveRequiredInputs(packet, selectedIntent, taskSessionIntent);
   const clarificationShape = selectedShape === 'direct_answer' ? 'direct_reply' : selectedShape;
@@ -150,7 +186,7 @@ export function resolveIntentResolutionContract(
         executionShape: clarificationShape,
         requiredInputs,
         confidence: taskSessionIntent?.executionBrief?.confidence ?? packet.selected_confidence,
-        contextualFrame: buildContextualIntentFrame(trimmed),
+        contextualFrame: packet.contextual_frame || buildContextualIntentFrame(trimmed),
       })
     : undefined;
   const missingInputs = packet.selected_intent_id
@@ -179,20 +215,39 @@ export function resolveIntentResolutionContract(
     missingInputs.length > 0
       ? {
           kind: 'provide_input',
-          label: 'Provide the missing information to continue.',
-          consequence: 'Execution remains waiting until the missing information is provided.',
+          label: t(
+            'next_action:intent_resolution_provide_input',
+            undefined,
+            options.locale || 'en'
+          ),
+          consequence: t(
+            'next_action:intent_resolution_provide_input_consequence',
+            undefined,
+            options.locale || 'en'
+          ),
         }
       : authorityLevel === 'approval_required'
         ? {
             kind: 'request_approval',
-            label: 'Approve this plan to continue.',
-            consequence:
-              'The requested action remains waiting and does not execute without approval.',
+            label: t(
+              'next_action:intent_resolution_request_approval',
+              undefined,
+              options.locale || 'en'
+            ),
+            consequence: t(
+              'next_action:intent_resolution_request_approval_consequence',
+              undefined,
+              options.locale || 'en'
+            ),
           }
         : {
             kind: 'continue',
-            label: 'Continue with the resolved request.',
-            consequence: 'The request can proceed under the current authority boundary.',
+            label: t('next_action:intent_resolution_continue', undefined, options.locale || 'en'),
+            consequence: t(
+              'next_action:intent_resolution_continue_consequence',
+              undefined,
+              options.locale || 'en'
+            ),
           };
 
   return {

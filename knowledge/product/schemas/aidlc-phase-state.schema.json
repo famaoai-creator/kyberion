@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "aidlc-phase-state.schema.json",
+  "title": "AI-DLC phase state",
+  "description": "Persisted phase state and circuit-breaker context for an AI-DLC mission.",
+  "type": "object",
+  "required": ["version", "mission_id", "phase", "attempts", "updated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "task_board_ref": { "type": "string", "minLength": 1 },
+    "phase": {
+      "type": "string",
+      "enum": ["alignment", "execution", "test", "self_review", "complete"]
+    },
+    "execution_result": { "$ref": "#/$defs/phase_result" },
+    "test_output": { "$ref": "#/$defs/test_result" },
+    "review_findings": { "$ref": "#/$defs/review_result" },
+    "failure_context": { "$ref": "#/$defs/failure_context" },
+    "resume_count": { "type": "integer", "minimum": 0 },
+    "last_resumed_at": { "type": "string", "format": "date-time" },
+    "attempts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/attempt" }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "phase_result": {
+      "type": "object",
+      "required": ["summary", "artifact_refs"],
+      "properties": {
+        "summary": { "type": "string" },
+        "artifact_refs": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "test_result": {
+      "type": "object",
+      "required": ["summary", "artifact_refs", "passed"],
+      "properties": {
+        "summary": { "type": "string" },
+        "artifact_refs": { "type": "array", "items": { "type": "string" } },
+        "passed": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "review_result": {
+      "type": "object",
+      "required": ["summary", "artifact_refs", "approved"],
+      "properties": {
+        "summary": { "type": "string" },
+        "artifact_refs": { "type": "array", "items": { "type": "string" } },
+        "approved": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "attempt": {
+      "type": "object",
+      "required": ["phase", "at", "outcome"],
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": ["alignment", "execution", "test", "self_review", "complete"]
+        },
+        "at": { "type": "string", "format": "date-time" },
+        "outcome": { "type": "string", "enum": ["passed", "failed"] },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "failure_context": {
+      "type": "object",
+      "required": ["failed_phase", "what_failed", "attempted", "open_questions"],
+      "properties": {
+        "failed_phase": {
+          "type": "string",
+          "enum": ["alignment", "execution", "test", "self_review", "complete"]
+        },
+        "what_failed": { "type": "string" },
+        "attempted": { "type": "array", "items": { "type": "string" } },
+        "open_questions": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

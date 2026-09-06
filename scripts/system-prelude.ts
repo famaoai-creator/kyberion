@@ -4,7 +4,8 @@
  * [SECRET-GUARD COMPLIANT VERSION]
  */
 
-import { secretGuard, logger } from '@agent/core';
+import { secretGuard } from '@agent/core/secret-guard';
+import { logger } from '@agent/core/core';
 import { setRegisteredEnv } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

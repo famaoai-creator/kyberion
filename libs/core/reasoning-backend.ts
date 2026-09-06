@@ -161,7 +161,7 @@ function recordReasoningPromptVisibility(
  * at the call site and can carry task/context-pack/knowledge references.
  */
 function inferAmbientPromptVisibility(): ReasoningPromptVisibilityContext | undefined {
-  const missionId = String(process.env.MISSION_ID || '').trim();
+  const missionId = String(getRegisteredEnvText('MISSION_ID') || '').trim();
   if (!missionId) return undefined;
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return undefined;
@@ -690,6 +690,9 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     const toolPlan = planDeferredToolLoading(tools, {
       ...(options?.role ? { role: options.role } : {}),
       ...(options?.deferred_tool_names ? { deferredToolNames: options.deferred_tool_names } : {}),
+      ...(options?.deferred_tool_definitions
+        ? { deferredTools: options.deferred_tool_definitions }
+        : {}),
     });
     const effectivePrompt = appendDeferredToolAnnouncement(prompt, toolPlan.announcement);
     recordReasoningPromptVisibility(
@@ -1013,7 +1016,11 @@ export async function delegateStructured<T>(
 
   let lastError = '';
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const raw = await backend.delegateTask(buildPrompt(attempt, lastError), options.context);
+    const raw = await backend.delegateTask(buildPrompt(attempt, lastError), options.context, {
+      ...(constrainedSampling.mode === 'native' && constrainedSampling.request
+        ? { constrainedSampling: constrainedSampling.request }
+        : {}),
+    });
     try {
       const parsed = parseStructuredJson(raw, 'delegateStructured');
       const validated = resolvedSchema.safeParse(parsed);
@@ -1440,7 +1447,8 @@ export const stubReasoningBackend: ReasoningBackend = {
     });
   },
 
-  async prompt(prompt) {
+  async prompt(prompt, options) {
+    throwIfReasoningAborted(options?.signal);
     recordStubServed('prompt', `prompt="${prompt.slice(0, 80)}"`);
     return stubText(`[STUB] ${prompt}`);
   },

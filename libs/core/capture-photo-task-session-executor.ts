@@ -1,4 +1,6 @@
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import { recordTaskSessionHistory, updateTaskSession, type TaskSession } from './task-session.js';
 import { createVirtualCameraBridge } from './virtual-camera-bridge.js';
 import { createVirtualDeviceInventoryBridge } from './virtual-device-inventory-bridge.js';
@@ -15,7 +17,13 @@ export interface ExecuteCapturePhotoTaskSessionResult {
 }
 
 function buildOutputPath(sessionId: string): string {
-  return pathResolver.sharedTmp(`capture-photo/${sessionId}.jpg`);
+  const normalized = String(sessionId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('[CAPTURE_PHOTO_SESSION_ID] session id must be a single path segment');
+  }
+  return assertSafeRepositoryPath(pathResolver.sharedTmp(`capture-photo/${normalized}.jpg`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function resolveCameraPreference(session: TaskSession): string | undefined {
@@ -32,15 +40,19 @@ function resolveCameraPreference(session: TaskSession): string | undefined {
   return undefined;
 }
 
-function resolveCameraIntent(session: TaskSession): 'record' | 'share' | 'reference' | 'ocr_source' {
+function resolveCameraIntent(
+  session: TaskSession
+): 'record' | 'share' | 'reference' | 'ocr_source' {
   const payloadIntent = session.payload?.camera_intent;
-  return payloadIntent === 'share' || payloadIntent === 'reference' || payloadIntent === 'ocr_source'
+  return payloadIntent === 'share' ||
+    payloadIntent === 'reference' ||
+    payloadIntent === 'ocr_source'
     ? payloadIntent
     : 'record';
 }
 
 export async function executeCapturePhotoTaskSession(
-  params: ExecuteCapturePhotoTaskSessionParams,
+  params: ExecuteCapturePhotoTaskSessionParams
 ): Promise<ExecuteCapturePhotoTaskSessionResult> {
   const devicePreference = resolveCameraPreference(params.session);
   const inventoryBridge = createVirtualDeviceInventoryBridge();
@@ -51,7 +63,9 @@ export async function executeCapturePhotoTaskSession(
 
   const probe = await cameraBridge.probe();
   if (!probe.available) {
-    throw new Error(`[capture-photo-task-session] camera bridge unavailable: ${probe.reason || 'unknown reason'}`);
+    throw new Error(
+      `[capture-photo-task-session] camera bridge unavailable: ${probe.reason || 'unknown reason'}`
+    );
   }
 
   const outputPath = buildOutputPath(params.session.session_id);
@@ -82,7 +96,7 @@ export async function executeCapturePhotoTaskSession(
   });
 
   if (updated) {
-    const timestamp = new Date().toISOString();
+    const timestamp = nowIso();
     recordTaskSessionHistory(updated.session_id, {
       ts: timestamp,
       type: 'execution',

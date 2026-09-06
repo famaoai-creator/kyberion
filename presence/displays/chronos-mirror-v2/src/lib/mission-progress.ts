@@ -1,23 +1,19 @@
-export type MissionAssetCategory = 'deliverables' | 'artifacts' | 'outputs' | 'evidence';
+import {
+  parseMissionNextTaskRecords,
+  type MissionNextTaskRecord,
+} from '@agent/core/mission-next-task-reader';
+import type { MissionAssetCategory } from './mission-progress-client';
+
+export { findLatestMissionHandoff } from './mission-progress-client';
+export type { MissionAssetCategory, MissionHandoffSummary } from './mission-progress-client';
+
+export type NextTaskRecord = MissionNextTaskRecord;
 
 export interface MissionAssetSummary {
   path: string;
   category: MissionAssetCategory;
   sizeBytes: number;
   updatedAt: string;
-}
-
-export interface MissionHandoffSummary {
-  ts: string;
-  missionId: string;
-  sender: string;
-  receiver: string;
-  teamRole?: string;
-  channel?: string;
-  thread?: string;
-  performative?: string;
-  intent?: string;
-  promptExcerpt?: string;
 }
 
 export interface MissionProgressSnapshot {
@@ -68,7 +64,7 @@ export function parseTaskBoard(
 }
 
 export function summarizeNextTasks(
-  tasks: Array<{ status?: string }>
+  tasks: NextTaskRecord[]
 ): Pick<MissionProgressSnapshot, 'nextTasksTotal' | 'nextTasksPending' | 'nextTasksCompleted'> {
   let nextTasksPending = 0;
   let nextTasksCompleted = 0;
@@ -87,6 +83,11 @@ export function summarizeNextTasks(
     nextTasksPending,
     nextTasksCompleted,
   };
+}
+
+/** Parse the persisted task list before it enters either Chronos progress projection. */
+export function parseNextTaskRecords(value: unknown): NextTaskRecord[] | null {
+  return parseMissionNextTaskRecords(value, 'NEXT_TASKS');
 }
 
 export function extractMissionDependencies(
@@ -116,15 +117,4 @@ export function normalizeMissionAssets(assets: MissionAssetSummary[]): MissionAs
       return true;
     })
     .sort((a, b) => a.path.localeCompare(b.path));
-}
-
-export function findLatestMissionHandoff(
-  missionId: string,
-  handoffs: MissionHandoffSummary[]
-): MissionHandoffSummary | null {
-  return (
-    handoffs
-      .filter((handoff) => handoff.missionId === missionId)
-      .sort((a, b) => b.ts.localeCompare(a.ts))[0] || null
-  );
 }

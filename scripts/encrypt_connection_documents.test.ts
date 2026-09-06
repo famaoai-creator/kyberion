@@ -1,17 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { readTextFile } from '@agent/core/foundation';
 import {
   isEncryptedConnectionEnvelope,
   overrideSecretEncryptionKeyForTests,
-  pathResolver,
+} from '@agent/core/secret-encryption';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
   safeExistsSync,
-} from '@agent/core';
-import { migrateConnectionDocuments } from './encrypt_connection_documents.js';
+} from '@agent/core/secure-io';
+import {
+  migrateConnectionDocuments,
+  readConnectionDocumentTextFile,
+} from './encrypt_connection_documents.js';
 
 let dir: string;
 
@@ -28,6 +34,18 @@ afterEach(() => {
 });
 
 describe('migrateConnectionDocuments (AC-05)', () => {
+  it('uses the foundation reader for plaintext connection documents', () => {
+    const source = readTextFile(
+      pathResolver.rootResolve('scripts/encrypt_connection_documents.ts')
+    );
+    expect(source).toContain('parseSafeJsonInput, readTextFile');
+    expect(source).toContain('readConnectionDocumentTextFile(filePath: string)');
+  });
+
+  it('rejects a directory before reading a connection document', () => {
+    expect(() => readConnectionDocumentTextFile(dir)).toThrow('must be a regular file');
+  });
+
   it('encrypts plaintext documents with a raw .bak, then round-trips via --decrypt', () => {
     const first = migrateConnectionDocuments({ decrypt: false, connectionsDir: dir });
     expect(first).toEqual({ encrypted: 1, decrypted: 0, skipped: 0 });
@@ -56,5 +74,19 @@ describe('migrateConnectionDocuments (AC-05)', () => {
       safeReadFile(path.join(dir, 'github.json'), { encoding: 'utf8' }) as string
     );
     expect(plain).toEqual({ token: 'ghp_abc' });
+  });
+
+  it('skips persisted documents containing dangerous JSON keys', () => {
+    safeWriteFile(
+      path.join(dir, 'unsafe.json'),
+      '{"__proto__":{"token":"should-not-be-reencrypted"}}\n'
+    );
+
+    expect(migrateConnectionDocuments({ decrypt: false, connectionsDir: dir })).toEqual({
+      encrypted: 1,
+      decrypted: 0,
+      skipped: 1,
+    });
+    expect(safeExistsSync(path.join(dir, 'unsafe.json.bak'))).toBe(false);
   });
 });

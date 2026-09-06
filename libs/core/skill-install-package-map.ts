@@ -83,8 +83,3 @@ export function findSkillInstallPackageMapEntry(
     ) || null
   );
 }
-
-export function resetSkillInstallPackageMapCache(): void {
-  cachedMap = null;
-  cachedKey = null;
-}

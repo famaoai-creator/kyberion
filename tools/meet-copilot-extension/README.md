@@ -117,7 +117,7 @@ capped history).
 
 Open the panel from the popup's **Open AI panel** button, press **AI モデルを準備**
 once (the first run downloads the model; progress is shown), then use the
-per-feature buttons. Tests: `pnpm test:meet-copilot`.
+per-feature buttons. Tests: `pnpm test -- --suite meet-copilot`.
 
 Audio is **decoupled** from this extension: the coordinator captures meeting audio
 from the BlackHole virtual device exactly as with the Playwright driver. As a bonus,

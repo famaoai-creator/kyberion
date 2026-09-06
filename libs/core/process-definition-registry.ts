@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 
 export type ProcessDefinitionKind =
@@ -43,7 +43,9 @@ export interface ProcessDefinitionRegistryAudit {
   errors: string[];
 }
 
-const REGISTRY_PATH = pathResolver.knowledge('product/governance/process-definition-registry.json');
+const REGISTRY_PATH = assertSafeRepositoryPath(
+  pathResolver.knowledge('product/governance/process-definition-registry.json')
+);
 
 const registryCatalog = defineCatalog<ProcessDefinitionRegistry>({
   id: 'process-definition-registry',
@@ -51,12 +53,24 @@ const registryCatalog = defineCatalog<ProcessDefinitionRegistry>({
   schema: pathResolver.knowledge('product/schemas/process-definition-registry.schema.json'),
 });
 
+const JSON_SOURCE_SCHEMA_BY_ID: Record<string, string> = {
+  'mission-workflow-catalog': pathResolver.knowledge(
+    'product/schemas/mission-workflow-catalog.schema.json'
+  ),
+  'mission-orchestration-scenarios': pathResolver.knowledge(
+    'product/schemas/mission-orchestration-scenario-pack.schema.json'
+  ),
+  'mission-task-classification-scenarios': pathResolver.knowledge(
+    'product/schemas/mission-task-classification-scenarios.schema.json'
+  ),
+};
+
 export function loadProcessDefinitionRegistry(): ProcessDefinitionRegistry {
   return registryCatalog.load();
 }
 
 function rootPath(relativePath: string): string {
-  return pathResolver.rootResolve(relativePath);
+  return assertSafeRepositoryPath(relativePath, { allowMissingLeaf: true });
 }
 
 function countJsonArray(payload: Record<string, unknown>, key: string): number {
@@ -70,6 +84,18 @@ function sortedEntries(path: string): string[] {
   return safeReaddir(path)
     .filter((entry) => !entry.startsWith('.'))
     .sort();
+}
+
+function loadJsonSourceAtPath(source: ProcessDefinitionSource, filePath: string) {
+  const schema = JSON_SOURCE_SCHEMA_BY_ID[source.id];
+  if (!schema) {
+    throw new Error(`[PROCESS_DEFINITION] no schema registered for ${source.id}`);
+  }
+  return defineCatalog<Record<string, unknown>>({
+    id: `process-definition-source-${source.id}`,
+    path: filePath,
+    schema,
+  }).load();
 }
 
 export function auditProcessDefinitionRegistry(
@@ -128,7 +154,7 @@ export function auditProcessDefinitionRegistry(
       sources.push(audit);
       continue;
     }
-    const payload = loadJson<Record<string, unknown>>(resolved);
+    const payload = loadJsonSourceAtPath(source, resolved);
     const actualCounts: Record<string, number> = {};
     for (const key of Object.keys(source.expected_counts ?? {})) {
       actualCounts[key] = countJsonArray(payload, key);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { watch, type FSWatcher } from 'chokidar';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 
 export interface PollWatchOptions<T> {
   load: () => Promise<T> | T;
@@ -17,6 +17,20 @@ export interface PollWatchState<T> {
   loading: boolean;
   refreshedAt?: number;
   refresh: () => void;
+}
+
+/** Resolve only repository-local regular files/directories for Chokidar. */
+export function resolveWatchPaths(watchPaths: readonly string[]): string[] {
+  return watchPaths.flatMap((watchPath) => {
+    try {
+      const safePath = assertSafeRepositoryPath(watchPath, { allowMissingLeaf: true });
+      if (!safeExistsSync(safePath)) return [];
+      const stat = safeLstat(safePath);
+      return stat.isFile() || stat.isDirectory() ? [safePath] : [];
+    } catch {
+      return [];
+    }
+  });
 }
 
 export function usePollWatch<T>({
@@ -69,13 +83,7 @@ export function usePollWatch<T>({
       debounceTimer = setTimeout(refresh, debounceMs);
     };
     let watcher: FSWatcher | undefined;
-    const existing = watchPaths.filter((p) => {
-      try {
-        return safeExistsSync(p);
-      } catch {
-        return false;
-      }
-    });
+    const existing = resolveWatchPaths(watchPaths);
     if (existing.length > 0) {
       watcher = watch(existing, {
         ignoreInitial: true,

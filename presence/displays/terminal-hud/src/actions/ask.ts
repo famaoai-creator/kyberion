@@ -1,5 +1,6 @@
-import { runSurfaceMessageConversation } from '@agent/core';
-import type { IntentResolutionContract } from '@agent/core';
+import { runSurfaceMessageConversation } from '@agent/core/channel-surface';
+import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { auditAction } from './dispatch.js';
 
 export interface AskReply {
@@ -12,7 +13,7 @@ export interface AskReply {
  * Route free-form operator input through the same governed CLI surface
  * conversation used by `pnpm kyberion ask` (reasoning backend + delegation).
  */
-export async function askKyberion(text: string): Promise<AskReply> {
+export async function askKyberion(text: string, locale?: SupportedLocale): Promise<AskReply> {
   const correlationId = `tui-ask-${Date.now().toString(36)}`;
   try {
     const result = await runSurfaceMessageConversation({
@@ -22,6 +23,7 @@ export async function askKyberion(text: string): Promise<AskReply> {
       threadTs: correlationId,
       correlationId,
       receivedAt: new Date().toISOString(),
+      locale,
       actorId: 'operator',
       senderAgentId: 'kyberion:terminal-hud',
       agentId: 'cli-surface-agent',

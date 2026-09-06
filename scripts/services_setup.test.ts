@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import {
   buildServiceAuthNextAction,
   buildServiceConnectionSetupCommand,
 } from './services_setup.js';
 
 describe('services setup guidance', () => {
+  it('uses the canonical service connection loader for readiness inspection', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/services_setup.ts'), { encoding: 'utf8' })
+    );
+
+    expect(source).toContain('loadServiceConnectionAtPath');
+    expect(source).not.toContain('readJsonIfPresent');
+  });
+
   it('routes connection completion through the services-only onboarding phase', () => {
     expect(buildServiceConnectionSetupCommand('voice')).toBe(
       'pnpm onboard -- --services-only --service voice'

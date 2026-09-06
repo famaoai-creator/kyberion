@@ -5,6 +5,8 @@ import { normalizeEventScope } from './event-scope.js';
 import {
   checkGenerationQuota,
   generationQuotaCounterPath,
+  GENERATION_QUOTA_POLICY_REPO_PATH,
+  loadGenerationQuotaPolicy,
   reserveGenerationQuota,
   releaseGenerationQuota,
   type GenerationQuotaPolicy,
@@ -20,6 +22,35 @@ const POLICY: GenerationQuotaPolicy = {
 };
 
 describe('generation quota', () => {
+  it('fails closed when the governed policy is missing', () => {
+    safeRmSync(ROOT, { recursive: true, force: true });
+
+    expect(() => loadGenerationQuotaPolicy({ rootDir: ROOT })).toThrowError(/missing/iu);
+  });
+
+  it('loads the governed policy through its dedicated schema', () => {
+    safeRmSync(ROOT, { recursive: true, force: true });
+    const policyPath = path.join(ROOT, ...GENERATION_QUOTA_POLICY_REPO_PATH.split('/'));
+    safeMkdir(path.dirname(policyPath), { recursive: true });
+    safeWriteFile(
+      policyPath,
+      JSON.stringify({
+        version: '1.0.0',
+        max_units_per_day: 12,
+        warn_ratio: 0.75,
+        operation_units: { generate_image: 2 },
+        tenant_overrides: { 'client-a': { max_units_per_day: 5 } },
+      })
+    );
+    expect(loadGenerationQuotaPolicy({ rootDir: ROOT })).toMatchObject({
+      max_units_per_day: 12,
+      warn_ratio: 0.75,
+      operation_units: { generate_image: 2 },
+      tenant_overrides: { 'client-a': { max_units_per_day: 5 } },
+    });
+    safeRmSync(ROOT, { recursive: true, force: true });
+  });
+
   it('reserves atomically and blocks the next operation over the daily limit', () => {
     safeRmSync(ROOT, { recursive: true, force: true });
     const options = { rootDir: ROOT, policy: POLICY, now: '2026-08-16T00:00:00.000Z' };
@@ -73,5 +104,56 @@ describe('generation quota', () => {
       level: 'block',
     });
     safeRmSync(ROOT, { recursive: true, force: true });
+  });
+
+  it('fails closed for schema-invalid, cross-tenant, and non-file counters', () => {
+    safeRmSync(ROOT, { recursive: true, force: true });
+    const options = { rootDir: ROOT, policy: POLICY, now: '2026-08-16T00:00:00.000Z' };
+    const counterPath = generationQuotaCounterPath('client-a', options);
+    safeMkdir(path.dirname(counterPath), { recursive: true });
+    const updatedAt = new Date(options.now).toISOString();
+
+    safeWriteFile(
+      counterPath,
+      JSON.stringify({
+        tenant_slug: 'client-a',
+        date: '2026-08-16',
+        units: 1,
+        updated_at: updatedAt,
+        unexpected: true,
+      })
+    );
+    expect(reserveGenerationQuota(SCOPE, 'generate_image', options)).toMatchObject({
+      allowed: false,
+      reason: expect.stringContaining('counter is invalid'),
+    });
+
+    safeWriteFile(
+      counterPath,
+      JSON.stringify({
+        tenant_slug: 'other-tenant',
+        date: '2026-08-16',
+        units: 1,
+        updated_at: updatedAt,
+      })
+    );
+    expect(reserveGenerationQuota(SCOPE, 'generate_image', options)).toMatchObject({
+      allowed: false,
+      reason: expect.stringContaining('counter is invalid'),
+    });
+
+    safeRmSync(counterPath, { force: true });
+    safeMkdir(counterPath, { recursive: true });
+    expect(reserveGenerationQuota(SCOPE, 'generate_image', options)).toMatchObject({
+      allowed: false,
+      reason: expect.stringContaining('counter is invalid'),
+    });
+    safeRmSync(ROOT, { recursive: true, force: true });
+  });
+
+  it('rejects a tenant counter path outside the governed fixture root', () => {
+    expect(() => generationQuotaCounterPath('client-a', { rootDir: '/tmp' })).toThrow(
+      /outside the repository/
+    );
   });
 });

@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { getVoiceTtsLanguageConfig, resetVoiceTtsConfigCache } from './voice-tts-config.js';
+import {
+  getVoiceTtsLanguageConfig,
+  _resetVoiceTtsConfigCacheForTests,
+} from './voice-tts-config.js';
 
 describe('voice tts config registry', () => {
   const tmpDir = pathResolver.sharedTmp('voice-tts-config-tests');
@@ -9,13 +12,15 @@ describe('voice tts config registry', () => {
 
   afterEach(() => {
     delete process.env.KYBERION_VOICE_HUB_TTS_CONFIG_PATH;
-    resetVoiceTtsConfigCache();
+    _resetVoiceTtsConfigCacheForTests();
     safeRmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('loads the governed japanese profile from the default registry', () => {
     const registry = JSON.parse(
-      safeReadFile(pathResolver.knowledge('product/presence/voice-hub-tts.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(pathResolver.knowledge('product/presence/voice-hub-tts.json'), {
+        encoding: 'utf8',
+      }) as string
     ) as {
       languages?: Record<string, { voice: string; rate: number }>;
     };
@@ -30,20 +35,24 @@ describe('voice tts config registry', () => {
     safeMkdir(tmpDir, { recursive: true });
     safeWriteFile(
       overridePath,
-      JSON.stringify({
-        defaultLanguage: 'ja',
-        languages: {
-          ja: {
-            voice: 'Kyoko',
-            rate: 170,
-            requestIdToken: '受付番号',
-            urlToken: 'リンク',
+      JSON.stringify(
+        {
+          defaultLanguage: 'ja',
+          languages: {
+            ja: {
+              voice: 'Kyoko',
+              rate: 170,
+              requestIdToken: '受付番号',
+              urlToken: 'リンク',
+            },
           },
         },
-      }, null, 2),
+        null,
+        2
+      )
     );
     process.env.KYBERION_VOICE_HUB_TTS_CONFIG_PATH = overridePath;
-    resetVoiceTtsConfigCache();
+    _resetVoiceTtsConfigCacheForTests();
 
     const config = getVoiceTtsLanguageConfig('ja');
 
@@ -51,5 +60,12 @@ describe('voice tts config registry', () => {
     expect(config.rate).toBe(170);
     expect(config.requestIdToken).toBe('受付番号');
     expect(config.urlToken).toBe('リンク');
+  });
+
+  it('rejects a configured registry path outside the repository', () => {
+    process.env.KYBERION_VOICE_HUB_TTS_CONFIG_PATH = '/tmp/voice-tts-external.json';
+    _resetVoiceTtsConfigCacheForTests();
+
+    expect(() => getVoiceTtsLanguageConfig('en')).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });

@@ -1,21 +1,29 @@
 import path from 'node:path';
 import { NextRequest } from 'next/server';
+import { readJsonLines } from '@agent/core/foundation';
 import {
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
-  safeReadFile,
+  safeLstat,
   safeReaddir,
-  workerEventEnvelopeSchema,
-  eventScopeFromRecord,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   eventScopeMatches,
   parseEventScopeFromRecord,
-  redactCollaborationMetadata,
   type EventScopeFilter,
+} from '@agent/core/event-scope';
+import { redactCollaborationMetadata } from '@agent/core/agent-collaboration-events';
+import {
+  workerEventEnvelopeSchema,
   type WorkerEventEnvelope,
-} from '@agent/core';
+} from '@agent/core/worker-event-stream';
+import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
+import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
 import {
   CollaborationEventBatcher,
+  collaborationEventVisibleToTier,
   normalizeWorkerEvent,
   type CollaborationStreamEvent,
 } from '../../../../lib/collaboration-stream';
@@ -23,7 +31,9 @@ import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
   viewerScopeTenantSlugs,
+  withViewerExecutionContext,
 } from '../../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,57 +42,92 @@ function sse(eventName: string, data: unknown, id?: string): string {
   return `${id ? `id: ${id}\n` : ''}event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
-function eventFiles(): string[] {
-  const root = pathResolver.shared('logs/worker-events');
-  if (!safeExistsSync(root)) return [];
-  const files = safeReaddir(root)
-    .filter((entry) => /^worker-events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(entry))
-    .map((entry) => path.join(root, entry));
-  for (const entry of safeReaddir(root)) {
-    const missionDir = path.join(root, entry);
-    if (!safeExistsSync(missionDir)) continue;
-    try {
-      for (const file of safeReaddir(missionDir)) {
-        if (/^worker-events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(file))
-          files.push(path.join(missionDir, file));
+export function eventFiles(rootPath = pathResolver.shared('logs/worker-events')): string[] {
+  try {
+    const root = assertSafeRepositoryPath(rootPath, { allowMissingLeaf: true });
+    if (!safeExistsSync(root) || !safeLstat(root).isDirectory()) return [];
+    const files: string[] = [];
+    const addRegularFile = (filePath: string): void => {
+      try {
+        const safeFile = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+        if (safeExistsSync(safeFile) && safeLstat(safeFile).isFile()) files.push(safeFile);
+      } catch {
+        // A symlink, malformed, or concurrently removed event resource is skipped.
       }
-    } catch {
-      // A concurrently removed mission partition is harmless.
+    };
+    const rootEntries = safeReaddir(root);
+    for (const entry of rootEntries) {
+      if (/^worker-events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(entry)) {
+        addRegularFile(path.join(root, entry));
+      }
     }
+    for (const entry of rootEntries) {
+      const missionDir = path.join(root, entry);
+      try {
+        const safeMissionDir = assertSafeRepositoryPath(missionDir, { allowMissingLeaf: true });
+        if (!safeExistsSync(safeMissionDir) || !safeLstat(safeMissionDir).isDirectory()) continue;
+        for (const file of safeReaddir(safeMissionDir)) {
+          if (/^worker-events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(file))
+            addRegularFile(path.join(safeMissionDir, file));
+        }
+      } catch {
+        // A concurrently removed mission partition is harmless.
+      }
+    }
+    return Array.from(new Set(files)).sort();
+  } catch {
+    return [];
   }
-  return Array.from(new Set(files)).sort();
 }
 
-function readEvents(
+export function readEvents(
   afterId: string | null,
   missionId?: string,
   tenantSlugs: string[] | 'all' = 'all',
-  scopeFilter: Omit<EventScopeFilter, 'tenant_slug' | 'tenant_slugs'> = {}
+  scopeFilter: Omit<EventScopeFilter, 'tenant_slug' | 'tenant_slugs'> = {},
+  tierAccess: readonly OsKnowledgeTier[] = ['public', 'confidential'],
+  files: readonly string[] = eventFiles()
 ): { events: CollaborationStreamEvent[]; lastSeenId?: string } {
   const events: CollaborationStreamEvent[] = [];
   let lastSeenId: string | undefined;
   let foundCursor = !afterId;
-  for (const file of eventFiles()) {
-    const raw = String(safeReadFile(file, { encoding: 'utf8' }) || '');
-    const lines = raw.split(/\r?\n/);
-    for (let lineNumber = 0; lineNumber < lines.length; lineNumber += 1) {
-      const line = lines[lineNumber]?.trim();
-      if (!line) continue;
-      const id = `${file}:${lineNumber}`;
+  for (const file of files) {
+    const entries = readJsonLines<{ id: string; value: unknown }>(file, {
+      map: (value, lineNumber) => ({
+        id: `${file}:${lineNumber - 1}`,
+        value,
+      }),
+      onMalformed: (_error, lineNumber) => {
+        const id = `${file}:${lineNumber - 1}`;
+        if (!foundCursor) {
+          if (id === afterId) foundCursor = true;
+          return;
+        }
+        lastSeenId = id;
+      },
+    });
+    for (const { id, value } of entries) {
       if (!foundCursor) {
         if (id === afterId) foundCursor = true;
         continue;
       }
       lastSeenId = id;
       try {
-        const event = workerEventEnvelopeSchema.parse(JSON.parse(line)) as WorkerEventEnvelope;
+        const event = workerEventEnvelopeSchema.parse(value) as WorkerEventEnvelope;
         if (missionId && event.source?.mission_id !== missionId) continue;
         const normalized = normalizeWorkerEvent(event, id);
         const scopeResult = parseEventScopeFromRecord(normalized.payload);
         const normalizedScope = scopeResult.scope;
         if (scopeResult.invalid) continue;
+        const eventScope = missionEventScope(normalized.mission_id);
+        // Worker-event envelopes historically carried mission identity in
+        // source but not the full scope in payload. Resolve that legacy form
+        // from authoritative mission state; unknown tier is never exposed.
+        if (!collaborationEventVisibleToTier(normalized.payload, eventScope?.tier, tierAccess))
+          continue;
         if (tenantSlugs !== 'all') {
           const eventTenant =
+            eventScope?.tenantSlug ||
             normalizedScope?.tenant_slug ||
             (typeof normalized.payload.tenant_slug === 'string'
               ? normalized.payload.tenant_slug
@@ -111,8 +156,35 @@ function readEvents(
   // A browser can reconnect with a cursor from a rotated log file. In that
   // case replay the bounded tail instead of silently waiting forever for a
   // cursor that can no longer be found.
-  if (afterId && !foundCursor) return readEvents(null, missionId, tenantSlugs, scopeFilter);
+  if (afterId && !foundCursor)
+    return readEvents(null, missionId, tenantSlugs, scopeFilter, tierAccess, files);
   return { events: events.slice(-60), lastSeenId };
+}
+
+function missionEventScope(
+  missionId: string | undefined
+): { tier: OsKnowledgeTier; tenantSlug?: string } | undefined {
+  const normalized = String(missionId || '')
+    .trim()
+    .toUpperCase();
+  if (!normalized) return undefined;
+  try {
+    const matches = listMissionsInSearchDirs().filter((entry) => entry.missionId === normalized);
+    if (matches.length !== 1) return undefined;
+    const missionPath = matches[0].missionPath;
+    const state = loadState(normalized, { directories: [path.dirname(missionPath)] });
+    const tier = state?.tier;
+    if (tier !== 'personal' && tier !== 'confidential' && tier !== 'public') return undefined;
+    const tenantSlug =
+      typeof state?.tenant_slug === 'string'
+        ? state.tenant_slug
+        : typeof state?.tenant_id === 'string'
+          ? state.tenant_id
+          : undefined;
+    return { tier, ...(tenantSlug ? { tenantSlug } : {}) };
+  } catch {
+    return undefined;
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -124,8 +196,8 @@ export async function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   const encoder = new TextEncoder();
-  const missionId = req.nextUrl.searchParams.get('mission') || undefined;
-  const scopeKind = req.nextUrl.searchParams.get('scope_kind') || undefined;
+  const missionId = readChronosOptionalStringParam(req.nextUrl.searchParams.get('mission'));
+  const scopeKind = readChronosOptionalStringParam(req.nextUrl.searchParams.get('scope_kind'));
   const allowedScopeKinds = new Set([
     'system',
     'tenant',
@@ -136,17 +208,21 @@ export async function GET(req: NextRequest) {
     'session',
   ]);
   const scopeFilter: Omit<EventScopeFilter, 'tenant_slug' | 'tenant_slugs'> = {
-    ...(req.nextUrl.searchParams.get('organization')
-      ? { organization_id: req.nextUrl.searchParams.get('organization')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization'))
+      ? {
+          organization_id: readChronosOptionalStringParam(
+            req.nextUrl.searchParams.get('organization')
+          )!,
+        }
       : {}),
-    ...(req.nextUrl.searchParams.get('project')
-      ? { project_id: req.nextUrl.searchParams.get('project')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('project'))
+      ? { project_id: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project'))! }
       : {}),
-    ...(req.nextUrl.searchParams.get('task')
-      ? { task_id: req.nextUrl.searchParams.get('task')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('task'))
+      ? { task_id: readChronosOptionalStringParam(req.nextUrl.searchParams.get('task'))! }
       : {}),
-    ...(req.nextUrl.searchParams.get('session')
-      ? { session_id: req.nextUrl.searchParams.get('session')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('session'))
+      ? { session_id: readChronosOptionalStringParam(req.nextUrl.searchParams.get('session'))! }
       : {}),
     ...(scopeKind && allowedScopeKinds.has(scopeKind)
       ? { scope_kind: scopeKind as EventScopeFilter['scope_kind'] }
@@ -156,11 +232,12 @@ export async function GET(req: NextRequest) {
   try {
     tenantSlugs = viewerScopeTenantSlugs(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
   } catch (error) {
     return viewerErrorResponse(error);
   }
+  const tierAccess = resolvedViewer.context.tierAccess ?? ['public', 'confidential'];
   const requestedCursor = req.headers.get('last-event-id');
   let cursor = requestedCursor;
   let closed = false;
@@ -192,7 +269,9 @@ export async function GET(req: NextRequest) {
       });
       const poll = () => {
         if (closed) return;
-        const result = readEvents(scanCursor, missionId, tenantSlugs, scopeFilter);
+        const result = withViewerExecutionContext(resolvedViewer.context, () =>
+          readEvents(scanCursor, missionId, tenantSlugs, scopeFilter, tierAccess)
+        );
         if (result.lastSeenId) scanCursor = result.lastSeenId;
         for (const event of result.events) batcher.push(event);
       };

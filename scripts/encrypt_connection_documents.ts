@@ -16,15 +16,13 @@ import {
   decryptConnectionDocument,
   encryptConnectionDocument,
   isEncryptedConnectionEnvelope,
-  logger,
-  pathResolver,
   resolveSecretEncryptionMode,
-  safeExistsSync,
-  safeReaddir,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secret-encryption';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
+import { parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export function migrateConnectionDocuments(input: { decrypt: boolean; connectionsDir?: string }): {
@@ -39,10 +37,10 @@ export function migrateConnectionDocuments(input: { decrypt: boolean; connection
   for (const entry of safeReaddir(dir)) {
     if (!entry.endsWith('.json') || entry.endsWith('.bak')) continue;
     const filePath = path.join(dir, entry);
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    const raw = readConnectionDocumentTextFile(filePath);
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
+      parsed = parseSafeJsonInput(raw, `connection document ${entry}`);
     } catch {
       counts.skipped += 1;
       continue;
@@ -70,6 +68,13 @@ export function migrateConnectionDocuments(input: { decrypt: boolean; connection
     }
   }
   return counts;
+}
+
+export function readConnectionDocumentTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 async function main(argv: string[] = []): Promise<number> {

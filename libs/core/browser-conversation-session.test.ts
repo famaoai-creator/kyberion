@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyBrowserConversationCommand,
+  bootstrapBrowserConversationSession,
   classifyBrowserConversationCommand,
   confirmBrowserConversationCandidate,
   createBrowserConversationCommand,
   createBrowserConversationSession,
   getActiveBrowserConversationSession,
+  loadBrowserRuntimeSessionAtPath,
+  loadBrowserSnapshotAtPath,
   listBrowserConversationSessions,
   loadBrowserConversationSession,
+  normalizeBrowserActuatorResult,
   recordBrowserConversationHistory,
   saveBrowserConversationSession,
   validateBrowserConversationCommand,
@@ -15,15 +19,18 @@ import {
   validateBrowserConversationSession,
 } from './browser-conversation-session.js';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync, safeWriteFile, safeMkdir } from './secure-io.js';
+import { safeReadFile, safeRmSync, safeWriteFile, safeMkdir } from './secure-io.js';
+import { resolveIntentResolutionPacket } from './intent-resolution.js';
 
 describe('browser conversation session helpers', () => {
   const sessionDir = pathResolver.shared('runtime/browser/conversation-sessions');
   const snapshotDir = pathResolver.shared('runtime/browser/snapshots');
+  const runtimeDir = pathResolver.shared('runtime/browser/sessions');
 
   afterEach(() => {
     safeRmSync(sessionDir, { recursive: true, force: true });
     safeRmSync(snapshotDir, { recursive: true, force: true });
+    safeRmSync(runtimeDir, { recursive: true, force: true });
   });
 
   it('creates and validates a session with defaults', () => {
@@ -41,6 +48,15 @@ describe('browser conversation session helpers', () => {
     expect(session.control.interruptible).toBe(true);
   });
 
+  it('rejects malformed or unsuccessful browser actuator results', () => {
+    expect(() => normalizeBrowserActuatorResult([])).toThrow('non-object result');
+    expect(() => normalizeBrowserActuatorResult({ status: 'unknown' })).toThrow('invalid status');
+    expect(() => normalizeBrowserActuatorResult({ status: 'succeeded', context: [] })).toThrow(
+      'invalid context'
+    );
+    expect(normalizeBrowserActuatorResult({ status: 'failed', results: [] }).status).toBe('failed');
+  });
+
   it('persists and reloads conversation sessions', () => {
     const session = createBrowserConversationSession({
       sessionId: 'BRS-TEST-1',
@@ -51,11 +67,153 @@ describe('browser conversation session helpers', () => {
       },
     });
 
-    saveBrowserConversationSession(session);
+    saveBrowserConversationSession({
+      ...session,
+      $schema: 'https://kyberion.local/schemas/browser-conversation-session.schema.json',
+    } as typeof session);
+    expect(
+      JSON.parse(String(safeReadFile(`${sessionDir}/BRS-TEST-1.json`))).$schema
+    ).toBeUndefined();
     const loaded = loadBrowserConversationSession('BRS-TEST-1');
 
     expect(loaded?.session_id).toBe('BRS-TEST-1');
     expect(listBrowserConversationSessions()).toHaveLength(1);
+  });
+
+  it('rejects schema-invalid persisted conversation sessions', () => {
+    safeMkdir(sessionDir, { recursive: true });
+    safeWriteFile(
+      `${sessionDir}/BRS-TEST-INVALID.json`,
+      JSON.stringify({ session_id: 'BRS-TEST-INVALID', status: 'executing' })
+    );
+
+    expect(loadBrowserConversationSession('BRS-TEST-INVALID')).toBeNull();
+  });
+
+  it('preserves the parse error contract for malformed conversation sessions', () => {
+    safeMkdir(sessionDir, { recursive: true });
+    safeWriteFile(`${sessionDir}/BRS-TEST-MALFORMED.json`, '{ malformed');
+
+    expect(() => loadBrowserConversationSession('BRS-TEST-MALFORMED')).toThrow(SyntaxError);
+  });
+
+  it('rejects traversal-shaped session ids before persistence lookup', () => {
+    expect(() => loadBrowserConversationSession('../outside')).toThrow(/single path segment/);
+  });
+
+  it('does not use a malformed browser snapshot for target resolution', () => {
+    const session = createBrowserConversationSession({
+      sessionId: 'BRS-TEST-MALFORMED-SNAPSHOT',
+      surface: 'presence',
+      goal: {
+        summary: '承認フローを進める',
+        success_condition: '承認を完了する',
+      },
+    });
+    saveBrowserConversationSession(session);
+    safeMkdir(snapshotDir, { recursive: true });
+    safeWriteFile(
+      `${snapshotDir}/BRS-TEST-MALFORMED-SNAPSHOT.json`,
+      JSON.stringify({
+        session_id: 'BRS-TEST-MALFORMED-SNAPSHOT',
+        tab_id: 'tab-1',
+        url: 'https://example.com',
+        title: 'Approval Console',
+        captured_at: new Date().toISOString(),
+        elements: [null],
+      })
+    );
+
+    const feedback = applyBrowserConversationCommand(
+      'BRS-TEST-MALFORMED-SNAPSHOT',
+      createBrowserConversationCommand({
+        sessionId: 'BRS-TEST-MALFORMED-SNAPSHOT',
+        utterance: '承認ボタンを押して',
+        resolution: {
+          commandType: 'step_command',
+          action: 'click',
+          targetHint: { text: '承認', role: 'button' },
+        },
+      })
+    );
+
+    expect(feedback?.status).toBe('progress');
+    expect(
+      loadBrowserConversationSession('BRS-TEST-MALFORMED-SNAPSHOT')?.candidate_targets
+    ).toEqual([]);
+  });
+
+  it('loads the actuator snapshot shape through the governed snapshot loader', () => {
+    safeMkdir(snapshotDir, { recursive: true });
+    const snapshotPath = `${snapshotDir}/BRS-TEST-FULL-SNAPSHOT.json`;
+    safeWriteFile(
+      snapshotPath,
+      JSON.stringify({
+        session_id: 'BRS-TEST-FULL-SNAPSHOT',
+        tab_id: 'tab-1',
+        url: 'https://example.com',
+        title: 'Approval Console',
+        captured_at: new Date().toISOString(),
+        element_count: 1,
+        viewport: { width: 1280, height: 720, scale: 1 },
+        focused_ref: '@e1',
+        ready_state: 'complete',
+        elements: [
+          {
+            ref: '@e1',
+            tag: 'button',
+            role: 'button',
+            text: '承認',
+            name: '承認',
+            type: null,
+            placeholder: null,
+            href: null,
+            value: null,
+            visible: true,
+            editable: false,
+            focused: true,
+            value_redacted: false,
+            selector: 'button',
+          },
+        ],
+      })
+    );
+
+    expect(loadBrowserSnapshotAtPath(snapshotPath)).toMatchObject({
+      session_id: 'BRS-TEST-FULL-SNAPSHOT',
+      element_count: 1,
+    });
+  });
+
+  it('rejects a directory at the persisted browser artifact paths', () => {
+    safeMkdir(`${snapshotDir}/directory.json`, { recursive: true });
+    safeMkdir(`${runtimeDir}/directory.json`, { recursive: true });
+
+    expect(() => loadBrowserSnapshotAtPath(`${snapshotDir}/directory.json`)).toThrow(
+      'snapshot must be a regular file'
+    );
+    expect(() => loadBrowserRuntimeSessionAtPath(`${runtimeDir}/directory.json`)).toThrow(
+      'runtime session must be a regular file'
+    );
+  });
+
+  it('rejects a malformed browser runtime session before bootstrap', () => {
+    safeMkdir(runtimeDir, { recursive: true });
+    safeWriteFile(
+      `${runtimeDir}/BROWSER-TEST-MALFORMED.json`,
+      JSON.stringify({
+        session_id: 'BROWSER-TEST-MALFORMED',
+        lease_status: 'active',
+        tabs: [null],
+      })
+    );
+
+    expect(() =>
+      bootstrapBrowserConversationSession({
+        browserSessionId: 'BROWSER-TEST-MALFORMED',
+        surface: 'presence',
+      })
+    ).toThrow('Browser runtime session not found');
   });
 
   it('records history entries on an existing session', () => {
@@ -154,21 +312,32 @@ describe('browser conversation session helpers', () => {
     expect(click?.targetHint?.text).toBe('Learn more');
   });
 
+  it('accepts the shared resolution packet instead of re-resolving browser text', () => {
+    const utterance = '日経新聞を開いて';
+    const packet = resolveIntentResolutionPacket(utterance);
+
+    expect(classifyBrowserConversationCommand(utterance, { packet })?.action).toBe('navigate');
+  });
+
   it('resolves a single candidate target from the latest browser snapshot', () => {
     safeMkdir(snapshotDir, { recursive: true });
     safeWriteFile(
       `${snapshotDir}/BRS-TEST-5.json`,
-      JSON.stringify({
-        session_id: 'BRS-TEST-5',
-        tab_id: 'tab-1',
-        url: 'https://example.com',
-        title: 'Approval Console',
-        captured_at: new Date().toISOString(),
-        elements: [
-          { ref: '@e1', role: 'button', text: '承認', name: '承認' },
-          { ref: '@e2', role: 'button', text: 'キャンセル', name: 'キャンセル' },
-        ],
-      }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'BRS-TEST-5',
+          tab_id: 'tab-1',
+          url: 'https://example.com',
+          title: 'Approval Console',
+          captured_at: new Date().toISOString(),
+          elements: [
+            { ref: '@e1', role: 'button', text: '承認', name: '承認' },
+            { ref: '@e2', role: 'button', text: 'キャンセル', name: 'キャンセル' },
+          ],
+        },
+        null,
+        2
+      )
     );
 
     const session = createBrowserConversationSession({
@@ -198,17 +367,21 @@ describe('browser conversation session helpers', () => {
     safeMkdir(snapshotDir, { recursive: true });
     safeWriteFile(
       `${snapshotDir}/BRS-TEST-6.json`,
-      JSON.stringify({
-        session_id: 'BRS-TEST-6',
-        tab_id: 'tab-1',
-        url: 'https://example.com',
-        title: 'Approval Console',
-        captured_at: new Date().toISOString(),
-        elements: [
-          { ref: '@e1', role: 'button', text: '承認', name: '承認' },
-          { ref: '@e2', role: 'button', text: '承認', name: '承認（下書き）' },
-        ],
-      }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'BRS-TEST-6',
+          tab_id: 'tab-1',
+          url: 'https://example.com',
+          title: 'Approval Console',
+          captured_at: new Date().toISOString(),
+          elements: [
+            { ref: '@e1', role: 'button', text: '承認', name: '承認' },
+            { ref: '@e2', role: 'button', text: '承認', name: '承認（下書き）' },
+          ],
+        },
+        null,
+        2
+      )
     );
 
     const session = createBrowserConversationSession({
@@ -239,16 +412,18 @@ describe('browser conversation session helpers', () => {
     safeMkdir(snapshotDir, { recursive: true });
     safeWriteFile(
       `${snapshotDir}/presence-demo.json`,
-      JSON.stringify({
-        session_id: 'presence-demo',
-        tab_id: 'tab-2',
-        url: 'https://example.com',
-        title: 'Example Domain',
-        captured_at: new Date().toISOString(),
-        elements: [
-          { ref: '@e1', role: null, text: 'Learn more', name: 'Learn more' },
-        ],
-      }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'presence-demo',
+          tab_id: 'tab-2',
+          url: 'https://example.com',
+          title: 'Example Domain',
+          captured_at: new Date().toISOString(),
+          elements: [{ ref: '@e1', role: null, text: 'Learn more', name: 'Learn more' }],
+        },
+        null,
+        2
+      )
     );
 
     const session = createBrowserConversationSession({

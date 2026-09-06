@@ -20,29 +20,39 @@
  * in a vendor SDK behind the same JSON contract).
  */
 
+import { auditChain } from '@agent/core/audit-chain';
+import { logger } from '@agent/core/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeExec,
+  safeMkdir,
   safeReadFile,
-  loadJson,
   safeWriteFile,
   safeExistsSync,
-  pathResolver,
-  auditChain,
-  buildGovernedRetryOptions,
-  retry,
-  createActuatorTrace,
-  finalizeActuatorTrace,
-  resolveIdentityContext,
-  executeAdfSteps,
-  resolveVars,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
-import { createStandardYargs } from '@agent/core/cli-utils';
+  safeLstat,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
+import { resolveIdentityContext } from '@agent/core/authority';
+import { loadVoiceConsentAtPath, validateVoiceConsentRecord } from '@agent/core/voice-consent';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import { resolveVars } from '@agent/core/logic-utils';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import {
+  createStandardYargs,
+  currentProcessArgv,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   auditSpeakerFairnessOp,
   conduct1on1,
@@ -53,6 +63,131 @@ import {
   runActionItemReminderSweepOp,
   trackPendingActionItemsOp,
 } from './meeting-intelligence-ops.js';
+import { hearingSessionOp, tutorSessionOp } from './meeting-guided-dialogue.js';
+import { normalizeTranscriptText } from './transcript-normalize.js';
+import { resolveNextMeetingTarget, type CalendarLikeEvent } from './meeting-target-resolve.js';
+import { extensionCaptionsToTranscript } from './extension-transcript.js';
+import { StubAudioBus } from '@agent/core/audio-bus';
+import { installChromeExtensionMeetingJoinDriver } from '@agent/core/chrome-extension-meeting-driver';
+import { getMeetingJoinDriver } from '@agent/core/meeting-join-driver';
+import type { TranscriptChunk } from '@agent/core/meeting-session-types';
+
+function resolveMeetingPath(ref: string, allowMissingLeaf = true): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
+}
+
+/**
+ * Join via the operator's own Chrome (Meet Copilot extension) instead of
+ * the Playwright subprocess. Collects `transcriptInput` caption chunks for
+ * `duration_sec`, renders the shared `[mm:ss] Speaker: text` transcript
+ * file, and leaves. Throws with setup guidance when the extension is not
+ * connected — the caller (`auto` mode) falls back to Playwright.
+ */
+async function runExtensionJoin(params: {
+  url: string;
+  platform?: string;
+  display_name?: string;
+  duration_sec?: number;
+  transcript_path?: string;
+  ws_port?: number;
+  join_timeout_sec?: number;
+  raise_hand?: boolean;
+}): Promise<Record<string, unknown>> {
+  const url = String(params.url || '').trim();
+  if (!url) throw new Error('[meeting] extension join requires params.url');
+  const platform = String(params.platform || 'auto').trim() || 'auto';
+  const durationSec = Math.max(0, Number(params.duration_sec || 0));
+  installChromeExtensionMeetingJoinDriver({
+    ...(params.ws_port !== undefined ? { wsPort: Number(params.ws_port) } : {}),
+    ...(params.join_timeout_sec !== undefined
+      ? { joinTimeoutSec: Number(params.join_timeout_sec) }
+      : {}),
+  });
+  const driver = getMeetingJoinDriver('chrome-extension');
+  if (!driver) throw new Error('[meeting] chrome-extension driver is not registered');
+  const probe = await driver.probe();
+  if (!probe.available) {
+    throw new Error(
+      `[meeting] chrome-extension driver unavailable: ${probe.reason || 'unknown'}. ` +
+        'Load tools/meet-copilot-extension in Chrome and set KYBERION_MEET_EXTENSION_TOKEN.'
+    );
+  }
+  const session = await driver.join(
+    {
+      url,
+      platform: platform as 'meet' | 'zoom' | 'teams' | 'auto',
+      display_name: String(params.display_name || 'Kyberion'),
+    },
+    new StubAudioBus()
+  );
+  // Declared gesture: announce presence right after joining so a
+  // listen-only bot is visible in the participant list.
+  if (params.raise_hand && typeof session.raiseHand === 'function') {
+    try {
+      await session.raiseHand();
+    } catch (err) {
+      logger.warn(
+        `[meeting] raise_hand after join failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+  const chunks: TranscriptChunk[] = [];
+  const endAt = Date.now() + durationSec * 1000;
+  const consumer = (async () => {
+    if (typeof session.transcriptInput !== 'function') return;
+    for await (const chunk of session.transcriptInput()) {
+      if (typeof chunk.text === 'string' && chunk.text.trim()) chunks.push(chunk);
+      if (Date.now() >= endAt) break;
+    }
+  })();
+  try {
+    while (Date.now() < endAt) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  } finally {
+    await session.leave().catch(() => undefined);
+  }
+  await Promise.race([
+    consumer.catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, 3000)),
+  ]);
+
+  const jsonl = chunks
+    .map((chunk) =>
+      JSON.stringify({
+        text: chunk.text,
+        ...(chunk.speaker_label ? { speaker: chunk.speaker_label } : {}),
+        ts: chunk.emitted_at,
+      })
+    )
+    .join('\n');
+  const rendered = extensionCaptionsToTranscript(jsonl);
+  const transcriptPath = String(params.transcript_path || '').trim();
+  if (transcriptPath && rendered.cueCount > 0) {
+    const resolved = resolveMeetingPath(transcriptPath);
+    safeMkdir(path.dirname(resolved), { recursive: true });
+    safeWriteFile(resolved, `${rendered.transcript}\n`);
+  }
+  return {
+    status: 'success',
+    platform,
+    join_backend: 'chrome-extension',
+    ...(transcriptPath ? { transcript_path: transcriptPath } : {}),
+    caption_cues: rendered.cueCount,
+    partial_state: rendered.cueCount === 0,
+    ...(rendered.cueCount === 0
+      ? { partial_reason: 'no live captions arrived from the extension' }
+      : {}),
+  };
+}
+
+function resolveExistingMeetingFile(ref: string, label: string): string {
+  const resolved = resolveMeetingPath(ref, false);
+  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
+    throw new Error(`[MEETING_RESOURCE_FILE] ${label} must be a regular file: ${ref}`);
+  }
+  return resolved;
+}
 import { resolveMeetingProvider } from './meeting-provider-adapters.js';
 
 export interface MeetingAction {
@@ -72,6 +207,13 @@ export interface MeetingAction {
     text?: string;
     duration_sec?: number;
     transcript_path?: string;
+    display_name?: string;
+    join_backend?: 'auto' | 'playwright' | 'chrome-extension';
+    ws_port?: number;
+    join_timeout_sec?: number;
+    raise_hand?: boolean;
+    headed?: boolean;
+    user_data_dir?: string;
   };
 }
 
@@ -88,9 +230,23 @@ export interface MeetingPipelineAction {
 
 export interface MeetingActionResult {
   status: 'success' | 'error' | 'denied';
+  action?: string;
   platform?: string;
   method?: string;
   join_backend?: string;
+  provider?: string;
+  provider_profile_id?: string;
+  execution_profile_id?: string;
+  mode?: string;
+  node?: string;
+  audio_bridge?: string;
+  url_policy?: string;
+  chars?: number;
+  duration?: number;
+  elapsed?: number;
+  playwright_driver?: string;
+  voice_bridge?: string;
+  blackhole_router?: string;
   message?: string;
   audit_event_id?: string;
   trace?: unknown;
@@ -99,6 +255,8 @@ export interface MeetingActionResult {
   partial_state?: boolean;
   partial_reason?: string;
   transcript_path?: string;
+  caption_cues?: number;
+  captions_available?: boolean;
 }
 
 const MEETING_MANIFEST_PATH = pathResolver.rootResolve(
@@ -112,78 +270,96 @@ const DEFAULT_MEETING_RETRY = {
   jitter: true,
 };
 
-interface VoiceConsentRecord {
-  consent?: unknown;
-  mission_id?: unknown;
-  operator_handle?: unknown;
-  tenant_slug?: unknown;
-  expires_at?: unknown;
-}
-
 function isPlainObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function normalizeOptionalString(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed || undefined;
+const MEETING_ACTIONS = new Set<MeetingAction['action']>([
+  'check_consent',
+  'join',
+  'leave',
+  'speak',
+  'listen',
+  'chat',
+  'status',
+]);
+
+/** Validate the structural CLI boundary before the typed action handler runs. */
+export function parseMeetingActionInput(value: unknown): MeetingAction | MeetingPipelineAction {
+  if (!isPlainObject(value) || typeof value.action !== 'string') {
+    throw new Error('meeting action input must be an object with an action');
+  }
+  if (value.action === 'pipeline') {
+    if (!Array.isArray(value.steps)) {
+      throw new Error('meeting action input pipeline steps must be an array');
+    }
+    return value as unknown as MeetingPipelineAction;
+  }
+  if (!MEETING_ACTIONS.has(value.action as MeetingAction['action'])) {
+    throw new Error(`meeting action input has unknown action: ${value.action}`);
+  }
+  if (!isPlainObject(value.params)) {
+    throw new Error('meeting action input params must be an object');
+  }
+  return value as unknown as MeetingAction;
 }
 
-function validateGrantedConsent(
-  consent: VoiceConsentRecord,
-  missionId: string
-): { allowed: boolean; reason?: string } {
-  if (consent.consent !== 'granted') {
-    return {
-      allowed: false,
-      reason: `voice-consent.json present but consent != 'granted' (got '${String(consent.consent)}')`,
-    };
+const MEETING_RESULT_STRING_FIELDS = [
+  'action',
+  'platform',
+  'method',
+  'join_backend',
+  'provider',
+  'provider_profile_id',
+  'execution_profile_id',
+  'mode',
+  'node',
+  'audio_bridge',
+  'url_policy',
+  'message',
+  'partial_reason',
+  'transcript_path',
+  'playwright_driver',
+  'voice_bridge',
+  'blackhole_router',
+] as const;
+
+const MEETING_RESULT_NUMBER_FIELDS = ['chars', 'duration', 'elapsed'] as const;
+
+/** Validate the JSON envelope emitted by the Python meeting bridge. */
+export function parseMeetingActionResult(value: unknown): MeetingActionResult | undefined {
+  if (!isPlainObject(value)) return undefined;
+  if (value.status !== 'success' && value.status !== 'error' && value.status !== 'denied') {
+    return undefined;
   }
 
-  const consentMissionId = normalizeOptionalString(consent.mission_id);
-  const operatorHandle = normalizeOptionalString(consent.operator_handle);
-  if (!consentMissionId || !operatorHandle) {
-    return {
-      allowed: false,
-      reason: 'voice-consent.json is malformed: mission_id and operator_handle are required',
-    };
+  const result: MeetingActionResult = { status: value.status };
+  for (const field of MEETING_RESULT_STRING_FIELDS) {
+    const candidate = value[field];
+    if (candidate !== undefined && typeof candidate !== 'string') return undefined;
+    if (typeof candidate === 'string') result[field] = candidate;
   }
-  if (consentMissionId !== missionId) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json mission_id '${consentMissionId}' does not match active mission '${missionId}'`,
-    };
-  }
-
-  const expiresAt = normalizeOptionalString(consent.expires_at);
-  if (expiresAt) {
-    const expiresMs = Date.parse(expiresAt);
-    if (!Number.isFinite(expiresMs)) {
-      return { allowed: false, reason: `voice-consent.json expires_at is invalid: ${expiresAt}` };
+  for (const field of MEETING_RESULT_NUMBER_FIELDS) {
+    const candidate = value[field];
+    if (candidate !== undefined && (typeof candidate !== 'number' || !Number.isFinite(candidate))) {
+      return undefined;
     }
-    if (expiresMs <= Date.now()) {
-      return { allowed: false, reason: `voice-consent.json expired at ${expiresAt}` };
-    }
+    if (typeof candidate === 'number') result[field] = candidate;
   }
-
-  const activeTenant = resolveIdentityContext().tenantSlug;
-  if (activeTenant) {
-    const consentTenant = normalizeOptionalString(consent.tenant_slug);
-    if (consentTenant !== activeTenant) {
-      return {
-        allowed: false,
-        reason: `voice-consent.json tenant_slug '${consentTenant ?? 'missing'}' does not match active tenant '${activeTenant}'`,
-      };
-    }
+  if (value.partial_state !== undefined && typeof value.partial_state !== 'boolean') {
+    return undefined;
   }
-
-  return { allowed: true };
+  if (typeof value.partial_state === 'boolean') result.partial_state = value.partial_state;
+  if (value.audit_event_id !== undefined && typeof value.audit_event_id !== 'string') {
+    return undefined;
+  }
+  if (typeof value.audit_event_id === 'string') result.audit_event_id = value.audit_event_id;
+  return result;
 }
 
 export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
   if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   if (!missionId) {
     return {
       allowed: false,
@@ -194,7 +370,9 @@ export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
   if (!evidenceDir) {
     return { allowed: false, reason: `mission '${missionId}' not found` };
   }
-  const consentPath = path.join(evidenceDir, 'voice-consent.json');
+  const consentPath = assertSafeRepositoryPath(path.join(evidenceDir, 'voice-consent.json'), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(consentPath)) {
     return {
       allowed: false,
@@ -202,14 +380,11 @@ export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
     };
   }
   try {
-    const consent = loadJson<unknown>(consentPath);
-    if (!isPlainObject(consent)) {
-      return {
-        allowed: false,
-        reason: 'voice-consent.json is malformed: expected an object',
-      };
-    }
-    return validateGrantedConsent(consent, missionId);
+    const consent = loadVoiceConsentAtPath(consentPath);
+    return validateVoiceConsentRecord(consent, {
+      missionId,
+      tenantSlug: resolveIdentityContext().tenantSlug,
+    });
   } catch (err: any) {
     return { allowed: false, reason: `failed to parse voice-consent.json: ${err?.message ?? err}` };
   }
@@ -226,14 +401,11 @@ function redactedTarget(input: MeetingAction): string {
   }
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: MEETING_MANIFEST_PATH,
-    defaults: DEFAULT_MEETING_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: MEETING_MANIFEST_PATH,
+  defaults: DEFAULT_MEETING_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 function recordMeetingEvent(input: MeetingAction, result: MeetingActionResult): string {
   const isDenied = result.status === 'denied';
@@ -314,14 +486,15 @@ async function executeMeetingPipeline(
   initialContext: Record<string, unknown> = {},
   options: MeetingPipelineAction['options'] = {}
 ) {
-  const result = await executeAdfSteps(
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'meeting',
     steps,
-    { ...initialContext, timestamp: new Date().toISOString() } as Record<string, unknown>,
-    {
-      maxSteps: options.max_steps || 1000,
-      timeoutMs: options.timeout_ms || 60000,
+    context: { ...initialContext, timestamp: nowIso() } as Record<string, unknown>,
+    options: {
+      maxSteps: options.max_steps || DEFAULT_MAX_PIPELINE_STEPS,
+      timeoutMs: options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS,
     },
-    {
+    handlers: {
       capture: async (op, rawParams, context) => {
         if (op !== 'listen' && op !== 'status') {
           throw new Error(`[UNKNOWN_OP] Unknown meeting capture op: ${op}`);
@@ -342,7 +515,7 @@ async function executeMeetingPipeline(
       },
       apply: async (op, rawParams, context) => {
         const params = resolveMeetingParams(rawParams, context) as Record<string, any>;
-        const missionId = String(params.mission_id || process.env.MISSION_ID || '');
+        const missionId = String(params.mission_id || getRegisteredEnvText('MISSION_ID') || '');
         const workItemId =
           String(params.work_item_id || context.work_item_id || '').trim() || undefined;
         switch (op) {
@@ -368,10 +541,50 @@ async function executeMeetingPipeline(
               }),
               'one_on_one_result'
             );
+          case 'hearing_session': {
+            const result = await hearingSessionOp({
+              topic: String(params.topic || ''),
+              ...(params.counterparty_label
+                ? { counterparty_label: String(params.counterparty_label) }
+                : {}),
+              ...(params.context ? { context: String(params.context) } : {}),
+              ...(Array.isArray(params.answers) ? { answers: params.answers } : {}),
+              ...(missionId ? { mission_id: missionId } : {}),
+              ...(workItemId ? { work_item_id: workItemId } : {}),
+              ...(params.output_path ? { output_path: String(params.output_path) } : {}),
+              ...(params.language ? { language: String(params.language) } : {}),
+            });
+            return meetingExport(context, params, result, 'hearing_result');
+          }
+          case 'tutor_session': {
+            const materialPath = params.material_path ? String(params.material_path) : '';
+            const material = materialPath
+              ? String(
+                  safeReadFile(resolveExistingMeetingFile(materialPath, 'material_path'), {
+                    encoding: 'utf8',
+                  })
+                )
+              : String(params.material || '');
+            const result = await tutorSessionOp({
+              material,
+              ...(params.learner_label ? { learner_label: String(params.learner_label) } : {}),
+              ...(params.goal ? { goal: String(params.goal) } : {}),
+              ...(Array.isArray(params.answers) ? { answers: params.answers } : {}),
+              ...(missionId ? { mission_id: missionId } : {}),
+              ...(workItemId ? { work_item_id: workItemId } : {}),
+              ...(params.output_path ? { output_path: String(params.output_path) } : {}),
+              ...(params.language ? { language: String(params.language) } : {}),
+            });
+            return meetingExport(context, params, result, 'tutor_result');
+          }
           case 'extract_action_items': {
             const transcriptPath = params.transcript_path ? String(params.transcript_path) : '';
             const transcript = transcriptPath
-              ? String(safeReadFile(pathResolver.rootResolve(transcriptPath), { encoding: 'utf8' }))
+              ? String(
+                  safeReadFile(resolveExistingMeetingFile(transcriptPath, 'transcript_path'), {
+                    encoding: 'utf8',
+                  })
+                )
               : String(params.transcript || '');
             const attendees = (
               Array.isArray(params.attendees)
@@ -417,6 +630,55 @@ async function executeMeetingPipeline(
                 : {}),
             });
             return meetingExport(context, params, result, 'extracted_action_items');
+          }
+          case 'normalize_transcript': {
+            const transcriptPath = params.transcript_path ? String(params.transcript_path) : '';
+            const raw = transcriptPath
+              ? String(
+                  safeReadFile(resolveExistingMeetingFile(transcriptPath, 'transcript_path'), {
+                    encoding: 'utf8',
+                  })
+                )
+              : String(params.transcript || '');
+            const attendees = (
+              Array.isArray(params.attendees)
+                ? params.attendees
+                : Array.isArray(context[String(params.attendees_from || 'attendees')])
+                  ? context[String(params.attendees_from || 'attendees')]
+                  : []
+            ) as Array<string | { name?: string }>;
+            const speakerAliases =
+              params.speaker_aliases && typeof params.speaker_aliases === 'object'
+                ? (params.speaker_aliases as Record<string, string>)
+                : {};
+            const normalized = normalizeTranscriptText(
+              raw,
+              { attendees, speakerAliases },
+              transcriptPath
+            );
+            return meetingExport(context, params, normalized, 'normalized_transcript');
+          }
+          case 'resolve_next_target': {
+            const events = (
+              Array.isArray(params.events)
+                ? params.events
+                : Array.isArray(context[String(params.events_from || 'events')])
+                  ? context[String(params.events_from || 'events')]
+                  : []
+            ) as CalendarLikeEvent[];
+            const target = resolveNextMeetingTarget(events, {
+              ...(params.now !== undefined ? { now: params.now as string | number } : {}),
+              ...(params.started_ago_min !== undefined
+                ? { started_ago_min: Number(params.started_ago_min) }
+                : {}),
+              ...(params.starts_within_min !== undefined
+                ? { starts_within_min: Number(params.starts_within_min) }
+                : {}),
+              ...(params.max_duration_sec !== undefined
+                ? { max_duration_sec: Number(params.max_duration_sec) }
+                : {}),
+            });
+            return meetingExport(context, params, target, 'meeting_target');
           }
           case 'generate_facilitation_script':
             return meetingExport(
@@ -485,7 +747,7 @@ async function executeMeetingPipeline(
             });
             if (params.output_path) {
               safeWriteFile(
-                pathResolver.rootResolve(String(params.output_path)),
+                resolveMeetingPath(String(params.output_path)),
                 JSON.stringify(result, null, 2)
               );
             }
@@ -507,7 +769,7 @@ async function executeMeetingPipeline(
             const report = auditSpeakerFairnessOp({ mission_id: missionId });
             if (params.output_path) {
               safeWriteFile(
-                pathResolver.rootResolve(String(params.output_path)),
+                resolveMeetingPath(String(params.output_path)),
                 JSON.stringify(report, null, 2)
               );
             }
@@ -517,8 +779,8 @@ async function executeMeetingPipeline(
             throw new Error(`[UNKNOWN_OP] Unknown meeting op: ${op}`);
         }
       },
-    }
-  );
+    },
+  });
   return result as unknown as Record<string, unknown>;
 }
 
@@ -572,6 +834,57 @@ export async function handleAction(
     platform: input.params.platform,
   });
 
+  // Backend selection for join/listen: the operator's own Chrome
+  // (chrome-extension) when requested, Playwright subprocess otherwise.
+  // `auto` tries the extension with a short connect timeout and falls
+  // back to Playwright so unattended runs keep working.
+  if (input.action === 'join' || input.action === 'listen') {
+    const requested = String(input.params.join_backend || 'playwright')
+      .trim()
+      .toLowerCase();
+    const url = String(input.params.url || '').trim();
+    if (url && (requested === 'chrome-extension' || requested === 'auto')) {
+      try {
+        const extended = await runExtensionJoin({
+          url,
+          ...(input.params.platform ? { platform: String(input.params.platform) } : {}),
+          ...(input.params.display_name ? { display_name: String(input.params.display_name) } : {}),
+          ...(input.params.duration_sec !== undefined
+            ? { duration_sec: Number(input.params.duration_sec) }
+            : {}),
+          ...(input.params.transcript_path
+            ? { transcript_path: String(input.params.transcript_path) }
+            : {}),
+          ...(input.params.ws_port !== undefined ? { ws_port: Number(input.params.ws_port) } : {}),
+          ...(requested === 'auto' ? { join_timeout_sec: 20 } : {}),
+          ...(input.params.raise_hand !== undefined
+            ? { raise_hand: Boolean(input.params.raise_hand) }
+            : {}),
+        });
+        const done = {
+          status: 'success',
+          ...extended,
+        } as MeetingActionResult;
+        done.audit_event_id = recordMeetingEvent(input, done);
+        traceCtx.endSpan('ok');
+        return { ...done, ...finalizeActuatorTrace(traceCtx) };
+      } catch (err) {
+        if (requested !== 'auto') {
+          const failed = {
+            status: 'error',
+            message: err instanceof Error ? err.message : String(err),
+          } as MeetingActionResult;
+          failed.audit_event_id = recordMeetingEvent(input, failed);
+          traceCtx.endSpan('error', failed.message);
+          return { ...failed, ...finalizeActuatorTrace(traceCtx) };
+        }
+        logger.warn(
+          `[MEETING] chrome-extension join failed, falling back to playwright: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+  }
+
   if (input.action === 'speak') {
     const consent = checkSpeakConsent();
     if (!consent.allowed) {
@@ -604,7 +917,12 @@ export async function handleAction(
     if (!normalized) {
       parsed = { status: 'error', message: 'meeting-bridge produced no output' };
     } else {
-      parsed = JSON.parse(normalized) as MeetingActionResult;
+      parsed = parseMeetingActionResult(
+        parseSafeJsonInput(normalized, 'meeting bridge result')
+      ) || {
+        status: 'error',
+        message: 'meeting-bridge produced an invalid result envelope',
+      };
     }
   } catch (err: any) {
     parsed = {
@@ -620,22 +938,19 @@ export async function handleAction(
 }
 
 const main = async () => {
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs(currentProcessArgv())
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputPath = pathResolver.rootResolve(argv.input as string);
-  const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
-  const result = await handleAction(JSON.parse(inputContent));
+  const inputPath = resolveExistingMeetingFile(String(argv.input), 'input');
+  const result = await handleAction(
+    parseMeetingActionInput(readJson<unknown>(inputPath, { label: 'meeting action input' }))
+  );
   console.log(JSON.stringify(result, null, 2));
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && (modulePath === entrypoint || entrypoint.endsWith('index.js'))) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+if (
+  isDirectEntry(import.meta.url, 'libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts')
+) {
+  void runActuatorCliEntryPoint(main, 'meeting-actuator');
 }

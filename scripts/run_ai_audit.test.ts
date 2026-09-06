@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeRmSync, safeWriteFile, loadJson } from '@agent/core';
+import { readTextFile } from '@agent/core/foundation';
+import {
+  loadJson,
+  pathResolver,
+  safeExistsSync,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core';
 import {
   AI_AUDIT_CASES_SCHEMA,
   SKIP_REASON_STUB_BACKEND,
@@ -8,6 +16,7 @@ import {
   enumerateInvariants,
   extractSection,
   parseInvariantMarkdown,
+  readAiAuditTextFile,
   renderReport,
   resolveScopeFiles,
   runAiAudit,
@@ -39,6 +48,12 @@ afterEach(() => {
 });
 
 describe('invariant markdown parsing', () => {
+  it('rejects a directory replacement before audit text parsing', () => {
+    expect(() => readAiAuditTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('extracts name, scope, and section bodies', () => {
     const md = [
       '# Invariant: errors carry guidance',
@@ -201,5 +216,18 @@ describe('runAiAudit deterministic guards', () => {
   it('rejects malformed auditor output via the shared schema', () => {
     expect(() => AI_AUDIT_CASES_SCHEMA.parse({ cases: [] })).toThrow();
     expect(() => AI_AUDIT_CASES_SCHEMA.parse({ cases: [{ name: 'x', pass: 'yes' }] })).toThrow();
+  });
+});
+
+describe('runAiAudit script boundary', () => {
+  it('routes report output through the shared script printer', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/run_ai_audit.ts'));
+
+    expect(source).not.toContain('console.log');
+    expect(source).not.toContain('console.error');
+    expect(source).not.toContain('process.exitCode =');
+    expect(source).toContain('setProcessExitCode(exitCode)');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).toContain('getRegisteredEnvText, nowIso, readTextFile');
   });
 });

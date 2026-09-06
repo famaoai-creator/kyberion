@@ -1,41 +1,12 @@
-import {
-  Activity,
-  AlertTriangle,
-  Bot,
-  Brain,
-  GitBranch,
-  Radar,
-  Send,
-  ShieldAlert,
-} from 'lucide-react';
+import { Activity, Bot, Brain, GitBranch, Radar, Send, ShieldAlert } from 'lucide-react';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import {
-  ActionDetailList,
-  ActionGuidance,
-  ActionStatusBadge,
-  actionButtonClass,
   attentionActionLabel,
   attentionNextStepLabel,
   attentionReasonLabel,
   attentionSourceLabel,
-  buildApprovalWorkLoopPreview,
-  buildArtifactWorkLoopPreview,
-  buildDangerousActionPrompt,
-  buildDistillCandidateWorkLoopPreview,
-  buildMissionSeedWorkLoopPreview,
-  buildMissionThread,
-  buildProjectWorkLoopPreview,
-  getActionDefinition,
-  getLatestMissionControlAction,
-  messageToneClass,
-  messageTypeLabel,
-  missionActionLabel,
-  missionStatusLabel,
-  missionSummaryBadgeClass,
-  surfaceSummaryBadgeClass,
-  toDomId,
 } from './MissionIntelligenceViewHelpers';
-import { MiniSummaryCard, Panel, providerResolutionSummary } from './MissionIntelligencePrimitives';
+import { MiniSummaryCard, Panel } from './MissionIntelligencePrimitives';
 
 export function MissionIntelligenceSurfaceOverview(context: Record<string, any>) {
   const {
@@ -63,21 +34,12 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
     setSelectedMissionId,
     setSelectedProjectId,
     setSelectedTrackId,
-    trackSeedTarget,
     memoryPromotionTarget,
     actionResult,
     runMemoryPromotion,
     runAttentionAction,
     focusTitle,
-    referenceMetadataEntries,
-    referenceSections,
-    selectedReferencePath,
-    selectedReferenceSeed,
-    missionSeedAssessment,
     memoryCandidateCount,
-    runtime,
-    runtimeLeases,
-    runtimeDoctor,
   } = context;
 
   return (

@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/model-cost-registry.schema.json",
   "version": "1.0.0",
   "currency": "USD",
   "unit": "per_1k_tokens",

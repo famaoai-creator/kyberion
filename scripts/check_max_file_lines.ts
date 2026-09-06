@@ -1,18 +1,20 @@
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { loadMaxFileLinesConfig, type MaxFileLinesConfig } from '@agent/core/max-file-lines-config';
 import { maskComments } from './check_module_boundaries.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
-
-type MaxFileLinesConfig = {
-  max_lines: number;
-  roots: string[];
-  exceptions: Array<{ file: string; reason: string; target: string }>;
-};
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
-const CONFIG_PATH = pathResolver.knowledge('product/governance/max-file-lines.json');
+
+export function readMaxFileLinesTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function relative(filePath: string): string {
   return path.relative(ROOT, filePath).split(path.sep).join('/');
@@ -30,7 +32,7 @@ function isSource(filePath: string): boolean {
 }
 
 export function checkMaxFileLines(): { maxLines: number; violations: string[] } {
-  const config = readJson<MaxFileLinesConfig>(CONFIG_PATH);
+  const config: MaxFileLinesConfig = loadMaxFileLinesConfig();
   const exceptions = new Set(config.exceptions.map((entry) => entry.file));
   const violations: string[] = [];
   if (exceptions.size !== config.exceptions.length) {
@@ -50,7 +52,7 @@ export function checkMaxFileLines(): { maxLines: number; violations: string[] } 
     for (const file of getAllFiles(pathResolver.rootResolve(root))) {
       const repoPath = relative(file);
       if (!isSource(file) || exceptions.has(repoPath)) continue;
-      const lineCount = maskComments(String(safeReadFile(file, { encoding: 'utf8' })))
+      const lineCount = maskComments(readMaxFileLinesTextFile(file))
         .split(/\r?\n/u)
         .filter((line) => line.trim().length > 0).length;
       if (lineCount > config.max_lines) {
@@ -67,12 +69,15 @@ export const runCheckMaxFileLines = defineScript({
   run(context) {
     const report = checkMaxFileLines();
     if (report.violations.length > 0) {
-      context.print('[check:max-file-lines] violations detected:');
-      for (const violation of report.violations) context.print(`- ${violation}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...report.violations.map((violation) => `- ${violation}`)].join(
+          '\n'
+        )
+      );
     }
     context.print(`[check:max-file-lines] OK (max ${report.maxLines} lines)`);
+    return report;
   },
 });
 

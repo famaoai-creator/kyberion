@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
+import { parseSetupResponse } from '../../lib/setup-response';
+import { parseConciergeIngestResponse } from '../../lib/ingest-response';
 
 /**
  * CS-03 文書取込 — the ingest ceremony as a dedicated page (linked from the
@@ -46,12 +48,12 @@ export default function IngestPage() {
         // Tenant candidates come from the same catalog the /setup tenant
         // section uses (tenant registry via /api/setup).
         const response = await fetch('/api/setup', { cache: 'no-store' });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'setup failed');
+        const setup = parseSetupResponse(await response.json().catch(() => null));
+        if (!response.ok || !setup) throw new Error('Invalid setup response');
         if (cancelled) return;
-        const catalog = (payload.setup?.tenant?.catalog || []) as TenantOption[];
+        const catalog: TenantOption[] = setup.tenant.catalog;
         setTenants(catalog);
-        setTenant(String(payload.setup?.tenant?.active_slug || catalog[0]?.tenant_slug || ''));
+        setTenant(String(setup.tenant.active_slug || catalog[0]?.tenant_slug || ''));
         setLoadError(null);
       } catch (error) {
         if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
@@ -80,11 +82,11 @@ export default function IngestPage() {
         if (format) form.set('format', format);
         if (asDryRun) form.set('dry_run', 'true');
         const response = await fetch('/api/ingest', { method: 'POST', body: form });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'ingest failed');
-        setResult(payload.summary as IngestSummary);
-        setNotice({ text: String(payload.message || '') });
-        if (payload.summary?.outcome === 'committed') {
+        const parsed = parseConciergeIngestResponse(await response.json().catch(() => null));
+        if (!response.ok || !parsed) throw new Error('Invalid ingest response');
+        setResult(parsed.summary);
+        setNotice({ text: parsed.message });
+        if (parsed.summary.outcome === 'committed') {
           // The ceremony is complete — the next upload starts fresh.
           setFile(null);
           if (fileInputRef.current) fileInputRef.current.value = '';

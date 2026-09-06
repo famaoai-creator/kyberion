@@ -1,17 +1,23 @@
-import { logger, secretGuard } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
+import { secretGuard } from '@agent/core/secret-guard';
+import { defineScript, isDirectScript } from '@agent/core/script-harness';
+import { parsePollingResponse, parsePollingUpdates } from './polling-response.js';
 const BRIDGE_WEBHOOK_URL = 'http://127.0.0.1:3035/webhook';
 
-async function main() {
+export async function main(_args: string[] = []): Promise<void> {
   const connection = secretGuard.loadConnectionDocument('telegram');
   if (!connection || Object.keys(connection).length === 0) {
     logger.error('❌ [TelegramPolling] telegram.json not found in Personal connections.');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const { token } = connection;
   if (!token) {
     logger.error('❌ [TelegramPolling] Token missing in telegram.json.');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   logger.info('🚀 [TelegramPolling] Starting Telegram Bot Long-Polling...');
@@ -25,9 +31,9 @@ async function main() {
         throw new Error(`Telegram API returned ${response.status}`);
       }
 
-      const body = (await response.json()) as any;
-      if (body.ok && Array.isArray(body.result)) {
-        for (const update of body.result) {
+      const body = parsePollingResponse(await response.json());
+      if (body.ok) {
+        for (const update of parsePollingUpdates(body.result)) {
           offset = Math.max(offset, update.update_id + 1);
 
           logger.info(
@@ -47,14 +53,23 @@ async function main() {
           }
         }
       }
-    } catch (error: any) {
-      logger.error(`❌ [TelegramPolling] Error: ${error?.message || error}`);
+    } catch (error: unknown) {
+      logger.error(
+        `❌ [TelegramPolling] Error: ${error instanceof Error ? error.message : String(error)}`
+      );
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+const directEntry = isDirectScript(import.meta.url, 'satellites/telegram-bridge/src/polling.ts');
+export const runTelegramPolling = defineScript({
+  name: 'telegram-polling',
+  async run({ argv }) {
+    await main(argv);
+  },
 });
+
+if (directEntry && !getRegisteredEnvText('VITEST')) {
+  void runTelegramPolling();
+}

@@ -22,6 +22,10 @@ vi.mock('@agent/core', async () => {
   };
 });
 
+vi.mock('@agent/core/profile-root', () => ({
+  resolveActiveProfileRoot: () => CUSTOMER_OVERLAY_ROOT,
+}));
+
 describe('vital_check', () => {
   beforeEach(() => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';

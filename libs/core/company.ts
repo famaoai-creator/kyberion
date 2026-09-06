@@ -6,8 +6,11 @@ import { resolveDecisionRightsMatrix, type DecisionRightsMatrix } from './decisi
 import { resolveFinancialModel, type FinancialModel } from './financial-model.js';
 import { resolveOkrTracker, type OkrTracker } from './okr-tracker.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import * as customerResolver from './customer-resolver.js';
+import { loadOrganizationProfileAtPath } from './organization-profile.js';
 
 export interface CompanyComponentRef<T = unknown> {
   path: string;
@@ -40,7 +43,10 @@ function resolveBaseDir(rootDir?: string): string {
 }
 
 function candidatePath(rootDir: string, tenantSlug: string, relativePath: string): string {
-  return path.join(rootDir, 'customer', tenantSlug, relativePath);
+  return assertSafeRepositoryPath(path.join(rootDir, 'customer', tenantSlug, relativePath), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
 }
 
 function loadJsonComponent<T>(filePath: string): CompanyComponentRef<T> {
@@ -50,8 +56,14 @@ function loadJsonComponent<T>(filePath: string): CompanyComponentRef<T> {
   }
 
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    return { path: filePath, exists: true, data: JSON.parse(raw) as T };
+    if (!safeLstat(filePath).isFile()) {
+      return { path: filePath, exists: true, data: null };
+    }
+    const value = parseSafeJsonObjectValue(
+      readJson<unknown>(filePath),
+      `company component ${path.basename(filePath)}`
+    );
+    return { path: filePath, exists: true, data: value as T };
   } catch {
     return { path: filePath, exists: true, data: null };
   }
@@ -91,8 +103,7 @@ function loadCompanyOrganizationProfile(
   for (const candidate of candidates) {
     if (!safeExistsSync(candidate)) continue;
     try {
-      const raw = safeReadFile(candidate, { encoding: 'utf8' }) as string;
-      const data = JSON.parse(raw) as OrganizationProfile;
+      const data = loadOrganizationProfileAtPath(candidate);
       return { path: candidate, exists: true, data };
     } catch {
       return { path: candidate, exists: true, data: null };
@@ -157,6 +168,9 @@ function resolveSovereignName(
 export function resolveCompany(tenantSlug?: string | null, rootDir?: string): CompanyAggregate {
   const baseDir = resolveBaseDir(rootDir);
   const resolvedTenantSlug = tenantSlug?.trim() || customerResolver.activeCustomer() || 'default';
+  if (!isValidTenantSlug(resolvedTenantSlug)) {
+    throw new Error(`[COMPANY_TENANT_SCOPE] invalid tenant slug: ${resolvedTenantSlug}`);
+  }
   const customerPath = candidatePath(baseDir, resolvedTenantSlug, 'customer.json');
   const identityPath = candidatePath(baseDir, resolvedTenantSlug, 'identity.json');
   const customer = loadJsonComponent<Record<string, unknown>>(customerPath);

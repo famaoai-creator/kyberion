@@ -15,7 +15,14 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import mammoth from 'mammoth';
 import ExcelJS from 'exceljs';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
 import { htmlToMarkdown } from './html-to-markdown.js';
 
 export type IngestFormat = 'docx' | 'pdf' | 'xlsx' | 'html' | 'slack_thread' | 'markdown' | 'text';
@@ -73,11 +80,14 @@ type MammothWithMarkdown = typeof mammoth & {
 
 function resolveRawBytes(input: ParseDocumentInput): Buffer {
   if (input.source_path) {
-    const absPath = path.isAbsolute(input.source_path)
-      ? input.source_path
-      : pathResolver.rootResolve(input.source_path);
+    const absPath = assertSafeRepositoryPath(pathResolver.rootResolve(input.source_path), {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(absPath)) {
       throw new Error(`ingest:parse_document — source_path not found: ${absPath}`);
+    }
+    if (!safeLstat(absPath).isFile()) {
+      throw new Error(`ingest:parse_document — source_path must be a regular file: ${absPath}`);
     }
     return safeReadFile(absPath, { encoding: null }) as Buffer;
   }
@@ -205,7 +215,7 @@ async function parseXlsx(raw: Buffer): Promise<{ markdown: string; tables: Inges
 function parseSlackThread(raw: Buffer): string {
   let messages: SlackMessage[];
   try {
-    const parsed = JSON.parse(raw.toString('utf8'));
+    const parsed = parseSafeJsonInput(raw.toString('utf8'), 'ingest slack thread');
     if (!Array.isArray(parsed)) throw new Error('not an array');
     messages = parsed as SlackMessage[];
   } catch (error) {

@@ -1,18 +1,21 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { withExecutionContext } from './authority.js';
 import {
   RETENTION_ARTIFACT_CLASSES,
   type RetentionArtifactClass,
 } from './storage-retention-catalog.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
-  loadJson,
 } from './secure-io.js';
 
 export type GovernedArtifactRole =
@@ -44,7 +47,15 @@ export function resolveGovernedArtifactPath(logicalPath: string): string {
       `Artifact path is outside governed coordination/observability scopes: ${logicalPath}`
     );
   }
-  return pathResolver.resolve(logicalPath);
+  return assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
+    allowMissingLeaf: true,
+  });
+}
+
+function ensureRegularGovernedArtifactFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`governed artifact must be a regular file: ${filePath}`);
+  }
 }
 
 export function ensureGovernedArtifactDir(role: GovernedArtifactRole, logicalDir: string): string {
@@ -64,6 +75,7 @@ export function writeGovernedArtifactJson(
     const resolved = resolveGovernedArtifactPath(logicalPath);
     const dir = path.dirname(resolved);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    ensureRegularGovernedArtifactFile(resolved);
     safeWriteFile(logicalPath, JSON.stringify(value, null, 2));
     return resolved;
   });
@@ -78,6 +90,7 @@ export function appendGovernedArtifactJsonl(
     const resolved = resolveGovernedArtifactPath(logicalPath);
     const dir = path.dirname(resolved);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    ensureRegularGovernedArtifactFile(resolved);
     appendJsonLine(logicalPath, value);
     return resolved;
   });
@@ -86,7 +99,8 @@ export function appendGovernedArtifactJsonl(
 export function readGovernedArtifactJson<T>(logicalPath: string): T | null {
   const resolved = resolveGovernedArtifactPath(logicalPath);
   if (!safeExistsSync(resolved)) return null;
-  return loadJson<T>(resolved);
+  ensureRegularGovernedArtifactFile(resolved);
+  return readJson<T>(resolved);
 }
 
 export function listGovernedArtifacts(logicalDir: string): string[] {
@@ -159,6 +173,28 @@ export interface WriteScopedArtifactResult {
 
 export const SCOPED_ARTIFACT_INDEX_FILENAME = 'artifacts-index.jsonl';
 
+const SCOPED_ARTIFACT_INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/scoped-artifact-index-entry.schema.json'
+);
+
+/** Canonical catalog for persisted scope-local artifact index rows. */
+export function scopedArtifactIndexCatalog(
+  filePath: string
+): GovernedCatalog<ScopedArtifactIndexEntry> {
+  return defineCatalog<ScopedArtifactIndexEntry>({
+    id: 'scoped-artifact-index-entry',
+    path: filePath,
+    schema: SCOPED_ARTIFACT_INDEX_SCHEMA_PATH,
+  });
+}
+
+/** Reject a directory or symlink before a persisted artifact index is used. */
+export function ensureRegularScopedArtifactIndex(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`scoped artifact index must be a regular file: ${filePath}`);
+  }
+}
+
 function sanitizeScopeSegment(value: string, label: string): string {
   const cleaned = String(value ?? '')
     .trim()
@@ -221,6 +257,46 @@ export function isScopedArtifactPath(logicalPath: string): boolean {
     return true;
   }
   return false;
+}
+
+function persistedString(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`scoped artifact index ${key} must be a non-empty string`);
+  }
+  return value;
+}
+
+/** Validate an artifacts-index row before lifecycle code treats it as typed state. */
+export function parseScopedArtifactIndexEntry(value: unknown): ScopedArtifactIndexEntry {
+  if (!isRecord(value)) throw new Error('scoped artifact index entry must be an object');
+  persistedString(value, 'name');
+  const artifactClass = persistedString(value, 'artifact_class');
+  if (!RETENTION_ARTIFACT_CLASSES.includes(artifactClass as RetentionArtifactClass)) {
+    throw new Error('scoped artifact index artifact_class is invalid');
+  }
+  const artifactPath = persistedString(value, 'path');
+  if (!isScopedArtifactPath(artifactPath) || artifactPath.startsWith('/')) {
+    throw new Error('scoped artifact index path is invalid');
+  }
+  const scope = value.scope;
+  if (!isRecord(scope)) throw new Error('scoped artifact index scope is invalid');
+  const scopeKeys = ['tenant', 'project', 'mission', 'task', 'session'] as const;
+  if (!scopeKeys.some((key) => scope[key] !== undefined)) {
+    throw new Error('scoped artifact index scope is empty');
+  }
+  for (const key of scopeKeys) {
+    if (scope[key] !== undefined) persistedString(scope, key);
+  }
+  const scopeKind = persistedString(value, 'scope_kind');
+  if (!['task', 'mission', 'project', 'session', 'tenant'].includes(scopeKind)) {
+    throw new Error('scoped artifact index scope_kind is invalid');
+  }
+  const writtenAt = persistedString(value, 'written_at');
+  if (!Number.isFinite(Date.parse(writtenAt))) {
+    throw new Error('scoped artifact index written_at is invalid');
+  }
+  return value as unknown as ScopedArtifactIndexEntry;
 }
 
 function resolveScopeBase(
@@ -317,6 +393,11 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
   const absolutePath = path.join(targetDir, ...name.split('/'));
   const indexPath = path.join(artifactsRoot, SCOPED_ARTIFACT_INDEX_FILENAME);
 
+  assertSafeRepositoryPath(base, { allowMissingLeaf: true });
+  assertSafeRepositoryPath(targetDir, { allowMissingLeaf: true });
+  assertSafeRepositoryPath(absolutePath, { allowMissingLeaf: true });
+  assertSafeRepositoryPath(indexPath, { allowMissingLeaf: true });
+
   // Fail closed: both the artifact and its index must be inside a recognized
   // scoped-artifact root, expressed repo-relative (never machine-absolute).
   const repoRelative = pathResolver.toRepoRelative(absolutePath).split(path.sep).join('/');
@@ -334,13 +415,16 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
     path: repoRelative,
     scope: { ...input.scope },
     scope_kind: kind,
-    written_at: new Date().toISOString(),
+    written_at: nowIso(),
   };
+  const catalog = scopedArtifactIndexCatalog(indexPath);
+  const validatedEntry = catalog.validate(entry, indexPath);
 
   const performWrite = (): void => {
     if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
+    ensureRegularScopedArtifactIndex(indexPath);
     safeWriteFile(absolutePath, data);
-    appendJsonLine(indexPath, entry);
+    appendJsonLine(indexPath, validatedEntry);
   };
   if (input.role) withRole(input.role, performWrite);
   else performWrite();
@@ -360,9 +444,11 @@ export function readScopedArtifactIndex(
 ): ScopedArtifactIndexEntry[] {
   const { base } = resolveScopeBase(scope, tier ?? 'confidential');
   const indexPath = path.join(base, 'artifacts', SCOPED_ARTIFACT_INDEX_FILENAME);
-  if (!safeExistsSync(indexPath)) return [];
-  return String(safeReadFile(indexPath, { encoding: 'utf8' }))
-    .split('\n')
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as ScopedArtifactIndexEntry);
+  const safeIndexPath = assertSafeRepositoryPath(indexPath, { allowMissingLeaf: true });
+  ensureRegularScopedArtifactIndex(safeIndexPath);
+  const catalog = scopedArtifactIndexCatalog(safeIndexPath);
+  return readJsonLines<ScopedArtifactIndexEntry>(safeIndexPath, {
+    map: (value, lineNumber) =>
+      parseScopedArtifactIndexEntry(catalog.validate(value, `${safeIndexPath}:${lineNumber}`)),
+  });
 }

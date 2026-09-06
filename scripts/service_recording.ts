@@ -1,23 +1,27 @@
 #!/usr/bin/env node
+import { compileServiceRecording } from '@agent/core/service-recording-compiler';
+import { buildServiceProcedureCandidate } from '@agent/core/service-distill-candidate';
+import { promoteServiceProcedure } from '@agent/core/service-procedure-promotion';
+import { resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import {
-  compileServiceRecording,
-  buildServiceProcedureCandidate,
-  promoteServiceProcedure,
-  resolveAllowlistedRecordingRef,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
+  loadServiceRecordingAtPath,
   serviceRecordingContentHash,
-  startServiceRecordingSession,
-  type ServiceRecording,
-  validatePipelineAdf,
-  validatePipelineGuardrails,
   validateServiceRecording,
-  withExecutionContext,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import { pathResolver } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+  type ServiceRecording,
+} from '@agent/core/service-recording';
+import { validatePipelineAdf } from '@agent/core/pipeline-contract';
+import { validatePipelineGuardrails } from '@agent/core/adf-guardrails';
+import { startServiceRecordingSession } from '@agent/core/service-recording-session';
+import { withExecutionContext } from '@agent/core/authority';
+import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  stripSharedScriptFlags,
+} from './lib/harness.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -37,15 +41,22 @@ function argMap(argv: string[]): Record<string, string> {
   return out;
 }
 
+function resolveServicePath(value: unknown, label: string, allowMissingLeaf = false): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`${label} is required`);
+  return assertSafeRepositoryPath(pathResolver.resolve(requested), { allowMissingLeaf });
+}
+
 function readJsonArgument(value: string, label: string): unknown {
   const candidate = value.startsWith('@') ? value.slice(1) : value;
-  const absolute = pathResolver.rootResolve(candidate);
-  const source =
-    value.startsWith('@') || safeExistsSync(absolute)
-      ? String(safeReadFile(absolute, { encoding: 'utf8' }))
+  const resolved = pathResolver.resolve(candidate);
+  const source = value.startsWith('@')
+    ? readTextFile(resolveServicePath(candidate, `--${label} path`))
+    : safeExistsSync(resolved)
+      ? readTextFile(resolveServicePath(candidate, `--${label} path`))
       : value;
   try {
-    return JSON.parse(source);
+    return parseSafeJsonInput(source, `service recording ${label} input`);
   } catch (error) {
     throw new Error(
       `--${label} must be JSON or @path: ${error instanceof Error ? error.message : String(error)}`
@@ -66,24 +77,24 @@ function requireCalls(value: unknown): Array<JsonObject> {
   return value.map((call, index) => requireObject(call, `calls[${index}]`));
 }
 
-function printUsage(): void {
-  console.log(`Usage:
+function printUsage(): string {
+  return `Usage:
   service_recording capture --target-name <name> --calls <json|@path> [--recording-id <id>]
   service_recording compile --recording <path> --procedure-id <id> --intent-phrases <json> [--output <path>] [--dry-run]
   service_recording candidate --recording <path> --procedure-id <id> --intent-phrases <json> [--mission-id <id>] [--tenant-slug <slug>] [--tier <personal|confidential>] [--title <text>]
   service_recording review --recording <path> --approve|--reject [--reviewer <id>] [--note <text>]
-  service_recording promote --recording <path> --procedure-id <id> --intent-phrases <json>`);
+  service_recording promote --recording <path> --procedure-id <id> --intent-phrases <json>`;
 }
+
+type CommandResult = { value: unknown; exitCode?: number };
 
 function loadRecording(ref: string) {
   const absolute = resolveAllowlistedRecordingRef(ref);
   if (!absolute) throw new Error('recording path is outside the allowlisted recording stores');
-  const validation = validateServiceRecording(readJson(absolute));
-  if (!validation.value) throw new Error(`recording invalid: ${validation.errors.join('; ')}`);
-  return { absolute, value: validation.value };
+  return { absolute, value: loadServiceRecordingAtPath(absolute) };
 }
 
-function compile(args: Record<string, string>): void {
+function compile(args: Record<string, string>): CommandResult {
   if (!args.recording || !args['procedure-id'] || !args['intent-phrases']) {
     throw new Error('compile requires --recording, --procedure-id, and --intent-phrases');
   }
@@ -100,33 +111,29 @@ function compile(args: Record<string, string>): void {
   const pipeline = validatePipelineAdf(compiled.pipeline);
   const guardrails = validatePipelineGuardrails(pipeline, `service:${args['procedure-id']}`);
   const output = args.output
-    ? pathResolver.rootResolve(args.output)
+    ? resolveServicePath(args.output, 'output path', true)
     : pathResolver.shared(`tmp/service-drafts/${args['procedure-id']}.json`);
   if (args['dry-run'] !== 'true') {
     withExecutionContext('surface_runtime', () => {
       safeWriteFile(output, `${JSON.stringify(pipeline, null, 2)}\n`);
     });
   }
-  console.log(
-    JSON.stringify(
-      {
-        status: args['dry-run'] === 'true' ? 'dry-run' : 'draft-written',
-        recording_ref: pathResolver.toRepoRelative(loaded.absolute),
-        pipeline_ref: pathResolver.toRepoRelative(output),
-        preflight: { ok: guardrails.ok, findings: guardrails.findings },
-        procedure: compiled.procedureEntry,
-        golden_scenario: compiled.goldenScenario,
-        warnings: compiled.warnings,
-        pipeline,
-      },
-      null,
-      2
-    )
-  );
-  if (!guardrails.ok) process.exitCode = 2;
+  return {
+    value: {
+      status: args['dry-run'] === 'true' ? 'dry-run' : 'draft-written',
+      recording_ref: pathResolver.toRepoRelative(loaded.absolute),
+      pipeline_ref: pathResolver.toRepoRelative(output),
+      preflight: { ok: guardrails.ok, findings: guardrails.findings },
+      procedure: compiled.procedureEntry,
+      golden_scenario: compiled.goldenScenario,
+      warnings: compiled.warnings,
+      pipeline,
+    },
+    ...(guardrails.ok ? {} : { exitCode: 2 }),
+  };
 }
 
-function capture(args: Record<string, string>): void {
+function capture(args: Record<string, string>): CommandResult {
   if (!args['target-name'] || !args.calls)
     throw new Error('capture requires --target-name and --calls');
   const calls = requireCalls(readJsonArgument(args.calls, 'calls'));
@@ -145,16 +152,12 @@ function capture(args: Record<string, string>): void {
       ...(Array.isArray(call.consumes) ? { consumes: call.consumes.map(String) } : {}),
     });
   const recordingRef = withExecutionContext('surface_runtime', () => session.persist());
-  console.log(
-    JSON.stringify(
-      { status: 'recorded', recording_ref: recordingRef, recording: session.toRecording() },
-      null,
-      2
-    )
-  );
+  return {
+    value: { status: 'recorded', recording_ref: recordingRef, recording: session.toRecording() },
+  };
 }
 
-function candidate(args: Record<string, string>): void {
+function candidate(args: Record<string, string>): CommandResult {
   if (!args.recording || !args['procedure-id'] || !args['intent-phrases']) {
     throw new Error('candidate requires --recording, --procedure-id, and --intent-phrases');
   }
@@ -177,23 +180,19 @@ function candidate(args: Record<string, string>): void {
       ...(args.tier ? { tier: args.tier as 'personal' | 'confidential' } : {}),
     })
   );
-  console.log(
-    JSON.stringify(
-      {
-        status: 'candidate-created',
-        candidate_id: result.candidate.candidate_id,
-        procedure_id: result.procedure_id,
-        preflight: result.preflight,
-        candidate: result.candidate,
-      },
-      null,
-      2
-    )
-  );
-  if (!result.preflight.ok) process.exitCode = 2;
+  return {
+    value: {
+      status: 'candidate-created',
+      candidate_id: result.candidate.candidate_id,
+      procedure_id: result.procedure_id,
+      preflight: result.preflight,
+      candidate: result.candidate,
+    },
+    ...(result.preflight.ok ? {} : { exitCode: 2 }),
+  };
 }
 
-function review(args: Record<string, string>): void {
+function review(args: Record<string, string>): CommandResult {
   if (!args.recording || (args.approve !== 'true' && args.reject !== 'true')) {
     throw new Error('review requires --recording and exactly one of --approve/--reject');
   }
@@ -204,7 +203,7 @@ function review(args: Record<string, string>): void {
     review: {
       status,
       reviewer: args.reviewer || 'human:operator',
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: nowIso(),
       decisions: loaded.value.steps.map((step) => ({ step_id: step.step_id, status })),
       ...(args.note ? { note: args.note } : {}),
     },
@@ -212,15 +211,17 @@ function review(args: Record<string, string>): void {
   if (status === 'approved') {
     updated.review.content_hash = serviceRecordingContentHash(updated);
   }
+  const validation = validateServiceRecording(updated);
+  if (!validation.value) {
+    throw new Error(`Invalid service recording review: ${validation.errors.join('; ')}`);
+  }
   withExecutionContext('surface_runtime', () =>
     safeWriteFile(loaded.absolute, `${JSON.stringify(updated, null, 2)}\n`)
   );
-  console.log(
-    JSON.stringify({ status, recording_ref: pathResolver.toRepoRelative(loaded.absolute) }, null, 2)
-  );
+  return { value: { status, recording_ref: pathResolver.toRepoRelative(loaded.absolute) } };
 }
 
-function promote(args: Record<string, string>): void {
+function promote(args: Record<string, string>): CommandResult {
   if (!args.recording || !args['procedure-id'] || !args['intent-phrases']) {
     throw new Error('promote requires --recording, --procedure-id, and --intent-phrases');
   }
@@ -235,24 +236,24 @@ function promote(args: Record<string, string>): void {
       intentPhrases,
     })
   );
-  console.log(
-    JSON.stringify(
-      {
-        status: 'promoted',
-        ...result,
-        pipelinePath: pathResolver.toRepoRelative(result.pipelinePath),
-      },
-      null,
-      2
-    )
-  );
+  return {
+    value: {
+      status: 'promoted',
+      ...result,
+      pipelinePath: pathResolver.toRepoRelative(result.pipelinePath),
+    },
+  };
 }
 
-async function main(argv: string[] = []): Promise<void> {
-  const normalizedArgs = argv[0] === '--' ? argv.slice(1) : argv;
+export async function main(
+  argv: string[] = [],
+  options: { dryRun?: boolean; check?: boolean } = {}
+): Promise<CommandResult> {
+  const normalizedArgs = stripSharedScriptFlags(argv);
   const command = normalizedArgs[0];
-  if (!command || command === 'help') return printUsage();
+  if (!command || command === 'help') return { value: printUsage() };
   const args = argMap(normalizedArgs.slice(1));
+  if (options.dryRun || options.check || argv.includes('--dry-run')) args['dry-run'] = 'true';
   if (command === 'capture') return capture(args);
   if (command === 'compile') return compile(args);
   if (command === 'candidate') return candidate(args);
@@ -263,8 +264,13 @@ async function main(argv: string[] = []): Promise<void> {
 
 export const runServiceRecording = defineScript({
   name: 'service:recording',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json', 'dry-run', 'check', 'quiet'],
+  run: async ({ argv, dryRun, check, print }) => {
+    const result = await main(argv, { dryRun, check });
+    print(result.value);
+    if (result.exitCode !== undefined) throw new ScriptExitError(result.exitCode, '', true);
+    return result.value;
+  },
 });
 
 if (

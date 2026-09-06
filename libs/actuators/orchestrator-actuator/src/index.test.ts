@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 
 const mocks = vi.hoisted(() => ({
   loadJson: vi.fn((filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath)))),
@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   safeMkdir: vi.fn(),
   safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(() => ({ isFile: () => true, isSymbolicLink: () => false })),
   safeUnlinkSync: vi.fn(),
   safeSymlinkSync: vi.fn(),
   resolveVars: vi.fn((value: string) => value),
@@ -24,30 +25,56 @@ const mocks = vi.hoisted(() => ({
     by_model: [],
     by_day: [],
   })),
+  getAllFiles: vi.fn(() => [] as string[]),
+  loadStateAtPath: vi.fn(),
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = (await vi.importActual('@agent/core')) as any;
-  return {
-    ...actual,
-    loadJson: mocks.loadJson,
-    safeReadFile: mocks.safeReadFile,
-    safeWriteFile: mocks.safeWriteFile,
-    safeExec: mocks.safeExec,
-    safeMkdir: mocks.safeMkdir,
-    safeExistsSync: mocks.safeExistsSync,
-    safeUnlinkSync: mocks.safeUnlinkSync,
-    safeSymlinkSync: mocks.safeSymlinkSync,
-    resolveVars: mocks.resolveVars,
-    evaluateCondition: mocks.evaluateCondition,
-    retry: mocks.retry,
-    derivePipelineStatus: mocks.derivePipelineStatus,
-    buildCostReportFromHistory: mocks.buildCostReportFromHistory,
-  };
-});
+vi.mock('@agent/core/foundation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
+  loadJson: mocks.loadJson,
+  readJson: mocks.loadJson,
+}));
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  safeReadFile: mocks.safeReadFile,
+  safeWriteFile: mocks.safeWriteFile,
+  safeExec: mocks.safeExec,
+  safeMkdir: mocks.safeMkdir,
+  safeExistsSync: mocks.safeExistsSync,
+  safeLstat: mocks.safeLstat,
+  safeUnlinkSync: mocks.safeUnlinkSync,
+  safeSymlinkSync: mocks.safeSymlinkSync,
+}));
+
+vi.mock('@agent/core/logic-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/logic-utils')>()),
+  resolveVars: mocks.resolveVars,
+  evaluateCondition: mocks.evaluateCondition,
+}));
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
+  retry: mocks.retry,
+}));
+
+vi.mock('@agent/core/pipeline-contract', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/pipeline-contract')>()),
+  derivePipelineStatus: mocks.derivePipelineStatus,
+}));
+
+vi.mock('@agent/core/cost-report', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/cost-report')>()),
+  buildCostReportFromHistory: mocks.buildCostReportFromHistory,
+}));
+
+vi.mock('@agent/core/mission-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/mission-state')>()),
+  loadStateAtPath: mocks.loadStateAtPath,
+}));
 
 vi.mock('@agent/core/fs-utils', () => ({
-  getAllFiles: vi.fn(() => []),
+  getAllFiles: mocks.getAllFiles,
 }));
 
 describe('orchestrator-actuator', () => {
@@ -56,6 +83,50 @@ describe('orchestrator-actuator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeLstat.mockReturnValue({ isFile: () => true, isSymbolicLink: () => false });
+  });
+
+  it('keeps non-JSON command output as text but rejects dangerous JSON', async () => {
+    const { parseJsonCommandOutput } = await import('./orchestrator-execution-brief-helpers.js');
+
+    expect(parseJsonCommandOutput('plain command output')).toEqual({
+      raw: 'plain command output',
+    });
+    expect(() => parseJsonCommandOutput('{"constructor":{"polluted":true}}')).toThrow(
+      'command output contains a dangerous JSON key'
+    );
+  });
+
+  it('projects only canonical mission states into the status snapshot', async () => {
+    const validPath = `${ROOT}/active/missions/public/MSN-ORCH-VALID/mission-state.json`;
+    const invalidPath = `${ROOT}/active/missions/public/MSN-ORCH-INVALID/mission-state.json`;
+    mocks.getAllFiles.mockReturnValue([validPath, invalidPath]);
+    mocks.loadStateAtPath.mockImplementation((filePath: string) =>
+      filePath === validPath
+        ? {
+            mission_id: 'MSN-ORCH-VALID',
+            tier: 'public',
+            status: 'active',
+            relationships: {
+              project: { project_id: 'project-1', relationship_type: 'belongs_to' },
+            },
+            assigned_persona: 'operator',
+          }
+        : null
+    );
+
+    const { collectMissionStatusSnapshot } =
+      await import('./orchestrator-execution-brief-helpers.js');
+    const snapshot = collectMissionStatusSnapshot();
+
+    expect(snapshot.metrics).toMatchObject({ total: 1, active: 1, completed: 0 });
+    expect(snapshot.missions).toEqual([
+      expect.objectContaining({
+        mission_id: 'MSN-ORCH-VALID',
+        project_id: 'project-1',
+        tier: 'public',
+      }),
+    ]);
   });
 
   it('renders a music pipeline bundle into an execution plan set', async () => {
@@ -171,7 +242,9 @@ describe('orchestrator-actuator', () => {
       if (filePath === resolvedInputPath) return JSON.stringify({ answer: 42 });
       throw new Error(`unexpected read: ${filePath}`);
     });
-    mocks.safeExistsSync.mockImplementation((filePath: string) => filePath === resolvedContextPath);
+    mocks.safeExistsSync.mockImplementation(
+      (filePath: string) => filePath === resolvedContextPath || filePath === resolvedInputPath
+    );
 
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -200,6 +273,43 @@ describe('orchestrator-actuator', () => {
     );
   });
 
+  it('rejects unsafe or non-object persisted orchestrator context before merging it', async () => {
+    const contextPath = 'active/shared/tmp/orchestrator-tests/invalid-context.json';
+    const resolvedContextPath = `${ROOT}/${contextPath}`;
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeReadFile.mockReturnValue('{"constructor":{"polluted":true}}');
+
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        context: { context_path: contextPath },
+        steps: [],
+      } as unknown as Parameters<typeof handleAction>[0])
+    ).rejects.toThrow('dangerous JSON key');
+
+    expect(mocks.loadJson).toHaveBeenCalledWith(resolvedContextPath);
+  });
+
+  it('rejects a directory or invalid JSON through the read_json boundary', async () => {
+    const inputPath = 'active/shared/tmp/orchestrator-tests/invalid-input.json';
+    const resolvedInputPath = `${ROOT}/${inputPath}`;
+    mocks.safeExistsSync.mockImplementation((filePath: string) => filePath === resolvedInputPath);
+    mocks.safeLstat.mockReturnValue({ isFile: () => false });
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        { type: 'capture', op: 'read_json', params: { path: inputPath, export_as: 'payload' } },
+      ],
+    } as unknown as Parameters<typeof handleAction>[0]);
+
+    expect(result.results[0]?.status).toBe('failed');
+    expect(result.results[0]?.error).toContain('existing regular file');
+    expect(mocks.safeLstat).toHaveBeenCalled();
+  });
+
   it('unknown capture op suggests a nearby known op', async () => {
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -216,6 +326,64 @@ describe('orchestrator-actuator', () => {
     const error = result.results.find((entry: any) => entry.error)?.error || '';
     expect(error).toContain('[UNKNOWN_OP]');
     expect(error).toContain('Did you mean: read_file');
+  });
+
+  it('rejects an orchestrator strategy outside the repository before reading it', async () => {
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({
+        action: 'reconcile',
+        strategy_path: '/tmp/kyberion-outside-strategy.json',
+      } as unknown as Parameters<typeof handleAction>[0])
+    ).rejects.toThrow('[ORCHESTRATOR_SCOPE]');
+    expect(mocks.loadJson).not.toHaveBeenCalled();
+  });
+
+  it('rejects legacy pipeline write paths outside the repository', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'write_file',
+          params: { path: '../../external-orchestrator-output.json', content: '{}' },
+        },
+      ],
+    } as any);
+    expect(result.results.find((entry: any) => entry.error)?.status).toBe('failed');
+    expect(result.results.find((entry: any) => entry.error)?.error).toContain(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
+  it('rejects a pipeline bundle template outside the repository before reading it', async () => {
+    const { renderPipelineBundleJob } = await import('./orchestrator-execution-brief-helpers.js');
+
+    expect(() =>
+      renderPipelineBundleJob(
+        {
+          id: 'unsafe-template',
+          title: 'Unsafe template',
+          actuator: 'artifact-actuator',
+          template_path: '../outside-template.json',
+        },
+        {},
+        'active/shared/tmp/orchestrator-tests'
+      )
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(mocks.loadJson).not.toHaveBeenCalled();
+  });
+
+  it('requires project trust before reading a project-local strategy', async () => {
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({
+        action: 'reconcile',
+        strategy_path: 'roles/PROCEDURE.md',
+      } as unknown as Parameters<typeof handleAction>[0])
+    ).rejects.toThrow('[TRUST_REQUIRED]');
+    expect(mocks.loadJson).not.toHaveBeenCalled();
   });
 
   it('renders an image pipeline bundle into an execution plan set', async () => {
@@ -713,6 +881,21 @@ describe('orchestrator-actuator', () => {
     ).rejects.toThrow('Strategy not found');
   });
 
+  it('rejects a malformed persisted reconcile strategy before executing a step', async () => {
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({ strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }] })
+    );
+
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({ action: 'reconcile', strategy_path: 'strategy.json' })
+    ).rejects.toThrow(
+      'orchestrator strategy.strategies[0].pipeline[0].params must be a JSON object'
+    );
+    expect(mocks.safeExec).not.toHaveBeenCalled();
+  });
+
   it('handles max_steps limit', async () => {
     const { handleAction } = await import('./index.js');
     const steps = Array.from({ length: 3 }, (_, i) => ({
@@ -890,6 +1073,40 @@ describe('orchestrator-actuator', () => {
     expect(costFinding.detail).toContain('MSN-A: $8.00');
     expect(costFinding.detail).toContain('estimated portion $1.50');
     expect(report.metrics.weekly_cost_usd).toBe(12.35);
+  });
+
+  it('uses canonical check registry commands for system status snapshots', async () => {
+    mocks.safeExec.mockReturnValue('');
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        status_brief: {
+          kind: 'system-status-brief',
+          scope: 'system',
+          summary: 'system status',
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'collect_system_status_snapshot',
+          params: { from: 'status_brief', export_as: 'system_status_snapshot' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'pnpm',
+      ['run', 'check', '--', '--scope', 'pr', '--only', 'esm'],
+      expect.objectContaining({ timeoutMs: 120000 })
+    );
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'pnpm',
+      ['run', 'check', '--', '--scope', 'full', '--only', 'catalogs'],
+      expect.objectContaining({ timeoutMs: 120000 })
+    );
   });
 
   it('handles status_report_to_operator_packet transform', async () => {

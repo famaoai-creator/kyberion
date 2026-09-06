@@ -27,15 +27,19 @@
  */
 
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
+import { readJson, readJsonLines } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { readTextFile } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import {
+  assertSafeRepositoryPath,
   safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
+  safeLstat,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -50,6 +54,8 @@ import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
 import { assertPhysicalScopeSegment } from './physical-namespace.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import type { MissionState } from './mission-types.js';
 
 // ---------------------------------------------------------------------------
 // Mission runtime residue
@@ -87,17 +93,25 @@ export interface GcMissionRuntimeResidueResult {
 
 function readJsonRecord(filePath: string): Record<string, unknown> | null {
   try {
-    const parsed = readJson<unknown>(filePath);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath)) return null;
+    if (!safeStat(safePath).isFile()) return null;
+    return parseSafeJsonObjectValue(readJson<unknown>(safePath), `scope record ${filePath}`);
   } catch {
     return null;
   }
 }
 
 function listDirEntries(dir: string): string[] {
-  if (!safeExistsSync(dir)) return [];
+  let safeDir: string;
   try {
-    return safeReaddir(dir);
+    safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  } catch {
+    return [];
+  }
+  if (!safeExistsSync(safeDir)) return [];
+  try {
+    return safeReaddir(safeDir);
   } catch {
     return [];
   }
@@ -106,6 +120,14 @@ function listDirEntries(dir: string): string[] {
 /** Mission ids are compared case-insensitively (`findMissionPath` upper-cases). */
 function sameMission(value: unknown, missionId: string): boolean {
   return typeof value === 'string' && value.trim().toUpperCase() === missionId;
+}
+
+function safeOptionalRepositoryPath(filePath: string): string | undefined {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return undefined;
+  }
 }
 
 function collectMissionResidue(missionId: string): MissionResidueCandidate[] {
@@ -145,8 +167,10 @@ function collectMissionResidue(missionId: string): MissionResidueCandidate[] {
   for (const name of listDirEntries(sessionRoot)) {
     const upper = name.toUpperCase();
     if (upper !== missionId && !upper.startsWith(`${missionId}-`)) continue;
+    const sessionPath = safeOptionalRepositoryPath(path.join(sessionRoot, name));
+    if (!sessionPath) continue;
     candidates.push({
-      path: repoRelativePosix(path.join(sessionRoot, name)),
+      path: repoRelativePosix(sessionPath),
       probe: 'session_volatile',
     });
   }
@@ -191,7 +215,8 @@ export function gcMissionRuntimeResidue(input: {
     if (dryRun) return result;
 
     for (const candidate of result.candidates) {
-      const absolute = pathResolver.rootResolve(candidate.path);
+      const absolute = safeOptionalRepositoryPath(pathResolver.rootResolve(candidate.path));
+      if (!absolute) continue;
       try {
         if (!safeExistsSync(absolute)) continue;
         softDeleteToTrash(absolute);
@@ -337,23 +362,22 @@ function missionStateScope(missionDir: string): {
   organizationId?: string;
   projectId?: string;
 } {
-  const record = readJsonRecord(path.join(missionDir, 'mission-state.json'));
+  const record = loadMissionStateAtPath(path.join(missionDir, 'mission-state.json')) as
+    | (MissionState & {
+        organization_profile?: { organization_id?: unknown };
+      })
+    | null;
   if (!record) return {};
-  const relationships = record.relationships as Record<string, unknown> | undefined;
-  const project = relationships?.project as Record<string, unknown> | undefined;
-  const organization = relationships?.organization as Record<string, unknown> | undefined;
-  const organizationProfile = record.organization_profile as Record<string, unknown> | undefined;
+  const organizationProfile = record.organization_profile;
   return {
-    tenantSlug: typeof record.tenant_slug === 'string' ? record.tenant_slug : undefined,
+    tenantSlug: record.tenant_slug,
     organizationId:
-      typeof record.organization_id === 'string'
-        ? record.organization_id
-        : typeof organization?.organization_id === 'string'
-          ? organization.organization_id
-          : typeof organizationProfile?.organization_id === 'string'
-            ? organizationProfile.organization_id
-            : undefined,
-    projectId: typeof project?.project_id === 'string' ? project.project_id : undefined,
+      record.organization_id ||
+      record.relationships?.organization?.organization_id ||
+      (typeof organizationProfile?.organization_id === 'string'
+        ? organizationProfile.organization_id
+        : undefined),
+    projectId: record.relationships?.project?.project_id,
   };
 }
 
@@ -424,15 +448,18 @@ function collectProjectWorkspaceTargets(
   for (const tier of SCOPE_TIERS) {
     const tierDir = path.join(pathResolver.rootDir(), 'active', 'projects', tier);
     for (const owner of listDirEntries(tierDir)) {
-      const ownerDir = path.join(tierDir, owner);
+      const ownerDir = safeOptionalRepositoryPath(path.join(tierDir, owner));
+      if (!ownerDir) continue;
       try {
         if (!safeStat(ownerDir).isDirectory()) continue;
       } catch {
         continue;
       }
 
-      const candidate = owner === projectId ? ownerDir : path.join(ownerDir, projectId);
-      if (!safeExistsSync(candidate)) continue;
+      const candidate = safeOptionalRepositoryPath(
+        owner === projectId ? ownerDir : path.join(ownerDir, projectId)
+      );
+      if (!candidate || !safeExistsSync(candidate)) continue;
       try {
         if (!safeStat(candidate).isDirectory()) continue;
       } catch {
@@ -539,16 +566,18 @@ function collectDirectoriesWithLineage(
 ): string[] {
   const matches: string[] = [];
   const visit = (dir: string): void => {
-    if (!safeExistsSync(dir)) return;
-    for (const name of listDirEntries(dir)) {
-      const child = path.join(dir, name);
+    const safeDir = safeOptionalRepositoryPath(dir);
+    if (!safeDir || !safeExistsSync(safeDir)) return;
+    for (const name of listDirEntries(safeDir)) {
+      const child = safeOptionalRepositoryPath(path.join(safeDir, name));
+      if (!child) continue;
       try {
         if (!safeStat(child).isDirectory()) continue;
       } catch {
         continue;
       }
       if (
-        path.basename(dir) === directoryName &&
+        path.basename(safeDir) === directoryName &&
         name === scopeId &&
         physicalLineageMatches(root, child, filter)
       ) {
@@ -577,8 +606,10 @@ function collectPhysicalNamespaceTargets(
     for (const root of roots) {
       if (root.kind === 'channel') {
         for (const surface of listDirEntries(root.path)) {
-          const tenantRoot = path.join(root.path, surface, 'tenants', scopeId);
-          if (safeExistsSync(tenantRoot)) {
+          const tenantRoot = safeOptionalRepositoryPath(
+            path.join(root.path, surface, 'tenants', scopeId)
+          );
+          if (tenantRoot && safeExistsSync(tenantRoot)) {
             targets.push({
               path: repoRelativePosix(tenantRoot),
               kind: 'tenant_physical_namespace',
@@ -587,8 +618,8 @@ function collectPhysicalNamespaceTargets(
         }
         continue;
       }
-      const tenantRoot = path.join(root.path, 'tenants', scopeId);
-      if (safeExistsSync(tenantRoot)) {
+      const tenantRoot = safeOptionalRepositoryPath(path.join(root.path, 'tenants', scopeId));
+      if (tenantRoot && safeExistsSync(tenantRoot)) {
         targets.push({
           path: repoRelativePosix(tenantRoot),
           kind: 'tenant_physical_namespace',
@@ -596,8 +627,10 @@ function collectPhysicalNamespaceTargets(
       }
     }
     for (const root of PHYSICAL_TENANT_LEARNING_ROOTS) {
-      const tenantRoot = path.join(pathResolver.rootResolve(root), 'tenants', scopeId);
-      if (safeExistsSync(tenantRoot)) {
+      const tenantRoot = safeOptionalRepositoryPath(
+        path.join(pathResolver.rootResolve(root), 'tenants', scopeId)
+      );
+      if (tenantRoot && safeExistsSync(tenantRoot)) {
         targets.push({ path: repoRelativePosix(tenantRoot), kind: 'tenant_learning_tree' });
       }
     }
@@ -651,8 +684,10 @@ export function collectScopeTargets(
   // selects only the exact project directory after lineage matching.
   if (scopeType === 'tenant') {
     for (const tier of SCOPE_TIERS) {
-      const dir = path.join(pathResolver.rootDir(), 'active', 'projects', tier, id);
-      if (safeExistsSync(dir)) {
+      const dir = safeOptionalRepositoryPath(
+        path.join(pathResolver.rootDir(), 'active', 'projects', tier, id)
+      );
+      if (dir && safeExistsSync(dir)) {
         targets.push({ path: repoRelativePosix(dir), kind: 'project_tree' });
       }
     }
@@ -676,7 +711,8 @@ export function collectScopeTargets(
   for (const tier of SCOPE_TIERS) {
     const tierDir = path.join(missionsRoot, tier);
     for (const name of listDirEntries(tierDir)) {
-      const missionDir = path.join(tierDir, name);
+      const missionDir = safeOptionalRepositoryPath(path.join(tierDir, name));
+      if (!missionDir) continue;
       try {
         if (!safeStat(missionDir).isDirectory()) continue;
       } catch {
@@ -712,7 +748,8 @@ export function collectScopeTargets(
   // sync cursors, and quota counters.
   if (scopeType === 'tenant') {
     const knowledgeRoot = tenantKnowledgeRootDefault(id);
-    if (safeExistsSync(pathResolver.rootResolve(knowledgeRoot))) {
+    const knowledgePath = safeOptionalRepositoryPath(pathResolver.rootResolve(knowledgeRoot));
+    if (knowledgePath && safeExistsSync(knowledgePath)) {
       targets.push({ path: knowledgeRoot, kind: 'tenant_knowledge_tree' });
     }
     for (const subtree of [
@@ -720,7 +757,8 @@ export function collectScopeTargets(
       `${INGEST_QUOTA_REPO_SUBPATH}/${id}`,
       `knowledge/personal/tenants/${id}`,
     ]) {
-      if (safeExistsSync(pathResolver.rootResolve(subtree))) {
+      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
+      if (subtreePath && safeExistsSync(subtreePath)) {
         targets.push({ path: subtree, kind: 'ingest_cursors_tree' });
       }
     }
@@ -752,20 +790,12 @@ interface LedgerAssetLine {
 
 /** Parse a JSONL file leniently (corrupt lines skipped — same contract as the ingest readers). */
 function readJsonlLines(absPath: string): Array<Record<string, unknown>> {
-  if (!safeExistsSync(absPath)) return [];
-  const raw = String(safeReadFile(absPath, { encoding: 'utf8' }) || '');
-  const records: Array<Record<string, unknown>> = [];
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (parsed && typeof parsed === 'object') records.push(parsed as Record<string, unknown>);
-    } catch {
-      /* skip corrupt line */
-    }
-  }
-  return records;
+  const safePath = safeOptionalRepositoryPath(absPath);
+  if (!safePath || !safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
+  return readJsonLines<unknown>(safePath, { onMalformed: 'skip' }).filter(
+    (value): value is Record<string, unknown> =>
+      value !== null && typeof value === 'object' && !Array.isArray(value)
+  );
 }
 
 interface DedupRegistryPrune {
@@ -782,9 +812,13 @@ interface DedupRegistryPrune {
  * be computed BEFORE the knowledge tree (and with it the ledger) is deleted.
  */
 function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
-  const registryAbs = pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH);
   const result: DedupRegistryPrune = { removedLines: [], keptLines: [] };
-  if (!safeExistsSync(registryAbs)) return result;
+  const registryAbs = safeOptionalRepositoryPath(
+    pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH)
+  );
+  if (!registryAbs || !safeExistsSync(registryAbs) || !safeLstat(registryAbs).isFile()) {
+    return result;
+  }
 
   const knowledgeRoot = tenantKnowledgeRootDefault(tenantSlug);
   const ledgerLines = readJsonlLines(
@@ -799,13 +833,13 @@ function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
     }
   }
 
-  const raw = String(safeReadFile(registryAbs, { encoding: 'utf8' }) || '');
+  const raw = readTextFile(registryAbs);
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     let matches = false;
     try {
-      const record = JSON.parse(trimmed) as {
+      const record = parseSafeJsonInput(trimmed, 'dedup registry JSONL entry') as {
         content_sha256?: string;
         source_system?: string;
         source_id?: string;
@@ -874,17 +908,19 @@ export function verifyScopeOffboarded(
 
 /** Recursive copy through secure-io (no shell, cross-platform). */
 function copyTree(source: string, destination: string): void {
-  const stat = safeStat(source);
+  const safeSource = assertSafeRepositoryPath(source);
+  const safeDestination = assertSafeRepositoryPath(destination, { allowMissingLeaf: true });
+  const stat = safeStat(safeSource);
   if (stat.isDirectory()) {
-    if (!safeExistsSync(destination)) safeMkdir(destination, { recursive: true });
-    for (const name of listDirEntries(source)) {
-      copyTree(path.join(source, name), path.join(destination, name));
+    if (!safeExistsSync(safeDestination)) safeMkdir(safeDestination, { recursive: true });
+    for (const name of listDirEntries(safeSource)) {
+      copyTree(path.join(safeSource, name), path.join(safeDestination, name));
     }
     return;
   }
-  const parent = path.dirname(destination);
+  const parent = path.dirname(safeDestination);
   if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
-  safeCopyFileSync(source, destination);
+  safeCopyFileSync(safeSource, safeDestination);
 }
 
 export interface OffboardScopeInput {
@@ -999,11 +1035,12 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       return result;
     }
 
-    const nowIso = input.nowIso ?? new Date().toISOString();
-    const approvedAt = input.approval?.approved_at ?? nowIso;
-    const exportDirName = `${scopeType}-${scopeId}-${nowIso.replace(/[:.]/g, '-')}`;
-    const exportDirAbs = pathResolver.sharedExports(
-      path.join(OFFBOARDING_EXPORT_SUBDIR, exportDirName)
+    const currentIso = input.nowIso ?? nowIso();
+    const approvedAt = input.approval?.approved_at ?? currentIso;
+    const exportDirName = `${scopeType}-${scopeId}-${currentIso.replace(/[:.]/g, '-')}`;
+    const exportDirAbs = assertSafeRepositoryPath(
+      pathResolver.sharedExports(path.join(OFFBOARDING_EXPORT_SUBDIR, exportDirName)),
+      { allowMissingLeaf: true }
     );
     if (!safeExistsSync(exportDirAbs)) safeMkdir(exportDirAbs, { recursive: true });
     result.export_path = repoRelativePosix(exportDirAbs);
@@ -1012,7 +1049,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     // a copy under the export directory.
     for (const target of result.targets) {
       copyTree(
-        pathResolver.rootResolve(target.path),
+        assertSafeRepositoryPath(pathResolver.rootResolve(target.path)),
         path.join(exportDirAbs, ...target.path.split('/'))
       );
     }
@@ -1022,25 +1059,28 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     // tenants, so it never goes to the trash wholesale).
     const dedupExportFile = 'dedup-registry-removed.jsonl';
     if (dedupPrune && dedupPrune.removedLines.length > 0) {
-      safeWriteFile(
-        path.join(exportDirAbs, dedupExportFile),
-        `${dedupPrune.removedLines.join('\n')}\n`
-      );
+      const dedupExportPath = assertSafeRepositoryPath(path.join(exportDirAbs, dedupExportFile), {
+        allowMissingLeaf: true,
+      });
+      safeWriteFile(dedupExportPath, `${dedupPrune.removedLines.join('\n')}\n`);
       result.dedup_registry = {
         matched: dedupPrune.removedLines.length,
         removed: 0,
         export_file: `${result.export_path}/${dedupExportFile}`,
       };
     }
+    const manifestPath = assertSafeRepositoryPath(path.join(exportDirAbs, 'manifest.json'), {
+      allowMissingLeaf: true,
+    });
     safeWriteFile(
-      path.join(exportDirAbs, 'manifest.json'),
+      manifestPath,
       JSON.stringify(
         {
           scope_type: scopeType,
           scope_id: scopeId,
           ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
           ...(organizationId ? { organization_id: organizationId } : {}),
-          exported_at: nowIso,
+          exported_at: currentIso,
           approval: { approved_by: approvedBy, approved_at: approvedAt, purpose },
           targets: result.targets,
           ...(result.dedup_registry ? { dedup_registry: result.dedup_registry } : {}),
@@ -1068,7 +1108,10 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     // DA-08: prune the tenant's lines out of the shared dedup registry
     // (exported above). Audited like every other purge in this ceremony.
     if (dedupPrune && dedupPrune.removedLines.length > 0) {
-      const registryAbs = pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH);
+      const registryAbs = assertSafeRepositoryPath(
+        pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH),
+        { allowMissingLeaf: true }
+      );
       safeWriteFile(
         registryAbs,
         dedupPrune.keptLines.length > 0 ? `${dedupPrune.keptLines.join('\n')}\n` : ''
@@ -1093,7 +1136,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     }
 
     for (const target of result.targets) {
-      const absolute = pathResolver.rootResolve(target.path);
+      const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(target.path));
       try {
         if (!safeExistsSync(absolute)) continue;
         softDeleteToTrash(absolute);

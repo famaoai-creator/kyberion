@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 import {
   getMediaBackendRegistry,
@@ -12,8 +13,10 @@ import {
   type AdapterDefaultKey,
   type AdapterDefaultPreferences,
 } from './adapter-default-preferences.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from './secure-io.js';
 import { getServiceRuntimeRegistry } from './service-runtime-registry.js';
 import { listToolRuntimes, getToolRuntimeRegistry } from './tool-runtime-registry.js';
 import { listVadBackends, resolveVadBackend } from './vad-registry.js';
@@ -56,8 +59,21 @@ const CATEGORY_LABELS: Record<AdapterDefaultKey, string> = {
 };
 
 function selectionPath(): string {
-  return path.join(resolveActiveProfileRoot(), 'onboarding', 'adapter-defaults.json');
+  return assertSafeRepositoryPath(
+    path.join(resolveActiveProfileRoot(), 'onboarding', 'adapter-defaults.json'),
+    { allowMissingLeaf: true }
+  );
 }
+
+const ADAPTER_DEFAULT_PREFERENCES_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/adapter-default-preferences.schema.json'
+);
+
+const adapterDefaultPreferencesCatalog = defineCatalog<AdapterDefaultPreferences>({
+  id: 'adapter-default-preferences',
+  path: selectionPath,
+  schema: ADAPTER_DEFAULT_PREFERENCES_SCHEMA_PATH,
+});
 
 function isAdapterDefaultKey(value: string): value is AdapterDefaultKey {
   return (ADAPTER_DEFAULT_KEYS as readonly string[]).includes(value);
@@ -65,13 +81,16 @@ function isAdapterDefaultKey(value: string): value is AdapterDefaultKey {
 
 function loadPersistedPreferences(): AdapterDefaultPreferences {
   const filePath = selectionPath();
-  if (!safeExistsSync(filePath)) {
+  let parsed: AdapterDefaultPreferences | null = null;
+  try {
+    if (safeLstat(filePath).isFile()) parsed = adapterDefaultPreferencesCatalog.load();
+  } catch {
+    parsed = null;
+  }
+  if (!parsed) {
     return setAdapterDefaultPreferences({ version: '1.0.0', defaults: {} });
   }
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(filePath, { encoding: 'utf8' }))
-    ) as Partial<AdapterDefaultPreferences> & { defaults?: Record<string, unknown> };
     const defaults: Partial<Record<AdapterDefaultKey, string>> = {};
     for (const [key, value] of Object.entries(parsed.defaults || {})) {
       if (isAdapterDefaultKey(key) && typeof value === 'string' && value.trim()) {
@@ -282,6 +301,19 @@ export function validateAdapterDefaultPreferences(
   return next;
 }
 
+export function writeAdapterDefaultPreferencesAtPath(
+  filePath: string,
+  preferences: AdapterDefaultPreferences
+): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = adapterDefaultPreferencesCatalog.validate(preferences, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2) + '\n', {
+    mkdir: true,
+    encoding: 'utf8',
+  });
+  return safePath;
+}
+
 export function saveAdapterDefaultPreferences(
   input: Record<string, unknown>
 ): AdapterDefaultSelectionSnapshot {
@@ -291,13 +323,10 @@ export function saveAdapterDefaultPreferences(
   const preferences: AdapterDefaultPreferences = {
     version: '1.0.0',
     defaults: nextDefaults,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
+  writeAdapterDefaultPreferencesAtPath(selectionPath(), preferences);
   setAdapterDefaultPreferences(preferences);
-  safeWriteFile(selectionPath(), JSON.stringify(preferences, null, 2) + '\n', {
-    mkdir: true,
-    encoding: 'utf8',
-  });
   return { ...snapshot, preferences };
 }
 

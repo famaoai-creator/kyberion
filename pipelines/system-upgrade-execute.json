@@ -60,7 +60,7 @@
             "role": "source",
             "op": "system:shell",
             "produces": { "channel": "final_vital", "type": "ShellResult" },
-            "params": { "cmd": "pnpm vital" }
+            "params": { "cmd": "pnpm pipeline vital-check" }
           },
           {
             "role": "sink",

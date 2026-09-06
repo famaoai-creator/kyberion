@@ -3,13 +3,13 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import {
   safeChmodSync,
   safeExistsSync,
   safeLstat,
-  loadJson,
   safeWriteFile,
   safeMkdir,
   safeExecResult,
@@ -18,16 +18,36 @@ import { SecretProvider, RegistryEntry } from './secret-types.js';
 
 const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
 const FILE_SECRETS_PATH = pathResolver.vault('secrets/file-secrets.json');
+const KEYCHAIN_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/keychain-registry.schema.json'
+);
+const FILE_SECRETS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/file-secrets.schema.json');
 
 // Helper to manage the registry catalog
 interface KeychainRegistry {
   entries: RegistryEntry[];
 }
 
+function keychainRegistryCatalog() {
+  return defineCatalog<KeychainRegistry>({
+    id: 'keychain-registry',
+    path: KEYCHAIN_REGISTRY_PATH,
+    schema: KEYCHAIN_REGISTRY_SCHEMA_PATH,
+  });
+}
+
+function fileSecretsCatalog(filePath: string) {
+  return defineCatalog<Record<string, Record<string, string>>>({
+    id: 'file-secrets',
+    path: filePath,
+    schema: FILE_SECRETS_SCHEMA_PATH,
+  });
+}
+
 function loadRegistry(): KeychainRegistry {
   if (!safeExistsSync(KEYCHAIN_REGISTRY_PATH)) return { entries: [] };
   try {
-    return readJson<KeychainRegistry>(KEYCHAIN_REGISTRY_PATH);
+    return keychainRegistryCatalog().load();
   } catch {
     return { entries: [] };
   }
@@ -36,7 +56,8 @@ function loadRegistry(): KeychainRegistry {
 function saveRegistry(registry: KeychainRegistry): void {
   const dir = path.dirname(KEYCHAIN_REGISTRY_PATH);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(KEYCHAIN_REGISTRY_PATH, JSON.stringify(registry, null, 2));
+  const validated = keychainRegistryCatalog().validate(registry, KEYCHAIN_REGISTRY_PATH);
+  safeWriteFile(KEYCHAIN_REGISTRY_PATH, JSON.stringify(validated, null, 2));
 }
 
 export function registryAdd(service: string, account: string): void {
@@ -44,7 +65,7 @@ export function registryAdd(service: string, account: string): void {
   const existing = registry.entries.findIndex(
     (e) => e.service === service && e.account === account
   );
-  const entry: RegistryEntry = { service, account, addedAt: new Date().toISOString() };
+  const entry: RegistryEntry = { service, account, addedAt: nowIso() };
   if (existing >= 0) {
     registry.entries[existing] = entry;
   } else {
@@ -242,7 +263,7 @@ export class FileSecretProvider implements SecretProvider {
     if (!safeExistsSync(this.secretsPath)) return {};
     this.assertNotSymlink(this.secretsPath, 'secret file');
     try {
-      return loadJson<Record<string, Record<string, string>>>(this.secretsPath);
+      return fileSecretsCatalog(this.secretsPath).load();
     } catch {
       return {};
     }
@@ -259,7 +280,8 @@ export class FileSecretProvider implements SecretProvider {
     if (safeExistsSync(this.secretsPath)) {
       this.assertNotSymlink(this.secretsPath, 'secret file');
     }
-    safeWriteFile(this.secretsPath, JSON.stringify(secrets, null, 2), { mode: 0o600 });
+    const validated = fileSecretsCatalog(this.secretsPath).validate(secrets, this.secretsPath);
+    safeWriteFile(this.secretsPath, JSON.stringify(validated, null, 2), { mode: 0o600 });
     // Also repair permissions of files created by older versions.
     safeChmodSync(this.secretsPath, 0o600);
   }
@@ -310,18 +332,18 @@ export class EnvSecretProvider implements SecretProvider {
 
   async get(service: string, account: string): Promise<string | null> {
     const key = this.envKey(service, account);
-    return process.env[key] || null;
+    return getRegisteredEnvText(key) || null;
   }
 
   async set(service: string, account: string, value: string): Promise<void> {
     const key = this.envKey(service, account);
-    process.env[key] = value;
+    setRegisteredEnv(key, value);
     registryAdd(service, account);
   }
 
   async delete(service: string, account: string): Promise<void> {
     const key = this.envKey(service, account);
-    delete process.env[key];
+    setRegisteredEnv(key, undefined);
     registryRemove(service, account);
   }
 }

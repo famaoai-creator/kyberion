@@ -5,6 +5,7 @@ import {
   buildApplySummary,
   buildState,
   buildSummary,
+  parseApplyInput,
   readInput,
   validateInput,
 } from './onboarding_apply.js';
@@ -54,6 +55,23 @@ describe('onboarding_apply', () => {
         tenants: [{ ...FIXTURE_INPUT.tenants[0], tenant_slug: 'INVALID_SLUG' }],
       })
     ).toThrow('Invalid tenant_slug');
+  });
+
+  it('rejects malformed external JSON shapes before onboarding writes', () => {
+    expect(() => parseApplyInput(null)).toThrow('identity block is required');
+    expect(() => parseApplyInput({ identity: { name: 'Famao' } })).toThrow('identity requires');
+    expect(() =>
+      parseApplyInput({
+        ...FIXTURE_INPUT,
+        tenants: [{ tenant_slug: 'alpha-team', display_name: 'Alpha Team' }],
+      })
+    ).toThrow('tenant entries require');
+    expect(() => parseApplyInput({ ...FIXTURE_INPUT, tutorial: { mode: 'unknown' } })).toThrow(
+      'tutorial.mode'
+    );
+    expect(() => parseApplyInput({ ...FIXTURE_INPUT, unexpected: true })).toThrow(
+      /Invalid catalog onboarding-apply-input/u
+    );
   });
 
   it('accepts a catalog reasoning_backend and rejects unknown ones (LC-05)', () => {
@@ -179,5 +197,9 @@ describe('onboarding_apply', () => {
     expect(script).toContain("path.join(onboardingRoot(), 'tutorial-plan.md')");
     expect(script).toContain('statePath()');
     expect(script).toContain('summaryPath()');
+    expect(script).toContain('loadOnboardingApplyInputAtPath');
+    expect(script).not.toContain('readJson');
+    expect(script).not.toContain('console.log');
+    expect(script).not.toContain('console.error');
   });
 });

@@ -1,23 +1,22 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { installCoreEnvironmentProbes } from '@agent/core/environment-capability-probes';
+import { listToolRuntimeInventory } from '@agent/core/tool-runtime-registry';
+import { loadEnvironmentManifest, probeManifest } from '@agent/core/environment-capability';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExecResult, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import {
-  installCoreEnvironmentProbes,
-  listToolRuntimeInventory,
-  loadEnvironmentManifest,
-  pathResolver,
-  probeManifest,
-  safeExecResult,
-  safeExistsSync,
-  safeReaddir,
   createCoreAudioDeviceInventoryBridge,
   resolveAudioDevice,
   type CoreAudioDeviceInventoryBridge,
-} from '@agent/core';
+} from '@agent/core/coreaudio-device-inventory';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
 import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 export type MeetingPreflightStatus = 'pass' | 'fail' | 'warn' | 'operator_action_required';
 
@@ -152,7 +151,7 @@ async function probeBlackHoleDevice(
       'blackhole.device',
       'pass',
       `BlackHole 2ch ready; input/output UID ${inputDescriptor.uid}, ${inputDescriptor.channel_count ?? '?'} channel(s), rates ${formatRates(inputDescriptor.supported_sample_rates)}`,
-      'pnpm voice:route:probe -- --json',
+      'pnpm voice:route probe -- --json',
       {
         data: {
           input_device: inputDescriptor,
@@ -261,7 +260,7 @@ function probeMlxAudioRuntime(platform: NodeJS.Platform): MeetingPreflightItem {
   const mlxAudio = inventory.items.find((entry) => entry.tool.tool_id === 'mlx_audio');
   const fix =
     formatCommand(mlxAudio?.install_backend?.command, mlxAudio?.install_backend?.args) ||
-    'pnpm voice:setup --apply';
+    'pnpm kyberion voice setup --apply';
   return item(
     'mlx.audio.runtime',
     'fail',
@@ -343,8 +342,9 @@ export async function runMeetingPreflight(
   } = {}
 ): Promise<MeetingPreflightReport> {
   installCoreEnvironmentProbes();
-  const missionId = options.missionId?.trim() || process.env.MISSION_ID?.trim() || undefined;
-  if (missionId) process.env.MISSION_ID = missionId;
+  const missionId =
+    options.missionId?.trim() || getRegisteredEnvText('MISSION_ID')?.trim() || undefined;
+  if (missionId) setRegisteredEnv('MISSION_ID', missionId);
   const platform = options.platform || process.platform;
 
   const items = [
@@ -367,16 +367,16 @@ export async function runMeetingPreflight(
   };
 }
 
-function printMeetingPreflightReport(report: MeetingPreflightReport): void {
+function printMeetingPreflightReport(report: MeetingPreflightReport, print: Print): void {
   for (const entry of report.items) {
-    console.log(`[meeting-preflight] ${entry.id}: ${entry.status}`);
-    console.log(`  detail: ${entry.detail}`);
-    console.log(`  fix: ${entry.fix}`);
+    print(`[meeting-preflight] ${entry.id}: ${entry.status}`);
+    print(`  detail: ${entry.detail}`);
+    print(`  fix: ${entry.fix}`);
   }
-  console.log('');
+  print('');
 }
 
-export async function main(args: string[] = []): Promise<number> {
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<number> {
   const argv = await createStandardYargs(['node', 'meeting_preflight', ...args])
     .option('mission', { type: 'string' })
     .option('json', { type: 'boolean', default: false })
@@ -387,9 +387,9 @@ export async function main(args: string[] = []): Promise<number> {
   });
 
   if (argv.json) {
-    console.log(JSON.stringify(report, null, 2));
+    print(JSON.stringify(report, null, 2));
   } else {
-    printMeetingPreflightReport(report);
+    printMeetingPreflightReport(report, print);
   }
 
   return report.ready ? 0 : 1;
@@ -403,7 +403,7 @@ if (
     name: 'meeting:preflight',
     flags: [],
     async run(context) {
-      const status = await main(context.argv);
+      const status = await main(context.argv, context.print);
       if (status !== 0) throw new Error(`meeting:preflight failed with exit code ${status}`);
     },
   })();

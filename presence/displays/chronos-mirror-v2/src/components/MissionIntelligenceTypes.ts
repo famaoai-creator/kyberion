@@ -1,4 +1,4 @@
-import type { OrganizationWorkLoopSummary } from '@agent/core';
+import type { OrganizationWorkLoopSummary } from '@agent/core/work-design';
 import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
 
 export interface MissionSummary {
@@ -158,32 +158,6 @@ export interface CompanySnapshot {
   };
 }
 
-const MISSION_INTELLIGENCE_PREFS_KEY = 'chronos.mission-intelligence.prefs';
-
-function loadMissionIntelligenceSelectedMissionId(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(MISSION_INTELLIGENCE_PREFS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<{ selectedMissionId: string | null }>;
-    return typeof parsed.selectedMissionId === 'string' ? parsed.selectedMissionId : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveMissionIntelligenceSelectedMissionId(selectedMissionId: string | null): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(
-      MISSION_INTELLIGENCE_PREFS_KEY,
-      JSON.stringify({ selectedMissionId })
-    );
-  } catch {
-    // localStorage may be denied; ignore.
-  }
-}
-
 export function resolveMissionThreadHotkeyAction(key: string): 'thread' | 'card' | null {
   const normalized = key.toLowerCase();
   if (normalized === 't') return 'thread';
@@ -226,17 +200,6 @@ export function pickDefaultMissionId(
   );
 
   return prioritized?.missionId || missions[0]?.missionId || null;
-}
-
-function isEditableHotkeyTarget(target: EventTarget | null): boolean {
-  const element = target as HTMLElement | null;
-  return Boolean(
-    element &&
-    (element.tagName === 'INPUT' ||
-      element.tagName === 'TEXTAREA' ||
-      element.tagName === 'SELECT' ||
-      element.isContentEditable)
-  );
 }
 
 interface OrchestrationEvent {
@@ -618,6 +581,7 @@ export type {
   WorkLoopPreview,
 };
 interface IntelligencePayload {
+  revision: number;
   accessRole: 'readonly' | 'localadmin';
   company?: CompanySnapshot;
   activeMissions: MissionSummary[];

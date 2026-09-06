@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "keychain-registry.schema.json",
+  "title": "Keychain registry",
+  "description": "Bounded metadata for credentials stored by an operating-system secret provider.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entries"],
+  "properties": {
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "account", "addedAt"],
+      "properties": {
+        "service": { "type": "string", "minLength": 1 },
+        "account": { "type": "string", "minLength": 1 },
+        "addedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

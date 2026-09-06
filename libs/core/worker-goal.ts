@@ -51,6 +51,7 @@
  */
 
 import type { ToolDefinition } from './reasoning-backend.js';
+import { nowIso } from './foundation/time.js';
 
 export const GOAL_STATES = ['active', 'paused', 'blocked', 'complete'] as const;
 export type GoalState = (typeof GOAL_STATES)[number];
@@ -93,7 +94,7 @@ export interface CreateGoalParams {
 }
 
 function isoNow(now?: () => string): string {
-  return now ? now() : new Date().toISOString();
+  return now ? now() : nowIso();
 }
 
 export function createGoal(params: CreateGoalParams): GoalRuntimeState {

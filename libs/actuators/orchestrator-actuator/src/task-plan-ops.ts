@@ -1,16 +1,21 @@
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { missionDir, pathResolver } from '@agent/core/path-resolver';
 import {
   evaluateTaskPlanReadyGate,
-  getReasoningBackend,
-  loadJson,
-  missionDir,
-  pathResolver,
+  readDesignSpecAtPath,
   readDesignSpec,
-  readRequirementsDraft,
   readTaskPlan,
-  safeExistsSync,
-  safeWriteFile,
   saveTaskPlan,
-} from '@agent/core';
+} from '@agent/core/sdlc-artifact-store';
+import {
+  readRequirementsDraft,
+  readRequirementsDraftAtPath,
+} from '@agent/core/requirements-draft-store';
+import { assertSafeRepositoryPath, safeWriteFile } from '@agent/core/secure-io';
+
+function resolveTaskPlanInputPath(ref: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
+}
 
 export async function decomposeIntoTasks(input: {
   mission_id: string;
@@ -22,20 +27,21 @@ export async function decomposeIntoTasks(input: {
     throw new Error('[decompose_into_tasks] requires mission_id and project_name');
   }
   const backend = getReasoningBackend();
+  const requirementsDraftPath = input.requirements_draft_path
+    ? resolveTaskPlanInputPath(input.requirements_draft_path)
+    : undefined;
   const requirementsDraft =
     readRequirementsDraft(input.mission_id) ??
-    (input.requirements_draft_path &&
-    safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
-      ? loadJson<unknown>(pathResolver.rootResolve(input.requirements_draft_path))
-      : null);
+    (requirementsDraftPath ? readRequirementsDraftAtPath(requirementsDraftPath) : null);
   if (!requirementsDraft) {
     throw new Error('[decompose_into_tasks] requirements draft not found');
   }
+  const designSpecPath = input.design_spec_path
+    ? resolveTaskPlanInputPath(input.design_spec_path)
+    : undefined;
   const designSpec =
     readDesignSpec(input.mission_id) ??
-    (input.design_spec_path && safeExistsSync(pathResolver.rootResolve(input.design_spec_path))
-      ? loadJson<unknown>(pathResolver.rootResolve(input.design_spec_path))
-      : undefined);
+    (designSpecPath ? readDesignSpecAtPath(designSpecPath) : undefined);
   const decomposed = await backend.decomposeIntoTasks({
     requirementsDraft,
     designSpec,

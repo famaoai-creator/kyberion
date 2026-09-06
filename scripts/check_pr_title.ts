@@ -8,9 +8,11 @@
  */
 
 import * as path from 'node:path';
-import { readJson } from '@agent/core/foundation';
-import { safeExec, pathResolver } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExec } from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 interface CheckResult {
   ok: boolean;
@@ -39,7 +41,7 @@ function isConventionalCommitTitle(value: string): boolean {
 
 function readEventTitle(eventPath: string): string | null {
   try {
-    const event = readJson<GitHubEventPayload>(eventPath);
+    const event = readSafeJsonFile<GitHubEventPayload>(eventPath, 'GitHub event payload');
     if (typeof event?.pull_request?.title === 'string') return event.pull_request.title;
     if (typeof event?.pull_request?.head?.commit?.message === 'string') {
       return event.pull_request.head.commit.message.split('\n', 1)[0];
@@ -103,9 +105,12 @@ export const runCheckPullRequestTitle = defineScript({
     }
     const result = checkPullRequestTitle({
       title: optionValue(context.argv, '--title'),
-      eventPath: optionValue(context.argv, '--event-path') || process.env.GITHUB_EVENT_PATH,
+      eventPath:
+        optionValue(context.argv, '--event-path') || getRegisteredEnvText('GITHUB_EVENT_PATH'),
     });
-    if (!result.ok) throw new Error(`${result.source}: ${result.value} (${result.reason})`);
+    if (!result.ok) {
+      throw new ScriptExitError(1, `${result.source}: ${result.value} (${result.reason})`);
+    }
     context.print(context.json ? result : `✅ ${result.source}: ${result.value}`);
   },
 });

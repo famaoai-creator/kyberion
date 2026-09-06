@@ -5,6 +5,9 @@
 
 import * as path from 'node:path';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import * as pathResolver from './path-resolver.js';
 import {
   findMissionPath,
@@ -13,7 +16,7 @@ import {
 } from './path-resolver.js';
 import { logger } from './core.js';
 import {
-  loadJsonIfPresent as loadOptionalJson,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -24,9 +27,21 @@ import { withLock } from './src/lock-utils.js';
 import { withFencedWriterLease, writerLeaseResourceId } from './writer-lease.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { hasAuthority } from './governance.js';
-import { readJsonFile } from './cli-input.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
+import { loadMissionManagementConfig } from './mission-management-config.js';
+import { loadMissionStateAtPath, writeMissionStateAtPath } from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
+const MISSION_FOCUS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-focus.schema.json'
+);
+
+function missionFocusCatalog(filePath: string) {
+  return defineCatalog<{ mission_id?: string; ts?: string }>({
+    id: 'mission-focus',
+    path: filePath,
+    schema: MISSION_FOCUS_SCHEMA_PATH,
+  });
+}
 
 function getMissionStateValidator() {
   return (missionStateValidate ??= compileSchema(
@@ -94,7 +109,8 @@ export function normalizeRelationships(
 export function readFocusedMissionId(missionFocusPath: string): string | null {
   if (!safeExistsSync(missionFocusPath)) return null;
   try {
-    const parsed = readJsonFile<{ mission_id?: string }>(missionFocusPath);
+    const safePath = assertSafeRepositoryPath(missionFocusPath);
+    const parsed = missionFocusCatalog(safePath).load();
     return typeof parsed?.mission_id === 'string' ? parsed.mission_id.toUpperCase() : null;
   } catch (_) {
     return null;
@@ -102,17 +118,10 @@ export function readFocusedMissionId(missionFocusPath: string): string | null {
 }
 
 export function writeFocusedMissionId(missionFocusPath: string, missionId: string): void {
-  safeWriteFile(
-    missionFocusPath,
-    JSON.stringify(
-      {
-        mission_id: missionId.toUpperCase(),
-        ts: new Date().toISOString(),
-      },
-      null,
-      2
-    )
-  );
+  const safePath = assertSafeRepositoryPath(missionFocusPath, { allowMissingLeaf: true });
+  const value = { mission_id: missionId.toUpperCase(), ts: nowIso() };
+  const validated = missionFocusCatalog(safePath).validate(value, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2));
 }
 
 export function checkPrerequisites(): void {
@@ -194,19 +203,53 @@ function customMissionSearchDirs(rootDir: string): string[] {
   ];
 }
 
+function resolveMissionStatePath(
+  id: string,
+  options: { rootDir?: string; directories?: string[] } = {}
+): string | null {
+  const missionPath = options.directories
+    ? findMissionPathAtRoot(id, options.rootDir || pathResolver.rootDir(), options.directories)
+    : options.rootDir
+      ? findMissionPathAtRoot(id, options.rootDir)
+      : findMissionPath(id);
+  if (!missionPath) return null;
+  let statePath: string;
+  try {
+    statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'));
+  } catch {
+    return null;
+  }
+  return safeExistsSync(statePath) ? statePath : null;
+}
+
 function findMissionPathAtRoot(
   id: string,
   rootDir: string,
   directories = customMissionSearchDirs(rootDir)
 ): string | null {
   for (const directory of directories) {
-    const candidate = path.join(directory, id);
-    if (safeExistsSync(candidate) && safeLstat(candidate).isDirectory()) return candidate;
-    if (!safeExistsSync(directory) || !safeLstat(directory).isDirectory()) continue;
+    let safeDirectory: string;
     try {
-      for (const scopeEntry of safeReaddir(directory)) {
-        const scopedCandidate = path.join(directory, scopeEntry, id);
-        if (safeExistsSync(scopedCandidate) && safeLstat(scopedCandidate).isDirectory()) {
+      safeDirectory = assertSafeRepositoryPath(directory, { allowMissingLeaf: true });
+    } catch {
+      continue;
+    }
+    const candidate = path.join(safeDirectory, id);
+    if (
+      safeExistsSync(candidate) &&
+      safeLstat(candidate).isDirectory() &&
+      safeHistoryPath(candidate)
+    )
+      return candidate;
+    if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) continue;
+    try {
+      for (const scopeEntry of safeReaddir(safeDirectory)) {
+        const scopedCandidate = path.join(safeDirectory, scopeEntry, id);
+        if (
+          safeExistsSync(scopedCandidate) &&
+          safeLstat(scopedCandidate).isDirectory() &&
+          safeHistoryPath(scopedCandidate)
+        ) {
           return scopedCandidate;
         }
       }
@@ -217,20 +260,43 @@ function findMissionPathAtRoot(
   return null;
 }
 
+function safeHistoryPath(filePath: string): boolean {
+  try {
+    assertSafeRepositoryPath(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function loadState(
   id: string,
   options: { rootDir?: string; directories?: string[] } = {}
 ): MissionState | null {
-  const missionPath = options.directories
-    ? findMissionPathAtRoot(id, options.rootDir || pathResolver.rootDir(), options.directories)
-    : options.rootDir
-      ? findMissionPathAtRoot(id, options.rootDir)
-      : findMissionPath(id);
-  if (!missionPath) return null;
-  const statePath = path.join(missionPath, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return null;
+  const statePath = resolveMissionStatePath(id, options);
+  if (!statePath) return null;
+  return loadMissionStateAtPath(statePath);
+}
+
+/** Load a mission state from an already resolved repository path. */
+export function loadStateAtPath(statePath: string): MissionState | null {
+  return loadMissionStateAtPath(statePath);
+}
+
+/**
+ * Read a legacy state for the explicit repair command. Normal mission
+ * callers must use `loadState`, which rejects schema-invalid state before it
+ * reaches lifecycle logic.
+ */
+export function loadStateForRepair(
+  id: string,
+  options: { rootDir?: string; directories?: string[] } = {}
+): MissionState | null {
+  const statePath = resolveMissionStatePath(id, options);
+  if (!statePath) return null;
   try {
-    return readJsonFile<MissionState>(statePath);
+    if (!safeLstat(statePath).isFile()) return null;
+    return readJson<MissionState>(statePath);
   } catch (_) {
     return null;
   }
@@ -250,13 +316,22 @@ export async function saveState(
     findMissionPath(id) ||
     tenantDir ||
     resolveMissionDir(id, state.tier);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDir)) safeMkdir(safeDir, { recursive: true });
 
   const doWrite = async () => {
-    safeWriteFile(path.join(dir, 'mission-state.json'), JSON.stringify(state, null, 2));
+    const statePath = assertSafeRepositoryPath(path.join(safeDir, 'mission-state.json'), {
+      allowMissingLeaf: true,
+    });
+    writeMissionStateAtPath(statePath, state);
   };
 
-  const leasePath = path.join(dir, 'coordination', 'writer-lease.json');
+  const leasePath = assertSafeRepositoryPath(
+    path.join(safeDir, 'coordination', 'writer-lease.json'),
+    {
+      allowMissingLeaf: true,
+    }
+  );
   const doFencedWrite = () =>
     withFencedWriterLease({
       resourceId: writerLeaseResourceId(leasePath),
@@ -289,17 +364,11 @@ export function checkDependencies(missionId: string): { ok: boolean; missing: st
 
 export function getActiveMissionSearchDirs(rootDir = pathResolver.rootDir()): string[] {
   if (rootDir !== pathResolver.rootDir()) return customMissionSearchDirs(rootDir);
-  const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
-  if (safeExistsSync(configPath)) {
-    try {
-      const config = readJsonFile<{ directories?: Record<string, string> }>(configPath);
-      const dirs = config.directories || {};
-      return ACTIVE_TIERS.map((tier) => dirs[tier])
-        .filter((d): d is string => !!d)
-        .map((d) => pathResolver.rootResolve(d));
-    } catch (err) {
-      logger.warn(`[mission-state] suppressed error in getActiveMissionSearchDirs: ${err}`);
-    }
+  const config = loadMissionManagementConfig();
+  if (config) {
+    return ACTIVE_TIERS.map((tier) => config.directories[tier])
+      .filter((d): d is string => !!d)
+      .map((d) => pathResolver.rootResolve(d));
   }
   return [pathResolver.active('missions')];
 }
@@ -309,20 +378,28 @@ export function listMissionsInSearchDirs(
 ): Array<{ missionId: string; missionPath: string }> {
   const missions: Array<{ missionId: string; missionPath: string }> = [];
   const scan = (directory: string, depth: number): void => {
-    if (!safeExistsSync(directory) || !safeLstat(directory).isDirectory()) return;
+    let safeDirectory: string;
     try {
-      if (safeExistsSync(path.join(directory, 'mission-state.json'))) {
+      safeDirectory = assertSafeRepositoryPath(directory, { allowMissingLeaf: true });
+    } catch {
+      return;
+    }
+    if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) return;
+    try {
+      if (safeExistsSync(path.join(safeDirectory, 'mission-state.json'))) {
         missions.push({
-          missionId: path.basename(directory),
-          missionPath: directory,
+          missionId: path.basename(safeDirectory),
+          missionPath: safeDirectory,
         });
         return;
       }
       if (depth >= 2) return;
-      for (const entry of safeReaddir(directory)) {
+      for (const entry of safeReaddir(safeDirectory)) {
         try {
-          const candidate = path.join(directory, entry);
-          if (safeLstat(candidate).isDirectory()) scan(candidate, depth + 1);
+          const candidate = path.join(safeDirectory, entry);
+          if (safeLstat(candidate).isDirectory() && safeHistoryPath(candidate)) {
+            scan(candidate, depth + 1);
+          }
         } catch (err) {
           logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
         }
@@ -343,8 +420,4 @@ export function listActiveMissions(
   return listMissionsInSearchDirs(options).filter(
     ({ missionId }) => loadState(missionId, options)?.status === 'active'
   );
-}
-
-export function readJsonFileSafe(filePath: string): any | null {
-  return loadOptionalJson(filePath);
 }

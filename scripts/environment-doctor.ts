@@ -1,4 +1,8 @@
-import type { CapabilityStatus, EnvironmentCapability, EnvironmentManifest } from '@agent/core';
+import type {
+  CapabilityStatus,
+  EnvironmentCapability,
+  EnvironmentManifest,
+} from '@agent/core/environment-capability';
 
 export type DoctorSeverity = 'must' | 'should' | 'nice';
 export type DoctorDomain = 'core' | 'meeting' | 'voice' | 'browser' | 'audio' | 'reasoning';

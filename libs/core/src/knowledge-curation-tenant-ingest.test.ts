@@ -17,6 +17,7 @@ import {
   computeTenantIngestCuration,
   TENANT_INGEST_DEFAULT_KIND,
 } from './knowledge-curation-tenant-ingest.js';
+import { deriveAssetId } from '../ingest-asset-ledger.js';
 import {
   renderCurationReportMarkdown,
   type CurationSloConfig,
@@ -36,7 +37,7 @@ let fixtureRoot = '';
 let options: { rootDir: string; env: NodeJS.ProcessEnv };
 
 function ledgerLine(overrides: Record<string, unknown>): string {
-  return JSON.stringify({
+  const record = {
     asset_id: 'ing-x',
     source_system: 'confluence',
     source_id: 'PAGE-X',
@@ -50,6 +51,10 @@ function ledgerLine(overrides: Record<string, unknown>): string {
     version: 1,
     status: 'active',
     ...overrides,
+  };
+  return JSON.stringify({
+    ...record,
+    asset_id: deriveAssetId(String(record.source_system), String(record.source_id)),
   });
 }
 
@@ -112,7 +117,7 @@ describe('computeTenantIngestCuration', () => {
           target_path: 'knowledge/confidential/acme-corp/reports/fresh.md',
         }),
         ledgerLine({
-          asset_id: 'ing-missing-card',
+          asset_id: deriveAssetId('confluence', 'PAGE-GONE'),
           source_id: 'PAGE-GONE',
           ingested_at: '2025-12-01T00:00:00.000Z',
           target_path: 'knowledge/confidential/acme-corp/reports/gone.md',
@@ -134,20 +139,20 @@ describe('computeTenantIngestCuration', () => {
     expect(sections[0].flagged).toEqual([
       {
         tenant_slug: 'acme-corp',
-        asset_id: 'ing-missing-card',
-        target_path: 'knowledge/confidential/acme-corp/reports/gone.md',
+        asset_id: deriveAssetId('confluence', 'PAGE-STALE'),
+        target_path: 'knowledge/confidential/acme-corp/reports/stale.md',
         kind: TENANT_INGEST_DEFAULT_KIND,
-        last_updated: '2025-12-01T00:00:00.000Z',
+        last_updated: '2026-01-01',
         age_days: expect.any(Number),
         threshold_days: 120,
         reason: 'stale',
       },
       {
         tenant_slug: 'acme-corp',
-        asset_id: 'ing-stale',
-        target_path: 'knowledge/confidential/acme-corp/reports/stale.md',
+        asset_id: deriveAssetId('confluence', 'PAGE-GONE'),
+        target_path: 'knowledge/confidential/acme-corp/reports/gone.md',
         kind: 'reference',
-        last_updated: '2026-01-01',
+        last_updated: '2025-12-01T00:00:00.000Z',
         age_days: expect.any(Number),
         threshold_days: 120,
         reason: 'stale',
@@ -163,6 +168,53 @@ describe('computeTenantIngestCuration', () => {
       pathOptions: options,
     });
     expect(sections).toEqual([]);
+  });
+
+  it('does not read a directory that occupies a tenant card path', () => {
+    const directoryCard = path.join(
+      fixtureRoot,
+      'knowledge/confidential/acme-corp/reports/directory-card.md'
+    );
+    safeMkdir(directoryCard, { recursive: true });
+    writeFixtureFile(
+      'knowledge/confidential/acme-corp/_ledger/assets.jsonl',
+      ledgerLine({
+        asset_id: 'ing-directory-card',
+        source_id: 'PAGE-DIRECTORY-CARD',
+        target_path: 'knowledge/confidential/acme-corp/reports/directory-card.md',
+      }) + '\n'
+    );
+
+    const sections = computeTenantIngestCuration({
+      config: CONFIG,
+      now: NOW,
+      tenants: ['acme-corp'],
+      pathOptions: options,
+    });
+
+    expect(sections[0]?.flagged).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target_path: 'knowledge/confidential/acme-corp/reports/directory-card.md',
+          last_updated: '2026-01-01T00:00:00.000Z',
+          reason: 'stale',
+        }),
+      ])
+    );
+  });
+
+  it('rejects an external tenant-ingest fixture root before ledger access', () => {
+    const key = 'KYBERION_CURATION_TENANT_ROOTDIR';
+    const previous = process.env[key];
+    process.env[key] = '/tmp/external-curation-root';
+    try {
+      expect(() =>
+        computeTenantIngestCuration({ config: CONFIG, now: NOW, tenants: ['acme-corp'] })
+      ).toThrow('RESOURCE_PATH_SCOPE');
+    } finally {
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+    }
   });
 });
 
@@ -198,7 +250,7 @@ describe('renderCurationReportMarkdown — tenant ingest section', () => {
           flagged: [
             {
               tenant_slug: 'acme-corp',
-              asset_id: 'ing-stale',
+              asset_id: deriveAssetId('confluence', 'PAGE-STALE'),
               target_path: 'knowledge/confidential/acme-corp/reports/stale.md',
               kind: 'reference',
               last_updated: '2026-01-01',
@@ -211,7 +263,7 @@ describe('renderCurationReportMarkdown — tenant ingest section', () => {
       ])
     );
     expect(rendered).toContain('### acme-corp (1 of 3 active asset(s))');
-    expect(rendered).toContain('| ing-stale |');
+    expect(rendered).toContain(`| ${deriveAssetId('confluence', 'PAGE-STALE')} |`);
     expect(rendered).toContain('| reference | 2026-01-01 | 208 | 120 | stale |');
   });
 });

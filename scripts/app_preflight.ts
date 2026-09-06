@@ -4,9 +4,11 @@
  * Answers "can this machine run the iOS/Android SDLC loop right now?" with
  * pass/fail/warn per item and a copy-pasteable fix for every failure.
  */
-import { safeExecResult, secretGuard } from '@agent/core';
+import { safeExecResult } from '@agent/core/secure-io';
+import { secretGuard } from '@agent/core/secret-guard';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type AppPreflightStatus = 'pass' | 'fail' | 'warn';
 
@@ -22,6 +24,9 @@ export interface AppPreflightReport {
   items: AppPreflightItem[];
   ready: boolean;
 }
+
+export const APP_PREFLIGHT_USAGE =
+  'Usage: pnpm kyberion doctor -- --runtime app [--platform ios|android|all] [--full] [--json]';
 
 function item(
   id: string,
@@ -64,13 +69,10 @@ function probeIosRuntimes(): AppPreflightItem {
 }
 
 function probeAndroidEnv(): AppPreflightItem {
-  if (process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT) {
-    return item(
-      'android.env',
-      'pass',
-      `ANDROID_HOME=${process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT}`,
-      'none'
-    );
+  const androidHome =
+    getRegisteredEnvText('ANDROID_HOME') || getRegisteredEnvText('ANDROID_SDK_ROOT');
+  if (androidHome) {
+    return item('android.env', 'pass', `ANDROID_HOME=${androidHome}`, 'none');
   }
   return item(
     'android.env',
@@ -176,17 +178,25 @@ export function runAppPreflight(options: {
   };
 }
 
-function printReport(report: AppPreflightReport): void {
-  for (const entry of report.items) {
-    console.log(`[app-preflight] ${entry.id}: ${entry.status}`);
-    console.log(`  detail: ${entry.detail}`);
-    if (entry.fix !== 'none') console.log(`  fix: ${entry.fix}`);
-  }
-  console.log('');
-  console.log(`[app-preflight] ready: ${report.ready}`);
+export function formatAppPreflightReport(report: AppPreflightReport): string {
+  return [
+    ...report.items.flatMap((entry) => [
+      `[app-preflight] ${entry.id}: ${entry.status}`,
+      `  detail: ${entry.detail}`,
+      ...(entry.fix !== 'none' ? [`  fix: ${entry.fix}`] : []),
+    ]),
+    '',
+    `[app-preflight] ready: ${report.ready}`,
+  ].join('\n');
 }
 
-export async function main(args: string[] = []): Promise<number> {
+export async function main(
+  args: string[] = []
+): Promise<{ report?: AppPreflightReport; status: number; help?: string }> {
+  if (args.includes('--help') || args.includes('-h')) {
+    return { status: 0, help: APP_PREFLIGHT_USAGE };
+  }
+
   const argv = await createStandardYargs(['node', 'app_preflight', ...args])
     .option('platform', { type: 'string', default: 'all', choices: ['ios', 'android', 'all'] })
     .option('full', { type: 'boolean', default: false, description: 'include distribution checks' })
@@ -198,9 +208,7 @@ export async function main(args: string[] = []): Promise<number> {
     full: Boolean(argv.full),
   });
 
-  if (argv.json) console.log(JSON.stringify(report, null, 2));
-  else printReport(report);
-  return report.ready ? 0 : 1;
+  return { report, status: report.ready ? 0 : 1 };
 }
 
 if (
@@ -208,10 +216,13 @@ if (
   isDirectScript(import.meta.url, 'app_preflight.js')
 )
   void defineScript({
-    name: 'app:preflight',
-    flags: [],
+    name: 'app-preflight',
+    flags: ['json'],
     async run(context) {
-      const status = await main(context.argv);
-      if (status !== 0) throw new Error(`app:preflight failed with exit code ${status}`);
+      const result = await main(context.argv);
+      if (result.help) context.print(context.json ? result : result.help);
+      else if (result.report)
+        context.print(context.json ? result.report : formatAppPreflightReport(result.report));
+      if (result.status !== 0) throw new ScriptExitError(result.status, '', true, result);
     },
   })();

@@ -4,7 +4,7 @@ import { Jimp } from 'jimp';
 import { ocrImage } from './ocr-bridge.js';
 import { redactFrame } from './frame-redaction.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeLstat, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { VideoFrame } from './meeting-session-types.js';
 
 /**
@@ -60,6 +60,9 @@ export async function redactScreenCaptureFile(
   outputPath: string
 ): Promise<void> {
   try {
+    if (!safeLstat(inputPath).isFile()) {
+      throw new Error(`[SCREEN_CAPTURE_RESOURCE] input must be a regular file: ${inputPath}`);
+    }
     const payload = safeReadFile(inputPath, { encoding: null });
     const buffer = Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
     const format: VideoFrame['format'] = {
@@ -79,6 +82,10 @@ export async function redactScreenCaptureFile(
     safeRmSync(outputPath, { force: true });
     throw error;
   } finally {
-    safeRmSync(inputPath, { force: true });
+    try {
+      if (!safeLstat(inputPath).isDirectory()) safeRmSync(inputPath, { force: true });
+    } catch {
+      // A missing or non-removable capture must not mask the redaction result.
+    }
   }
 }

@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/process-improvement-proposal.schema.json",
+  "title": "Process improvement proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposal_id",
+    "mission_id",
+    "kind",
+    "target",
+    "proposal",
+    "rationale",
+    "evidence",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "proposal_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "kind": {
+      "enum": ["team_composition", "workflow_rule", "process_step", "tooling"]
+    },
+    "target": { "type": "string", "minLength": 1 },
+    "proposal": { "type": "string", "minLength": 1 },
+    "rationale": { "type": "string" },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "status": {
+      "enum": ["proposed", "approved", "rejected", "applied"]
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

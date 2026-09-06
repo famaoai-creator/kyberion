@@ -5,7 +5,8 @@
 // step-type inference is unchanged; all other ops were previously
 // unclassifiable (determineActuatorStepType threw unknown-op).
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 
@@ -361,14 +362,14 @@ export const ANDROID_ACTUATOR_APPLY_OPS = [
   'wait_for_ui_text',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const schema = ANDROID_CONTRACTS[op];
   return schema
     ? { op, kind, input_schema: schema, examples: ANDROID_EXAMPLES[op] || [{}] }
     : { op, kind };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...ANDROID_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...ANDROID_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

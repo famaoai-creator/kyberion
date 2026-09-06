@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "pipeline-run-journal-event.schema.json",
+  "title": "Pipeline Run Journal Event",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 3 },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "event": {
+      "enum": [
+        "run_started",
+        "run_resumed",
+        "run_suspended",
+        "node_completed",
+        "node_failed",
+        "run_finished"
+      ]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "payload": { "type": "object", "additionalProperties": true }
+  },
+  "required": ["version", "sequence", "run_id", "event", "timestamp", "payload"]
+}

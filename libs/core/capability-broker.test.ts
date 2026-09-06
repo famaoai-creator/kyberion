@@ -1,8 +1,10 @@
+import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProviderInfo } from './provider-discovery.js';
 
 const recordMock = vi.fn();
 const files = new Map<string, string>();
+const nonRegularPaths = new Set<string>();
 
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: recordMock } }));
 
@@ -23,7 +25,15 @@ vi.mock('./path-resolver.js', () => ({
 }));
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (p: string) => {
+    const resolved = path.resolve(p);
+    if (resolved !== '/repo' && !resolved.startsWith('/repo/')) {
+      throw new Error(`[RESOURCE_PATH_SCOPE] ${p}`);
+    }
+    return resolved;
+  },
   safeExistsSync: (p: string) => files.has(p),
+  safeLstat: (p: string) => ({ isFile: () => files.has(p) && !nonRegularPaths.has(p) }),
   safeReadFile: (p: string) => {
     if (!files.has(p)) throw new Error('ENOENT');
     return files.get(p)!;
@@ -92,6 +102,35 @@ const FLEET = [claude, codex, gemini];
 describe('capability-broker', () => {
   beforeEach(async () => {
     files.clear();
+    nonRegularPaths.clear();
+    files.set(
+      '/repo/knowledge/product/schemas/provider-pins.schema.json',
+      JSON.stringify({
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          version: { type: 'string', minLength: 1 },
+          missionId: { type: 'string', minLength: 1 },
+          pins: {
+            type: 'object',
+            additionalProperties: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                provider: { type: 'string', minLength: 1 },
+                modelId: { type: 'string', minLength: 1 },
+                instance: { type: ['string', 'null'], minLength: 1 },
+                orchestration: { enum: ['leaf', 'managed_workflow'] },
+                pinnedAt: { type: 'string', format: 'date-time' },
+                by: { type: 'string', minLength: 1 },
+              },
+              required: ['provider', 'modelId', 'instance', 'orchestration', 'pinnedAt', 'by'],
+            },
+          },
+        },
+        required: ['version', 'pins'],
+      })
+    );
     recordMock.mockClear();
     delete process.env.MISSION_ID;
     const { clearProviderHealth } = await import('./provider-health-registry.js');
@@ -170,5 +209,38 @@ describe('capability-broker', () => {
     );
     expect(decision.provider).toBe('codex');
     expect(decision.pinned).toBe(false);
+  });
+
+  it('rejects a mission-derived pin path that escapes the repository', async () => {
+    process.env.MISSION_ID = '../../../../outside';
+    const { pinProviderDecision } = await import('./capability-broker.js');
+
+    expect(() =>
+      pinProviderDecision('role-escape', {
+        provider: 'codex',
+        modelId: 'codex',
+        instance: null,
+        strategy: 'preferred',
+        orchestration: 'leaf',
+        availableProviders: [],
+        requiredCapabilities: [],
+        unmetCapabilities: [],
+        rationale: 'test',
+        pinned: false,
+        decisionKey: 'role-escape',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('fails closed for schema-invalid and non-regular pin files', async () => {
+    process.env.MISSION_ID = 'MISSION-1';
+    const { loadPinnedDecision } = await import('./capability-broker.js');
+    const pinPath = '/repo/active/shared/runtime/provider-pins/MISSION-1.json';
+    files.set(pinPath, JSON.stringify({ version: '1.0', pins: { role: 'invalid' } }));
+    expect(loadPinnedDecision('role')).toBeNull();
+
+    files.set(pinPath, JSON.stringify({ version: '1.0', pins: {} }));
+    nonRegularPaths.add(pinPath);
+    expect(loadPinnedDecision('role')).toBeNull();
   });
 });

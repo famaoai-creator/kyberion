@@ -3,9 +3,10 @@
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { buildSafeExecEnv, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, buildSafeExecEnv, safeExistsSync } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
 import { registerVadBackend, type VadFactoryOptions } from './vad-registry.js';
+import { parseVadBridgeLine } from './vad-bridge-protocol.js';
 import {
   computeChunkDurationMs,
   EnergyVad,
@@ -25,7 +26,16 @@ export interface TenVadOptions {
 }
 
 export function defaultTenVadScriptPath(): string {
-  return rootResolve('libs/actuators/voice-actuator/scripts/ten_vad_bridge.py');
+  return assertSafeRepositoryPath(
+    rootResolve('libs/actuators/voice-actuator/scripts/ten_vad_bridge.py'),
+    { allowMissingLeaf: true }
+  );
+}
+
+function resolveTenVadScriptPath(scriptPath?: string): string {
+  return assertSafeRepositoryPath(scriptPath || defaultTenVadScriptPath(), {
+    allowMissingLeaf: true,
+  });
 }
 
 function resolvePythonBin(opts: TenVadOptions): string {
@@ -39,7 +49,15 @@ function resolvePythonBin(opts: TenVadOptions): string {
 
 export function probeTenVad(opts: TenVadOptions = {}): { available: boolean; reason?: string } {
   if (opts.command?.length) return { available: true };
-  const scriptPath = opts.scriptPath || defaultTenVadScriptPath();
+  let scriptPath: string;
+  try {
+    scriptPath = resolveTenVadScriptPath(opts.scriptPath);
+  } catch (error) {
+    return {
+      available: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
   if (!safeExistsSync(scriptPath)) {
     return { available: false, reason: `TEN VAD bridge script missing at ${scriptPath}` };
   }
@@ -87,7 +105,7 @@ export class TenVad implements VoiceActivityDetector {
       ? this.opts.command
       : [
           resolvePythonBin(this.opts),
-          this.opts.scriptPath || defaultTenVadScriptPath(),
+          resolveTenVadScriptPath(this.opts.scriptPath),
           '--hop-size',
           String(this.opts.hopSize || 160),
           '--threshold',
@@ -106,13 +124,10 @@ export class TenVad implements VoiceActivityDetector {
           const line = stdoutBuffer.slice(0, newline).trim();
           stdoutBuffer = stdoutBuffer.slice(newline + 1);
           if (!line) continue;
-          try {
-            const parsed = JSON.parse(line) as { prob?: number; error?: string };
-            if (typeof parsed.prob === 'number') this.lastProb = parsed.prob;
-            else if (parsed.error) this.fail(`bridge error: ${parsed.error}`);
-          } catch {
-            /* Ignore library noise; the bridge emits JSON responses. */
-          }
+          const parsed = parseVadBridgeLine(line);
+          if (!parsed) continue;
+          if (parsed.error !== undefined) this.fail(`bridge error: ${parsed.error}`);
+          else if (parsed.prob !== undefined) this.lastProb = parsed.prob;
         }
       });
       let stderrTail = '';

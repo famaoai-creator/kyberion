@@ -7,12 +7,14 @@ import { type ZodType } from 'zod';
 import * as customerResolver from './customer-resolver.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeExec } from './secure-io.js';
+import { safeExec } from './secure-io.js';
 import { runCodexCliQuery } from './codex-cli-query.js';
 import { runGeminiCliQuery } from './gemini-cli-backend.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
-import { readJsonFile } from './cli-input.js';
+import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 
 export interface LlmProfile {
@@ -141,13 +143,11 @@ export function loadUserLlmTools(): UserLlmTools {
   const identityPath =
     customerResolver.customerRoot('my-identity.json') ??
     pathResolver.knowledge('personal/my-identity.json');
-  if (!safeExistsSync(identityPath)) return {};
-  try {
-    const identity = readJsonFile<{ llm_tools?: UserLlmTools }>(identityPath);
-    return identity.llm_tools || {};
-  } catch (_) {
-    return {};
-  }
+  const identity = loadPersonalIdentityAtPath(identityPath);
+  const llmTools = identity?.llm_tools;
+  return llmTools && typeof llmTools === 'object' && !Array.isArray(llmTools)
+    ? (llmTools as UserLlmTools)
+    : {};
 }
 
 export function isToolAvailable(command: string, userTools: UserLlmTools): boolean {
@@ -382,34 +382,42 @@ export async function runStructuredLlmProfile<T>(
  * Parses the raw LLM output into a structured object.
  * Supported formats: "json_envelope", "raw_json", "text"
  */
-export function parseLlmResponse(raw: string, responseFormat?: string): any {
+export function parseLlmResponse(raw: string, responseFormat?: string): unknown {
   const format = responseFormat || 'json_envelope';
 
   let content: string;
   if (format === 'json_envelope') {
-    const envelope = JSON.parse(raw);
-    content =
-      typeof envelope.result === 'string' ? envelope.result : JSON.stringify(envelope.result);
+    const parsedEnvelope = parseSafeJsonInput(raw, 'mission LLM envelope');
+    if (!isRecord(parsedEnvelope) || !Object.hasOwn(parsedEnvelope, 'result')) {
+      throw new Error('mission LLM envelope must be a JSON object with a result field');
+    }
+    const result = parsedEnvelope.result;
+    content = typeof result === 'string' ? result : JSON.stringify(result) || '';
   } else {
     content = raw;
   }
 
   try {
-    return JSON.parse(content);
+    return parseSafeJsonInput(content, 'mission LLM response');
   } catch (err) {
     logger.warn(`[mission-llm] suppressed error in parseLlmResponse: ${err}`);
   }
 
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[1].trim());
+    return parseSafeJsonInput(jsonMatch[1].trim(), 'mission LLM fenced response');
   }
 
-  return JSON.parse(content.trim());
+  return parseSafeJsonInput(content.trim(), 'mission LLM response');
 }
 
-function isQuotaError(err: any): boolean {
-  return err?.cause?.code === 429 || err?.message?.includes('QUOTA_EXHAUSTED');
+function isQuotaError(err: unknown): boolean {
+  if (!isRecord(err)) return false;
+  const cause = isRecord(err.cause) ? err.cause : undefined;
+  return (
+    cause?.code === 429 ||
+    (typeof err.message === 'string' && err.message.includes('QUOTA_EXHAUSTED'))
+  );
 }
 
 /**
@@ -453,12 +461,13 @@ export async function runAdaptiveStructuredLlmProfile<T>(
     logger.info(`  [Try] ${name}: executing`);
     try {
       return await runStructuredLlmProfile(profile, prompt, schema, { systemPrompt });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isQuotaError(err)) {
         logger.warn(`⚠️ Model "${name}" exhausted, trying next...`);
         continue;
       }
-      logger.error(`❌ Model "${name}" failed with non-quota error: ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error(`❌ Model "${name}" failed with non-quota error: ${message}`);
       throw err;
     }
   }

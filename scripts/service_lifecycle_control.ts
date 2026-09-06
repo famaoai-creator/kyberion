@@ -1,14 +1,17 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  logger,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeWriteFile,
   safeExec,
-  loadSurfaceManifest,
-  loadSurfaceState,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import { loadServicePidRegistryAtPath } from '@agent/core/service-pid-registry';
+import { defineScript, isDirectScript } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 const PID_FILE = pathResolver.shared('services-pids.json');
 
@@ -23,7 +26,7 @@ type SurfaceStartableChoice = {
 };
 
 function isRunningPid(pid: unknown): pid is number {
-  if (typeof pid !== 'number' || !Number.isFinite(pid)) return false;
+  if (typeof pid !== 'number' || !Number.isSafeInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -35,19 +38,19 @@ function isRunningPid(pid: unknown): pid is number {
 function loadPidMap(): Record<string, number> {
   if (!safeExistsSync(PID_FILE)) return {};
   try {
-    const parsed = readJson<Record<string, unknown>>(PID_FILE);
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .filter(([, pid]) => isRunningPid(pid))
-        .map(([serviceName, pid]) => [serviceName, pid as number])
-    );
+    const parsed = loadServicePidRegistryAtPath(PID_FILE);
+    if (!parsed) return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([, pid]) => isRunningPid(pid)));
   } catch {
     return {};
   }
 }
 
 function savePidMap(pids: Record<string, number>): void {
-  safeWriteFile(PID_FILE, JSON.stringify(pids, null, 2));
+  safeWriteFile(
+    assertSafeRepositoryPath(PID_FILE, { allowMissingLeaf: true }),
+    JSON.stringify(pids, null, 2)
+  );
 }
 
 function loadStartableChoices(): SurfaceStartableChoice[] {
@@ -168,7 +171,7 @@ function startService(serviceName: string) {
 
     let parsed: unknown = resultText;
     try {
-      parsed = JSON.parse(resultText);
+      parsed = parseSafeJsonInput(resultText, 'surface runtime response');
     } catch {
       // keep plain text
     }
@@ -191,8 +194,8 @@ function startService(serviceName: string) {
   }
 }
 
-async function main() {
-  const argv = await createStandardYargs()
+async function main(args: string[] = [], print: Print = () => undefined) {
+  const argv = await createStandardYargs(['node', 'service_lifecycle_control', ...args])
     .option('operation', {
       type: 'string',
       choices: ['list', 'start', 'stop'] as const,
@@ -212,7 +215,7 @@ async function main() {
 
   if (operation === 'start') {
     if (!serviceName) {
-      console.log(
+      print(
         JSON.stringify(
           {
             status: 'selection_required',
@@ -227,13 +230,13 @@ async function main() {
     }
 
     const result = startService(serviceName);
-    console.log(JSON.stringify(result, null, 2));
+    print(JSON.stringify(result, null, 2));
     return;
   }
 
   if (operation === 'stop') {
     if (!serviceName) {
-      console.log(
+      print(
         JSON.stringify(
           {
             status: 'needs_selection',
@@ -248,7 +251,7 @@ async function main() {
     }
 
     const result = stopService(serviceName);
-    console.log(JSON.stringify(result, null, 2));
+    print(JSON.stringify(result, null, 2));
     return;
   }
 
@@ -257,10 +260,17 @@ async function main() {
     running_services: listRunningServices(),
     message: 'Choose a running service name and rerun with --operation stop --service-name <name>.',
   };
-  console.log(JSON.stringify(result, null, 2));
+  print(JSON.stringify(result, null, 2));
 }
 
-main().catch((error: any) => {
-  logger.error(error?.message || String(error));
-  process.exitCode = 1;
+export const runServiceLifecycleControl = defineScript({
+  name: 'service:lifecycle',
+  flags: [],
+  run: ({ argv, print }) => main(argv, print),
 });
+
+if (
+  isDirectScript(import.meta.url, 'service_lifecycle_control.ts') ||
+  isDirectScript(import.meta.url, 'service_lifecycle_control.js')
+)
+  void runServiceLifecycleControl();

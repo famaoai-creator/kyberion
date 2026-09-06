@@ -9,12 +9,7 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runTui } from '@presence/terminal-hud';
 import { setRegisteredEnv } from '@agent/core/foundation';
-import {
-  currentProcessArgv,
-  defineScript,
-  isDirectScript,
-  setCurrentProcessArgv,
-} from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 // Keep the interactive entrypoint in this process so stdin/stdout retain the
 // terminal's raw-mode capability. The old run_with_env wrapper used a
@@ -26,17 +21,12 @@ const SOURCE_ENTRY = '../presence/displays/terminal-hud/src/main.js';
 export async function main(args: string[] = []): Promise<void> {
   const devMode = args.includes('--dev');
   if (devMode) {
-    const currentArgv = currentProcessArgv();
-    setCurrentProcessArgv([
-      currentArgv[0] || 'node',
-      currentArgv[1] || 'scripts/tui.ts',
-      ...args.filter((arg) => arg !== '--dev'),
-    ]);
-    await import(SOURCE_ENTRY);
+    const { main: runTerminalHud } = await import(SOURCE_ENTRY);
+    await runTerminalHud(args.filter((arg) => arg !== '--dev'));
     return;
   }
 
-  const options = await createStandardYargs()
+  const options = await createStandardYargs(['node', 'tui', ...args])
     .option('once', { type: 'boolean', default: false, describe: 'Render one snapshot and exit' })
     .option('panel', { type: 'string', describe: 'Focus a single panel in --once mode' })
     .strict()

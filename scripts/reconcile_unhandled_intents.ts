@@ -7,6 +7,21 @@
  * summary to stdout that pipelines used to consume via system:shell.
  */
 
-import { reconcileUnhandledIntents } from '@agent/core';
+import { reconcileUnhandledIntents } from '@agent/core/reconcile-ops';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-process.stdout.write(JSON.stringify(reconcileUnhandledIntents(), null, 2));
+export const runReconcileUnhandledIntents = defineScript({
+  name: 'reconcile:unhandled-intents',
+  flags: [],
+  run(context) {
+    const result = reconcileUnhandledIntents();
+    context.print(result);
+    return result;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'reconcile_unhandled_intents.ts') ||
+  isDirectScript(import.meta.url, 'reconcile_unhandled_intents.js')
+)
+  void runReconcileUnhandledIntents();

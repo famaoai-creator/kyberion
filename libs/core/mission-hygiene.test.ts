@@ -6,12 +6,62 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const realFsSecureIo = vi.hoisted(() => ({
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeReaddir: (dirPath: string) => fs.readdirSync(dirPath),
+  assertSafeRepositoryPath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}) => {
+    const root = path.resolve(process.env.KYBERION_ROOT || process.cwd());
+    const resolved = path.resolve(filePath);
+    const relative = path.relative(root, resolved);
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error(`[RESOURCE_PATH_SCOPE] ${filePath}`);
+    }
+    let current = root;
+    for (const segment of relative.split(path.sep)) {
+      current = path.join(current, segment);
+      try {
+        if (fs.lstatSync(current).isSymbolicLink()) {
+          throw new Error(`[RESOURCE_PATH_SYMLINK] ${filePath}`);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+        throw error;
+      }
+    }
+    if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
+      throw new Error(`[RESOURCE_PATH_MISSING] ${filePath}`);
+    }
+    return resolved;
+  },
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
   loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
 }));
 vi.mock('./secure-io.js', () => realFsSecureIo);
+vi.mock('./foundation/json.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  return {
+    ...actual,
+    readJson: realFsSecureIo.loadJson,
+  };
+});
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: realFsSecureIo.loadJson,
+    loadJsonIfPresent: <T>(filePath: string) => {
+      try {
+        return realFsSecureIo.loadJson<T>(filePath);
+      } catch {
+        return null;
+      }
+    },
+    appendFile: () => {},
+    exists: (filePath: string) => fs.existsSync(filePath),
+    readFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: (filePath: string, content: string) => fs.writeFileSync(filePath, content),
+  }),
+}));
 vi.mock('./core.js', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
@@ -43,11 +93,22 @@ function seedMission(
           {
             ts: new Date(Date.now() - ageDays * 24 * 60 * 60 * 1000).toISOString(),
             event: 'CREATE',
+            note: 'test fixture',
           },
         ];
   fs.writeFileSync(
     path.join(dir, 'mission-state.json'),
-    JSON.stringify({ mission_id: id, status, history })
+    JSON.stringify({
+      mission_id: id,
+      status,
+      tier: 'public',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'operator',
+      confidence_score: 1,
+      git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
+      history,
+    })
   );
   if (options.tasks) {
     fs.writeFileSync(path.join(dir, 'NEXT_TASKS.json'), JSON.stringify(options.tasks));
@@ -66,6 +127,16 @@ describe('mission hygiene', () => {
     tmpRoot = path.join(os.tmpdir(), `kyb-hygiene-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    const schemaDir = path.join(tmpRoot, 'knowledge', 'product', 'schemas');
+    fs.mkdirSync(schemaDir, { recursive: true });
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
+      path.join(schemaDir, 'mission-state.schema.json')
+    );
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-next-tasks.schema.json'),
+      path.join(schemaDir, 'mission-next-tasks.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
 
     seedMission('MSN-FRESH', 'planned', 0, {}); // fresh — not stale yet
@@ -79,6 +150,9 @@ describe('mission hygiene', () => {
     }); // abandoned, dispatched but never activated
     seedMission('MSN-RUNNING', 'active', 5, {}); // not planned — ignored
     seedMission('MSN-NO-HISTORY', 'planned', null, {}); // unknown age → abandoned bucket
+    seedMission('MSN-MALFORMED', 'planned', 5, {
+      tasks: [{ task_id: 'T-1' }, { task_id: 42 }],
+    }); // malformed projection — treat as no usable task design
 
     mod = await import('./mission-hygiene.js');
   });
@@ -90,7 +164,7 @@ describe('mission hygiene', () => {
 
   it('classifies stuck planned missions with per-mission remediation', () => {
     const report = mod.collectMissionHygieneReport();
-    expect(report.planned_total).toBe(5);
+    expect(report.planned_total).toBe(6);
 
     const byId = Object.fromEntries(
       [...report.stale, ...report.abandoned].map((finding) => [finding.mission_id, finding])
@@ -101,6 +175,8 @@ describe('mission hygiene', () => {
     expect(byId['MSN-READY']?.reason).toBe('ready_not_started');
     expect(byId['MSN-READY']?.recommendation).toContain('dispatch-workitems');
     expect(byId['MSN-GATED']?.reason).toBe('awaiting_gate');
+    expect(byId['MSN-MALFORMED']?.reason).toBe('design_missing');
+    expect(byId['MSN-MALFORMED']?.task_count).toBe(0);
     expect(report.abandoned.map((finding) => finding.mission_id)).toContain('MSN-GATED');
     expect(report.abandoned.map((finding) => finding.mission_id)).toContain('MSN-NO-HISTORY');
     expect(report.active_stale?.map((finding) => finding.mission_id)).toContain('MSN-RUNNING');
@@ -150,5 +226,30 @@ describe('mission hygiene', () => {
     expect(mod.formatMissionHygieneLine(mod.collectMissionHygieneReport()).length).toBeGreaterThan(
       10
     );
+  });
+
+  it('skips a mission directory that is replaced by a symlink', () => {
+    const externalMissionPath = path.join(os.tmpdir(), `kyb-hygiene-external-${randomUUID()}`);
+    const linkedMissionPath = path.join(tmpRoot, 'active', 'missions', 'MSN-SYMLINKED');
+    fs.mkdirSync(externalMissionPath, { recursive: true });
+    fs.writeFileSync(
+      path.join(externalMissionPath, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MSN-SYMLINKED',
+        status: 'planned',
+        history: [{ ts: new Date(0).toISOString() }],
+      })
+    );
+    fs.symlinkSync(externalMissionPath, linkedMissionPath, 'dir');
+    try {
+      const report = mod.collectMissionHygieneReport();
+      expect(report.stale.some((finding) => finding.mission_id === 'MSN-SYMLINKED')).toBe(false);
+      expect(report.abandoned.some((finding) => finding.mission_id === 'MSN-SYMLINKED')).toBe(
+        false
+      );
+    } finally {
+      fs.unlinkSync(linkedMissionPath);
+      fs.rmSync(externalMissionPath, { recursive: true, force: true });
+    }
   });
 });

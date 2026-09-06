@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
-  const loadStandardIntentCatalog = vi.fn();
+  const loadResolvedStandardIntentCatalog = vi.fn();
   const resolveIntentResolutionPacket = vi.fn();
-  return { loadStandardIntentCatalog, resolveIntentResolutionPacket };
+  return { loadResolvedStandardIntentCatalog, resolveIntentResolutionPacket };
 });
 
 vi.mock('./intent-resolution.js', () => ({
-  loadStandardIntentCatalog: mocks.loadStandardIntentCatalog,
+  loadResolvedStandardIntentCatalog: mocks.loadResolvedStandardIntentCatalog,
   resolveIntentResolutionPacket: mocks.resolveIntentResolutionPacket,
 }));
 
@@ -17,7 +17,7 @@ describe('intent-contract relevant intent preview', () => {
     const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
     const { summarizeRelevantIntents } = await import('./intent-contract.js');
 
-    mocks.loadStandardIntentCatalog.mockReturnValue(
+    mocks.loadResolvedStandardIntentCatalog.mockReturnValue(
       Array.from({ length: 10 }, (_, index) => ({
         id: `intent-${index + 1}`,
         description: `Intent ${index + 1}`,

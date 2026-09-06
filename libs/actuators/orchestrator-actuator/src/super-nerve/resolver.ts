@@ -1,17 +1,15 @@
-import { compileIntent, logger, executeRegisteredSuperPipeline } from '@agent/core';
+import { compileIntent } from '@agent/core/intent-compiler';
+import { logger } from '@agent/core/core';
+import { executeRegisteredSuperPipeline } from '@agent/core/super-nerve-execution-port';
+import {
+  resolveIntentResolutionPacket,
+  type IntentResolutionPacket,
+} from '@agent/core/intent-resolution';
 
 /**
  * Intent Resolver: Resolves high-level semantic intents into Super-Nerve pipeline steps.
  * Delegates to the canonical intent-compiler in @agent/core.
  */
-
-function extractServiceNameFromText(text: string): string | undefined {
-  const serviceMatch =
-    text.match(
-      /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(?:再起動|restart|起動|停止|stop|status|状態|ログ)/i
-    ) || text.match(/service\s+([A-Za-z0-9._-]+)/i);
-  return serviceMatch?.[1];
-}
 
 function buildStopServiceShellCommand(serviceName?: string): string {
   const base = 'node dist/scripts/service_lifecycle_control.js --operation ';
@@ -31,6 +29,19 @@ function buildStartServiceShellCommand(serviceName?: string): string {
   return `${base}start --service-name ${serviceName}`;
 }
 
+function isIntentResolutionPacket(value: unknown): value is IntentResolutionPacket {
+  if (!value || typeof value !== 'object') return false;
+  const packet = value as Partial<IntentResolutionPacket>;
+  return packet.kind === 'intent_resolution_packet' && Array.isArray(packet.candidates);
+}
+
+function resolveServiceName(initialContext: any, sourceText: string): string | undefined {
+  const packet = isIntentResolutionPacket(initialContext?.resolution_packet)
+    ? initialContext.resolution_packet
+    : resolveIntentResolutionPacket(sourceText);
+  return packet.selected_parameters?.service_name;
+}
+
 export async function resolveIntentToSteps(
   intentId: string,
   initialContext: any = {}
@@ -41,10 +52,14 @@ export async function resolveIntentToSteps(
   }
 
   if (result.intentId === 'stop-service') {
+    const sourceText =
+      typeof initialContext?.source_text === 'string' && initialContext.source_text.trim()
+        ? initialContext.source_text.trim()
+        : intentId;
     const selectedService =
       typeof initialContext?.service_name === 'string' && initialContext.service_name.trim()
         ? initialContext.service_name.trim()
-        : extractServiceNameFromText(intentId);
+        : resolveServiceName(initialContext, sourceText);
 
     logger.info(
       `[INTENT_RESOLVER] Stop-service selection flow: ${selectedService ? `target=${selectedService}` : 'listing running services'}`
@@ -61,10 +76,14 @@ export async function resolveIntentToSteps(
   }
 
   if (result.intentId === 'start-service') {
+    const sourceText =
+      typeof initialContext?.source_text === 'string' && initialContext.source_text.trim()
+        ? initialContext.source_text.trim()
+        : intentId;
     const selectedService =
       typeof initialContext?.service_name === 'string' && initialContext.service_name.trim()
         ? initialContext.service_name.trim()
-        : extractServiceNameFromText(intentId);
+        : resolveServiceName(initialContext, sourceText);
 
     logger.info(
       `[INTENT_RESOLVER] Start-service selection flow: ${selectedService ? `target=${selectedService}` : 'listing startable services'}`

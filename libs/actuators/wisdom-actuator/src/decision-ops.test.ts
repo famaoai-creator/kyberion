@@ -5,16 +5,20 @@ import {
   safeWriteFile,
   safeReadFile,
   safeRmSync,
-  pathResolver,
   safeExistsSync,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   registerReasoningBackend,
   buildFailoverReasoningBackend,
   resetReasoningBackend,
-  resetVoiceBridge,
   stubReasoningBackend,
+} from '@agent/core/reasoning-backend';
+import { resetVoiceBridge } from '@agent/core/voice-bridge';
+import {
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
-} from '@agent/core';
+} from '@agent/core/actuator-forwarding-port';
 import {
   stakeholderGridSort,
   emitDissentLog,
@@ -140,6 +144,24 @@ describe('emitDissentLog', () => {
     expect(payload.dissents[1].revisit_triggers).toEqual(['vendor EOL']);
   });
 
+  it('rejects an external dissent source path', () => {
+    expect(() =>
+      emitDissentLog({
+        source_path: '/tmp/external-hypotheses.json',
+        output_path: outRel,
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects an external dissent output path', () => {
+    expect(() =>
+      emitDissentLog({
+        source_path: sourceRel,
+        output_path: '/tmp/external-dissent-log.json',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('appends to an existing log when append flag is set', () => {
     emitDissentLog({
       source_path: sourceRel,
@@ -218,6 +240,18 @@ describe('computeReadinessMatrix + recommend', () => {
     write('z', 'neutral');
     const result = computeReadinessMatrix({ visits_dir: opposedDir, output_path: opposedMatrix });
     expect(result.recommendation).toBe('redesign');
+  });
+
+  it('rejects stakeholder input and output paths outside the repository', () => {
+    expect(() =>
+      computeReadinessMatrix({
+        visits_dir: '/tmp/external-stakeholder-visits',
+        output_path: `${TMP_ROOT}/readiness.json`,
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(() => recommend({ readiness_ref: '/tmp/external-readiness.json' })).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
   });
 });
 

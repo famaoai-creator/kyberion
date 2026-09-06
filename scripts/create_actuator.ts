@@ -3,8 +3,8 @@
  * create_actuator.ts — Scaffold a new Kyberion actuator from the canonical template.
  *
  * Usage:
- *   pnpm create:actuator <name>           e.g. pnpm create:actuator my-feature
- *   pnpm create:actuator <name> --desc "What this actuator does"
+ *   pnpm kyberion create actuator <name>           e.g. pnpm kyberion create actuator my-feature
+ *   pnpm kyberion create actuator <name> --desc "What this actuator does"
  *
  * Generates:
  *   libs/actuators/<name>-actuator/
@@ -19,8 +19,17 @@
 
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStandardYargs, logger, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -54,6 +63,15 @@ export interface ActuatorScaffoldResult {
   files: string[];
   name: string;
   description: string;
+}
+
+export interface ActuatorScaffoldPreview extends ActuatorScaffoldResult {
+  files_to_write: string[];
+}
+
+export interface ActuatorScaffoldMachineResult extends ActuatorScaffoldPreview {
+  ok: true;
+  mode: 'check' | 'dry-run';
 }
 
 function buildManifest(fullName: string, description: string, name: string): string {
@@ -107,7 +125,15 @@ function buildPackage(description: string, name: string, fullName: string): stri
 }
 
 function buildIndexTs(fullName: string, _pascalName: string, _name: string): string {
-  return `import { defineActuator, logger, runActuatorCli } from '@agent/core';
+  return `import { defineActuator } from '@agent/core/actuator-sdk';
+import { logger } from '@agent/core/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
+import { nowIso } from '@agent/core/foundation';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 
 const executeInputSchema = {
   type: 'object',
@@ -137,7 +163,7 @@ async function opExecute(
     received_params: params,
     state: {
       ...currentState,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     },
   };
 }
@@ -155,14 +181,11 @@ export const actuator = defineActuator({
 });
 
 export async function main(): Promise<void> {
-  await runActuatorCli({ name: '${fullName}', actuator });
+  await runActuatorCli({ args: currentProcessArgv(), name: '${fullName}', actuator });
 }
 
-if (import.meta.main) {
-  main().catch((err: unknown) => {
-    logger.error(err instanceof Error ? err.message : String(err));
-    process.exitCode = 1;
-  });
+if (isDirectEntry(import.meta.url, 'libs/actuators/${fullName}/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, '${fullName}');
 }
 `;
 }
@@ -219,7 +242,10 @@ Register any required secrets via \`secret:set\` before running:
 `;
 }
 
-export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorScaffoldResult {
+function buildActuatorScaffoldPlan(input: ActuatorScaffoldInput): {
+  result: ActuatorScaffoldResult;
+  files: Array<{ path: string; content: string }>;
+} {
   const rawName = input.name.trim();
   if (!rawName) {
     throw new Error('Missing actuator name');
@@ -232,45 +258,73 @@ export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorSc
   const description = input.description?.trim() || `${pascalName} actuator for Kyberion`;
   const rootDir = input.rootDir || ROOT;
   const outDir = path.join(rootDir, 'libs', 'actuators', fullName);
+  const safeOutDir = assertSafeRepositoryPath(outDir, {
+    allowMissingLeaf: true,
+    rootDir,
+  });
 
-  if (safeExistsSync(outDir)) {
+  if (safeExistsSync(safeOutDir)) {
     throw new Error(`Directory already exists: ${outDir}`);
   }
 
-  safeMkdir(path.join(outDir, 'src'));
-  safeMkdir(path.join(outDir, 'examples'));
-  safeMkdir(path.join(outDir, 'schemas'));
-
-  safeWriteFile(
-    path.join(outDir, 'manifest.json'),
-    `${buildManifest(fullName, description, name)}\n`
-  );
-  safeWriteFile(
-    path.join(outDir, 'package.json'),
-    `${buildPackage(description, name, fullName)}\n`
-  );
-  safeWriteFile(path.join(outDir, 'src', 'index.ts'), buildIndexTs(fullName, pascalName, name));
-  safeWriteFile(
-    path.join(outDir, 'schemas', `${name}-action.schema.json`),
-    `${buildSchema(pascalName)}\n`
-  );
-  safeWriteFile(
-    path.join(outDir, 'examples', 'README.md'),
-    buildExamplesReadme(pascalName, name, envName)
-  );
+  const files = [
+    {
+      path: path.join(safeOutDir, 'manifest.json'),
+      content: `${buildManifest(fullName, description, name)}\n`,
+    },
+    {
+      path: path.join(safeOutDir, 'package.json'),
+      content: `${buildPackage(description, name, fullName)}\n`,
+    },
+    {
+      path: path.join(safeOutDir, 'src', 'index.ts'),
+      content: buildIndexTs(fullName, pascalName, name),
+    },
+    {
+      path: path.join(safeOutDir, 'schemas', `${name}-action.schema.json`),
+      content: `${buildSchema(pascalName)}\n`,
+    },
+    {
+      path: path.join(safeOutDir, 'examples', 'README.md'),
+      content: buildExamplesReadme(pascalName, name, envName),
+    },
+  ].map((file) => ({
+    ...file,
+    path: assertSafeRepositoryPath(file.path, { allowMissingLeaf: true, rootDir }),
+  }));
 
   return {
-    outDir,
-    files: [
-      'manifest.json',
-      'package.json',
-      'src/index.ts',
-      `knowledge/product/schemas/${name}-action.schema.json`,
-      'examples/README.md',
-    ],
-    name: fullName,
-    description,
+    result: {
+      outDir: safeOutDir,
+      files: [
+        'manifest.json',
+        'package.json',
+        'src/index.ts',
+        `knowledge/product/schemas/${name}-action.schema.json`,
+        'examples/README.md',
+      ],
+      name: fullName,
+      description,
+    },
+    files,
   };
+}
+
+export function previewActuatorScaffold(input: ActuatorScaffoldInput): ActuatorScaffoldPreview {
+  const plan = buildActuatorScaffoldPlan(input);
+  return {
+    ...plan.result,
+    files_to_write: plan.files.map((file) => file.path),
+  };
+}
+
+export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorScaffoldResult {
+  const plan = buildActuatorScaffoldPlan(input);
+  for (const file of plan.files) {
+    safeMkdir(path.dirname(file.path), { recursive: true });
+    safeWriteFile(file.path, file.content);
+  }
+  return plan.result;
 }
 
 function parseCliArgs(args: string[]): ActuatorScaffoldInput {
@@ -282,7 +336,7 @@ function parseCliArgs(args: string[]): ActuatorScaffoldInput {
   const positional = argv._.map(String).filter(Boolean);
   const name = (argv.name as string | undefined) || positional[0];
   if (!name || name.startsWith('-')) {
-    throw new Error('Usage: pnpm create:actuator <name> [--desc "description"]');
+    throw new Error('Usage: pnpm kyberion create actuator <name> [--desc "description"]');
   }
 
   return {
@@ -291,27 +345,56 @@ function parseCliArgs(args: string[]): ActuatorScaffoldInput {
   };
 }
 
-async function main(args: string[]): Promise<void> {
-  const scaffold = createActuatorScaffold(parseCliArgs(args));
-  logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
-  console.log('  Files created:');
-  for (const file of scaffold.files) {
-    console.log(`    ${file}`);
+async function main(
+  args: string[],
+  options: {
+    dryRun?: boolean;
+    check?: boolean;
+    json?: boolean;
+    quiet?: boolean;
+    print?: Print;
+  } = {}
+): Promise<ActuatorScaffoldResult | ActuatorScaffoldMachineResult> {
+  const input = parseCliArgs(args);
+  const machineOutput =
+    options.json === true ||
+    options.dryRun === true ||
+    options.check === true ||
+    options.quiet === true;
+  if (options.dryRun === true || options.check === true) {
+    return {
+      ok: true,
+      ...previewActuatorScaffold(input),
+      mode: options.check === true ? 'check' : 'dry-run',
+    };
   }
-  console.log('\nNext steps:');
-  console.log('  1. Implement the actuator-specific op logic in src/index.ts');
-  console.log('  2. Replace the schema stub with the real contract');
-  console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
-  console.log('  4. Run: pnpm build');
-  console.log(
-    '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm validate enforces this via check:op-registry)'
-  );
+
+  const scaffold = createActuatorScaffold(input);
+  if (!machineOutput) {
+    const print = options.print ?? (() => undefined);
+    logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
+    print('  Files created:');
+    for (const file of scaffold.files) print(`    ${file}`);
+    print('\nNext steps:');
+    print('  1. Implement the actuator-specific op logic in src/index.ts');
+    print('  2. Replace the schema stub with the real contract');
+    print('  3. Add an entry to CAPABILITIES_GUIDE.md');
+    print('  4. Run: pnpm build');
+    print(
+      '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm generate:op-registry -- --check verifies drift)'
+    );
+  }
+  return scaffold;
 }
 
 const script = defineScript({
   name: 'create:actuator',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json', 'dry-run', 'check', 'quiet'],
+  run: ({ argv, dryRun, check, json, quiet, print }) =>
+    main(stripSharedScriptFlags(argv), { dryRun, check, json, quiet, print }).then((result) => {
+      if (json || dryRun || check) print(result);
+      return result;
+    }),
 });
 if (
   isDirectScript(import.meta.url, 'create_actuator.ts') ||

@@ -8,7 +8,7 @@ vi.mock('./frame-redaction.js', () => ({ redactFrame }));
 
 import { redactScreenCaptureFile } from './screen-frame-redaction.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 async function fixturePng(): Promise<Buffer> {
   return new Jimp({ data: Buffer.alloc(4 * 4 * 4, 255), width: 4, height: 4 }).getBuffer(
@@ -66,5 +66,24 @@ describe('redactScreenCaptureFile', () => {
 
     expect(safeExistsSync(input)).toBe(false);
     expect(safeExistsSync(output)).toBe(false);
+  });
+
+  it('rejects a raw capture path replaced by a directory without removing it', async () => {
+    const input = pathResolver.sharedTmp('screen-redaction-tests/raw-directory');
+    const output = pathResolver.sharedTmp('screen-redaction-tests/redacted-directory.png');
+    safeRmSync(input, { recursive: true, force: true });
+    safeRmSync(output, { force: true });
+    safeMkdir(input, { recursive: true });
+
+    try {
+      await expect(redactScreenCaptureFile(input, output)).rejects.toThrow(
+        '[SCREEN_CAPTURE_RESOURCE] input must be a regular file'
+      );
+      expect(safeExistsSync(input)).toBe(true);
+      expect(safeExistsSync(output)).toBe(false);
+    } finally {
+      safeRmSync(input, { recursive: true, force: true });
+      safeRmSync(output, { force: true });
+    }
   });
 });

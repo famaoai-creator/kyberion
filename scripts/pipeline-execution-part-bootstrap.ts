@@ -1,40 +1,41 @@
+import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
+import { TraceContext, finalizeAndPersist, persistTrace } from '@agent/core/trace';
+import { logger } from '@agent/core/core';
 import {
-  recordGovernanceAction,
-  TraceContext,
-  finalizeAndPersist,
-  persistTrace,
-  logger,
   safeExec,
+  safeExecResult,
   safeExistsSync,
-  safeWriteFile,
   safeMkdir,
-  retry,
-  resolveVars,
-  capabilityEntry,
-  pathResolver,
-  getReasoningBackend,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { retry } from '@agent/core/async-utils';
+import { resolveVars } from '@agent/core/logic-utils';
+import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
+import { getReasoningBackend, type ReasoningCallOptions } from '@agent/core/reasoning-backend';
+import {
   getReasoningRuntimeInstructions,
   renderRuntimeInstructions,
-  buildWorkingPrinciplesLines,
-  executeReportContract,
-  getReasoningPayloadScope,
-  resolveFacets,
-  renderFacets,
-  resolveStepReasoningRoute,
+} from '@agent/core/reasoning-runtime-instructions';
+import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
+import { executeReportContract } from '@agent/core/report-contract';
+import { getReasoningPayloadScope } from '@agent/core/reasoning-egress-scope';
+import { renderFacets, resolveFacets } from '@agent/core/facet-registry';
+import { resolveStepReasoningRoute } from '@agent/core/reasoning-route-resolver';
+import {
   determineActuatorStepType,
   resolveActuatorOperation,
-  safeExecResult,
-  runJanitor,
-  checkActuatorCapabilities,
-  validateOpInput,
-  getRegisteredEnv,
-  resolveIdentityContext,
-  type ReasoningCallOptions,
-  defineLegacyPipelineActuator,
-  type PipelineRunJournalHandle,
-  type PipelineRunJournalState,
-  type PipelineRunSuspendedPayload,
-} from '@agent/core';
+} from '@agent/core/actuator-op-registry';
+import { runJanitor } from '@agent/core/storage-janitor';
+import { checkActuatorCapabilities } from '@agent/core/actuator-capability';
+import { validateOpInput } from '@agent/core/op-input-contracts';
+import { getRegisteredEnv, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { resolveIdentityContext } from '@agent/core/authority';
+import { defineLegacyPipelineActuator } from '@agent/core/actuator-sdk';
+import type {
+  PipelineRunJournalHandle,
+  PipelineRunJournalState,
+  PipelineRunSuspendedPayload,
+} from '@agent/core/pipeline-run-journal';
 
 import { markRouterActive, markRouterInactive } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
@@ -85,7 +86,10 @@ export type RunStepResult = {
   error?: string;
 };
 
-export function runTsFallbackPipeline(fallbackPath: string): ReturnType<typeof safeExecResult> {
+export function runTsFallbackPipeline(
+  fallbackPath: string,
+  options: { trustResolved?: boolean; projectTrustApprovalId?: string } = {}
+): ReturnType<typeof safeExecResult> {
   const fallbackEntry = pathResolver.rootResolve('scripts/run_pipeline.ts');
   const tsxAvailable = safeExecResult('node', ['--import', 'tsx', '--eval', 'process.exitCode=0'], {
     cwd: pathResolver.rootDir(),
@@ -102,7 +106,14 @@ export function runTsFallbackPipeline(fallbackPath: string): ReturnType<typeof s
   logger.warn(
     `⚠️ [PIPELINE] Running fallback pipeline from source because dist/scripts/run_pipeline.js was not used: ${fallbackPath}`
   );
-  return safeExecResult('node', ['--import', 'tsx', fallbackEntry, '--input', fallbackPath], {
+  const args = ['--import', 'tsx', fallbackEntry, '--input', fallbackPath];
+  // A fallback is a new CLI process, so carry the already-resolved decision
+  // explicitly. Never widen it: false/omitted stays pre-trust.
+  if (options.trustResolved === true) args.push('--trust-project');
+  if (options.projectTrustApprovalId) {
+    args.push('--project-trust-approval', options.projectTrustApprovalId);
+  }
+  return safeExecResult('node', args, {
     cwd: pathResolver.rootDir(),
     env: {
       KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
@@ -132,7 +143,8 @@ export function recordFallbackOutcome(
 export function tryPermissionFallback(
   pipeline: Record<string, unknown>,
   failure: PipelineFailure,
-  trace: TraceContext
+  trace: TraceContext,
+  options: { trustResolved?: boolean; projectTrustApprovalId?: string } = {}
 ): boolean {
   const fallbackPath = String(pipeline.fallback_pipeline || '');
   if (
@@ -153,7 +165,7 @@ export function tryPermissionFallback(
   });
 
   try {
-    const fallbackResult = runTsFallbackPipeline(fallbackPath);
+    const fallbackResult = runTsFallbackPipeline(fallbackPath, options);
     const recovered = recordFallbackOutcome(trace, fallbackPath, failure, fallbackResult);
     if (recovered) {
       logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
@@ -507,6 +519,10 @@ export interface RunStepsOptions {
   quiet?: boolean;
   /** Trusted execution-boundary signal for human-gated operations. */
   hasHuman?: boolean;
+  /** Explicit project-trust decision for pipeline/template loading. */
+  trustResolved?: boolean;
+  /** Durable human approval for the exact project-local resource being loaded. */
+  projectTrustApprovalId?: string;
   runJournal?: PipelineRunJournalHandle;
   resumeState?: PipelineRunJournalState;
   runId?: string;
@@ -519,6 +535,8 @@ export interface RunStepsOptions {
       context?: Record<string, unknown>;
       quiet?: boolean;
       hasHuman?: boolean;
+      trustResolved?: boolean;
+      projectTrustApprovalId?: string;
     }
   ) => Promise<{
     status?: string;
@@ -596,7 +614,6 @@ export async function loadActuatorDispatch(
 
   if (domain === 'reasoning') {
     dispatchCache[domain] = async (op, params, ctx, type, _trace?, policy?) => {
-      const { getReasoningBackend } = await import('@agent/core');
       const backend = getReasoningBackend();
       if (op === 'analyze' || op === 'transform' || op === 'synthesize') {
         const resolvedInstruction =
@@ -701,11 +718,11 @@ export async function loadActuatorDispatch(
         payload: params.payload || params.instruction || params.prompt,
         context: ctx,
       });
-      let parsed = result;
+      let parsed: unknown = result;
       try {
-        parsed = JSON.parse(result);
+        parsed = parseSafeJsonInput(result, 'pipeline provider output');
       } catch (err) {
-        logger.warn(`[run_pipeline] suppressed error in reasoningPolicy: ${err}`);
+        logger.warn(`[run_pipeline] provider output was not safe JSON; preserving text: ${err}`);
       }
       return {
         handled: true,
@@ -991,7 +1008,7 @@ export async function runInlineSystemWriteFile(
   ctx: Record<string, unknown>,
   rootDir: string
 ): Promise<Record<string, unknown>> {
-  const enrichedCtx = { ...ctx, $now: new Date().toISOString() };
+  const enrichedCtx = { ...ctx, $now: nowIso() };
   const resolvedParams = resolveParamsRecursive(params, enrichedCtx);
   const writePath = nodePath.resolve(rootDir, String(resolvedParams.path ?? ''));
   const rawContent = resolvedParams.content;
@@ -1039,7 +1056,7 @@ export async function runInlineSystemShell(
   let parsedOutput: unknown = output;
   if (output) {
     try {
-      parsedOutput = JSON.parse(output);
+      parsedOutput = parseSafeJsonInput(output, 'pipeline shell output');
     } catch {
       parsedOutput = output;
     }

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { createApprovalRequest, loadApprovalRequest } from './approval-store.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
+import type { SupportedLocale } from './locale-normalize.js';
+import { t } from './t.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
 import {
@@ -15,13 +19,18 @@ import type {
   SlackApprovalRequestDraft,
   SlackApprovalRequestRecord,
 } from './channel-surface-types.js';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+  type IntentResolutionContract,
+} from './intent-resolution-contract.js';
 
 function emitSlackApprovalEvent(event: Record<string, unknown>): string {
   return appendGovernedArtifactJsonl(
     'slack_bridge',
     'active/shared/observability/channels/slack/approvals.jsonl',
     {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event_id: randomUUID(),
       channel: 'slack',
       ...event,
@@ -63,14 +72,27 @@ export function loadSlackApprovalRequest(id: string): SlackApprovalRequestRecord
   return loadApprovalRequest('slack', id);
 }
 
-export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): any[] {
+export function buildSlackApprovalBlocks(
+  record: SlackApprovalRequestRecord,
+  intentResolution?: IntentResolutionContract,
+  locale: SupportedLocale = 'en'
+): any[] {
   const severity = record.severity || 'medium';
+  const labels = {
+    understanding: t('bridge:contract_understanding', undefined, locale),
+    missingInput: t('bridge:contract_missing_input', undefined, locale),
+    authority: t('bridge:contract_authority', undefined, locale),
+    nextAction: t('bridge:contract_next_action', undefined, locale),
+    consequence: t('bridge:contract_consequence', undefined, locale),
+    outcome: t('bridge:contract_outcome', undefined, locale),
+    none: locale === 'en' ? 'None' : t('bridge:contract_none', undefined, locale),
+  };
   return [
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Approval Required*\n*${record.title}*\n${record.summary}`,
+        text: `*${t('bridge:approval_heading', { surface: 'Slack' }, locale)}*\n*${record.title}*\n${record.summary}`,
       },
     },
     ...(record.details
@@ -80,7 +102,7 @@ export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): an
             elements: [
               {
                 type: 'mrkdwn',
-                text: `Details: ${record.details}`,
+                text: `${t('bridge:approval_details_label', undefined, locale)}: ${record.details}`,
               },
             ],
           },
@@ -91,17 +113,42 @@ export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): an
       elements: [
         {
           type: 'mrkdwn',
-          text: `Severity: ${severity} | Status: ${record.status}`,
+          text: `${t('bridge:approval_severity_label', undefined, locale)}: ${severity} | Status: ${record.status}`,
         },
       ],
     },
+    ...(intentResolution
+      ? [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: [
+                `*${labels.understanding}:* ${intentResolution.normalized_intent}`,
+                `*${labels.missingInput}:* ${
+                  intentResolution.missing_inputs.length > 0
+                    ? intentResolution.missing_inputs.join(', ')
+                    : labels.none
+                }`,
+                `*${labels.authority}:* ${renderIntentAuthorityLabel(intentResolution.authority_level, locale)}`,
+                `*${labels.nextAction}:* ${intentResolution.next_action.label}`,
+                `*${labels.consequence}:* ${intentResolution.next_action.consequence}`,
+                `*${labels.outcome}:* ${renderIntentOutcomeLabel(intentResolution.outcome_kind, locale)}`,
+              ].join('\n'),
+            },
+          },
+        ]
+      : []),
     {
       type: 'actions',
       elements: [
         {
           type: 'button',
           style: 'primary',
-          text: { type: 'plain_text', text: 'Approve' },
+          text: {
+            type: 'plain_text',
+            text: t('bridge:approval_approve_button', undefined, locale),
+          },
           action_id: 'slack_approval_decide',
           value: JSON.stringify({
             requestId: record.id,
@@ -111,7 +158,10 @@ export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): an
         {
           type: 'button',
           style: 'danger',
-          text: { type: 'plain_text', text: 'Reject' },
+          text: {
+            type: 'plain_text',
+            text: t('bridge:approval_reject_button', undefined, locale),
+          },
           action_id: 'slack_approval_decide',
           value: JSON.stringify({
             requestId: record.id,
@@ -124,7 +174,14 @@ export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): an
 }
 
 export function parseSlackApprovalAction(value: string): SlackApprovalActionPayload {
-  return JSON.parse(value) as SlackApprovalActionPayload;
+  const parsed = parseSafeJsonObjectInput(value, 'Slack approval action');
+  if (!parsed || typeof parsed.requestId !== 'string' || !parsed.requestId.trim()) {
+    throw new Error('Slack approval action requires requestId');
+  }
+  if (parsed.decision !== 'approved' && parsed.decision !== 'rejected') {
+    throw new Error('Slack approval action requires a valid decision');
+  }
+  return { requestId: parsed.requestId, decision: parsed.decision };
 }
 
 export function applySlackApprovalDecision(params: {
@@ -190,11 +247,12 @@ export function buildSlackApprovalAskWhyBlocks(requestId: string): any[] {
 }
 
 export function parseSlackAskWhyAction(value: string): SlackAskWhyActionPayload {
-  const parsed = JSON.parse(value) as Partial<SlackAskWhyActionPayload>;
-  const category = normalizeSurfaceApprovalAskWhyCategory(parsed.category);
-  if (!parsed.requestId || !category) {
-    return { requestId: String(parsed.requestId || ''), category: 'skip' };
+  const parsed = parseSafeJsonObjectInput(value, 'Slack approval reason action');
+  if (!parsed || typeof parsed.requestId !== 'string' || !parsed.requestId.trim()) {
+    throw new Error('Slack approval reason action requires requestId');
   }
+  const category = normalizeSurfaceApprovalAskWhyCategory(parsed.category);
+  if (!category) throw new Error('Slack approval reason action requires a valid category');
   return { requestId: parsed.requestId, category };
 }
 

@@ -115,7 +115,7 @@
 - [x] **E2E-06**: Customer Dialogue (`E2E-06_CUSTOMER_DIALOGUE.ja.md`) — Task 1〜8 完了(見積/契約生成+レビューゲート・impact_analysis・won→SDLC handoff・distill 還流)。帳票整形(xlsx/pdf)と intake pipeline のみ残余(原文 §7)
 - [x] **E2E-03**: Agent Collaboration (`E2E-03_AGENT_COLLABORATION.ja.md`) — 全 Task 完了(best-of-2+judge、code_change PR 協調を追加)
 - [x] **E2E-04**: Operator Interface (`E2E-04_OPERATOR_INTERFACE.ja.md`) — Task 2(notifyOperator 通知ルーティング)を追加実装し発火点(承認・質問・完了/失敗・inbox)を配線。CLI 統一(Task 6)は残余
-- [x] **E2E-05**: App Lifecycle (`E2E-05_APP_LIFECYCLE.ja.md`) — Task 1〜7 完了(app:preflight・build-actuator・scaffold・sdlc-cycle・device compiler・mobile-beta)。実機実走記録のみ未取得(原文 §7)
+- [x] **E2E-05**: App Lifecycle (`E2E-05_APP_LIFECYCLE.ja.md`) — Task 1〜7 完了(doctor app runtime preflight・build-actuator・scaffold・sdlc-cycle・device compiler・mobile-beta)。実機実走記録のみ未取得(原文 §7)
 - [x] **PHIL-01**: Working Philosophy Pack(2026-07-08/09 セッション)— フロンティアモデルの作業規律を機械的ルール化(`knowledge/product/governance/working-philosophy.md`)し、`libs/core/working-principles.ts` 経由で全ワーカープロンプト(task 実行・workitem dispatch・独立レビュー)へロール別に自動注入
 - [x] **E2E-06 追補**: 顧客対話モード — sales / support / requirements_hearing を deal stage から自動導出、要件ヒアリングは deal 単位の構造化ドラフトを増分収集(`pnpm kyberion deals --requirements`)。既知問題接地のサポートモード
 - [x] **DS-01 追補**: セマンティックカラートークン(accent_text/surface/muted_text 等)+ WCAG コントラストの多面ゲート(CI `check:design-contrast` 拡張、ランタイム `design-qa.ts`、media-actuator レンダリング時 warn 監査)

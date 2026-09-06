@@ -18,17 +18,13 @@
 
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeReadFile,
-  safeReaddir,
-  safeStat,
-  safeWriteFile,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir, safeStat, safeWriteFile } from '@agent/core/secure-io';
+import { nowIso, readJson, readTextFile } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 interface Manifest {
   actuator_id: string;
@@ -58,7 +54,7 @@ interface BumpKind {
 }
 
 const ACTUATOR_DIR = pathResolver.rootResolve('libs/actuators');
-const BASELINE_PATH = pathResolver.rootResolve('scripts/contract-baseline.json');
+const BASELINE_PATH = resolveCiGateBaselinePath('contract-semver');
 
 function listActuatorManifests(): string[] {
   const entries = safeExistsSync(ACTUATOR_DIR) ? safeReaddir(ACTUATOR_DIR) : [];
@@ -73,7 +69,7 @@ function listActuatorManifests(): string[] {
 }
 
 function readManifest(p: string): Manifest {
-  return readJson<Manifest>(p);
+  return readSafeJsonFile<Manifest>(p, `actuator manifest ${p}`);
 }
 
 function sha256(content: string): string {
@@ -96,12 +92,11 @@ function fingerprint(manifest: Manifest): ActuatorFingerprint {
   if (manifest.contract_schema) {
     const schemaPath = pathResolver.rootResolve(manifest.contract_schema);
     if (safeExistsSync(schemaPath)) {
-      const raw = safeReadFile(schemaPath, { encoding: 'utf8' }) as string;
       let parsed: unknown;
       try {
-        parsed = JSON.parse(raw);
+        parsed = readJson<unknown>(schemaPath);
       } catch {
-        parsed = raw;
+        parsed = readTextFile(schemaPath);
       }
       contractSchemaSha = sha256(canonicalize(parsed));
       contractSchema = manifest.contract_schema;
@@ -233,7 +228,7 @@ function check(prev: BaselineFile, current: ActuatorFingerprint[]): Diagnostic[]
 
 function loadBaseline(): BaselineFile | null {
   if (!safeExistsSync(BASELINE_PATH)) return null;
-  return readJson<BaselineFile>(BASELINE_PATH);
+  return readSafeJsonFile<BaselineFile>(BASELINE_PATH, 'contract semver baseline');
 }
 
 function writeBaseline(file: BaselineFile): void {
@@ -244,7 +239,7 @@ function writeBaseline(file: BaselineFile): void {
 
 function buildBaseline(actuators: ActuatorFingerprint[]): BaselineFile {
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     generator_note:
       'Baseline of actuator extension-point surfaces for semver enforcement. ' +
       'See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.',
@@ -252,8 +247,8 @@ function buildBaseline(actuators: ActuatorFingerprint[]): BaselineFile {
   };
 }
 
-function printUsage(): void {
-  console.log('Usage: pnpm check:contract-semver [--rebaseline]');
+function printUsage(): string {
+  return 'Usage: pnpm check:contract-semver [--rebaseline]';
 }
 
 export const runCheckContractSemver = defineScript({
@@ -263,8 +258,8 @@ export const runCheckContractSemver = defineScript({
     const args = context.argv;
     const rebaseline = args.includes('--rebaseline');
     if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
-      printUsage();
-      return;
+      context.print(printUsage());
+      return { help: true };
     }
 
     const manifests = listActuatorManifests()
@@ -277,7 +272,7 @@ export const runCheckContractSemver = defineScript({
       writeBaseline(baseline);
       context.print(`✅ Baseline updated: ${BASELINE_PATH}`);
       context.print(`   Recorded ${baseline.actuators.length} actuators.`);
-      return;
+      return { baseline, rebaseline: true };
     }
 
     const baseline = loadBaseline();
@@ -286,23 +281,29 @@ export const runCheckContractSemver = defineScript({
       writeBaseline(initial);
       context.print(`📝 No baseline existed. Created initial baseline: ${BASELINE_PATH}`);
       context.print(`   Recorded ${initial.actuators.length} actuators. Commit this file.`);
-      return;
+      return { baseline: initial, rebaseline: false };
     }
 
     const diags = check(baseline, fingerprints);
     const errors = diags.filter((d) => d.severity === 'error');
     const warnings = diags.filter((d) => d.severity === 'warning');
 
-    for (const w of warnings) console.log(`⚠️  ${w.message}`);
-    for (const e of errors) console.error(`❌ ${e.message}`);
+    for (const w of warnings) context.print(`⚠️  ${w.message}`);
 
     if (errors.length > 0) {
-      console.error(`\n${errors.length} contract-semver violations.`);
-      throw new Error(`${errors.length} contract-semver violation(s)`);
+      throw new ScriptExitError(
+        1,
+        [
+          ...errors.map((error) => `❌ ${error.message}`),
+          '',
+          `${errors.length} contract-semver violations.`,
+        ].join('\n')
+      );
     }
     context.print(
       `✅ Contract-semver check passed. ${fingerprints.length} actuators, ${warnings.length} warnings.`
     );
+    return { fingerprints, warnings, errors };
   },
 });
 

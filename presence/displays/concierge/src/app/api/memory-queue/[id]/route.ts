@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { loadMemoryPromotionCandidate } from '@agent/core/memory-promotion-queue';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  loadMemoryPromotionCandidate,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
-  withExecutionContext,
-} from '@agent/core';
+  safeLstat,
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import { readRequestObject } from '../../../../lib/request-input';
 import {
   conciergeText,
   resolveConciergeLocale,
   type ConciergeMessageKey,
 } from '../../../../lib/i18n';
+import { resolveConciergeViewer } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +39,8 @@ const CONTROLLER_TIMEOUT_MS = 30_000;
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
 
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
@@ -42,7 +48,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   try {
     const { id } = await context.params;
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const parsedBody = await readRequestObject(req, 'request body', ['decision']);
+    if (!parsedBody.ok)
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
+    const { body } = parsedBody;
     const decision = ALLOWED_DECISIONS.includes(body?.decision as MemoryDecision)
       ? (body.decision as MemoryDecision)
       : null;
@@ -57,7 +66,16 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     const candidate = withExecutionContext('sovereign_concierge', () =>
       loadMemoryPromotionCandidate(id)
     );
-    if (!candidate) {
+    const visible =
+      candidate &&
+      resolved.context.tierAccess.includes(candidate.sensitivity_tier) &&
+      (resolved.context.tenantSlugs === 'all'
+        ? true
+        : Boolean(
+            candidate.scope?.tenant_slug &&
+            resolved.context.tenantSlugs.includes(candidate.scope.tenant_slug)
+          ));
+    if (!visible) {
       return NextResponse.json({ ok: false, error: t('api.memory.not_found') }, { status: 404 });
     }
     if (candidate.status !== 'queued') {
@@ -66,7 +84,17 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
     const rootDir = pathResolver.rootDir();
     const controllerPath = pathResolver.rootResolve(CONTROLLER_RELATIVE);
-    if (!safeExistsSync(controllerPath)) {
+    let controllerReady = false;
+    try {
+      const safeControllerPath = assertSafeRepositoryPath(controllerPath, {
+        allowMissingLeaf: true,
+      });
+      controllerReady =
+        safeExistsSync(safeControllerPath) && safeLstat(safeControllerPath).isFile();
+    } catch {
+      controllerReady = false;
+    }
+    if (!controllerReady) {
       console.error(`[concierge/memory-queue] mission controller build missing: ${controllerPath}`);
       return NextResponse.json({ ok: false, error: t('api.memory.failed') }, { status: 503 });
     }

@@ -15,8 +15,16 @@
 import * as path from 'node:path';
 
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExecResult, safeExistsSync, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExecResult,
+  safeExistsSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   getSpeechToTextBridges,
   registerSpeechToTextBridge,
@@ -32,10 +40,24 @@ const SCRIPT_PATH = 'satellites/voice-hub/native-stt.swift';
 const DEFAULT_TIMEOUT_SEC = 180;
 
 interface NativeSttPayload {
-  ok?: boolean;
+  ok: boolean;
   text?: string;
   error?: string;
   locale?: string;
+}
+
+/** Normalize the small JSON envelope emitted by native-stt.swift. */
+export function normalizeAppleSpeechFilePayload(value: unknown): NativeSttPayload | undefined {
+  if (!isRecord(value) || typeof value.ok !== 'boolean') return undefined;
+  for (const field of ['text', 'error', 'locale'] as const) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return undefined;
+  }
+  return {
+    ok: value.ok,
+    ...(typeof value.text === 'string' ? { text: value.text } : {}),
+    ...(typeof value.error === 'string' ? { error: value.error } : {}),
+    ...(typeof value.locale === 'string' ? { locale: value.locale } : {}),
+  };
 }
 
 /** BCP-47 in, BCP-47 out; bare language tags get a sensible region. */
@@ -54,7 +76,10 @@ function parseLastJsonLine(stdout: string): NativeSttPayload | null {
     const line = lines[index].trim();
     if (!line.startsWith('{')) continue;
     try {
-      return JSON.parse(line) as NativeSttPayload;
+      const payload = normalizeAppleSpeechFilePayload(
+        parseSafeJsonInput(line, 'Apple Speech response')
+      );
+      if (payload) return payload;
     } catch {
       continue;
     }
@@ -64,14 +89,14 @@ function parseLastJsonLine(stdout: string): NativeSttPayload | null {
 
 export function isAppleSpeechFileTranscriptionSupported(): boolean {
   if (process.platform !== 'darwin') return false;
-  return safeExistsSync(pathResolver.resolve(SCRIPT_PATH));
+  return safeExistsSync(assertSafeRepositoryPath(pathResolver.resolve(SCRIPT_PATH)));
 }
 
 export function transcribeAudioFileWithAppleSpeech(
   audioPath: string,
   options: { locale?: string; timeoutSec?: number } = {}
 ): { text: string; locale: string } {
-  const audioAbs = pathResolver.rootResolve(audioPath);
+  const audioAbs = assertSafeRepositoryPath(pathResolver.rootResolve(audioPath));
   if (!safeExistsSync(audioAbs)) {
     throw new Error(`[stt-bridge:apple-speech-file] audio file not found: ${audioPath}`);
   }
@@ -80,7 +105,7 @@ export function transcribeAudioFileWithAppleSpeech(
   const result = safeExecResult(
     'swift',
     [
-      pathResolver.resolve(SCRIPT_PATH),
+      assertSafeRepositoryPath(pathResolver.resolve(SCRIPT_PATH)),
       '--transcribe-file',
       audioAbs,
       '--locale',
@@ -115,16 +140,19 @@ export function createAppleSpeechFileToTextBridge(): SpeechToTextBridge {
       const { text, locale } = transcribeAudioFileWithAppleSpeech(input.audioPath, {
         locale: input.language,
       });
-      const audioAbs = pathResolver.rootResolve(input.audioPath);
+      const audioAbs = assertSafeRepositoryPath(pathResolver.rootResolve(input.audioPath));
       const parsed = path.parse(audioAbs);
       const outputPath = input.outputPath
-        ? pathResolver.rootResolve(input.outputPath)
+        ? assertSafeRepositoryPath(pathResolver.rootResolve(input.outputPath), {
+            allowMissingLeaf: true,
+          })
         : path.join(parsed.dir, `${parsed.name}.transcript.txt`);
-      safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+      const safeOutputPath = assertSafeRepositoryPath(outputPath, { allowMissingLeaf: true });
+      safeWriteFile(safeOutputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
       return {
         text,
         language: locale,
-        written_to: outputPath,
+        written_to: safeOutputPath,
         backend: APPLE_SPEECH_FILE_BRIDGE_NAME,
         capabilities: { timestamps: false, granularity: 'none' },
       };
@@ -143,7 +171,10 @@ export function installAppleSpeechFileToTextBridgeIfAvailable(
   if (getSpeechToTextBridges().some((bridge) => bridge.name === APPLE_SPEECH_FILE_BRIDGE_NAME)) {
     return true;
   }
-  if (env.KYBERION_STT_COMMAND?.trim() || env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()) {
+  if (
+    getRegisteredEnvText('KYBERION_STT_COMMAND', { env })?.trim() ||
+    getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND', { env })?.trim()
+  ) {
     return false;
   }
   if (!isAppleSpeechFileTranscriptionSupported()) return false;

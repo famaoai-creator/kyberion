@@ -14,24 +14,48 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeWriteFile: vi.fn(),
   safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(),
   safeMkdir: vi.fn(),
   safeExecResult: vi.fn(),
   shared: vi.fn((relPath: string) => `/repo/active/shared/${relPath}`),
+  schema: undefined as unknown,
 }));
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeReadFile: mocks.safeReadFile,
+  safeLstat: mocks.safeLstat,
   safeWriteFile: mocks.safeWriteFile,
   safeExistsSync: mocks.safeExistsSync,
   safeMkdir: mocks.safeMkdir,
   safeExecResult: mocks.safeExecResult,
 }));
 
+vi.mock('./foundation/json.js', () => ({
+  readJson: (filePath: string) =>
+    String(filePath).endsWith('provider-capability-registry.schema.json')
+      ? mocks.schema
+      : JSON.parse(String(mocks.safeReadFile(filePath))),
+}));
+
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
+    rootDir: () => '/repo',
     shared: mocks.shared,
+    knowledge: (relPath: string) => `/repo/knowledge/${relPath}`,
     rootResolve: (relPath: string) => `/repo/${relPath}`,
   },
+}));
+
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    exists: (filePath: string) => mocks.safeExistsSync(filePath),
+    stat: (filePath: string) => ({
+      mtimeMs: 1,
+      size: String(mocks.safeReadFile(filePath)).length,
+    }),
+  }),
+  registerFoundationIo: vi.fn(),
 }));
 
 // loadProviderCapabilityCatalog reads knowledge files via secure-io; with
@@ -42,15 +66,18 @@ vi.mock('./provider-discovery.js', () => ({
 }));
 
 function resetMocks() {
+  mocks.schema = providerCapabilityRegistrySchema;
   mocks.safeReadFile.mockReset();
   mocks.safeWriteFile.mockReset();
   mocks.safeExistsSync.mockReset();
+  mocks.safeLstat.mockReset();
   mocks.safeMkdir.mockReset();
   mocks.safeExecResult.mockReset();
   mocks.safeReadFile.mockImplementation(() => {
     throw new Error('ENOENT');
   });
   mocks.safeExistsSync.mockReturnValue(false);
+  mocks.safeLstat.mockReturnValue({ isFile: () => true });
   mocks.safeMkdir.mockReturnValue(undefined);
   mocks.safeWriteFile.mockReturnValue(undefined);
 }
@@ -188,6 +215,127 @@ describe('provider-capability-registry', () => {
     });
   });
 
+  it('uses the registered CLI binary override for Cursor capability probes', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const calls: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`);
+      return { ok: true, stdout: '--sandbox --mode', stderr: '' };
+    };
+
+    const results = probeProviderCapabilities({
+      providerIds: ['cursor'],
+      env: { KYBERION_CURSOR_CLI_BIN: '/custom/cursor-agent' },
+      exec,
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'cursor',
+      binary_found: true,
+      sandbox_probe: { command: '/custom/cursor-agent' },
+    });
+    expect(calls).toEqual([
+      '/custom/cursor-agent --version',
+      '/custom/cursor-agent status',
+      '/custom/cursor-agent --help',
+    ]);
+  });
+
+  it('uses the registered CLI binary override for OpenCode capability probes', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const calls: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`);
+      return { ok: true, stdout: '--agent --format', stderr: '' };
+    };
+
+    const results = probeProviderCapabilities({
+      providerIds: ['opencode'],
+      env: { KYBERION_OPENCODE_CLI_BIN: '/custom/opencode' },
+      exec,
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'opencode',
+      binary_found: true,
+      sandbox_probe: { command: '/custom/opencode' },
+    });
+    expect(calls).toEqual([
+      '/custom/opencode --version',
+      '/custom/opencode auth list',
+      '/custom/opencode --help',
+    ]);
+  });
+
+  it('does not replace an explicitly configured Claude binary with a fallback candidate', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const calls: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`);
+      return { ok: false, stdout: '', stderr: 'placeholder failure' };
+    };
+
+    const results = probeProviderCapabilities({
+      providerIds: ['claude'],
+      env: { KYBERION_CLAUDE_CLI_BIN: '/configured/claude' },
+      exec,
+      resolveClaudeCliFallbackCandidates: () => ['/fallback/claude'],
+    });
+
+    expect(results[0]).toMatchObject({ binary_found: false, authenticated: false });
+    expect(calls).toEqual(['/configured/claude --version']);
+  });
+
+  it('records help-flag sandbox evidence without claiming OS-level enforcement', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec: ProbeExecFn = (command, args) => {
+      if (command === 'gemini' && args[0] === '--version') {
+        return { ok: true, stdout: '0.46.0', stderr: '' };
+      }
+      return {
+        ok: true,
+        stdout: '--sandbox --approval-mode default|auto_edit|yolo|plan',
+        stderr: '',
+      };
+    };
+    const results = probeProviderCapabilities({ providerIds: ['gemini'], exec });
+
+    expect(results[0]?.sandbox_probe).toEqual({
+      status: 'supported',
+      method: 'help-flag',
+      command: 'gemini',
+      args: ['--help'],
+      expected_flags: ['--sandbox', '--approval-mode'],
+      evidence: 'gemini help output advertises --sandbox, --approval-mode',
+    });
+  });
+
+  it('keeps missing sandbox flags explicitly unsupported', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec: ProbeExecFn = (command, args) => {
+      if (command === 'codex' && args[0] === '--help') {
+        return { ok: true, stdout: 'codex help without sandbox option', stderr: '' };
+      }
+      return { ok: true, stdout: 'codex 1.0.0', stderr: '' };
+    };
+    const results = probeProviderCapabilities({ providerIds: ['codex'], exec });
+
+    expect(results[0]).toMatchObject({
+      binary_found: true,
+      sandbox_probe: {
+        status: 'unsupported',
+        evidence: 'missing advertised flags: --sandbox',
+      },
+    });
+  });
+
   it('probe command failure marks the provider unavailable without throwing', async () => {
     resetMocks();
     const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
@@ -212,6 +360,20 @@ describe('provider-capability-registry', () => {
   it('peekProviderCapabilityRegistry returns null when no snapshot file exists', async () => {
     resetMocks();
     mocks.safeExistsSync.mockReturnValue(false);
+    const { peekProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
+
+    expect(peekProviderCapabilityRegistry()).toBeNull();
+  });
+
+  it('treats a schema-invalid snapshot as no opinion', async () => {
+    resetMocks();
+    const stored = {
+      computed_at: '2026-07-25T00:00:00.000Z',
+      ttl_ms: -1,
+      value: [],
+    };
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeReadFile.mockReturnValue(JSON.stringify(stored));
     const { peekProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
 
     expect(peekProviderCapabilityRegistry()).toBeNull();
@@ -267,6 +429,20 @@ describe('provider-capability-registry', () => {
       now: () => new Date(t0.getTime() + 5000),
     });
     expect(execCallCounts.length).toBe(firstCallCount);
+  });
+
+  it('does not persist a schema-invalid TTL envelope', async () => {
+    resetMocks();
+    const { loadProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
+
+    loadProviderCapabilityRegistry({
+      providerIds: ['codex'],
+      exec: () => ({ ok: true, stdout: '', stderr: '' }),
+      maxAgeMs: -1,
+      now: () => new Date('2026-07-25T00:00:00.000Z'),
+    });
+
+    expect(mocks.safeWriteFile).not.toHaveBeenCalled();
   });
 
   it('the persisted envelope validates against provider-capability-registry.schema.json', async () => {

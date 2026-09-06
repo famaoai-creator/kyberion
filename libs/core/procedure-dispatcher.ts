@@ -45,7 +45,7 @@ import {
   type DesktopPipeline,
 } from './desktop-pipeline.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir, safeRmSync } from './secure-io.js';
 import { redactScreenCaptureFile } from './screen-frame-redaction.js';
 
 /** Approval-gate operation id for external-effect service actions. */
@@ -430,12 +430,21 @@ async function dispatchDesktopProcedure(input: DispatchInput): Promise<DispatchR
         case 'screenshot': {
           const recordingSegment = recording.recording_id.replace(/[^a-zA-Z0-9._-]/g, '_');
           const stepSegment = step.step_id.replace(/[^a-zA-Z0-9._-]/g, '_');
-          const screenshotDir = pathResolver.sharedTmp('desktop-screenshots');
-          safeMkdir(screenshotDir, { recursive: true });
-          const finalPath = pathResolver.sharedTmp(
-            `desktop-screenshots/${recordingSegment}-${stepSegment}-${randomUUID()}.png`
+          const screenshotDir = assertSafeRepositoryPath(
+            pathResolver.sharedTmp('desktop-screenshots'),
+            { allowMissingLeaf: true }
           );
-          const rawPath = pathResolver.sharedTmp(`desktop-screenshots/raw-${randomUUID()}.png`);
+          safeMkdir(screenshotDir, { recursive: true });
+          const finalPath = assertSafeRepositoryPath(
+            pathResolver.sharedTmp(
+              `desktop-screenshots/${recordingSegment}-${stepSegment}-${randomUUID()}.png`
+            ),
+            { allowMissingLeaf: true }
+          );
+          const rawPath = assertSafeRepositoryPath(
+            pathResolver.sharedTmp(`desktop-screenshots/raw-${randomUUID()}.png`),
+            { allowMissingLeaf: true }
+          );
           try {
             bridge.takeScreenshot(rawPath);
             await redactScreenshot(rawPath, finalPath);

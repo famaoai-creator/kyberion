@@ -1,27 +1,24 @@
-import { logger } from '@agent/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import {
   handleAction,
   dispatchVideoCompositionOperation,
 } from './video-composition-action-helpers.js';
-import { runActuatorCli } from '@agent/core';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 
 const main = async () => {
   await runActuatorCli({
     name: 'video-composition-actuator',
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+if (isDirectEntry(import.meta.url, 'libs/actuators/video-composition-actuator/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, 'video-composition-actuator');
 }
 
 export { handleAction, dispatchVideoCompositionOperation };

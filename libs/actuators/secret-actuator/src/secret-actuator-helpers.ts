@@ -1,22 +1,19 @@
+import { safeWriteFile, safeExec, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
+import * as secureIo from '@agent/core/secure-io';
+import { logger } from '@agent/core/core';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
+import { ledger } from '@agent/core/ledger';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
 import {
-  logger,
-  safeReadFile,
-  safeWriteFile,
-  safeExec,
-  ledger,
-  buildGovernedRetryOptions,
-  retry,
-  safeExistsSync,
-  safeMkdir,
   fetchSecret,
   storeSecret,
   removeSecret,
   listSecrets as coreListSecrets,
-  pathResolver,
-  secureIo,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+} from '@agent/core/secret-bridge';
+import * as pathResolver from '@agent/core/path-resolver';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import * as path from 'node:path';
 
 /**
@@ -69,9 +66,7 @@ function loadRegistry(): KeychainRegistry {
     return { entries: [] };
   }
   try {
-    return JSON.parse(
-      withVaultIo(() => safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' })) as string
-    ) as KeychainRegistry;
+    return withVaultIo(() => readJson<KeychainRegistry>(KEYCHAIN_REGISTRY_PATH));
   } catch {
     return { entries: [] };
   }
@@ -90,7 +85,7 @@ function registryAdd(service: string, account: string): void {
   const existing = registry.entries.findIndex(
     (e) => e.service === service && e.account === account
   );
-  const entry: RegistryEntry = { service, account, addedAt: new Date().toISOString() };
+  const entry: RegistryEntry = { service, account, addedAt: nowIso() };
   if (existing >= 0) {
     registry.entries[existing] = entry;
   } else {
@@ -107,14 +102,11 @@ function registryRemove(service: string, account: string): void {
   saveRegistry(registry);
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: SECRET_MANIFEST_PATH,
-    defaults: DEFAULT_SECRET_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: SECRET_MANIFEST_PATH,
+  defaults: DEFAULT_SECRET_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 async function withGovernedMutation(
   actionType: 'set' | 'delete',
@@ -122,7 +114,7 @@ async function withGovernedMutation(
   platform: string,
   logic: () => Promise<any>
 ) {
-  const existingMissionId = process.env.MISSION_ID;
+  const existingMissionId = getRegisteredEnvText('MISSION_ID');
   const isEphemeral = !existingMissionId;
   const missionId = existingMissionId || `MSN-SEC-${Date.now().toString(36).toUpperCase()}`;
 
@@ -163,7 +155,7 @@ async function withGovernedMutation(
     if (result.status === 'success') {
       ledger.record('CONFIG_CHANGE', {
         mission_id: missionId,
-        role: process.env.MISSION_ROLE || 'secret_guard',
+        role: getRegisteredEnvText('MISSION_ROLE') || 'secret_guard',
         service_id: params.service,
         config_target: 'os-keychain',
         action: actionType,

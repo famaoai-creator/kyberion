@@ -1,11 +1,29 @@
 #!/usr/bin/env node
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { readValidatedPipelineAdf } from './refactor/adf-input.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface SmokeRule {
   file: string;
   required: string[];
+}
+
+const FIRST_WIN_DOCUMENTS = ['README.md', 'docs/QUICKSTART.md', 'docs/INITIALIZATION.md'] as const;
+const CANONICAL_FIRST_WIN_COMMANDS = [
+  'pnpm install',
+  'pnpm build',
+  'pnpm env:bootstrap --manifest kyberion-toolchain',
+  'pnpm doctor',
+  'pnpm pipeline --input pipelines/verify-session.json',
+] as const;
+
+export function readFirstWinTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 const RULES: SmokeRule[] = [
@@ -34,8 +52,8 @@ const RULES: SmokeRule[] = [
   {
     file: 'docs/user/TROUBLESHOOTING.md',
     required: [
-      'pnpm setup:report --persona first-time-user',
-      'pnpm surfaces:repair',
+      'pnpm kyberion setup report --persona first-time-user',
+      'pnpm surfaces repair',
       'pnpm doctor',
     ],
   },
@@ -75,10 +93,9 @@ const RULES: SmokeRule[] = [
   },
 ];
 
-function readJson(file: string): any | null {
-  const abs = pathResolver.rootResolve(file);
+function readValidatedPipeline(file: string): any | null {
   try {
-    return readFoundationJson<unknown>(abs);
+    return readValidatedPipelineAdf(file);
   } catch {
     return null;
   }
@@ -179,28 +196,79 @@ export function validateFirstWinLifecyclePipeline(pipeline: unknown): string[] {
   return violations;
 }
 
+export function extractCanonicalFirstWinCommands(source: string): string[] | null {
+  const markerIndex = source.indexOf('# kyberion-first-win');
+  if (markerIndex < 0) return null;
+  const afterMarker = source.slice(markerIndex + '# kyberion-first-win'.length);
+  const block = afterMarker.match(/```bash\r?\n([\s\S]*?)\r?\n```/u)?.[1];
+  if (!block) return null;
+  return block
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith('#'));
+}
+
+export function validateCanonicalFirstWinDocumentation(
+  documents: ReadonlyArray<{ file: string; source: string }> = FIRST_WIN_DOCUMENTS.map((file) => ({
+    file,
+    source: readFirstWinTextFile(pathResolver.rootResolve(file), file),
+  }))
+): string[] {
+  const violations: string[] = [];
+  let canonical: string[] | null = null;
+
+  for (const document of documents) {
+    const commands = extractCanonicalFirstWinCommands(document.source);
+    if (!commands) {
+      violations.push(`${document.file}: missing canonical # kyberion-first-win bash block`);
+      continue;
+    }
+    if (commands.length !== CANONICAL_FIRST_WIN_COMMANDS.length) {
+      violations.push(
+        `${document.file}: canonical first-win block must contain exactly ${CANONICAL_FIRST_WIN_COMMANDS.length} commands`
+      );
+      continue;
+    }
+    for (const [index, expected] of CANONICAL_FIRST_WIN_COMMANDS.entries()) {
+      if (commands[index] !== expected) {
+        violations.push(
+          `${document.file}: canonical first-win command ${index + 1} must be "${expected}"`
+        );
+      }
+    }
+    if (!canonical) canonical = commands;
+    else if (JSON.stringify(commands) !== JSON.stringify(canonical)) {
+      violations.push(
+        `${document.file}: canonical first-win commands differ from the first document`
+      );
+    }
+  }
+  return violations;
+}
+
 export function checkFirstWinSmoke(): string[] {
   const violations: string[] = [];
+  violations.push(...validateCanonicalFirstWinDocumentation());
   for (const rule of RULES) {
     const abs = pathResolver.rootResolve(rule.file);
     if (!safeExistsSync(abs)) {
       violations.push(`${rule.file}: missing`);
       continue;
     }
-    const text = String(safeReadFile(abs, { encoding: 'utf8' }) || '');
+    const text = readFirstWinTextFile(abs, rule.file);
     for (const needle of rule.required) {
       if (!text.includes(needle)) {
         violations.push(`${rule.file}: missing "${needle}"`);
       }
     }
   }
-  const verifySession = readJson('pipelines/verify-session.json');
+  const verifySession = readValidatedPipeline('pipelines/verify-session.json');
   if (!verifySession) {
     violations.push('pipelines/verify-session.json: invalid JSON');
   } else {
     violations.push(...validateVerifySessionPipeline(verifySession));
   }
-  const lifecycle = readJson('pipelines/first-win-lifecycle-weekly.json');
+  const lifecycle = readValidatedPipeline('pipelines/first-win-lifecycle-weekly.json');
   if (!lifecycle) {
     violations.push('pipelines/first-win-lifecycle-weekly.json: invalid JSON');
   } else {
@@ -215,13 +283,13 @@ export const runCheckFirstWinSmoke = defineScript({
   run(context) {
     const violations = checkFirstWinSmoke();
     if (violations.length > 0) {
-      console.error('[check:first-win-smoke] violations detected:');
-      for (const violation of violations) {
-        console.error(`- ${violation}`);
-      }
-      throw new Error(`${violations.length} first-win smoke violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.map((violation) => `- ${violation}`)].join('\n')
+      );
     }
     context.print('[check:first-win-smoke] OK');
+    return { violations };
   },
 });
 

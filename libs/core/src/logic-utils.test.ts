@@ -8,6 +8,7 @@ import {
   resolveRequiredStringParam,
 } from './logic-utils.js';
 import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync } from '../secure-io.js';
 
 describe('logic-utils', () => {
   const ctx = {
@@ -74,6 +75,25 @@ describe('logic-utils', () => {
     expect(resolved.startsWith(pathResolver.rootDir())).toBe(true);
   });
 
+  it('rejects path-token traversal and symlink components', () => {
+    expect(() => resolveVars('{{@active:../knowledge/private}}', ctx)).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    const suffix = `logic-utils-path-token-${process.pid}`;
+    const target = pathResolver.sharedTmp(`${suffix}-target`);
+    const link = pathResolver.sharedTmp(`${suffix}-link`);
+    safeMkdir(target);
+    safeSymlinkSync(target, link, 'dir');
+    try {
+      expect(() => resolveVars(`{{@tmp:${suffix}-link/file}}`, ctx)).toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+    } finally {
+      safeRmSync(link, { recursive: true, force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
+  });
+
   it('resolves multi-var strings that start AND end with {{ }} correctly', () => {
     const c = { account_org: '田中製造株式会社', account_name: '田中誠' };
     // "{{account_org}} / {{account_name}}" starts with {{ and ends with }} — must NOT be
@@ -88,6 +108,17 @@ describe('logic-utils', () => {
     );
     expect(getPathValue({ report: { metrics: { count: 5 } } }, 'report.metrics.count')).toBe(5);
     expect(getPathValue({ report: {} }, 'report.metrics.count')).toBeUndefined();
+  });
+
+  it('resolves env paths through the governed environment accessor', () => {
+    const previous = process.env.KYBERION_LOCALE;
+    process.env.KYBERION_LOCALE = 'ja';
+    try {
+      expect(getPathValue({}, 'env.KYBERION_LOCALE')).toBe('ja');
+    } finally {
+      if (previous === undefined) delete process.env.KYBERION_LOCALE;
+      else process.env.KYBERION_LOCALE = previous;
+    }
   });
 
   it('evaluates supported condition operators', () => {

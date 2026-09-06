@@ -16,6 +16,7 @@
 
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { safeExecResult } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 export type SecretEncryptionMode = 'none' | 'keychain';
 
@@ -150,5 +151,8 @@ export function decryptConnectionDocument(
     decipher.update(Buffer.from(envelope.ciphertext, 'base64')),
     decipher.final(),
   ]);
-  return JSON.parse(plaintext.toString('utf8')) as Record<string, unknown>;
+  return parseSafeJsonInput(plaintext.toString('utf8'), 'decrypted secret document') as Record<
+    string,
+    unknown
+  >;
 }

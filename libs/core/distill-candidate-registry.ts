@@ -1,11 +1,12 @@
-import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -40,16 +41,37 @@ export interface DistillCandidateRecord {
 
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/distill-candidate-record.schema.json');
 const DISTILL_DIR = pathResolver.shared('runtime/distill-candidates');
-let validateFn: ValidateFunction | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(SCHEMA_PATH);
-  return validateFn;
-}
 
 function recordPath(candidateId: string): string {
   return `${DISTILL_DIR}/${candidateId}.json`;
+}
+
+const distillCandidateRecordCatalog = defineCatalog<DistillCandidateRecord>({
+  id: 'distill-candidate-record',
+  path: DISTILL_DIR,
+  schema: SCHEMA_PATH,
+});
+
+function distillCandidateRecordCatalogAtPath(filePath: string) {
+  return defineCatalog<DistillCandidateRecord>({
+    id: 'distill-candidate-record',
+    path: filePath,
+    schema: SCHEMA_PATH,
+  });
+}
+
+let distillCandidateListCache: {
+  fingerprint: string;
+  records: DistillCandidateRecord[];
+} | null = null;
+
+function distillCandidateListFingerprint(entries: string[]): string {
+  return entries
+    .map((entry) => {
+      const stats = safeLstat(`${DISTILL_DIR}/${entry}`);
+      return `${entry}:${stats.mode}:${stats.size}:${stats.mtimeMs}`;
+    })
+    .join('|');
 }
 
 export function createDistillCandidateRecord(
@@ -57,7 +79,7 @@ export function createDistillCandidateRecord(
     candidate_id?: string;
   }
 ): DistillCandidateRecord {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     candidate_id:
       input.candidate_id ||
@@ -69,41 +91,68 @@ export function createDistillCandidateRecord(
 }
 
 export function validateDistillCandidateRecord(value: unknown): value is DistillCandidateRecord {
-  return Boolean(ensureValidator()(value));
+  try {
+    distillCandidateRecordCatalog.validate(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function saveDistillCandidateRecord(record: DistillCandidateRecord): string {
-  if (!validateDistillCandidateRecord(record)) {
-    const errors = (ensureValidator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
-    );
-    throw new Error(`Invalid distill candidate record: ${errors.join('; ')}`);
-  }
-  if (!safeExistsSync(DISTILL_DIR)) safeMkdir(DISTILL_DIR, { recursive: true });
   const filePath = recordPath(record.candidate_id);
   const updated: DistillCandidateRecord = {
     ...record,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
-  safeWriteFile(filePath, JSON.stringify(updated, null, 2));
+  let validated: DistillCandidateRecord;
+  try {
+    validated = distillCandidateRecordCatalogAtPath(filePath).validate(updated, filePath);
+  } catch (error) {
+    throw new Error(
+      `Invalid distill candidate record: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  if (!safeExistsSync(DISTILL_DIR)) safeMkdir(DISTILL_DIR, { recursive: true });
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  distillCandidateListCache = null;
   return filePath;
 }
 
 export function loadDistillCandidateRecord(candidateId: string): DistillCandidateRecord | null {
   const filePath = recordPath(candidateId);
-  if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as DistillCandidateRecord;
-  return validateDistillCandidateRecord(parsed) ? parsed : null;
+  try {
+    const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeFilePath)) return null;
+    if (!safeLstat(safeFilePath).isFile()) {
+      throw new Error(`[DISTILL_CANDIDATE] record must be a regular file: ${filePath}`);
+    }
+    return distillCandidateRecordCatalogAtPath(safeFilePath).load();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
+    throw error;
+  }
 }
 
 export function listDistillCandidateRecords(): DistillCandidateRecord[] {
-  if (!safeExistsSync(DISTILL_DIR)) return [];
-  return safeReaddir(DISTILL_DIR)
+  if (!safeExistsSync(DISTILL_DIR)) {
+    distillCandidateListCache = null;
+    return [];
+  }
+  const entries = safeReaddir(DISTILL_DIR)
     .filter((entry) => entry.endsWith('.json'))
+    .sort();
+  const fingerprint = distillCandidateListFingerprint(entries);
+  if (distillCandidateListCache?.fingerprint === fingerprint) {
+    return distillCandidateListCache.records.map((record) => structuredClone(record));
+  }
+
+  const records = entries
     .map((entry) => loadDistillCandidateRecord(entry.replace(/\.json$/, '')))
     .filter((record): record is DistillCandidateRecord => Boolean(record))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  distillCandidateListCache = { fingerprint, records };
+  return records.map((record) => structuredClone(record));
 }
 
 export function updateDistillCandidateRecord(
@@ -117,7 +166,7 @@ export function updateDistillCandidateRecord(
     ...patch,
     candidate_id: current.candidate_id,
     created_at: current.created_at,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   saveDistillCandidateRecord(next);
   return next;

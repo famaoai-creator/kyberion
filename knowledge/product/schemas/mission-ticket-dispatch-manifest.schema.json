@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mission-ticket-dispatch-manifest.schema.json",
+  "title": "Mission Ticket Dispatch Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "propertyNames": {
+    "not": { "enum": ["__proto__", "constructor", "prototype"] }
+  },
+  "properties": {
+    "mission_id": { "type": "string", "minLength": 1 },
+    "mission_type": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "track_id": { "type": "string", "minLength": 1 },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "targets": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["workitem", "github", "jira"] }
+    },
+    "live_targets": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["workitem", "github", "jira"] }
+    },
+    "ticket_count": { "type": "integer", "minimum": 0 },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "propertyNames": {
+          "not": { "enum": ["__proto__", "constructor", "prototype"] }
+        },
+        "properties": {
+          "task_id": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["created", "updated", "skipped", "deferred", "failed"]
+          },
+          "notes": { "type": "array", "items": { "type": "string" } },
+          "ticket_targets": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["workitem", "github", "jira"] }
+          },
+          "ticket_files": { "type": "array", "items": { "type": "string" } },
+          "live_results": { "type": "object", "additionalProperties": true }
+        }
+      }
+    },
+    "manifest_path": { "type": "string", "minLength": 1 },
+    "event_path": { "type": "string", "minLength": 1 }
+  },
+  "required": ["mission_id", "records"]
+}

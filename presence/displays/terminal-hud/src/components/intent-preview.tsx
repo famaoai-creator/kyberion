@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import type { IntentResolutionContract } from '@agent/core';
+import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract';
 import { useI18n } from '../i18n.js';
 import { theme } from '../theme.js';
 import {

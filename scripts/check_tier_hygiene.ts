@@ -7,10 +7,11 @@
  * Invoke: pnpm check:tier-hygiene
  */
 
-import { pathResolver, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineCatalog, readTextFile } from '@agent/core/foundation';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import * as path from 'node:path';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface DeniedPattern {
   name: string;
@@ -37,10 +38,21 @@ export interface Violation {
 }
 
 const POLICY_PATH = 'knowledge/product/governance/tier-hygiene-policy.json';
+const policyCatalog = defineCatalog<Policy>({
+  id: 'tier-hygiene-policy',
+  path: () => pathResolver.rootResolve(POLICY_PATH),
+  schema: pathResolver.knowledge('product/schemas/tier-hygiene-policy.schema.json'),
+});
+
+export function readTierHygieneTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 async function loadPolicy(): Promise<Policy> {
-  const absolute = pathResolver.rootResolve(POLICY_PATH);
-  return readJson<Policy>(absolute);
+  return policyCatalog.load();
 }
 
 function buildAllowlist(policy: Policy): RegExp[] {
@@ -232,7 +244,7 @@ export function scanPersistentTierFixturePollution(root: string, files: string[]
   for (const rel of targets) {
     let content: string;
     try {
-      content = safeReadFile(path.join(root, rel), { encoding: 'utf8' }) as string;
+      content = readTierHygieneTextFile(path.join(root, rel));
     } catch {
       // Fail-open: an unreadable file is not this check's concern.
       continue;
@@ -310,7 +322,7 @@ export async function scan(): Promise<Violation[]> {
     const absolute = path.join(root, rel);
     let content: string;
     try {
-      content = safeReadFile(absolute, { encoding: 'utf8' }) as string;
+      content = readTierHygieneTextFile(absolute);
     } catch {
       continue;
     }
@@ -373,19 +385,21 @@ export const runCheckTierHygiene = defineScript({
     const violations = await scan();
     if (violations.length === 0) {
       context.print('[check:tier-hygiene] OK');
-      return;
+      return { violations };
     }
-    console.error(`[check:tier-hygiene] ${violations.length} violation(s) detected:`);
-    for (const v of violations) {
-      console.error(`  ${v.file}:${v.line} [${v.pattern}] ${v.matched}`);
-      console.error(`    → ${v.rationale}`);
-    }
-    console.error('');
-    console.error(
-      'Fix by moving the value into knowledge/confidential/{org}/ and using a placeholder (${VAR} / <PLACEHOLDER>) in public. ' +
-        'Legitimate industry terms should be added to allowlist_patterns in the tier-hygiene-policy.'
+    throw new ScriptExitError(
+      1,
+      [
+        `[check:tier-hygiene] ${violations.length} violation(s) detected:`,
+        ...violations.flatMap((v) => [
+          `  ${v.file}:${v.line} [${v.pattern}] ${v.matched}`,
+          `    → ${v.rationale}`,
+        ]),
+        '',
+        'Fix by moving the value into knowledge/confidential/{org}/ and using a placeholder (${VAR} / <PLACEHOLDER>) in public. ' +
+          'Legitimate industry terms should be added to allowlist_patterns in the tier-hygiene-policy.',
+      ].join('\n')
     );
-    process.exitCode = 1;
   },
 });
 

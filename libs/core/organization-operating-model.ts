@@ -2,6 +2,7 @@ import { type OrganizationProfile } from './organization-profile.js';
 import type { SupportedLocale } from './locale.js';
 import { auditChain } from './audit-chain.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { safeRmSync } from './secure-io.js';
 
 export type OrganizationTier = 'personal' | 'confidential' | 'public';
@@ -688,7 +689,7 @@ export function retireOrganizationEntity(input: {
   const next = {
     ...record,
     status: 'retired',
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     metadata: {
       ...(record.metadata || {}),
       ...(input.reason ? { retire_reason: input.reason } : {}),

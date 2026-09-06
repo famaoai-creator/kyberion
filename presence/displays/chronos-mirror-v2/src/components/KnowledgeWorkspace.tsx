@@ -12,19 +12,13 @@ import {
 } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
+import { parseKnowledgeResponse, type ClientKnowledgeCandidate } from '../lib/knowledge-response';
+import {
+  parseKnowledgeFeedbackResponse,
+  parseKnowledgeMutationResponse,
+} from '../lib/knowledge-mutation-response';
 
-type Candidate = {
-  candidate_id: string;
-  status: string;
-  proposed_memory_kind: string;
-  summary: string;
-  evidence_refs: string[];
-  sensitivity_tier: string;
-  source_ref: string;
-  tenantSlug?: string;
-  promoted_ref?: string;
-  ratification_required: boolean;
-};
+type Candidate = ClientKnowledgeCandidate;
 
 function knowledgeStatusLabel(value: string, locale: string): string {
   const labels: Record<string, string> = {
@@ -52,10 +46,10 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
     try {
       const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
       const response = await fetch(`/api/knowledge${query}`, { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to load knowledge candidates');
-      const nextItems = Array.isArray(payload.candidates) ? payload.candidates : [];
-      setAccessRole(payload.accessRole === 'localadmin' ? 'localadmin' : 'readonly');
+      const payload = parseKnowledgeResponse(await response.json().catch(() => null));
+      if (!response.ok || !payload) throw new Error('Invalid knowledge response');
+      const nextItems = payload.candidates;
+      setAccessRole(payload.accessRole);
       setItems(nextItems);
       setSelectedId((current) =>
         nextItems.some((item: Candidate) => item.candidate_id === current)
@@ -110,8 +104,11 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
           tenant,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to promote knowledge');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('Failed to promote knowledge');
+      if (!parseKnowledgeMutationResponse(payload)) {
+        throw new Error('Invalid knowledge promotion response');
+      }
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -128,8 +125,11 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ document_path: selected.promoted_ref, verdict, tenant }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to record feedback');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('Failed to record feedback');
+      if (!parseKnowledgeFeedbackResponse(payload)) {
+        throw new Error('Invalid knowledge feedback response');
+      }
       setFeedback(verdict);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -150,8 +150,11 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
           tenant,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to approve the candidate');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('Failed to approve the candidate');
+      if (!parseKnowledgeMutationResponse(payload)) {
+        throw new Error('Invalid knowledge approval response');
+      }
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -175,8 +178,11 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
           note: decisionNote,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Failed to reject the candidate');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('Failed to reject the candidate');
+      if (!parseKnowledgeMutationResponse(payload)) {
+        throw new Error('Invalid knowledge rejection response');
+      }
       setDecisionNote('');
       await refresh();
     } catch (err) {

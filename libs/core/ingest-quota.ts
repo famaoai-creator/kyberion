@@ -27,8 +27,16 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 
 /** Governance policy file (same directory + override shape as spend-policy.json). */
 export const INGEST_QUOTA_POLICY_REPO_PATH =
@@ -53,11 +61,33 @@ export interface IngestQuotaPolicy extends IngestQuotaLimits {
   tenant_overrides?: Record<string, IngestQuotaOverride>;
 }
 
-export const DEFAULT_INGEST_QUOTA_POLICY: IngestQuotaPolicy = Object.freeze({
-  max_files_per_day: 200,
-  max_bytes_per_day: 50 * 1024 * 1024,
-  warn_ratio: 0.8,
-});
+const INGEST_QUOTA_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/ingest-quota-policy.schema.json'
+);
+const INGEST_QUOTA_COUNTER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/ingest-quota-counter.schema.json'
+);
+
+interface IngestQuotaCounterRecord {
+  tenant_slug: string;
+  date: string;
+  files: number;
+  bytes: number;
+  updated_at: string;
+}
+
+function createIngestQuotaPolicyCatalog(rootDir: string) {
+  return defineCatalog<IngestQuotaPolicy>({
+    id: 'ingest-quota-policy',
+    path: assertSafeRepositoryPath(
+      path.join(rootDir, ...INGEST_QUOTA_POLICY_REPO_PATH.split('/')),
+      { allowMissingLeaf: true, rootDir }
+    ),
+    schema: INGEST_QUOTA_POLICY_SCHEMA_PATH,
+  });
+}
+
+const defaultIngestQuotaPolicyCatalog = createIngestQuotaPolicyCatalog(pathResolver.rootDir());
 
 export type IngestQuotaLevel = 'ok' | 'warn' | 'block';
 export type IngestQuotaDimension = 'files' | 'bytes';
@@ -99,7 +129,17 @@ function assertTenantSlug(slug: string): void {
 }
 
 function resolveRootDir(options: IngestQuotaOptions): string {
-  return options.rootDir ?? pathResolver.rootDir();
+  const candidate = path.resolve(options.rootDir ?? pathResolver.rootDir());
+  const relative = path.relative(pathResolver.rootDir(), candidate).replaceAll('\\', '/');
+  if (relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] ingest quota root is outside the repository: ${candidate}`
+    );
+  }
+  assertSafeRepositoryPath(path.join(candidate, '.ingest-quota-root'), {
+    allowMissingLeaf: true,
+  });
+  return candidate;
 }
 
 /** UTC calendar day for the injectable clock (spend-guard counts per UTC day too). */
@@ -118,11 +158,10 @@ export function ingestQuotaCounterPath(
 ): string {
   assertTenantSlug(tenantSlug);
   const date = ingestQuotaDateKey(options.now);
-  return path.join(
-    resolveRootDir(options),
-    ...INGEST_QUOTA_COUNTER_REPO_SUBPATH.split('/'),
-    tenantSlug,
-    `${date}.json`
+  const root = resolveRootDir(options);
+  return assertSafeRepositoryPath(
+    path.join(root, ...INGEST_QUOTA_COUNTER_REPO_SUBPATH.split('/'), tenantSlug, `${date}.json`),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -131,43 +170,31 @@ function isPositive(value: unknown): value is number {
 }
 
 /**
- * Load the governed quota policy. A missing or broken policy file must not
- * silently disable the guard — it falls back to the defaults, exactly like
- * `loadSpendPolicy`.
+ * Load the governed quota policy. A missing or broken policy file is an
+ * operator-visible configuration error; the quota guard never substitutes a
+ * second policy embedded in code.
  */
 export function loadIngestQuotaPolicy(options: IngestQuotaOptions = {}): IngestQuotaPolicy {
-  const policyPath = path.join(
-    resolveRootDir(options),
-    ...INGEST_QUOTA_POLICY_REPO_PATH.split('/')
-  );
-  if (!safeExistsSync(policyPath)) return { ...DEFAULT_INGEST_QUOTA_POLICY };
-  try {
-    const parsed = readJson<Partial<IngestQuotaPolicy>>(policyPath);
-    const tenantOverrides: Record<string, IngestQuotaOverride> = {};
-    for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
-      if (!raw || typeof raw !== 'object') continue;
-      const override: IngestQuotaOverride = {};
-      if (isPositive(raw.max_files_per_day)) override.max_files_per_day = raw.max_files_per_day;
-      if (isPositive(raw.max_bytes_per_day)) override.max_bytes_per_day = raw.max_bytes_per_day;
-      if (isPositive(raw.warn_ratio) && raw.warn_ratio <= 1) override.warn_ratio = raw.warn_ratio;
-      if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
-    }
-    return {
-      max_files_per_day: isPositive(parsed.max_files_per_day)
-        ? parsed.max_files_per_day
-        : DEFAULT_INGEST_QUOTA_POLICY.max_files_per_day,
-      max_bytes_per_day: isPositive(parsed.max_bytes_per_day)
-        ? parsed.max_bytes_per_day
-        : DEFAULT_INGEST_QUOTA_POLICY.max_bytes_per_day,
-      warn_ratio:
-        isPositive(parsed.warn_ratio) && parsed.warn_ratio <= 1
-          ? parsed.warn_ratio
-          : DEFAULT_INGEST_QUOTA_POLICY.warn_ratio,
-      ...(Object.keys(tenantOverrides).length > 0 ? { tenant_overrides: tenantOverrides } : {}),
-    };
-  } catch {
-    return { ...DEFAULT_INGEST_QUOTA_POLICY };
+  const catalog =
+    options.rootDir === undefined
+      ? defaultIngestQuotaPolicyCatalog
+      : createIngestQuotaPolicyCatalog(resolveRootDir(options));
+  const parsed = catalog.load();
+  const tenantOverrides: Record<string, IngestQuotaOverride> = {};
+  for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
+    if (!raw || typeof raw !== 'object') continue;
+    const override: IngestQuotaOverride = {};
+    if (isPositive(raw.max_files_per_day)) override.max_files_per_day = raw.max_files_per_day;
+    if (isPositive(raw.max_bytes_per_day)) override.max_bytes_per_day = raw.max_bytes_per_day;
+    if (isPositive(raw.warn_ratio) && raw.warn_ratio <= 1) override.warn_ratio = raw.warn_ratio;
+    if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
   }
+  return {
+    max_files_per_day: parsed.max_files_per_day,
+    max_bytes_per_day: parsed.max_bytes_per_day,
+    warn_ratio: parsed.warn_ratio,
+    ...(Object.keys(tenantOverrides).length > 0 ? { tenant_overrides: tenantOverrides } : {}),
+  };
 }
 
 /**
@@ -189,16 +216,29 @@ export function resolveIngestQuotaForTenant(
   };
 }
 
-function readUsage(counterPath: string): IngestQuotaUsage {
+function readUsage(
+  counterPath: string,
+  expectedTenantSlug?: string,
+  expectedDate?: string
+): IngestQuotaUsage {
   if (!safeExistsSync(counterPath)) return { files: 0, bytes: 0 };
   try {
-    const parsed = readJson<{
-      files?: unknown;
-      bytes?: unknown;
-    }>(counterPath);
+    const safeCounterPath = assertSafeRepositoryPath(counterPath, { allowMissingLeaf: true });
+    if (!safeLstat(safeCounterPath).isFile()) return { files: 0, bytes: 0 };
+    const parsed = defineCatalog<IngestQuotaCounterRecord>({
+      id: 'ingest-quota-counter',
+      path: safeCounterPath,
+      schema: INGEST_QUOTA_COUNTER_SCHEMA_PATH,
+    }).load();
+    if (
+      (expectedTenantSlug !== undefined && parsed.tenant_slug !== expectedTenantSlug) ||
+      (expectedDate !== undefined && parsed.date !== expectedDate)
+    ) {
+      return { files: 0, bytes: 0 };
+    }
     return {
-      files: isPositive(parsed.files) ? Math.floor(parsed.files as number) : 0,
-      bytes: isPositive(parsed.bytes) ? Math.floor(parsed.bytes as number) : 0,
+      files: isPositive(parsed.files) ? Math.floor(parsed.files) : 0,
+      bytes: isPositive(parsed.bytes) ? Math.floor(parsed.bytes) : 0,
     };
   } catch {
     // A corrupt counter must not open the gate wide OR wedge it shut: treat
@@ -224,7 +264,7 @@ export function checkIngestQuota(
   const policy = options.policy ?? loadIngestQuotaPolicy(options);
   const { limits, warn_ratio: warnRatio } = resolveIngestQuotaForTenant(policy, tenantSlug);
   const date = ingestQuotaDateKey(options.now);
-  const usage = readUsage(ingestQuotaCounterPath(tenantSlug, options));
+  const usage = readUsage(ingestQuotaCounterPath(tenantSlug, options), tenantSlug, date);
   const projected: IngestQuotaUsage = {
     files: usage.files + incomingFiles,
     bytes: usage.bytes + incomingBytes,
@@ -275,28 +315,27 @@ export function recordIngestUsage(
 ): IngestQuotaUsage {
   assertTenantSlug(tenantSlug);
   const counterPath = ingestQuotaCounterPath(tenantSlug, options);
-  const usage = readUsage(counterPath);
+  const date = ingestQuotaDateKey(options.now);
+  const usage = readUsage(counterPath, tenantSlug, date);
   const next: IngestQuotaUsage = {
     files: usage.files + Math.max(0, Math.floor(Number(files) || 0)),
     bytes: usage.bytes + Math.max(0, Math.floor(Number(bytes) || 0)),
   };
   safeMkdir(path.dirname(counterPath), { recursive: true });
-  safeWriteFile(
-    counterPath,
-    JSON.stringify(
-      {
-        tenant_slug: tenantSlug,
-        date: ingestQuotaDateKey(options.now),
-        ...next,
-        updated_at:
-          options.now === undefined
-            ? new Date().toISOString()
-            : new Date(options.now).toISOString(),
-      },
-      null,
-      2
-    )
+  const validated = defineCatalog<IngestQuotaCounterRecord>({
+    id: 'ingest-quota-counter',
+    path: counterPath,
+    schema: INGEST_QUOTA_COUNTER_SCHEMA_PATH,
+  }).validate(
+    {
+      tenant_slug: tenantSlug,
+      date,
+      ...next,
+      updated_at: options.now === undefined ? nowIso() : nowIso(new Date(options.now)),
+    },
+    counterPath
   );
+  safeWriteFile(counterPath, JSON.stringify(validated, null, 2));
   return next;
 }
 
@@ -307,6 +346,8 @@ export function recordIngestUsage(
  * `KYBERION_INGEST_QUOTA_TEST=1`.
  */
 export function shouldEnforceIngestQuota(env: NodeJS.ProcessEnv = process.env): boolean {
-  if (env.VITEST && env.KYBERION_INGEST_QUOTA_TEST !== '1') return false;
+  if (env.VITEST && getRegisteredEnvText('KYBERION_INGEST_QUOTA_TEST', { env }) !== '1') {
+    return false;
+  }
   return true;
 }

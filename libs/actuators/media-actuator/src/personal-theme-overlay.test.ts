@@ -1,14 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
-  const personalThemePath = actual.pathResolver.rootResolve(
-    'knowledge/personal/design-patterns/media-templates/themes.json'
-  );
-  const personalThemeDir = actual.pathResolver.rootResolve(
-    'knowledge/personal/design-patterns/media-templates/themes'
-  );
-  const personalTheme = {
+const { personalTheme } = vi.hoisted(() => ({
+  personalTheme: {
     version: '1.1.0',
     default_theme: 'test-roundtrip-theme',
     themes: {
@@ -27,7 +20,27 @@ vi.mock('@agent/core', async (importOriginal) => {
         },
       },
     },
-  };
+  },
+}));
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
+  const { pathResolver } = await vi.importActual<typeof import('@agent/core/path-resolver')>(
+    '@agent/core/path-resolver'
+  );
+  const personalThemePath = pathResolver.rootResolve(
+    'knowledge/personal/design-patterns/media-templates/themes.json'
+  );
+  const personalThemeDir = pathResolver.rootResolve(
+    'knowledge/personal/design-patterns/media-templates/themes'
+  );
+  const personalThemeFileStat = {
+    isFile: () => true,
+    isDirectory: () => false,
+    isSymbolicLink: () => false,
+    mtimeMs: 1,
+    size: JSON.stringify(personalTheme).length,
+  } as ReturnType<typeof actual.safeLstat>;
   return {
     ...actual,
     safeExistsSync: (targetPath: string) => {
@@ -41,12 +54,45 @@ vi.mock('@agent/core', async (importOriginal) => {
       }
       return actual.safeReadFile(targetPath, options as any);
     },
+    safeLstat: (targetPath: string) =>
+      targetPath === personalThemePath ? personalThemeFileStat : actual.safeLstat(targetPath),
+    safeStat: (targetPath: string) =>
+      targetPath === personalThemePath ? personalThemeFileStat : actual.safeStat(targetPath),
     loadJson: <T>(targetPath: string) =>
       targetPath === personalThemePath ? (personalTheme as T) : actual.loadJson<T>(targetPath),
   };
 });
 
+import { getFoundationIo, registerFoundationIo } from '@agent/core/foundation/io.js';
+import { pathResolver } from '@agent/core/path-resolver';
 import { handleAction } from './index.js';
+
+const personalThemePath = pathResolver.rootResolve(
+  'knowledge/personal/design-patterns/media-templates/themes.json'
+);
+const originalFoundationIo = getFoundationIo();
+const personalThemeJson = JSON.stringify(personalTheme);
+registerFoundationIo({
+  ...originalFoundationIo,
+  loadJson: <T>(filePath: string) =>
+    filePath === personalThemePath
+      ? (personalTheme as T)
+      : originalFoundationIo.loadJson<T>(filePath),
+  loadJsonIfPresent: <T>(filePath: string) =>
+    filePath === personalThemePath
+      ? (personalTheme as T)
+      : originalFoundationIo.loadJsonIfPresent<T>(filePath),
+  exists: (filePath: string) =>
+    filePath === personalThemePath ? true : originalFoundationIo.exists(filePath),
+  readFile: (filePath: string) =>
+    filePath === personalThemePath ? personalThemeJson : originalFoundationIo.readFile(filePath),
+  stat: (filePath: string) =>
+    filePath === personalThemePath
+      ? { mtimeMs: 1, size: personalThemeJson.length }
+      : originalFoundationIo.stat(filePath),
+});
+
+afterAll(() => registerFoundationIo(originalFoundationIo));
 
 describe('media-actuator personal theme overlay', () => {
   it('merges a personal overlay theme into the catalog used by apply_theme', async () => {

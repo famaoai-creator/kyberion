@@ -1,14 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from '../secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   knowledgeDeliveryLogDir,
   knowledgeUsageAggregatePath,
+  loadKnowledgeFeedbackCap,
   loadKnowledgeUsageAggregate,
   recordKnowledgeDelivery,
   recordKnowledgeGap,
   recordKnowledgeUsageFeedback,
+  recordHumanKnowledgeFeedback,
 } from './knowledge-feedback-loop.js';
 import {
   listMemoryPromotionCandidates,
@@ -23,21 +31,25 @@ const suiteRoot = pathResolver.sharedTmp(`kp05-knowledge-feedback-loop-test/${pr
 const deliveryDirOverride = `${suiteRoot}/knowledge-delivery`;
 const usagePathOverride = `${suiteRoot}/knowledge-usage/usage.json`;
 const queuePathOverride = `${suiteRoot}/promotion-queue.jsonl`;
+const policyPathOverride = `${suiteRoot}/knowledge-feedback-policy.json`;
 
 let originalDeliveryDir: string | undefined;
 let originalUsagePath: string | undefined;
 let originalQueuePath: string | undefined;
 let originalFeedbackDir: string | undefined;
+let originalPolicyPath: string | undefined;
 
 beforeEach(() => {
   originalDeliveryDir = process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
   originalUsagePath = process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
   originalQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
   originalFeedbackDir = process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+  originalPolicyPath = process.env.KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH;
   process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = deliveryDirOverride;
   process.env.KYBERION_KNOWLEDGE_USAGE_PATH = usagePathOverride;
   process.env.KYBERION_MEMORY_QUEUE_PATH = queuePathOverride;
   process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = `${suiteRoot}/feedback`;
+  process.env.KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH = policyPathOverride;
   safeRmSync(suiteRoot, { recursive: true, force: true });
   // enqueueMemoryPromotionCandidate only ensures the DEFAULT queue dir
   // exists, not an overridden one — pre-create the parent dir ourselves.
@@ -54,6 +66,54 @@ afterEach(() => {
   else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueuePath;
   if (originalFeedbackDir === undefined) delete process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
   else process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = originalFeedbackDir;
+  if (originalPolicyPath === undefined) delete process.env.KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH;
+  else process.env.KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH = originalPolicyPath;
+});
+
+describe('knowledge feedback policy', () => {
+  it('ignores a policy override outside the repository', () => {
+    process.env.KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH =
+      '/tmp/external-knowledge-feedback-policy.json';
+
+    expect(loadKnowledgeFeedbackCap()).toEqual({
+      max_usage_entries: 10_000,
+      max_usage_bytes: 10 * 1024 * 1024,
+    });
+  });
+
+  it('falls back from external runtime path overrides', () => {
+    process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = '/tmp/external-knowledge-delivery';
+    process.env.KYBERION_KNOWLEDGE_USAGE_PATH = '/tmp/external-knowledge-usage.json';
+    process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = '/tmp/external-knowledge-feedback';
+
+    expect(knowledgeDeliveryLogDir()).not.toContain('/tmp/external-knowledge-delivery');
+    expect(knowledgeUsageAggregatePath()).not.toContain('/tmp/external-knowledge-usage.json');
+    expect(knowledgeDeliveryLogDir()).toContain('active/shared/runtime/feedback-loop');
+    expect(knowledgeUsageAggregatePath()).toContain('active/shared/runtime/feedback-loop');
+  });
+
+  it('loads governed defaults and tenant overrides, then rejects invalid policy input', () => {
+    safeWriteFile(
+      policyPathOverride,
+      JSON.stringify({
+        version: '1.0.0',
+        defaults: { max_usage_entries: 12, max_usage_bytes: 4096 },
+        tenant_overrides: { 'tenant-a': { max_usage_entries: 3 } },
+      })
+    );
+
+    expect(loadKnowledgeFeedbackCap({ tier: 'confidential', tenant_slug: 'tenant-a' })).toEqual({
+      max_usage_entries: 3,
+      max_usage_bytes: 4096,
+    });
+    expect(loadKnowledgeFeedbackCap()).toEqual({
+      max_usage_entries: 12,
+      max_usage_bytes: 4096,
+    });
+
+    safeWriteFile(policyPathOverride, JSON.stringify({ defaults: { max_usage_entries: 0 } }));
+    expect(() => loadKnowledgeFeedbackCap()).toThrow('Invalid catalog knowledge-feedback-policy');
+  });
 });
 
 describe('recordKnowledgeDelivery', () => {
@@ -106,6 +166,31 @@ describe('recordKnowledgeDelivery', () => {
     expect(result).toBeUndefined();
     expect(safeExistsSync(knowledgeDeliveryLogDir())).toBe(false);
     expect(safeExistsSync(knowledgeUsageAggregatePath())).toBe(false);
+  });
+
+  it('rejects feedback log paths that are directories', () => {
+    const humanPath = path.join(suiteRoot, 'feedback', 'knowledge-human.jsonl');
+    const gapsPath = path.join(suiteRoot, 'feedback', 'knowledge-gaps.jsonl');
+    safeMkdir(humanPath, { recursive: true });
+    safeMkdir(gapsPath, { recursive: true });
+
+    try {
+      expect(() =>
+        recordHumanKnowledgeFeedback({
+          document_path: 'knowledge/product/architecture/example.md',
+          verdict: 'useful',
+        })
+      ).toThrow('[KNOWLEDGE_FEEDBACK_INVALID] feedback log must be a regular file');
+      expect(() =>
+        recordKnowledgeGap({
+          topic: 'directory boundary',
+          sourceRef: 'task:directory-boundary',
+        })
+      ).toThrow('[KNOWLEDGE_FEEDBACK_INVALID] feedback log must be a regular file');
+    } finally {
+      safeRmSync(humanPath, { recursive: true, force: true });
+      safeRmSync(gapsPath, { recursive: true, force: true });
+    }
   });
 
   it('deduplicates refs by path within one delivery call', () => {

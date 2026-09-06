@@ -1,5 +1,6 @@
 import { PlanningPacketSchema, formatZodIssues } from './structured-output-contracts.js';
 import type { PlanningPacket } from './channel-surface-types.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 export interface PlanningPacketValidationResult {
   valid: boolean;
@@ -39,7 +40,7 @@ export function extractPlanningPacketBlocks(raw: string): ExtractPlanningPacketB
     }
 
     try {
-      const parsed = JSON.parse(trimmed);
+      const parsed = parseSafeJsonInput(trimmed, 'planning_packet block');
       const validation = validateParsedPlanningPacket(parsed);
       if (validation.valid && validation.value) {
         planningPackets.push(validation.value);

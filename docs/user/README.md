@@ -8,7 +8,7 @@ For people **using** Kyberion to get work done. If you're trying to operate / de
 | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | [WHY.md](../WHY.md)                                                | First. What is this thing and why does it exist.                                                      |
 | [QUICKSTART.md](../QUICKSTART.md)                                  | Then. 5 minutes from clone to first working smoke.                                                    |
-| [OPERATIONS_READINESS_MATRIX.md](./OPERATIONS_READINESS_MATRIX.md) | What is ready, conditional, or environment-dependent in normal use. Pair it with `pnpm setup:report`. |
+| [OPERATIONS_READINESS_MATRIX.md](./OPERATIONS_READINESS_MATRIX.md) | What is ready, conditional, or environment-dependent in normal use. Pair it with `pnpm kyberion setup report`. |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)                         | First-stop recovery guide for missing auth, stale surfaces, and first-run setup noise.                |
 | [USE_CASE_QUICKSTARTS.md](./USE_CASE_QUICKSTARTS.md)               | Three task-first entry points: meeting facilitator, report generation, browser research.              |
 | [PRODUCTIVITY_TASKS.md](./PRODUCTIVITY_TASKS.md)                   | Plan ad hoc work across calendar, meeting, email, documents, browser, and connected systems.          |

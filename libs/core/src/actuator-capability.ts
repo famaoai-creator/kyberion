@@ -7,9 +7,15 @@
  */
 
 import { logger } from '../core.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
-import { loadJson, safeExec, safeExistsSync } from '../secure-io.js';
-import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
+import { safeExec, safeExistsSync, assertSafeRepositoryPath } from '../secure-io.js';
+import {
+  loadActuatorManifest,
+  loadActuatorManifestCatalog,
+  type ActuatorManifestFile,
+} from './actuator-manifest-index.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface ActuatorCapability {
@@ -27,24 +33,7 @@ export interface ActuatorStatus {
   checkedAt: string;
 }
 
-interface ManifestCapability {
-  op: string;
-  platforms?: string[];
-  /** false = declared but not implemented (AC-01 goal 4; triaged by AC-06). */
-  implemented?: boolean;
-  requirements?: {
-    bin?: string[];
-    env?: string[];
-    lib?: string[];
-  };
-  prerequisites?: {
-    binaries?: string[];
-    platforms?: string[];
-    env?: string[];
-    services?: string[];
-    install?: string[] | Record<string, string>;
-  };
-}
+type ManifestCapability = NonNullable<ActuatorManifestFile['capabilities']>[number];
 
 export type ActuatorCapabilityProbe = () => Promise<ActuatorCapability[]>;
 
@@ -142,7 +131,7 @@ function evaluateManifestCapability(capability: ManifestCapability): ActuatorCap
     if (!hasBinary(binary)) missing.push(`missing binary: ${binary}`);
   }
   for (const envName of envRequirements) {
-    if (!process.env[envName]) missing.push(`missing env: ${envName}`);
+    if (!getRegisteredEnvText(envName)) missing.push(`missing env: ${envName}`);
   }
   for (const service of serviceRequirements) {
     missing.push(`service prerequisite requires a dedicated probe: ${service}`);
@@ -188,14 +177,8 @@ export async function checkActuatorCapabilities(
   manifestPath: string
 ): Promise<ActuatorStatus> {
   // Read manifest
-  const manifest = loadJson<{
-    capabilities?: ManifestCapability[];
-    actuator_id?: string;
-    version?: string;
-  }>(manifestPath);
-  const manifestCapabilities = ((manifest.capabilities || []) as ManifestCapability[]).map(
-    evaluateManifestCapability
-  );
+  const manifest = loadActuatorManifest(manifestPath);
+  const manifestCapabilities = (manifest.capabilities || []).map(evaluateManifestCapability);
   const manifestByOp = new Map(
     manifestCapabilities.map((capability) => [capability.op, capability])
   );
@@ -215,7 +198,7 @@ export async function checkActuatorCapabilities(
       actuatorId: manifest.actuator_id || actuatorId,
       version: manifest.version || '0.0.0',
       capabilities,
-      checkedAt: new Date().toISOString(),
+      checkedAt: nowIso(),
     };
   } else {
     // Fallback: evaluate manifest prerequisites. Capabilities without
@@ -224,7 +207,7 @@ export async function checkActuatorCapabilities(
       actuatorId: manifest.actuator_id || actuatorId,
       version: manifest.version || '0.0.0',
       capabilities: manifestCapabilities,
-      checkedAt: new Date().toISOString(),
+      checkedAt: nowIso(),
     };
   }
 }
@@ -236,8 +219,10 @@ export async function checkAllActuatorCapabilities(
   actuatorsDir?: string
 ): Promise<ActuatorStatus[]> {
   const dir = actuatorsDir
-    ? pathResolver.rootResolve(actuatorsDir)
-    : pathResolver.rootResolve('libs/actuators');
+    ? assertSafeRepositoryPath(pathResolver.rootResolve(actuatorsDir), {
+        allowMissingLeaf: true,
+      })
+    : assertSafeRepositoryPath(pathResolver.rootResolve('libs/actuators'));
   const results: ActuatorStatus[] = [];
 
   const catalog = loadActuatorManifestCatalog(dir);
@@ -245,7 +230,7 @@ export async function checkAllActuatorCapabilities(
     try {
       const status = await checkActuatorCapabilities(
         entry.n,
-        pathResolver.rootResolve(entry.manifest_path)
+        assertSafeRepositoryPath(pathResolver.rootResolve(entry.manifest_path))
       );
       results.push(status);
     } catch (e: any) {

@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/feedback-knowledge-hints.schema.json",
+  "title": "Feedback knowledge hints",
+  "description": "Persisted, trace-derived knowledge hints used by the feedback loop.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["topic", "hint", "source", "confidence"],
+    "properties": {
+      "topic": { "type": "string", "minLength": 1 },
+      "hint": { "type": "string", "minLength": 1 },
+      "source": { "type": "string", "minLength": 1 },
+      "confidence": { "type": "number" },
+      "tags": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+      "tier": {
+        "type": "string",
+        "enum": ["public", "confidential", "personal", "product", "customer"]
+      },
+      "customerId": { "type": "string", "minLength": 1 },
+      "score": { "type": "number" },
+      "parentSource": { "type": "string", "minLength": 1 },
+      "chunkIndex": { "type": "integer", "minimum": 0 },
+      "matchedChunkIndex": { "type": "integer", "minimum": 0 },
+      "embeddingBackend": { "type": "string", "minLength": 1 },
+      "last_updated": { "type": "string", "minLength": 1 },
+      "doc_authority": { "type": "string", "minLength": 1 },
+      "scope": { "type": "string", "minLength": 1 },
+      "usage_yield": { "type": "number" }
+    }
+  }
+}

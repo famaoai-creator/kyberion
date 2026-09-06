@@ -1,5 +1,6 @@
 {
   "$schema": "../schemas/metadata-sync-contract.schema.json",
+  "documentation_only": true,
   "sync_rules": [
     {
       "source": "libs/actuators/*/src/index.ts",

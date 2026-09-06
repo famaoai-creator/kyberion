@@ -28,13 +28,18 @@ const mocks = vi.hoisted(() => ({
   ProvenanceTaintPolicyError: class ProvenanceTaintPolicyError extends Error {},
 }));
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core/cloudflare-os-control-plane', () => ({
   CloudflareOsControlPlane: class {
     projectTaint = mocks.projectTaint;
   },
+}));
+
+vi.mock('@agent/core/share-grant-graph', () => ({
+  SHARE_GRANT_ROLES: ['view', 'operate'],
+  SHARE_GRANT_TAINTS: ['personal', 'confidential', 'public'],
+  SHARE_LINK_MAX_TTL_MS: 7 * 24 * 60 * 60 * 1000,
   ShareGrantAuthorizationError: class ShareGrantAuthorizationError extends Error {},
   ShareGrantValidationError: class ShareGrantValidationError extends Error {},
-  ProvenanceTaintPolicyError: mocks.ProvenanceTaintPolicyError,
   ShareGrantGraph: class {
     registerResource = mocks.registerResource;
     grantEdge = mocks.grantEdge;
@@ -43,11 +48,25 @@ vi.mock('@agent/core', () => ({
     revokeShareLink = mocks.revokeShareLink;
     openShareLinkSession = mocks.openShareLinkSession;
   },
+}));
+
+vi.mock('@agent/core/share-grant-live-sessions', () => ({
   ShareGrantLiveSessionRegistry: class {
     evictShareLinkSessions = mocks.evictShareLinkSessions;
   },
+}));
+
+vi.mock('@agent/core/share-grant-authorizer', () => ({
   createShareGrantRegistryAuthorizer: mocks.createShareGrantRegistryAuthorizer,
   shareGrantActorFromViewer: mocks.shareGrantActorFromViewer,
+}));
+
+vi.mock('@agent/core/provenance-taint', () => ({
+  ProvenanceTaintPolicyError: mocks.ProvenanceTaintPolicyError,
+}));
+
+vi.mock('@agent/core/tenant-registry', () => ({
+  resolveTenant: vi.fn(() => ({ profile: null })),
 }));
 
 vi.mock('../../../../lib/api-guard', () => ({
@@ -57,10 +76,10 @@ vi.mock('../../../../lib/api-guard', () => ({
 
 vi.mock('../../../../lib/viewer-context', () => ({
   resolveViewerContextForRequest: mocks.resolveViewerContextForRequest,
-  viewerErrorResponse: (error: unknown) =>
+  viewerErrorResponse: (error: unknown, status = 500) =>
     Response.json(
       { ok: false, error: error instanceof Error ? error.message : 'Forbidden' },
-      { status: 403 }
+      { status }
     ),
   withViewerExecutionContext: mocks.withViewerExecutionContext,
 }));

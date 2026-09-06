@@ -985,8 +985,8 @@ Kyberion:
 まず共通 planner で dry-run する。
 
 ```bash
-pnpm cli -- task plan "連携システムから情報を集め、会議資料とメール下書きを作って"
-pnpm cli -- task plan "ブラウザで購入して決済を確定して"
+pnpm kyberion task plan "連携システムから情報を集め、会議資料とメール下書きを作って"
+pnpm kyberion task plan "ブラウザで購入して決済を確定して"
 ```
 
 planner は対象を `calendar / meeting / email / document / presentation / browser / connected_systems` に分解し、各 step を次の効果レベルに分類する。
@@ -1001,7 +1001,7 @@ planner は対象を `calendar / meeting / email / document / presentation / bro
 Task Session として保存する場合:
 
 ```bash
-pnpm cli -- task start "明日の会議資料と参加者向けメール下書きを作って"
+pnpm kyberion task start "明日の会議資料と参加者向けメール下書きを作って"
 ```
 
 `task start` は plan artifact と Task Session を保存するが、外部操作は行わない。レビュー用 Evidence を生成する dry-run は次で再実行できる。
@@ -1010,7 +1010,7 @@ pnpm cli -- task start "明日の会議資料と参加者向けメール下書�
 pnpm pipeline --input knowledge/product/pipeline-templates/productivity-task-orchestration.json
 ```
 
-**ポイント**: planner は承認そのものではない。`external_write` と `financial_commit` は既存の approval gate と実行 receipt に接続されるまで preview-only のまま扱う。`pnpm task:list` などの TaskScenario CLI は反復業務用、`pnpm cli -- task ...` は自由文から始める横断タスク用である。
+**ポイント**: planner は承認そのものではない。`external_write` と `financial_commit` は既存の approval gate と実行 receipt に接続されるまで preview-only のまま扱う。`pnpm task:list` などの TaskScenario CLI は反復業務用、`pnpm kyberion task ...` は自由文から始める横断タスク用である。
 
 ---
 

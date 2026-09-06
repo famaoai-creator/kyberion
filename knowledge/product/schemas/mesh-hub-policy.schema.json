@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mesh-hub-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "placement": { "type": "object" },
+    "tenant_scope": { "type": "object" },
+    "routing": {
+      "type": "object",
+      "properties": {
+        "selectors": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "request_kinds": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "automatic_peer_selection": { "type": "string", "enum": ["deny"] },
+        "load_signals": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["selectors", "request_kinds", "automatic_peer_selection"],
+      "additionalProperties": true
+    },
+    "data_tier": { "type": "object" },
+    "topic_delivery": {
+      "type": "object",
+      "properties": {
+        "max_fan_out": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "required": ["max_fan_out"],
+      "additionalProperties": true
+    },
+    "recipient_acceptance": { "type": "object" }
+  },
+  "required": [
+    "version",
+    "placement",
+    "tenant_scope",
+    "routing",
+    "data_tier",
+    "topic_delivery",
+    "recipient_acceptance"
+  ]
+}

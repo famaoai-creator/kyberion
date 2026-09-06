@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { safeExistsSync, safeFsyncFile, safeWriteFile } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
 import type {
@@ -32,13 +33,97 @@ export class ShareGrantLiveSessionValidationError extends Error {
   }
 }
 
-function required(value: string, label: string): string {
-  const normalized = String(value || '').trim();
+function required(value: unknown, label: string): string {
+  const normalized = typeof value === 'string' ? value.trim() : '';
   if (!normalized) throw new ShareGrantLiveSessionValidationError(`${label} is required`);
   if (normalized.length > 512) {
     throw new ShareGrantLiveSessionValidationError(`${label} exceeds the 512-character limit`);
   }
   return normalized;
+}
+
+function requiredTimestamp(value: unknown, label: string): string {
+  const normalized = required(value, label);
+  if (!Number.isFinite(Date.parse(normalized))) {
+    throw new ShareGrantLiveSessionValidationError(`${label} must be a valid timestamp`);
+  }
+  return normalized;
+}
+
+const LIVE_SESSION_STATE_FIELDS = ['version', 'sessions', 'revokedScopes'] as const;
+const LIVE_SESSION_FIELDS = ['sessionId', 'linkId', 'resourceRef', 'connectedAt'] as const;
+const LIVE_SESSION_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/share-grant-live-session-state.schema.json'
+);
+
+function liveSessionStateCatalog(filePath: string) {
+  return defineCatalog<PersistedLiveSessionState>({
+    id: 'share-grant-live-session-state',
+    path: filePath,
+    schema: LIVE_SESSION_STATE_SCHEMA_PATH,
+  });
+}
+
+function parsePersistedLiveSessionState(value: unknown): PersistedLiveSessionState {
+  const root = parseSafeJsonObjectValue(value, 'live-session state');
+  const allowedRootFields = new Set<string>(LIVE_SESSION_STATE_FIELDS);
+  if (Object.keys(root).some((key) => !allowedRootFields.has(key))) {
+    throw new ShareGrantLiveSessionValidationError('live-session state contains unknown fields');
+  }
+  if (root.version !== 1) {
+    throw new ShareGrantLiveSessionValidationError('live-session state has an invalid version');
+  }
+  if (!Array.isArray(root.sessions) || !Array.isArray(root.revokedScopes)) {
+    throw new ShareGrantLiveSessionValidationError('live-session state has an invalid schema');
+  }
+
+  const revokedScopeKeys = new Set<string>();
+  const revokedScopes = root.revokedScopes.map((scope, index) => {
+    if (typeof scope !== 'string' || scope.trim() === '' || !scope.includes('\u0000')) {
+      throw new ShareGrantLiveSessionValidationError(
+        `revokedScopes[${index}] must be a valid link/resource scope`
+      );
+    }
+    const parts = scope.split('\u0000');
+    if (parts.length !== 2) {
+      throw new ShareGrantLiveSessionValidationError(
+        `revokedScopes[${index}] must contain one link/resource separator`
+      );
+    }
+    const normalized = scopeKey(
+      required(parts[0], `revokedScopes[${index}].linkId`),
+      required(parts[1], `revokedScopes[${index}].resourceRef`)
+    );
+    if (normalized !== scope || revokedScopeKeys.has(normalized)) {
+      throw new ShareGrantLiveSessionValidationError(
+        `revokedScopes[${index}] must be canonical and unique`
+      );
+    }
+    revokedScopeKeys.add(normalized);
+    return normalized;
+  });
+
+  const sessionIds = new Set<string>();
+  const sessions = root.sessions.map((candidate, index) => {
+    const record = parseSafeJsonObjectValue(candidate, `live-session state sessions[${index}]`);
+    const allowedSessionFields = new Set<string>(LIVE_SESSION_FIELDS);
+    if (Object.keys(record).some((key) => !allowedSessionFields.has(key))) {
+      throw new ShareGrantLiveSessionValidationError(`sessions[${index}] contains unknown fields`);
+    }
+    const session = {
+      sessionId: required(record.sessionId, `session[${index}].sessionId`),
+      linkId: required(record.linkId, `session[${index}].linkId`),
+      resourceRef: required(record.resourceRef, `session[${index}].resourceRef`),
+      connectedAt: requiredTimestamp(record.connectedAt, `session[${index}].connectedAt`),
+    };
+    if (sessionIds.has(session.sessionId)) {
+      throw new ShareGrantLiveSessionValidationError(`session[${index}].sessionId is duplicated`);
+    }
+    sessionIds.add(session.sessionId);
+    return session;
+  });
+
+  return { version: 1, sessions, revokedScopes };
 }
 
 /**
@@ -65,7 +150,7 @@ export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvict
       sessionId: required(input.sessionId, 'sessionId'),
       linkId: required(input.linkId, 'linkId'),
       resourceRef: required(input.resourceRef, 'resourceRef'),
-      connectedAt: required(input.connectedAt, 'connectedAt'),
+      connectedAt: requiredTimestamp(input.connectedAt, 'connectedAt'),
     };
     return this.#mutate(() => {
       if (this.#revokedScopes.has(scopeKey(session.linkId, session.resourceRef))) {
@@ -108,7 +193,7 @@ export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvict
   ): ShareGrantLiveSessionEvictionResult {
     const linkId = required(input.linkId, 'linkId');
     const resourceRef = required(input.resourceRef, 'resourceRef');
-    required(input.revokedAt, 'revokedAt');
+    requiredTimestamp(input.revokedAt, 'revokedAt');
     return this.#mutate(() => {
       this.#revokedScopes.add(scopeKey(linkId, resourceRef));
       const evictedSessionIds: string[] = [];
@@ -143,52 +228,46 @@ export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvict
     if (!safeExistsSync(this.#storePath)) return;
     let parsed: PersistedLiveSessionState;
     try {
-      parsed = readJson<PersistedLiveSessionState>(this.#storePath);
+      parsed = parsePersistedLiveSessionState(liveSessionStateCatalog(this.#storePath).load());
     } catch (error) {
+      if (error instanceof ShareGrantLiveSessionValidationError) throw error;
       throw new ShareGrantLiveSessionValidationError(
         `live-session state could not be read: ${error instanceof Error ? error.message : String(error)}`
       );
     }
-    if (
-      parsed?.version !== 1 ||
-      !Array.isArray(parsed.sessions) ||
-      !Array.isArray(parsed.revokedScopes)
-    ) {
-      throw new ShareGrantLiveSessionValidationError('live-session state has an invalid schema');
+    const revokedScopes = new Set(parsed.revokedScopes);
+    const sessions = new Map<string, ShareGrantLiveSessionRegistration>();
+    for (const session of parsed.sessions) {
+      const normalized = {
+        sessionId: session.sessionId,
+        linkId: session.linkId,
+        resourceRef: session.resourceRef,
+        connectedAt: session.connectedAt,
+      };
+      if (revokedScopes.has(scopeKey(normalized.linkId, normalized.resourceRef))) {
+        continue;
+      }
+      sessions.set(normalized.sessionId, normalized);
     }
     this.#sessions.clear();
     this.#revokedScopes.clear();
-    for (const scope of parsed.revokedScopes) {
-      this.#revokedScopes.add(required(scope, 'revokedScope'));
-    }
-    for (const session of parsed.sessions) {
-      const normalized = {
-        sessionId: required(session.sessionId, 'sessionId'),
-        linkId: required(session.linkId, 'linkId'),
-        resourceRef: required(session.resourceRef, 'resourceRef'),
-        connectedAt: required(session.connectedAt, 'connectedAt'),
-      };
-      if (this.#revokedScopes.has(scopeKey(normalized.linkId, normalized.resourceRef))) {
-        continue;
-      }
-      this.#sessions.set(normalized.sessionId, normalized);
-    }
+    for (const scope of revokedScopes) this.#revokedScopes.add(scope);
+    for (const [sessionId, session] of sessions) this.#sessions.set(sessionId, session);
   }
 
   #persistState(): void {
-    safeWriteFile(
-      this.#storePath,
-      `${JSON.stringify(
-        {
-          version: 1,
-          sessions: [...this.#sessions.values()],
-          revokedScopes: [...this.#revokedScopes],
-        } satisfies PersistedLiveSessionState,
-        null,
-        2
-      )}\n`,
-      { encoding: 'utf8', mkdir: true }
+    const state = liveSessionStateCatalog(this.#storePath).validate(
+      {
+        version: 1,
+        sessions: [...this.#sessions.values()],
+        revokedScopes: [...this.#revokedScopes],
+      } satisfies PersistedLiveSessionState,
+      this.#storePath
     );
+    safeWriteFile(this.#storePath, `${JSON.stringify(state, null, 2)}\n`, {
+      encoding: 'utf8',
+      mkdir: true,
+    });
     safeFsyncFile(this.#storePath);
   }
 }

@@ -1,6 +1,4 @@
-import { logger } from '@agent/core';
-import { fileURLToPath } from 'node:url';
-import * as path from 'node:path';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import {
   buildRetryOptions,
   DEFAULT_IOS_RETRY,
@@ -8,7 +6,11 @@ import {
   type IOSAction,
   type PipelineStep,
 } from './ios-runtime-helpers.js';
-import { runActuatorCli } from '@agent/core';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 
 async function handleAction(input: IOSAction) {
   if (input.action !== 'pipeline') {
@@ -20,21 +22,16 @@ async function handleAction(input: IOSAction) {
 const main = async () => {
   await runActuatorCli({
     name: 'ios-actuator',
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+if (isDirectEntry(import.meta.url, 'libs/actuators/ios-actuator/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, 'ios-actuator');
 }
 
-export { handleAction, buildRetryOptions, DEFAULT_IOS_RETRY, executePipeline };
+export { handleAction, buildRetryOptions, DEFAULT_IOS_RETRY };
 export type { IOSAction, PipelineStep };
 
 export const actuator = defineCatalogBackedActuator({

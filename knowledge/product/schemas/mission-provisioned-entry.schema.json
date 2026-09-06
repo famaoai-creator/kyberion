@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mission-provisioned-entry.schema.json",
+  "title": "Mission Provisioned Entry",
+  "description": "Hash-bound wrapper persisted for an artifact provisioned before mission execution writes it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "content", "content_hash"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "content": {},
+    "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

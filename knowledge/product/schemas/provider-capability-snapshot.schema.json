@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/provider-capability-snapshot.schema.json",
+  "title": "Provider Capability Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "generated_at",
+    "registered_capabilities",
+    "available_capabilities",
+    "available_providers",
+    "missing_providers",
+    "providers",
+    "capabilities"
+  ],
+  "properties": {
+    "generated_at": { "type": "string", "minLength": 1 },
+    "registered_capabilities": { "type": "integer", "minimum": 0 },
+    "available_capabilities": { "type": "integer", "minimum": 0 },
+    "available_providers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "missing_providers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider", "installed", "version", "protocol", "healthy"],
+        "properties": {
+          "provider": { "type": "string", "minLength": 1 },
+          "installed": { "type": "boolean" },
+          "version": { "type": ["string", "null"] },
+          "protocol": { "enum": ["acp", "print-json", "exec", "json-rpc"] },
+          "healthy": { "type": "boolean" }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability_id", "provider", "status", "discovery_status"],
+        "properties": {
+          "capability_id": { "type": "string", "minLength": 1 },
+          "provider": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "minLength": 1 },
+          "discovery_status": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "string" }
+        }
+      }
+    },
+    "runtime_probes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider_id", "binary_found", "authenticated"],
+        "properties": {
+          "provider_id": { "type": "string", "minLength": 1 },
+          "binary_found": { "type": "boolean" },
+          "authenticated": { "type": ["boolean", "string"], "enum": [true, false, "unknown"] },
+          "sandbox_status": { "enum": ["supported", "unsupported", "unknown"] }
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { scanPipelineOpSchemas } from './check_pipeline_op_schema_coverage.js';
 
 describe('check_pipeline_op_schema_coverage', () => {
+  it('uses the governed persisted pipeline JSON loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_pipeline_op_schema_coverage.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('readSafeJsonValueFile');
+    expect(source).not.toContain('readJson(safeFile)');
+  });
+
   it('resolves whole-value templates before validating typed params', () => {
     const report = scanPipelineOpSchemas(
       {

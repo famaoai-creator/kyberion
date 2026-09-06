@@ -1,11 +1,33 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import {
   buildLocalesBlock,
   buildVocabularyKeys,
+  readVocabularyTypesTextFile,
   spliceLocalesBlock,
 } from './generate_vocabulary_types.js';
 
 describe('generate_vocabulary_types (I18N-02)', () => {
+  it('uses the governed vocabulary catalog loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/generate_vocabulary_types.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('loadVocabularyCatalog()');
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain('readVocabularyTypesTextFile(filePath: string)');
+    expect(source).not.toContain('safeReadFile(');
+    expect(source).not.toContain('readJson<');
+  });
+
+  it('rejects a directory before reading the locale source', () => {
+    expect(() => readVocabularyTypesTextFile(pathResolver.rootResolve('libs'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   describe('buildLocalesBlock / spliceLocalesBlock', () => {
     it('renders a sorted, deduplicated locales array literal between markers', () => {
       const block = buildLocalesBlock(['ja', 'en']);

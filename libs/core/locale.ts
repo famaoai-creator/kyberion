@@ -1,12 +1,15 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectInput } from './foundation/json.js';
+import { readTextFile } from './foundation/text.js';
+import { loadVocabularyCatalog } from './vocabulary-catalog.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync } from './secure-io.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { normalizeLocale, nextSupportedLocale, type SupportedLocale } from './locale-normalize.js';
 import { assertScopeContext, type ScopeContext } from './scope-context.js';
+import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
 
 /**
  * I18N-01: single source of truth for locale *resolution*.
@@ -38,24 +41,12 @@ export interface LocaleContext {
   scope?: Pick<ScopeContext, 'tenant_slug' | 'organization_id' | 'project_id'>;
 }
 
-const VOCABULARY_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
-
-// Deliberately NOT reusing ux-vocabulary.ts's catalog loader here: this
-// module is imported by operator-identity.ts, and ux-vocabulary.ts is
-// rewired (I18N-01) to delegate its own locale resolution to this module.
-// Importing ux-vocabulary.ts from here would create an import cycle.
-// locale.ts stays dependency-light and reads the one field it needs
-// (`default_locale`) through its own tiny, independently-cached loader.
 let cachedDefaultLocale: SupportedLocale | undefined;
 
 function loadCatalogDefaultLocale(): SupportedLocale {
   if (cachedDefaultLocale !== undefined) return cachedDefaultLocale;
-  try {
-    const parsed = readJson<{ default_locale?: string }>(VOCABULARY_PATH);
-    cachedDefaultLocale = normalizeLocale(parsed?.default_locale) ?? 'en';
-  } catch {
-    cachedDefaultLocale = 'en';
-  }
+  const parsed = loadVocabularyCatalog();
+  cachedDefaultLocale = normalizeLocale(parsed?.default_locale) ?? 'en';
   return cachedDefaultLocale;
 }
 
@@ -71,10 +62,10 @@ export function resolveDefaultLocale(): SupportedLocale {
 
 function resolveIdentityLocale(identityPathOverride?: string): SupportedLocale | null {
   try {
-    const identityPath =
-      identityPathOverride ?? path.join(resolveActiveProfileRoot(), 'my-identity.json');
-    if (!safeExistsSync(identityPath)) return null;
-    const parsed = readJson<Record<string, unknown>>(identityPath);
+    const parsed = loadPersonalIdentityAtPath(
+      identityPathOverride ?? path.join(resolveActiveProfileRoot(), 'my-identity.json')
+    );
+    if (!parsed) return null;
     const language = String(parsed?.language || '')
       .trim()
       .toLowerCase();
@@ -127,8 +118,12 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
   ].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
     try {
-      if (!safeExistsSync(candidate)) continue;
-      const parsed = readJson<{ locale?: string; default_locale?: string }>(candidate);
+      if (!safeExistsSync(candidate) || !safeLstat(candidate).isFile()) continue;
+      const parsed = parseSafeJsonObjectInput(
+        readTextFile(candidate),
+        `locale overlay ${candidate}`
+      );
+      if (!parsed) continue;
       const locale = normalizeLocale(parsed.locale || parsed.default_locale);
       if (locale) return locale;
     } catch {
@@ -149,7 +144,7 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
  *    `resolveActiveProfileRoot()`).
  * 4. the canonical `KYBERION_LOCALE` setting, then the deprecated
  *    `KYBERION_UI_LOCALE` alias (warns once).
- * 5. OS/browser locale: `process.env.LANG`, then `ctx.navigatorLanguage`
+ * 5. OS/browser locale: the registered `LANG` setting, then `ctx.navigatorLanguage`
  *    when a browser caller supplies it.
  * 6. The vocabulary catalog's `default_locale`.
  *
@@ -193,7 +188,7 @@ function resolveWithoutExplicit(ctx: LocaleContext): SupportedLocale {
   const aliasEnv = readDeprecatedUiLocaleAlias();
   if (aliasEnv) return aliasEnv;
 
-  const osLocale = normalizeLocale(process.env.LANG);
+  const osLocale = normalizeLocale(getRegisteredEnvText('LANG'));
   if (osLocale) return osLocale;
 
   const navigatorLocale = normalizeLocale(ctx.navigatorLanguage);

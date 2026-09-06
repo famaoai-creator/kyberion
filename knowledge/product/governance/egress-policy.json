@@ -9,6 +9,8 @@
     "generativelanguage.googleapis.com",
     "api.githubcopilot.com",
     "api.x.ai",
+    "api.cursor.com",
+    "opencode.ai",
     "api.box.com"
   ],
   "blocked_domains": [],

@@ -1,15 +1,13 @@
 import {
   loadCapabilityRegistry,
-  pathResolver,
   probeProviderAvailability,
-  resolveProviderCliCapabilityReportPolicy,
-  safeMkdir,
-  safeWriteFile,
-} from '@agent/core';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
-import * as path from 'node:path';
-import type { CapabilityRegistryEntry } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+} from '@agent/core/provider-capability-scanner';
+import { resolveProviderCliCapabilityReportPolicy } from '@agent/core/provider-cli-capability-report-policy';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
+import type { CapabilityRegistryEntry } from '@agent/core/provider-capability-scanner';
+import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 type AdapterEntry = {
   adapter_id: string;
@@ -32,9 +30,21 @@ type AdapterRegistry = {
   profiles: AdapterEntry[];
 };
 
-function readJson<T>(relativePath: string): T {
-  return readFoundationJson<T>(pathResolver.rootResolve(relativePath));
-}
+const ADAPTER_REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/harness-adapter-registry.json'
+);
+const ADAPTER_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/harness-adapter-registry.schema.json'
+);
+const DEFAULT_REPORT_PATH = pathResolver.knowledge(
+  'product/architecture/provider-cli-capability-report.md'
+);
+
+const adapterRegistryCatalog = defineCatalog<AdapterRegistry>({
+  id: 'harness-adapter-registry',
+  path: ADAPTER_REGISTRY_PATH,
+  schema: ADAPTER_REGISTRY_SCHEMA_PATH,
+});
 
 function parseArg(args: string[], name: string, fallback?: string): string {
   const prefixed = args.find((arg) => arg.startsWith(`${name}=`));
@@ -149,16 +159,10 @@ function buildReport(
   return md;
 }
 
-function main(args: string[]): void {
-  const outPath = parseArg(
-    args,
-    '--out',
-    pathResolver.knowledge('product/architecture/provider-cli-capability-report.md')
-  );
+function render(args: string[]): GeneratedFile[] {
+  const outPath = parseArg(args, '--out', DEFAULT_REPORT_PATH);
   const capabilityRegistry = loadCapabilityRegistry();
-  const adapterRegistry = readJson<AdapterRegistry>(
-    'knowledge/product/governance/harness-adapter-registry.json'
-  );
+  const adapterRegistry = adapterRegistryCatalog.load();
   const capabilities = capabilityRegistry.capabilities;
   const adapters = adapterRegistry.profiles;
   const providerAvailability = probeProviderAvailability();
@@ -171,20 +175,25 @@ function main(args: string[]): void {
   }
 
   const report = buildReport(capabilities, adapters, providerAvailability);
-  const resolvedOutPath = pathResolver.resolve(outPath);
-  safeMkdir(path.dirname(resolvedOutPath), { recursive: true });
-  safeWriteFile(resolvedOutPath, report);
-  console.log(`[generate:provider-cli-capability-report] wrote report to ${outPath}`);
+  const resolvedOutPath = assertSafeRepositoryPath(pathResolver.resolve(outPath), {
+    allowMissingLeaf: true,
+  });
+  return [{ path: resolvedOutPath, content: report }];
 }
 
-const script = defineScript({
-  name: 'generate:provider-cli-capability-report',
-  flags: [],
-  run: ({ argv }) => main(argv),
+export const runGenerateProviderCliCapabilityReport = defineGenerator({
+  id: 'provider-cli-capability-report',
+  outputs: (context) => [
+    assertSafeRepositoryPath(
+      pathResolver.resolve(parseArg(context.argv, '--out', DEFAULT_REPORT_PATH)),
+      { allowMissingLeaf: true }
+    ),
+  ],
+  render: ({ argv }) => render(argv),
 });
 if (
   isDirectScript(import.meta.url, 'generate_provider_cli_capability_report.ts') ||
   isDirectScript(import.meta.url, 'generate_provider_cli_capability_report.js')
 ) {
-  void script();
+  void runGenerateProviderCliCapabilityReport();
 }

@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { withExecutionContext } from './authority.js';
-import { readJson as readFoundationJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import {
   getAdapterDefaultSelectionSnapshot,
   saveAdapterDefaultPreferences,
@@ -12,18 +13,42 @@ import {
 import { loadProviderConfig } from './provider-config.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import {
+  loadPersonalAgentIdentityAtPath,
+  loadPersonalIdentityAtPath,
+  writePersonalAgentIdentityAtPath,
+  writePersonalIdentityAtPath,
+} from './personal-identity-state.js';
+import {
+  loadOperatorProviderPreferencesAtPath,
+  writeOperatorProviderPreferencesAtPath,
+} from './operator-provider-preferences.js';
+import {
+  loadBrowserOnboardingStateAtPath,
+  writeBrowserOnboardingStateAtPath,
+} from './browser-onboarding-state.js';
+import {
   getLlmSelectionSnapshot,
   saveLlmSelectionPreferences,
   validateLlmSelectionPreferences,
 } from './llm-selection-preferences.js';
 import { listServiceBindingRecords } from './service-binding-registry.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
-import { getToolRuntimePolicy } from './tool-runtime-policy.js';
+import { getToolRuntimePolicy, writeToolRuntimePolicyAtPath } from './tool-runtime-policy.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { writeServiceConnectionAtPath } from './service-engine-helpers.js';
 import {
   getVoiceProfileRegistry,
+  loadVoiceProfileRegistryAtPath,
   resetVoiceProfileRegistryCache,
+  writeVoiceProfileRegistry,
+  type VoiceProfileRegistry,
 } from './voice-profile-registry.js';
 
 const interactionStyles = ['Senior Partner', 'Concierge', 'Minimalist'] as const;
@@ -38,22 +63,24 @@ const allowedServices = [
   'browser',
 ] as const;
 
-const identitySchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  language: z.string().trim().min(2).max(16),
-  interaction_style: z.enum(interactionStyles),
-  primary_domain: z.string().trim().min(1).max(200),
-  vision: z.string().trim().min(1).max(4000),
-  agent_id: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z][A-Za-z0-9._-]{2,63}$/),
-  tenant_slug: z
-    .string()
-    .trim()
-    .refine(isValidTenantSlug, 'tenant slug is reserved or invalid')
-    .optional(),
-});
+const identitySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    language: z.string().trim().min(2).max(16),
+    interaction_style: z.enum(interactionStyles),
+    primary_domain: z.string().trim().min(1).max(200),
+    vision: z.string().trim().min(1).max(4000),
+    agent_id: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z][A-Za-z0-9._-]{2,63}$/),
+    tenant_slug: z
+      .string()
+      .trim()
+      .refine(isValidTenantSlug, 'tenant slug is reserved or invalid')
+      .optional(),
+  })
+  .strict();
 
 const voiceSchema = z
   .object({
@@ -68,6 +95,7 @@ const voiceSchema = z
     engine_id: z.string().trim().min(1).max(120).default('mlx_audio_qwen3'),
     sample_refs: z.array(z.string().trim().min(1)).max(3).default([]),
   })
+  .strict()
   .superRefine((value, context) => {
     if (!value.enabled) return;
     if (!value.profile_id)
@@ -78,11 +106,13 @@ const voiceSchema = z
       context.addIssue({ code: 'custom', message: 'at least one voice sample is required' });
   });
 
-const serviceSchema = z.object({
-  service_id: z.enum(allowedServices),
-  auth_mode: z.enum(['none', 'oauth', 'secret-guard', 'session']),
-  required: z.boolean().default(false),
-});
+const serviceSchema = z
+  .object({
+    service_id: z.enum(allowedServices),
+    auth_mode: z.enum(['none', 'oauth', 'secret-guard', 'session']),
+    required: z.boolean().default(false),
+  })
+  .strict();
 
 export const browserOnboardingDraftSchema = z
   .object({
@@ -95,35 +125,44 @@ export const browserOnboardingDraftSchema = z
       sample_refs: [],
     }),
     services: z.array(serviceSchema).max(16).default([]),
-    providers: z.object({
-      priority: z.array(z.string().trim().min(1).max(80)).min(1).max(12),
-      default_models: z.record(z.string(), z.string().trim().min(1).max(160)).default({}),
-    }),
+    providers: z
+      .object({
+        priority: z.array(z.string().trim().min(1).max(80)).min(1).max(12),
+        default_models: z.record(z.string(), z.string().trim().min(1).max(160)).default({}),
+      })
+      .strict(),
     reasoning: z
       .object({
         provider: z.string().trim().min(1).max(80),
         model_id: z.string().trim().min(1).max(160).optional(),
       })
+      .strict()
       .optional(),
     adapter_defaults: z
       .record(z.string().trim().min(1).max(120), z.string().trim().min(1).max(200))
       .optional(),
-    tools: z.object({
-      mode_preference: z.object({
-        python: z.enum(toolModes),
-        node: z.enum(toolModes),
-        system: z.enum(toolModes),
-      }),
-      install_requires_approval: z.boolean().default(true),
-      pin_requires_approval: z.boolean().default(true),
-    }),
+    tools: z
+      .object({
+        mode_preference: z
+          .object({
+            python: z.enum(toolModes),
+            node: z.enum(toolModes),
+            system: z.enum(toolModes),
+          })
+          .strict(),
+        install_requires_approval: z.boolean().default(true),
+        pin_requires_approval: z.boolean().default(true),
+      })
+      .strict(),
     tutorial: z
       .object({
         mode: z.enum(['simulate', 'apply', 'skipped']).default('simulate'),
         summary: z.string().trim().max(1000).default('Run the first governed tutorial.'),
       })
+      .strict()
       .default({ mode: 'simulate', summary: 'Run the first governed tutorial.' }),
   })
+  .strict()
   .superRefine((value, context) => {
     if (new Set(value.providers.priority).size !== value.providers.priority.length) {
       context.addIssue({
@@ -152,31 +191,26 @@ export interface BrowserOnboardingPreview {
 }
 
 function profileRoot(): string {
-  return resolveActiveProfileRoot();
+  return assertSafeRepositoryPath(resolveActiveProfileRoot(), { allowMissingLeaf: true });
 }
 
 function onboardingPath(name: string): string {
-  return path.join(profileRoot(), 'onboarding', name);
-}
-
-function readJson<T>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  return readFoundationJson<T>(filePath);
-}
-
-function writeJson(filePath: string, value: unknown): void {
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(value, null, 2));
+  return assertSafeRepositoryPath(path.join(profileRoot(), 'onboarding', name), {
+    allowMissingLeaf: true,
+  });
 }
 
 function assertVoiceSampleRefs(sampleRefs: string[]): void {
-  const sampleRoot = path.resolve(profileRoot(), 'voice', 'samples');
+  const sampleRoot = assertSafeRepositoryPath(path.resolve(profileRoot(), 'voice', 'samples'), {
+    allowMissingLeaf: true,
+  });
   for (const sampleRef of sampleRefs) {
     const resolved = path.resolve(sampleRef);
     if (resolved !== sampleRoot && !resolved.startsWith(`${sampleRoot}${path.sep}`)) {
       throw new Error(`voice sample is outside the active profile: ${sampleRef}`);
     }
-    if (!safeExistsSync(resolved)) throw new Error(`voice sample does not exist: ${sampleRef}`);
+    const safeResolved = assertSafeRepositoryPath(resolved);
+    if (!safeExistsSync(safeResolved)) throw new Error(`voice sample does not exist: ${sampleRef}`);
   }
 }
 
@@ -244,11 +278,11 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
     withExecutionContext(
       'sovereign_concierge',
       () => {
-        const now = new Date().toISOString();
+        const now = nowIso();
         const artifacts: string[] = [];
         const identityPath = path.join(profileRoot(), 'my-identity.json');
-        const existingIdentity = readJson<Record<string, unknown>>(identityPath) || {};
-        writeJson(identityPath, {
+        const existingIdentity = loadPersonalIdentityAtPath(identityPath) || {};
+        writePersonalIdentityAtPath(identityPath, {
           ...existingIdentity,
           name: draft.identity.name,
           language: draft.identity.language,
@@ -262,12 +296,14 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         });
         artifacts.push(identityPath);
 
-        const visionPath = path.join(profileRoot(), 'my-vision.md');
+        const visionPath = assertSafeRepositoryPath(path.join(profileRoot(), 'my-vision.md'), {
+          allowMissingLeaf: true,
+        });
         safeWriteFile(visionPath, `# Sovereign Vision\n\n${draft.identity.vision}\n`);
         artifacts.push(visionPath);
 
         const agentPath = path.join(profileRoot(), 'agent-identity.json');
-        writeJson(agentPath, {
+        writePersonalAgentIdentityAtPath(agentPath, {
           agent_id: draft.identity.agent_id,
           version: '1.0.0',
           role: 'Ecosystem Architect / Senior Partner',
@@ -278,7 +314,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         artifacts.push(agentPath);
 
         const providerPath = onboardingPath('provider-preferences.json');
-        writeJson(providerPath, {
+        writeOperatorProviderPreferencesAtPath(providerPath, {
           version: '1.0.0',
           priority: draft.providers.priority,
           default_models: draft.providers.default_models,
@@ -299,7 +335,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
 
         const toolPath = onboardingPath('tool-runtime-policy.json');
         const baseToolPolicy = getToolRuntimePolicy();
-        writeJson(toolPath, {
+        writeToolRuntimePolicyAtPath(toolPath, {
           ...baseToolPolicy,
           version: '1.0.0',
           mode_preference: draft.tools.mode_preference,
@@ -312,7 +348,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
 
         for (const service of draft.services) {
           const servicePath = path.join(profileRoot(), 'connections', `${service.service_id}.json`);
-          writeJson(servicePath, {
+          writeServiceConnectionAtPath(servicePath, {
             version: '1.0.0',
             service_id: service.service_id,
             status: 'proposed',
@@ -327,13 +363,11 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
 
         if (draft.voice.enabled) {
           const voicePath = path.join(profileRoot(), 'voice', 'profile-registry.json');
-          const current = readJson<{
-            version?: string;
-            default_profile_id?: string;
-            profiles?: any[];
-          }>(voicePath);
+          const current: VoiceProfileRegistry = safeExistsSync(voicePath)
+            ? loadVoiceProfileRegistryAtPath(voicePath, { allowEmpty: true })
+            : { version: '1.0.0', default_profile_id: '', profiles: [] };
           const profiles = new Map(
-            (current?.profiles || []).map((profile) => [profile.profile_id, profile])
+            current.profiles.map((profile) => [profile.profile_id, profile])
           );
           profiles.set(draft.voice.profile_id!, {
             profile_id: draft.voice.profile_id,
@@ -345,17 +379,20 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
             status: 'active',
             notes: 'Registered through Browser Onboarding Studio',
           });
-          writeJson(voicePath, {
-            version: '1.0.0',
-            default_profile_id: draft.voice.profile_id,
-            profiles: [...profiles.values()],
-          });
+          writeVoiceProfileRegistry(
+            {
+              version: '1.0.0',
+              default_profile_id: draft.voice.profile_id,
+              profiles: [...profiles.values()],
+            },
+            voicePath
+          );
           resetVoiceProfileRegistryCache();
           artifacts.push(voicePath);
         }
 
         const statePath = onboardingPath('browser-onboarding-state.json');
-        writeJson(statePath, {
+        writeBrowserOnboardingStateAtPath(statePath, {
           version: '1.0.0',
           status: 'complete',
           applied_at: now,
@@ -402,8 +439,14 @@ export function saveBrowserOnboardingVoiceSample(input: {
   if (!input.data.length || input.data.length > 12 * 1024 * 1024) {
     throw new Error('voice sample must be between 1 byte and 12 MiB');
   }
-  const sampleDir = path.join(profileRoot(), 'voice', 'samples', profileId);
-  const samplePath = path.join(sampleDir, `sample-${randomUUID()}.${extension}`);
+  const sampleDir = assertSafeRepositoryPath(
+    path.join(profileRoot(), 'voice', 'samples', profileId),
+    { allowMissingLeaf: true }
+  );
+  const samplePath = assertSafeRepositoryPath(
+    path.join(sampleDir, `sample-${randomUUID()}.${extension}`),
+    { allowMissingLeaf: true }
+  );
   withExecutionContext(
     'sovereign_concierge',
     () => {
@@ -420,20 +463,21 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
     'sovereign_concierge',
     () => {
       const providerConfig = loadProviderConfig();
-      const providerPreference = readJson<Record<string, unknown>>(
+      const providerPreference = loadOperatorProviderPreferencesAtPath(
         onboardingPath('provider-preferences.json')
       );
-      const toolPreference = readJson<Record<string, unknown>>(
-        onboardingPath('tool-runtime-policy.json')
-      );
-      const identity = readJson<Record<string, unknown>>(
-        path.join(profileRoot(), 'my-identity.json')
-      );
+      const toolPreference = getToolRuntimePolicy();
+      const identity = loadPersonalIdentityAtPath(path.join(profileRoot(), 'my-identity.json'));
       const visionPath = path.join(profileRoot(), 'my-vision.md');
+      if (!identity?.vision && safeExistsSync(visionPath) && !safeLstat(visionPath).isFile()) {
+        throw new Error(
+          `[BROWSER_ONBOARDING_RESOURCE] vision must be a regular file: ${visionPath}`
+        );
+      }
       const vision = String(
         identity?.vision ||
           (safeExistsSync(visionPath)
-            ? String(safeReadFile(visionPath, { encoding: 'utf8' }) || '')
+            ? readTextFile(visionPath)
                 .replace(/^#\s+Sovereign Vision\s*/i, '')
                 .trim()
             : '')
@@ -443,8 +487,12 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
         profile_root: profileRoot(),
         identity,
         vision,
-        agent_identity: readJson(path.join(profileRoot(), 'agent-identity.json')),
-        onboarding: readJson(onboardingPath('browser-onboarding-state.json')),
+        agent_identity: loadPersonalAgentIdentityAtPath(
+          path.join(profileRoot(), 'agent-identity.json')
+        ),
+        onboarding: loadBrowserOnboardingStateAtPath(
+          onboardingPath('browser-onboarding-state.json')
+        ),
         providers: providerPreference || {
           version: 'default',
           priority: providerConfig.default_priority,
@@ -452,7 +500,7 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
         },
         reasoning_selection: getLlmSelectionSnapshot(),
         adapter_defaults: getAdapterDefaultSelectionSnapshot(),
-        tools: toolPreference || getToolRuntimePolicy(),
+        tools: toolPreference,
         voice_profiles: getVoiceProfileRegistry().profiles,
         service_bindings: listServiceBindingRecords(),
         allowed_services: allowedServices,
@@ -469,7 +517,7 @@ export function loadOperatorProviderPreferences(): {
   return withExecutionContext(
     'sovereign_concierge',
     () => {
-      const value = readJson<{ priority?: string[]; default_models?: Record<string, string> }>(
+      const value = loadOperatorProviderPreferencesAtPath(
         onboardingPath('provider-preferences.json')
       );
       if (!value?.priority?.length) return null;

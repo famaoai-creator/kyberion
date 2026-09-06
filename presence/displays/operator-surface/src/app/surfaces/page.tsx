@@ -6,7 +6,7 @@ import {
   getTenantScope,
 } from '@/lib/data';
 import { emitMosRead } from '@/lib/audit-mos';
-import { renderStatus } from '@agent/core';
+import { renderStatus } from '@agent/core/ux-vocabulary';
 
 export const dynamic = 'force-dynamic';
 

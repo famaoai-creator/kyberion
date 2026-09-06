@@ -2,7 +2,7 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
-import { compileSchemaFromPath } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import {
   compileImageGenerationADF,
   compileVideoGenerationADF,

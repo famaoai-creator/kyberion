@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { reconcileCompletion } from './intent-reconciliation.js';
@@ -58,5 +59,41 @@ describe('intent reconciliation', () => {
 
     expect(result.satisfied).toBe(false);
     expect(result.gaps.length).toBeGreaterThan(0);
+  });
+
+  it('does not use evidence reached through a symbolic link', async () => {
+    safeMkdir(tmpDir, { recursive: true });
+    const target = `${tmpDir}/evidence-target.md`;
+    const link = `${tmpDir}/evidence-link.md`;
+    safeWriteFile(target, 'The closeout note is saved');
+    fs.symlinkSync(target, link);
+
+    const result = await reconcileCompletion({
+      goal: {
+        summary: 'Deliver a closeout note',
+        success_condition: 'The closeout note is saved',
+      },
+      evidenceRefs: [link],
+    });
+
+    expect(result.satisfied).toBe(false);
+    expect(result.gaps.length).toBeGreaterThan(0);
+  });
+
+  it('does not treat a directory or path name as completion evidence', async () => {
+    safeMkdir(tmpDir, { recursive: true });
+    const directoryPath = `${tmpDir}/evidence-directory.md`;
+    safeMkdir(directoryPath, { recursive: true });
+
+    const result = await reconcileCompletion({
+      goal: {
+        summary: 'evidence-directory.md',
+        success_condition: 'evidence-directory.md',
+      },
+      evidenceRefs: [directoryPath],
+    });
+
+    expect(result.satisfied).toBe(false);
+    expect(result.gaps).toContain('evidence-directory.md');
   });
 });

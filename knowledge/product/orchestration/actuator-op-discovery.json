@@ -21294,6 +21294,9 @@
               "structure": {
                 "type": "array"
               },
+              "speaker_aliases": {
+                "type": "object"
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -21324,11 +21327,93 @@
                 "type": "string",
                 "enum": ["blackhole", "pulseaudio", "none"]
               },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
               "duration_sec": {
                 "type": "number"
               },
               "execution_profile_id": {
                 "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
               }
             },
             "additionalProperties": false
@@ -21499,6 +21584,9 @@
               "structure": {
                 "type": "array"
               },
+              "speaker_aliases": {
+                "type": "object"
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -21529,11 +21617,93 @@
                 "type": "string",
                 "enum": ["blackhole", "pulseaudio", "none"]
               },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
               "duration_sec": {
                 "type": "number"
               },
               "execution_profile_id": {
                 "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
               }
             },
             "additionalProperties": false
@@ -21704,6 +21874,9 @@
               "structure": {
                 "type": "array"
               },
+              "speaker_aliases": {
+                "type": "object"
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -21734,11 +21907,93 @@
                 "type": "string",
                 "enum": ["blackhole", "pulseaudio", "none"]
               },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
               "duration_sec": {
                 "type": "number"
               },
               "execution_profile_id": {
                 "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
               }
             },
             "additionalProperties": false
@@ -21909,6 +22164,9 @@
               "structure": {
                 "type": "array"
               },
+              "speaker_aliases": {
+                "type": "object"
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -21939,11 +22197,93 @@
                 "type": "string",
                 "enum": ["blackhole", "pulseaudio", "none"]
               },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
               "duration_sec": {
                 "type": "number"
               },
               "execution_profile_id": {
                 "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
               }
             },
             "additionalProperties": false
@@ -22114,6 +22454,9 @@
               "structure": {
                 "type": "array"
               },
+              "speaker_aliases": {
+                "type": "object"
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -22144,11 +22487,93 @@
                 "type": "string",
                 "enum": ["blackhole", "pulseaudio", "none"]
               },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
               "duration_sec": {
                 "type": "number"
               },
               "execution_profile_id": {
                 "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
               }
             },
             "additionalProperties": false
@@ -22156,6 +22581,1166 @@
           "examples": [
             {
               "transcript": "Please confirm the decisions."
+            }
+          ]
+        },
+        {
+          "op": "hearing_session",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "agenda": {
+                "type": "array"
+              },
+              "attendees": {
+                "type": "array"
+              },
+              "attendees_from": {
+                "type": "string"
+              },
+              "counterparty_ref": {
+                "type": "string"
+              },
+              "current_topic": {
+                "type": "string"
+              },
+              "days_overdue": {
+                "type": "number"
+              },
+              "default_assignee_label": {
+                "type": "string"
+              },
+              "enforce_restricted_actions": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string"
+              },
+              "facilitator_persona_label": {
+                "type": "string"
+              },
+              "item": {
+                "type": "object",
+                "properties": {
+                  "item_id": {
+                    "type": "string"
+                  },
+                  "mission_id": {
+                    "type": "string"
+                  },
+                  "meeting_ref": {},
+                  "title": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "assignee": {},
+                  "due_at": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "modality": {
+                    "type": "string"
+                  },
+                  "review_state": {
+                    "type": "string"
+                  },
+                  "provenance": {},
+                  "max_reminders": {
+                    "type": "number"
+                  },
+                  "policy": {},
+                  "priority": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "type": "string"
+                  },
+                  "completed_at": {
+                    "type": "string"
+                  },
+                  "blocked_reason": {
+                    "type": "string"
+                  },
+                  "tenant_slug": {
+                    "type": "string"
+                  },
+                  "reminders": {
+                    "type": "array"
+                  },
+                  "execution": {}
+                },
+                "additionalProperties": false
+              },
+              "item_from": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "max_items": {
+                "type": "number"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "operator_label": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "partial_reason": {
+                "type": "string"
+              },
+              "partial_state": {
+                "type": "boolean"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "proposal_draft_ref": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "recent_transcript_chunk": {
+                "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "structure": {
+                "type": "array"
+              },
+              "speaker_aliases": {
+                "type": "object"
+              },
+              "tenant_slug": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "transcript": {
+                "type": "string"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "audio_bridge": {
+                "type": "string",
+                "enum": ["blackhole", "pulseaudio", "none"]
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "topic": "Renewal requirements"
+            }
+          ]
+        },
+        {
+          "op": "tutor_session",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "agenda": {
+                "type": "array"
+              },
+              "attendees": {
+                "type": "array"
+              },
+              "attendees_from": {
+                "type": "string"
+              },
+              "counterparty_ref": {
+                "type": "string"
+              },
+              "current_topic": {
+                "type": "string"
+              },
+              "days_overdue": {
+                "type": "number"
+              },
+              "default_assignee_label": {
+                "type": "string"
+              },
+              "enforce_restricted_actions": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string"
+              },
+              "facilitator_persona_label": {
+                "type": "string"
+              },
+              "item": {
+                "type": "object",
+                "properties": {
+                  "item_id": {
+                    "type": "string"
+                  },
+                  "mission_id": {
+                    "type": "string"
+                  },
+                  "meeting_ref": {},
+                  "title": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "assignee": {},
+                  "due_at": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "modality": {
+                    "type": "string"
+                  },
+                  "review_state": {
+                    "type": "string"
+                  },
+                  "provenance": {},
+                  "max_reminders": {
+                    "type": "number"
+                  },
+                  "policy": {},
+                  "priority": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "type": "string"
+                  },
+                  "completed_at": {
+                    "type": "string"
+                  },
+                  "blocked_reason": {
+                    "type": "string"
+                  },
+                  "tenant_slug": {
+                    "type": "string"
+                  },
+                  "reminders": {
+                    "type": "array"
+                  },
+                  "execution": {}
+                },
+                "additionalProperties": false
+              },
+              "item_from": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "max_items": {
+                "type": "number"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "operator_label": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "partial_reason": {
+                "type": "string"
+              },
+              "partial_state": {
+                "type": "boolean"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "proposal_draft_ref": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "recent_transcript_chunk": {
+                "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "structure": {
+                "type": "array"
+              },
+              "speaker_aliases": {
+                "type": "object"
+              },
+              "tenant_slug": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "transcript": {
+                "type": "string"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "audio_bridge": {
+                "type": "string",
+                "enum": ["blackhole", "pulseaudio", "none"]
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "material": "Photosynthesis converts light into chemical energy."
+            }
+          ]
+        },
+        {
+          "op": "normalize_transcript",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "agenda": {
+                "type": "array"
+              },
+              "attendees": {
+                "type": "array"
+              },
+              "attendees_from": {
+                "type": "string"
+              },
+              "counterparty_ref": {
+                "type": "string"
+              },
+              "current_topic": {
+                "type": "string"
+              },
+              "days_overdue": {
+                "type": "number"
+              },
+              "default_assignee_label": {
+                "type": "string"
+              },
+              "enforce_restricted_actions": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string"
+              },
+              "facilitator_persona_label": {
+                "type": "string"
+              },
+              "item": {
+                "type": "object",
+                "properties": {
+                  "item_id": {
+                    "type": "string"
+                  },
+                  "mission_id": {
+                    "type": "string"
+                  },
+                  "meeting_ref": {},
+                  "title": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "assignee": {},
+                  "due_at": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "modality": {
+                    "type": "string"
+                  },
+                  "review_state": {
+                    "type": "string"
+                  },
+                  "provenance": {},
+                  "max_reminders": {
+                    "type": "number"
+                  },
+                  "policy": {},
+                  "priority": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "type": "string"
+                  },
+                  "completed_at": {
+                    "type": "string"
+                  },
+                  "blocked_reason": {
+                    "type": "string"
+                  },
+                  "tenant_slug": {
+                    "type": "string"
+                  },
+                  "reminders": {
+                    "type": "array"
+                  },
+                  "execution": {}
+                },
+                "additionalProperties": false
+              },
+              "item_from": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "max_items": {
+                "type": "number"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "operator_label": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "partial_reason": {
+                "type": "string"
+              },
+              "partial_state": {
+                "type": "boolean"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "proposal_draft_ref": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "recent_transcript_chunk": {
+                "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "structure": {
+                "type": "array"
+              },
+              "speaker_aliases": {
+                "type": "object"
+              },
+              "tenant_slug": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "transcript": {
+                "type": "string"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "audio_bridge": {
+                "type": "string",
+                "enum": ["blackhole", "pulseaudio", "none"]
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "transcript_path": "active/shared/tmp/meeting.vtt"
+            }
+          ]
+        },
+        {
+          "op": "resolve_next_target",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "agenda": {
+                "type": "array"
+              },
+              "attendees": {
+                "type": "array"
+              },
+              "attendees_from": {
+                "type": "string"
+              },
+              "counterparty_ref": {
+                "type": "string"
+              },
+              "current_topic": {
+                "type": "string"
+              },
+              "days_overdue": {
+                "type": "number"
+              },
+              "default_assignee_label": {
+                "type": "string"
+              },
+              "enforce_restricted_actions": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string"
+              },
+              "facilitator_persona_label": {
+                "type": "string"
+              },
+              "item": {
+                "type": "object",
+                "properties": {
+                  "item_id": {
+                    "type": "string"
+                  },
+                  "mission_id": {
+                    "type": "string"
+                  },
+                  "meeting_ref": {},
+                  "title": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "assignee": {},
+                  "due_at": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "modality": {
+                    "type": "string"
+                  },
+                  "review_state": {
+                    "type": "string"
+                  },
+                  "provenance": {},
+                  "max_reminders": {
+                    "type": "number"
+                  },
+                  "policy": {},
+                  "priority": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "type": "string"
+                  },
+                  "completed_at": {
+                    "type": "string"
+                  },
+                  "blocked_reason": {
+                    "type": "string"
+                  },
+                  "tenant_slug": {
+                    "type": "string"
+                  },
+                  "reminders": {
+                    "type": "array"
+                  },
+                  "execution": {}
+                },
+                "additionalProperties": false
+              },
+              "item_from": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "max_items": {
+                "type": "number"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "operator_label": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "partial_reason": {
+                "type": "string"
+              },
+              "partial_state": {
+                "type": "boolean"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "proposal_draft_ref": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "recent_transcript_chunk": {
+                "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "structure": {
+                "type": "array"
+              },
+              "speaker_aliases": {
+                "type": "object"
+              },
+              "tenant_slug": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "transcript": {
+                "type": "string"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "audio_bridge": {
+                "type": "string",
+                "enum": ["blackhole", "pulseaudio", "none"]
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "events": []
             }
           ]
         },
@@ -22319,6 +23904,9 @@
               "structure": {
                 "type": "array"
               },
+              "speaker_aliases": {
+                "type": "object"
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -22349,11 +23937,93 @@
                 "type": "string",
                 "enum": ["blackhole", "pulseaudio", "none"]
               },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
               "duration_sec": {
                 "type": "number"
               },
               "execution_profile_id": {
                 "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
               }
             },
             "additionalProperties": false
@@ -22524,6 +24194,9 @@
               "structure": {
                 "type": "array"
               },
+              "speaker_aliases": {
+                "type": "object"
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -22554,11 +24227,93 @@
                 "type": "string",
                 "enum": ["blackhole", "pulseaudio", "none"]
               },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
               "duration_sec": {
                 "type": "number"
               },
               "execution_profile_id": {
                 "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
               }
             },
             "additionalProperties": false
@@ -22767,6 +24522,9 @@
               "structure": {
                 "type": "array"
               },
+              "speaker_aliases": {
+                "type": "object"
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -22797,11 +24555,93 @@
                 "type": "string",
                 "enum": ["blackhole", "pulseaudio", "none"]
               },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "learner_label": {
+                "type": "string"
+              },
+              "material": {
+                "type": "string"
+              },
+              "material_path": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
               "duration_sec": {
                 "type": "number"
               },
               "execution_profile_id": {
                 "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "enable_captions": {
+                "type": "boolean"
+              },
+              "end": {
+                "type": "string"
+              },
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "join_backend": {
+                "type": "string",
+                "enum": ["auto", "playwright", "chrome-extension"]
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "now": {
+                "type": "string"
+              },
+              "profile_id": {
+                "type": "string"
+              },
+              "python_bin": {
+                "type": "string"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "screenshot_path": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
               }
             },
             "additionalProperties": false
@@ -28803,6 +30643,69 @@
           "examples": [{}]
         },
         {
+          "op": "normalize_audio",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "audio_path": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "audio_path": "active/shared/tmp/meeting.m4a"
+            }
+          ]
+        },
+        {
+          "op": "output_to_virtual_camera",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "video_path": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "scene_name": {
+                "type": "string"
+              },
+              "source_name": {
+                "type": "string"
+              },
+              "loop": {
+                "type": "boolean"
+              },
+              "stop": {
+                "type": "boolean"
+              },
+              "obs_host": {
+                "type": "string"
+              },
+              "obs_port": {
+                "type": "number"
+              },
+              "obs_password": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "video_path": "active/shared/tmp/avatar.mp4"
+            }
+          ]
+        },
+        {
           "op": "record_interaction",
           "kind": "apply",
           "input_schema": {
@@ -28885,6 +30788,62 @@
             {
               "profile_id": "profile-1",
               "samples": []
+            }
+          ]
+        },
+        {
+          "op": "render_talking_avatar",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "portrait_path": {
+                "type": "string"
+              },
+              "avatar_name": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "audio_path": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "voice": {
+                "type": "string"
+              },
+              "fps": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "mouth_x": {
+                "type": "number"
+              },
+              "mouth_y": {
+                "type": "number"
+              },
+              "mouth_w": {
+                "type": "number"
+              },
+              "eyes_y": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "portrait_path": "active/shared/tmp/avatar.png",
+              "text": "こんにちは。",
+              "language": "ja"
             }
           ]
         },
@@ -29199,6 +31158,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -29509,6 +31471,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -29813,6 +31778,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -30121,6 +32089,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -30427,6 +32398,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -30731,6 +32705,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -31043,6 +33020,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -31351,6 +33331,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -31663,6 +33646,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -31967,6 +33953,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -32275,6 +34264,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -32579,6 +34571,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -32887,6 +34882,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -33191,6 +35189,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -33517,6 +35518,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -33826,6 +35830,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -34130,6 +36137,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -34437,6 +36447,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -34779,6 +36792,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -35087,6 +37103,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -35416,6 +37435,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -35722,6 +37744,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -36026,6 +38051,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -36352,6 +38380,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -36660,6 +38691,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -36987,6 +39021,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -37312,6 +39349,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -37620,6 +39660,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -37932,6 +39975,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -38240,6 +40286,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -38552,6 +40601,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -38856,6 +40908,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -39168,6 +41223,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -39478,6 +41536,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -39782,6 +41843,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -40094,6 +42158,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -40402,6 +42469,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -40714,6 +42784,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -41022,6 +43095,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -41349,6 +43425,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -41657,6 +43736,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -41969,6 +44051,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -42277,6 +44362,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -42592,6 +44680,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -42900,6 +44991,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -43212,6 +45306,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -43518,6 +45615,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -43822,6 +45922,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -44145,6 +46248,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -44451,6 +46557,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -44755,6 +46864,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -45067,6 +47179,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -45371,6 +47486,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -45679,6 +47797,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -46017,6 +48138,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -46342,6 +48466,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -46664,6 +48791,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -46969,6 +49099,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -47292,6 +49425,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -47602,6 +49738,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -47908,6 +50047,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -48220,6 +50362,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -48530,6 +50675,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -48834,6 +50982,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -49146,6 +51297,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -49456,6 +51610,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -49762,6 +51919,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -49793,8 +51953,1284 @@
     {
       "n": "working-memory-actuator",
       "path": "libs/actuators/working-memory-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "note",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "set-now",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "add-action-item",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "complete-action-item",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "daily-open",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "todo-add",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "todo-done",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "todo-rollover",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "weekly-open",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "nominate-promotion",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "consolidation-status",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "run-gc",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "build-index",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "read",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "list",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        }
+      ]
     }
   ]
 }

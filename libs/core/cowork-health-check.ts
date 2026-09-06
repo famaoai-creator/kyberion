@@ -13,7 +13,25 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+
+const SYNC_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/cowork-sync-state.schema.json'
+);
+
+interface CoworkSyncState {
+  last_sync_at: string;
+  [key: string]: unknown;
+}
+
+function syncStateCatalogAtPath(filePath: string) {
+  return defineCatalog<CoworkSyncState>({
+    id: 'cowork-health-sync-state',
+    path: filePath,
+    schema: SYNC_STATE_SCHEMA_PATH,
+  });
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,7 +81,9 @@ function checkConnectorConfig(): CoworkHealthCheck {
 }
 
 function checkSyncPolicy(): CoworkHealthCheck {
-  const policyPath = pathResolver.rootResolve('knowledge/product/governance/cowork-sync-policy.json');
+  const policyPath = pathResolver.rootResolve(
+    'knowledge/product/governance/cowork-sync-policy.json'
+  );
   const exists = safeExistsSync(policyPath);
   return {
     name: 'sync_policy_present',
@@ -78,13 +98,18 @@ function checkCoworkOutbox(): CoworkHealthCheck {
   return {
     name: 'cowork_outbox_accessible',
     passed: exists,
-    detail: exists ? outboxPath : 'Cowork outbox dir not yet created (no deliveries yet — acceptable)',
+    detail: exists
+      ? outboxPath
+      : 'Cowork outbox dir not yet created (no deliveries yet — acceptable)',
   };
 }
 
 function checkSyncStateFreshness(maxAgeHours = 24): { check: CoworkHealthCheck; warning?: string } {
-  const statePath = pathResolver.resolve('active/shared/runtime/cowork-sync-state.json');
-  if (!safeExistsSync(statePath)) {
+  const statePath = assertSafeRepositoryPath(
+    pathResolver.resolve('active/shared/runtime/cowork-sync-state.json'),
+    { allowMissingLeaf: true }
+  );
+  if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) {
     return {
       check: {
         name: 'sync_state_freshness',
@@ -95,8 +120,7 @@ function checkSyncStateFreshness(maxAgeHours = 24): { check: CoworkHealthCheck; 
   }
 
   try {
-    const raw = safeReadFile(statePath, { encoding: 'utf8' }) as string;
-    const state = JSON.parse(raw) as { last_sync_at?: string };
+    const state = syncStateCatalogAtPath(statePath).load();
     const lastSync = state.last_sync_at ? new Date(state.last_sync_at).getTime() : 0;
     const ageHours = (Date.now() - lastSync) / (1000 * 60 * 60);
     const stale = lastSync > 0 && ageHours > maxAgeHours;
@@ -123,7 +147,7 @@ function checkSyncStateFreshness(maxAgeHours = 24): { check: CoworkHealthCheck; 
 
 function checkSurfaceManifest(): CoworkHealthCheck {
   const manifestPath = pathResolver.rootResolve(
-    'knowledge/product/governance/surfaces/mcp-server-cowork.json',
+    'knowledge/product/governance/surfaces/mcp-server-cowork.json'
   );
   const exists = safeExistsSync(manifestPath);
   return {
@@ -140,7 +164,9 @@ function checkSurfaceManifest(): CoworkHealthCheck {
  *
  * @param options.syncStateMaxAgeHours  Warn if sync state is older than this (default: 24h).
  */
-export function runCoworkHealthCheck(options: { syncStateMaxAgeHours?: number } = {}): CoworkHealthReport {
+export function runCoworkHealthCheck(
+  options: { syncStateMaxAgeHours?: number } = {}
+): CoworkHealthReport {
   const freshnessResult = checkSyncStateFreshness(options.syncStateMaxAgeHours ?? 24);
 
   const checks: CoworkHealthCheck[] = [

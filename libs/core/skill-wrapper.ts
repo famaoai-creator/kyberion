@@ -7,6 +7,7 @@
 import type { SkillOutput } from './types.js';
 import { metrics } from './metrics.js';
 import { fileUtils } from './core.js';
+import { nowIso } from './foundation/time.js';
 import { safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import chalk from 'chalk';
@@ -20,6 +21,11 @@ import {
 } from './skill-plugin-loader.js';
 import { currentScope } from './scope-context.js';
 
+export interface SkillRunOptions {
+  /** Project-local plugin configuration is consumed only after trust is explicit. */
+  trustResolved?: boolean;
+}
+
 function buildOutput<T>(
   skillName: string,
   status: 'success' | 'error',
@@ -32,7 +38,7 @@ function buildOutput<T>(
     status,
     metadata: {
       duration_ms: durationMs,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
       system_directive: fileUtils.getGoldenRule(),
     },
   };
@@ -119,6 +125,17 @@ export async function wrapSkillAsync<T>(
 }
 
 export function runSkill<T>(skillName: string, fn: () => T): SkillOutput<T> {
+  const skillDecision = isSkillAllowed(skillName, currentScope());
+  if (!skillDecision.allowed) {
+    const output = buildOutput<T>(
+      skillName,
+      'error',
+      new Error(`[SKILL_RESTRICTED] ${skillDecision.reason || 'skill is not allowed'}`),
+      Date.now()
+    );
+    printOutput(output);
+    return output;
+  }
   const output = wrapSkill(skillName, fn);
   printOutput(output);
   return output;
@@ -134,9 +151,11 @@ export function runSkill<T>(skillName: string, fn: () => T): SkillOutput<T> {
  */
 async function runSkillWithPlugins<T>(
   skillName: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  options: SkillRunOptions = {}
 ): Promise<SkillOutput<T>> {
-  const skillDecision = isSkillAllowed(skillName, currentScope());
+  const scope = currentScope();
+  const skillDecision = isSkillAllowed(skillName, scope);
   if (!skillDecision.allowed) {
     return buildOutput<T>(
       skillName,
@@ -147,7 +166,12 @@ async function runSkillWithPlugins<T>(
   }
   let plugins: LoadedSkillPlugin[] = [];
   try {
-    plugins = (await loadAuthorizedSkillPlugins(process.cwd(), undefined, currentScope())).loaded;
+    plugins = (
+      await loadAuthorizedSkillPlugins(process.cwd(), undefined, scope, {
+        // Do not let omission silently mean that project trust was resolved.
+        trustResolved: options.trustResolved === true,
+      })
+    ).loaded;
   } catch (err) {
     // Plugin loading itself must never block a skill run.
     console.error(
@@ -169,9 +193,10 @@ async function runSkillWithPlugins<T>(
 
 export async function runSkillAsync<T>(
   skillName: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  options: SkillRunOptions = {}
 ): Promise<SkillOutput<T>> {
-  const output = await runSkillWithPlugins(skillName, fn);
+  const output = await runSkillWithPlugins(skillName, fn, options);
   printOutput(output);
   return output;
 }
@@ -181,8 +206,12 @@ export function runSkillCli<T>(skillName: string, fn: () => T): void {
   if (output.status === 'error') process.exitCode = 1;
 }
 
-export async function runSkillAsyncCli<T>(skillName: string, fn: () => Promise<T>): Promise<void> {
-  const output = await runSkillAsync(skillName, fn);
+export async function runSkillAsyncCli<T>(
+  skillName: string,
+  fn: () => Promise<T>,
+  options: SkillRunOptions = {}
+): Promise<void> {
+  const output = await runSkillAsync(skillName, fn, options);
   if (output.status === 'error') process.exitCode = 1;
 }
 

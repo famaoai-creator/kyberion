@@ -2,12 +2,59 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   PROVIDER_IDS,
   buildProviderChildEnv,
+  resolveActiveProviderPermissionArgs,
+  resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderId,
 } from './provider-permission-profiles.js';
 import { listSubagentCapabilityProfileNames } from './subagent-capability-profiles.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 describe('provider-permission-profiles', () => {
+  it('projects an active read-only policy to explorer and preserves planner', () => {
+    const policy = resolveSandboxPolicy({
+      provider: 'codex',
+      mode: 'read-only',
+      networkAccess: false,
+    });
+    withSandboxPolicy(policy, () => {
+      expect(resolveEffectiveProviderPermissionProfile('codex')).toBe('explorer');
+      expect(resolveEffectiveProviderPermissionProfile('claude', 'implementer')).toBe('explorer');
+      expect(resolveEffectiveProviderPermissionProfile('grok', 'planner')).toBe('planner');
+    });
+  });
+
+  it('projects an active workspace-write policy to implementer only when unprofiled', () => {
+    const policy = resolveSandboxPolicy({
+      provider: 'codex',
+      mode: 'workspace-write',
+      networkAccess: true,
+    });
+    withSandboxPolicy(policy, () => {
+      expect(resolveEffectiveProviderPermissionProfile('codex')).toBe('implementer');
+      expect(resolveEffectiveProviderPermissionProfile('codex', 'explorer')).toBe('explorer');
+    });
+  });
+
+  it('rejects a partial active provider policy before permission projection', () => {
+    const policy = resolveSandboxPolicy({ provider: 'agy', mode: 'read-only' });
+    expect(() =>
+      withSandboxPolicy(policy, () => resolveEffectiveProviderPermissionProfile('agy'))
+    ).toThrow('SANDBOX_POLICY_PARTIAL');
+  });
+
+  it('returns provider argv for an active policy while preserving no-policy legacy behavior', () => {
+    expect(resolveActiveProviderPermissionArgs('codex')).toBeUndefined();
+    const policy = resolveSandboxPolicy({
+      provider: 'codex',
+      mode: 'read-only',
+      networkAccess: true,
+    });
+    withSandboxPolicy(policy, () => {
+      expect(resolveActiveProviderPermissionArgs('codex')).toEqual(['--sandbox', 'read-only']);
+    });
+  });
+
   describe('resolveProviderPermissionArgs', () => {
     it('resolves every KD-05 profile x provider combo to either a grant or a typed refusal, never throwing', () => {
       for (const profileName of listSubagentCapabilityProfileNames()) {
@@ -104,7 +151,15 @@ describe('provider-permission-profiles', () => {
   });
 
   describe('buildProviderChildEnv', () => {
-    const providers: ProviderId[] = ['claude', 'codex', 'agy', 'grok'];
+    const providers: ProviderId[] = [
+      'claude',
+      'codex',
+      'agy',
+      'grok',
+      'gemini',
+      'cursor',
+      'opencode',
+    ];
     const fakeBaseEnv = (): NodeJS.ProcessEnv =>
       ({
         PATH: '/usr/bin:/bin',
@@ -116,6 +171,7 @@ describe('provider-permission-profiles', () => {
         GEMINI_API_KEY: 'fake-gemini-key',
         GH_TOKEN: 'fake-github-token',
         XAI_API_KEY: 'fake-xai-key',
+        CURSOR_API_KEY: 'fake-cursor-key',
         CUSTOM_SECRET_TOKEN: 'fake-custom-token',
         CODEX_HOME: '/home/test/.codex',
         KYBERION_PERSONA: 'implementer',
@@ -171,6 +227,25 @@ describe('provider-permission-profiles', () => {
       expect(env.ANTHROPIC_API_KEY).toBeUndefined();
       expect(env.GEMINI_API_KEY).toBeUndefined();
       expect(env.GH_TOKEN).toBeUndefined();
+      expect(env.CURSOR_API_KEY).toBeUndefined();
+    });
+
+    it('excludes other providers credentials for cursor, and carries CURSOR_API_KEY', () => {
+      const env = buildProviderChildEnv({ provider: 'cursor', baseEnv: fakeBaseEnv() });
+      expect(env.CURSOR_API_KEY).toBe('fake-cursor-key');
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.XAI_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+    });
+
+    it('carries no provider API key for opencode (login session auth)', () => {
+      const env = buildProviderChildEnv({ provider: 'opencode', baseEnv: fakeBaseEnv() });
+      expect(env.CURSOR_API_KEY).toBeUndefined();
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.XAI_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
     });
 
     it('carries KYBERION_*/MISSION_* vars for every provider, but not unrelated vars', () => {

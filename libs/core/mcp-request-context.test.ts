@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { resolveMcpRequestContext } from './mcp-request-context.js';
 
 describe('MCP request context', () => {
@@ -30,5 +31,15 @@ describe('MCP request context', () => {
         env: { KYBERION_MCP_TENANT: 'tenant-a' },
       })
     ).toThrow('MCP_SCOPE_MISMATCH');
+  });
+
+  it('routes server binding reads through the governed environment accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/mcp-request-context.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toContain('env.KYBERION_');
+    expect(source).toContain('getRegisteredEnvText');
   });
 });

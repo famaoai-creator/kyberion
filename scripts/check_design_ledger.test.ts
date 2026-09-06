@@ -1,11 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { safeMkdir, safeWriteFile } from '@agent/core';
-import { pathResolver } from '@agent/core';
-import { validateDesignLedger } from './check_design_ledger.js';
+import { pathResolver, safeReadFile } from '@agent/core';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { readDesignLedgerTextFile, validateDesignLedger } from './check_design_ledger.js';
 
 const fixtureRoot = pathResolver.shared('tmp/design-ledger-check');
 
 describe('design ledger checker', () => {
+  it('rejects a directory replacement before frontmatter parsing', () => {
+    expect(() => readDesignLedgerTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
+  it('uses the foundation text reader for ledger markdown files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_design_ledger.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(');
+  });
+
   it('rejects a rejected note without a rationale and accepts a complete note', () => {
     safeMkdir(`${fixtureRoot}/docs/developer/design-notes/rejected`, { recursive: true });
     safeMkdir(`${fixtureRoot}/docs/developer/design-notes/implemented`, { recursive: true });

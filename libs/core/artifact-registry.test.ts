@@ -1,5 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import {
   appendArtifactOwnershipRecord,
   findReusableArtifactOwnershipRecord,
@@ -33,26 +41,49 @@ describe('artifact-registry', () => {
   });
 
   it('appends and lists ownership records from jsonl registry', () => {
-    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-      artifact_id: 'ART-TEST-ONE',
-      project_id: 'PRJ-TEST',
-      kind: 'pptx',
-      storage_class: 'artifact_store',
-      path: 'active/shared/exports/test-one.pptx',
-    }));
-    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-      artifact_id: 'ART-TEST-TWO',
-      task_session_id: 'TSK-TEST',
-      kind: 'docx',
-      storage_class: 'artifact_store',
-      path: 'active/shared/exports/test-two.docx',
-      evidence_refs: ['artifact:ART-TEST-ONE'],
-    }));
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-TEST-ONE',
+        project_id: 'PRJ-TEST',
+        kind: 'pptx',
+        storage_class: 'artifact_store',
+        path: 'active/shared/exports/test-one.pptx',
+      })
+    );
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-TEST-TWO',
+        task_session_id: 'TSK-TEST',
+        kind: 'docx',
+        storage_class: 'artifact_store',
+        path: 'active/shared/exports/test-two.docx',
+        evidence_refs: ['artifact:ART-TEST-ONE'],
+      })
+    );
 
     const rows = listArtifactOwnershipRecords();
     expect(rows.length).toBe(2);
     expect(rows[0]?.artifact_id).toBe('ART-TEST-ONE');
     expect(rows[1]?.artifact_id).toBe('ART-TEST-TWO');
+  });
+
+  it('appends the canonical ownership payload returned by the catalog', () => {
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-TEST-CANONICAL',
+        project_id: 'PRJ-TEST',
+        kind: 'report',
+        storage_class: 'artifact_store',
+        path: 'active/shared/exports/canonical.md',
+        $schema: 'governance-metadata',
+      } as unknown as Parameters<typeof createArtifactOwnershipRecord>[0])
+    );
+
+    const persisted = JSON.parse(
+      String(safeReadFile(registryPath, { encoding: 'utf8' })).trim()
+    ) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.artifact_id).toBe('ART-TEST-CANONICAL');
   });
 
   it('rejects records without ownership metadata', () => {
@@ -73,47 +104,117 @@ describe('artifact-registry', () => {
       storage_class: 'tmp',
       path: 'active/shared/tmp/out.txt',
     });
-    expect(() => appendArtifactOwnershipRecord(record, { for_delivery: true })).toThrow(/tmp storage_class/i);
+    expect(() => appendArtifactOwnershipRecord(record, { for_delivery: true })).toThrow(
+      /tmp storage_class/i
+    );
   });
 
   it('finds reusable project artifacts and keeps mission-local artifacts scoped by query', () => {
-    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-      artifact_id: 'ART-PROJ-OLD',
-      project_id: 'PRJ-TEST-PROJ',
-      mission_id: 'MSN-TEST-OLD',
-      kind: 'markdown',
-      storage_class: 'artifact_store',
-      path: 'active/shared/artifacts/old.md',
-      created_at: '2026-06-01T00:00:00.000Z',
-    }));
-    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-      artifact_id: 'ART-PROJ-NEW',
-      project_id: 'PRJ-TEST-PROJ',
-      mission_id: 'MSN-TEST-NEW',
-      kind: 'markdown',
-      storage_class: 'artifact_store',
-      path: 'active/shared/artifacts/new.md',
-      created_at: '2026-06-02T00:00:00.000Z',
-    }));
-    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-      artifact_id: 'ART-PROJ-TMP',
-      project_id: 'PRJ-TEST-PROJ',
-      mission_id: 'MSN-TEST-TMP',
-      kind: 'markdown',
-      storage_class: 'tmp',
-      path: 'active/shared/tmp/tmp.md',
-      created_at: '2026-06-03T00:00:00.000Z',
-    }));
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-PROJ-OLD',
+        project_id: 'PRJ-TEST-PROJ',
+        mission_id: 'MSN-TEST-OLD',
+        kind: 'markdown',
+        storage_class: 'artifact_store',
+        path: 'active/shared/artifacts/old.md',
+        created_at: '2026-06-01T00:00:00.000Z',
+      })
+    );
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-PROJ-NEW',
+        project_id: 'PRJ-TEST-PROJ',
+        mission_id: 'MSN-TEST-NEW',
+        kind: 'markdown',
+        storage_class: 'artifact_store',
+        path: 'active/shared/artifacts/new.md',
+        created_at: '2026-06-02T00:00:00.000Z',
+      })
+    );
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-PROJ-TMP',
+        project_id: 'PRJ-TEST-PROJ',
+        mission_id: 'MSN-TEST-TMP',
+        kind: 'markdown',
+        storage_class: 'tmp',
+        path: 'active/shared/tmp/tmp.md',
+        created_at: '2026-06-03T00:00:00.000Z',
+      })
+    );
 
-    expect(listArtifactOwnershipRecordsForProject('PRJ-TEST-PROJ').map((record) => record.artifact_id)).toEqual([
-      'ART-PROJ-TMP',
-      'ART-PROJ-NEW',
-      'ART-PROJ-OLD',
-    ]);
-    expect(listArtifactOwnershipRecordsByQuery({ projectId: 'PRJ-TEST-PROJ', kind: 'markdown', includeTmp: false }).map((record) => record.artifact_id)).toEqual([
-      'ART-PROJ-NEW',
-      'ART-PROJ-OLD',
-    ]);
-    expect(findReusableArtifactOwnershipRecord({ projectId: 'PRJ-TEST-PROJ', kind: 'markdown' })?.artifact_id).toBe('ART-PROJ-NEW');
+    expect(
+      listArtifactOwnershipRecordsForProject('PRJ-TEST-PROJ').map((record) => record.artifact_id)
+    ).toEqual(['ART-PROJ-TMP', 'ART-PROJ-NEW', 'ART-PROJ-OLD']);
+    expect(
+      listArtifactOwnershipRecordsByQuery({
+        projectId: 'PRJ-TEST-PROJ',
+        kind: 'markdown',
+        includeTmp: false,
+      }).map((record) => record.artifact_id)
+    ).toEqual(['ART-PROJ-NEW', 'ART-PROJ-OLD']);
+    expect(
+      findReusableArtifactOwnershipRecord({ projectId: 'PRJ-TEST-PROJ', kind: 'markdown' })
+        ?.artifact_id
+    ).toBe('ART-PROJ-NEW');
+  });
+
+  it('fails closed on malformed ownership registry JSONL', () => {
+    safeWriteFile(registryPath, '{not-json}\n');
+
+    expect(() => listArtifactOwnershipRecords()).toThrow();
+  });
+
+  it('rejects schema-invalid ownership records when reading the registry', () => {
+    safeWriteFile(
+      registryPath,
+      `${JSON.stringify({
+        artifact_id: 'ART-INVALID-READ',
+        kind: 'report',
+        storage_class: 'artifact_store',
+        created_at: '2026-09-03T00:00:00.000Z',
+        evidence_refs: [],
+      })}\n`
+    );
+
+    expect(() => listArtifactOwnershipRecords()).toThrow(
+      /Invalid catalog artifact-ownership-record/
+    );
+  });
+
+  it('rejects a registry file that traverses a symlink', () => {
+    const target = pathResolver.sharedTmp('artifact-ownership-registry-target.jsonl');
+    safeWriteFile(target, '{}\n');
+    safeSymlinkSync(target, registryPath);
+
+    try {
+      expect(() => listArtifactOwnershipRecords()).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(registryPath, { force: true });
+      safeRmSync(target, { force: true });
+    }
+  });
+
+  it('rejects a registry path that is a directory', () => {
+    safeMkdir(registryPath, { recursive: true });
+
+    try {
+      expect(() => listArtifactOwnershipRecords()).toThrow(
+        '[ARTIFACT_REGISTRY] registry must be a regular file'
+      );
+      expect(() =>
+        appendArtifactOwnershipRecord(
+          createArtifactOwnershipRecord({
+            artifact_id: 'ART-DIRECTORY-REGISTRY',
+            project_id: 'PRJ-TEST',
+            kind: 'report',
+            storage_class: 'artifact_store',
+          })
+        )
+      ).toThrow('[ARTIFACT_REGISTRY] registry must be a regular file');
+    } finally {
+      safeRmSync(registryPath, { recursive: true, force: true });
+    }
   });
 });

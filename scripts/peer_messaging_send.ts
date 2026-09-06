@@ -1,19 +1,20 @@
-import { createStandardYargs, logger } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
 import {
   buildPeerMessageEnvelope,
   loadPeerNetworkCatalog,
   resolvePeerDispatchTarget,
   sendPeerMessage,
-} from '@agent/core';
+} from '@agent/core/peer-messaging';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import { parseSafeJsonInput } from './lib/json-input.js';
 
-function parseJsonPayload(raw: string | undefined): unknown {
-  if (!raw) return {};
-  return JSON.parse(raw);
-}
-
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
+  const argv = await createStandardYargs(['node', 'peer_messaging_send', ...args])
     .option('from-peer-id', {
       type: 'string',
       demandOption: true,
@@ -83,7 +84,7 @@ async function main(): Promise<void> {
   });
   const tenantId = String(argv['tenant-id']);
   const target = resolvePeerDispatchTarget(String(argv['to-peer-id']), catalog);
-  const payload = parseJsonPayload(String(argv.payload || '{}'));
+  const payload = parseSafeJsonInput(String(argv.payload || '{}'), 'peer message payload');
   const envelope = buildPeerMessageEnvelope({
     tenantId,
     senderPeerId: String(argv['from-peer-id']),
@@ -108,10 +109,17 @@ async function main(): Promise<void> {
   logger.success(
     `[peer-messaging-send] ${receipt.ok ? 'delivered' : 'failed'} ${envelope.message_id} -> ${target.peer.peer_id} (${target.destinationUrl})`
   );
-  console.log(JSON.stringify(receipt, null, 2));
+  print(receipt);
 }
 
-main().catch((error: any) => {
-  logger.error(error?.message || String(error));
-  process.exitCode = 1;
+const runPeerMessagingSend = defineScript({
+  name: 'peer-messaging-send',
+  flags: ['json', 'quiet'],
+  run: ({ argv, print }) => main(stripSharedScriptFlags(argv), print),
 });
+
+if (
+  isDirectScript(import.meta.url, 'peer_messaging_send.ts') ||
+  isDirectScript(import.meta.url, 'peer_messaging_send.js')
+)
+  void runPeerMessagingSend();

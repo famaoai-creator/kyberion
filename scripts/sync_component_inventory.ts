@@ -1,34 +1,13 @@
 import * as path from 'node:path';
+import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
 import {
-  pathResolver,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeReaddir,
-  safeWriteFile,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import { withExecutionContext } from '@agent/core/governance';
-import {} from '../libs/actuators/system-actuator/src/op-catalog.js';
-
-interface CapabilityManifest {
-  actuator_id: string;
-  version: string;
-  description: string;
-  contract_schema?: string;
-  capabilities: Array<{
-    op: string;
-    platforms: string[];
-    requirements?: { bin?: string[]; env?: string[]; lib?: string[] };
-    prerequisites?: {
-      binaries?: string[];
-      platforms?: string[];
-      env?: string[];
-      services?: string[];
-      install?: string[] | Record<string, string>;
-    };
-  }>;
-}
+  loadActuatorManifest,
+  type ActuatorManifestFile,
+} from '@agent/core/actuator-manifest-index';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { nowIso, parseSafeJsonObjectInput } from '@agent/core/foundation';
+import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 interface CurrentIndexRecord {
   n: string;
@@ -68,7 +47,7 @@ const LEGACY_RATIONALES: Record<string, string> = {
     'Retired 2026-05-28 → retired/actuators/physical-bridge/. Was a thin wrapper that shelled into browser/system actuators via temp files. Replaced by direct ADF orchestration.',
 };
 
-function summarizePrerequisites(manifest: CapabilityManifest): string {
+function summarizePrerequisites(manifest: ActuatorManifestFile): string {
   const parts = new Set<string>();
   for (const capability of manifest.capabilities || []) {
     for (const binary of capability.prerequisites?.binaries || capability.requirements?.bin || []) {
@@ -87,7 +66,7 @@ function summarizePrerequisites(manifest: CapabilityManifest): string {
   return parts.size > 0 ? Array.from(parts).sort().join(', ') : '-';
 }
 
-function listOps(manifest: CapabilityManifest): string[] {
+function listOps(manifest: ActuatorManifestFile): string[] {
   return Array.from(
     new Set(
       (manifest.capabilities || []).map((capability) => String(capability.op || '')).filter(Boolean)
@@ -95,8 +74,8 @@ function listOps(manifest: CapabilityManifest): string[] {
   ).sort();
 }
 
-function loadManifest(manifestPath: string): CapabilityManifest {
-  return readJson<CapabilityManifest>(manifestPath);
+function loadManifest(manifestPath: string): ActuatorManifestFile {
+  return loadActuatorManifest(manifestPath);
 }
 
 function collectComponentInventory() {
@@ -120,7 +99,7 @@ function collectComponentInventory() {
         d: manifest.description,
         s: 'implemented',
         version: manifest.version,
-        capability_count: manifest.capabilities.length,
+        capability_count: manifest.capabilities?.length || 0,
         ops: listOps(manifest),
         contract_schema: manifest.contract_schema,
         prerequisites_summary: summarizePrerequisites(manifest),
@@ -142,52 +121,58 @@ function collectComponentInventory() {
   return { current, legacy };
 }
 
-function writeJsonArtifacts(current: CurrentIndexRecord[], legacy: LegacyRecord[]) {
-  safeWriteFile(
-    CURRENT_INDEX_PATH,
-    JSON.stringify(
-      {
-        v: '2.0.0',
-        t: current.length,
-        actuators: current,
-      },
-      null,
-      2
-    ) + '\n'
-  );
-
-  safeWriteFile(
-    LEGACY_INDEX_PATH,
-    JSON.stringify(
-      {
-        v: '1.0.0',
-        t: legacy.length,
-        components: legacy,
-      },
-      null,
-      2
-    ) + '\n'
-  );
-
-  safeWriteFile(
-    SKILL_INDEX_PATH,
-    JSON.stringify(
-      {
-        v: '3.0.0',
-        t: current.length,
-        s: current.map((entry) => ({
-          n: entry.n,
-          path: entry.path,
-          d: entry.d,
-          s: entry.s,
-          version: entry.version,
-          capability_count: entry.capability_count,
-        })),
-      },
-      null,
-      2
-    ) + '\n'
-  );
+function renderJsonArtifacts(
+  current: CurrentIndexRecord[],
+  legacy: LegacyRecord[]
+): GeneratedFile[] {
+  return [
+    {
+      path: CURRENT_INDEX_PATH,
+      content:
+        JSON.stringify(
+          {
+            v: '2.0.0',
+            t: current.length,
+            actuators: current,
+          },
+          null,
+          2
+        ) + '\n',
+    },
+    {
+      path: LEGACY_INDEX_PATH,
+      content:
+        JSON.stringify(
+          {
+            v: '1.0.0',
+            t: legacy.length,
+            components: legacy,
+          },
+          null,
+          2
+        ) + '\n',
+    },
+    {
+      path: SKILL_INDEX_PATH,
+      content:
+        JSON.stringify(
+          {
+            v: '3.0.0',
+            t: current.length,
+            s: current.map((entry) => ({
+              n: entry.n,
+              path: entry.path,
+              d: entry.d,
+              s: entry.s,
+              version: entry.version,
+              capability_count: entry.capability_count,
+            })),
+          },
+          null,
+          2
+        ) + '\n',
+    },
+  ];
 }
 
 interface DiscoveryOpsRecord {
@@ -198,12 +183,8 @@ interface DiscoveryOpsRecord {
 // AR-02: the op tables are generated from the self-described discovery index
 // (all actuators), not just the system actuator's exported constants.
 function loadDiscoveryOps(): DiscoveryOpsRecord[] {
-  const discoveryPath = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
   try {
-    const parsed = readJson<{
-      actuators?: DiscoveryOpsRecord[];
-    }>(discoveryPath);
-    return parsed.actuators ?? [];
+    return loadActuatorOpDiscoveryAtPath().actuators;
   } catch {
     return [];
   }
@@ -231,7 +212,7 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('# Kyberion Capabilities Guide');
   lines.push('');
   lines.push(`Total Actuators: ${current.length}`);
-  lines.push(`Last updated: ${new Date().toISOString().slice(0, 10)}`);
+  lines.push(`Last updated: ${nowIso().slice(0, 10)}`);
   lines.push('');
   lines.push(
     'This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.'
@@ -394,38 +375,41 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   return `${lines.join('\n')}\n`;
 }
 
-function main() {
-  return withExecutionContext(
-    'component_inventory_sync',
-    () => {
-      const knowledgeDir = path.dirname(REPORT_PATH);
-      if (!safeExistsSync(knowledgeDir)) {
-        safeMkdir(knowledgeDir);
-      }
-
-      const { current, legacy } = collectComponentInventory();
-      writeJsonArtifacts(current, legacy);
-      safeWriteFile(REPORT_PATH, buildReport(current, legacy));
-      safeWriteFile(CAPABILITIES_GUIDE_PATH, buildCapabilitiesGuide(current));
-      console.log(
-        JSON.stringify(
-          {
-            status: 'ok',
-            current_count: current.length,
-            legacy_count: legacy.length,
-            current_index_path: path.relative(pathResolver.rootDir(), CURRENT_INDEX_PATH),
-            skill_index_path: path.relative(pathResolver.rootDir(), SKILL_INDEX_PATH),
-            legacy_index_path: path.relative(pathResolver.rootDir(), LEGACY_INDEX_PATH),
-            report_path: path.relative(pathResolver.rootDir(), REPORT_PATH),
-            capabilities_guide_path: path.relative(pathResolver.rootDir(), CAPABILITIES_GUIDE_PATH),
-          },
-          null,
-          2
-        )
-      );
-    },
-    'ecosystem_architect'
-  );
+function render(): GeneratedFile[] {
+  const { current, legacy } = collectComponentInventory();
+  return [
+    ...renderJsonArtifacts(current, legacy),
+    { path: REPORT_PATH, content: buildReport(current, legacy) },
+    { path: CAPABILITIES_GUIDE_PATH, content: buildCapabilitiesGuide(current) },
+  ];
 }
 
-main();
+function normalizeGeneratedContent(content: string): string {
+  const withoutGeneratedDate = content.replace(/^Last updated: .*$/mu, 'Last updated: <generated>');
+  try {
+    return JSON.stringify(
+      parseSafeJsonObjectInput(withoutGeneratedDate, 'component inventory generated output')
+    );
+  } catch {
+    return withoutGeneratedDate;
+  }
+}
+
+export const runSyncComponentInventory = defineGenerator({
+  id: 'component-inventory',
+  outputs: [
+    CURRENT_INDEX_PATH,
+    SKILL_INDEX_PATH,
+    LEGACY_INDEX_PATH,
+    REPORT_PATH,
+    CAPABILITIES_GUIDE_PATH,
+  ],
+  normalize: normalizeGeneratedContent,
+  render,
+});
+
+if (
+  isDirectScript(import.meta.url, 'sync_component_inventory.ts') ||
+  isDirectScript(import.meta.url, 'sync_component_inventory.js')
+)
+  void runSyncComponentInventory();

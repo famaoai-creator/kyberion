@@ -1,6 +1,8 @@
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type UiUxGovernanceViolation = {
   rule: 'hardcoded-color' | 'missing-semantic-token' | 'status-vocabulary-bypass';
@@ -33,6 +35,13 @@ const REQUIRED_SEMANTIC_TOKENS = [
   '--kb-danger',
 ];
 const RAW_COLOR_PATTERN = /(?:#[0-9a-f]{3,8}\b|\brgba?\s*\()/giu;
+
+export function readUiUxGovernanceTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function walkFiles(directory: string): string[] {
   if (!safeExistsSync(directory)) return [];
@@ -67,15 +76,13 @@ export function collectUiUxGovernanceReport(now = new Date()): UiUxGovernanceRep
 
   for (const filePath of operatorFiles) {
     const relativePath = path.relative(pathResolver.rootDir(), filePath);
-    const source = String(safeReadFile(filePath, { encoding: 'utf8' }));
+    const source = readUiUxGovernanceTextFile(filePath);
     violations.push(...findHardcodedColorViolations(source, relativePath));
   }
 
   for (const relativePath of GENERATED_TOKEN_FILES) {
     const filePath = pathResolver.rootResolve(relativePath);
-    const source = safeExistsSync(filePath)
-      ? String(safeReadFile(filePath, { encoding: 'utf8' }))
-      : '';
+    const source = safeExistsSync(filePath) ? readUiUxGovernanceTextFile(filePath) : '';
     for (const token of REQUIRED_SEMANTIC_TOKENS) {
       if (!source.includes(`${token}:`)) {
         violations.push({
@@ -88,9 +95,7 @@ export function collectUiUxGovernanceReport(now = new Date()): UiUxGovernanceRep
   }
 
   const dashboardPath = 'scripts/sovereign_dashboard.ts';
-  const dashboardSource = String(
-    safeReadFile(pathResolver.rootResolve(dashboardPath), { encoding: 'utf8' })
-  );
+  const dashboardSource = readUiUxGovernanceTextFile(pathResolver.rootResolve(dashboardPath));
   const rendererUses = dashboardSource.match(/renderStatus\s*\(/gu)?.length ?? 0;
   if (rendererUses < 5) {
     violations.push({
@@ -127,12 +132,18 @@ export const runCheckUiUxGovernance = defineScript({
     } else if (report.status === 'pass') {
       context.print(`[check:ui-ux] OK (${report.checked_files} files, owner=${report.owner})`);
     } else {
-      console.error(`[check:ui-ux] ${report.violations.length} violation(s) detected:`);
-      for (const violation of report.violations) {
-        console.error(`- ${violation.rule}: ${violation.path} — ${violation.detail}`);
-      }
+      throw new ScriptExitError(
+        1,
+        [
+          `${report.violations.length} violation(s) detected:`,
+          ...report.violations.map(
+            (violation) => `- ${violation.rule}: ${violation.path} — ${violation.detail}`
+          ),
+        ].join('\n')
+      );
     }
-    if (report.status === 'fail') process.exitCode = 1;
+    if (report.status === 'fail') throw new ScriptExitError(1);
+    return report;
   },
 });
 

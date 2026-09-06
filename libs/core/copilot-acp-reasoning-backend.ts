@@ -8,6 +8,7 @@ import {
   type StructuredOpSpec,
 } from './structured-reasoning.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
+import { getActiveSandboxPolicy } from './sandbox-policy.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -95,6 +96,11 @@ export class CopilotAcpReasoningBackend implements ReasoningBackend {
 
   private async complete(systemPrompt: string, userPrompt: string): Promise<string> {
     assertReasoningEgressAllowed(this.name);
+    if (getActiveSandboxPolicy()) {
+      throw new Error(
+        '[SANDBOX_POLICY_UNSUPPORTED] copilot-acp cannot project the active sandbox policy into its ACP session'
+      );
+    }
     await this.ensureBooted();
     try {
       return await this.mediator.ask(`${systemPrompt}\n\n${userPrompt}`);
@@ -175,6 +181,6 @@ export function buildCopilotAcpBackendFromEnv(
   model?: string
 ): CopilotAcpReasoningBackend {
   return new CopilotAcpReasoningBackend({
-    model: model || env.KYBERION_COPILOT_MODEL,
+    model: model || getRegisteredEnvText('KYBERION_COPILOT_MODEL', { env }),
   });
 }

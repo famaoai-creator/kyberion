@@ -7,6 +7,7 @@ import AjvModule from 'ajv';
 
 // Real-fs seam: the loader only touches these two secure-io functions.
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (p: string) => p,
   safeExistsSync: (p: string) => fs.existsSync(p),
   safeReadFile: (p: string, _opts: any) => fs.readFileSync(p, 'utf8'),
   loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),

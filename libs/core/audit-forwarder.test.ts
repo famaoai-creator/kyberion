@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   ChainAuditForwarder,
   HttpAuditForwarder,
   TenantFilteringAuditForwarder,
   getAuditForwarder,
+  installAuditForwarderIfAvailable,
   registerAuditForwarder,
   resetAuditForwarder,
   stubAuditForwarder,
   ShellAuditForwarder,
+  parseAuditForwarderHeaders,
   type AuditForwarder,
 } from './audit-forwarder.js';
 import type { AuditEntry } from './audit-chain.js';
@@ -34,13 +38,39 @@ const sample: AuditEntry = {
 describe('audit-forwarder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      text: async () => '',
-    } as any));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => '',
+      } as any)
+    );
   });
 
   afterEach(() => resetAuditForwarder());
+
+  it('routes audit forwarder environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/audit-forwarder.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).not.toContain('process.env.SHELL');
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  it('installs shell and HTTP forwarders from an injected environment', () => {
+    expect(
+      installAuditForwarderIfAvailable({
+        KYBERION_AUDIT_FORWARDER_COMMAND: 'logger {{entry}}',
+        KYBERION_AUDIT_FORWARDER_URL: 'https://example.com/audit',
+        KYBERION_AUDIT_FORWARDER_HEADERS: '{"x-tenant":"acme"}',
+        KYBERION_AUDIT_FORWARDER_TIMEOUT_MS: '2500',
+      })
+    ).toBe(true);
+    expect(getAuditForwarder().name).toContain('shell→http');
+  });
 
   it('defaults to the stub (no-op) forwarder', () => {
     expect(getAuditForwarder().name).toBe('stub');
@@ -48,6 +78,15 @@ describe('audit-forwarder', () => {
 
   it('stub publish is a no-op', () => {
     expect(() => stubAuditForwarder.publish(sample)).not.toThrow();
+  });
+
+  it('fails closed for malformed, array, and dangerous header JSON', () => {
+    expect(parseAuditForwarderHeaders('{"Authorization":"Bearer token","X-Trace":"1"}')).toEqual({
+      Authorization: 'Bearer token',
+      'X-Trace': '1',
+    });
+    expect(parseAuditForwarderHeaders('[]')).toEqual({});
+    expect(parseAuditForwarderHeaders('{"__proto__":{"Authorization":"injected"}}')).toEqual({});
   });
 
   it('resolves a registered forwarder', async () => {
@@ -125,7 +164,9 @@ describe('audit-forwarder', () => {
       const seen: string[] = [];
       const sink: AuditForwarder = {
         name: 'sink',
-        publish: (e) => { seen.push(e.id); },
+        publish: (e) => {
+          seen.push(e.id);
+        },
       };
       const filter = new TenantFilteringAuditForwarder(sink, ['acme-corp']);
       await filter.publish({ ...sample, id: 'A1', tenantSlug: 'acme-corp' });
@@ -138,7 +179,9 @@ describe('audit-forwarder', () => {
       const seen: string[] = [];
       const sink: AuditForwarder = {
         name: 'sink',
-        publish: (e) => { seen.push(e.id); },
+        publish: (e) => {
+          seen.push(e.id);
+        },
       };
       const filter = new TenantFilteringAuditForwarder(sink, ['acme-corp'], true);
       await filter.publish({ ...sample, id: 'B1' });

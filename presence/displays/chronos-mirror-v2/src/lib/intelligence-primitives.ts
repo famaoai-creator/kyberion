@@ -68,9 +68,11 @@ export {
   probeSurfaceHealth,
 } from '@agent/core/surface-runtime';
 export { pathResolver } from '@agent/core/path-resolver';
+export { readJson } from '@agent/core/foundation';
 export {
+  assertSafeRepositoryPath,
   safeExistsSync,
-  loadJson,
+  safeLstat,
   safeReadFile,
   safeReaddir,
   safeStat,

@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/adapter-default-preferences.schema.json",
+  "title": "Adapter Default Preferences",
+  "description": "Persisted adapter selections for the active profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaults"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "media.image": { "type": "string", "minLength": 1 },
+        "media.video": { "type": "string", "minLength": 1 },
+        "media.music": { "type": "string", "minLength": 1 },
+        "email.backend": { "type": "string", "minLength": 1 },
+        "email.account": { "type": "string", "minLength": 1 },
+        "service.runtime": { "type": "string", "minLength": 1 },
+        "tool.runtime": { "type": "string", "minLength": 1 },
+        "voice.vad": { "type": "string", "minLength": 1 }
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

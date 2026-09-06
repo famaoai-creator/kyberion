@@ -13,6 +13,7 @@ import sys
 import json
 import os
 from pathlib import Path
+from json_boundary import JsonInputError, parse_json_object
 
 
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
@@ -40,7 +41,7 @@ def _check_health() -> dict:
         return {
             "status": "unavailable",
             "error": "mlx_whisper not installed",
-            "install_hint": "pnpm voice:setup --apply",
+            "install_hint": "pnpm kyberion voice setup --apply",
         }
 
 
@@ -65,8 +66,8 @@ def _transcribe(params: dict) -> dict:
     except ImportError:
         return {
             "status": "error",
-            "error": "mlx_whisper not installed — run: pnpm voice:setup --apply",
-            "install_hint": "pnpm voice:setup --apply",
+            "error": "mlx_whisper not installed — run: pnpm kyberion voice setup --apply",
+            "install_hint": "pnpm kyberion voice setup --apply",
         }
 
     try:
@@ -112,8 +113,8 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw, "mlx STT input")
+    except JsonInputError as exc:
         print(json.dumps({"status": "error", "error": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 

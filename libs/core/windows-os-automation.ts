@@ -1,5 +1,6 @@
 import { safeExec, safeExecResult } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import type { FocusedInputState } from './apple-event-bridge.js';
 import { escapeXml } from './text-escaping.js';
 
@@ -111,11 +112,12 @@ export function runAppleScript(_script: string): string {
 
 export function getScreenSize(): { width: number; height: number } {
   try {
-    return JSON.parse(
+    return parseSafeJsonInput(
       runResult(
         'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Screen]::PrimaryScreen.Bounds | ConvertTo-Json -Compress'
-      )
-    );
+      ),
+      'Windows screen size response'
+    ) as { width: number; height: number };
   } catch {
     return { width: 0, height: 0 };
   }

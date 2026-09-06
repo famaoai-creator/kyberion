@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
 import { getServicePresetRecord, type ServicePresetRecord } from './service-preset-registry.js';
 import { loadServiceEndpointsCatalog } from './service-binding.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 
 export type ServiceOperationRisk = 'read' | 'write' | 'destructive';
 export type ServiceOperationKind = 'capture' | 'apply';
@@ -331,7 +332,7 @@ export function planServiceOperation(
   return {
     kind: 'service-operation-plan.v1',
     plan_id: `PLN-SVC-${randomUUID()}`,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     service_id: descriptor.service_id,
     action,
     risk: operation.risk,
@@ -435,7 +436,7 @@ export function createServiceExecutionReceipt(
   return {
     kind: 'service-execution-receipt.v1',
     receipt_id: `RCP-SVC-${randomUUID()}`,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     plan_id: plan.plan_id,
     service_id: plan.service_id,
     action: plan.action,
@@ -455,7 +456,9 @@ export function persistServiceExecutionReceipt(
 ): ServiceExecutionReceipt {
   safeMkdir(RECEIPT_DIR, { recursive: true });
   const safeId = receipt.receipt_id.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const receiptPath = path.join(RECEIPT_DIR, `${safeId}.json`);
+  const receiptPath = assertSafeRepositoryPath(path.join(RECEIPT_DIR, `${safeId}.json`), {
+    allowMissingLeaf: true,
+  });
   safeWriteFile(receiptPath, JSON.stringify(receipt, null, 2));
   return { ...receipt, receipt_path: receiptPath };
 }

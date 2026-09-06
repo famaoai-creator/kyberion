@@ -7,6 +7,21 @@
  * summary to stdout that pipelines used to consume via system:shell.
  */
 
-import { reconcileConfigFallbacks } from '@agent/core';
+import { reconcileConfigFallbacks } from '@agent/core/reconcile-ops';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-process.stdout.write(JSON.stringify(reconcileConfigFallbacks(), null, 2));
+export const runReconcileConfigFallbacks = defineScript({
+  name: 'reconcile:config-fallbacks',
+  flags: [],
+  run(context) {
+    const result = reconcileConfigFallbacks();
+    context.print(result);
+    return result;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'reconcile_config_fallbacks.ts') ||
+  isDirectScript(import.meta.url, 'reconcile_config_fallbacks.js')
+)
+  void runReconcileConfigFallbacks();

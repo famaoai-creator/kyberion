@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-policy.schema.json",
+  "$schema": "../schemas/security-policy.schema.json",
   "version": "1.3.0",
   "default_allow": [
     "active/missions/${MISSION_ID}/",

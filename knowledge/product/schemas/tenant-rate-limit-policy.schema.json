@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/tenant-rate-limit-policy.schema.json",
+  "title": "Tenant Rate Limit Policy",
+  "type": "object",
+  "required": ["version", "default", "tenants", "operation_costs"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "default": { "$ref": "#/$defs/limits" },
+    "tenants": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/partialLimits" }
+    },
+    "operation_costs": {
+      "type": "object",
+      "additionalProperties": { "type": "number", "exclusiveMinimum": 0 }
+    },
+    "exempt_personas": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "rationale": { "type": "string" }
+  },
+  "$defs": {
+    "limits": {
+      "type": "object",
+      "required": ["tokens_per_minute", "burst_capacity", "denial_grace_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "tokens_per_minute": { "type": "number", "exclusiveMinimum": 0 },
+        "burst_capacity": { "type": "number", "exclusiveMinimum": 0 },
+        "denial_grace_ms": { "type": "number", "minimum": 0 }
+      }
+    },
+    "partialLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tokens_per_minute": { "type": "number", "exclusiveMinimum": 0 },
+        "burst_capacity": { "type": "number", "exclusiveMinimum": 0 },
+        "denial_grace_ms": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

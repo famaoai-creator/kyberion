@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import {
   SYSTEM_ACTUATOR_APPLY_OPS,
   SYSTEM_ACTUATOR_CAPTURE_OPS,

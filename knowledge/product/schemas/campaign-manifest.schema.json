@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "campaign-manifest.schema.json",
+  "title": "Campaign execution manifest",
+  "description": "Durable result envelope for the campaign suite runner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "title",
+    "design_source",
+    "primary_hex",
+    "accent_hex",
+    "deliverables",
+    "generated_by"
+  ],
+  "properties": {
+    "kind": { "const": "campaign-manifest" },
+    "title": { "type": "string", "minLength": 1 },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
+    "design_source": { "type": "string", "enum": ["brand-default", "tenant-override"] },
+    "primary_hex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "accent_hex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "deliverables": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/deliverable" }
+    },
+    "generated_by": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "deliverable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "output_dir", "status"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["deck", "doc", "intro_video", "web_lp", "mv"]
+        },
+        "output_dir": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "succeeded", "failed", "skipped"]
+        },
+        "detail": { "type": "string" }
+      }
+    }
+  }
+}

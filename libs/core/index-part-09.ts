@@ -4,6 +4,12 @@ export * from './mission-orchestration-worker.js';
 
 export * from './mission-orchestration-phase-gates.js';
 
+export * from './mission-next-task-reader.js';
+
+export * from './mission-ticket-dispatch-manifest.js';
+
+export * from './mission-ticket-provider-artifact.js';
+
 export * from './mission-task-events.js';
 
 export * from './worker-assignment-policy.js';
@@ -18,6 +24,8 @@ export * from './mission-graph-run-journal.js';
 
 export * from './pipeline-run-journal.js';
 
+export * from './pipeline-approval-resume.js';
+
 export * from './graph-run-artifact.js';
 
 export * from './realtime-voice-conversation.js';
@@ -27,6 +35,8 @@ export * from './surface-coordination-store.js';
 export * from './surface-delivery.js';
 
 export * from './surface-mutation-guard.js';
+
+export * from './surface-request-input.js';
 
 export * from './ceo-surface-summary.js';
 
@@ -95,8 +105,18 @@ export type { OnErrorConfig, RefParams } from './src/pipeline-engine.js';
 export * from './channel-surface.js';
 
 export * from './cowork-surface.js';
+export {
+  loadCoworkArtifactPacketAtPath,
+  validateCoworkArtifactPacket,
+} from './cowork-artifact-packet.js';
 
 export * from './cowork-knowledge-bridge.js';
+
+export {
+  delegationChildrenRegistryPath,
+  loadDelegationChildrenRegistryAtPath,
+  writeDelegationChildrenRegistryAtPath,
+} from './delegation-child-registry.js';
 
 export * from './cowork-health-check.js';
 
@@ -143,6 +163,8 @@ export * from './narrated-video-preference-profile.js';
 export * from './narrated-video-upload-package.js';
 
 export * from './meeting-operations-profile.js';
+
+export * from './meeting-attendees.js';
 
 export * from './mission-seed-assessment.js';
 
@@ -389,10 +411,17 @@ export type { ActuatorCapability, ActuatorStatus } from './src/actuator-capabili
 
 export {
   buildActuatorManifestIndexSnapshot,
+  loadActuatorManifest,
   loadActuatorManifestCatalog,
 } from './src/actuator-manifest-index.js';
 
-export type { ActuatorCatalogEntry, ActuatorManifestFile } from './src/actuator-manifest-index.js';
+export type {
+  ActuatorCatalogEntry,
+  ActuatorManifestCapability,
+  ActuatorManifestCapabilityPrerequisites,
+  ActuatorManifestCapabilityRequirements,
+  ActuatorManifestFile,
+} from './src/actuator-manifest-index.js';
 
 // Pre-Flight Check (Sovereign Sentinel)
 

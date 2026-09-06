@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 describe('media-actuator security boundary', () => {
   it('keeps production entrypoints free of raw node:fs imports', () => {
@@ -10,9 +11,22 @@ describe('media-actuator security boundary', () => {
 
     for (const filePath of files) {
       const source = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      expect(source).not.toContain("node:fs");
+      expect(source).not.toContain('node:fs');
       expect(source).not.toContain("from 'fs'");
       expect(source).not.toContain('from "fs"');
     }
+  });
+
+  it('revalidates the document layout catalog before reading it', () => {
+    const source = safeReadFile(
+      pathResolver.rootResolve(
+        'libs/actuators/media-actuator/src/media-document-pipeline-helpers.ts'
+      ),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(source).toContain('defineCatalog<DocumentLayoutCatalog>({');
+    expect(source).toContain("id: 'document-layouts'");
+    expect(source).toContain('schema: DOCUMENT_LAYOUTS_SCHEMA_PATH');
+    expect(source).toContain('documentLayoutCatalog.load()');
   });
 });

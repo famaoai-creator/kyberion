@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 
 export type VoicePathKind = 'audio-input' | 'recording-output' | 'transcript-output';
 
@@ -38,7 +39,7 @@ export function resolveVoicePath(inputPath: string, kind: VoicePathKind): string
       `[SECURITY] voice ${kind} path is outside an approved voice data directory: ${raw}`
     );
   }
-  return resolved;
+  return assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
 }
 
 export function isVoicePathAllowed(inputPath: string, kind: VoicePathKind): boolean {

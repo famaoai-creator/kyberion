@@ -38,6 +38,29 @@ async function withHttpApp<T>(run: (baseUrl: string) => Promise<T>): Promise<T> 
 }
 
 describe('Computer Surface Cloudflare OS projection', () => {
+  it('routes OS projection environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(
+        pathResolver.rootResolve('presence/displays/computer-surface/os-control-plane.ts'),
+        {
+          encoding: 'utf8',
+        }
+      )
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  it('uses the shared scalar query reader after rejecting repeated mission IDs', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('presence/displays/computer-surface/server.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('readSurfaceStringParam(rawMissionId)');
+    expect(source).toContain("error: 'mission_id must be a single value'");
+  });
+
   it('derives human tenant-scoped access from server environment', () => {
     vi.stubEnv('KYBERION_TENANT', 'tenant-a');
     vi.stubEnv('KYBERION_COMPUTER_SURFACE_PRINCIPAL', 'human:computer-a');
@@ -202,6 +225,31 @@ describe('Computer Surface Cloudflare OS projection', () => {
         body: JSON.stringify({ updateDataModel: { surfaceId: 'computer-surface', data: {} } }),
       });
       expect(adminDispatchResponse.status).toBe(200);
+
+      const malformedDispatchResponse = await fetch(`${baseUrl}/a2ui/dispatch`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer computer-admin-token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          updateDataModel: {
+            surfaceId: 'computer-surface',
+            data: [],
+          },
+        }),
+      });
+      expect(malformedDispatchResponse.status).toBe(400);
+
+      const dangerousKeyDispatchResponse = await fetch(`${baseUrl}/a2ui/dispatch`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer computer-admin-token',
+          'Content-Type': 'application/json',
+        },
+        body: '{"updateDataModel":{"surfaceId":"computer-surface","data":{"__proto__":{"tenant_slug":"tenant-b"}}}}',
+      });
+      expect(dangerousKeyDispatchResponse.status).toBe(400);
 
       const crossTenantDispatchResponse = await fetch(`${baseUrl}/a2ui/dispatch`, {
         method: 'POST',

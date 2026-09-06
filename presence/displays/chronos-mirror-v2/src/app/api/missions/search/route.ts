@@ -6,6 +6,10 @@ import {
   viewerErrorResponse,
   viewerScopeTenantSlugs,
 } from '../../../../lib/viewer-context';
+import {
+  readChronosOptionalStringParam,
+  readChronosStringParam,
+} from '../../../../lib/request-input';
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -19,17 +23,17 @@ export function GET(req: NextRequest) {
   try {
     const tenantSlugs = viewerScopeTenantSlugs(
       resolvedViewer.context,
-      url.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(url.searchParams.get('tenant'))
     );
     const missions = buildMissionHistoryItems({
-      query: url.searchParams.get('query') || undefined,
-      status: url.searchParams.get('status') || undefined,
+      query: readChronosOptionalStringParam(url.searchParams.get('query')),
+      status: readChronosOptionalStringParam(url.searchParams.get('status')),
       tier: 'confidential',
-      tenant: url.searchParams.get('tenant') || undefined,
+      tenant: readChronosOptionalStringParam(url.searchParams.get('tenant')),
       tenantSlugs,
-      kind: url.searchParams.get('kind') || undefined,
-      missionId: url.searchParams.get('missionId') || undefined,
-      limit: Number(url.searchParams.get('limit') || 24),
+      kind: readChronosOptionalStringParam(url.searchParams.get('kind')),
+      missionId: readChronosOptionalStringParam(url.searchParams.get('missionId')),
+      limit: Number(readChronosStringParam(url.searchParams.get('limit')) || 24),
     });
     return NextResponse.json({ missions });
   } catch (error) {

@@ -2,17 +2,27 @@ import { resolveLatinFontFamily } from '@agent/core/design-fonts';
 import {
   resolveDrawioEdgeLabelStyleParts,
   resolveDrawioEdgeRoutingStyleParts,
+} from '@agent/core/media-drawio-edge-policy';
+import {
   resolveDrawioBoundaryIconCandidates,
   resolveDrawioBoundaryPaletteOverride,
+} from '@agent/core/media-drawio-boundary-policy';
+import {
   resolveMediaDrawioBoundaryPalette,
   resolveMediaDrawioNodeSize,
-  resolveMediaAwsIconCandidates,
-  resolveMediaDrawioTierRank,
+} from '@agent/core/media-drawio-policy';
+import { resolveMediaAwsIconCandidates } from '@agent/core/media-aws-icon-rules';
+import { resolveMediaDrawioTierRank } from '@agent/core/media-drawio-tier-order';
+import {
   resolveMediaDrawioGroupRank,
   resolveMediaDrawioTypeRank,
-  resolveMediaDrawioSecurityGroupRelationPrefix,
-} from '@agent/core';
-import { escapeXml, safeExistsSync, safeReadFile, pathResolver } from '@agent/core';
+} from '@agent/core/media-drawio-sort-policy';
+import { resolveMediaDrawioSecurityGroupRelationPrefix } from '@agent/core/media-drawio-security-group-order';
+import { escapeXml } from '@agent/core/text-escaping';
+import { nowIso } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import type { MediaLayoutChrome, MediaLayoutTemplateCatalog } from './media-layout-catalog.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 
@@ -289,7 +299,10 @@ function resolveDiagramSource(rootDir: string, params: any, ctx: any, resolve: F
   }
 
   if (params.input_path) {
-    const inputPath = path.resolve(rootDir, resolve(params.input_path));
+    const inputPath = assertSafeRepositoryPath(
+      path.resolve(rootDir, String(resolve(params.input_path) || '').trim()),
+      { allowMissingLeaf: true }
+    );
     return safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   }
 
@@ -550,7 +563,7 @@ function generateDrawioDocument(
 
   const diagramId = createHash('sha1').update(JSON.stringify(graph)).digest('hex').slice(0, 12);
   return [
-    `<mxfile host="kyberion" modified="${new Date().toISOString()}" agent="Kyberion Media-Actuator" version="1.0.0" type="device">`,
+    `<mxfile host="kyberion" modified="${nowIso()}" agent="Kyberion Media-Actuator" version="1.0.0" type="device">`,
     `  <diagram id="${diagramId}" name="${escapeXml(options.title)}" compressed="false">`,
     '    <mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">',
     '      <root>',
@@ -718,13 +731,16 @@ function deriveLayoutTemplateFromPptxDesign(design: any, fallbackTemplate: any =
   };
 }
 
-function matchLayoutTemplate(geometry: any, catalog: any): { id: string; score: number } | null {
-  const templates = catalog?.templates as Record<string, any> | undefined;
+function matchLayoutTemplate(
+  geometry: { chrome: MediaLayoutChrome },
+  catalog: MediaLayoutTemplateCatalog
+): { id: string; score: number } | null {
+  const templates = catalog.templates;
   if (!templates) return null;
   const g = geometry.chrome;
   let best: { id: string; score: number } | null = null;
   for (const [id, tpl] of Object.entries(templates)) {
-    const c = (tpl as any).chrome;
+    const c = tpl.chrome;
     if (!c) continue;
     const diffs = [
       Math.abs((c.header_h ?? 0) - (g.header_h ?? 0)) / 0.5,

@@ -1,7 +1,9 @@
 import * as path from 'node:path';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { isValidTenantSlug } from './entity-scope.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 
 export type VisionSectionKey = 'soul' | 'steering' | 'destination';
 
@@ -66,24 +68,38 @@ function buildCandidatePaths(
   const candidates: Array<{ path: string; kind: ResolvedVision['source_kind'] }> = [];
 
   if (tenantSlug) {
+    if (!isValidTenantSlug(tenantSlug)) {
+      throw new Error(`[VISION_TENANT_SCOPE] invalid tenant slug: ${tenantSlug}`);
+    }
     candidates.push({
-      path: path.join(baseDir, 'customer', tenantSlug, 'vision.md'),
+      path: assertSafeRepositoryPath(path.join(baseDir, 'customer', tenantSlug, 'vision.md'), {
+        allowMissingLeaf: true,
+        rootDir: baseDir,
+      }),
       kind: 'customer',
     });
     candidates.push({
-      path: path.join(baseDir, 'knowledge', 'confidential', tenantSlug, 'vision.md'),
+      path: assertSafeRepositoryPath(
+        path.join(baseDir, 'knowledge', 'confidential', tenantSlug, 'vision.md'),
+        { allowMissingLeaf: true, rootDir: baseDir }
+      ),
       kind: 'tenant',
     });
   }
 
   candidates.push({
-    path: path.join(baseDir, 'vision', '_default.md'),
+    path: assertSafeRepositoryPath(path.join(baseDir, 'vision', '_default.md'), {
+      allowMissingLeaf: true,
+      rootDir: baseDir,
+    }),
     kind: 'global',
   });
 
   if (baseDir !== pathResolver.rootDir()) {
     candidates.push({
-      path: pathResolver.vision('_default.md'),
+      path: assertSafeRepositoryPath(pathResolver.vision('_default.md'), {
+        allowMissingLeaf: true,
+      }),
       kind: 'global',
     });
   }
@@ -149,8 +165,14 @@ function extractTitleAndSections(raw: string): {
 function readResolvedVision(filePath: string): string | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  } catch {
+    if (!safeLstat(filePath).isFile()) {
+      throw new Error(`[VISION_RESOURCE] vision must be a regular file: ${filePath}`);
+    }
+    return readTextFile(filePath);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[VISION_RESOURCE]')) {
+      throw error;
+    }
     return null;
   }
 }

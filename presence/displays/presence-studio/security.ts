@@ -1,14 +1,20 @@
 import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
+import { logger } from '@agent/core/core';
 import {
   extractSurfaceBearerToken,
-  logger,
   narrowSurfaceViewerTenant,
+  resolveSurfaceViewerScope,
+  SurfaceViewerScopeError,
   resolveSurfaceViewerToken,
-} from '@agent/core';
+} from '@agent/core/surface-mutation-guard';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+export {
+  parsePersonalAgentIdentity as parsePresenceStudioAgentIdentity,
+  parsePersonalSovereignIdentity as parsePresenceStudioSovereignIdentity,
+} from '@agent/core/personal-identity-reader';
 
 const LOCALHOST_NAMES = new Set([
   'localhost',
@@ -53,7 +59,9 @@ function isPrivateIpv6(hostname: string): boolean {
 
 export function getPresenceStudioAuthToken(): string {
   return String(
-    process.env.PRESENCE_STUDIO_TOKEN || getRegisteredEnvText('KYBERION_API_TOKEN') || ''
+    getRegisteredEnvText('PRESENCE_STUDIO_TOKEN') ||
+      getRegisteredEnvText('KYBERION_API_TOKEN') ||
+      ''
   );
 }
 
@@ -85,7 +93,7 @@ export function extractPresenceStudioToken(req: Pick<Request, 'headers'>): strin
 function resolvePresenceStudioCredential(presented: string) {
   const configured = getPresenceStudioAuthToken();
   return resolveSurfaceViewerToken(presented, {
-    apiToken: process.env.PRESENCE_STUDIO_TOKEN ? undefined : configured,
+    apiToken: getRegisteredEnvText('PRESENCE_STUDIO_TOKEN') ? undefined : configured,
     configuredCredentials: configured ? [{ token: configured, role: 'readonly' as const }] : [],
   });
 }
@@ -101,13 +109,17 @@ export function checkPresenceStudioRateLimit(
 
   const windowMs =
     options?.windowMs ??
-    Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS || RATE_LIMIT_DEFAULT_WINDOW_MS);
+    Number(
+      getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS') || RATE_LIMIT_DEFAULT_WINDOW_MS
+    );
   const method = String(req.method || 'UNKNOWN').toUpperCase();
   const limit =
     options?.limit ??
     (method === 'GET' || method === 'HEAD'
-      ? Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_GET || RATE_LIMIT_DEFAULT_GET)
-      : Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_MUTATION || RATE_LIMIT_DEFAULT_MUTATION));
+      ? Number(getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_GET') || RATE_LIMIT_DEFAULT_GET)
+      : Number(
+          getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_MUTATION') || RATE_LIMIT_DEFAULT_MUTATION
+        ));
   const key = getPresenceStudioRateLimitKey(req);
   const now = Date.now();
   const current = rateLimitStore.get(key);
@@ -139,7 +151,7 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
     return { ok: true, status: 200, reason: 'local' };
   }
 
-  if (process.env.PRESENCE_STUDIO_ALLOW_REMOTE === 'true') {
+  if (getRegisteredEnvText('PRESENCE_STUDIO_ALLOW_REMOTE') === 'true') {
     const token = getPresenceStudioAuthToken();
     if (!token) {
       return {
@@ -288,28 +300,39 @@ export function resolvePresenceStudioViewerContext(
   if (!auth.ok) throw new PresenceStudioViewerError(auth.status as 401 | 403, auth.reason);
 
   const tenant = String(getRegisteredEnvText('KYBERION_TENANT') || '').trim();
-  if (isLoopbackAddress(getPresenceStudioClientAddress(req))) {
+  const local = isLoopbackAddress(getPresenceStudioClientAddress(req));
+  try {
+    const scope = resolveSurfaceViewerScope({
+      // A local request is the server-derived localadmin boundary even when a
+      // stale or unrelated bearer header is present.
+      token: local ? undefined : extractPresenceStudioToken(req),
+      local,
+      serverTenant: tenant,
+      configuredCredentials: [{ token: getPresenceStudioAuthToken(), role: 'readonly' as const }],
+      allowLoopback: true,
+      loopbackRole: 'localadmin',
+      loopbackUsesServerTenant: true,
+      principalIds: {
+        localadmin: 'human:presence-studio-localadmin',
+        readonly: 'human:presence-studio-token',
+      },
+    });
     return {
-      principalId: 'human:presence-studio-localadmin',
-      tenantSlugs: tenant ? [tenant] : 'all',
-      source: 'loopback',
+      principalId: scope.principalId || 'human:presence-studio-token',
+      tenantSlugs: scope.tenantSlugs,
+      source: scope.source === 'loopback' ? 'loopback' : 'token',
     };
+  } catch (error) {
+    if (!(error instanceof SurfaceViewerScopeError)) throw error;
+    let message = error.message;
+    if (message.includes('Remote viewer access requires')) {
+      message = 'OS surface remote access requires server-side KYBERION_TENANT scope.';
+    }
+    if (message === 'A viewer principal is required.') {
+      message = 'OS surface remote access requires a bearer token.';
+    }
+    throw new PresenceStudioViewerError(error.status, message);
   }
-
-  if (auth.reason !== 'token') {
-    throw new PresenceStudioViewerError(401, 'OS surface remote access requires a bearer token.');
-  }
-  if (!tenant) {
-    throw new PresenceStudioViewerError(
-      403,
-      'OS surface remote access requires server-side KYBERION_TENANT scope.'
-    );
-  }
-  return {
-    principalId: 'human:presence-studio-token',
-    tenantSlugs: [tenant],
-    source: 'token',
-  };
 }
 
 export function requirePresenceStudioAccess(): RequestHandler {
@@ -376,96 +399,164 @@ export function validateLocalServiceUrl(rawUrl: string, label: string): string {
   throw new Error(`${label} must resolve to localhost or a private IP address`);
 }
 
-export const presenceStudioVoiceStimulusSchema = z.object({
-  text: z.string().trim().min(1, 'text is required').max(4000, 'text is too long'),
-  request_id: z.string().trim().min(1).max(128).optional(),
-  intent: z.string().trim().min(1).max(128).optional(),
-  source_id: z.string().trim().min(1).max(128).optional(),
-});
+export const presenceStudioVoiceStimulusSchema = z
+  .object({
+    text: z.string().trim().min(1, 'text is required').max(4000, 'text is too long'),
+    request_id: z.string().trim().min(1).max(128).optional(),
+    intent: z.string().trim().min(1).max(128).optional(),
+    source_id: z.string().trim().min(1).max(128).optional(),
+  })
+  .strict();
 
-export const presenceStudioVoiceIngestSchema = z.object({
-  text: z.string().trim().min(1, 'text is required').max(4000, 'text is too long'),
-  request_id: z.string().trim().min(1).max(128).optional(),
-  intent: z.string().trim().min(1).max(128).optional(),
-  source_id: z.string().trim().min(1).max(128).optional(),
-  speaker: z.string().trim().min(1).max(128).optional(),
-  reflect_to_surface: booleanLike,
-  auto_reply: booleanLike,
-});
+export const presenceStudioVoiceIngestSchema = z
+  .object({
+    text: z.string().trim().min(1, 'text is required').max(4000, 'text is too long'),
+    request_id: z.string().trim().min(1).max(128).optional(),
+    intent: z.string().trim().min(1).max(128).optional(),
+    source_id: z.string().trim().min(1).max(128).optional(),
+    speaker: z.string().trim().min(1).max(128).optional(),
+    reflect_to_surface: booleanLike,
+    auto_reply: booleanLike,
+  })
+  .strict();
 
-export const presenceStudioVoiceNativeListenSchema = z.object({
-  request_id: z.string().trim().min(1).max(128).optional(),
-  locale: z.string().trim().min(2).max(32).optional(),
-  device_id: z.string().trim().min(1).max(128).optional(),
-  backend: z.string().trim().min(1).max(128).optional(),
-  timeout_seconds: z.number().finite().int().min(1).max(30).optional(),
-  intent: z.string().trim().min(1).max(128).optional(),
-  speaker: z.string().trim().min(1).max(128).optional(),
-  reflect_to_surface: booleanLike,
-  auto_reply: booleanLike,
-});
+export const presenceStudioVoiceNativeListenSchema = z
+  .object({
+    request_id: z.string().trim().min(1).max(128).optional(),
+    locale: z.string().trim().min(2).max(32).optional(),
+    device_id: z.string().trim().min(1).max(128).optional(),
+    backend: z.string().trim().min(1).max(128).optional(),
+    timeout_seconds: z.number().finite().int().min(1).max(30).optional(),
+    intent: z.string().trim().min(1).max(128).optional(),
+    speaker: z.string().trim().min(1).max(128).optional(),
+    reflect_to_surface: booleanLike,
+    auto_reply: booleanLike,
+  })
+  .strict();
 
 export const presenceStudioVoiceSelectionSchema = z
   .object({
     tts_engine_id: z.string().trim().min(1).max(120).optional(),
     stt_backend: z.string().trim().min(1).max(64).optional(),
   })
+  .strict()
   .refine((value) => value.tts_engine_id !== undefined || value.stt_backend !== undefined, {
     message: 'tts_engine_id or stt_backend is required',
   });
 
-export const presenceStudioEmailDraftSchema = z.object({
-  request_id: z.string().trim().min(1).max(128).optional(),
-  to: z.string().trim().max(254).optional(),
-  subject: z.string().trim().max(200).optional(),
-  tone: z.string().trim().min(1).max(120).optional(),
-  triage_text: z.string().trim().min(1).max(20_000).optional(),
-});
+export const presenceStudioEmailDraftSchema = z
+  .object({
+    request_id: z.string().trim().min(1).max(128).optional(),
+    to: z.string().trim().max(254).optional(),
+    subject: z.string().trim().max(200).optional(),
+    tone: z.string().trim().min(1).max(120).optional(),
+    triage_text: z.string().trim().min(1).max(20_000).optional(),
+  })
+  .strict();
 
-export const presenceStudioEmailDeliverSchema = z.object({
-  approved: booleanLike,
-  body_markdown: z
-    .string()
-    .trim()
-    .min(1, 'body_markdown is required')
-    .max(20_000, 'body_markdown is too long'),
-  reply_mode: z.enum(['new', 'reply', 'reply-all']).optional(),
-  draft_mode: booleanLike,
-  subject: z.string().trim().max(200).optional(),
-  to: z.string().trim().max(254).optional(),
-  message_id: z.string().trim().max(512).optional(),
-  account: z.enum(['auto', 'gmail', 'outlook']).optional(),
-});
+export const presenceStudioEmailDeliverSchema = z
+  .object({
+    approved: booleanLike,
+    body_markdown: z
+      .string()
+      .trim()
+      .min(1, 'body_markdown is required')
+      .max(20_000, 'body_markdown is too long'),
+    reply_mode: z.enum(['new', 'reply', 'reply-all']).optional(),
+    draft_mode: booleanLike,
+    subject: z.string().trim().max(200).optional(),
+    to: z.string().trim().max(254).optional(),
+    message_id: z.string().trim().max(512).optional(),
+    account: z.enum(['auto', 'gmail', 'outlook']).optional(),
+  })
+  .strict();
 
-export const presenceStudioVoiceMinutesSchema = z.object({
-  text: z.string().trim().min(1, 'text is required').max(20_000, 'text is too long'),
-  request_id: z.string().trim().min(1).max(128).optional(),
-  mission_id: z.string().trim().min(1).max(128).optional(),
-  title: z.string().trim().min(1).max(120).optional(),
-  language: z.string().trim().min(1).max(16).optional(),
-  attendees: z
-    .array(
-      z.union([
-        z.string(),
-        z.object({ name: z.string().trim().min(1).max(120) }).transform((value) => value.name),
-      ])
-    )
-    .max(20)
-    .optional(),
-});
+export const presenceStudioVoiceMinutesSchema = z
+  .object({
+    text: z.string().trim().min(1, 'text is required').max(20_000, 'text is too long'),
+    request_id: z.string().trim().min(1).max(128).optional(),
+    mission_id: z.string().trim().min(1).max(128).optional(),
+    title: z.string().trim().min(1).max(120).optional(),
+    language: z.string().trim().min(1).max(16).optional(),
+    attendees: z
+      .array(
+        z.union([
+          z.string(),
+          z.object({ name: z.string().trim().min(1).max(120) }).transform((value) => value.name),
+        ])
+      )
+      .max(20)
+      .optional(),
+  })
+  .strict();
 
-export const presenceStudioLocationSchema = z.object({
-  latitude: z.number().finite().min(-90).max(90),
-  longitude: z.number().finite().min(-180).max(180),
-  accuracy: z.number().finite().min(0).max(100_000).optional(),
-  timestamp: z.string().trim().min(1).max(128).optional(),
-});
+export const presenceStudioMinutesSessionStartSchema = z
+  .object({
+    missionId: z.string().trim().min(1, 'missionId is required').max(128),
+    title: z.string().trim().min(1).max(200).optional(),
+    language: z.string().trim().min(1).max(32).optional(),
+    device: z.string().trim().min(1).max(256).optional(),
+  })
+  .strict();
 
-export const presenceStudioBrowserBootstrapSchema = z.object({
-  browser_session_id: z.string().trim().min(1).max(128),
-  goal_summary: z.string().trim().min(1).max(300).optional(),
-  success_condition: z.string().trim().min(1).max(300).optional(),
-});
+export const presenceStudioVoiceStopSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict()
+  .default({});
+
+export const presenceStudioDemoFrameSchema = z
+  .object({
+    surfaceId: z.string().trim().min(1).max(128).optional(),
+    agentId: z.string().trim().min(1).max(128).optional(),
+    title: z.string().trim().min(1).max(200).optional(),
+    status: z.string().trim().min(1).max(64).optional(),
+    expression: z.string().trim().min(1).max(64).optional(),
+    subtitle: z.string().trim().max(4000).optional(),
+    transcript: z
+      .array(
+        z
+          .object({
+            speaker: z.string().trim().min(1).max(128),
+            text: z.string().trim().max(4000),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict()
+  .default({});
+
+export const presenceStudioLocationSchema = z
+  .object({
+    latitude: z.number().finite().min(-90).max(90),
+    longitude: z.number().finite().min(-180).max(180),
+    accuracy: z.number().finite().min(0).max(100_000).optional(),
+    timestamp: z.string().trim().min(1).max(128).optional(),
+  })
+  .strict();
+
+export const presenceStudioBrowserBootstrapSchema = z
+  .object({
+    browser_session_id: z.string().trim().min(1).max(128),
+    goal_summary: z.string().trim().min(1).max(300).optional(),
+    success_condition: z.string().trim().min(1).max(300).optional(),
+  })
+  .strict();
+
+export const presenceStudioApprovalDecisionSchema = z
+  .object({
+    decision: z.enum(['approved', 'rejected']),
+  })
+  .strict();
+
+export function readPresenceStudioStringParam(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
 
 export function summarizePresenceStudioIdentity(payload: {
   sovereign?: { name?: unknown } | null;

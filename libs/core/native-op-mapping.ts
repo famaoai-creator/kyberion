@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { listKnownActuatorOps } from './actuator-op-registry.js';
 
 export interface ObservationOpMapping {
@@ -14,9 +14,14 @@ interface MappingFile {
   entries: ObservationOpMapping[];
 }
 
+const observationOpMappingCatalog = defineCatalog<MappingFile>({
+  id: 'observation-to-op-mapping',
+  path: pathResolver.knowledge('product/orchestration/observation-to-op-map.json'),
+  schema: pathResolver.knowledge('product/schemas/observation-to-op-map.schema.json'),
+});
+
 function load(): MappingFile {
-  const path = pathResolver.knowledge('product/orchestration/observation-to-op-map.json');
-  return loadJson<MappingFile>(path);
+  return observationOpMappingCatalog.load();
 }
 
 function splitOp(op: string): { domain: string; action: string } {

@@ -2,17 +2,23 @@ import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   AdaptivePolicyRouter,
+  WindowsNativeOcrProvider,
   TesseractOcrProvider,
   AppleVisionOcrProvider,
   LlmApiOcrProvider,
   LocalVlmOcrProvider,
   ocrImageWithRouter,
+  parseClaudeOcrResponse,
+  parseGeminiOcrResponse,
+  parseLocalVlmOcrResponse,
+  parseOpenAiOcrResponse,
 } from './ocr-bridge.js';
 import { OcrProvider } from './ocr-types.js';
 
 const mocks = vi.hoisted(() => {
   const spawn = vi.fn();
-  return { spawn };
+  const safeLstat = vi.fn(() => ({ isFile: () => true }));
+  return { safeLstat, spawn };
 });
 
 vi.mock('node:child_process', () => ({
@@ -42,6 +48,7 @@ vi.mock('./secure-io.js', async () => {
   const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
     ...actual,
+    safeLstat: mocks.safeLstat,
     safeReadFile: () => Buffer.from('dummy_png_bytes'),
   };
 });
@@ -207,6 +214,19 @@ describe('AppleVisionOcrProvider', () => {
 
     expect(fakeChild.kill).toHaveBeenCalledWith('SIGKILL');
   });
+
+  it('rejects dangerous native OCR response objects', async () => {
+    const fakeChild = createFakeChild();
+    mocks.spawn.mockReturnValue(fakeChild);
+
+    const provider = new AppleVisionOcrProvider();
+    const promise = provider.recognize({ path: 'test.png' });
+
+    fakeChild.stdout.emit('data', '{"status":"succeeded","meta":{"__proto__":{}}}');
+    fakeChild.emit('close', 0);
+
+    await expect(promise).rejects.toThrow('apple_vision_invalid_json');
+  });
 });
 
 describe('TesseractOcrProvider', () => {
@@ -315,6 +335,16 @@ describe('LlmApiOcrProvider', () => {
       })
     );
   });
+
+  it('fails closed when a cloud provider returns an invalid response shape', async () => {
+    process.env.GEMINI_API_KEY = 'mock-gemini-key';
+    networkMocks.secureFetch.mockResolvedValue({ candidates: [{ content: { parts: [{}] } }] });
+
+    const provider = new LlmApiOcrProvider();
+    await expect(provider.recognize({ path: 'test.png' })).rejects.toThrow(
+      'gemini_ocr_invalid_response'
+    );
+  });
 });
 
 describe('LocalVlmOcrProvider', () => {
@@ -347,6 +377,32 @@ describe('LocalVlmOcrProvider', () => {
         kyberion_allow_local_network: true,
       })
     );
+  });
+
+  it('fails closed when the local VLM response is not a text envelope', async () => {
+    networkMocks.secureFetch.mockResolvedValue({ response: ['not text'] });
+
+    const provider = new LocalVlmOcrProvider();
+    await expect(provider.recognize({ path: 'test.png' })).rejects.toThrow(
+      'local_vlm_ocr_invalid_response'
+    );
+  });
+});
+
+describe('OCR response parsers', () => {
+  it('accepts only the expected provider text paths', () => {
+    expect(
+      parseGeminiOcrResponse({ candidates: [{ content: { parts: [{ text: 'gemini' }] } }] })
+    ).toBe('gemini');
+    expect(parseClaudeOcrResponse({ content: [{ text: 'claude' }] })).toBe('claude');
+    expect(parseOpenAiOcrResponse({ choices: [{ message: { content: 'openai' } }] })).toBe(
+      'openai'
+    );
+    expect(parseLocalVlmOcrResponse({ response: 'local' })).toBe('local');
+    expect(parseGeminiOcrResponse([])).toBeUndefined();
+    expect(parseClaudeOcrResponse({ content: [{ text: 1 }] })).toBeUndefined();
+    expect(parseOpenAiOcrResponse({ choices: [{ message: { content: [] } }] })).toBeUndefined();
+    expect(parseLocalVlmOcrResponse({ response: null })).toBeUndefined();
   });
 });
 
@@ -445,6 +501,46 @@ describe('OCR egress capability routing', () => {
     } finally {
       if (previous === undefined) delete process.env.OLLAMA_HOST;
       else process.env.OLLAMA_HOST = previous;
+    }
+  });
+});
+
+describe('OCR input path boundary', () => {
+  it('rejects an external image path before any provider reads or executes it', async () => {
+    const native = await import('./windows-native-image-recognition-bridge.js');
+    expect(() => native.recognizeTextWithWindowsNativeApi('/tmp/outside-ocr.png')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    expect(() => native.describeImageWithWindowsNativeApi('/tmp/outside-ocr.png')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+
+    const providers = [
+      new WindowsNativeOcrProvider(),
+      new TesseractOcrProvider(),
+      new AppleVisionOcrProvider(),
+      new LlmApiOcrProvider(),
+      new LocalVlmOcrProvider(),
+    ];
+
+    for (const provider of providers) {
+      await expect(provider.recognize({ path: '/tmp/outside-ocr.png' })).rejects.toThrow(
+        '[RESOURCE_PATH_SCOPE]'
+      );
+    }
+  });
+
+  it('rejects a repository image path replaced by a directory before provider access', async () => {
+    networkMocks.secureFetch.mockClear();
+    mocks.safeLstat.mockReturnValue({ isFile: () => false });
+
+    try {
+      await expect(new LlmApiOcrProvider().recognize({ path: 'directory.png' })).rejects.toThrow(
+        '[OCR_RESOURCE] input must be a regular file'
+      );
+      expect(networkMocks.secureFetch).not.toHaveBeenCalled();
+    } finally {
+      mocks.safeLstat.mockReturnValue({ isFile: () => true });
     }
   });
 });

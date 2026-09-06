@@ -6,9 +6,11 @@ import {
   isInjectionSuspected,
   setInjectionSuspected,
   processUntrustedContent,
+  parseInjectionScannerVerdict,
 } from './untrusted-content.js';
 import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
+import { getInjectionSignalPath, writeInjectionSignalAtPath } from './injection-signal.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile, safeRmSync } from './secure-io.js';
 
@@ -16,6 +18,22 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
   const testMissionId = 'test-mission-sa-03';
   const origMissionId = process.env.MISSION_ID;
   const origSuspected = process.env.KYBERION_INJECTION_SUSPECTED;
+
+  it('fails closed for malformed or dangerous LLM scanner verdicts', () => {
+    expect(parseInjectionScannerVerdict('{"injection_suspected":false,"indicators":[]}')).toEqual({
+      injection_suspected: false,
+      indicators: [],
+    });
+    expect(
+      parseInjectionScannerVerdict('{"injection_suspected":false,"meta":{"__proto__":{}}}')
+    ).toBeNull();
+    expect(parseInjectionScannerVerdict('[{"injection_suspected":false}]')).toBeNull();
+  });
+
+  it('rejects a mission id that could escape the injection signal store', () => {
+    process.env.MISSION_ID = '../outside';
+    expect(() => getInjectionSignalPath()).toThrow('[INJECTION_SIGNAL_SCOPE]');
+  });
 
   beforeEach(() => {
     process.env.MISSION_ID = testMissionId;
@@ -98,6 +116,29 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
   });
 
   describe('Taint propagation & policy downgrades', () => {
+    it('rejects an invalid signal before persisting it', () => {
+      expect(() =>
+        writeInjectionSignalAtPath(getInjectionSignalPath(), {
+          injection_suspected: true,
+          scopes: [],
+          unexpected: true,
+        } as unknown as { injection_suspected: boolean; scopes: string[] })
+      ).toThrow(/Invalid catalog injection-signal/);
+    });
+
+    it('fails closed when the persisted injection signal is not an object', () => {
+      const signalPath = getInjectionSignalPath();
+      safeWriteFile(signalPath, JSON.stringify(['malformed']));
+
+      setInjectionSuspected(true, 'malformed-state-test');
+
+      const persisted = JSON.parse(String(safeReadFile(signalPath, { encoding: 'utf8' }))) as {
+        scopes?: unknown;
+      };
+      expect(persisted.scopes).toEqual(['malformed-state-test']);
+      setInjectionSuspected(false, 'malformed-state-test');
+    });
+
     it('should propagate injection suspected status through temp signal file', () => {
       expect(isInjectionSuspected()).toBe(false);
       setInjectionSuspected(true);

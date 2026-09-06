@@ -19,6 +19,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
 import {
   buildProviderChildEnv,
+  resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
@@ -30,6 +31,8 @@ import {
 } from './delegation-concurrency.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { GrokAdapter, type AgentAskOptions, type AgentResponse } from './agent-adapter.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 import type { ReasoningCallOptions } from './reasoning-backend.js';
@@ -60,6 +63,10 @@ import type {
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
 
 const DEFAULT_MODEL = 'grok-4.6';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
@@ -193,12 +200,12 @@ export class ShellGrokCliBackend implements ReasoningBackend {
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const model = resolveGrokModelForTier(options?.model_tier, this.model);
-    const permissionArgs = this.resolvePermissionArgs(
-      options?.advisory ? 'planner' : options?.profile
-    );
+    const requestedProfile = options?.advisory ? 'planner' : options?.profile;
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('grok', requestedProfile);
+    const permissionArgs = this.resolvePermissionArgs(effectiveProfile);
     // Historical default for unprofiled headless calls: auto-approve tools.
     // When a KD-05 profile is set, its permission projection owns the mode.
-    const defaultPermissionArgs = options?.advisory || options?.profile ? [] : ['--always-approve'];
+    const defaultPermissionArgs = effectiveProfile ? [] : ['--always-approve'];
     const prompt = [instruction.trim(), context ? `Context: ${context}` : '']
       .filter(Boolean)
       .join('\n\n');
@@ -316,11 +323,12 @@ export class ShellGrokCliBackend implements ReasoningBackend {
   }
 
   private resolvePermissionArgs(profile?: ProviderPermissionProfileName): string[] {
-    if (!profile) return [];
-    const resolution = resolveProviderPermissionArgs(profile, 'grok');
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('grok', profile);
+    if (!effectiveProfile) return [];
+    const resolution = resolveProviderPermissionArgs(effectiveProfile, 'grok');
     if (resolution.kind === 'refused') {
       throw new Error(
-        `[shell-grok-cli] permission profile "${profile}" refused: ${resolution.reason}`
+        `[shell-grok-cli] permission profile "${effectiveProfile}" refused: ${resolution.reason}`
       );
     }
     return [...resolution.args];
@@ -334,6 +342,8 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     assertReasoningEgressAllowed(this.name);
     const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
     if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
+    const activeProfile = resolveEffectiveProviderPermissionProfile('grok');
+    const defaultPermissionArgs = activeProfile ? [] : ['--always-approve'];
 
     const args = [
       '-p',
@@ -346,16 +356,17 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       JSON.stringify(jsonSchema),
       '--model',
       this.model,
-      '--always-approve',
+      ...defaultPermissionArgs,
       '--disable-web-search',
       '--no-subagents',
+      ...this.resolvePermissionArgs(),
       ...this.extraArgs,
     ];
 
     const stdout = await this.spawnCli(args, '');
     let cliResult: any;
     try {
-      cliResult = JSON.parse(stdout);
+      cliResult = parseSafeJsonInput(stdout, 'Grok CLI response');
     } catch (err: any) {
       throw new Error(
         `[shell-grok-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`
@@ -432,22 +443,29 @@ export class ShellGrokCliBackend implements ReasoningBackend {
 function resolveGrokSubagentProfile(options?: ReasoningCallOptions) {
   const requested = options?.profile || options?.role || 'implementer';
   try {
-    return getSubagentCapabilityProfile(requested);
+    const profile = getSubagentCapabilityProfile(requested);
+    const effective = resolveEffectiveProviderPermissionProfile(
+      'grok',
+      profile.name as ProviderPermissionProfileName
+    );
+    return getSubagentCapabilityProfile(effective ?? profile.name);
   } catch {
-    return getSubagentCapabilityProfile('implementer');
+    return getSubagentCapabilityProfile(
+      resolveEffectiveProviderPermissionProfile('grok', 'implementer') ?? 'implementer'
+    );
   }
 }
 
 function parseStructuredFromText(text: unknown): unknown {
   if (typeof text !== 'string' || !text.trim()) return undefined;
   try {
-    return JSON.parse(text);
+    return parseSafeJsonInput(text, 'Grok structured response');
   } catch {
     // Some envelopes wrap JSON in fences; strip a single outer fence if present.
     const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/u);
     if (!fenced) return undefined;
     try {
-      return JSON.parse(fenced[1].trim());
+      return parseSafeJsonInput(fenced[1].trim(), 'Grok fenced structured response');
     } catch {
       return undefined;
     }
@@ -459,7 +477,7 @@ export function probeShellGrokCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number } = {}
 ): ShellGrokCliAvailability {
-  const bin = options.bin?.trim() || env.KYBERION_GROK_CLI_BIN?.trim() || 'grok';
+  const bin = options.bin?.trim() || envText(env, 'KYBERION_GROK_CLI_BIN')?.trim() || 'grok';
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   try {
@@ -508,11 +526,11 @@ export async function runGrokCliQuery<T>({
 export function buildGrokCliOptionsFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): ShellGrokCliBackendOptions {
-  const bin = env.KYBERION_GROK_CLI_BIN?.trim();
-  const model = env.KYBERION_GROK_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_GROK_CLI_TIMEOUT_MS?.trim();
+  const bin = envText(env, 'KYBERION_GROK_CLI_BIN')?.trim();
+  const model = envText(env, 'KYBERION_GROK_CLI_MODEL')?.trim();
+  const timeoutRaw = envText(env, 'KYBERION_GROK_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const extraRaw = env.KYBERION_GROK_CLI_EXTRA_ARGS?.trim();
+  const extraRaw = envText(env, 'KYBERION_GROK_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
   return {
     ...(bin ? { bin } : {}),
@@ -529,7 +547,7 @@ export function buildShellGrokCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[shell-grok-cli] backend unavailable (bin=${env.KYBERION_GROK_CLI_BIN?.trim() || 'grok'}): ${availability.reason ?? 'failed health check'}`
+      `[shell-grok-cli] backend unavailable (bin=${envText(env, 'KYBERION_GROK_CLI_BIN')?.trim() || 'grok'}): ${availability.reason ?? 'failed health check'}`
     );
     return null;
   }

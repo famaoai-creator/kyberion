@@ -49,7 +49,7 @@ pnpm tui:dev    # ソース実行 (@agent/core の dist は事前ビルドが必
 ## テスト
 
 ```bash
-pnpm test:tui
+pnpm test -- --suite tui
 ```
 
 hermetic: work-coordination は namespace 分離、exec は注入スタブ、mic は fixture command 再生、STT はテストブリッジ登録。

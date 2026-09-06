@@ -1,29 +1,30 @@
-import { loadJson, logger, pathResolver, defineCatalogBackedActuator } from '@agent/core';
-import { fileURLToPath } from 'node:url';
-import * as path from 'node:path';
+import { isDirectEntry } from '@agent/core/direct-entry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { handleAction } from './wisdom-pipeline-helpers.js';
 import { describeOps } from './op-catalog.js';
-import { runActuatorCli } from '@agent/core';
+import { readWisdomJsonObjectAtPath } from './wisdom-persisted-json.js';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 
 const main = async () => {
-  const schema = loadJson<object>(
-    pathResolver.rootResolve('knowledge/product/schemas/wisdom-action.schema.json')
+  const schema = readWisdomJsonObjectAtPath(
+    pathResolver.rootResolve('knowledge/product/schemas/wisdom-action.schema.json'),
+    'wisdom action schema'
   );
   await runActuatorCli({
     name: 'wisdom-actuator',
+    args: currentProcessArgv(),
     handleAction,
     schema,
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+if (isDirectEntry(import.meta.url, 'libs/actuators/wisdom-actuator/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, 'wisdom-actuator');
 }
 
 export { handleAction } from './wisdom-pipeline-helpers.js';

@@ -10,6 +10,8 @@ import { runMissionRetrospective } from './mission-retrospective.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
+import { readTextFile } from './foundation/text.js';
 import { createActuatorTrace, finalizeActuatorTrace } from './actuator-trace.js';
 import { buildCompletionNextAction, type CompletionReconciliation } from './next-action.js';
 import {
@@ -22,7 +24,13 @@ import { logger } from './core.js';
 import { latestSnapshot } from './intent-snapshot-store.js';
 import { queueMissionMemoryPromotionCandidate } from './memory-promotion-queue.js';
 import { summarizeReviewGateVerdicts } from './mission-review-gates.js';
-import { safeExec, safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+} from './secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
 import { closeMissionArtifacts } from './mission-artifact-closure.js';
 import { reconcileCompletion, reconcileCompletionStructurally } from './intent-reconciliation.js';
@@ -194,7 +202,7 @@ function recordMissionFinishGateFailure(input: {
   repairStrategy?: 'task' | 'operator' | 'existing_tasks' | 'artifact_review';
   actionTaskIds?: string[];
 }): string {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const context = input.state.context || {};
   const failureCount = Number(context.mission_finish_gate_failure_count || 0) + 1;
   const requiresOperator = input.repairStrategy === 'operator';
@@ -297,7 +305,7 @@ function reopenArtifactReviewTasks(input: {
   const taskIds = new Set(input.taskIds);
   const tasks = readMissionNextTasks(input.missionDir);
   const reopened: string[] = [];
-  const invalidatedAt = new Date().toISOString();
+  const invalidatedAt = nowIso();
   for (const task of tasks) {
     const taskId = String(task.task_id || '');
     if (!taskIds.has(taskId)) continue;
@@ -321,7 +329,7 @@ function recordMissionIntentDriftGateFailure(input: {
   reason: string;
   agentRuntimeEventPath: string;
 }): string {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const context = input.state.context || {};
   const failureCount = Number(context.intent_drift_gate_failure_count || 0) + 1;
   const nextStatus =
@@ -426,6 +434,13 @@ export async function verifyMission(
     logger.error(`Mission directory for ${upperId} not found.`);
     return;
   }
+  try {
+    assertSafeRepositoryPath(missionDir);
+    assertSafeRepositoryPath(path.join(missionDir, 'gates'), { allowMissingLeaf: true });
+  } catch (error: any) {
+    logger.error(`Mission ${upperId} path rejected: ${error?.message || String(error)}`);
+    return;
+  }
   const runtimeEventPath = path.join(missionDir, 'runtime-events.jsonl');
 
   logger.info(`🛡️ Verifying Mission ${upperId}: Result = ${result.toUpperCase()}`);
@@ -474,7 +489,7 @@ export async function verifyMission(
       evidenceDir: path.join(missionDir, 'gates'),
       payload: {
         verdict: 'pass',
-        checked_at: new Date().toISOString(),
+        checked_at: nowIso(),
         reason: driftGate.reason || 'intent drift gate passed',
         review_summary: driftReview,
       },
@@ -491,12 +506,12 @@ export async function verifyMission(
 
   state.verification = {
     status: result,
-    verified_at: new Date().toISOString(),
+    verified_at: nowIso(),
     note,
   };
 
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'VERIFY',
     note: `Verification ${result}: ${note}`,
   });
@@ -566,6 +581,15 @@ export async function finishMission(
   });
   const missionDir = findMissionPath(upperId);
   if (!missionDir) return;
+  try {
+    assertSafeRepositoryPath(missionDir);
+    assertSafeRepositoryPath(path.join(missionDir, 'gates'), { allowMissingLeaf: true });
+    assertSafeRepositoryPath(args.agentRuntimeEventPath, { allowMissingLeaf: true });
+    assertSafeRepositoryPath(args.archiveDir, { allowMissingLeaf: true });
+  } catch (error: any) {
+    logger.error(`Mission ${upperId} path rejected: ${error?.message || String(error)}`);
+    return;
+  }
   const missionHead = args.getGitHash(missionDir);
   if (preState.git?.latest_commit !== missionHead) {
     const headSubject = safeExec('git', ['log', '-1', '--pretty=%s'], { cwd: missionDir }).trim();
@@ -577,7 +601,7 @@ export async function finishMission(
         mission_finish_recovered_commit: missionHead,
       };
       preState.history.push({
-        ts: new Date().toISOString(),
+        ts: nowIso(),
         event: 'FINISH_RECOVER',
         note: `Recovered interrupted finish commit ${missionHead.slice(0, 8)} before resuming gates.`,
       });
@@ -608,7 +632,7 @@ export async function finishMission(
     evidenceDir: path.join(missionDir, 'gates'),
     payload: {
       verdict: 'pass',
-      checked_at: new Date().toISOString(),
+      checked_at: nowIso(),
       reason: driftSummary?.message || 'intent drift gate passed',
     },
   });
@@ -639,7 +663,7 @@ export async function finishMission(
     evidenceDir: path.join(missionDir, 'gates'),
     payload: {
       verdict: 'pass',
-      checked_at: new Date().toISOString(),
+      checked_at: nowIso(),
       reason: 'No pending tasks remain',
     },
   });
@@ -679,7 +703,7 @@ export async function finishMission(
     evidenceDir: path.join(missionDir, 'gates'),
     payload: {
       verdict: 'pass',
-      checked_at: new Date().toISOString(),
+      checked_at: nowIso(),
       reason: 'Mission quality validation passed',
     },
   });
@@ -774,7 +798,7 @@ export async function finishMission(
       };
       state.status = 'active';
       state.history.push({
-        ts: new Date().toISOString(),
+        ts: nowIso(),
         event: 'GOAL_GAP_REALIGN',
         note: `Goal not yet satisfied (round ${nextRound}/${goalLoopMaxRounds}). Gap tasks dispatched: ${gapTaskIds.join(', ')} — ${gapSummary}`,
       });
@@ -784,7 +808,7 @@ export async function finishMission(
         evidenceDir: path.join(missionDir, 'gates'),
         payload: {
           verdict: 'fail',
-          checked_at: new Date().toISOString(),
+          checked_at: nowIso(),
           reason: `goal gaps remain (round ${nextRound}/${goalLoopMaxRounds}): ${gapSummary}`,
         },
       });
@@ -823,7 +847,7 @@ export async function finishMission(
     evidenceDir: path.join(missionDir, 'gates'),
     payload: {
       verdict: 'pass',
-      checked_at: new Date().toISOString(),
+      checked_at: nowIso(),
       reason: completionReconciliation.satisfied
         ? `goal satisfied (confidence=${completionReconciliation.confidence})`
         : 'goal loop disabled or no actionable gaps — completing with reported next action',
@@ -859,7 +883,7 @@ export async function finishMission(
     }
     state.status = args.transitionStatus(state.status, 'completed');
     state.history.push({
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'FINISH',
       note: 'Mission completed.',
     });
@@ -946,11 +970,12 @@ export async function finishMission(
       pathResolver.volatile('mission', upperId, { tier: state.tier }),
       'MEMORY.md'
     );
-    const memorySummary = safeExistsSync(memoryPath)
-      ? extractPromotableMissionMemory(safeReadFile(memoryPath, { encoding: 'utf8' }) as string)
+    const safeMemoryPath = assertSafeRepositoryPath(memoryPath, { allowMissingLeaf: true });
+    const memorySummary = safeExistsSync(safeMemoryPath)
+      ? extractPromotableMissionMemory(readTextFile(safeMemoryPath))
       : null;
     const memoryEvidenceRefs = memorySummary
-      ? [...evidence.map((item) => item.ref), memoryPath]
+      ? [...evidence.map((item) => item.ref), safeMemoryPath]
       : evidence.map((item) => item.ref);
     const queued = queueMissionMemoryPromotionCandidate({
       missionId: upperId,
@@ -962,7 +987,7 @@ export async function finishMission(
         `Mission ${upperId} completed and yielded reusable operational memory.`,
       evidenceRefs: memoryEvidenceRefs,
     });
-    if (memorySummary) updateMissionMemorySidecar(memoryPath, queued.candidate_id);
+    if (memorySummary) updateMissionMemorySidecar(safeMemoryPath, queued.candidate_id);
     logger.info(
       `🧠 [MEMORY_PROMOTION] queued candidate ${queued.candidate_id} (${queued.proposed_memory_kind}).`
     );
@@ -1023,15 +1048,19 @@ export async function finishMission(
   }
 
   const missionTmpDir = pathResolver.sharedTmp(path.join('missions', upperId));
-  if (safeExistsSync(missionTmpDir)) {
+  const safeMissionTmpDir = assertSafeRepositoryPath(missionTmpDir, { allowMissingLeaf: true });
+  if (safeExistsSync(safeMissionTmpDir)) {
     traceCtx.startSpan('mission:purge-temp');
     logger.info('🧹 Purging mission runtime temp...');
-    safeRmSync(missionTmpDir, { recursive: true, force: true });
+    safeRmSync(safeMissionTmpDir, { recursive: true, force: true });
     traceCtx.endSpan('ok');
   }
 
-  if (!safeExistsSync(args.archiveDir)) safeMkdir(args.archiveDir, { recursive: true });
-  const archivePath = path.join(args.archiveDir, upperId);
+  const safeArchiveDir = assertSafeRepositoryPath(args.archiveDir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeArchiveDir)) safeMkdir(safeArchiveDir, { recursive: true });
+  const archivePath = assertSafeRepositoryPath(path.join(safeArchiveDir, upperId), {
+    allowMissingLeaf: true,
+  });
   traceCtx.startSpan('mission:archive');
   if (safeExistsSync(archivePath)) safeExec('rm', ['-rf', archivePath]);
   safeExec('cp', ['-r', missionDir, archivePath]);
@@ -1040,7 +1069,7 @@ export async function finishMission(
 
   state.status = args.transitionStatus(state.status, 'archived');
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'ARCHIVE',
     note: `Mission archived to ${archivePath}.`,
   });
@@ -1131,7 +1160,7 @@ export async function reenterMissionFromReview(
     review_reentry_last_gaps: gaps.slice(0, 5),
   };
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'REVIEW_GAP_REALIGN',
     note: `Human review re-entry (${pending.length} request(s), was ${previousStatus}). Rework tasks: ${gapTaskIds.join(', ')}`,
   });

@@ -6,13 +6,18 @@
  * direct foundation import bypass tier, tenant, size, and audit checks.
  */
 export interface FoundationIo {
-  loadJson<T>(filePath: string): T;
-  loadJsonIfPresent<T>(filePath: string): T | null;
+  loadJson<T>(filePath: string, options?: FoundationReadOptions): T;
+  loadJsonIfPresent<T>(filePath: string, options?: FoundationReadOptions): T | null;
   appendFile(filePath: string, content: string): void;
   exists(filePath: string): boolean;
-  readFile(filePath: string): string;
+  readFile(filePath: string, options?: FoundationReadOptions): string;
   stat(filePath: string): { mtimeMs: number; size: number };
   writeFile(filePath: string, content: string): void;
+}
+
+export interface FoundationReadOptions {
+  maxSizeMB?: number;
+  label?: string;
 }
 
 // Keep the registration stable across test module resets. This is a registry

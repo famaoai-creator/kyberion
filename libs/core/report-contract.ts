@@ -16,9 +16,9 @@ import {
   type StructuredOutputSchemaRef,
 } from './structured-output-contracts.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { createAjv } from './foundation/ajv.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { compileSchema } from './foundation/ajv.js';
+import { readTextFile } from './foundation/text.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
 
 export interface PipelineReportContract {
@@ -56,10 +56,17 @@ function schemaPathFromRef(schemaRef: string): string {
       `[REPORT_SCHEMA_INVALID] schema_ref escapes the product schema root: ${schemaRef}`
     );
   }
-  if (!candidate.endsWith('.json') || !safeExistsSync(candidate)) {
+  if (!candidate.endsWith('.json')) {
     throw new Error(`[REPORT_SCHEMA_NOT_FOUND] report schema not found: ${schemaRef}`);
   }
-  return candidate;
+  const safeCandidate = assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeCandidate)) {
+    throw new Error(`[REPORT_SCHEMA_NOT_FOUND] report schema not found: ${schemaRef}`);
+  }
+  if (!safeLstat(safeCandidate).isFile()) {
+    throw new Error(`[REPORT_SCHEMA_INVALID] report schema must be a regular file: ${schemaRef}`);
+  }
+  return safeCandidate;
 }
 
 function compileReportSchema(schemaRef: string): CompiledReportSchema {
@@ -74,15 +81,14 @@ function compileReportSchema(schemaRef: string): CompiledReportSchema {
   }
 
   const schemaPath = schemaPathFromRef(schemaRef);
-  const ajv = createAjv();
-  const validate: ValidateFunction = compileSchemaFromPath(ajv, schemaPath);
+  const validate: ValidateFunction = compileSchema(schemaPath);
   return {
     validate: (value) => Boolean(validate(value)),
     errors: () =>
       (validate.errors || []).map(
         (error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`
       ),
-    prompt: String(safeReadFile(schemaPath, { encoding: 'utf8' })),
+    prompt: readTextFile(schemaPath),
   };
 }
 

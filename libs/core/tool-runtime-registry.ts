@@ -1,16 +1,18 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
 import {
   getToolRuntimePolicy,
   resolveToolRuntimeRoot,
@@ -124,483 +126,31 @@ export interface ToolRuntimeInventory {
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/tool-runtime-registry.json'
 );
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tool-runtime-registry.schema.json'
+);
+const TOOL_RUNTIME_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tool-runtime-state.schema.json'
+);
 const STATE_VERSION = '1.0.0';
 
-const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
-  version: 'fallback',
-  default_tool_id: 'mflux',
-  tools: [
-    {
-      tool_id: 'mflux',
-      display_name: 'mflux Local FLUX Image Generator',
-      ecosystem: 'python',
-      status: 'active',
-      platforms: ['darwin'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'uvx',
-        command: 'uvx',
-        args: ['--from', 'mflux', 'mflux-generate'],
-        description: 'Temporary local FLUX execution without a managed install.',
-      },
-      install_backend: {
-        kind: 'uv',
-        command: 'uv',
-        args: ['tool', 'install', 'mflux'],
-        description: 'Install mflux into the managed Python tool environment.',
-      },
-      installed_backend: {
-        kind: 'uv',
-        command: 'uv',
-        args: ['tool', 'run', 'mflux-generate'],
-        description: 'Run mflux from the managed Python tool environment.',
-      },
-      managed_env_subpath: 'tool-runtimes/mflux',
-      notes:
-        'Apple Silicon FLUX entrypoint. Trial via uvx; promote to installed state after approval.',
-    },
-    {
-      tool_id: 'playwright',
-      display_name: 'Playwright Chromium Runtime',
-      ecosystem: 'node',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'npx',
-        command: 'npx',
-        args: ['playwright', '--version'],
-        description: 'Probe Playwright availability without mutating workspace state.',
-      },
-      install_backend: {
-        kind: 'pnpm',
-        command: 'pnpm',
-        args: ['exec', 'playwright', 'install', 'chromium'],
-        description: 'Install the Chromium browser binary used by Playwright flows.',
-      },
-      installed_backend: {
-        kind: 'pnpm',
-        command: 'pnpm',
-        args: ['exec', 'playwright', '--version'],
-        description: 'Re-check the Playwright runtime after browser bootstrap.',
-      },
-      managed_env_subpath: 'tool-runtimes/playwright',
-      notes:
-        'Node runtime example: trial via npx, managed browser bootstrap through the Playwright runtime installer.',
-    },
-    {
-      tool_id: 'ffmpeg',
-      display_name: 'FFmpeg Media Toolkit',
-      ecosystem: 'system',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'ffmpeg',
-        args: ['-version'],
-        description: 'Probe FFmpeg availability without any install step.',
-      },
-      install_backend: {
-        kind: 'brew',
-        command: 'brew',
-        args: ['install', 'ffmpeg'],
-        description: 'Install FFmpeg through Homebrew on macOS.',
-      },
-      install_backend_platform_overrides: {
-        win32: {
-          kind: 'winget',
-          command: 'winget',
-          args: [
-            'install',
-            '--id',
-            'Gyan.FFmpeg',
-            '--exact',
-            '--source',
-            'winget',
-            '--accept-source-agreements',
-            '--accept-package-agreements',
-          ],
-          description: 'Install ffmpeg through WinGet on Windows.',
-        },
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'ffmpeg',
-        args: ['-version'],
-        description: 'Re-check the installed FFmpeg binary.',
-      },
-      managed_env_subpath: 'tool-runtimes/ffmpeg',
-      notes: 'System media example for capture and composition flows.',
-    },
-    {
-      tool_id: 'sox',
-      display_name: 'SoX Audio Toolkit',
-      ecosystem: 'system',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'sox',
-        args: ['--version'],
-        description: 'Probe SoX availability without mutating workspace state.',
-      },
-      install_backend: {
-        kind: 'brew',
-        command: 'brew',
-        args: ['install', 'sox'],
-        description: 'Install SoX through Homebrew on macOS.',
-      },
-      install_backend_platform_overrides: {
-        win32: {
-          kind: 'winget',
-          command: 'winget',
-          args: [
-            'install',
-            '--id',
-            'ChrisBagwell.SoX',
-            '--exact',
-            '--source',
-            'winget',
-            '--accept-source-agreements',
-            '--accept-package-agreements',
-          ],
-          description: 'Install sox through WinGet on Windows.',
-        },
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'sox',
-        args: ['--version'],
-        description: 'Re-check the installed SoX binary.',
-      },
-      managed_env_subpath: 'tool-runtimes/sox',
-      notes: 'Audio capture fallback used by the voice sample recorder.',
-    },
-    {
-      tool_id: 'tesseract',
-      display_name: 'Tesseract OCR Toolkit',
-      ecosystem: 'system',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'tesseract',
-        args: ['--version'],
-        description: 'Probe Tesseract availability without mutating workspace state.',
-      },
-      install_backend: {
-        kind: 'brew',
-        command: 'brew',
-        args: ['install', 'tesseract'],
-        description: 'Install Tesseract through Homebrew on macOS.',
-      },
-      install_backend_platform_overrides: {
-        win32: {
-          kind: 'winget',
-          command: 'winget',
-          args: [
-            'install',
-            '--id',
-            'tesseract-ocr.tesseract',
-            '--exact',
-            '--source',
-            'winget',
-            '--accept-source-agreements',
-            '--accept-package-agreements',
-          ],
-          description: 'Install tesseract through WinGet on Windows.',
-        },
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'tesseract',
-        args: ['--version'],
-        description: 'Re-check the installed Tesseract binary.',
-      },
-      managed_env_subpath: 'tool-runtimes/tesseract',
-      notes: 'OCR fallback example for image and screen recognition flows.',
-    },
-    {
-      tool_id: 'mlx_audio',
-      display_name: 'mlx-audio TTS Runtime',
-      ecosystem: 'python',
-      status: 'active',
-      platforms: ['darwin'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import mlx_audio; print("ok")'],
-        description: 'Probe mlx-audio availability through an import check.',
-      },
-      install_backend: {
-        kind: 'uv',
-        command: 'uv',
-        args: ['pip', 'install', 'mlx-audio[tts]'],
-        description: 'Install the current mlx-audio TTS extras into the managed Python runtime.',
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import mlx_audio; print("ok")'],
-        description: 'Re-check the installed mlx-audio runtime.',
-      },
-      managed_env_subpath: 'tool-runtimes/mlx-audio',
-      notes: 'Runtime dependency for the Qwen3-TTS voice engine bridge.',
-    },
-    {
-      tool_id: 'mlx_whisper',
-      display_name: 'mlx-whisper STT Runtime',
-      ecosystem: 'python',
-      status: 'active',
-      platforms: ['darwin'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import mlx_whisper; print("ok")'],
-        description: 'Probe mlx-whisper availability through an import check.',
-      },
-      install_backend: {
-        kind: 'uv',
-        command: 'uv',
-        args: ['pip', 'install', 'mlx-whisper'],
-        description: 'Install mlx-whisper into the managed Python runtime.',
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import mlx_whisper; print("ok")'],
-        description: 'Re-check the installed mlx-whisper runtime.',
-      },
-      managed_env_subpath: 'tool-runtimes/mlx-whisper',
-      notes: 'Runtime dependency for the Qwen3-STT bridge used by voice capture flows.',
-    },
-    {
-      tool_id: 'kokoro_tts',
-      display_name: 'Kokoro TTS Runtime',
-      ecosystem: 'python',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import kokoro, soundfile; print("ok")'],
-        description: 'Probe the Kokoro and soundfile Python packages.',
-      },
-      install_backend: {
-        kind: 'uv',
-        command: 'uv',
-        args: ['pip', 'install', 'kokoro', 'soundfile', 'misaki[ja]', 'unidic-lite'],
-        description: 'Install Kokoro with audio output and Japanese text dependencies.',
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import kokoro, soundfile, unidic_lite; print("ok")'],
-        description: 'Re-check the Kokoro TTS runtime.',
-      },
-      managed_env_subpath: 'tool-runtimes/kokoro-tts',
-      notes: 'Optional lightweight TTS runtime used by the governed Kokoro bridge.',
-    },
-    {
-      tool_id: 'pocket_tts',
-      display_name: 'Kyutai Pocket TTS Runtime',
-      ecosystem: 'python',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import pocket_tts, scipy; print("ok")'],
-        description: 'Probe Pocket TTS and scipy availability.',
-      },
-      install_backend: {
-        kind: 'uv',
-        command: 'uv',
-        args: ['pip', 'install', 'pocket-tts', 'scipy'],
-        description: 'Install Kyutai Pocket TTS and WAV output dependencies.',
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import pocket_tts, scipy; print("ok")'],
-        description: 'Re-check the Pocket TTS runtime.',
-      },
-      managed_env_subpath: 'tool-runtimes/pocket-tts',
-      notes:
-        'CPU streaming TTS and consent-gated voice cloning; upstream language packs currently exclude Japanese.',
-    },
-    {
-      tool_id: 'ten_vad',
-      display_name: 'TEN VAD Runtime',
-      ecosystem: 'python',
-      status: 'active',
-      platforms: ['darwin', 'linux', 'win32'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import ten_vad; print("ok")'],
-        description: 'Probe the TEN VAD Python binding.',
-      },
-      install_backend: {
-        kind: 'uv',
-        command: 'uv',
-        args: ['pip', 'install', 'numpy', 'git+https://github.com/TEN-framework/ten-vad.git'],
-        description:
-          'Install the official TEN VAD Python binding and its NumPy dependency from upstream.',
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import ten_vad; print("ok")'],
-        description: 'Re-check the TEN VAD runtime.',
-      },
-      managed_env_subpath: 'tool-runtimes/ten-vad',
-      notes:
-        'Optional 10/16ms-hop VAD. Review the upstream Apache-2.0 additional conditions before redistribution.',
-    },
-    {
-      tool_id: 'silero_vad',
-      display_name: 'Silero VAD Runtime',
-      ecosystem: 'python',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import numpy, onnxruntime; print("ok")'],
-        description: 'Probe the lightweight Silero ONNX bridge dependencies.',
-      },
-      install_backend: {
-        kind: 'uv',
-        command: 'uv',
-        args: ['pip', 'install', 'numpy', 'onnxruntime'],
-        description: 'Install the ONNX runtime used by the Silero VAD v6 bridge.',
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'python3',
-        args: ['-c', 'import numpy, onnxruntime; print("ok")'],
-        description: 'Re-check the Silero VAD dependencies.',
-      },
-      managed_env_subpath: 'tool-runtimes/silero-vad',
-      notes:
-        'The bridge accepts the current Silero VAD v6.2-compatible ONNX model through KYBERION_SILERO_VAD_MODEL.',
-    },
-    {
-      tool_id: 'ollama',
-      display_name: 'Ollama Local LLM Runtime',
-      ecosystem: 'system',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'ollama',
-        args: ['--version'],
-        description: 'Probe Ollama CLI availability without mutating workspace state.',
-      },
-      install_backend: {
-        kind: 'brew',
-        command: 'brew',
-        args: ['install', 'ollama'],
-        description: 'Install Ollama via Homebrew on macOS.',
-      },
-      install_backend_platform_overrides: {
-        win32: {
-          kind: 'winget',
-          command: 'winget',
-          args: [
-            'install',
-            '--id',
-            'Ollama.Ollama',
-            '--exact',
-            '--source',
-            'winget',
-            '--accept-source-agreements',
-            '--accept-package-agreements',
-          ],
-          description: 'Install Ollama through WinGet on Windows.',
-        },
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'ollama',
-        args: ['serve'],
-        description: 'Run Ollama server process.',
-      },
-      managed_env_subpath: 'tool-runtimes/ollama',
-      notes: 'Ollama local LLM server runtime.',
-    },
-    {
-      tool_id: 'llamacpp',
-      display_name: 'llama.cpp C++ LLM Engine',
-      ecosystem: 'system',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: {
-        kind: 'system',
-        command: 'llama-server',
-        args: ['--version'],
-        description: 'Probe llama-server CLI availability.',
-      },
-      install_backend: {
-        kind: 'brew',
-        command: 'brew',
-        args: ['install', 'llama.cpp'],
-        description: 'Install llama.cpp binaries via Homebrew.',
-      },
-      install_backend_platform_overrides: {
-        win32: {
-          kind: 'winget',
-          command: 'winget',
-          args: [
-            'install',
-            '--id',
-            'ggml.llamacpp',
-            '--exact',
-            '--source',
-            'winget',
-            '--accept-source-agreements',
-            '--accept-package-agreements',
-          ],
-          description: 'Install llama.cpp through WinGet on Windows.',
-        },
-      },
-      installed_backend: {
-        kind: 'system',
-        command: 'llama-server',
-        args: ['--port', '8080'],
-        description: 'Run llama-server process.',
-      },
-      managed_env_subpath: 'tool-runtimes/llamacpp',
-      notes: 'llama.cpp server runtime for GGUF model inference.',
-    },
-  ],
-};
-
-let cachedRegistryPath: string | null = null;
-let cachedRegistry: ToolRuntimeRegistry | null = null;
-
 function getRegistryPath(): string {
-  return (
-    getRegisteredEnvText('KYBERION_TOOL_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
-  );
+  const configured =
+    getRegisteredEnvText('KYBERION_TOOL_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
-function loadRegistryFromPath(registryPath: string): ToolRuntimeRegistry {
-  const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<ToolRuntimeRegistry>(raw, 'tool runtime registry');
-}
+const toolRuntimeRegistryCatalog = defineCatalog<ToolRuntimeRegistry>({
+  id: 'tool-runtime-registry',
+  path: getRegistryPath,
+  schema: REGISTRY_SCHEMA_PATH,
+});
+
+const toolRuntimeStateCatalog = defineCatalog<ToolRuntimeState>({
+  id: 'tool-runtime-state',
+  path: TOOL_RUNTIME_STATE_SCHEMA_PATH,
+  schema: TOOL_RUNTIME_STATE_SCHEMA_PATH,
+});
 
 function isSupportedPlatform(record: ToolRuntimeRecord, platform: NodeJS.Platform): boolean {
   return (
@@ -634,8 +184,19 @@ function backendIsAvailable(
 }
 
 function resolveManagedEnvPath(tool: ToolRuntimeRecord): string {
+  const root = resolveToolRuntimeRoot(getToolRuntimePolicy());
   const subPath = tool.managed_env_subpath || `tool-runtimes/${tool.tool_id}`;
-  return path.join(resolveToolRuntimeRoot(getToolRuntimePolicy()), subPath);
+  return assertManagedRuntimePath(root, path.join(root, subPath));
+}
+
+function assertManagedRuntimePath(root: string, candidate: string): string {
+  const resolvedRoot = path.resolve(root);
+  const resolved = assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+  const relative = path.relative(resolvedRoot, resolved).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(`[TOOL_RUNTIME_PATH_SCOPE] path escapes managed runtime root: ${candidate}`);
+  }
+  return resolved;
 }
 
 function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
@@ -654,39 +215,17 @@ function normalizeToolId(toolId?: string): string {
 }
 
 function getRegistry(): ToolRuntimeRegistry {
-  const registryPath = getRegistryPath();
-  if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
-
-  if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
-
-  try {
-    const parsed = loadRegistryFromPath(registryPath);
-    cachedRegistryPath = registryPath;
-    cachedRegistry = parsed;
-    return parsed;
-  } catch (error: any) {
-    logger.warn(
-      `[TOOL_RUNTIME_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
-    );
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
+  return toolRuntimeRegistryCatalog.load();
 }
 
 function statePathForTool(tool: ToolRuntimeRecord): string {
   const root = resolveToolRuntimeRoot(getToolRuntimePolicy());
   const subPath = tool.managed_env_subpath || `tool-runtimes/${tool.tool_id}`;
-  return path.join(root, subPath, 'state.json');
+  return assertManagedRuntimePath(root, path.join(root, subPath, 'state.json'));
 }
 
-export function resetToolRuntimeRegistryCache(): void {
-  cachedRegistryPath = null;
-  cachedRegistry = null;
+export function _resetToolRuntimeRegistryCacheForTests(): void {
+  toolRuntimeRegistryCatalog.reset();
 }
 
 export function getToolRuntimeRegistry(): ToolRuntimeRegistry {
@@ -704,7 +243,7 @@ export function getToolRuntimeRecord(toolId?: string): ToolRuntimeRecord {
   return (
     registry.tools.find((tool) => tool.tool_id === resolvedToolId) ||
     registry.tools.find((tool) => tool.tool_id === registry.default_tool_id) ||
-    FALLBACK_REGISTRY.tools[0]
+    registry.tools[0]
   );
 }
 
@@ -712,17 +251,71 @@ export function getToolRuntimeStatePath(toolId?: string): string {
   return statePathForTool(getToolRuntimeRecord(toolId));
 }
 
+function parseToolRuntimeState(
+  value: unknown,
+  statePath: string,
+  toolId: string
+): ToolRuntimeState {
+  const record = toolRuntimeStateCatalog.validate(value, statePath);
+  if (record.version !== STATE_VERSION) {
+    throw new Error('tool runtime state version is invalid');
+  }
+  if (record.tool_id !== toolId) {
+    throw new Error('tool runtime state tool scope mismatch');
+  }
+  const expectedManagedPath = path.dirname(path.resolve(statePath));
+  const managedPath = assertSafeRepositoryPath(record.managed_env_path, {
+    allowMissingLeaf: true,
+  });
+  if (path.resolve(managedPath) !== expectedManagedPath) {
+    throw new Error('tool runtime state managed path mismatch');
+  }
+  return {
+    version: record.version,
+    tool_id: record.tool_id,
+    status: record.status,
+    backend_kind: record.backend_kind,
+    command: record.command,
+    args: [...record.args],
+    managed_env_path: managedPath,
+    ...(record.installed_at ? { installed_at: record.installed_at } : {}),
+    ...(record.pinned_at ? { pinned_at: record.pinned_at } : {}),
+    ...(record.provenance
+      ? {
+          provenance: {
+            ...record.provenance,
+            args: record.provenance.args ? [...record.provenance.args] : undefined,
+          },
+        }
+      : {}),
+  };
+}
+
+/** Load tool runtime state through schema, regular-file, and tool/path binding checks. */
+export function loadToolRuntimeStateAtPath(statePath: string, toolId: string): ToolRuntimeState {
+  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeStatePath).isFile()) {
+    throw new Error(`[TOOL_RUNTIME_STATE] state must be a regular file: ${statePath}`);
+  }
+  const value = defineCatalog<ToolRuntimeState>({
+    id: 'tool-runtime-state',
+    path: safeStatePath,
+    schema: TOOL_RUNTIME_STATE_SCHEMA_PATH,
+  }).load();
+  return parseToolRuntimeState(value, safeStatePath, toolId);
+}
+
 export function readToolRuntimeState(toolId?: string): ToolRuntimeState | null {
   const statePath = getToolRuntimeStatePath(toolId);
   if (!safeExistsSync(statePath)) return null;
   try {
-    const parsed = safeJsonParse<ToolRuntimeState>(
-      safeReadFile(statePath, { encoding: 'utf8' }) as string,
-      'tool runtime state'
+    return loadToolRuntimeStateAtPath(statePath, getToolRuntimeRecord(toolId).tool_id);
+  } catch (error: unknown) {
+    logger.warn(
+      `[TOOL_RUNTIME_REGISTRY] Failed to read state at ${statePath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
     );
-    return parsed;
-  } catch (error: any) {
-    logger.warn(`[TOOL_RUNTIME_REGISTRY] Failed to read state at ${statePath}: ${error.message}`);
     return null;
   }
 }
@@ -731,7 +324,8 @@ function writeToolRuntimeStateFile(state: ToolRuntimeState): void {
   const statePath = getToolRuntimeStatePath(state.tool_id);
   const dir = path.dirname(statePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(statePath, JSON.stringify(state, null, 2), { encoding: 'utf8' });
+  const validated = parseToolRuntimeState(state, statePath, state.tool_id);
+  safeWriteFile(statePath, JSON.stringify(validated, null, 2), { encoding: 'utf8' });
 }
 
 export function markToolRuntimeInstalled(
@@ -747,7 +341,7 @@ export function markToolRuntimeInstalled(
     command: tool.installed_backend?.command || tool.trial_backend.command,
     args: tool.installed_backend?.args || tool.trial_backend.args,
     managed_env_path: resolveManagedEnvPath(tool),
-    installed_at: new Date().toISOString(),
+    installed_at: nowIso(),
     provenance: provenance || undefined,
   };
   writeToolRuntimeStateFile(state);
@@ -767,7 +361,7 @@ export function markToolRuntimePinned(
     command: tool.installed_backend?.command || tool.trial_backend.command,
     args: tool.installed_backend?.args || tool.trial_backend.args,
     managed_env_path: resolveManagedEnvPath(tool),
-    pinned_at: new Date().toISOString(),
+    pinned_at: nowIso(),
     provenance: provenance || undefined,
   };
   writeToolRuntimeStateFile(state);

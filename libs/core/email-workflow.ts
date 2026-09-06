@@ -3,13 +3,18 @@ import { randomUUID } from 'node:crypto';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import { executeServicePreset } from './service-engine.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { clamp } from './foundation/text.js';
+import { readTextFile } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { processUntrustedContent } from './untrusted-content.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeExec,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -167,32 +172,53 @@ const GMAIL_AUTOMATED_SENDER_RE =
 const GMAIL_INBOX_ARCHIVE_LABEL = 'INBOX';
 
 export function resolveEmailDraftDir(): string {
-  return pathResolver.shared('runtime/presence-studio/email-drafts');
+  return assertSafeRepositoryPath(pathResolver.shared('runtime/presence-studio/email-drafts'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function resolveEmailTriagePath(): string {
-  return pathResolver.sharedTmp('email-inbox-triage.md');
+  return assertSafeRepositoryPath(pathResolver.sharedTmp('email-inbox-triage.md'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function resolveLatestEmailDraftPaths(): { markdown: string; json: string } {
   const dir = resolveEmailDraftDir();
   return {
-    markdown: path.join(dir, 'latest.md'),
-    json: path.join(dir, 'latest.json'),
+    markdown: assertSafeRepositoryPath(path.join(dir, 'latest.md'), { allowMissingLeaf: true }),
+    json: assertSafeRepositoryPath(path.join(dir, 'latest.json'), { allowMissingLeaf: true }),
   };
+}
+
+export function isRegularEmailDraftPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function emailRequestId(value: string): string {
+  const normalized = value.trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[email-workflow] invalid request id: ${value}`);
+  }
+  return normalized;
 }
 
 export function extractFirstJsonBlock(text: string): Record<string, unknown> | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
+  const firstJsonToken = trimmed.search(/[\[{]/u);
+  if (firstJsonToken >= 0 && trimmed[firstJsonToken] === '[') return null;
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidates = fenced ? [fenced[1], trimmed] : [trimmed];
   for (const candidate of candidates) {
     try {
-      const parsed = JSON.parse(candidate);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
+      const parsed = parseSafeJsonObjectInput(candidate, 'email JSON block');
+      if (parsed) return parsed;
     } catch (err) {
       logger.warn(`suppressed error in extractFirstJsonBlock: ${err}`);
     }
@@ -201,15 +227,20 @@ export function extractFirstJsonBlock(text: string): Record<string, unknown> | n
   const last = trimmed.lastIndexOf('}');
   if (first >= 0 && last > first) {
     try {
-      const parsed = JSON.parse(trimmed.slice(first, last + 1));
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
+      return parseSafeJsonObjectInput(trimmed.slice(first, last + 1), 'email JSON block') ?? null;
     } catch (err) {
       logger.warn(`suppressed error in extractFirstJsonBlock: ${err}`);
     }
   }
   return null;
+}
+
+export function parseEmailDraftArtifact(value: unknown): Record<string, unknown> | null {
+  try {
+    return parseSafeJsonObjectValue(value, 'email draft artifact');
+  } catch {
+    return null;
+  }
 }
 
 export function extractBodyMarkdownFromDraft(draftMarkdown: string): string {
@@ -380,7 +411,7 @@ async function listUnreadInboxMessages(limit: number): Promise<GmailMessageListI
     const page = await gwsJson('gmail_messages_list', {
       userId: 'me',
       q: GMAIL_INBOX_ARCHIVE_QUERY,
-      maxResults: Math.max(1, Math.min(limit, 500)),
+      maxResults: clamp(limit, 1, 500),
       ...(pageToken ? { pageToken } : {}),
     });
     const pageMessages = extractMessageList(page);
@@ -640,10 +671,10 @@ export function buildFallbackEmailDraft(input: {
 
 export function readEmailDraftArtifact(): EmailDraftArtifact {
   const { markdown, json } = resolveLatestEmailDraftPaths();
-  if (safeExistsSync(json)) {
+  if (isRegularEmailDraftPath(json)) {
     try {
-      const parsed = readJson<Record<string, unknown>>(json);
-      if (parsed && typeof parsed === 'object') {
+      const parsed = parseEmailDraftArtifact(readJson<unknown>(json));
+      if (parsed) {
         const jsonStat = safeStat(json);
         return {
           exists: true,
@@ -653,7 +684,7 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
             typeof parsed.updated_at === 'string'
               ? parsed.updated_at
               : jsonStat?.mtime instanceof Date
-                ? jsonStat.mtime.toISOString()
+                ? nowIso(jsonStat.mtime)
                 : null,
           to: typeof parsed.to === 'string' ? parsed.to : '',
           subject: typeof parsed.subject === 'string' ? parsed.subject : '',
@@ -668,14 +699,14 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
       logger.warn(`suppressed error in readEmailDraftArtifact: ${err}`);
     }
   }
-  if (safeExistsSync(markdown)) {
-    const draftMarkdown = String(safeReadFile(markdown, { encoding: 'utf8' }) || '');
+  if (isRegularEmailDraftPath(markdown)) {
+    const draftMarkdown = readTextFile(markdown);
     const markdownStat = safeStat(markdown);
     return {
       exists: true,
       path: markdown,
       json_path: json,
-      updated_at: markdownStat?.mtime instanceof Date ? markdownStat.mtime.toISOString() : null,
+      updated_at: markdownStat?.mtime instanceof Date ? nowIso(markdownStat.mtime) : null,
       to: '',
       subject: '',
       tone: 'clear and concise',
@@ -699,10 +730,11 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
 }
 
 export function readGwsAuthStatus(): GwsAuthStatus {
-  const checkedAt = new Date().toISOString();
+  const checkedAt = nowIso();
   try {
     const raw = safeExec('gws', ['auth', 'status'], { timeoutMs: 5_000, maxOutputMB: 1 }).trim();
-    const parsed = raw ? JSON.parse(raw) : {};
+    const parsed = raw ? parseSafeJsonObjectInput(raw, 'gws auth status') : {};
+    if (!parsed) throw new Error('gws auth status must be a JSON object');
     return {
       ok: true,
       available: true,
@@ -739,17 +771,25 @@ export function readGwsAuthStatus(): GwsAuthStatus {
 }
 
 function writeDraftModeFallbackArtifact(request: EmailDeliveryRequest) {
-  const timestamp = new Date().toISOString();
+  const timestamp = nowIso();
   const draftDir = resolveEmailDraftDir();
   safeMkdir(draftDir, { recursive: true });
   const fallbackId = `gws-fallback-${randomUUID()}`;
-  const artifactDir = path.join(draftDir, fallbackId);
+  const artifactDir = assertSafeRepositoryPath(path.join(draftDir, fallbackId), {
+    allowMissingLeaf: true,
+  });
   safeMkdir(artifactDir, { recursive: true });
 
   const subject = request.subject?.trim() || 'Re: Inbox update';
   const to = request.to?.trim() || '';
-  const draftPath = path.join(artifactDir, `email-draft-${fallbackId}.md`);
-  const jsonPath = path.join(artifactDir, `email-draft-${fallbackId}.json`);
+  const draftPath = assertSafeRepositoryPath(
+    path.join(artifactDir, `email-draft-${fallbackId}.md`),
+    { allowMissingLeaf: true }
+  );
+  const jsonPath = assertSafeRepositoryPath(
+    path.join(artifactDir, `email-draft-${fallbackId}.json`),
+    { allowMissingLeaf: true }
+  );
   const draftMarkdown = [
     `To: ${to || 'TBD'}`,
     `Subject: ${subject}`,
@@ -821,7 +861,7 @@ function writeDraftModeFallbackArtifact(request: EmailDeliveryRequest) {
 export async function generateEmailReplyDraft(
   input: EmailDraftGenerationInput
 ): Promise<EmailDraftGenerationResult> {
-  const requestId = input.requestId?.trim() || randomUUID();
+  const requestId = input.requestId?.trim() ? emailRequestId(input.requestId) : randomUUID();
   const recipient = input.recipient?.trim() || '';
   const subjectInput = input.subjectInput?.trim() || '';
   const tone = input.tone?.trim() || 'clear and concise';
@@ -841,10 +881,14 @@ export async function generateEmailReplyDraft(
 
   const draftDir = resolveEmailDraftDir();
   safeMkdir(draftDir, { recursive: true });
-  const artifactDir = path.join(draftDir, requestId);
+  const artifactDir = assertSafeRepositoryPath(path.join(draftDir, requestId), {
+    allowMissingLeaf: true,
+  });
   safeMkdir(artifactDir, { recursive: true });
 
-  const triagePath = path.join(artifactDir, `triage-${requestId}.md`);
+  const triagePath = assertSafeRepositoryPath(path.join(artifactDir, `triage-${requestId}.md`), {
+    allowMissingLeaf: true,
+  });
   safeWriteFile(triagePath, `${triageText}\n`, { encoding: 'utf8' });
 
   const defaultSubject = subjectInput || `Re: ${summarizeEmailSubject(triageText, 'Inbox update')}`;
@@ -902,8 +946,15 @@ export async function generateEmailReplyDraft(
     draft_markdown = fallback.draft_markdown;
   }
 
-  const draftPath = path.join(artifactDir, `email-draft-${requestId}.md`);
-  const jsonPath = path.join(artifactDir, `email-draft-${requestId}.json`);
+  const draftPath = assertSafeRepositoryPath(
+    path.join(artifactDir, `email-draft-${requestId}.md`),
+    { allowMissingLeaf: true }
+  );
+  const jsonPath = assertSafeRepositoryPath(
+    path.join(artifactDir, `email-draft-${requestId}.json`),
+    { allowMissingLeaf: true }
+  );
+  const updatedAt = nowIso();
   safeWriteFile(draftPath, draft_markdown, { encoding: 'utf8' });
   safeWriteFile(
     jsonPath,
@@ -918,7 +969,7 @@ export async function generateEmailReplyDraft(
         draft_markdown,
         triage_path: triagePath,
         draft_path: draftPath,
-        updated_at: new Date().toISOString(),
+        updated_at: updatedAt,
       },
       null,
       2
@@ -935,7 +986,7 @@ export async function generateEmailReplyDraft(
         exists: true,
         path: draftPath,
         json_path: jsonPath,
-        updated_at: new Date().toISOString(),
+        updated_at: updatedAt,
         to: generatedTo,
         subject: generatedSubject,
         tone,
@@ -1112,7 +1163,7 @@ export async function executeOutlookDelivery(request: EmailDeliveryRequest) {
 export async function listOutlookInbox(
   input: OutlookInboxListInput = {}
 ): Promise<OutlookInboxMessage[]> {
-  const maxMessages = Math.min(Math.max(Math.floor(input.max_messages || 50), 1), 100);
+  const maxMessages = clamp(Math.floor(input.max_messages || 50), 1, 100);
   const result: any = await executeServicePreset('m365', 'outlook_messages_list', {
     max_results: maxMessages,
   });

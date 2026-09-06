@@ -1,8 +1,11 @@
 import path from 'node:path';
 import { listArtifactRecords, type ArtifactRecord } from '@agent/core/artifact-record';
-import { listInboxEntries, type DeliverableInboxEntry } from '@agent/core';
-import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
-import { loadJson, safeExistsSync, safeStat } from '@agent/core/secure-io';
+import { listInboxEntries, type DeliverableInboxEntry } from '@agent/core/deliverable-inbox';
+import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
+import { clamp } from '@agent/core/foundation';
+import { loadState } from '@agent/core/mission-state';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { loadDeliverableReviewState } from './deliverable-review';
 
 export interface DeliverableInboxItem {
@@ -20,6 +23,8 @@ export interface DeliverableInboxItem {
   missionId?: string;
   projectId?: string;
   tenantSlug?: string;
+  /** Security tier resolved from the mission state, record metadata, or path. */
+  tier?: OsKnowledgeTier;
   organizationId?: string;
   trackId?: string;
   trackName?: string;
@@ -45,6 +50,8 @@ export interface DeliverableInboxQuery {
   missionId?: string;
   kind?: string;
   tier?: 'personal' | 'confidential' | 'public' | '';
+  /** When supplied, unknown-tier records are excluded (fail closed). */
+  tierAccess?: readonly OsKnowledgeTier[];
   tenantSlugs?: string[] | 'all';
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
@@ -53,13 +60,8 @@ export interface DeliverableInboxQuery {
 
 function readMissionStatus(missionId?: string): string | undefined {
   if (!missionId) return undefined;
-  const missionPath = findMissionPath(missionId.toUpperCase());
-  if (!missionPath) return undefined;
-  const statePath = path.join(missionPath, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return undefined;
   try {
-    const parsed = loadJson<{ status?: string }>(statePath);
-    return typeof parsed.status === 'string' ? parsed.status : undefined;
+    return loadState(missionId.toUpperCase())?.status;
   } catch {
     return undefined;
   }
@@ -67,26 +69,19 @@ function readMissionStatus(missionId?: string): string | undefined {
 
 function readMissionContext(missionId?: string): {
   tenantSlug?: string;
+  tier?: OsKnowledgeTier;
   projectId?: string;
   trackId?: string;
   trackName?: string;
 } {
   if (!missionId) return {};
-  const missionPath = findMissionPath(missionId.toUpperCase());
-  if (!missionPath) return {};
-  const statePath = path.join(missionPath, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return {};
   try {
-    const state = loadJson<{
-      tenant_slug?: string;
-      tenant_id?: string;
-      relationships?: {
-        project?: { project_id?: string };
-        track?: { track_id?: string; track_name?: string };
-      };
-    }>(statePath);
+    const state = loadState(missionId.toUpperCase());
+    if (!state) return {};
+    const tier = normalizeDeliverableTier(state.tier);
     return {
       tenantSlug: state.tenant_slug || state.tenant_id,
+      ...(tier ? { tier } : {}),
       projectId: state.relationships?.project?.project_id,
       trackId: state.relationships?.track?.track_id,
       trackName: state.relationships?.track?.track_name,
@@ -96,8 +91,50 @@ function readMissionContext(missionId?: string): {
   }
 }
 
+function normalizeDeliverableTier(value: unknown): OsKnowledgeTier | undefined {
+  return value === 'personal' || value === 'confidential' || value === 'public' ? value : undefined;
+}
+
+/**
+ * Resolve the record's governing data tier without trusting a browser filter.
+ * Mission state is authoritative when available; metadata and path are
+ * compatibility fallbacks for older artifact records.
+ */
+export function inferDeliverableTier(
+  record: ArtifactRecord,
+  normalizedPath: string | undefined,
+  missionTier?: OsKnowledgeTier
+): OsKnowledgeTier | undefined {
+  if (missionTier) return missionTier;
+  const metadata = record.metadata || {};
+  const metadataTier =
+    normalizeDeliverableTier(metadata.tier) ||
+    normalizeDeliverableTier(metadata.data_tier) ||
+    normalizeDeliverableTier(metadata.sensitivity_tier);
+  if (metadataTier) return metadataTier;
+  const pathTier = normalizedPath?.match(/(?:^|\/)(personal|confidential|public)(?:\/|$)/)?.[1];
+  return normalizeDeliverableTier(pathTier);
+}
+
+/** Tier filtering used by the request-boundary projection. Unknown is denied. */
+export function deliverableVisibleToTierAccess(
+  item: DeliverableInboxItem,
+  tierAccess: readonly OsKnowledgeTier[]
+): boolean {
+  return Boolean(item.tier && tierAccess.includes(item.tier));
+}
+
 function resolveArtifactRecordPath(artifactId: string): string {
   return pathResolver.shared(path.join('runtime', 'artifacts', `${artifactId}.json`));
+}
+
+export function resolveSafeExistingFile(filePath: string): string | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    return safeExistsSync(safePath) && safeLstat(safePath).isFile() ? safePath : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -160,7 +197,8 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
   const filtered = listArtifactRecords()
     .map((record) => {
       const recordPath = resolveArtifactRecordPath(record.artifact_id);
-      const stats = safeExistsSync(recordPath) ? safeStat(recordPath) : null;
+      const safeRecordPath = resolveSafeExistingFile(recordPath);
+      const stats = safeRecordPath ? safeLstat(safeRecordPath) : null;
       // Paths in artifact records mix absolute and repo-relative; the UI and
       // the asset route both speak repo-relative.
       const root = pathResolver.rootDir().replace(/\\/g, '/').replace(/\/$/, '');
@@ -172,7 +210,7 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
       // The DELIVERABLE file itself (not the record json): tmp sweeps and
       // mission archival routinely delete these — surface it honestly.
       const targetMissing = normalizedPath
-        ? !safeExistsSync(path.join(root, normalizedPath))
+        ? resolveSafeExistingFile(path.join(root, normalizedPath)) === null
         : false;
       const linkedInbox = governedInbox.find((entry) => {
         if (
@@ -186,11 +224,13 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
         );
       });
       const missionContext = readMissionContext(record.mission_id);
+      const tier = inferDeliverableTier(record, normalizedPath, missionContext.tier);
       return {
         artifactId: record.artifact_id,
         missing: targetMissing,
         missionId: record.mission_id,
         tenantSlug: record.tenant_slug || missionContext.tenantSlug,
+        ...(tier ? { tier } : {}),
         organizationId: record.organization_id,
         projectId: record.project_id || missionContext.projectId,
         trackId: record.track_id || missionContext.trackId,
@@ -232,16 +272,17 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
         ? Boolean(item.projectId && input.projectIds.includes(item.projectId))
         : true
     )
-    .filter((item) => (kind ? item.kind.toLowerCase().includes(kind) : true))
     .filter((item) =>
-      tier ? item.path?.includes(`/${tier}/`) || item.externalRef?.includes(tier) : true
+      input.tierAccess ? deliverableVisibleToTierAccess(item, input.tierAccess) : true
     )
+    .filter((item) => (kind ? item.kind.toLowerCase().includes(kind) : true))
+    .filter((item) => (tier ? item.tier === tier : true))
     .filter((item) => (query ? collectSearchText(item).includes(query) : true));
 
   // Dedupe BEFORE the limit — otherwise a handful of re-registered fixtures
   // eats the whole page and the real deliverables never reach the operator.
   return dedupeDeliverables(filtered.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))).slice(
     0,
-    Math.max(1, Math.min(200, Number(input.limit || 50)))
+    clamp(Number(input.limit || 50), 1, 200)
   );
 }

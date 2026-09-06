@@ -1,8 +1,10 @@
 import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
+import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEPRECATED = new Map(
   describeOps()
@@ -27,12 +29,19 @@ type Finding = {
   kind: 'deprecated_alias' | 'compatibility_forwarder';
 };
 
+export function readDeprecatedWisdomTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function collectFindings(): Finding[] {
   const findings: Finding[] = [];
   for (const root of ROOTS) {
     if (!safeExistsSync(root)) continue;
     for (const file of getAllFiles(root).filter((entry) => entry.endsWith('.json'))) {
-      const content = String(safeReadFile(file, { encoding: 'utf8' }));
+      const content = readDeprecatedWisdomTextFile(file);
       for (const [alias, canonical] of DEPRECATED) {
         if (content.includes(`wisdom:${alias}`)) {
           findings.push({
@@ -67,12 +76,14 @@ export const runCheckDeprecatedWisdomOps = defineScript({
       context.print('[check:deprecated-wisdom-ops] OK (no deprecated Wisdom ops in catalogs)');
     } else {
       for (const finding of findings) {
-        console.warn(
-          `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
-        );
+        if (!context.json)
+          context.print(
+            `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
+          );
       }
-      if (context.argv.includes('--fail')) process.exitCode = 1;
+      if (context.argv.includes('--fail')) throw new ScriptExitError(1);
     }
+    return { findings };
   },
 });
 

@@ -29,7 +29,7 @@
  *     OpenRouter model policy; paid inference requires an explicit
  *     `KYBERION_OPENROUTER_COST_POLICY=paid-allowed` opt-in.
  *   - Otherwise → prefer the authenticated Claude CLI, then Grok, Codex, AGY,
- *     and Copilot through the governed provider fallback chain. The legacy
+ *     and Copilot, then Cursor, then OpenCode through the governed provider fallback chain. The legacy
  *     `gemini-cli` adapter remains available for explicit / Enterprise
  *     configurations but is not auto-selected.
  *
@@ -85,7 +85,7 @@ import { auditChain } from './audit-chain.js';
 import {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode as normalizeReasoningBackendModeFromPolicy,
-  resolveReasoningBackendModeFromContext,
+  resolveReasoningBackendSelectionFromContext,
   type ReasoningBackendMode,
 } from './reasoning-backend-policy.js';
 
@@ -114,6 +114,7 @@ let lastBrokerSelection: {
   provider: string;
   pinned: boolean;
 } | null = null;
+let lastModeSelectionReason: string | null = null;
 
 export function normalizeReasoningBackendMode(mode: ReasoningBackendMode): ReasoningBackendMode {
   return normalizeReasoningBackendModeFromPolicy(mode, loadReasoningBackendPolicy());
@@ -153,12 +154,14 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
       configuredEndpoints.map((endpoint) => endpoint.runtime).join(', ') || 'none'
     }`
   );
-  return resolveReasoningBackendModeFromContext({
+  const selection = resolveReasoningBackendSelectionFromContext({
     requestedMode: options.mode,
     env: process.env,
     providers: discoveredProviders,
     policy: loadReasoningBackendPolicy(),
-  }) as ReasoningBackendMode;
+  });
+  lastModeSelectionReason = selection.reason;
+  return selection.mode;
 }
 
 function applyOperatorLlmSelection(options: InstallReasoningOptions): InstallReasoningOptions {
@@ -538,7 +541,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   const brokerSelection = lastBrokerSelection;
   try {
     auditChain.record({
-      agentId: process.env.MISSION_ROLE || 'reasoning-bootstrap',
+      agentId: getRegisteredEnvText('MISSION_ROLE') || 'reasoning-bootstrap',
       action: 'reasoning_runtime_selection',
       operation: `${primaryMode}/${chain[0]!.backend.label || primaryMode}`,
       result: 'completed',
@@ -609,7 +612,19 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
         ? buildRoleAwareReasoningBackend(defaultBackend, roleBackends, profileBackends)
         : defaultBackend;
   }
-  registerReasoningBackend(activeBackend);
+  const bindingReason = [
+    lastModeSelectionReason,
+    lastBrokerSelection
+      ? `capability broker provider=${lastBrokerSelection.provider} pinned=${lastBrokerSelection.pinned}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('; ');
+  registerReasoningBackend(activeBackend, {
+    provenance: 'builtin',
+    source: activeBackend.name,
+    ...(bindingReason ? { reason: bindingReason } : {}),
+  });
   const intentCandidates = chain.flatMap((candidate) =>
     candidate.intentExtractor ? [candidate.intentExtractor] : []
   );
@@ -639,7 +654,16 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   // Only CLI-backed candidates can be probed via provider discovery; API-key /
   // URL-backed candidates (anthropic, openrouter, local, nemotron) only enter
   // the chain when their credential exists, so they count as usable.
-  const CLI_PROBED_PROVIDERS = new Set(['claude', 'codex', 'gemini', 'agy', 'grok', 'copilot']);
+  const CLI_PROBED_PROVIDERS = new Set([
+    'claude',
+    'codex',
+    'gemini',
+    'agy',
+    'grok',
+    'copilot',
+    'cursor',
+    'opencode',
+  ]);
   const chainUsable = chain.some((candidate) => {
     const provider = providerForReasoningMode(candidate.mode);
     if (!provider || !CLI_PROBED_PROVIDERS.has(provider)) return true;
@@ -689,6 +713,7 @@ export function resetReasoningBootstrap(): void {
   installed = false;
   installedMode = null;
   lastBrokerSelection = null;
+  lastModeSelectionReason = null;
 }
 
 /** Which mode was selected on the last successful install, or null. */

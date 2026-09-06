@@ -5,7 +5,7 @@ Use the productivity task planner when one request spans calendars, meetings, em
 ## Preview first
 
 ```bash
-pnpm cli -- task plan "Collect the latest project data, prepare tomorrow's meeting deck, and draft the attendee email"
+pnpm kyberion task plan "Collect the latest project data, prepare tomorrow's meeting deck, and draft the attendee email"
 ```
 
 The result identifies:
@@ -22,7 +22,7 @@ The planner never executes external effects. Every step is emitted as `preview_o
 ## Create a task session
 
 ```bash
-pnpm cli -- task start "Collect the latest project data and prepare a meeting deck"
+pnpm kyberion task start "Collect the latest project data and prepare a meeting deck"
 ```
 
 This stores a governed Task Session and the matching plan under `active/shared/`. It does not fetch remote data, update a calendar, join a meeting, send email, control a browser, or make a payment.
@@ -30,7 +30,7 @@ This stores a governed Task Session and the matching plan under `active/shared/`
 Use `--output` to choose the plan artifact path:
 
 ```bash
-pnpm cli -- task plan "Check tomorrow's calendar" --output active/shared/tmp/tomorrow-plan.json
+pnpm kyberion task plan "Check tomorrow's calendar" --output active/shared/tmp/tomorrow-plan.json
 ```
 
 ## Effect levels

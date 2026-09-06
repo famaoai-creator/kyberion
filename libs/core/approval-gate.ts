@@ -5,6 +5,7 @@
  */
 
 import { resolveApprovalPolicy } from './approval-policy.js';
+import { nowIso } from './foundation/time.js';
 import { summarizeApprovalGate } from './approval-gate-summary.js';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from './decision-rights.js';
 import { resolveGoldenRulePriorityOrder, resolveVision } from './vision-resolver.js';
@@ -21,9 +22,7 @@ import {
 import type { GovernedArtifactRole } from './artifact-store.js';
 import { auditChain } from './audit-chain.js';
 import type { TraceContext } from './src/trace.js';
-// Existing governance cycle is tracked by check:module-boundaries baseline.
-// eslint-disable-next-line import/no-cycle -- baseline until the governance seam is split
-import { recordGovernanceAction } from './kill-switch.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
 import { notifyOperator } from './operator-notifications.js';
 
 export interface ApprovalGateParams {
@@ -474,7 +473,7 @@ export function enforceApprovalGate(
 
   const record = createApprovalRequest(role, {
     channel,
-    threadTs: new Date().toISOString(),
+    threadTs: nowIso(),
     correlationId,
     requestedBy: agentId,
     draft,

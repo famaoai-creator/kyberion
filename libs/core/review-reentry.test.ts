@@ -2,7 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { registerFoundationIo } from './foundation/io.js';
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // secure-io resolves logical paths itself; the mock mirrors that against the
 // hermetic KYBERION_ROOT (same pattern as approval-rejection-reason.test.ts).
@@ -15,6 +19,7 @@ const secureIo = vi.hoisted(() => {
       fs.appendFileSync(abs(filePath), data, 'utf8');
     },
     safeExistsSync: (filePath: string) => fs.existsSync(abs(filePath)),
+    assertSafeRepositoryPath: (filePath: string) => abs(filePath),
     safeMkdir: (dirPath: string) => fs.mkdirSync(abs(dirPath), { recursive: true }),
     safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
       options.encoding === null
@@ -39,6 +44,9 @@ const secureIo = vi.hoisted(() => {
   };
 });
 
+const secureIoPath = (filePath: string) =>
+  path.isAbsolute(filePath) ? filePath : path.join(process.env.KYBERION_ROOT || '', filePath);
+
 vi.mock('./secure-io.js', () => secureIo);
 
 describe('review re-entry queue (LC-11)', () => {
@@ -48,7 +56,29 @@ describe('review re-entry queue (LC-11)', () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-review-reentry-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    // persistRejectionLearning -> persistHints validates against this governed catalog schema.
+    const schemaRelative = 'knowledge/product/schemas/feedback-knowledge-hints.schema.json';
+    fs.mkdirSync(path.dirname(path.join(tmpRoot, schemaRelative)), { recursive: true });
+    fs.copyFileSync(path.join(REPO_ROOT, schemaRelative), path.join(tmpRoot, schemaRelative));
     process.env.KYBERION_ROOT = tmpRoot;
+    registerFoundationIo({
+      loadJson: <T>(filePath: string) =>
+        JSON.parse(fs.readFileSync(secureIoPath(filePath), 'utf8')) as T,
+      loadJsonIfPresent: <T>(filePath: string) => {
+        const resolved = secureIoPath(filePath);
+        if (!fs.existsSync(resolved)) return null;
+        try {
+          return JSON.parse(fs.readFileSync(resolved, 'utf8')) as T;
+        } catch {
+          return null;
+        }
+      },
+      appendFile: secureIo.safeAppendFileSync,
+      exists: secureIo.safeExistsSync,
+      readFile: (filePath: string) => String(secureIo.safeReadFile(filePath)),
+      stat: (filePath: string) => fs.statSync(secureIoPath(filePath)),
+      writeFile: secureIo.safeWriteFile,
+    });
   });
 
   afterEach(() => {

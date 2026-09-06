@@ -26,7 +26,7 @@ This is the procedure behind the `live-voice` intent and its default execution p
 - strict mode rejects `shadow` profiles and clone-engine fallback
 - `KYBERION_STT_COMMAND` may be configured for a deployment-specific streaming
   backend; when it is unset, the managed `mlx_whisper` runtime installed by
-  `pnpm voice:setup --apply` is selected automatically when available
+  `pnpm kyberion voice setup --apply` is selected automatically when available
 - On Apple Silicon macOS, the CLI first tries the native Apple SpeechAnalyzer
   bridge and maps short language codes such as `ja` to `ja-JP`.
 - a reasoning backend should be available through `installReasoningBackends()`
@@ -34,7 +34,7 @@ This is the procedure behind the `live-voice` intent and its default execution p
 ## CLI
 
 ```bash
-pnpm voice:conversation:turn \
+pnpm kyberion voice conversation-turn \
   --session-id user-voice-live \
   --audio active/shared/tmp/live/user-turn-01.wav \
   --profile-id your-active-voice-profile \
@@ -59,7 +59,7 @@ pnpm meeting:consent grant --mission MSN-LIVE-VOICE-001
 ```
 
 ```bash
-pnpm voice:conversation:turn \
+pnpm kyberion voice conversation-turn \
   --interactive \
   --session-id user-voice-live \
   --profile-id your-active-voice-profile \
@@ -112,7 +112,7 @@ the `mlx_audio_qwen3` learned-voice engine therefore uses WAV on macOS.
 The legacy fixed-duration recorder remains available as a fallback:
 
 ```bash
-pnpm voice:conversation:turn \
+pnpm kyberion voice conversation-turn \
   --interactive \
   --recorder fixed \
   --record-seconds 8 \

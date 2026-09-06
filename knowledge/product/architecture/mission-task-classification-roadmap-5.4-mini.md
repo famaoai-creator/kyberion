@@ -279,7 +279,7 @@ The resolver must be pure when policy data is injected. Policy loading and schem
 
 ```bash
 pnpm exec vitest run libs/core/work-scope-decision.test.ts
-pnpm run check:contract-schemas
+pnpm run check -- --scope full --only contract-schemas
 pnpm check -- --only governance-rules
 pnpm build
 ```
@@ -339,7 +339,7 @@ pnpm build
 
 ```bash
 pnpm exec vitest run libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/work-design.test.ts
-pnpm run test:core
+pnpm test -- --suite core
 pnpm build
 ```
 
@@ -493,7 +493,7 @@ Run this only after Tasks 1-10 are complete:
 
 ```bash
 pnpm run validate
-pnpm run test:core
+pnpm test -- --suite core
 ```
 
 Then run the representative scenarios through the real operator entry point in dry-run or preview mode. Confirm:

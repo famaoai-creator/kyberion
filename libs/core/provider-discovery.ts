@@ -1,12 +1,15 @@
 /* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import {
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -40,12 +43,124 @@ let cacheTimestamp = 0;
 const CACHE_TTL = 300000; // 5 min
 
 const DISK_CACHE_PATH = pathResolver.rootResolve('active/shared/runtime/provider-cache.json');
+const PROVIDER_DISCOVERY_CACHE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/provider-discovery-cache.schema.json'
+);
+
+export interface ProviderDiscoveryCache {
+  ts: number;
+  providers: ProviderInfo[];
+}
+
+function providerDiscoveryCacheCatalogAtPath(filePath: string) {
+  return defineCatalog<ProviderDiscoveryCache>({
+    id: 'provider-discovery-cache',
+    path: filePath,
+    schema: PROVIDER_DISCOVERY_CACHE_SCHEMA_PATH,
+  });
+}
+
+function assertExactKeys(
+  record: Record<string, unknown>,
+  expected: readonly string[],
+  label: string
+): void {
+  const expectedKeys = new Set(expected);
+  const unknown = Object.keys(record).filter((key) => !expectedKeys.has(key));
+  if (unknown.length > 0) {
+    throw new Error(`${label} contains unknown field(s): ${unknown.join(', ')}`);
+  }
+}
+
+function parseStringArray(value: unknown, label: string): string[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  return value.map((entry, index) => {
+    if (typeof entry !== 'string' || entry.trim() === '') {
+      throw new Error(`${label}[${index}] must be a non-empty string`);
+    }
+    return entry;
+  });
+}
+
+function parseProviderInfo(value: unknown, index: number): ProviderInfo {
+  const label = `provider discovery cache.providers[${index}]`;
+  const record = parseSafeJsonObjectValue(value, label);
+  assertExactKeys(
+    record,
+    [
+      'provider',
+      'installed',
+      'version',
+      'protocol',
+      'models',
+      'capabilities',
+      'modelCapabilities',
+      'healthy',
+    ],
+    label
+  );
+  const version = record.version;
+  if (version !== null && typeof version !== 'string') {
+    throw new Error(`${label}.version must be a string or null`);
+  }
+  const protocol = record.protocol;
+  if (!['acp', 'print-json', 'exec', 'json-rpc'].includes(String(protocol))) {
+    throw new Error(`${label}.protocol is invalid`);
+  }
+  if (typeof record.installed !== 'boolean' || typeof record.healthy !== 'boolean') {
+    throw new Error(`${label}.installed and healthy must be booleans`);
+  }
+  const capabilities =
+    record.capabilities === undefined
+      ? undefined
+      : parseStringArray(record.capabilities, `${label}.capabilities`);
+  let modelCapabilities: Record<string, string[]> | undefined;
+  if (record.modelCapabilities !== undefined) {
+    const raw = parseSafeJsonObjectValue(record.modelCapabilities, `${label}.modelCapabilities`);
+    modelCapabilities = Object.fromEntries(
+      Object.entries(raw).map(([model, values]) => [
+        model,
+        parseStringArray(values, `${label}.modelCapabilities.${model}`),
+      ])
+    );
+  }
+  return {
+    provider:
+      typeof record.provider === 'string' && record.provider.trim() !== ''
+        ? record.provider
+        : (() => {
+            throw new Error(`${label}.provider must be a non-empty string`);
+          })(),
+    installed: record.installed as boolean,
+    version: version as string | null,
+    protocol: protocol as ProviderInfo['protocol'],
+    models: parseStringArray(record.models, `${label}.models`),
+    ...(capabilities !== undefined ? { capabilities } : {}),
+    ...(modelCapabilities !== undefined ? { modelCapabilities } : {}),
+    healthy: record.healthy as boolean,
+  };
+}
+
+/** Parse the persisted provider discovery cache before it affects probing decisions. */
+export function parseProviderDiscoveryCache(value: unknown): ProviderDiscoveryCache {
+  const root = parseSafeJsonObjectValue(value, 'provider discovery cache');
+  assertExactKeys(root, ['ts', 'providers'], 'provider discovery cache');
+  if (typeof root.ts !== 'number' || !Number.isSafeInteger(root.ts) || root.ts <= 0) {
+    throw new Error('provider discovery cache.ts must be a positive integer');
+  }
+  if (!Array.isArray(root.providers)) {
+    throw new Error('provider discovery cache.providers must be an array');
+  }
+  return { ts: root.ts, providers: root.providers.map(parseProviderInfo) };
+}
 
 function readDiskCache(): ProviderInfo[] | null {
   try {
     if (!safeExistsSync(DISK_CACHE_PATH)) return null;
-    const raw = safeReadFile(DISK_CACHE_PATH, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as { ts: number; providers: ProviderInfo[] };
+    if (!safeLstat(DISK_CACHE_PATH).isFile()) return null;
+    const parsed = parseProviderDiscoveryCache(
+      providerDiscoveryCacheCatalogAtPath(DISK_CACHE_PATH).load()
+    );
     if (Date.now() - parsed.ts < CACHE_TTL) return parsed.providers;
   } catch {
     /* cache miss — non-fatal */
@@ -57,7 +172,11 @@ function writeDiskCache(providers: ProviderInfo[]): void {
   try {
     const dir = path.dirname(DISK_CACHE_PATH);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(DISK_CACHE_PATH, JSON.stringify({ ts: Date.now(), providers }), {
+    const validated = providerDiscoveryCacheCatalogAtPath(DISK_CACHE_PATH).validate(
+      { ts: Date.now(), providers },
+      DISK_CACHE_PATH
+    );
+    safeWriteFile(DISK_CACHE_PATH, JSON.stringify(validated), {
       encoding: 'utf8',
     });
   } catch {
@@ -70,8 +189,8 @@ function writeDiskCache(providers: ProviderInfo[]): void {
  *
  * Capabilities are knowledge-driven (knowledge/product/orchestration/provider-capabilities.json)
  * rather than hardcoded, so they can evolve — by hand or by dynamic probing — without code
- * changes. FALLBACK_CATALOG below is the conservative built-in baseline used only when the
- * knowledge file is missing or malformed, so discovery still works offline.
+ * changes. A missing catalog is represented by an explicit empty view; a present but malformed
+ * catalog is rejected so discovery cannot advertise unverified capabilities.
  */
 export interface ProviderCapabilityEntry {
   models: string[];
@@ -88,10 +207,25 @@ interface ProviderCapabilityCatalog {
 }
 
 const CAPABILITY_CATALOG_PATH = 'knowledge/product/orchestration/provider-capabilities.json';
-const FALLBACK_CAPABILITY_CATALOG_PATH =
-  'knowledge/product/orchestration/provider-capabilities.fallback.json';
+const CAPABILITY_CATALOG_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/provider-capabilities.schema.json'
+);
 
 let catalogCache: Record<string, ProviderCapabilityEntry> | null = null;
+const capabilityCatalogs = new Map<string, GovernedCatalog<ProviderCapabilityCatalog>>();
+
+function capabilityCatalogFor(filePath: string): GovernedCatalog<ProviderCapabilityCatalog> {
+  const resolvedPath = pathResolver.rootResolve(filePath);
+  const existing = capabilityCatalogs.get(resolvedPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<ProviderCapabilityCatalog>({
+    id: `provider-capabilities:${filePath}`,
+    path: resolvedPath,
+    schema: CAPABILITY_CATALOG_SCHEMA_PATH,
+  });
+  capabilityCatalogs.set(resolvedPath, catalog);
+  return catalog;
+}
 
 function isCapabilityEntry(value: unknown): value is ProviderCapabilityEntry {
   if (!value || typeof value !== 'object') return false;
@@ -105,20 +239,15 @@ function isCapabilityEntry(value: unknown): value is ProviderCapabilityEntry {
 }
 
 function readCapabilityCatalog(filePath: string): ProviderCapabilityCatalog | null {
-  try {
-    const raw = safeReadFile(pathResolver.rootResolve(filePath), { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as ProviderCapabilityCatalog;
-    if (parsed && parsed.providers && typeof parsed.providers === 'object') return parsed;
-  } catch {
-    /* ignore */
-  }
-  return null;
+  const resolvedPath = pathResolver.rootResolve(filePath);
+  if (!safeExistsSync(resolvedPath)) return null;
+  return capabilityCatalogFor(filePath).load();
 }
 
 function mergeCatalogInto(
   target: Record<string, ProviderCapabilityEntry>,
   source: ProviderCapabilityCatalog | null,
-  fallbackLabel: string
+  sourceLabel: string
 ): void {
   if (!source?.providers || typeof source.providers !== 'object') return;
   for (const [provider, entry] of Object.entries(source.providers)) {
@@ -126,33 +255,28 @@ function mergeCatalogInto(
       target[provider] = entry;
     } else {
       logger.warn(
-        `[PROVIDER_DISCOVERY] capability entry for '${provider}' is malformed in ${fallbackLabel}`
+        `[PROVIDER_DISCOVERY] capability entry for '${provider}' is malformed in ${sourceLabel}`
       );
     }
   }
 }
 
 /**
- * Load the provider capability catalog from knowledge, merged over the built-in fallback.
- * Invalid or missing entries silently fall back so discovery never hard-fails on a bad edit.
+ * Load the provider capability catalog from knowledge.
+ * A missing catalog starts from an explicit empty view; invalid content fails closed instead of
+ * silently substituting an unverified capability baseline.
  */
 export function loadProviderCapabilityCatalog(
   forceRefresh = false
 ): Record<string, ProviderCapabilityEntry> {
   if (!forceRefresh && catalogCache) return catalogCache;
   const merged: Record<string, ProviderCapabilityEntry> = {};
-  mergeCatalogInto(
-    merged,
-    readCapabilityCatalog(FALLBACK_CAPABILITY_CATALOG_PATH),
-    FALLBACK_CAPABILITY_CATALOG_PATH
-  );
-
   const primary = readCapabilityCatalog(CAPABILITY_CATALOG_PATH);
   if (primary) {
     mergeCatalogInto(merged, primary, CAPABILITY_CATALOG_PATH);
   } else {
     logger.info(
-      '[PROVIDER_DISCOVERY] provider-capabilities.json unavailable — using built-in capability fallback catalog'
+      '[PROVIDER_DISCOVERY] provider-capabilities.json unavailable — using an explicit empty capability catalog'
     );
   }
   catalogCache = merged;
@@ -195,19 +319,15 @@ export function mergeProbedCapabilitiesIntoCatalog(
   opts: { updatedBy?: string; note?: string; mode?: 'union' | 'replace'; timestamp?: string } = {}
 ): ProviderCapabilityCatalog {
   const mode = opts.mode || 'union';
-  const timestamp = opts.timestamp || new Date().toISOString();
+  const timestamp = opts.timestamp || nowIso();
   const updatedBy = opts.updatedBy || 'probe';
 
-  // Read the raw on-disk catalog (NOT merged with fallback) so we preserve its exact structure.
+  // Read the raw on-disk catalog so we preserve its exact structure. A present malformed catalog
+  // is rejected rather than being replaced by an empty write target.
   let catalog: ProviderCapabilityCatalog = { version: '1.0', providers: {} };
-  try {
-    const raw = safeReadFile(pathResolver.rootResolve(CAPABILITY_CATALOG_PATH), {
-      encoding: 'utf8',
-    }) as string;
-    const parsed = JSON.parse(raw) as ProviderCapabilityCatalog;
-    if (parsed && parsed.providers && typeof parsed.providers === 'object') catalog = parsed;
-  } catch {
-    /* start from an empty catalog */
+  const filePath = pathResolver.rootResolve(CAPABILITY_CATALOG_PATH);
+  if (safeExistsSync(filePath)) {
+    catalog = capabilityCatalogFor(CAPABILITY_CATALOG_PATH).load();
   }
 
   for (const [provider, entry] of Object.entries(probed)) {
@@ -245,20 +365,24 @@ export function mergeProbedCapabilitiesIntoCatalog(
     ...(opts.note ? { note: opts.note } : {}),
   };
 
-  const filePath = pathResolver.rootResolve(CAPABILITY_CATALOG_PATH);
+  const validatedCatalog = capabilityCatalogFor(CAPABILITY_CATALOG_PATH).validate(
+    catalog,
+    filePath
+  );
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(catalog, null, 2), { encoding: 'utf8' });
+  safeWriteFile(filePath, JSON.stringify(validatedCatalog, null, 2), { encoding: 'utf8' });
 
   // Invalidate caches so the next discovery reflects the freshly-written catalog.
   catalogCache = null;
+  capabilityCatalogs.forEach((catalog) => catalog.reset());
   cachedProviders = null;
   cacheTimestamp = 0;
 
   logger.info(
     `[PROVIDER_DISCOVERY] Merged probe results into ${CAPABILITY_CATALOG_PATH} for: ${Object.keys(probed).join(', ')}`
   );
-  return catalog;
+  return validatedCatalog;
 }
 
 function run(cmd: string, args: string[], timeoutMs = 10000): { ok: boolean; stdout: string } {
@@ -439,6 +563,70 @@ function checkGrok(): ProviderInfo {
   };
 }
 
+function checkCursor(): ProviderInfo {
+  const configuredBinary = getRegisteredEnvText('KYBERION_CURSOR_CLI_BIN')?.trim();
+  const binary = configuredBinary || 'cursor-agent';
+  const version = configuredBinary
+    ? run(configuredBinary, ['--version'])
+    : (() => {
+        const which = run('which', [binary]);
+        return which.ok ? run(binary, ['--version']) : which;
+      })();
+  if (!version.ok)
+    return {
+      provider: 'cursor',
+      installed: false,
+      version: null,
+      protocol: 'print-json',
+      models: [],
+      healthy: false,
+    };
+
+  const entry = capabilityEntryFor('cursor');
+  return {
+    provider: 'cursor',
+    installed: true,
+    version: version.stdout || null,
+    protocol: 'print-json',
+    models: entry.models,
+    capabilities: entry.capabilities,
+    modelCapabilities: entry.modelCapabilities,
+    healthy: version.ok,
+  };
+}
+
+function checkOpencode(): ProviderInfo {
+  const configuredBinary = getRegisteredEnvText('KYBERION_OPENCODE_CLI_BIN')?.trim();
+  const binary = configuredBinary || 'opencode';
+  const version = configuredBinary
+    ? run(configuredBinary, ['--version'])
+    : (() => {
+        const which = run('which', [binary]);
+        return which.ok ? run(binary, ['--version']) : which;
+      })();
+  if (!version.ok)
+    return {
+      provider: 'opencode',
+      installed: false,
+      version: null,
+      protocol: 'print-json',
+      models: [],
+      healthy: false,
+    };
+
+  const entry = capabilityEntryFor('opencode');
+  return {
+    provider: 'opencode',
+    installed: true,
+    version: version.stdout || null,
+    protocol: 'print-json',
+    models: entry.models,
+    capabilities: entry.capabilities,
+    modelCapabilities: entry.modelCapabilities,
+    healthy: version.ok,
+  };
+}
+
 /**
  * Discover all available providers. Cached for 5 minutes.
  */
@@ -473,6 +661,8 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
     checkCodex(),
     checkAgy(),
     checkGrok(),
+    checkCursor(),
+    checkOpencode(),
   ];
 
   const available = providers.filter((p) => p.installed);
@@ -483,6 +673,22 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
   cacheTimestamp = Date.now();
   writeDiskCache(providers);
   return providers;
+}
+
+/**
+ * Read provider discovery evidence without starting a new probe or writing the
+ * cache. Inspection commands use this so a diagnostic dump remains read-only.
+ */
+export function peekProviderDiscovery(): {
+  providers: ProviderInfo[];
+  source: 'memory' | 'disk' | 'unavailable';
+} {
+  if (!cachedProviders || Date.now() - cacheTimestamp >= CACHE_TTL) {
+    const disk = readDiskCache();
+    if (disk) return { providers: disk, source: 'disk' };
+    return { providers: [], source: 'unavailable' };
+  }
+  return { providers: cachedProviders, source: 'memory' };
 }
 
 export function refreshProviderDiscoveryCache(): ProviderInfo[] {

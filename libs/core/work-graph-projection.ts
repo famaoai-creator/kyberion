@@ -1,10 +1,10 @@
 import * as nodePath from 'node:path';
 import { withExecutionContext } from './authority.js';
-import { readJson } from './foundation/json.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { findMissionPath, pathResolver } from './path-resolver.js';
 import { listWorkItems, type WorkItem, type WorkItemStatus } from './work-coordination.js';
 import { buildWorkGraph, type WorkGraph } from './work-graph.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export interface WorkGraphProjectionOptions {
   missionId: string;
@@ -151,9 +151,11 @@ function toProjectedTask(item: WorkItem): NextTask {
 
 function readExistingTasks(nextTasksPath: string): NextTask[] {
   if (!safeExistsSync(nextTasksPath)) return [];
-  const parsed = readJson<unknown>(nextTasksPath);
-  if (!Array.isArray(parsed))
-    throw new Error(`NEXT_TASKS.json must contain an array: ${nextTasksPath}`);
+  const parsed = loadMissionNextTaskObjectsAtPath(
+    nextTasksPath,
+    nodePath.basename(nodePath.dirname(nextTasksPath))
+  );
+  if (!parsed) throw new Error(`NEXT_TASKS.json must contain an array: ${nextTasksPath}`);
   return parsed.map((entry, index) => {
     if (
       !entry ||
@@ -245,13 +247,8 @@ function mergedTasks(existing: NextTask[], projected: NextTask[]): NextTask[] {
   ];
 }
 
-function assertMissionPathWithinRoot(missionPath: string): void {
-  const root = nodePath.resolve(pathResolver.rootDir());
-  const resolved = nodePath.resolve(missionPath);
-  const relative = nodePath.relative(root, resolved);
-  if (relative.startsWith('..') || nodePath.isAbsolute(relative)) {
-    throw new Error(`mission path must remain inside the repository: ${missionPath}`);
-  }
+function assertMissionPathWithinRoot(missionPath: string): string {
+  return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
 }
 
 /** Read dispatch/reconciliation state from canonical WorkItems, never NEXT_TASKS. */
@@ -293,8 +290,11 @@ export function projectWorkGraphToNextTasks(
     input.missionPath ||
     findMissionPath(missionId) ||
     pathResolver.missionDir(missionId, 'confidential', input.tenantSlug);
-  assertMissionPathWithinRoot(missionPath);
-  const nextTasksPath = nodePath.join(missionPath, 'NEXT_TASKS.json');
+  const safeMissionPath = assertMissionPathWithinRoot(missionPath);
+  const nextTasksPath = assertSafeRepositoryPath(
+    nodePath.join(safeMissionPath, 'NEXT_TASKS.json'),
+    { allowMissingLeaf: true }
+  );
   const canonical = readCanonicalWorkGraph(projectId, {
     ...(input.tenantSlug?.trim() ? { tenantSlug: input.tenantSlug.trim() } : {}),
   });
@@ -317,7 +317,7 @@ export function projectWorkGraphToNextTasks(
     withExecutionContext(
       'mission_controller',
       () => {
-        safeMkdir(missionPath, { recursive: true });
+        safeMkdir(safeMissionPath, { recursive: true });
         safeWriteFile(
           nextTasksPath,
           JSON.stringify(mergedTasks(existingTasks, projectedTasks), null, 2)

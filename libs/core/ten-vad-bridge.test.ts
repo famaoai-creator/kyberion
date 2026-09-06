@@ -28,6 +28,12 @@ describe('TEN VAD bridge', () => {
     expect(probeTenVad({ command: fakeBridgeCommand() })).toEqual({ available: true });
   });
 
+  it('fails closed when the configured bridge script is outside the repository', () => {
+    const result = probeTenVad({ scriptPath: '/tmp/ten-vad-bridge.py' });
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('uses the streaming protocol and reports speech', async () => {
     const vad = new TenVad({ command: fakeBridgeCommand(), endpointMs: 200 });
     try {

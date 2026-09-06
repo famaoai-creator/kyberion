@@ -16,13 +16,13 @@ first-win をまだ実行していない場合は、先に QUICKSTART.md の5コ
 ```bash
 pnpm install
 pnpm build
-pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
 ```bash
-pnpm setup:report --persona first-time-user
+pnpm kyberion setup report --persona first-time-user
 ```
 
 前提:
@@ -51,7 +51,7 @@ winget install --id Microsoft.FoundryLocal --exact --source winget --accept-sour
 ```powershell
 pnpm install
 pnpm build
-pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 ```
 
@@ -63,7 +63,7 @@ pnpm install
 pnpm build
 
 # 3. 事前ツール確認 (Node 24+ floor / pnpm / git / Playwright ブラウザ有無 などを一括チェック)
-pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain
 
 # 2b. (推奨) ブラウザ first-win 用の Playwright ブラウザ導入
 #     未導入でも起動はできますが、ブラウザ経路(スクリーンショット first-win 等)は
@@ -77,7 +77,7 @@ pnpm deps:check --actuator voice
 pnpm deps:check --actuator media-generation
 
 # 4. バックグラウンド surface の認証準備を確認
-pnpm surfaces:setup
+pnpm surfaces setup
 
 # 5. 外部サービス連携の認証準備を確認
 pnpm services:setup
@@ -86,10 +86,10 @@ pnpm services:setup
 pnpm reasoning:setup
 
 # 7. 一括 readiness レポートを確認
-pnpm setup:report
+pnpm kyberion setup report
 
 # 8. バックグラウンド surface の整列
-pnpm surfaces:reconcile
+pnpm surfaces reconcile
 
 # 9. 魂の注入 (オンボーディング)
 pnpm onboard
@@ -102,7 +102,7 @@ pnpm onboard
 ソロプレナーがAI workforceを主な労働力として会社を始める場合は、個人オンボードの後に会社オンボードを実行します。
 
 ```bash
-pnpm company:onboard --vertical saas-product-company --slug <company-slug> \
+pnpm onboard company --vertical saas-product-company --slug <company-slug> \
   --name "<会社名>" --owner-id human:founder \
   --goal "最初に達成する顧客成果" --dry-run
 ```
@@ -158,7 +158,7 @@ pnpm tenant:activation activate \
 
 ### Stage 3: 事前ツール確認 (Prerequisite Toolchain Check)
 
-- **実行コマンド**: `pnpm prereq:check`
+- **実行コマンド**: `pnpm env:bootstrap --manifest kyberion-toolchain`
 - **目的**: Node / pnpm / git / TypeScript / tsx / vitest など、Kyberion をソースから動かすための基本ツールが揃っているかを確認します。
 - **チェック内容の補足**:
   - **Node floor 検証**: 実行中の Node が `package.json` の `engines`（`>=24.0.0`）を満たすかを実バージョン比較で検証し、不足なら `nvm install 24 && nvm use 24` を案内して失敗します（バイナリ存在確認だけの素通りはしません）。
@@ -176,16 +176,16 @@ pnpm tenant:activation activate \
 
 ### Stage 4: Runtime Surface Setup
 
-- **実行コマンド**: `pnpm surfaces:setup`
+- **実行コマンド**: `pnpm surfaces setup`
 - **目的**: `slack-bridge`、`imessage-bridge`、`discord-bridge`、`telegram-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface について、認証の不足項目、CLI 代替、ホスト管理 surface を確認します。
 - **物理的変化**:
   - 認証と起動準備の要約が表示されます。
 - **補助コマンド**:
-  - `pnpm surfaces:reconcile` で setup 結果をもとに background surface を標準起動します。
-  - `pnpm surfaces:status` で起動状態を確認できます。
-  - `pnpm surfaces:repair -- --surface <surface-id>` で stale / unhealthy な surface を再起動できます。
-  - `pnpm surfaces:start -- --surface <surface-id>` で個別 surface を開始できます。
-  - `pnpm surfaces:stop -- --surface <surface-id>` で個別 surface を停止できます。
+  - `pnpm surfaces reconcile` で setup 結果をもとに background surface を標準起動します。
+  - `pnpm surfaces status` で起動状態を確認できます。
+  - `pnpm surfaces repair -- --surface <surface-id>` で stale / unhealthy な surface を再起動できます。
+  - `pnpm surfaces start -- --surface <surface-id>` で個別 surface を開始できます。
+  - `pnpm surfaces stop -- --surface <surface-id>` で個別 surface を停止できます。
 
 ### Stage 5: External Service Setup
 
@@ -216,7 +216,7 @@ pnpm tenant:activation activate \
 
 ### Stage 7: Consolidated Readiness Report
 
-- **実行コマンド**: `pnpm setup:report`
+- **実行コマンド**: `pnpm kyberion setup report`
 - **目的**: `surface` / `service` / `reasoning` / `doctor` の readiness を一度に確認し、初期セットアップの抜けをまとめて潰します。
 - **物理的変化**:
   - まだ実体の変更は行いません。まとめた readiness summary が表示されます。
@@ -233,7 +233,7 @@ pnpm tenant:activation activate \
 
 ### Stage 8: Runtime Surface Reconciliation
 
-- **実行コマンド**: `pnpm surfaces:reconcile`
+- **実行コマンド**: `pnpm surfaces reconcile`
 - **目的**: setup で確認した状態をもとに、background surface を manifest から標準起動します。
 - **物理的変化**:
   - `active/shared/runtime/surfaces/state.json` が生成または更新されます。
@@ -245,9 +245,9 @@ pnpm tenant:activation activate \
 - **実行コマンド**: `pnpm onboard` (または `node dist/scripts/onboarding_wizard.js`)
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
 - **非対話環境の場合**: TTY が無い環境では `pnpm onboard` は exit 2 で停止します。代わりに以下のいずれかを使用:
-  - `pnpm onboard:apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
+  - `pnpm onboard apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
     - ひな形は [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json) をコピーして使ってください。まず `--dry-run` で検証すると安全です。
-  - `pnpm onboard:reset` — onboarding state と生成 identity/vision/agent 成果物を削除してやり直す
+  - `pnpm onboard reset` — onboarding state と生成 identity/vision/agent 成果物を削除してやり直す
   - エージェントが直接 `customer/{slug}/` を優先し、未設定時のみ `knowledge/personal/` 配下のスキーマ準拠ファイルを書き込み
   - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — 意図的に default 値で進める（評価環境向け）
 - **物理的変化**:
@@ -329,7 +329,7 @@ Project Bootstrap 候補になり、定常運用・サービス運用・イン�
 オンボーディングが正しく完了したかを確認するには、以下のコマンドを実行してください。
 
 ```bash
-pnpm vital
+pnpm pipeline vital-check
 ```
 
 **期待される出力例**:

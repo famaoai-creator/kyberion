@@ -3,28 +3,13 @@
 import * as React from 'react';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
+import {
+  parseAgentActivityResponse,
+  type ClientAgentActivity,
+} from '../lib/agent-activity-response';
 
-type Office = {
-  rooms: Array<{
-    room_id: string;
-    title: string;
-    agents: Array<{
-      agent_id: string;
-      status: string;
-      title?: string;
-      latest_event?: string;
-      pressure?: { severity: string; value: number };
-    }>;
-  }>;
-  attention: Array<{ agent_id: string }>;
-};
-
-type TrackRecord = {
-  agent_id: string;
-  completed_tasks: number;
-  review_pass_rate: number;
-  rank: string;
-};
+type Office = Pick<ClientAgentActivity, 'rooms' | 'attention'>;
+type TrackRecord = ClientAgentActivity['trackRecords'][number];
 
 export type OfficeAgent = Office['rooms'][number]['agents'][number];
 
@@ -64,10 +49,10 @@ export function ChronosOffice({
           cache: 'no-store',
         }
       );
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'office failed');
-      setOffice(payload.office || null);
-      setTrackRecords(payload.trackRecords || []);
+      const payload = parseAgentActivityResponse(await response.json().catch(() => null));
+      if (!response.ok || !payload) throw new Error('Invalid agent activity response');
+      setOffice({ rooms: payload.rooms, attention: payload.attention });
+      setTrackRecords(payload.trackRecords);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

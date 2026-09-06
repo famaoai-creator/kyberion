@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
+import { withExecutionContext } from './authority.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { MissionWorkingMemory } from './mission-working-memory.js';
 
 describe('mission-working-memory', () => {
@@ -66,5 +70,33 @@ describe('mission-working-memory', () => {
         },
       })
     ).toHaveLength(0);
+  });
+
+  it('does not load schema-invalid persisted entries', () => {
+    const missionId = `MSN-MWM-INVALID-${randomUUID()}`.toUpperCase();
+    const missionDir = pathResolver.active(path.join('missions', 'confidential', missionId));
+    const entriesPath = path.join(missionDir, '.mwm-entries.json');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(
+        entriesPath,
+        JSON.stringify([
+          {
+            entry_id: 'MWM-INVALID',
+            mission_id: missionId,
+            scope: 'mission',
+            key: 'secret',
+          },
+        ])
+      );
+    });
+
+    try {
+      expect(new MissionWorkingMemory().list({ missionId })).toEqual([]);
+    } finally {
+      withExecutionContext('mission_controller', () =>
+        safeRmSync(missionDir, { recursive: true, force: true })
+      );
+    }
   });
 });

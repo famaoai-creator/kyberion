@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-staffing-assignments.schema.json",
+  "title": "Mission staffing assignments",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "mission_id", "generated_at", "assignments"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "organization_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["organization_id", "name"],
+      "properties": {
+        "organization_id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "default_team_template": { "type": "string", "minLength": 1 },
+        "team_template_catalog_id": { "type": "string", "minLength": 1 },
+        "default_agent_profile": { "type": "string", "minLength": 1 }
+      }
+    },
+    "assignments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/assignment" }
+    }
+  },
+  "$defs": {
+    "assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assignment_id",
+        "mission_id",
+        "team_role",
+        "actor_id",
+        "actor_type",
+        "authority_role",
+        "provider",
+        "model_id",
+        "assigned_at",
+        "released_at",
+        "status",
+        "source"
+      ],
+      "properties": {
+        "assignment_id": { "type": "string", "minLength": 1 },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "team_role": { "type": "string", "minLength": 1 },
+        "actor_id": { "type": "string", "minLength": 1 },
+        "actor_type": { "type": "string", "enum": ["agent", "human", "service"] },
+        "authority_role": { "type": ["string", "null"] },
+        "provider": { "type": ["string", "null"] },
+        "model_id": { "type": ["string", "null"] },
+        "assigned_at": { "type": "string", "minLength": 1 },
+        "released_at": { "type": ["string", "null"] },
+        "status": { "type": "string", "enum": ["active", "released"] },
+        "source": { "const": "team_composition" },
+        "organization_role_id": { "type": "string", "minLength": 1 },
+        "perspective_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "reasoning_route_id": { "type": "string", "minLength": 1 },
+        "security_scope": { "$ref": "./security-scope.schema.json" },
+        "selection_reason_codes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "delegation_contract": { "type": ["object", "null"] },
+        "resource": { "$ref": "#/$defs/resource" }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource_id",
+        "resource_type",
+        "display_name",
+        "authority_roles",
+        "capabilities",
+        "availability",
+        "cost_profile",
+        "status",
+        "accountable_human_id"
+      ],
+      "properties": {
+        "resource_id": { "type": "string", "minLength": 1 },
+        "resource_type": { "type": "string", "enum": ["agent", "human", "service"] },
+        "display_name": { "type": "string", "minLength": 1 },
+        "authority_roles": { "type": "array", "items": { "type": "string" } },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "availability": { "type": "object", "additionalProperties": true },
+        "cost_profile": { "type": "object", "additionalProperties": true },
+        "status": { "type": "string", "enum": ["active", "suspended", "revoked"] },
+        "accountable_human_id": { "type": ["string", "null"] },
+        "provider": { "type": ["string", "null"] },
+        "model_id": { "type": ["string", "null"] },
+        "runtime_identity": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

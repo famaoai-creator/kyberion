@@ -1,12 +1,22 @@
 import * as path from 'node:path';
+import { loadPersonalIdentityAtPath } from '@agent/core/personal-identity-reader';
 import {
+  assertSafeRepositoryPath,
   safeCopyFileSync,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { isRecord, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
+
+export function normalizeIdentityRecord(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
+}
 
 function parseArgs(argv: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -22,14 +32,39 @@ function parseArgs(argv: string[]): Record<string, string> {
   return result;
 }
 
-function main(argv: string[]) {
-  const args = parseArgs(argv);
-  const srcAvatar = path.resolve(args['src-avatar'] || 'active/shared/tmp/avatar.png');
-  const destAvatarDir = path.resolve(args['dest-avatar-dir'] || 'knowledge/personal');
-  const destAvatar = path.resolve(args['dest-avatar'] || path.join(destAvatarDir, 'avatar.png'));
-  const identityJsonPath = path.resolve(
-    args['identity-path'] || path.join(destAvatarDir, 'my-identity.json')
+export interface AvatarRegistrationPaths {
+  srcAvatar: string;
+  destAvatarDir: string;
+  destAvatar: string;
+  identityJsonPath: string;
+}
+
+export function resolveAvatarRegistrationPaths(
+  args: Record<string, string>
+): AvatarRegistrationPaths {
+  const srcAvatar = assertSafeRepositoryPath(
+    pathResolver.resolve(args['src-avatar'] || 'active/shared/tmp/avatar.png'),
+    { allowMissingLeaf: true }
   );
+  const destAvatarDir = assertSafeRepositoryPath(
+    pathResolver.resolve(args['dest-avatar-dir'] || 'knowledge/personal'),
+    { allowMissingLeaf: true }
+  );
+  const destAvatar = assertSafeRepositoryPath(
+    pathResolver.resolve(args['dest-avatar'] || path.join(destAvatarDir, 'avatar.png')),
+    { allowMissingLeaf: true }
+  );
+  const identityJsonPath = assertSafeRepositoryPath(
+    pathResolver.resolve(args['identity-path'] || path.join(destAvatarDir, 'my-identity.json')),
+    { allowMissingLeaf: true }
+  );
+  return { srcAvatar, destAvatarDir, destAvatar, identityJsonPath };
+}
+
+function main(argv: string[], print: Print = () => undefined) {
+  const args = parseArgs(argv);
+  const { srcAvatar, destAvatarDir, destAvatar, identityJsonPath } =
+    resolveAvatarRegistrationPaths(args);
   const profileName = args['profile-name'] || 'user';
   const language = args.language || 'Japanese';
   const interactionStyle = args['interaction-style'] || 'Concierge';
@@ -39,8 +74,11 @@ function main(argv: string[]) {
   if (!safeExistsSync(srcAvatar)) {
     throw new Error(`Source avatar not found at ${srcAvatar}`);
   }
+  if (!safeLstat(srcAvatar).isFile()) {
+    throw new Error(`Source avatar must be a regular file: ${srcAvatar}`);
+  }
 
-  console.log(`Copying avatar from ${srcAvatar} to ${destAvatar}...`);
+  print(`Copying avatar from ${srcAvatar} to ${destAvatar}...`);
   if (!safeExistsSync(destAvatarDir)) {
     safeMkdir(destAvatarDir, { recursive: true });
   }
@@ -54,40 +92,47 @@ function main(argv: string[]) {
   };
 
   if (!safeExistsSync(identityJsonPath)) {
-    console.warn(`Identity file not found at ${identityJsonPath}. Creating a default one...`);
+    print(`Identity file not found at ${identityJsonPath}. Creating a default one...`);
     const defaultIdentity = {
       ...identityBase,
-      created_at: new Date().toISOString(),
+      created_at: nowIso(),
       status: 'active',
       version: '1.0.0',
     };
     safeWriteFile(identityJsonPath, JSON.stringify(defaultIdentity, null, 2), { encoding: 'utf8' });
   } else {
-    console.log(`Reading identity file from ${identityJsonPath}...`);
-    const identityContent = safeReadFile(identityJsonPath, { encoding: 'utf8' }) as string;
+    print(`Reading identity file from ${identityJsonPath}...`);
+    if (!safeLstat(identityJsonPath).isFile()) {
+      throw new Error(`Identity file must be a regular file: ${identityJsonPath}`);
+    }
     try {
-      const identity = JSON.parse(identityContent);
+      const identity = loadPersonalIdentityAtPath(identityJsonPath);
+      if (!identity) {
+        throw new Error('identity JSON root must be an object');
+      }
       if (args['profile-name']) identity.name = profileName;
       if (args.language) identity.language = language;
       if (args['interaction-style']) identity.interaction_style = interactionStyle;
       identity.avatar_path = avatarPath;
-      identity.updated_at = new Date().toISOString();
+      identity.updated_at = nowIso();
 
-      console.log('Updating identity file to register avatar...');
+      print('Updating identity file to register avatar...');
       safeWriteFile(identityJsonPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });
-    } catch (err: any) {
-      throw new Error(`Failed to parse identity JSON: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(
+        `Failed to parse identity JSON: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 
-  console.log('Successfully registered avatar in personal profile!');
+  print('Successfully registered avatar in personal profile!');
 }
 
 export const runRegisterAvatar = defineScript({
   name: 'avatar:register',
   flags: [],
   run(context) {
-    return main(context.argv);
+    return main(context.argv, context.print);
   },
 });
 

@@ -9,7 +9,8 @@
  * and distinct semantics reach distinct zones.
  */
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import { handleAction } from './index.js';
 
 const CANVAS = { w: 10, h: 5.625 };

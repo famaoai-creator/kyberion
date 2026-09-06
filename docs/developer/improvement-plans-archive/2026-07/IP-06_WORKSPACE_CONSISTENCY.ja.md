@@ -59,7 +59,7 @@ status: archived
 ## リスクと注意
 
 - Task 2 で依存をパッケージ側に宣言すると pnpm の hoisting 変化で他パッケージの解決が変わる可能性がある。`pnpm build` 全体と smoke テストで確認する。
-- scope リネームは文字列参照(manifest.json の `package` フィールド、capability カタログ `knowledge/product/orchestration/global_actuator_index.json` 等)に漏れが出やすい。Task 3 の grep は `.md` を除く全拡張子で行い、`pnpm check:catalogs` を必ず実行する。
+- scope リネームは文字列参照(manifest.json の `package` フィールド、capability カタログ `knowledge/product/orchestration/global_actuator_index.json` 等)に漏れが出やすい。Task 3 の grep は `.md` を除く全拡張子で行い、`pnpm run check -- --scope full --only catalogs` を必ず実行する。
 
 ## 実装メモ
 

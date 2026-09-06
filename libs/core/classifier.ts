@@ -9,7 +9,8 @@
  *   const result = classify(text, rules, { resultKey: 'domain' });
  */
 
-import { safeReadFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import { safeLstat } from './secure-io.js';
 import type { ClassifyRules, ClassifyOptions, ClassifyResult } from './types.js';
 
 /**
@@ -66,6 +67,11 @@ export function classifyFile(
   rules: ClassifyRules,
   options: ClassifyOptions = {}
 ): ClassifyResult {
-  const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(
+      `[CLASSIFIER_RESOURCE] classification target must be a regular file: ${filePath}`
+    );
+  }
+  const content = readTextFile(filePath);
   return classify(content, rules, options);
 }

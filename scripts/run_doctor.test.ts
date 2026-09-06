@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   loadEnvironmentManifest: vi.fn(),
   probeManifest: vi.fn(),
   createStandardYargs: vi.fn(),
+  runAppPreflight: vi.fn(),
+  formatAppPreflightReport: vi.fn(),
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {
@@ -17,8 +19,25 @@ vi.mock('@agent/core', async (importOriginal) => {
   };
 });
 
+vi.mock('@agent/core/environment-capability', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/environment-capability')>(
+    '@agent/core/environment-capability'
+  );
+  return {
+    ...actual,
+    listEnvironmentManifestIds: mocks.listEnvironmentManifestIds,
+    loadEnvironmentManifest: mocks.loadEnvironmentManifest,
+    probeManifest: mocks.probeManifest,
+  };
+});
+
 vi.mock('@agent/core/cli-utils', () => ({
   createStandardYargs: mocks.createStandardYargs,
+}));
+
+vi.mock('./app_preflight.js', () => ({
+  runAppPreflight: mocks.runAppPreflight,
+  formatAppPreflightReport: mocks.formatAppPreflightReport,
 }));
 
 describe('run_doctor', () => {
@@ -66,6 +85,12 @@ describe('run_doctor', () => {
       'kyberion-runtime-baseline',
       'reasoning-backend',
     ]);
+    mocks.runAppPreflight.mockReturnValue({
+      platform: 'android',
+      items: [{ id: 'android.env', status: 'pass', detail: 'configured', fix: 'none' }],
+      ready: true,
+    });
+    mocks.formatAppPreflightReport.mockReturnValue('[app-preflight] ready: true');
   });
 
   afterEach(() => {
@@ -81,10 +106,10 @@ describe('run_doctor', () => {
 
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('kyberion-runtime-baseline');
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('reasoning-backend');
-    expect(process.exitCode).toBe(0);
+    expect(process.exitCode ?? 0).toBe(0);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('reasoning-backend'));
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('pnpm setup:report --persona first-time-user')
+      expect.stringContaining('pnpm kyberion setup report --persona first-time-user')
     );
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Maintenance: janitor'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Governance controls:'));
@@ -103,7 +128,7 @@ describe('run_doctor', () => {
 
     const payload = JSON.parse(String(logSpy.mock.calls[0]?.[0])) as { summaries?: unknown[] };
     expect(payload.summaries).toEqual(expect.any(Array));
-    expect(process.exitCode).toBe(0);
+    expect(process.exitCode ?? 0).toBe(0);
   });
 
   it('expands the meeting runtime preset to the meeting participation manifest', async () => {
@@ -121,6 +146,17 @@ describe('run_doctor', () => {
     await collectDoctorReport({ runtime: 'browser' });
 
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('meeting-participation-runtime');
+  });
+
+  it('routes app runtime preflight through the canonical doctor entrypoint', async () => {
+    const { collectDoctorReport } = await import('./run_doctor.js');
+
+    const report = await collectDoctorReport({ runtime: 'app', platform: 'android', full: true });
+
+    expect(mocks.runAppPreflight).toHaveBeenCalledWith({ platform: 'android', full: true });
+    expect(mocks.loadEnvironmentManifest).not.toHaveBeenCalled();
+    expect(report.appPreflight).toMatchObject({ platform: 'android', ready: true });
+    expect(report.totalMissing).toBe(0);
   });
 
   it('reports surface outbox and dead-letter state in the doctor report', async () => {
@@ -195,7 +231,7 @@ describe('run_doctor', () => {
       expect.stringContaining('pnpm env:bootstrap --manifest meeting-participation-runtime --apply')
     );
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('pnpm setup:report --persona first-time-user')
+      expect.stringContaining('pnpm kyberion setup report --persona first-time-user')
     );
     expect(process.exitCode).toBe(1);
   });

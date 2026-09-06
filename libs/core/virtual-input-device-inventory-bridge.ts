@@ -1,4 +1,6 @@
 import { safeExecResult } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export const VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID =
   'virtual-input-device-inventory-bridge' as const;
@@ -76,6 +78,11 @@ function uniqueByName(records: VirtualInputDeviceRecord[]): VirtualInputDeviceRe
     seen.add(key);
     return true;
   });
+}
+
+export function parseWindowsInputDeviceRows(payload: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(payload)) return payload.filter(isRecord);
+  return isRecord(payload) ? [payload] : [];
 }
 
 function runCommand(
@@ -361,13 +368,13 @@ function collectWindowsInputDevices(
   ]);
   let payload: unknown;
   try {
-    payload = JSON.parse(result.stdout);
+    payload = parseSafeJsonInput(result.stdout, 'virtual input device inventory response');
   } catch {
     return [];
   }
-  const rows = Array.isArray(payload) ? payload : payload ? [payload] : [];
+  const rows = parseWindowsInputDeviceRows(payload);
   const records: VirtualInputDeviceRecord[] = [];
-  for (const row of rows as Array<Record<string, unknown>>) {
+  for (const row of rows) {
     const name = String(row.FriendlyName || '').trim();
     if (!name) continue;
     const lower = name.toLowerCase();

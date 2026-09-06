@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/security-posture.schema.json",
+  "version": "1.0.0",
+  "posture": "auto"
+}

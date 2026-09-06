@@ -30,6 +30,16 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('./mission-state-reader.js', () => ({
+  loadMissionStateAtPath: (statePath: string) => {
+    try {
+      return JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  },
+}));
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const REAL_ADF = path.join(REPO_ROOT, 'knowledge/product/governance/mission-lifecycle.json');
 
@@ -43,7 +53,26 @@ function seedMission(id: string, status: string, ageDays: number): string {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
     path.join(dir, 'mission-state.json'),
-    JSON.stringify({ mission_id: id, status, history: [] }, null, 2)
+    JSON.stringify(
+      {
+        mission_id: id,
+        tier: 'public',
+        status,
+        execution_mode: 'local',
+        priority: 0,
+        assigned_persona: 'mission-controller-test',
+        confidence_score: 1,
+        git: {
+          branch: 'test',
+          start_commit: 'test',
+          latest_commit: 'test',
+          checkpoints: [],
+        },
+        history: [],
+      },
+      null,
+      2
+    )
   );
   fs.writeFileSync(path.join(dir, 'evidence.txt'), `evidence for ${id}`);
   // Directory mtime drives max_age_days matching — set it last.
@@ -69,6 +98,16 @@ describe('purgeMissions (AL-01)', () => {
     fs.copyFileSync(
       path.join(REPO_ROOT, 'knowledge/product/schemas', 'mission-state.schema.json'),
       path.join(tmpRoot, 'schemas', 'mission-state.schema.json')
+    );
+    fs.mkdirSync(path.join(tmpRoot, 'knowledge/product/schemas'), { recursive: true });
+    fs.copyFileSync(
+      path.join(REPO_ROOT, 'knowledge/product/schemas', 'mission-lifecycle-policy.schema.json'),
+      path.join(tmpRoot, 'knowledge/product/schemas/mission-lifecycle-policy.schema.json')
+    );
+    // ops-alert.ts logs alerts through the governed ops-alert-log catalog.
+    fs.copyFileSync(
+      path.join(REPO_ROOT, 'knowledge/product/schemas', 'ops-alert-log-record.schema.json'),
+      path.join(tmpRoot, 'knowledge/product/schemas/ops-alert-log-record.schema.json')
     );
 
     mod = await import('./mission-maintenance.js');
@@ -168,6 +207,44 @@ describe('purgeMissions (AL-01)', () => {
     const failedEntry = entries.find((e) => e.mission === 'MSN-OLD-FAILED');
     expect(failedEntry.to).toBe(failedTarget);
     expect(failedEntry.policy).toBe('purge-orphaned');
+  });
+
+  it('skips symlinked mission roots during purge discovery', async () => {
+    const adfDir = path.join(tmpRoot, 'knowledge', 'product', 'governance');
+    fs.mkdirSync(adfDir, { recursive: true });
+    fs.copyFileSync(REAL_ADF, path.join(adfDir, 'mission-lifecycle.json'));
+
+    const target = path.join(tmpRoot, 'external-mission-target');
+    const linked = path.join(tmpRoot, 'active', 'missions', 'MSN-SYMLINK-PURGE');
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(
+      path.join(target, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MSN-SYMLINK-PURGE',
+        tier: 'public',
+        status: 'failed',
+        execution_mode: 'local',
+        priority: 0,
+        assigned_persona: 'mission-controller-test',
+        confidence_score: 1,
+        git: { branch: 'test', start_commit: 'test', latest_commit: 'test', checkpoints: [] },
+        history: [],
+      })
+    );
+    fs.utimesSync(target, new Date(Date.now() - 40 * DAY_MS), new Date(Date.now() - 40 * DAY_MS));
+    fs.mkdirSync(path.dirname(linked), { recursive: true });
+    fs.symlinkSync(target, linked, 'dir');
+
+    try {
+      const result = await mod.purgeMissions(tmpRoot, true);
+      expect(result.candidates.map((candidate) => candidate.mission)).not.toContain(
+        'MSN-SYMLINK-PURGE'
+      );
+      expect(fs.existsSync(target)).toBe(true);
+    } finally {
+      fs.rmSync(linked, { force: true });
+      fs.rmSync(target, { recursive: true, force: true });
+    }
   });
 
   it('is a no-op (status ok, empty candidates) when nothing matches any policy', async () => {

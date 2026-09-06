@@ -7,7 +7,7 @@ import {
   getSurfaceQueryProviderConfig,
   isSurfaceLocationQuery,
   isSurfaceWeatherQuery,
-  resetSurfaceQueryProviderConfigCache,
+  _resetSurfaceQueryProviderConfigCacheForTests,
 } from './surface-query.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
@@ -22,7 +22,7 @@ describe('surface-query', () => {
     delete process.env.KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH;
     delete process.env.KYBERION_SURFACE_QUERY_ROLE;
     delete process.env.KYBERION_SURFACE_QUERY_PHASE;
-    resetSurfaceQueryProviderConfigCache();
+    _resetSurfaceQueryProviderConfigCacheForTests();
   });
 
   it('classifies location and weather queries', () => {
@@ -32,15 +32,56 @@ describe('surface-query', () => {
     expect(classifySurfaceQueryIntent('today weather')).toBe('weather');
   });
 
+  it('uses a supplied intent packet without resolving the text again', () => {
+    expect(
+      classifySurfaceQueryIntent('unrelated text', {
+        packet: {
+          kind: 'intent_resolution_packet',
+          utterance: 'unrelated text',
+          selected_intent_id: 'knowledge-query',
+          selected_confidence: 0.9,
+          selected_resolution: { shape: 'direct_reply' },
+          candidates: [],
+        },
+      })
+    ).toBe('knowledge_search');
+  });
+
   it('extracts web and knowledge search queries', () => {
-    expect(extractSurfaceWebSearchQuery('Webで OpenAI Responses API を検索して')).toBe('OpenAI Responses API');
-    expect(extractSurfaceKnowledgeQuery('ナレッジで mission authority を調べて')).toBe('mission authority');
+    expect(extractSurfaceWebSearchQuery('Webで OpenAI Responses API を検索して')).toBe(
+      'OpenAI Responses API'
+    );
+    expect(extractSurfaceKnowledgeQuery('ナレッジで mission authority を調べて')).toBe(
+      'mission authority'
+    );
   });
 
   it('loads provider config from knowledge defaults', () => {
     const config = getSurfaceQueryProviderConfig();
     expect(config.web_search?.provider).toBe('duckduckgo_html');
     expect(config.knowledge?.provider).toBe('context_ranker');
+  });
+
+  it('fails closed when the base provider catalog is schema-invalid', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(overridePath, JSON.stringify({ web_search: 'not-a-provider-section' }));
+    process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH = overridePath;
+    process.env.KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH = path.join(
+      tmpDir,
+      'missing-personal-overlay.json'
+    );
+    _resetSurfaceQueryProviderConfigCacheForTests();
+
+    expect(() => getSurfaceQueryProviderConfig()).toThrowError(
+      /Invalid catalog surface-query-providers/
+    );
+  });
+
+  it('rejects a base provider path outside the repository', () => {
+    process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH = '/tmp/surface-query-external.json';
+    _resetSurfaceQueryProviderConfigCacheForTests();
+
+    expect(() => getSurfaceQueryProviderConfig()).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('merges personal overlay provider settings', () => {
@@ -87,7 +128,7 @@ describe('surface-query', () => {
     );
     process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH = overridePath;
     process.env.KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH = overlayPath;
-    resetSurfaceQueryProviderConfigCache();
+    _resetSurfaceQueryProviderConfigCacheForTests();
 
     const config = getSurfaceQueryProviderConfig();
     expect(config.weather?.provider).toBe('open_meteo_ch');
@@ -127,7 +168,7 @@ describe('surface-query', () => {
       })
     );
     process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH = overridePath;
-    resetSurfaceQueryProviderConfigCache();
+    _resetSurfaceQueryProviderConfigCacheForTests();
 
     const config = getSurfaceQueryProviderConfig({ role: 'presence_surface_agent' });
     expect(config.web_search?.maxResults).toBe(5);
@@ -167,7 +208,7 @@ describe('surface-query', () => {
       })
     );
     process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH = overridePath;
-    resetSurfaceQueryProviderConfigCache();
+    _resetSurfaceQueryProviderConfigCacheForTests();
 
     const config = getSurfaceQueryProviderConfig({
       role: 'slack_surface_agent',
@@ -212,7 +253,7 @@ describe('surface-query', () => {
       })
     );
     process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH = overridePath;
-    resetSurfaceQueryProviderConfigCache();
+    _resetSurfaceQueryProviderConfigCacheForTests();
 
     const config = getSurfaceQueryProviderConfig({
       role: 'chronos_surface_agent',

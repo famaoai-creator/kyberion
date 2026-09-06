@@ -1,4 +1,5 @@
 import { safeExecResult } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 export interface GovernedCommandOptions {
   cwd?: string;
@@ -35,7 +36,7 @@ export function runGovernedJsonCommand<T>(
     );
   }
   try {
-    return JSON.parse(result.stdout) as T;
+    return parseSafeJsonInput(result.stdout, `${command} response`) as T;
   } catch (error) {
     throw new Error(
       `${command} returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`

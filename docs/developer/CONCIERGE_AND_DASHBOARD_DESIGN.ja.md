@@ -49,7 +49,7 @@
 - `presence/displays/concierge/server.ts` — Express: `/health`、static 配信、`POST /api/message`(voice-hub プロキシ)、`GET /api/state`(状態)。presence-studio と同構造(package.json 不要、ルート tsc でコンパイル → `dist/presence/displays/concierge/server.js`)。
 - `presence/displays/concierge/static/index.html` — 2.5D アバター(インライン SVG + CSS アニメ)+ 音声/テキスト会話 UI(vanilla JS、Web Speech API、`/api/message` へ fetch)。self-contained。
 - `knowledge/product/governance/surfaces/concierge.json` — surface manifest(**当時** kind `ui`, port 3033, healthPath `/health`。現行 manifest は Next.js 版 port 3050 / `/api/summary`)。
-- 起動(旧): `pnpm build && pnpm surfaces:reconcile`(または `PRESENCE_CONCIERGE_PORT=3033 node dist/presence/displays/concierge/server.js`)。
+- 起動(旧): `pnpm build && pnpm surfaces reconcile`(または `PRESENCE_CONCIERGE_PORT=3033 node dist/presence/displays/concierge/server.js`)。
 
 ---
 
@@ -127,7 +127,7 @@ chronos にはチャートライブラリが無く CSP も無い。既存 `Focus
 ### 起動方法
 
 1. `pnpm build`(全体ビルド)
-2. `pnpm surfaces:reconcile`(manifest を surface レジストリへ登録)、または直接 `PRESENCE_CONCIERGE_PORT=3033 node dist/presence/displays/concierge/server.js`
+2. `pnpm surfaces reconcile`(manifest を surface レジストリへ登録)、または直接 `PRESENCE_CONCIERGE_PORT=3033 node dist/presence/displays/concierge/server.js`
 3. ブラウザで `http://127.0.0.1:3033` を開く。会話するには voice-hub(:3032)を起動しておく(`VOICE_HUB_PORT=3032` で voice-hub server)。voice-hub 未起動でも UI・アバターは動作し、送信時に明確なガイドを返す。
 4. チャートは chronos-mirror-v2(`pnpm chronos:dev` or ビルド済み)の Agent Registry パネルで確認できる。
 
@@ -136,4 +136,4 @@ chronos にはチャートライブラリが無く CSP も無い。既存 `Focus
 - **会話バックエンドは voice-hub 依存**(direct_reply/mission 判定・TTS を委譲)。voice-hub 未起動時は UI のみ動作。将来、server から直接 `runSurfaceMessageConversation` を呼ぶ経路を足せば voice-hub 非依存にできる。
 - **アバターは 2.5D**(軽量優先)。3D は §4 の設計に沿って将来オプション。
 - **統制未接続**: 現状ローカル(127.0.0.1)バインドのみ。SA 系(承認・egress・認証)の統制は未接続で、外部公開前に要接続。
-- **surface 登録・起動はユーザー操作**(常駐プロセスを増やすため、`pnpm surfaces:reconcile` は明示実行)。
+- **surface 登録・起動はユーザー操作**(常駐プロセスを増やすため、`pnpm surfaces reconcile` は明示実行)。

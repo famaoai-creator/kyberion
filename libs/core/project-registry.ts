@@ -1,11 +1,10 @@
-import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -53,40 +52,59 @@ export interface ProjectBootstrapWorkItem {
   outcome_id?: string;
 }
 
-const ajv = createAjv();
 const PROJECT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/project-record.schema.json');
-let projectValidateFn: ValidateFunction | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (projectValidateFn) return projectValidateFn;
-  const raw = safeReadFile(PROJECT_SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  projectValidateFn = ajv.compile(JSON.parse(raw));
-  return projectValidateFn!;
-}
 
 export function projectRecordPath(projectId: string, rootDir = pathResolver.rootDir()): string {
   const projectDir = path.resolve(rootDir, 'active/shared/runtime/projects');
-  return `${projectDir}/${projectId}.json`;
+  const candidate = path.resolve(projectDir, `${projectId}.json`);
+  const relative = path.relative(projectDir, candidate).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] project record path escapes its directory: ${projectId}`
+    );
+  }
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true, rootDir });
+}
+
+const projectRecordCatalog = defineCatalog<ProjectRecord>({
+  id: 'project-record',
+  path: () => path.dirname(projectRecordPath('placeholder')),
+  schema: PROJECT_SCHEMA_PATH,
+});
+
+function projectRecordCatalogAtPath(filePath: string) {
+  return defineCatalog<ProjectRecord>({
+    id: 'project-record',
+    path: filePath,
+    schema: PROJECT_SCHEMA_PATH,
+  });
 }
 
 export function validateProjectRecord(value: unknown): value is ProjectRecord {
-  return Boolean(ensureValidator()(value));
+  try {
+    projectRecordCatalog.validate(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function saveProjectRecord(
   record: ProjectRecord,
   options: { rootDir?: string } = {}
 ): string {
-  if (!validateProjectRecord(record)) {
-    const errors = (ensureValidator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
-    );
-    throw new Error(`Invalid project record: ${errors.join('; ')}`);
-  }
-  const projectDir = path.dirname(projectRecordPath(record.project_id, options.rootDir));
-  if (!safeExistsSync(projectDir)) safeMkdir(projectDir, { recursive: true });
   const filePath = projectRecordPath(record.project_id, options.rootDir);
-  safeWriteFile(filePath, JSON.stringify(record, null, 2));
+  let validated: ProjectRecord;
+  try {
+    validated = projectRecordCatalogAtPath(filePath).validate(record, filePath);
+  } catch (error) {
+    throw new Error(
+      `Invalid project record: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  const projectDir = path.dirname(filePath);
+  if (!safeExistsSync(projectDir)) safeMkdir(projectDir, { recursive: true });
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return filePath;
 }
 
@@ -96,9 +114,12 @@ export function loadProjectRecord(
 ): ProjectRecord | null {
   const filePath = projectRecordPath(projectId, options.rootDir);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as ProjectRecord;
-  return validateProjectRecord(parsed) ? parsed : null;
+  try {
+    return projectRecordCatalogAtPath(filePath).load();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
+    throw error;
+  }
 }
 
 export function listProjectRecords(rootDir = pathResolver.rootDir()): ProjectRecord[] {

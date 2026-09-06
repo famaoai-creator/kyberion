@@ -37,6 +37,7 @@ import { getMissionAgentInputQueue } from './agent-input-queue.js';
 import type { SurfaceConversationInput } from './channel-surface-types.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 import type { MissionStatusView } from './mission-read-model.js';
+import { t } from './t.js';
 
 /**
  * SO-04 hermetic E2E tests. Hermetic like surface-steering-authority.test.ts:
@@ -130,7 +131,12 @@ function buildAdapter(
 
 function buildContext(
   text: string,
-  overrides: Partial<{ surface: string; channel: string; threadTs: string }> = {}
+  overrides: Partial<{
+    surface: string;
+    channel: string;
+    threadTs: string;
+    locale: 'en' | 'ja' | 'qps-ploc';
+  }> = {}
 ): SurfaceRuntimeRouteContext {
   const surface = overrides.surface ?? STEERING_TEST_SURFACE;
   const channel = `${overrides.channel ?? 'C1'}-${RUN_ID}`;
@@ -140,6 +146,7 @@ function buildContext(
     query: text,
     senderAgentId: 'tester',
     surface,
+    locale: overrides.locale,
     surfaceMetadata: { surface, channel, threadTs } as SurfaceConversationInput['surfaceMetadata'],
   };
   return {
@@ -323,6 +330,32 @@ describe('surface-mission-steering route handler (SO-04)', () => {
     ]);
   });
 
+  it('uses the conversation locale for approval-gated steering replies', async () => {
+    const missionId = 'MSN-SO04-LOCALE-APPROVAL';
+    createSession({ missionId, channel: 'C-locale', threadTs: 'T-locale' });
+    const handler = buildMissionSteeringRouteHandler();
+
+    const result = await handler.handle(
+      buildContext('承認', {
+        channel: 'C-locale',
+        threadTs: 'T-locale',
+        locale: 'qps-ploc',
+      })
+    );
+
+    expect(result.text).toContain(
+      t(
+        'bridge:mission_steering_approval_required',
+        { missionId, verbLabel: 'ゲート承認' },
+        'qps-ploc'
+      )
+    );
+    expect(result.text).toContain(
+      t('bridge:mission_steering_approve_choice', undefined, 'qps-ploc')
+    );
+    expect(result.text).not.toContain('承認が必要です');
+  });
+
   it('(a) full flow: status -> checkpoint -> pause -> resume -> gate approval -> decision -> gate executes', async () => {
     const missionId = 'MSN-SO04-FULL-A';
     createSession({ missionId, channel: 'C-full', threadTs: 'T-full' });
@@ -502,6 +535,11 @@ describe('no-bypass structural check (SO-04 Task 3)', () => {
     const source = safeReadFile(`${pathResolver.rootDir()}/libs/core/surface-mission-steering.ts`, {
       encoding: 'utf8',
     }) as string;
+
+    expect(source).toContain('bridge:mission_steering_approval_required');
+    expect(source).not.toContain(
+      '状態: ミッション ${params.missionId} の${params.verbLabel}には承認が必要です。'
+    );
 
     const fnStart = source.indexOf('export async function executeApprovedMissionSteeringApproval');
     expect(fnStart, 'executeApprovedMissionSteeringApproval not found in source').toBeGreaterThan(

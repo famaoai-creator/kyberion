@@ -23,26 +23,36 @@
  *     required for Meet, which has no public bot SDK)
  */
 
+import { logger } from '@agent/core/core';
+import { retry } from '@agent/core/async-utils';
+import { nowIso } from '@agent/core/foundation';
 import {
   registerMeetingJoinDriver,
-  abortableAudioChunks,
-  logger,
-  retry,
-  type AudioBus,
-  type AudioChunk,
   validateMeetingTarget,
   type MeetingJoinDriver,
+} from '@agent/core/meeting-join-driver';
+import {
+  abortableAudioChunks,
+  type AudioChunk,
   type MeetingSession,
   type MeetingSessionState,
   type MeetingTarget,
-} from '@agent/core';
+  type TranscriptChunk,
+} from '@agent/core/meeting-session-types';
+import type { AudioBus } from '@agent/core/audio-bus';
 import {
+  MEET_IN_MEETING_SELECTORS,
   MEET_SELECTORS,
+  TEAMS_IN_MEETING_SELECTORS,
   TEAMS_SELECTORS,
+  ZOOM_IN_MEETING_SELECTORS,
   ZOOM_SELECTORS,
+  inMeetingSelectorsForPlatform,
   selectorsForPlatform,
+  type MeetingInMeetingSelectors,
   type MeetingPreJoinSelectors,
 } from './selectors.js';
+import { diffCaptionLines, parseCaptionLine, scrapeCaptionLines } from './caption-capture.js';
 import { readCookies, writeCookies } from './cookie-store.js';
 import {
   buildRetryOptions,
@@ -50,7 +60,7 @@ import {
   trySelectors,
   waitForAnyVisibleSelector,
 } from './meeting-browser-driver-helpers.js';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import * as path from 'node:path';
 
 /* Playwright type stand-ins so this file compiles without playwright
@@ -69,6 +79,7 @@ type PlaywrightPage = {
   fill: (selector: string, value: string) => Promise<void>;
   click: (selector: string, opts?: any) => Promise<void>;
   close: () => Promise<void>;
+  evaluate: <T>(fn: (arg: any) => T, arg?: any) => Promise<T>;
   locator: (selector: string) => {
     first: () => { click: () => Promise<void>; isVisible: () => Promise<boolean> };
     innerText: () => Promise<string>;
@@ -103,6 +114,14 @@ export interface BrowserDriverOptions {
   camera_device?: string;
   /** Override selectors per deployment / DOM update. */
   selectors_override?: Partial<Record<'meet' | 'zoom' | 'teams', MeetingPreJoinSelectors>>;
+  /** Override in-meeting (caption) selectors per deployment / DOM update. */
+  in_meeting_selectors_override?: Partial<
+    Record<'meet' | 'zoom' | 'teams', MeetingInMeetingSelectors>
+  >;
+  /** Try to switch live captions on after joining (default true, best effort). */
+  enable_captions?: boolean;
+  /** Live-caption DOM poll interval in ms (default 3000). */
+  caption_poll_ms?: number;
   /** Timeout in ms for any single pre-join step. */
   step_timeout_ms?: number;
 }
@@ -344,6 +363,9 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     const selectors =
       this.opts.selectors_override?.[platform as 'meet' | 'zoom' | 'teams'] ??
       selectorsForPlatform(platform);
+    const inMeetingSelectors =
+      this.opts.in_meeting_selectors_override?.[platform as 'meet' | 'zoom' | 'teams'] ??
+      inMeetingSelectorsForPlatform(platform);
     const accountSlug = this.opts.account_slug ?? 'default';
     const microphoneDevice = this.opts.microphone_device;
     const speakerDevice = this.opts.speaker_device;
@@ -425,7 +447,18 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
         throw new Error(`[browser-driver] no join button matched (${platform})`);
       }
       state.status = 'in_meeting';
-      state.joined_at = new Date().toISOString();
+      state.joined_at = nowIso();
+
+      // Best effort: switch live captions on so transcriptInput has
+      // something to scrape. A missing toggle never fails the session —
+      // the coordinator falls back to partial_state.
+      if (this.opts.enable_captions !== false) {
+        try {
+          await clickFirstVisible(page, inMeetingSelectors.captions_toggle, 5_000);
+        } catch (err: any) {
+          logger.warn(`[browser-driver] captions toggle unavailable: ${err?.message ?? err}`);
+        }
+      }
 
       // Persist cookies so next run skips the login.
       try {
@@ -451,6 +484,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     }
 
     let leaveSignaled = false;
+    const pollMs = Math.max(1000, Math.min(30_000, this.opts.caption_poll_ms ?? 3000));
     return {
       state,
       async *audioInput(): AsyncIterable<AudioChunk> {
@@ -465,6 +499,38 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
       async chat(_text: string): Promise<void> {
         // Chat is platform-specific; selectors not yet wired.
       },
+      async *transcriptInput(): AsyncIterable<TranscriptChunk> {
+        const seen: string[] = [];
+        let utterance = 0;
+        while (!leaveSignaled) {
+          let lines: string[] = [];
+          try {
+            const scraped = await page.evaluate(
+              scrapeCaptionLines,
+              inMeetingSelectors.captions_container
+            );
+            lines = Array.isArray(scraped)
+              ? scraped.flatMap((entry) => String(entry).split('\n'))
+              : [];
+          } catch {
+            lines = [];
+          }
+          for (const line of diffCaptionLines(seen, lines)) {
+            seen.push(line);
+            utterance += 1;
+            const { speaker, text } = parseCaptionLine(line);
+            if (!text) continue;
+            yield {
+              utterance_id: `cap-${utterance}`,
+              is_final: false,
+              text,
+              ...(speaker ? { speaker_label: speaker } : {}),
+              emitted_at: nowIso(),
+            };
+          }
+          await new Promise((resolve) => setTimeout(resolve, pollMs));
+        }
+      },
       async leave(): Promise<void> {
         leaveSignaled = true;
         await retry(
@@ -475,7 +541,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
           buildRetryOptions()
         );
         state.status = 'ended';
-        state.left_at = new Date().toISOString();
+        state.left_at = nowIso();
         if (runtime.cleanup_mode === 'browser' && runtime.browser) {
           await retry(
             async () => runtime.browser?.close().catch(() => undefined),
@@ -492,8 +558,23 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
   }
 }
 
-export { BrowserMeetingJoinDriver, MEET_SELECTORS, TEAMS_SELECTORS, ZOOM_SELECTORS };
-export type { MeetingPreJoinSelectors };
+export {
+  BrowserMeetingJoinDriver,
+  MEET_SELECTORS,
+  TEAMS_SELECTORS,
+  ZOOM_SELECTORS,
+  MEET_IN_MEETING_SELECTORS,
+  TEAMS_IN_MEETING_SELECTORS,
+  ZOOM_IN_MEETING_SELECTORS,
+};
+export type { MeetingPreJoinSelectors, MeetingInMeetingSelectors };
+export {
+  diffCaptionLines,
+  formatTranscriptCues,
+  parseCaptionLine,
+  scrapeCaptionLines,
+} from './caption-capture.js';
+export type { CaptionCue } from './caption-capture.js';
 
 /**
  * Convenience: register the driver with the core registry on import.

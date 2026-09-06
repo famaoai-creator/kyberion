@@ -384,10 +384,10 @@ describe('DA-02 extraction connector presets (real catalog contract)', () => {
 
   describe('egress gate coverage for the new HTTP connectors', () => {
     it('routes every box/slack read op host through an allowlisted egress domain', async () => {
-      const { evaluateEgressPolicy, resetEgressPolicyCache } = (await vi.importActual(
+      const { evaluateEgressPolicy, _resetEgressPolicyCacheForTests } = (await vi.importActual(
         './egress-policy.js'
       )) as any;
-      resetEgressPolicyCache();
+      _resetEgressPolicyCacheForTests();
 
       const urls = [
         'https://api.box.com/2.0/folders/0/items',

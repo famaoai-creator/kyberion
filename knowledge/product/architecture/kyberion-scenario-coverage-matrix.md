@@ -76,7 +76,7 @@ the canonical surface(s) involved.
 | D3  | Counterfactual rubric override     | `mission_controller accept-with-override --reason --severity` → `rubric.override_accepted` | ✅     |
 | D4  | Degradation policy                 | `counterfactual-degradation-policy.json`                                                   | ✅     |
 | D5  | Tier hygiene                       | `pnpm check -- --only tier-hygiene` (CI)                                                   | ✅     |
-| D6  | Contract schema validation         | `pnpm run check:contract-schemas` (CI)                                                     | ✅     |
+| D6  | Contract schema validation         | `pnpm run check -- --scope full --only contract-schemas` (CI)                              | ✅     |
 | D7  | MOS no-write-API + SSRF guard      | `pnpm check -- --scope full --only mos-no-write-api` (CI)                                  | ✅     |
 | D8  | Rubric scope disclosure            | `rubric-disclosure-template.md`                                                            | ✅     |
 

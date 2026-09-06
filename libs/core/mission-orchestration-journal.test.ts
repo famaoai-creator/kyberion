@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -165,8 +166,12 @@ describe('mission-orchestration-journal', () => {
   });
 
   it('provisions, writes, and verifies an artifact; mismatch is fail-closed', async () => {
-    const { provisionMissionEntry, verifyProvisionedEntry, writeProvisionedEntry } =
-      await import('./mission-orchestration-journal.js');
+    const {
+      provisionMissionEntry,
+      readProvisionedEntry,
+      verifyProvisionedEntry,
+      writeProvisionedEntry,
+    } = await import('./mission-orchestration-journal.js');
     const dir = pathResolver.shared(`tmp/pi-provisioned-entry-${process.pid}`);
     const filePath = `${dir}/artifact.json`;
     safeMkdir(dir, { recursive: true });
@@ -182,6 +187,17 @@ describe('mission-orchestration-journal', () => {
         content: { artifact: 'tampered', version: 1 },
       })
     ).toThrow('MISSION_LOG_CORRUPT:provisioned_entry_mismatch');
+
+    safeWriteFile(filePath, `${JSON.stringify({ ...persisted, unexpected: true })}\n`);
+    expect(() => readProvisionedEntry(filePath, provisioned)).toThrow(
+      'Invalid catalog mission-provisioned-entry'
+    );
+
+    safeRmSync(filePath, { force: true });
+    safeMkdir(filePath, { recursive: true });
+    expect(() => readProvisionedEntry(filePath, provisioned)).toThrow(
+      'MISSION_LOG_CORRUPT:provisioned_entry_unreadable'
+    );
 
     safeRmSync(dir, { recursive: true, force: true });
   });
@@ -207,6 +223,39 @@ describe('mission-orchestration-journal', () => {
     withExecutionContext('mission_controller', () =>
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true })
     );
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(`${missionPath}/coordination`, { recursive: true });
+      safeWriteFile(`${missionPath}/coordination/orchestration-journal.jsonl`, '[]\n');
+    });
+    expect(() => loadMissionOrchestrationJournal(missionId)).toThrow(
+      'MISSION_LOG_CORRUPT:journal_entry_unreadable:1'
+    );
+    withExecutionContext('mission_controller', () =>
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true })
+    );
+
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(`${missionPath}/coordination`, { recursive: true });
+      safeWriteFile(
+        `${missionPath}/coordination/orchestration-journal.jsonl`,
+        `${JSON.stringify({
+          ts: new Date().toISOString(),
+          event_id: 'EV-SCHEMA-INVALID',
+          event_type: 'mission_followup_requested',
+          mission_id: missionId,
+          status: 'enqueued',
+          payload_hash: 'hash',
+          operation: { id: 'EV-SCHEMA-INVALID', kind: 'invalid', attempt: 0 },
+          outcome: { status: 'pending' },
+        })}\n`
+      );
+    });
+    expect(() => loadMissionOrchestrationJournal(missionId)).toThrow(
+      'MISSION_LOG_CORRUPT:journal_entry_unreadable:1'
+    );
+    withExecutionContext('mission_controller', () =>
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true })
+    );
 
     const first = appendMissionOrchestrationJournalEntry({
       missionId,
@@ -224,6 +273,29 @@ describe('mission-orchestration-journal', () => {
     expect(() => reduceMissionState([first, older])).toThrow(
       'MISSION_LOG_CORRUPT:operation_attempt_regression:OP-CORRUPT'
     );
+  });
+
+  it('rejects a journal stream replaced by a directory', async () => {
+    const { loadMissionOrchestrationJournal } = await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-DIRECTORY-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const journalPath = `${missionPath}/coordination/orchestration-journal.jsonl`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeMkdir(journalPath, { recursive: true });
+    });
+
+    try {
+      expect(() => loadMissionOrchestrationJournal(missionId)).toThrow(
+        'MISSION_LOG_CORRUPT:journal_file_not_regular'
+      );
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      });
+    }
   });
 
   it('records provision intent before a native JSON write and verifies it after the write', async () => {
@@ -301,5 +373,197 @@ describe('mission-orchestration-journal', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
       safeRmSync(dir, { recursive: true, force: true });
     });
+  });
+
+  it('detects unverified provision receipts and rejects orphaned verification', async () => {
+    const { findUnverifiedProvisionedEntries } = await import('./mission-orchestration-journal.js');
+    const record = {
+      ts: new Date().toISOString(),
+      entry_id: 'PE-UNVERIFIED',
+      content_hash: 'hash',
+      target_path: 'PLAN.md',
+      phase: 'provisioned' as const,
+    };
+
+    expect(findUnverifiedProvisionedEntries([record])).toEqual([record]);
+    expect(
+      findUnverifiedProvisionedEntries([record, { ...record, phase: 'verified' as const }])
+    ).toEqual([]);
+    expect(() =>
+      findUnverifiedProvisionedEntries([{ ...record, phase: 'verified' as const }])
+    ).toThrow('MISSION_LOG_CORRUPT:verified_entry_without_provision:PE-UNVERIFIED');
+  });
+
+  it('blocks orchestration replay while a provisioned receipt is unverified', async () => {
+    const missionId = `MSN-JOURNAL-RECOVERY-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+    });
+
+    const {
+      appendProvisionedEntryRecord,
+      loadMissionOrchestrationReplayPlan,
+      provisionMissionEntry,
+    } = await import('./mission-orchestration-journal.js');
+    const { enqueueMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
+    const event = enqueueMissionOrchestrationEvent({
+      eventType: 'mission_issue_requested',
+      missionId,
+      requestedBy: 'tester',
+      payload: { channel: 'test', threadTs: 'recovery' },
+    });
+    appendProvisionedEntryRecord({
+      missionId,
+      entry: provisionMissionEntry({ goal: 'recover without duplicate execution' }),
+      targetPath: 'PLAN.md',
+      phase: 'provisioned',
+    });
+
+    const plan = loadMissionOrchestrationReplayPlan(missionId);
+    expect(plan.pending_event_ids).toContain(event.event_id);
+    expect(plan.next_event).toBeNull();
+    expect(plan.recovery_required).toBe(true);
+    expect(plan.recovery_reason).toBe('unverified_provisioned_entries');
+    expect(plan.unverified_provisioned_entries).toHaveLength(1);
+
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+    });
+  });
+
+  it('rejects provisioned artifact paths outside the repository root', async () => {
+    const { provisionMissionEntry, writeProvisionedEntry } =
+      await import('./mission-orchestration-journal.js');
+    const outside = path.join(pathResolver.rootDir(), '..', 'mission-journal-outside.json');
+    expect(() =>
+      writeProvisionedEntry(
+        outside,
+        provisionMissionEntry({ secret: 'must stay in the repository' })
+      )
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('blocks replay when a verified artifact is missing or has been changed', async () => {
+    const missionId = `MSN-JOURNAL-TARGET-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const artifactPath = `${missionPath}/PLAN.md`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeRmSync(artifactPath, { force: true });
+    });
+
+    const {
+      findMissingProvisionedEntries,
+      loadMissionOrchestrationReplayPlan,
+      loadProvisionedEntryRecords,
+      provisionMissionEntry,
+      writeProvisionedText,
+    } = await import('./mission-orchestration-journal.js');
+    writeProvisionedText({
+      missionId,
+      filePath: artifactPath,
+      targetPath: 'PLAN.md',
+      missionPathHint: missionPath,
+      provisioned: provisionMissionEntry('# plan\n'),
+    });
+
+    withExecutionContext('mission_controller', () => safeRmSync(artifactPath, { force: true }));
+    const missingPlan = loadMissionOrchestrationReplayPlan(missionId);
+    expect(missingPlan.recovery_required).toBe(true);
+    expect(missingPlan.recovery_reason).toBe('missing_provisioned_entries');
+    expect(missingPlan.missing_provisioned_entries).toHaveLength(1);
+    expect(missingPlan.next_event).toBeNull();
+
+    writeProvisionedText({
+      missionId,
+      filePath: artifactPath,
+      targetPath: 'PLAN.md',
+      missionPathHint: missionPath,
+      provisioned: provisionMissionEntry('# plan\n'),
+    });
+    withExecutionContext('mission_controller', () => safeWriteFile(artifactPath, '# changed\n'));
+    const records = loadProvisionedEntryRecords(missionId);
+    expect(() => findMissingProvisionedEntries(missionId, records)).toThrow(
+      'MISSION_LOG_CORRUPT:provisioned_entry_mismatch'
+    );
+
+    writeProvisionedText({
+      missionId,
+      filePath: artifactPath,
+      targetPath: 'PLAN.md',
+      missionPathHint: missionPath,
+      provisioned: provisionMissionEntry('# repaired\n'),
+    });
+    expect(
+      findMissingProvisionedEntries(missionId, loadProvisionedEntryRecords(missionId))
+    ).toEqual([]);
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeRmSync(missionPath, { recursive: true, force: true });
+    });
+  });
+
+  it('rejects a verified provisioned artifact replaced by a directory', async () => {
+    const missionId = `MSN-JOURNAL-TARGET-DIRECTORY-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const artifactPath = `${missionPath}/PLAN.md`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeRmSync(artifactPath, { recursive: true, force: true });
+    });
+
+    const {
+      findMissingProvisionedEntries,
+      loadProvisionedEntryRecords,
+      provisionMissionEntry,
+      writeProvisionedText,
+    } = await import('./mission-orchestration-journal.js');
+    writeProvisionedText({
+      missionId,
+      filePath: artifactPath,
+      targetPath: 'PLAN.md',
+      missionPathHint: missionPath,
+      provisioned: provisionMissionEntry('# plan\n'),
+    });
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(artifactPath, { force: true });
+      safeMkdir(artifactPath, { recursive: true });
+    });
+
+    expect(() =>
+      findMissingProvisionedEntries(missionId, loadProvisionedEntryRecords(missionId))
+    ).toThrow('MISSION_LOG_CORRUPT:provisioned_entry_unreadable');
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeRmSync(missionPath, { recursive: true, force: true });
+    });
+  });
+
+  it('rejects malformed provisioned-entry records through the schema boundary', async () => {
+    const { loadProvisionedEntryRecords } = await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-RECORD-SCHEMA-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const recordPath = `${missionPath}/coordination/provisioned-entries.jsonl`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeMkdir(`${missionPath}/coordination`, { recursive: true });
+      safeWriteFile(recordPath, `${JSON.stringify({ entry_id: 'missing-fields' })}\n`);
+    });
+
+    expect(() => loadProvisionedEntryRecords(missionId)).toThrow(
+      'MISSION_LOG_CORRUPT:provisioned_entry_record:1'
+    );
+    withExecutionContext('mission_controller', () =>
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true })
+    );
   });
 });

@@ -1,8 +1,10 @@
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
+import { nowIso } from '../../foundation/time.js';
 import { pathResolver } from '../../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import type { PdfDesignProtocol, PdfLayoutElement, PdfPage, PdfImageElement } from '../types/pdf-protocol.js';
+import { clamp } from '../../foundation/text.js';
 
 /**
  * High-Fidelity Native PDF Parser v4.0 [PDF 2.0 COMPLIANT]
@@ -470,7 +472,7 @@ export class NativePdfParser {
     type ColorState = { r: number; g: number; b: number };
     const elements: any[] = [];
     const rgbToHex = (color: ColorState) => {
-      const toHex = (value: number) => Math.max(0, Math.min(255, Math.round(value * 255))).toString(16).padStart(2, '0').toUpperCase();
+      const toHex = (value: number) => clamp(Math.round(value * 255), 0, 255).toString(16).padStart(2, '0').toUpperCase();
       return `${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
     };
     const isWhite = (color: ColorState) => color.r > 0.95 && color.g > 0.95 && color.b > 0.95;
@@ -1409,7 +1411,7 @@ export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDes
 
   return {
     version: '4.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     source: { format: 'markdown' as any, body: fullText, title: metadata.title },
     content: { text: fullText, pages },
     metadata: { ...metadata, pageCount: pages.length },

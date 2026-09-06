@@ -44,7 +44,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 
 PRs must use one of these types. CI rejects PR titles that do not match the pattern. Pushes to `main` reject commit subjects that do not match the pattern, except for the default GitHub merge commit subject (`Merge pull request #...`) when a human uses the merge button.
 
-Before opening a PR locally, run the title through `pnpm run check:pr-title -- --title "<proposed title>"`. The repo also exposes `pnpm run pr:create -- --title "<proposed title>"` as a guarded publish wrapper that fails fast if the title is not conventional.
+Before opening a PR locally, run the title through `pnpm run check:pr-title -- --title "<proposed title>"`. The repo also exposes `pnpm kyberion pr create --title "<proposed title>"` as a guarded publish wrapper that fails fast if the title is not conventional.
 
 ## Release cadence
 
@@ -55,6 +55,20 @@ Before opening a PR locally, run the title through `pnpm run check:pr-title -- -
 Pre-releases use `-alpha.N`, `-beta.N`, `-rc.N` suffixes.
 
 ## Release runbook
+
+The CI/release workflow also creates a deterministic source archive and
+verifies its sibling `SHA256SUMS`. It extracts that archive into a governed
+clean staging directory and runs
+`pnpm install --frozen-lockfile --ignore-scripts`; a release is not published
+when this smoke fails.
+
+```bash
+pnpm run release:source-archive -- --ref HEAD \
+  --output active/shared/exports/release/kyberion-vX.Y.Z.tar.gz
+pnpm run release:source-archive -- --check \
+  --output active/shared/exports/release/kyberion-vX.Y.Z.tar.gz
+pnpm kyberion release install-smoke --ref HEAD
+```
 
 ```bash
 # 1. On main, ensure CI is green.
@@ -125,7 +139,7 @@ If the release introduces a schema or path change, add a migration script under 
 Release prep is not complete until the migration state is explicit:
 
 - If no migration is required, the release changelog section must say `Migration required: None`.
-- If a migration is required, add `migration/<sequence>-<slug>.ts`, document operator impact and rollback expectations in the changelog, and run `pnpm migration:run -- --dry-run` before tagging.
+- If a migration is required, add `migration/<sequence>-<slug>.ts`, document operator impact and rollback expectations in the changelog, and run `pnpm migration -- --dry-run` before tagging.
 - If actuator contract surfaces changed, update manifest versions and commit the refreshed `scripts/contract-baseline.json` produced by `pnpm run check:contract-semver -- --rebaseline`.
 
 ## Hotfix branch policy

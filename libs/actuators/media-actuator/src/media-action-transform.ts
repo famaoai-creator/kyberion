@@ -1,24 +1,29 @@
-import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core';
+import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core/deck-theme-direction';
 import { htmlToDeckProtocol } from './html-deck-helpers.js';
+import { logger } from '@agent/core/core';
+import { clamp, nowIso } from '@agent/core/foundation';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
-  pathResolver,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   detectRasterCapabilities,
   rasterizeDocument,
   rasterizeHtml,
   assertVisualReviewPathScope,
-  runVisualReviewLoop,
-  loadVisualReviewRubric,
-  formatVisualReviewReport,
+} from '@agent/core/visual-raster';
+import { runVisualReviewLoop } from '@agent/core/visual-review-loop';
+import { loadVisualReviewRubric, formatVisualReviewReport } from '@agent/core/visual-review';
+import {
   lockMediaBrief,
   inferredDecisions,
   formatBriefForConfirmation,
-} from '@agent/core';
-import { validateThemeContrast } from '@agent/core';
+} from '@agent/core/media-brief-lock';
+import { validateThemeContrast } from '@agent/core/design-qa';
 import { type PdfDesignProtocol } from '@agent/core/media-contracts';
 import {
   buildPptxProtocolFromPdfDesign as buildPptxProtocolFromPdfDesignHelper,
@@ -67,11 +72,20 @@ import {
 
 import {
   cloneJsonValue,
-  loadJsonValue,
   loadLayoutTemplateCatalog,
   buildPptxSlideFromPattern,
 } from './media-layout-runtime.js';
+import { loadLayoutTemplateCatalogFromPath } from './media-layout-catalog.js';
+import { loadDesignPattern } from './media-catalog-loaders.js';
 import { opCapture, PDF_PYPDF_OPS } from './media-action-capture.js';
+
+function resolveMediaRepositoryPath(rootDir: string, value: unknown, label: string): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`[${label}] path is required`);
+  return assertSafeRepositoryPath(path.resolve(rootDir, requested), {
+    allowMissingLeaf: true,
+  });
+}
 
 async function maybeAugmentPdfDesignWithImageOcr(
   pdfDesign: PdfDesignProtocol,
@@ -268,11 +282,15 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       };
     }
     case 'apply_pattern': {
-      const patternPath = path.resolve(rootDir, resolve(params.pattern_path));
+      const patternPath = resolveMediaRepositoryPath(
+        rootDir,
+        resolve(params.pattern_path),
+        'apply_pattern'
+      );
       if (!safeExistsSync(patternPath)) {
         throw new Error(`Design pattern not found: ${patternPath}`);
       }
-      const pattern = loadJsonValue(patternPath);
+      const pattern = loadDesignPattern(rootDir, patternPath);
       return { ...ctx, active_pattern: pattern, pattern_id: pattern.pattern_id };
     }
     case 'merge_content': {
@@ -289,7 +307,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         const canvas = ctx.active_canvas || themePack?.pptx?.canvas || { w: 10, h: 5.625 };
         const protocol: any = {
           version: '3.0.0',
-          generatedAt: new Date().toISOString(),
+          generatedAt: nowIso(),
           canvas,
           theme: {
             dk1: (themeColors.primary || '#000000').replace('#', ''),
@@ -339,7 +357,9 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       if (tenantSlug) {
         const confPath = `knowledge/confidential/${tenantSlug}/design/layout-templates.json`;
         try {
-          const confCatalog = loadJsonValue(path.resolve(rootDir, confPath));
+          const confCatalog = loadLayoutTemplateCatalogFromPath(
+            resolveMediaRepositoryPath(rootDir, confPath, 'layout_template_from_pptx_design')
+          );
           const m = matchLayoutTemplate(geometry, confCatalog);
           if (m) confMatch = { ...m, catalog: confPath };
         } catch {
@@ -539,7 +559,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       // (`path`). Produces `last_pptx_design` for a downstream pptx_render.
       let html: unknown = typeof params.html === 'string' ? params.html : undefined;
       if (html === undefined && params.path) {
-        const p = path.resolve(rootDir, resolve(params.path));
+        const p = resolveMediaRepositoryPath(rootDir, resolve(params.path), 'deck_from_html');
         // Keep file-backed input bounded at the same gate as inline input;
         // otherwise safeReadFile may allocate its 100MB default before the
         // parser rejects the 8MiB protocol limit.
@@ -679,6 +699,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         ? params.html_paths.map((value: unknown) => String(resolve(value)))
         : [];
       const artifactInput = String(resolve(params.path || params.artifact_path) || '');
+      let artifactPath = '';
       if (artifactKind === 'video-scenes' || artifactKind === 'web') {
         if (rawHtmlPaths.length === 0) {
           throw new Error(
@@ -695,7 +716,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           });
         }
       } else {
-        const artifactPath = path.resolve(rootDir, artifactInput);
+        artifactPath = resolveMediaRepositoryPath(rootDir, artifactInput, 'visual_review');
         assertVisualReviewPathScope({
           artifactPath,
           workDir: requestedWorkDir,
@@ -758,7 +779,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
                 missionId,
               })
             : rasterizeDocument({
-                sourcePath: path.resolve(rootDir, artifactInput),
+                sourcePath: artifactPath,
                 label,
                 ...(params.dpi ? { dpi: Number(params.dpi) } : {}),
                 ...(params.max_pages ? { maxPages: Number(params.max_pages) } : {}),
@@ -827,7 +848,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
                   review_outcome: loop.outcome,
                   rounds: loop.rounds,
                   report,
-                  generated_at: new Date().toISOString(),
+                  generated_at: nowIso(),
                 },
                 null,
                 2
@@ -958,7 +979,9 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           title: brief.payload.title || brief.title || 'Diagram',
           theme: activeTheme,
           iconMap,
-          iconRoot: params.icon_root ? path.resolve(rootDir, resolve(params.icon_root)) : undefined,
+          iconRoot: params.icon_root
+            ? resolveMediaRepositoryPath(rootDir, resolve(params.icon_root), 'icon_root')
+            : undefined,
         });
       } else if (typeof brief.payload.source === 'string') {
         nextCtx.document_diagram_source = brief.payload.source;
@@ -1004,7 +1027,9 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         title: resolve(params.title) || graph.title || 'Architecture Diagram',
         theme: activeTheme,
         iconMap,
-        iconRoot: params.icon_root ? path.resolve(rootDir, resolve(params.icon_root)) : undefined,
+        iconRoot: params.icon_root
+          ? resolveMediaRepositoryPath(rootDir, resolve(params.icon_root), 'icon_root')
+          : undefined,
       });
       return {
         ...ctx,
@@ -1073,7 +1098,7 @@ function cssVarHex(value: unknown): string | undefined {
     /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i
   );
   if (!rgba) return undefined;
-  const channels = rgba.slice(1, 4).map((entry) => Math.max(0, Math.min(255, Number(entry))));
+  const channels = rgba.slice(1, 4).map((entry) => clamp(Number(entry), 0, 255));
   if (channels.some((entry) => !Number.isFinite(entry))) return undefined;
   return `#${channels.map((entry) => entry.toString(16).padStart(2, '0')).join('')}`;
 }

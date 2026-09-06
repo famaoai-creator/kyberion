@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeAppendFileSync, safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
 import { resolveIdentityContext, withExecutionContext } from './authority.js';
 import {
   issueTaskGrant,
@@ -112,6 +112,20 @@ describe('task-scoped grants: issuance', () => {
         issueTaskGrant({ granteeNhiId: GRANTEE, audience: { missionId: 'MSN-A' } })
       )
     ).toThrow(TaskGrantGovernedError);
+  });
+
+  it('rejects an external store override before reading grants', () => {
+    process.env[TASK_GRANTS_PATH_ENV] = '/tmp/task-grants-external.jsonl';
+
+    expect(() => listActiveGrants()).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
+  it('fails closed when the grant store is replaced by a directory', () => {
+    const storePath = pathResolver.rootResolve(process.env[TASK_GRANTS_PATH_ENV]!);
+    safeMkdir(storePath, { recursive: true });
+
+    expect(() => listActiveGrants()).toThrow('store must be a regular file');
+    expect(() => issueGoverned()).toThrow('store must be a regular file');
   });
 
   it('refuses the governed default store path under vitest', () => {
@@ -388,6 +402,18 @@ describe('task-scoped grants: authority.resolveIdentityContext integration', () 
     };
     safeAppendFileSync(storePath, `${JSON.stringify(expired)}\n`);
     expect(resolveIdentityContext().authorities).not.toContain('NETWORK_FETCH');
+  });
+
+  it('fails closed when the authority read-side override is external', () => {
+    issueGoverned({ scope: { capabilities: ['GIT_WRITE'] } });
+    process.env.MISSION_ID = 'MSN-A';
+    process.env.TASK_ID = 'task-1';
+    process.env.KYBERION_NHI_ID = GRANTEE;
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'software_developer';
+    process.env[TASK_GRANTS_PATH_ENV] = '/tmp/task-grants-external.jsonl';
+
+    expect(resolveIdentityContext().authorities).not.toContain('GIT_WRITE');
   });
 
   it('never translates SUDO from a grant capability', () => {

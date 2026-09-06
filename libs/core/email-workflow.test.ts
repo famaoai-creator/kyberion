@@ -1,10 +1,22 @@
+import * as path from 'node:path';
+import { afterEach } from 'vitest';
 import { describe, expect, it } from 'vitest';
 import {
   buildFallbackEmailDraft,
   extractBodyMarkdownFromDraft,
   extractFirstJsonBlock,
+  generateEmailReplyDraft,
+  isRegularEmailDraftPath,
+  parseEmailDraftArtifact,
   summarizeEmailSubject,
 } from './email-workflow.js';
+import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from './index.js';
+
+const FIXTURE_ROOT = pathResolver.sharedTmp('email-workflow-loader-test');
+
+afterEach(() => {
+  safeRmSync(FIXTURE_ROOT, { recursive: true, force: true });
+});
 
 describe('email-workflow shared helpers', () => {
   it('extracts only the body from a persisted draft envelope', () => {
@@ -21,14 +33,9 @@ describe('email-workflow shared helpers', () => {
       'Kyberion',
     ].join('\n');
 
-    expect(extractBodyMarkdownFromDraft(draft)).toBe([
-      'Hi team,',
-      '',
-      'Here is the reply body.',
-      '',
-      'Best,',
-      'Kyberion',
-    ].join('\n'));
+    expect(extractBodyMarkdownFromDraft(draft)).toBe(
+      ['Hi team,', '', 'Here is the reply body.', '', 'Best,', 'Kyberion'].join('\n')
+    );
   });
 
   it('builds a fallback draft with a subject envelope', () => {
@@ -51,5 +58,35 @@ describe('email-workflow shared helpers', () => {
   it('extracts a JSON object from a fenced block', () => {
     const parsed = extractFirstJsonBlock('before\n```json\n{"to":"team@example.com"}\n```\nafter');
     expect(parsed).toEqual({ to: 'team@example.com' });
+  });
+
+  it('rejects arrays and dangerous JSON keys in model email output', () => {
+    expect(extractFirstJsonBlock('[{"to":"team@example.com"}]')).toBeNull();
+    expect(extractFirstJsonBlock('{"to":"team@example.com","meta":{"__proto__":{}}}')).toBeNull();
+  });
+
+  it('accepts only object-root persisted email draft artifacts', () => {
+    expect(parseEmailDraftArtifact({ to: 'team@example.com' })).toEqual({
+      to: 'team@example.com',
+    });
+    expect(parseEmailDraftArtifact([])).toBeNull();
+    expect(parseEmailDraftArtifact('invalid')).toBeNull();
+    expect(parseEmailDraftArtifact(null)).toBeNull();
+  });
+
+  it('accepts only regular files for persisted draft paths', () => {
+    const filePath = path.join(FIXTURE_ROOT, 'latest.json');
+    const directoryPath = path.join(FIXTURE_ROOT, 'latest.md');
+    safeWriteFile(filePath, '{"subject":"safe"}', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(isRegularEmailDraftPath(filePath)).toBe(true);
+    expect(isRegularEmailDraftPath(directoryPath)).toBe(false);
+  });
+
+  it('rejects a request id that escapes the draft artifact directory', async () => {
+    await expect(
+      generateEmailReplyDraft({ requestId: '../outside', triageText: 'safe triage' })
+    ).rejects.toThrow(/invalid request id/);
   });
 });

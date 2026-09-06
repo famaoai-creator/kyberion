@@ -1,9 +1,34 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { safeExistsSync, safeMkdir, safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
+import { readTextFile } from './foundation/text.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 const CACHE_DIR = pathResolver.shared('entropy-cache');
+
+function safeHashPath(key: string): string {
+  if (!key || /[\\/]/u.test(key) || key === '.' || key === '..') {
+    throw new Error(`[ENTROPY_GATE] cache key must be a single path segment: ${key}`);
+  }
+  const safeCacheDir = assertSafeRepositoryPath(CACHE_DIR, { allowMissingLeaf: true });
+  if (safeExistsSync(safeCacheDir) && !safeLstat(safeCacheDir).isDirectory()) {
+    throw new Error(`[ENTROPY_GATE] cache directory must be a directory: ${CACHE_DIR}`);
+  }
+  const hashPath = assertSafeRepositoryPath(path.join(safeCacheDir, `${key}.hash`), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(hashPath) && !safeLstat(hashPath).isFile()) {
+    throw new Error(`[ENTROPY_GATE] cache hash must be a regular file: ${hashPath}`);
+  }
+  return hashPath;
+}
 
 /**
  * Entropy Gate v1.0
@@ -16,16 +41,17 @@ export const entropyGate = {
    * If changed, updates cache and returns true (Gate Open - Process).
    */
   shouldWake(key: string, data: any): boolean {
-    if (!safeExistsSync(CACHE_DIR)) {
-      safeMkdir(CACHE_DIR, { recursive: true });
+    const hashPath = safeHashPath(key);
+    const safeCacheDir = assertSafeRepositoryPath(CACHE_DIR, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeCacheDir)) {
+      safeMkdir(safeCacheDir, { recursive: true });
     }
 
-    const hashPath = path.join(CACHE_DIR, `${key}.hash`);
     const currentData = typeof data === 'string' ? data : JSON.stringify(data);
     const currentHash = createHash('md5').update(currentData).digest('hex');
 
     if (safeExistsSync(hashPath)) {
-      const lastHash = safeReadFile(hashPath, { encoding: 'utf8' }) as string;
+      const lastHash = readTextFile(hashPath);
       if (lastHash === currentHash) {
         return false; // No change, stay in sleep
       }
@@ -40,7 +66,7 @@ export const entropyGate = {
    * Reset the gate for a specific key.
    */
   reset(key: string): void {
-    const hashPath = path.join(CACHE_DIR, `${key}.hash`);
+    const hashPath = safeHashPath(key);
     if (safeExistsSync(hashPath)) safeUnlinkSync(hashPath);
-  }
+  },
 };

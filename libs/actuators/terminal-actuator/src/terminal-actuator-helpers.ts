@@ -1,15 +1,14 @@
-import {
-  executeLlmDecideOp,
-  ptyEngine,
-  encodeTerminalInput,
-  emitComputerSurfacePatch,
-  pathResolver,
-  buildGovernedRetryOptions,
-  retry,
-  resolveShellAdapter,
-  runOpPreflight,
-  ensureDefaultOpPreflight,
-} from '@agent/core';
+import { executeLlmDecideOp } from '@agent/core/semantic-decide';
+import { ptyEngine } from '@agent/core/pty-engine';
+import { encodeTerminalInput } from '@agent/core/terminal-keys';
+import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
+import * as pathResolver from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { resolveShellAdapter } from '@agent/core/platform-command-adapters';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import * as path from 'node:path';
 
 /**
@@ -97,12 +96,16 @@ export interface ComputerInteractionAction {
   };
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: TERMINAL_MANIFEST_PATH,
-    defaults: DEFAULT_TERMINAL_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: TERMINAL_MANIFEST_PATH,
+  defaults: DEFAULT_TERMINAL_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
+
+function resolveTerminalCwd(rootDir: string, cwd: string | undefined): string {
+  if (!cwd) return rootDir;
+  return assertSafeRepositoryPath(path.resolve(rootDir, cwd), {
+    allowMissingLeaf: true,
   });
 }
 
@@ -129,7 +132,7 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
     case 'spawn': {
       const shell = params.shell || resolveShellAdapter().shell;
       const args = params.args || [];
-      const cwd = params.cwd ? path.resolve(rootDir, params.cwd) : rootDir;
+      const cwd = resolveTerminalCwd(rootDir, params.cwd);
       const sessionId = ptyEngine.spawn(shell, args, cwd, params.env || {}, params.threadId);
       return { status: 'created', sessionId };
     }

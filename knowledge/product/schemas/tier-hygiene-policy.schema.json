@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tier-hygiene-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "scan_paths": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "skip_paths": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "denied_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "regex": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string", "minLength": 1 }
+        },
+        "required": ["name", "regex", "rationale"]
+      }
+    },
+    "denied_substrings": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "allowlist_patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  },
+  "required": [
+    "version",
+    "description",
+    "scan_paths",
+    "skip_paths",
+    "denied_patterns",
+    "denied_substrings",
+    "allowlist_patterns"
+  ]
+}

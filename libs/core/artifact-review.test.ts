@@ -1,11 +1,17 @@
+import * as fs from 'node:fs';
+import * as nodePath from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildArtifactReviewReceipt,
   evaluateArtifactReviews,
+  hashArtifactForReview,
   inferArtifactReviewKind,
+  loadArtifactReviewReceipt,
   validateArtifactReviewReceipt,
   type ArtifactReviewReceipt,
 } from './artifact-review.js';
+import * as pathResolver from './path-resolver.js';
+import { safeRmSync, safeWriteFile } from './secure-io.js';
 
 function receipt(overrides: Partial<ArtifactReviewReceipt> = {}): ArtifactReviewReceipt {
   return {
@@ -166,5 +172,48 @@ describe('artifact review contract', () => {
     expect(inferArtifactReviewKind('slides/pitch.pptx')).toBe('deck');
     expect(inferArtifactReviewKind('video/final.mp4')).toBe('media');
     expect(inferArtifactReviewKind('docs/report.md')).toBe('doc');
+  });
+
+  it('rejects symlinked artifact and receipt paths before reading them', () => {
+    const boundaryRoot = pathResolver.sharedTmp('artifact-review-boundary');
+    const targetRoot = nodePath.join(boundaryRoot, 'target');
+    const linkedRoot = nodePath.join(boundaryRoot, 'linked');
+    const artifactPath = nodePath.join(targetRoot, 'artifact.txt');
+    const receiptPath = nodePath.join(targetRoot, 'receipt.json');
+    fs.mkdirSync(targetRoot, { recursive: true });
+    safeWriteFile(artifactPath, 'artifact');
+    safeWriteFile(receiptPath, JSON.stringify(receipt()));
+    fs.symlinkSync(targetRoot, linkedRoot, 'dir');
+
+    try {
+      expect(() => hashArtifactForReview(nodePath.join(linkedRoot, 'artifact.txt'))).toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+      expect(() => loadArtifactReviewReceipt(nodePath.join(linkedRoot, 'receipt.json'))).toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+      expect(fs.existsSync(artifactPath)).toBe(true);
+    } finally {
+      safeRmSync(boundaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects directory artifact and receipt paths before reading them', () => {
+    const boundaryRoot = pathResolver.sharedTmp('artifact-review-directory-boundary');
+    const artifactDir = nodePath.join(boundaryRoot, 'artifact');
+    const receiptDir = nodePath.join(boundaryRoot, 'receipt.json');
+    fs.mkdirSync(artifactDir, { recursive: true });
+    fs.mkdirSync(receiptDir, { recursive: true });
+
+    try {
+      expect(() => hashArtifactForReview(artifactDir)).toThrow(
+        '[ARTIFACT_REVIEW_RESOURCE] artifact must be a regular file'
+      );
+      expect(() => loadArtifactReviewReceipt(receiptDir)).toThrow(
+        '[ARTIFACT_REVIEW_RESOURCE] receipt must be a regular file'
+      );
+    } finally {
+      safeRmSync(boundaryRoot, { recursive: true, force: true });
+    }
   });
 });

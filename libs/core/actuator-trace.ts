@@ -1,10 +1,14 @@
 import { logger } from './core.js';
 import { type Trace, TraceContext, persistTrace } from './src/trace.js';
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function createActuatorTrace(
   actuator: string,
   action: string,
-  metadata?: Partial<Trace['metadata']> & Record<string, string | number | boolean>,
+  metadata?: Partial<Trace['metadata']> & Record<string, string | number | boolean>
 ): TraceContext {
   return new TraceContext(`${actuator}:${action}`, {
     actuator,
@@ -22,8 +26,8 @@ export function finalizeActuatorTrace(traceCtx: TraceContext): {
   try {
     const trace_persisted_path = persistTrace(trace);
     return { trace, trace_summary, trace_persisted_path };
-  } catch (err: any) {
-    logger.warn(`[trace] Failed to persist actuator trace: ${err?.message || err}`);
+  } catch (err: unknown) {
+    logger.warn(`[trace] Failed to persist actuator trace: ${errorMessage(err)}`);
     return { trace, trace_summary };
   }
 }

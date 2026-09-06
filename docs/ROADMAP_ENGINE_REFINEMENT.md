@@ -93,7 +93,7 @@ PPTX/XLSX 個別の DesignProtocol を汎用 `DocumentDesignProtocol<T>` に昇�
 
 ### Acceptance Criteria
 
-- `pnpm cli list --check` で各 actuator の実行時状態が表示される
+- `pnpm kyberion list --check` で各 actuator の実行時状態が表示される
 - Playwright 未インストール時に browser-actuator が `available: false, reason: "playwright not installed"` を返す
 - orchestrator が capability に基づいてフォールバックルーティングできる
 

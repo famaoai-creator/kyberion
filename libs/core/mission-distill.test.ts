@@ -37,7 +37,14 @@ vi.mock('./ledger.js', async (importOriginal) => {
 });
 
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import {
   createMemoryPromotionCandidate,
@@ -48,7 +55,12 @@ import {
 } from './memory-promotion-queue.js';
 import { loadDistillCandidateRecord } from './distill-candidate-registry.js';
 import { loadState } from './mission-state.js';
-import { distillMission } from './mission-distill.js';
+import {
+  gatherDistillContext,
+  distillMission,
+  isRegularMissionDistillPromptPath,
+  resolveWisdomOutputPath,
+} from './mission-distill.js';
 import { promoteMemoryCandidateToKnowledge } from './memory-promotion-workflow.js';
 import { safeExec } from './secure-io.js';
 
@@ -56,6 +68,24 @@ import { safeExec } from './secure-io.js';
 // real shared queue (root cause of combined-run flakes).
 process.env.KYBERION_MEMORY_QUEUE_PATH =
   'active/shared/tmp/test-memory-queue-mission-distill.jsonl';
+
+describe('mission-distill prompt resource loader', () => {
+  it('accepts only existing regular prompt files', () => {
+    const fixtureRoot = pathResolver.shared('tmp/mission-distill-prompt-loader-test');
+    const filePath = `${fixtureRoot}/prompt.md`;
+    const directoryPath = `${fixtureRoot}/prompt-directory.md`;
+    try {
+      safeWriteFile(filePath, 'distill prompt', { mkdir: true });
+      safeMkdir(directoryPath, { recursive: true });
+
+      expect(isRegularMissionDistillPromptPath(filePath)).toBe(true);
+      expect(isRegularMissionDistillPromptPath(directoryPath)).toBe(false);
+      expect(isRegularMissionDistillPromptPath(`${fixtureRoot}/missing.md`)).toBe(false);
+    } finally {
+      safeRmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('mission-distill end-to-end promotion flow', () => {
   const missionId = 'MSN-DISTILL-E2E-001';
@@ -215,5 +245,40 @@ describe('mission-distill end-to-end promotion flow', () => {
     expect(hints).toContain('Distilled wisdom from mission');
     expect(hints).toContain(`source_ref: ${queued.candidate_id}`);
     expect(hints).toContain(`knowledge/product/evolution/${wisdomFileName}`);
+  });
+
+  it('rejects a directory replacing the evidence ledger before distillation reads it', () => {
+    safeMkdir(`${missionPath}/evidence/ledger.jsonl`, { recursive: true });
+
+    expect(() => gatherDistillContext(missionId, loadState(missionId)!, missionPath)).toThrow(
+      '[MISSION_DISTILL_RESOURCE] evidence ledger must be a regular file'
+    );
+  });
+});
+
+describe('resolveWisdomOutputPath', () => {
+  it('rejects output directories outside the repository root', () => {
+    expect(() => resolveWisdomOutputPath('../../outside-wisdom', 'distill.md')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
+  it('rejects a symbolic-link output directory', () => {
+    const suffix = `${process.pid}-${Date.now()}`;
+    const target = pathResolver.shared(`tmp/mission-distill-output-target-${suffix}`);
+    const link = pathResolver.shared(`tmp/mission-distill-output-link-${suffix}`);
+    safeMkdir(target, { recursive: true });
+    safeSymlinkSync(target, link);
+    try {
+      expect(() =>
+        resolveWisdomOutputPath(
+          `active/shared/tmp/mission-distill-output-link-${suffix}`,
+          'distill.md'
+        )
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(link, { force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
   });
 });

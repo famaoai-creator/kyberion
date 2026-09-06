@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "package-governance.schema.json",
+  "title": "Documentation-only package governance",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "documentation_only": { "const": true },
+    "ignore_deps": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "private": { "type": "boolean" },
+        "author": { "type": "string", "minLength": 1 },
+        "license": { "type": "string", "minLength": 1 },
+        "ensure_engines": { "type": "boolean" },
+        "ensure_agent_core": { "type": "boolean" }
+      },
+      "required": ["private", "author", "license", "ensure_engines", "ensure_agent_core"]
+    }
+  },
+  "required": ["$schema", "documentation_only", "ignore_deps", "normalization"]
+}

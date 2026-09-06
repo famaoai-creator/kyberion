@@ -1,9 +1,14 @@
-import { createVirtualCameraBridge } from '@agent/core';
-import * as path from 'node:path';
+import { createVirtualCameraBridge } from '@agent/core/virtual-camera-bridge';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function main(argv: string[]) {
-  const outputPath = argv[0] || 'active/shared/tmp/user_face.jpg';
+export function resolveCapturePhotoPath(outputPath = 'active/shared/tmp/user_face.jpg'): string {
+  return assertSafeRepositoryPath(pathResolver.resolve(outputPath), { allowMissingLeaf: true });
+}
+
+async function main(outputPath = 'active/shared/tmp/user_face.jpg') {
+  const resolvedOutputPath = resolveCapturePhotoPath(outputPath);
   const cameraBridge = createVirtualCameraBridge();
   const probe = await cameraBridge.probe();
 
@@ -11,15 +16,13 @@ async function main(argv: string[]) {
     throw new Error(`Camera is not available: ${probe.reason || 'unknown'}`);
   }
 
-  console.log(`Using camera backend: ${probe.backend}`);
-
   try {
     const result = await cameraBridge.capturePhoto({
-      save_path: path.resolve(outputPath),
+      save_path: resolvedOutputPath,
       camera_intent: 'reference',
       subject_hint: 'Face capture for avatar generation pipeline',
     });
-    console.log(`Successfully saved photo to: ${result.save_path}`);
+    return { backend: probe.backend, save_path: result.save_path };
   } catch (err: any) {
     throw new Error(`Failed to capture photo: ${err.message}`);
   }
@@ -27,9 +30,11 @@ async function main(argv: string[]) {
 
 export const runCapturePhoto = defineScript({
   name: 'capture-photo',
-  flags: [],
-  run(context) {
-    return main(context.argv);
+  flags: ['json'],
+  async run(context) {
+    const result = await main(context.positional[0]);
+    context.print(result);
+    return result;
   },
 });
 

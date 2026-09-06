@@ -1,38 +1,56 @@
 import {
   ControlPlaneClientError,
-  createNextActionContract,
   createControlPlaneClient,
-  createStandardYargs,
-  findIntentOutcomePattern,
   getControlPlaneRemediationPlan,
-  listMemoryPromotionCandidates,
-  loadIntentOutcomePatterns,
-  logger,
-  pathResolver,
-  safeExec,
-  summarizeMissionSeedAssessment,
+} from '@agent/core/control-plane-client';
+import {
+  createNextActionContract,
   validateNextActionContract,
+} from '@agent/core/next-action-contract';
+import {
+  findIntentOutcomePattern,
+  loadIntentOutcomePatterns,
+} from '@agent/core/intent-outcome-patterns';
+import { listMemoryPromotionCandidates } from '@agent/core/memory-promotion-queue';
+import { summarizeMissionSeedAssessment } from '@agent/core/mission-seed-assessment';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
   safeExistsSync,
   safeReaddir,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import {
+  defineCatalog,
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonInput,
+} from '@agent/core/foundation';
 import * as path from 'node:path';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export { summarizeMissionSeedAssessment };
 
 type SurfaceKind = 'presence' | 'chronos';
 type ControlPlaneClient = ReturnType<typeof createControlPlaneClient>;
+type ControlPlaneJsonObject = Record<string, unknown>;
+type Print = (value: unknown) => void;
 type SurfaceActionHandler = (
   client: ControlPlaneClient,
   args: string[],
   json: boolean
 ) => Promise<void>;
 type CatalogActionHandler = (args: string[], json: boolean) => Promise<void>;
+const ARTIFACT_LIBRARY_DIR = pathResolver.knowledge(
+  'public/design-patterns/media-templates/artifact-library'
+);
 const ARTIFACT_LIBRARY_INDEX_PATH = pathResolver.knowledge(
   'public/design-patterns/media-templates/artifact-library/index.json'
 );
-const ARTIFACT_LIBRARY_DIR = pathResolver.knowledge(
-  'public/design-patterns/media-templates/artifact-library'
+const ARTIFACT_LIBRARY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/artifact-library.schema.json'
 );
 const DESIGN_MD_INDEX_PATH = pathResolver.knowledge(
   'public/design-patterns/media-templates/design-md-catalog/index.json'
@@ -43,21 +61,93 @@ const DESIGN_MD_THEME_PATH = pathResolver.knowledge(
 const DESIGN_MD_SYSTEM_PATH = pathResolver.knowledge(
   'public/design-patterns/media-templates/media-design-systems/design-md-imports.json'
 );
+const DESIGN_MD_INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/imported-design-md-index.schema.json'
+);
+const DESIGN_MD_THEME_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/design-md-theme-imports.schema.json'
+);
+const DESIGN_MD_SYSTEM_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/design-md-system-imports.schema.json'
+);
 
-function loadArtifactLibraryIndex(): any {
-  return readJson(ARTIFACT_LIBRARY_INDEX_PATH);
+const defaultPrint: Print = (value) => {
+  const rendered = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  process.stdout.write(`${rendered}\n`);
+};
+let activePrint: Print = defaultPrint;
+
+async function withOutputPrinter<T>(print: Print, callback: () => Promise<T>): Promise<T> {
+  const previousPrint = activePrint;
+  activePrint = print;
+  try {
+    return await callback();
+  } finally {
+    activePrint = previousPrint;
+  }
 }
 
-function loadDesignMdIndex(): any {
-  return readJson(DESIGN_MD_INDEX_PATH);
+function printText(value: string): void {
+  activePrint(value.endsWith('\n') ? value.slice(0, -1) : value);
+}
+
+interface ImportedDesignMdSummary {
+  design_system_id: string;
+  theme_id: string;
+  slug: string;
+  name: string;
+  category: string;
+  description: string;
+  source_path: string;
+  keywords: string[];
+}
+
+interface ImportedDesignMdIndex {
+  generated_at: string;
+  source_repo: string;
+  source_dir: string;
+  count: number;
+  systems: ImportedDesignMdSummary[];
+}
+
+function loadArtifactLibraryIndex(): any {
+  return defineCatalog({
+    id: 'control-plane-artifact-library-index',
+    path: ARTIFACT_LIBRARY_INDEX_PATH,
+    schema: pathResolver.knowledge('product/schemas/artifact-library-index.schema.json'),
+  }).load();
+}
+
+function loadDesignMdIndex(): ImportedDesignMdIndex {
+  return defineCatalog<ImportedDesignMdIndex>({
+    id: 'control-plane-imported-design-md-index',
+    path: DESIGN_MD_INDEX_PATH,
+    schema: DESIGN_MD_INDEX_SCHEMA_PATH,
+  }).load();
 }
 
 function loadDesignMdThemes(): any {
-  return readJson(DESIGN_MD_THEME_PATH);
+  return defineCatalog({
+    id: 'control-plane-design-md-themes',
+    path: DESIGN_MD_THEME_PATH,
+    schema: DESIGN_MD_THEME_SCHEMA_PATH,
+  }).load();
 }
 
 function loadDesignMdSystems(): any {
-  return readJson(DESIGN_MD_SYSTEM_PATH);
+  return defineCatalog({
+    id: 'control-plane-design-md-systems',
+    path: DESIGN_MD_SYSTEM_PATH,
+    schema: DESIGN_MD_SYSTEM_SCHEMA_PATH,
+  }).load();
+}
+
+function loadArtifactLibraryPack(filePath: string): any {
+  return defineCatalog({
+    id: 'control-plane-artifact-library-pack',
+    path: filePath,
+    schema: ARTIFACT_LIBRARY_SCHEMA_PATH,
+  }).load();
 }
 
 function normalizeCatalogQuery(input: unknown): string {
@@ -85,13 +175,18 @@ function searchArtifactLibraryProfiles(query?: string): any[] {
   });
 }
 
+export function resolveArtifactLibraryResource(file: string): string {
+  return assertSafeRepositoryPath(path.resolve(ARTIFACT_LIBRARY_DIR, String(file)), {
+    allowMissingLeaf: false,
+  });
+}
+
 function resolveArtifactLibraryProfile(profileId: string): any {
   const index = loadArtifactLibraryIndex();
   const normalizedProfileId = String(profileId || '').trim();
   for (const pack of asArray(index.packs)) {
     if (!asArray<string>(pack.profiles).includes(normalizedProfileId)) continue;
-    const fullPath = path.resolve(ARTIFACT_LIBRARY_DIR, String(pack.file));
-    const doc = readJson<any>(fullPath);
+    const doc = loadArtifactLibraryPack(resolveArtifactLibraryResource(String(pack.file)));
     return {
       profile_id: normalizedProfileId,
       domain: pack.domain,
@@ -102,10 +197,10 @@ function resolveArtifactLibraryProfile(profileId: string): any {
   return null;
 }
 
-function searchImportedDesignSystems(query?: string): any[] {
+function searchImportedDesignSystems(query?: string): ImportedDesignMdSummary[] {
   const index = loadDesignMdIndex();
   const normalized = normalizeCatalogQuery(query);
-  const items = asArray(index.systems);
+  const items = index.systems;
   if (!normalized) return items;
   return items.filter((item) => {
     const haystack = [
@@ -190,15 +285,51 @@ function summarizeSurfaceRuntimeOutput(output: unknown, fallback: string): strin
     return fallback;
   }
   try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
-    const status = String(parsed.status || 'ok');
-    const id = parsed.id ? String(parsed.id) : undefined;
-    const detail = parsed.detail ? String(parsed.detail) : undefined;
-    const port = parsed.port ? String(parsed.port) : undefined;
+    const parsed = parseSurfaceRuntimeJsonOutput(text);
+    const status = parsed.status || 'ok';
+    const id = parsed.id;
+    const detail = parsed.detail;
+    const port = parsed.port === undefined ? undefined : String(parsed.port);
     return [status, id, detail, port ? `port ${port}` : undefined].filter(Boolean).join(' · ');
   } catch (_) {
     return formatExecTail(text, fallback);
   }
+}
+
+export interface SurfaceRuntimeCommandOutput {
+  status?: string;
+  id?: string;
+  detail?: string;
+  port?: string | number;
+}
+
+export function parseSurfaceRuntimeJsonOutput(raw: string): SurfaceRuntimeCommandOutput {
+  return parseSurfaceRuntimeCommandOutput(parseSafeJsonInput(raw, 'surface runtime output'));
+}
+
+export function parseSurfaceRuntimeCommandOutput(value: unknown): SurfaceRuntimeCommandOutput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('invalid_surface_runtime_output');
+  }
+  const record = value as Record<string, unknown>;
+  for (const field of ['status', 'id', 'detail'] as const) {
+    if (record[field] !== undefined && typeof record[field] !== 'string') {
+      throw new Error(`invalid_surface_runtime_output_${field}`);
+    }
+  }
+  if (
+    record.port !== undefined &&
+    typeof record.port !== 'string' &&
+    (typeof record.port !== 'number' || !Number.isFinite(record.port))
+  ) {
+    throw new Error('invalid_surface_runtime_output_port');
+  }
+  return {
+    ...(record.status !== undefined ? { status: record.status as string } : {}),
+    ...(record.id !== undefined ? { id: record.id as string } : {}),
+    ...(record.detail !== undefined ? { detail: record.detail as string } : {}),
+    ...(record.port !== undefined ? { port: record.port as string | number } : {}),
+  };
 }
 
 function formatExecTail(output: unknown, fallback: string): string {
@@ -237,7 +368,7 @@ function attemptSurfaceFix(surface: SurfaceKind): string {
     }
     return steps.join(' -> ');
   } catch (error) {
-    const reconcileOutput = safeExec('pnpm', ['surfaces:reconcile'], {
+    const reconcileOutput = safeExec('pnpm', ['surfaces', 'reconcile'], {
       cwd: pathResolver.rootDir(),
       timeoutMs: 120_000,
     });
@@ -250,21 +381,19 @@ function attemptSurfaceFix(surface: SurfaceKind): string {
 }
 
 function printJson(data: unknown): void {
-  process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
+  activePrint(data);
 }
 
 function printItems(title: string, items: unknown[], projector: (item: any) => string[]): void {
   if (!items.length) {
-    process.stdout.write(`${title}: none\n`);
+    printText(`${title}: none`);
     return;
   }
-  process.stdout.write(`${title} (${items.length})\n`);
+  printText(`${title} (${items.length})`);
   for (const item of items) {
     const lines = projector(item);
-    process.stdout.write(`- ${lines[0] || 'item'}\n`);
-    for (const line of lines.slice(1)) {
-      process.stdout.write(`  ${line}\n`);
-    }
+    printText(`- ${lines[0] || 'item'}`);
+    for (const line of lines.slice(1)) printText(`  ${line}`);
   }
 }
 
@@ -404,13 +533,13 @@ async function runDoctor(input: {
   const surfaces: Array<{ surface: SurfaceKind; run: () => Promise<unknown>; baseUrl: string }> = [
     {
       surface: 'presence' as SurfaceKind,
-      baseUrl: String(process.env.PRESENCE_STUDIO_URL || 'http://127.0.0.1:3031'),
+      baseUrl: String(getRegisteredEnvText('PRESENCE_STUDIO_URL') || 'http://127.0.0.1:3031'),
       run: async () =>
         createControlPlaneClient('presence', { timeoutMs: 3000, retryCount: 0 }).listProjects(),
     },
     {
       surface: 'chronos' as SurfaceKind,
-      baseUrl: String(process.env.CHRONOS_URL || 'http://127.0.0.1:3000'),
+      baseUrl: String(getRegisteredEnvText('CHRONOS_URL') || 'http://127.0.0.1:3000'),
       run: async () =>
         createControlPlaneClient('chronos', {
           timeoutMs: 3000,
@@ -477,34 +606,34 @@ async function runDoctor(input: {
 
   const summary = {
     ok: checks.every((check) => check.ok),
-    checked_at: new Date().toISOString(),
+    checked_at: nowIso(),
     surfaces: checks,
   };
 
   if (input.json) {
     printJson(summary);
     if (!summary.ok) {
-      process.exitCode = 1;
+      throw new ScriptExitError(1, '', true);
     }
     return;
   }
 
-  process.stdout.write('Control Plane Doctor\n');
+  printText('Control Plane Doctor');
   for (const check of checks) {
-    process.stdout.write(`- ${check.surface}: ${check.ok ? 'ok' : 'error'}\n`);
-    process.stdout.write(`  ${check.detail}\n`);
+    printText(`- ${check.surface}: ${check.ok ? 'ok' : 'error'}`);
+    printText(`  ${check.detail}`);
     if (input.verbose && check.baseUrl) {
-      process.stdout.write(`  url: ${check.baseUrl}\n`);
+      printText(`  url: ${check.baseUrl}`);
     }
     if (check.suggestedCommand) {
-      process.stdout.write(`  suggested fix: ${check.suggestedCommand}\n`);
+      printText(`  suggested fix: ${check.suggestedCommand}`);
     }
     if (check.fixAttempted) {
-      process.stdout.write(`  fix attempted: ${check.fixResult || 'completed'}\n`);
+      printText(`  fix attempted: ${check.fixResult || 'completed'}`);
     }
   }
   if (!summary.ok) {
-    process.exitCode = 1;
+    throw new ScriptExitError(1, '', true);
   }
 }
 
@@ -521,7 +650,7 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
       ]);
     },
     bindings: async (client, _args, outputJson) => {
-      const body = await client.getJson('/api/service-bindings');
+      const body = await client.getJson<ControlPlaneJsonObject>('/api/service-bindings');
       if (outputJson) return printJson(body.items || []);
       return printItems('Service Bindings', asArray(body.items), (item) => [
         `${item.binding_id || 'binding'} [${item.service_type || 'service'}]`,
@@ -584,7 +713,7 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
         warnLegacyApprovalForm('control presence approve <requestId> / reject <requestId>');
         decision = String(legacyDecision);
       }
-      const body = await client.postJson(
+      const body = await client.postJson<ControlPlaneJsonObject>(
         `/api/approvals/${encodeURIComponent(requestId)}/decision`,
         { decision }
       );
@@ -596,7 +725,7 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
       if (!requestId) {
         throw new Error('Usage: control presence reject <requestId>');
       }
-      const body = await client.postJson(
+      const body = await client.postJson<ControlPlaneJsonObject>(
         `/api/approvals/${encodeURIComponent(requestId)}/decision`,
         { decision: 'rejected' }
       );
@@ -629,7 +758,9 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
       if (!sessionId) {
         throw new Error('Usage: control presence task <sessionId>');
       }
-      const body = await client.getJson(`/api/task-sessions/${encodeURIComponent(sessionId)}`);
+      const body = await client.getJson<ControlPlaneJsonObject>(
+        `/api/task-sessions/${encodeURIComponent(sessionId)}`
+      );
       return printJson(body.item || body);
     },
     memory: async (client, currentArgs) => {
@@ -640,7 +771,7 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
       const text = await client.getText(
         `/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`
       );
-      process.stdout.write(text.endsWith('\n') ? text : `${text}\n`);
+      printText(text);
     },
     ref: async (client, currentArgs) => {
       const [logicalPath] = currentArgs;
@@ -651,7 +782,7 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
         ? `/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`
         : `/api/runtime-ref?path=${encodeURIComponent(logicalPath)}`;
       const text = await client.getText(pathname);
-      process.stdout.write(text.endsWith('\n') ? text : `${text}\n`);
+      printText(text);
     },
   };
 
@@ -680,7 +811,7 @@ function parseApprovalFlagArgs(args: string[]): {
 }
 
 function warnLegacyApprovalForm(example: string): void {
-  console.warn(
+  printText(
     `[deprecated] positional approval decisions are replaced by approve/reject verbs — use: ${example}`
   );
 }
@@ -739,16 +870,16 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
           memoryCandidates,
           nextActions,
         });
-      process.stdout.write(`Chronos overview\n`);
-      process.stdout.write(`- access: ${body.accessRole}\n`);
-      process.stdout.write(`- projects: ${asArray(body.projects).length}\n`);
-      process.stdout.write(`- mission seeds: ${asArray(body.missionSeeds).length}\n`);
-      process.stdout.write(
-        `- mission seed assessment: eligible ${missionSeedAssessment.eligible} · flagged ${missionSeedAssessment.flagged} · unassessed ${missionSeedAssessment.unassessed}\n`
+      printText('Chronos overview');
+      printText(`- access: ${body.accessRole}`);
+      printText(`- projects: ${asArray(body.projects).length}`);
+      printText(`- mission seeds: ${asArray(body.missionSeeds).length}`);
+      printText(
+        `- mission seed assessment: eligible ${missionSeedAssessment.eligible} · flagged ${missionSeedAssessment.flagged} · unassessed ${missionSeedAssessment.unassessed}`
       );
-      process.stdout.write(`- approvals: ${asArray(body.pendingApprovals).length}\n`);
-      process.stdout.write(`- distill candidates: ${asArray(body.distillCandidates).length}\n`);
-      process.stdout.write(`- memory candidates: ${memoryCandidates.length}\n`);
+      printText(`- approvals: ${asArray(body.pendingApprovals).length}`);
+      printText(`- distill candidates: ${asArray(body.distillCandidates).length}`);
+      printText(`- memory candidates: ${memoryCandidates.length}`);
 
       const conversationsDir = pathResolver.shared('runtime/a2a-conversations');
       let threadCount = 0;
@@ -768,14 +899,12 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       } catch (err) {
         logger.warn(`[control_plane_cli] suppressed error in asArray: ${err}`);
       }
-      process.stdout.write(
-        `- A2A conversations: ${threadCount} threads · ${inflightCount} inflight\n`
-      );
+      printText(`- A2A conversations: ${threadCount} threads · ${inflightCount} inflight`);
 
       if (nextActions.length > 0) {
-        process.stdout.write(`- next action: ${nextActions[0]?.reason}\n`);
+        printText(`- next action: ${nextActions[0]?.reason}`);
         if (nextActions[0]?.suggested_command) {
-          process.stdout.write(`  command: ${nextActions[0].suggested_command}\n`);
+          printText(`  command: ${nextActions[0].suggested_command}`);
         }
       }
     },
@@ -802,7 +931,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       if (outputJson) {
         return printJson({ threadCount, inflightCount });
       }
-      process.stdout.write(`A2A status: ${threadCount} threads · ${inflightCount} inflight\n`);
+      printText(`A2A status: ${threadCount} threads · ${inflightCount} inflight`);
     },
     approvals: async (client, _args, outputJson) => {
       const items = await client.listApprovals();
@@ -818,7 +947,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
         currentArgs,
         'approved'
       );
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'approval_decision',
         requestId,
         storageChannel,
@@ -832,7 +961,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
         currentArgs,
         'rejected'
       );
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'approval_decision',
         requestId,
         storageChannel,
@@ -886,7 +1015,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       if (!trackId) {
         throw new Error('Usage: control chronos seed-track <trackId> [artifactId]');
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'create_track_seed',
         trackId,
         artifactId,
@@ -898,14 +1027,14 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       if (!seedId) {
         throw new Error('Usage: control chronos promote-seed <seedId>');
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'promote_mission_seed',
         seedId,
       });
       return printJson(body);
     },
     'distill-candidates': async (client, _args, outputJson) => {
-      const body = await client.getJson('/api/intelligence');
+      const body = await client.getJson<ControlPlaneJsonObject>('/api/intelligence');
       const items = asArray(body.distillCandidates);
       if (outputJson) return printJson(items);
       return printItems('Distill Candidates', items, (item) => [
@@ -953,7 +1082,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
     },
     'promote-memory': async (client, currentArgs) => {
       const dryRun = currentArgs.includes('--dry-run');
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'memory_promote_pending',
         dryRun,
       });
@@ -964,7 +1093,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       if (!candidateId || !['promote', 'archive'].includes(String(decision))) {
         throw new Error('Usage: control chronos distill <candidateId> <promote|archive>');
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'distill_candidate_decision',
         candidateId,
         decision,
@@ -978,7 +1107,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
           'Usage: control chronos mission-control <missionId> <resume|refresh_team|prewarm_team|staff_team|finish>'
         );
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'mission_control',
         missionId,
         operation,
@@ -992,7 +1121,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
           'Usage: control chronos surface-control <reconcile|status|start|stop> [surfaceId]'
         );
       }
-      const body = await client.postJson('/api/intelligence', {
+      const body = await client.postJson<ControlPlaneJsonObject>('/api/intelligence', {
         action: 'surface_control',
         operation,
         surfaceId,
@@ -1008,7 +1137,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
         ? `/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`
         : `/api/runtime-file?path=${encodeURIComponent(logicalPath)}`;
       const text = await client.getText(pathname);
-      process.stdout.write(text.endsWith('\n') ? text : `${text}\n`);
+      printText(text);
     },
   };
 
@@ -1112,7 +1241,7 @@ async function handleCatalog(action: string, args: string[], json: boolean): Pro
 }
 
 function printHelp(): void {
-  process.stdout.write(`Kyberion Control Plane CLI
+  printText(`Kyberion Control Plane CLI
 
 Usage:
   pnpm control doctor
@@ -1157,12 +1286,12 @@ Environment:
   PRESENCE_STUDIO_URL  default http://127.0.0.1:3031
   CHRONOS_URL          default http://127.0.0.1:3000
   KYBERION_LOCALADMIN_TOKEN / KYBERION_API_TOKEN for Chronos API
-  Requests use a short timeout/retry and report stale surface processes explicitly.
+Requests use a short timeout/retry and report stale surface processes explicitly.
 `);
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'control_plane_cli', ...args])
     .option('json', { type: 'boolean', default: false, description: 'Print raw JSON' })
     .option('surface', {
       type: 'string',
@@ -1213,10 +1342,26 @@ async function main(): Promise<void> {
   await handleChronos(action, rest, Boolean(argv.json));
 }
 
-main().catch((error) => {
-  logger.error(error?.message || String(error));
-  if (error instanceof ControlPlaneClientError && error.suggestedCommand) {
-    process.stderr.write(`Suggested fix: ${error.suggestedCommand}\n`);
-  }
-  process.exitCode = 1;
+const runControlPlaneCli = defineScript({
+  name: 'control-plane',
+  flags: [],
+  run: async ({ argv, print }) =>
+    withOutputPrinter(print, async () => {
+      try {
+        await main(argv);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof ControlPlaneClientError && error.suggestedCommand) {
+          throw new ScriptExitError(1, `${message}\nSuggested fix: ${error.suggestedCommand}`);
+        }
+        throw error;
+      }
+    }),
 });
+
+if (
+  isDirectScript(import.meta.url, 'control_plane_cli.ts') ||
+  isDirectScript(import.meta.url, 'control_plane_cli.js')
+) {
+  void runControlPlaneCli();
+}

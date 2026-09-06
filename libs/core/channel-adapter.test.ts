@@ -6,6 +6,7 @@ import {
   type ChannelAdapter,
 } from './channel-adapter.js';
 import { isSurfaceAsyncChannel } from './channel-surface-types.js';
+import { t } from './t.js';
 
 describe('SurfaceAsyncChannel registry', () => {
   it('accepts manifest channels and rejects unregistered values', () => {
@@ -29,6 +30,51 @@ describe('formatChannelThreadContext', () => {
     expect(
       formatChannelThreadContext('Slack', [{ role: 'user', authorLabel: 'alice', text: '   ' }])
     ).toBeUndefined();
+  });
+
+  it('renders thread context using the requested operator locale', () => {
+    expect(
+      formatChannelThreadContext(
+        'Slack',
+        [
+          { role: 'user', authorLabel: 'alice', text: 'こんにちは' },
+          { role: 'assistant', authorLabel: 'bot', text: '確認しました' },
+        ],
+        'ja'
+      )
+    ).toBe(
+      'Slack スレッドの最近の文脈:\nユーザー（alice）: こんにちは\nアシスタント: 確認しました'
+    );
+  });
+
+  it('uses an explicit locale when projecting a text-only contract', () => {
+    const formatted = formatChannelTurnText(
+      {
+        text: '⟦reply⟧',
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+        intentResolution: {
+          request_id: 'ir_qps',
+          normalized_intent: 'send_message',
+          missing_inputs: [],
+          resolution_shape: 'task_session',
+          outcome_kind: 'service_change',
+          authority_level: 'approval_required',
+          next_action: {
+            kind: 'request_approval',
+            label: '⟦approve⟧',
+            consequence: '⟦wait⟧',
+          },
+          rationale: 'approval',
+        },
+      },
+      { locale: 'qps-ploc' }
+    );
+
+    expect(formatted).toContain(t('bridge:contract_authority', undefined, 'qps-ploc'));
+    expect(formatted).not.toContain('Authority:');
   });
 });
 
@@ -107,7 +153,94 @@ describe('runChannelTurn', () => {
       },
     });
     expect(formatted).toContain('理解: send_message');
+    expect(formatted).toContain('権限: 人間の承認が必要');
+    expect(formatted).toContain('結果: サービス変更');
+    expect(formatted).not.toContain('approval_required');
+    expect(formatted).not.toContain('service_change');
     expect(formatted).not.toContain('Understanding:');
+  });
+
+  it('keeps authority and outcome user-facing in English contract text', () => {
+    const formatted = formatChannelTurnText({
+      text: 'Approval is required.',
+      a2uiMessages: [],
+      a2aMessages: [],
+      delegationResults: [],
+      approvalRequests: [],
+      intentResolution: {
+        request_id: 'ir_en',
+        normalized_intent: 'send_message',
+        missing_inputs: [],
+        resolution_shape: 'task_session',
+        outcome_kind: 'service_change',
+        authority_level: 'approval_required',
+        next_action: {
+          kind: 'request_approval',
+          label: 'Approve the request',
+          consequence: 'Execution remains paused until approval.',
+        },
+        rationale: 'approval',
+      },
+    });
+
+    expect(formatted).toContain('Authority: human approval required');
+    expect(formatted).toContain('Outcome: service change');
+    expect(formatted).not.toContain('approval_required');
+    expect(formatted).not.toContain('service_change');
+  });
+
+  it('does not duplicate an already rendered Japanese contract', () => {
+    const text = ['理解: send_message', '不足入力: なし', '次の操作: 承認してください'].join('\n');
+    const result = {
+      text,
+      a2uiMessages: [],
+      a2aMessages: [],
+      delegationResults: [],
+      approvalRequests: [],
+      intentResolution: {
+        request_id: 'ir_ja_existing',
+        normalized_intent: 'send_message',
+        missing_inputs: [],
+        resolution_shape: 'task_session' as const,
+        outcome_kind: 'service_change',
+        authority_level: 'approval_required' as const,
+        next_action: {
+          kind: 'request_approval' as const,
+          label: '承認してください',
+          consequence: '実行待ち',
+        },
+        rationale: 'approval',
+      },
+    };
+
+    expect(formatChannelTurnText(result)).toBe(text);
+  });
+
+  it('does not treat a single Japanese prose label as a rendered contract', () => {
+    const formatted = formatChannelTurnText({
+      text: '結果: 承認待ちです。',
+      a2uiMessages: [],
+      a2aMessages: [],
+      delegationResults: [],
+      approvalRequests: [],
+      intentResolution: {
+        request_id: 'ir_ja_prose',
+        normalized_intent: 'send_message',
+        missing_inputs: [],
+        resolution_shape: 'task_session',
+        outcome_kind: 'service_change',
+        authority_level: 'approval_required',
+        next_action: {
+          kind: 'request_approval',
+          label: '承認してください',
+          consequence: '実行待ち',
+        },
+        rationale: 'approval',
+      },
+    });
+
+    expect(formatted).toContain('理解: send_message');
+    expect(formatted).toContain('結果: 承認待ちです。');
   });
 
   it('keeps thread context, typing, conversation, delivery, and cleanup ordered', async () => {
@@ -321,8 +454,10 @@ describe('runChannelTurn', () => {
     expect(sent[0]).toContain('Understanding: send_message');
     expect(sent[0]).toContain('Missing input: none');
     expect(sent[0]).toContain('Next action: Approve this plan to continue.');
+    expect(sent[0]).toContain('Authority: human approval required');
     expect(sent[0]).toContain('Consequence: The action waits for approval.');
-    expect(sent[0]).toContain('Outcome: service_change');
+    expect(sent[0]).toContain('Outcome: service change');
+    expect(sent[0]).not.toContain('service_change');
     expect(result.text).toBe(sent[0]);
   });
 });

@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeReaddir, safeReadFile, safeStat } from '@agent/core';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core/secure-io';
 
 const MACHINE_ABS_PATH_RE =
   /(?:\/Users\/|\/home\/[A-Za-z0-9._-]+\/|\/private\/(?:var\/folders|tmp)\/|[A-Za-z]:\\Users\\)/; // governance-allow-abs-path
@@ -52,12 +54,19 @@ const PRODUCT_DISALLOWED_PATTERNS: Array<{ id: string; regex: RegExp; message: s
   },
 ];
 
+export function readGovernancePathScannerTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function scanFileForAbsolutePaths(absPath: string, relPath: string, violations: string[]) {
   // Skip test fixtures — they legitimately carry machine-shaped strings and aren't runtime config.
   if (/\.(test|spec)\.[tj]s$/.test(relPath)) return;
   let content: string;
   try {
-    content = safeReadFile(absPath, { encoding: 'utf8' }) as string;
+    content = readGovernancePathScannerTextFile(absPath);
   } catch {
     return;
   }
@@ -135,7 +144,7 @@ export function scanProductJsonForPlacementDrift(violations: string[]) {
       const relPath = path.relative(pathResolver.rootDir(), absEntry);
       let content: string;
       try {
-        content = safeReadFile(absEntry, { encoding: 'utf8' }) as string;
+        content = readGovernancePathScannerTextFile(absEntry);
       } catch {
         continue;
       }

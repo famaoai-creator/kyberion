@@ -27,18 +27,23 @@
  *     a delivery receipt in the audit chain.
  */
 
+import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  logger,
-  safeReaddir,
-  safeReadFile,
+  assertSafeRepositoryPath,
   safeExistsSync,
-  pathResolver,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core/secure-io';
+import {
   createTriggerRunner,
-  runWakeTrigger,
   resolveCurrentTriggerAuthority,
+  runWakeTrigger,
   type TriggerAuthoritySnapshot,
   type TriggerRunner,
-} from '@agent/core';
+} from '@agent/core/trigger-runner';
 import type { NerveMessage } from '@agent/core/nerve-bridge';
 
 export interface ReflexADF {
@@ -178,24 +183,29 @@ class ReflexEngine {
 
   public reloadReflexes() {
     this.reflexes = [];
-    if (!safeExistsSync(this.REFLEX_DIR)) return;
-
     try {
-      const files = safeReaddir(this.REFLEX_DIR).filter((f) => f.endsWith('.adf.json'));
+      const safeReflexDir = assertSafeRepositoryPath(this.REFLEX_DIR, {
+        allowMissingLeaf: true,
+      });
+      if (!safeExistsSync(safeReflexDir)) return;
+
+      const files = safeReaddir(safeReflexDir).filter((f) => f.endsWith('.adf.json'));
       for (const file of files) {
-        const content = safeReadFile(
-          pathResolver.resolve(`knowledge/procedures/reflexes/${file}`),
-          { encoding: 'utf8' }
-        ) as string;
-        const reflex = JSON.parse(content) as ReflexADF;
-        // Reject a malformed reflex at load time: a definition that can never
-        // dispatch should be visible now, not on the first matching stimulus.
-        const invalid = validateReflexAction(reflex.action);
-        if (invalid) {
-          logger.error(`❌ [ReflexEngine] Ignoring reflex "${reflex.id}" (${file}): ${invalid}`);
-          continue;
+        try {
+          const reflexPath = assertSafeRepositoryPath(path.join(safeReflexDir, file));
+          if (!safeLstat(reflexPath).isFile()) continue;
+          const reflex = readJson<ReflexADF>(reflexPath);
+          // Reject a malformed reflex at load time: a definition that can never
+          // dispatch should be visible now, not on the first matching stimulus.
+          const invalid = validateReflexAction(reflex.action);
+          if (invalid) {
+            logger.error(`❌ [ReflexEngine] Ignoring reflex "${reflex.id}" (${file}): ${invalid}`);
+            continue;
+          }
+          this.reflexes.push(reflex);
+        } catch (err) {
+          logger.error(`❌ [ReflexEngine] Ignoring reflex (${file}): ${err}`);
         }
-        this.reflexes.push(reflex);
       }
       logger.info(`⚡ [ReflexEngine] Loaded ${this.reflexes.length} autonomic reflexes.`);
     } catch (err) {

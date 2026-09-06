@@ -7,9 +7,15 @@ import {
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { getRegisteredEnv } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
+import { getRegisteredEnv, getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { listDemotedProviders, registerHealthyInstancesResolver } from './provider-health-view.js';
 
 export { listDemotedProviders } from './provider-health-view.js';
@@ -63,14 +69,23 @@ let loadedFromPath: string | null = null;
 // leak demotions across unrelated test files (same pattern as
 // operator-notifications' VITEST guard).
 function persistenceEnabled(): boolean {
-  return !process.env.VITEST || Boolean(getRegisteredEnv(STATE_PATH_ENV));
+  return !isVitestProcess() || Boolean(getRegisteredEnv(STATE_PATH_ENV));
 }
 
 function stateFilePath(): string {
   const override = getRegisteredEnv<string>(STATE_PATH_ENV);
-  if (typeof override === 'string' && override) return pathResolver.rootResolve(override);
-  return pathResolver.active('shared/runtime/provider-health.json');
+  const candidate =
+    typeof override === 'string' && override
+      ? pathResolver.rootResolve(override)
+      : pathResolver.active('shared/runtime/provider-health.json');
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
+
+const providerHealthStateCatalog = defineCatalog<{ version: string; demotions: Demotion[] }>({
+  id: 'provider-health-state',
+  path: stateFilePath,
+  schema: pathResolver.knowledge('product/schemas/provider-health-state.schema.json'),
+});
 
 function ensureLoaded(now: number = Date.now()): void {
   if (!persistenceEnabled()) return;
@@ -78,16 +93,17 @@ function ensureLoaded(now: number = Date.now()): void {
   if (loadedFromPath === filePath) return;
   loadedFromPath = filePath;
   demotions.clear();
-  if (!safeExistsSync(filePath)) return;
   try {
-    const parsed = readJson<{ demotions?: Demotion[] }>(filePath);
-    for (const entry of parsed.demotions || []) {
+    const parsed = providerHealthStateCatalog.load();
+    for (const entry of parsed.demotions) {
       if (!entry?.provider || !entry.instance || !Number.isFinite(entry.until)) continue;
       if (entry.until <= now) continue; // TTL recovery across restarts
       demotions.set(keyFor(entry.provider, entry.instance), entry);
     }
   } catch (err) {
-    logger.warn(`[provider-health] failed to load persisted state, starting empty: ${err}`);
+    if (!/missing:/u.test(String(err))) {
+      logger.warn(`[provider-health] failed to load persisted state, starting empty: ${err}`);
+    }
   }
 }
 
@@ -96,10 +112,11 @@ function persist(): void {
   const filePath = stateFilePath();
   try {
     safeMkdir(path.dirname(filePath), { recursive: true });
-    safeWriteFile(
-      filePath,
-      JSON.stringify({ version: '1.0', demotions: [...demotions.values()] }, null, 2)
+    const validated = providerHealthStateCatalog.validate(
+      { version: '1.0', demotions: [...demotions.values()] },
+      filePath
     );
+    safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   } catch (err) {
     // Best-effort: in-memory failover keeps working even if persistence fails.
     logger.warn(`[provider-health] failed to persist state: ${err}`);
@@ -134,7 +151,7 @@ function keyFor(provider: string, instance: string): string {
  */
 export function instancesForProvider(provider: string): string[] {
   const envKey = `KYBERION_${provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_INSTANCES`;
-  const configured = (process.env[envKey] || '')
+  const configured = (getRegisteredEnvText(envKey) || '')
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);

@@ -9,7 +9,12 @@ vi.mock('./service-engine.js', () => ({
   executeServicePreset: mocks.executeServicePreset,
 }));
 
-import { createCalendarEvent, listCalendarAgenda, listCalendars, queryCalendarFreeBusy } from './calendar-workflow.js';
+import {
+  createCalendarEvent,
+  listCalendarAgenda,
+  listCalendars,
+  queryCalendarFreeBusy,
+} from './calendar-workflow.js';
 
 describe('calendar-workflow helpers', () => {
   it('lists agenda items from the primary calendar by default', async () => {
@@ -27,16 +32,20 @@ describe('calendar-workflow helpers', () => {
 
     const result = await listCalendarAgenda({});
 
-    expect(mocks.executeServicePreset).toHaveBeenCalledWith('google-workspace', 'calendar_events_list', {
-      params: {
-        calendarId: 'primary',
-        timeMin: expect.any(String),
-        timeMax: expect.any(String),
-        singleEvents: true,
-        orderBy: 'startTime',
-        maxResults: 20,
-      },
-    });
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'google-workspace',
+      'calendar_events_list',
+      {
+        params: {
+          calendarId: 'primary',
+          timeMin: expect.any(String),
+          timeMax: expect.any(String),
+          singleEvents: true,
+          orderBy: 'startTime',
+          maxResults: 20,
+        },
+      }
+    );
     expect(result.events).toEqual([
       {
         id: 'event-1',
@@ -72,14 +81,18 @@ describe('calendar-workflow helpers', () => {
       time_zone: 'Asia/Tokyo',
     });
 
-    expect(mocks.executeServicePreset).toHaveBeenCalledWith('google-workspace', 'calendar_freebusy_query', {
-      body: {
-        timeMin: '2026-06-21T09:00:00+09:00',
-        timeMax: '2026-06-21T18:00:00+09:00',
-        timeZone: 'Asia/Tokyo',
-        items: [{ id: 'primary' }, { id: 'team@example.com' }],
-      },
-    });
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'google-workspace',
+      'calendar_freebusy_query',
+      {
+        body: {
+          timeMin: '2026-06-21T09:00:00+09:00',
+          timeMax: '2026-06-21T18:00:00+09:00',
+          timeZone: 'Asia/Tokyo',
+          items: [{ id: 'primary' }, { id: 'team@example.com' }],
+        },
+      }
+    );
     expect(result.calendars[0]).toEqual({
       calendar_id: 'primary',
       busy: [{ start: '2026-06-21T10:00:00+09:00', end: '2026-06-21T11:00:00+09:00' }],
@@ -104,9 +117,13 @@ describe('calendar-workflow helpers', () => {
 
     const result = await listCalendars();
 
-    expect(mocks.executeServicePreset).toHaveBeenCalledWith('google-workspace', 'calendar_calendarList_list', {
-      params: {},
-    });
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'google-workspace',
+      'calendar_calendarList_list',
+      {
+        params: {},
+      }
+    );
     expect(result.calendars).toEqual([
       {
         id: 'primary',
@@ -213,26 +230,30 @@ describe('calendar-workflow helpers', () => {
       attendees: ['team@example.com'],
     });
 
-    expect(mocks.executeServicePreset).toHaveBeenCalledWith('google-workspace', 'calendar_events_insert', {
-      params: {
-        calendarId: 'primary',
-        conferenceDataVersion: 1,
-      },
-      body: {
-        summary: 'Planning session',
-        start: { dateTime: '2026-06-22T13:00:00+09:00', timeZone: 'Asia/Tokyo' },
-        end: { dateTime: '2026-06-22T14:00:00+09:00', timeZone: 'Asia/Tokyo' },
-        attendees: [{ email: 'team@example.com' }],
-        conferenceData: {
-          createRequest: {
-            requestId: expect.any(String),
-            conferenceSolutionKey: {
-              type: 'hangoutsMeet',
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'google-workspace',
+      'calendar_events_insert',
+      {
+        params: {
+          calendarId: 'primary',
+          conferenceDataVersion: 1,
+        },
+        body: {
+          summary: 'Planning session',
+          start: { dateTime: '2026-06-22T13:00:00+09:00', timeZone: 'Asia/Tokyo' },
+          end: { dateTime: '2026-06-22T14:00:00+09:00', timeZone: 'Asia/Tokyo' },
+          attendees: [{ email: 'team@example.com' }],
+          conferenceData: {
+            createRequest: {
+              requestId: expect.any(String),
+              conferenceSolutionKey: {
+                type: 'hangoutsMeet',
+              },
             },
           },
         },
-      },
-    });
+      }
+    );
     expect(result.with_meet).toBe(true);
     expect(result.created_event.hangout_link).toBe('https://meet.google.com/abc-defg-hij');
   });
@@ -266,15 +287,54 @@ describe('calendar-workflow helpers', () => {
         subject: 'Planning session',
         start: { dateTime: '2026-06-22T13:00:00+09:00', timeZone: 'Asia/Tokyo' },
         end: { dateTime: '2026-06-22T14:00:00+09:00', timeZone: 'Asia/Tokyo' },
-        attendees: [{
-          emailAddress: { address: 'team@example.com' },
-          type: 'required',
-        }],
+        attendees: [
+          {
+            emailAddress: { address: 'team@example.com' },
+            type: 'required',
+          },
+        ],
         isOnlineMeeting: true,
         onlineMeetingProvider: 'teamsForBusiness',
       },
     });
     expect(result.with_meet).toBe(true);
     expect(result.created_event.hangout_link).toBe('https://teams.microsoft.com/l/meetup-join/xyz');
+  });
+
+  it('drops malformed provider records and rejects malformed create responses', async () => {
+    mocks.executeServicePreset.mockResolvedValueOnce({
+      items: [null, { id: 7 }, { id: 'event-valid', summary: 'Valid event' }],
+    });
+
+    const agenda = await listCalendarAgenda({});
+
+    expect(agenda.events).toEqual([
+      {
+        id: 'event-valid',
+        summary: 'Valid event',
+        start: '',
+        end: '',
+        location: '',
+        status: '',
+        html_link: '',
+        hangout_link: '',
+      },
+    ]);
+
+    mocks.executeServicePreset.mockResolvedValueOnce({
+      items: [{ id: 'calendar-valid', name: 'Valid calendar' }, { id: 8 }],
+    });
+    const calendars = await listCalendars();
+    expect(calendars.calendars).toHaveLength(1);
+    expect(calendars.calendars[0]?.id).toBe('calendar-valid');
+
+    mocks.executeServicePreset.mockResolvedValueOnce({ malformed: true });
+    await expect(
+      createCalendarEvent({
+        summary: 'Malformed response',
+        start: '2026-06-22T13:00:00+09:00',
+        end: '2026-06-22T14:00:00+09:00',
+      })
+    ).rejects.toThrow('invalid_calendar_event_response');
   });
 });

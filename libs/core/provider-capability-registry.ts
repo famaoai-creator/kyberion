@@ -23,12 +23,14 @@
 
 import { logger } from './core.js';
 import {
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { loadProviderCapabilityCatalog } from './provider-discovery.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
@@ -47,6 +49,18 @@ export interface ProviderCapability {
   models: string[];
   probed_at: string;
   probe_error?: string;
+  /** Help-output flag evidence only; this is not an OS-level enforcement proof. */
+  sandbox_probe?: SandboxFlagProbeResult;
+}
+
+export interface SandboxFlagProbeResult {
+  status: 'supported' | 'unsupported' | 'unknown';
+  method: 'help-flag';
+  command: string;
+  args: string[];
+  expected_flags: string[];
+  evidence?: string;
+  error?: string;
 }
 
 /** Result shape the exec seam must return — deliberately CLI-tool agnostic. */
@@ -77,6 +91,12 @@ interface ProviderProbeSpec {
   /** Declared (not probed — no cheap runtime signal exists) adapter capabilities. */
   headless: boolean;
   structuredOutput: boolean;
+  /** Safe, non-model probe for provider-advertised sandbox/approval flags. */
+  sandboxProbe?: {
+    command: string;
+    args: string[];
+    expectedFlags: string[];
+  };
 }
 
 /**
@@ -99,30 +119,81 @@ export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> =
     authArgs: ['auth', 'status'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'claude',
+      args: ['--help'],
+      expectedFlags: ['--permission-mode'],
+    },
   },
   codex: {
     binaryCommand: 'codex',
     binaryArgs: ['--help'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'codex',
+      args: ['--help'],
+      expectedFlags: ['--sandbox'],
+    },
   },
   agy: {
     binaryCommand: 'agy',
     binaryArgs: ['--help'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'agy',
+      args: ['--help'],
+      expectedFlags: ['--sandbox'],
+    },
   },
   grok: {
     binaryCommand: 'grok',
     binaryArgs: ['--version'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'grok',
+      args: ['--help'],
+      expectedFlags: ['--allow', '--deny'],
+    },
+  },
+  cursor: {
+    binaryCommand: 'cursor-agent',
+    binaryArgs: ['--version'],
+    authCommand: 'cursor-agent',
+    authArgs: ['status'],
+    headless: true,
+    structuredOutput: true,
+    sandboxProbe: {
+      command: 'cursor-agent',
+      args: ['--help'],
+      expectedFlags: ['--sandbox', '--mode'],
+    },
+  },
+  opencode: {
+    binaryCommand: 'opencode',
+    binaryArgs: ['--version'],
+    authCommand: 'opencode',
+    authArgs: ['auth', 'list'],
+    headless: true,
+    structuredOutput: true,
+    sandboxProbe: {
+      command: 'opencode',
+      args: ['--help'],
+      expectedFlags: ['--agent', '--format'],
+    },
   },
   gemini: {
     binaryCommand: 'gemini',
     binaryArgs: ['--version'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'gemini',
+      args: ['--help'],
+      expectedFlags: ['--sandbox', '--approval-mode'],
+    },
   },
   copilot: {
     binaryCommand: 'gh',
@@ -140,6 +211,30 @@ const DEFAULT_PROBE_TIMEOUT_MS = 5000;
 // module's own default instead of duplicating the magic number.
 export const DEFAULT_PROVIDER_CAPABILITY_TTL_MS = 15 * 60 * 1000; // 15 minutes — cheap probes, but not free
 const REGISTRY_CACHE_RELATIVE_PATH = 'runtime/provider-capability-registry.json';
+
+const PROVIDER_BINARY_ENV_KEYS: Readonly<Record<string, string>> = {
+  claude: 'KYBERION_CLAUDE_CLI_BIN',
+  codex: 'KYBERION_CODEX_CLI_BIN',
+  agy: 'KYBERION_AGY_CLI_BIN',
+  grok: 'KYBERION_GROK_CLI_BIN',
+  cursor: 'KYBERION_CURSOR_CLI_BIN',
+  opencode: 'KYBERION_OPENCODE_CLI_BIN',
+  gemini: 'KYBERION_GEMINI_CLI_BIN',
+  copilot: 'KYBERION_COPILOT_CLI_BIN',
+};
+
+function resolveProbeBinary(
+  providerId: string,
+  spec: ProviderProbeSpec,
+  env: NodeJS.ProcessEnv
+): { command: string; explicit: boolean } {
+  const envKey = PROVIDER_BINARY_ENV_KEYS[providerId];
+  const configured = envKey ? getRegisteredEnvText(envKey, { env })?.trim() : undefined;
+  return {
+    command: configured || spec.binaryCommand,
+    explicit: Boolean(configured),
+  };
+}
 
 function defaultProbeExec(
   command: string,
@@ -177,12 +272,60 @@ function runProbe(
   }
 }
 
+function probeSandboxFlags(
+  providerId: string,
+  spec: ProviderProbeSpec,
+  exec: ProbeExecFn,
+  timeoutMs: number,
+  resolvedBinaryCommand: string
+): SandboxFlagProbeResult | undefined {
+  const sandboxProbe = spec.sandboxProbe;
+  if (!sandboxProbe) return undefined;
+
+  const command =
+    sandboxProbe.command === spec.binaryCommand ? resolvedBinaryCommand : sandboxProbe.command;
+  const result = runProbe(exec, command, sandboxProbe.args, timeoutMs);
+  const output = `${result.stdout}\n${result.stderr}`.toLowerCase();
+  const missingFlags = sandboxProbe.expectedFlags.filter(
+    (flag) => !output.includes(flag.toLowerCase())
+  );
+  if (!result.ok) {
+    return {
+      status: 'unknown',
+      method: 'help-flag',
+      command,
+      args: sandboxProbe.args,
+      expected_flags: sandboxProbe.expectedFlags,
+      ...(result.stderr.trim() ? { error: result.stderr.trim() } : {}),
+    };
+  }
+  if (missingFlags.length > 0) {
+    return {
+      status: 'unsupported',
+      method: 'help-flag',
+      command,
+      args: sandboxProbe.args,
+      expected_flags: sandboxProbe.expectedFlags,
+      evidence: `missing advertised flags: ${missingFlags.join(', ')}`,
+    };
+  }
+  return {
+    status: 'supported',
+    method: 'help-flag',
+    command,
+    args: sandboxProbe.args,
+    expected_flags: sandboxProbe.expectedFlags,
+    evidence: `${providerId} help output advertises ${sandboxProbe.expectedFlags.join(', ')}`,
+  };
+}
+
 function probeSingleProvider(
   providerId: string,
   exec: ProbeExecFn,
   timeoutMs: number,
   probedAt: string,
-  claudeFallbackCandidates: () => string[]
+  claudeFallbackCandidates: () => string[],
+  env: NodeJS.ProcessEnv
 ): ProviderCapability {
   const spec = PROVIDER_PROBE_TABLE[providerId];
   if (!spec) {
@@ -198,10 +341,12 @@ function probeSingleProvider(
     };
   }
 
-  let binaryCommand = spec.binaryCommand;
+  const resolvedBinary = resolveProbeBinary(providerId, spec, env);
+  let binaryCommand = resolvedBinary.command;
   let versionResult = runProbe(exec, binaryCommand, spec.binaryArgs, timeoutMs);
   if (
     providerId === 'claude' &&
+    !resolvedBinary.explicit &&
     !versionResult.ok &&
     isClaudeCliPlaceholderFailure(versionResult.stderr)
   ) {
@@ -230,6 +375,10 @@ function probeSingleProvider(
     }
   }
 
+  const sandboxProbe = binaryFound
+    ? probeSandboxFlags(providerId, spec, exec, timeoutMs, binaryCommand)
+    : undefined;
+
   return {
     provider_id: providerId,
     binary_found: binaryFound,
@@ -239,6 +388,7 @@ function probeSingleProvider(
     models: binaryFound ? modelsFor(providerId) : [],
     probed_at: probedAt,
     ...(probeError ? { probe_error: probeError } : {}),
+    ...(sandboxProbe ? { sandbox_probe: sandboxProbe } : {}),
   };
 }
 
@@ -248,6 +398,8 @@ export interface ProbeProviderCapabilitiesOptions {
   /** Injectable exec seam. Production default calls out via secure-io. Tests MUST inject a fake. */
   exec?: ProbeExecFn;
   timeoutMs?: number;
+  /** Environment used to resolve registered provider CLI binary overrides. */
+  env?: NodeJS.ProcessEnv;
   /** Injectable clock for deterministic `probed_at` in tests. */
   now?: () => Date;
   /** Injectable Claude fallback resolver for hermetic tests. */
@@ -265,6 +417,7 @@ export function probeProviderCapabilities(
 ): ProviderCapability[] {
   const exec = opts.exec ?? defaultProbeExec;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
+  const env = opts.env ?? process.env;
   const providerIds = opts.providerIds ?? Object.keys(PROVIDER_PROBE_TABLE);
   const now = opts.now ?? (() => new Date());
   const probedAt = now().toISOString();
@@ -273,7 +426,14 @@ export function probeProviderCapabilities(
 
   return providerIds.map((providerId) => {
     try {
-      return probeSingleProvider(providerId, exec, timeoutMs, probedAt, claudeFallbackCandidates);
+      return probeSingleProvider(
+        providerId,
+        exec,
+        timeoutMs,
+        probedAt,
+        claudeFallbackCandidates,
+        env
+      );
     } catch (err) {
       // Belt-and-braces: probeSingleProvider already catches exec errors,
       // but nothing about the probe path may ever throw out to the caller.
@@ -298,8 +458,16 @@ interface RegistryEnvelope {
 }
 
 function registryCachePath(): string {
-  return pathResolver.shared(REGISTRY_CACHE_RELATIVE_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(REGISTRY_CACHE_RELATIVE_PATH), {
+    allowMissingLeaf: true,
+  });
 }
+
+const providerCapabilityRegistryCatalog = defineCatalog<RegistryEnvelope>({
+  id: 'provider-capability-registry',
+  path: registryCachePath,
+  schema: pathResolver.knowledge('product/schemas/provider-capability-registry.schema.json'),
+});
 
 /**
  * Read the persisted registry snapshot without ever (re-)probing. Returns
@@ -311,12 +479,8 @@ export function peekProviderCapabilityRegistry(
   opts: { now?: () => Date } = {}
 ): ProviderCapability[] | null {
   const now = opts.now ?? (() => new Date());
-  const filePath = registryCachePath();
   try {
-    if (!safeExistsSync(filePath)) return null;
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as RegistryEnvelope;
-    if (!parsed || !Array.isArray(parsed.value)) return null;
+    const parsed = providerCapabilityRegistryCatalog.load();
     const computedAt = new Date(parsed.computed_at).getTime();
     if (!Number.isFinite(computedAt)) return null;
     const ageMs = now().getTime() - computedAt;
@@ -337,7 +501,8 @@ function writeRegistryCache(value: ProviderCapability[], ttlMs: number, now: () 
       ttl_ms: ttlMs,
       value,
     };
-    safeWriteFile(filePath, JSON.stringify(envelope, null, 2), { encoding: 'utf8' });
+    const validated = providerCapabilityRegistryCatalog.validate(envelope, filePath);
+    safeWriteFile(filePath, JSON.stringify(validated, null, 2), { encoding: 'utf8' });
   } catch (err) {
     logger.warn(
       `[provider-capability-registry] failed to persist snapshot (non-fatal): ${err instanceof Error ? err.message : String(err)}`
@@ -375,6 +540,7 @@ export function loadProviderCapabilityRegistry(
     providerIds: opts.providerIds,
     exec: opts.exec,
     timeoutMs: opts.timeoutMs,
+    env: opts.env,
     now,
   });
   writeRegistryCache(value, ttlMs, now);

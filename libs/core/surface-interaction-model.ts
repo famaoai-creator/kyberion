@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { nowIso } from './foundation/time.js';
 import {
   buildChronosSurfaceIngressEnvelope,
   buildPresenceSurfaceIngressEnvelope,
@@ -25,6 +26,7 @@ import type {
   SurfaceConversationMessageInput,
   SurfaceNotificationRecord,
 } from './channel-surface-types.js';
+import type { SupportedLocale } from './locale-normalize.js';
 import type { ExecutionFeedbackInput } from './execution-feedback.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 
@@ -149,6 +151,7 @@ export function resolveSurfaceIngressScope(input: {
 export interface BuildSurfaceConversationInputOptions {
   agentId: string;
   senderAgentId: string;
+  locale?: SupportedLocale;
   cwd?: string;
   threadContext?: string;
   forcedReceiver?: string;
@@ -487,6 +490,20 @@ export const telegramSurfaceProviderDefinition: SurfaceProviderDefinition = {
   createMessage: createSurfaceMessage,
 };
 
+export const coworkSurfaceProviderDefinition: SurfaceProviderDefinition = {
+  id: 'cowork',
+  capabilities: {
+    reply: true,
+    edit: false,
+    react: false,
+    notify: true,
+    asyncRequest: true,
+    responding: true,
+  },
+  createSpace: createSurfaceSpace,
+  createMessage: createSurfaceMessage,
+};
+
 // E2E-04 G5: the terminal is a first-class surface too — `pnpm kyberion ask`
 // and scripts/cli.ts route through the same brain as every bridge.
 export const cliSurfaceProviderDefinition: SurfaceProviderDefinition = {
@@ -503,6 +520,14 @@ export const cliSurfaceProviderDefinition: SurfaceProviderDefinition = {
   createMessage: createSurfaceMessage,
 };
 
+// The terminal bridge is the session-oriented sibling of the CLI surface.
+// Reuse the same interaction capabilities while keeping its provider id
+// distinct so persisted surface records remain explicit.
+export const terminalSurfaceProviderDefinition: SurfaceProviderDefinition = {
+  ...cliSurfaceProviderDefinition,
+  id: 'terminal',
+};
+
 // Auto-register defaults. A later registration must use a new provider id;
 // replacing a built-in provider is intentionally rejected by the seam.
 registerSurfaceProvider(slackSurfaceProviderDefinition);
@@ -511,7 +536,9 @@ registerSurfaceProvider(presenceSurfaceProviderDefinition);
 registerSurfaceProvider(imessageSurfaceProviderDefinition);
 registerSurfaceProvider(discordSurfaceProviderDefinition);
 registerSurfaceProvider(telegramSurfaceProviderDefinition);
+registerSurfaceProvider(coworkSurfaceProviderDefinition);
 registerSurfaceProvider(cliSurfaceProviderDefinition);
+registerSurfaceProvider(terminalSurfaceProviderDefinition);
 
 export function createSlackSurfaceSpace(
   input: SlackSurfaceInput & { correlationId?: string }
@@ -571,7 +598,7 @@ export function createIMessageSurfaceMessage(input: {
     threadTs: input.threadTs,
     correlationId: input.correlationId || randomUUID(),
     text: input.text,
-    receivedAt: input.receivedAt || new Date().toISOString(),
+    receivedAt: input.receivedAt || nowIso(),
     actorId: input.actorId,
     attachments: input.attachments,
   });
@@ -593,7 +620,7 @@ export function createDiscordSurfaceMessage(input: {
     threadTs: input.threadTs,
     correlationId: input.correlationId || randomUUID(),
     text: input.text,
-    receivedAt: input.receivedAt || new Date().toISOString(),
+    receivedAt: input.receivedAt || nowIso(),
     actorId: input.actorId,
   });
 }
@@ -624,6 +651,7 @@ export function buildSurfaceConversationInputFromMessage(
     agentId: options.agentId,
     query,
     senderAgentId: options.senderAgentId,
+    locale: options.locale,
     correlationId: message.correlationId,
     surface: message.surface,
     surfaceText: message.text,
@@ -659,10 +687,10 @@ export function createSurfaceMessageFromConversationInput(
   input: SurfaceConversationMessageInput
 ): SurfaceMessage {
   const channel = input.channel?.trim() || 'unknown';
-  const threadTs = input.threadTs?.trim() || input.receivedAt || new Date().toISOString();
+  const receivedAt = input.receivedAt || nowIso();
+  const threadTs = input.threadTs?.trim() || receivedAt;
   const correlationId = input.correlationId || randomUUID();
   const messageId = input.messageId || randomUUID();
-  const receivedAt = input.receivedAt || new Date().toISOString();
   const ingressScope = resolveSurfaceIngressScope({
     surface: input.surface,
     channel,
@@ -725,6 +753,7 @@ export function buildSurfaceConversationInput(
   const baseInput = buildSurfaceConversationInputFromMessage(message, {
     agentId: input.agentId || manifest.agentId,
     senderAgentId: input.senderAgentId,
+    locale: input.locale,
     cwd: input.cwd,
     threadContext: input.threadContext,
     forcedReceiver: input.forcedReceiver,

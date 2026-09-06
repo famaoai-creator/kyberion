@@ -1,4 +1,5 @@
-import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
+import { type AttentionItem } from '../lib/operator-console';
+import { optionalStringField, parseJsonRecord } from '../lib/json-record';
 import { chronosSpeechLocale, resolveChronosLocale, uxMessage, uxText } from '../lib/ux-vocabulary';
 import type {
   A2AHandoffSummary,
@@ -16,6 +17,43 @@ import type {
   SurfaceSummary,
   WorkLoopPreview,
 } from './MissionIntelligenceTypes';
+
+const MISSION_INTELLIGENCE_PREFS_KEY = 'chronos.mission-intelligence.prefs';
+
+export function loadMissionIntelligenceSelectedMissionId(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(MISSION_INTELLIGENCE_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = parseJsonRecord(raw);
+    return parsed ? optionalStringField(parsed, 'selectedMissionId') || null : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveMissionIntelligenceSelectedMissionId(selectedMissionId: string | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      MISSION_INTELLIGENCE_PREFS_KEY,
+      JSON.stringify({ selectedMissionId })
+    );
+  } catch {
+    // localStorage may be denied; ignore.
+  }
+}
+
+export function isEditableHotkeyTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  return Boolean(
+    element &&
+    (element.tagName === 'INPUT' ||
+      element.tagName === 'TEXTAREA' ||
+      element.tagName === 'SELECT' ||
+      element.isContentEditable)
+  );
+}
 
 export function resolveMissionThreadHotkeyAction(key: string): 'thread' | 'card' | null {
   const normalized = key.toLowerCase();

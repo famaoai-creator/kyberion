@@ -1,15 +1,8 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-
-type BrandTokens = {
-  tokens?: {
-    fonts?: {
-      sans?: string;
-      mono?: string;
-    };
-  };
-};
+import { loadBrandTokensAtPath, type BrandTokens } from './brand-tokens.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync } from './secure-io.js';
 
 type FontFamilyPair = {
   latin: string;
@@ -41,13 +34,19 @@ function findExistingPath(relativePath: string): string {
   throw new Error(`Unable to locate ${relativePath} from cwd or module path`);
 }
 
+function resolveBrandTokensPath(): string {
+  try {
+    return findExistingPath(BRAND_TOKENS_RELATIVE_PATH);
+  } catch {
+    // Let the governed catalog surface its configured fallback when a fresh
+    // checkout has not generated the optional design-token artifact yet.
+    return pathResolver.rootResolve(BRAND_TOKENS_RELATIVE_PATH);
+  }
+}
+
 function loadBrandTokens(): BrandTokens {
   if (!cachedBrandTokens) {
-    const raw = safeReadFile(findExistingPath(BRAND_TOKENS_RELATIVE_PATH), {
-      encoding: 'utf8',
-      label: 'brand tokens',
-    }) as string;
-    cachedBrandTokens = JSON.parse(raw) as BrandTokens;
+    cachedBrandTokens = loadBrandTokensAtPath(resolveBrandTokensPath());
   }
   return cachedBrandTokens;
 }

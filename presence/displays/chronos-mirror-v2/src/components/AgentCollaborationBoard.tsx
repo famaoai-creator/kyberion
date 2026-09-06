@@ -3,66 +3,13 @@
 import * as React from 'react';
 import { useChronosLocale } from '../lib/hooks';
 import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
+import {
+  parseCollaborationResponse,
+  type ClientCollaborationProjection,
+} from '../lib/collaboration-response';
 import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 
-type Attention = {
-  event_id: string;
-  mission_id?: string;
-  task_id?: string;
-  agent_id?: string;
-  kind: string;
-  title: string;
-  reason: string;
-  next_action: string;
-};
-
-type CollaborationProjection = {
-  generated_at: string;
-  partial: boolean;
-  status_flags: Array<'sequence_gap' | 'unknown_event' | 'stale_runtime'>;
-  sequence_gaps: Array<{
-    source: string;
-    previous_seq: number;
-    expected_seq: number;
-    actual_seq: number;
-  }>;
-  overview: {
-    events: number;
-    missions: number;
-    tasks: number;
-    agents: number;
-    active: number;
-    blocked: number;
-    waiting_human: number;
-    review_pending: number;
-    failures: number;
-    native_subagents: number;
-    unavailable_subagents: number;
-  };
-  events: Array<{
-    event_id: string;
-    ts: string;
-    mission_id?: string;
-    task_id?: string;
-    agent_id?: string;
-    causation_id?: string;
-    evidence_refs?: string[];
-    kind: string;
-    summary: string;
-    source: string;
-    provider?: string;
-    thread_id?: string;
-    parent_thread_id?: string;
-    turn_id?: string;
-    native?: boolean;
-    native_fork?: boolean;
-    native_mode?: string;
-    effort?: 'low' | 'medium' | 'high' | 'ultra';
-    native_unavailable?: boolean;
-  }>;
-  edges: Array<{ from: string; to: string; kind: string; event_id: string }>;
-  attention: Attention[];
-};
+type CollaborationProjection = ClientCollaborationProjection;
 
 const KIND_LABEL_KEY: Record<string, string> = {
   dispatch: 'chronos_ac_kind_dispatch',
@@ -184,31 +131,21 @@ export function AgentCollaborationBoard({
   const [error, setError] = React.useState<string | null>(null);
   const [missionId, setMissionId] = React.useState('');
   const [refreshing, setRefreshing] = React.useState(false);
+  const schedulerRef = React.useRef<LiveSyncScheduler<CollaborationProjection> | null>(null);
 
-  const refresh = React.useCallback(async () => {
+  const refresh = React.useCallback(() => {
     setRefreshing(true);
-    try {
-      const query = buildCollaborationQuery(tenant, missionId);
-      const response = await fetch(`/api/collaboration${query}`, { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok)
-        throw new Error(payload.error || uxText('chronos_ac_load_error', locale));
-      setProjection(payload.projection);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setRefreshing(false);
-    }
-  }, [locale, missionId, tenant]);
+    schedulerRef.current?.invalidate();
+  }, []);
 
   const loadProjection = React.useCallback(async () => {
     const query = buildCollaborationQuery(tenant, missionId);
     const response = await fetch(`/api/collaboration${query}`, { cache: 'no-store' });
     const payload = await response.json();
-    if (!response.ok || !payload.ok)
-      throw new Error(payload.error || uxText('chronos_ac_load_error', locale));
-    return payload.projection as CollaborationProjection;
+    if (!response.ok) throw new Error(uxText('chronos_ac_load_error', locale));
+    const parsed = parseCollaborationResponse(payload);
+    if (!parsed) throw new Error(uxText('chronos_ac_load_error', locale));
+    return parsed;
   }, [locale, missionId, tenant]);
 
   React.useEffect(() => {
@@ -216,16 +153,22 @@ export function AgentCollaborationBoard({
   }, [tenant]);
 
   React.useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  React.useEffect(() => {
     const scheduler = new LiveSyncScheduler<CollaborationProjection>({
       fetchSnapshot: loadProjection,
-      onSnapshot: setProjection,
+      onSnapshot: (snapshot) => {
+        setProjection(snapshot);
+        setRefreshing(false);
+        setError(null);
+      },
+      onError: (reason) => {
+        setRefreshing(false);
+        setError(reason instanceof Error ? reason.message : String(reason));
+      },
       isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
       debounceMs: 120,
+      revisionOf: (snapshot) => snapshot.revision,
     });
+    schedulerRef.current = scheduler;
     const unbindVisibility = bindVisibilityToLiveSync(scheduler);
     const eventSource =
       typeof window !== 'undefined' && 'EventSource' in window
@@ -244,8 +187,9 @@ export function AgentCollaborationBoard({
       eventSource?.close();
       unbindVisibility();
       scheduler.stop();
+      if (schedulerRef.current === scheduler) schedulerRef.current = null;
     };
-  }, [loadProjection, tenant]);
+  }, [loadProjection]);
 
   const overview = projection?.overview;
   const eventById = React.useMemo(

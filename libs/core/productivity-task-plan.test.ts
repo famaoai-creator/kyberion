@@ -4,11 +4,24 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { previewPipeline } from './src/pipeline-preview.js';
-import { buildProductivityTaskPlan } from './productivity-task-plan.js';
+import {
+  buildProductivityTaskPlan,
+  validateProductivityTaskPlan,
+} from './productivity-task-plan.js';
+import { resolveIntentResolutionPacket } from './intent-resolution.js';
 
 const Ajv = AjvModule;
 
 describe('productivity-task-plan', () => {
+  it('reuses the canonical resolution packet for plan and session classification', () => {
+    const request = '会議の日程を変更して参加者にメールを送って';
+    const resolutionPacket = resolveIntentResolutionPacket(request);
+    const plan = buildProductivityTaskPlan(request, { resolutionPacket });
+
+    expect(plan.primary_intent_id).toBe(resolutionPacket.selected_intent_id);
+    expect(plan.missing_inputs).toEqual(expect.arrayContaining(['approval_confirmation']));
+  });
+
   it('builds a multi-domain dry-run plan without external effects', () => {
     const plan = buildProductivityTaskPlan(
       '連携システムから情報収集して会議資料をPPTXで作り、メールの下書きを用意して'
@@ -56,6 +69,14 @@ describe('productivity-task-plan', () => {
 
     expect(validate(plan), JSON.stringify(validate.errors || [])).toBe(true);
     expect(validate(example), JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('rejects unknown fields at the governed persistence boundary', () => {
+    const plan = buildProductivityTaskPlan('明日のカレンダーの空き時間を確認して');
+
+    expect(() =>
+      validateProductivityTaskPlan({ ...plan, unexpected: true }, 'test-plan.json')
+    ).toThrow(/Invalid catalog productivity-task-plan at test-plan\.json/);
   });
 
   it('provides a valid dry-run pipeline with no external actuator steps', () => {

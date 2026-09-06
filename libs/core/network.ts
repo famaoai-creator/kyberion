@@ -2,7 +2,8 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, validateUrl } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { validateUrl } from './secure-io.js';
 import {
   evaluateEgressPolicy,
   resolveEgressPayloadContext,
@@ -12,28 +13,26 @@ import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { assertOperationPolicy } from './operation-policy-gate.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isRecord } from './foundation/text.js';
 
 /**
  * Standardized network utilities for Kyberion Components.
  * v2.2 - POLICY-DRIVEN GUARDRAILS (ADF ENABLED)
  */
 
+const securityPolicyCatalog = defineCatalog<{
+  network_guardrails?: { max_request_size_kb?: number };
+}>({
+  id: 'security-policy-network-guardrails',
+  path: pathResolver.knowledge('product/governance/security-policy.json'),
+  schema: pathResolver.knowledge('product/schemas/security-policy.schema.json'),
+});
+
 function loadNetworkGuardrails(): { maxRequestSizeKb: number } {
-  try {
-    const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
-    if (safeExistsSync(policyPath)) {
-      const policy = loadJson<{ network_guardrails?: { max_request_size_kb?: unknown } }>(
-        policyPath
-      );
-      const maxRequestSizeKb = Number(policy?.network_guardrails?.max_request_size_kb);
-      if (!Number.isNaN(maxRequestSizeKb) && maxRequestSizeKb > 0) {
-        return { maxRequestSizeKb };
-      }
-    }
-  } catch (_) {
-    /* policy unreadable: fall back to default guardrails */
-  }
-  return { maxRequestSizeKb: 2048 };
+  const maxRequestSizeKb = securityPolicyCatalog.load().network_guardrails?.max_request_size_kb;
+  return typeof maxRequestSizeKb === 'number' && maxRequestSizeKb > 0
+    ? { maxRequestSizeKb }
+    : { maxRequestSizeKb: 2048 };
 }
 
 const SENSITIVE_KEY_PATTERN =
@@ -62,7 +61,7 @@ export function redactSensitiveString(value: string): string {
   return redacted;
 }
 
-export function redactSensitiveValue(value: any, keyPath: string[] = []): any {
+export function redactSensitiveValue(value: unknown, keyPath: string[] = []): unknown {
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') {
     return SENSITIVE_KEY_PATTERN.test(keyPath[keyPath.length - 1] || '')
@@ -75,8 +74,8 @@ export function redactSensitiveValue(value: any, keyPath: string[] = []): any {
   if (Array.isArray(value)) {
     return value.map((entry, index) => redactSensitiveValue(entry, [...keyPath, String(index)]));
   }
-  if (typeof value === 'object') {
-    const output: Record<string, any> = {};
+  if (isRecord(value)) {
+    const output: Record<string, unknown> = {};
     for (const [key, nested] of Object.entries(value)) {
       if (SENSITIVE_KEY_PATTERN.test(key)) {
         output[key] =
@@ -92,8 +91,8 @@ export function redactSensitiveValue(value: any, keyPath: string[] = []): any {
   return value;
 }
 
-export function redactSensitiveObject(data: any): any {
-  return redactSensitiveValue(data);
+export function redactSensitiveObject<T>(data: T): T {
+  return redactSensitiveValue(data) as T;
 }
 
 function enforcePayloadSize(options: AxiosRequestConfig) {
@@ -110,7 +109,7 @@ function enforcePayloadSize(options: AxiosRequestConfig) {
   }
 }
 
-export async function secureFetch<T = any>(options: SecureFetchOptions): Promise<T> {
+export async function secureFetch<T = unknown>(options: SecureFetchOptions): Promise<T> {
   const { kyberion_allow_local_network, kyberion_egress_context, ...axiosOptions } =
     options as SecureFetchOptions & {
       authenticateRequest?: boolean;
@@ -221,9 +220,11 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
       },
     });
     return response.data;
-  } catch (err: any) {
-    const status = err.response ? ` (${err.response.status})` : '';
-    throw new Error(`Network Error: ${err.message}${status}`);
+  } catch (err: unknown) {
+    const response = isRecord(err) && isRecord(err.response) ? err.response : undefined;
+    const status = typeof response?.status === 'number' ? ` (${response.status})` : '';
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Network Error: ${message}${status}`);
   }
 }
 export interface SecureFetchOptions extends AxiosRequestConfig {

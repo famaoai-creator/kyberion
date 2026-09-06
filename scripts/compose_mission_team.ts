@@ -1,23 +1,32 @@
 import * as path from 'node:path';
+import { createStandardYargs } from '@agent/core/cli-utils';
 import {
-  createStandardYargs,
   composeMissionTeamPlan,
-  composeMissionTeamBrief,
-  loadOrganizationProfile,
-  writeMissionTeamBrief,
-  findMissionPath,
-  initializeMissionTeamBindings,
-  missionDir,
   writeMissionTeamPlan,
-} from '@agent/core';
-import { getRegisteredEnvText, readJson, setRegisteredEnv } from '@agent/core/foundation';
+} from '@agent/core/mission-team-plan-composer';
+import {
+  composeMissionTeamBrief,
+  writeMissionTeamBrief,
+} from '@agent/core/mission-team-brief-composer';
+import { loadOrganizationProfile } from '@agent/core/organization-profile';
+import { initializeMissionTeamBindings } from '@agent/core/mission-team-binding';
+import { findMissionPath, missionDir } from '@agent/core/path-resolver';
+import { loadStateAtPath } from '@agent/core/mission-state';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { withOrganizationContext } from './refactor/organization-context.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
+
+export const MISSION_TEAM_COMPOSITION_USAGE =
+  'Usage: pnpm mission:compose-team --mission-id <id> [--request <text>] [--write]';
 
 function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () => T): T {
-  const previousRole = process.env.MISSION_ROLE;
+  const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
 
-  process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+  }
   if (!getRegisteredEnvText('KYBERION_PERSONA') && assignedPersona) {
     setRegisteredEnv('KYBERION_PERSONA', assignedPersona);
   }
@@ -25,14 +34,17 @@ function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () 
   try {
     return fn();
   } finally {
-    if (previousRole === undefined) delete process.env.MISSION_ROLE;
-    else process.env.MISSION_ROLE = previousRole;
+    setRegisteredEnv('MISSION_ROLE', previousRole);
     setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }
 
-async function main() {
-  const argv = await createStandardYargs()
+export async function main(args: string[] = []): Promise<unknown> {
+  if (args.includes('--help') || args.includes('-h')) {
+    return { status: 'help', usage: MISSION_TEAM_COMPOSITION_USAGE };
+  }
+
+  const argv = await createStandardYargs(['node', 'compose_mission_team', ...args])
     .option('mission-id', { type: 'string', demandOption: true })
     .option('mission-type', { type: 'string' })
     .option('request', {
@@ -83,12 +95,15 @@ async function main() {
   let missionTenantSlug: string | undefined;
 
   if (missionPath) {
-    const state = readJson<{
-      tier?: typeof tier;
-      tenant_slug?: string;
-      assigned_persona?: string;
-    }>(path.join(missionPath, 'mission-state.json'));
-    tier = state.tier || tier;
+    const missionStatePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'));
+    if (!safeLstat(missionStatePath).isFile()) {
+      throw new Error(`Mission state must be a regular file: ${missionStatePath}`);
+    }
+    const state = loadStateAtPath(missionStatePath);
+    if (!state) {
+      throw new Error(`Mission state is invalid or unreadable: ${missionStatePath}`);
+    }
+    tier = state.tier;
     assignedPersona = assignedPersona || state.assigned_persona;
     missionTenantSlug = state.tenant_slug;
   }
@@ -165,10 +180,21 @@ async function main() {
     });
   }
 
-  console.log(JSON.stringify(brief || plan, null, 2));
+  return brief || plan;
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+export const runComposeMissionTeam = defineScript({
+  name: 'mission:compose-team',
+  flags: ['json'],
+  run: async ({ argv, print }) => {
+    const result = await main(argv);
+    print(result);
+    return result;
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'compose_mission_team.ts') ||
+  isDirectScript(import.meta.url, 'compose_mission_team.js')
+)
+  void runComposeMissionTeam();

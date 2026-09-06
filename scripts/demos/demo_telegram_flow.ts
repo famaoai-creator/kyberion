@@ -1,41 +1,49 @@
-import { logger, runSurfaceMessageConversation } from '@agent/core';
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
+import { getRegisteredEnvText, nowIso, setRegisteredEnv } from '@agent/core/foundation';
+import { currentProcessArgv, defineScript, isDirectScript } from '../lib/harness.js';
 
-async function simulate() {
-  if (!getRegisteredEnvText('KYBERION_PERSONA')) {
-    setRegisteredEnv('KYBERION_PERSONA', 'ecosystem_architect');
-  }
-  process.env.MISSION_ROLE ||= 'mission_controller';
+export const simulateTelegram = defineScript({
+  name: 'telegram-demo',
+  async run({ print }) {
+    if (!getRegisteredEnvText('KYBERION_PERSONA')) {
+      setRegisteredEnv('KYBERION_PERSONA', 'ecosystem_architect');
+    }
+    if (!getRegisteredEnvText('MISSION_ROLE')) {
+      setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+    }
 
-  logger.info('🚀 Starting Telegram Flow Simulation...');
-  logger.info('📥 Inbound Message: "Telegram連携を試して"');
+    logger.info('🚀 Starting Telegram Flow Simulation...');
+    logger.info('📥 Inbound Message: "Telegram連携を試して"');
 
-  try {
     const result = await runSurfaceMessageConversation({
       surface: 'telegram',
       text: 'Telegram連携を試して',
+      locale: 'ja',
       channel: '123456789',
       threadTs: 'telegram-demo-1',
       correlationId: 'demo-telegram-123',
-      receivedAt: new Date().toISOString(),
+      receivedAt: nowIso(),
       actorId: '987654321',
       senderAgentId: 'kyberion:telegram-bridge',
       agentId: 'telegram-surface-agent',
       delegationSummaryInstruction:
         'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
-    } as any);
+    });
 
     logger.success('✅ Conversation logic completed.');
     logger.info('📤 Response Text:');
-    console.log('\n' + result.text + '\n');
+    print('\n' + result.text + '\n');
 
     if (result.a2uiMessages?.length) {
       logger.info(`✨ Generated ${result.a2uiMessages.length} A2UI blocks.`);
     }
-  } catch (error: any) {
-    logger.error(`❌ Simulation failed: ${error.message}`);
-    if (error.stack) console.error(error.stack);
-  }
-}
+    return result;
+  },
+});
 
-simulate();
+if (
+  isDirectScript(import.meta.url, 'demo_telegram_flow.ts') ||
+  isDirectScript(import.meta.url, 'demo_telegram_flow.js')
+)
+  void simulateTelegram(currentProcessArgv().slice(2));

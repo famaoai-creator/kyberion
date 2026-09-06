@@ -1,17 +1,18 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import {
   checkI18nHardcoding,
   isExcludedFile,
   isTestFile,
+  readI18nHardcodingTextFile,
   scanFileForKanaLiterals,
 } from './check_i18n_hardcoding.js';
 
@@ -114,6 +115,23 @@ describe('isTestFile / isExcludedFile', () => {
 });
 
 describe('checkI18nHardcoding', () => {
+  it('rejects a directory replacement before workspace scanning', () => {
+    expect(() => readI18nHardcodingTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
+  it('uses the foundation text reader for workspace scans', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_i18n_hardcoding.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).not.toContain('safeReadFile(filePath');
+  });
+
   afterEach(() => {
     if (safeExistsSync(FIXTURE_DIR)) {
       safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
@@ -159,7 +177,7 @@ describe('checkI18nHardcoding', () => {
       JSON.stringify({
         version: 1,
         generated_at: '2026-07-01T00:00:00.000Z',
-        scan_roots: [],
+        scan_roots: ['active/shared/tmp/check-i18n-hardcoding/src'],
         files: { [relativeFile]: 1 },
       })
     );
@@ -183,7 +201,7 @@ describe('checkI18nHardcoding', () => {
       JSON.stringify({
         version: 1,
         generated_at: '2026-07-01T00:00:00.000Z',
-        scan_roots: [],
+        scan_roots: ['active/shared/tmp/check-i18n-hardcoding/src'],
         files: { [relativeFile]: 1 },
       })
     );
@@ -204,7 +222,7 @@ describe('checkI18nHardcoding', () => {
       JSON.stringify({
         version: 1,
         generated_at: '2026-07-01T00:00:00.000Z',
-        scan_roots: [],
+        scan_roots: ['active/shared/tmp/check-i18n-hardcoding/src'],
         files: {},
       })
     );
@@ -226,7 +244,7 @@ describe('checkI18nHardcoding', () => {
       JSON.stringify({
         version: 1,
         generated_at: '2026-07-01T00:00:00.000Z',
-        scan_roots: [],
+        scan_roots: ['active/shared/tmp/check-i18n-hardcoding/src'],
         files: { [relativeFile]: 3 },
       })
     );
@@ -249,7 +267,7 @@ describe('checkI18nHardcoding', () => {
       JSON.stringify({
         version: 1,
         generated_at: '2026-07-01T00:00:00.000Z',
-        scan_roots: [],
+        scan_roots: ['active/shared/tmp/check-i18n-hardcoding/src'],
         files: { [relativeFile]: 2 },
       })
     );
@@ -279,7 +297,7 @@ describe('checkI18nHardcoding', () => {
       JSON.stringify({
         version: 1,
         generated_at: '2026-07-01T00:00:00.000Z',
-        scan_roots: [],
+        scan_roots: ['active/shared/tmp/check-i18n-hardcoding/src'],
         files: { [relativeDeletedFile]: 5 },
       })
     );

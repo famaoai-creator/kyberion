@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/adf-execution-policy.schema.json",
   "version": "1",
   "limits": {
     "max_steps": 500,

@@ -2,8 +2,13 @@ import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
+import {
+  provisionMissionEntry,
+  writeProvisionedJson,
+  writeProvisionedText,
+} from './mission-orchestration-journal.js';
 import {
   findReusableArtifactOwnershipRecord,
   listArtifactOwnershipRecordsForProject,
@@ -40,6 +45,9 @@ import {
   organizationIdFromContext,
   resolveScopeBudget,
 } from './mission-context-pack-knowledge.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
+import { loadMissionWorkItemDispatchResponseSeedAtPath } from './mission-workitem-dispatch-response.js';
 import type {
   BuildMissionContextPackInput,
   MissionContextPack,
@@ -130,6 +138,26 @@ function estimatedChars(value: unknown): number {
   }
 }
 
+function safeMissionPath(missionPath: string): string {
+  return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
+}
+
+function safeMissionArtifactPath(missionPath: string, relativePath: string): string {
+  const safeRoot = safeMissionPath(missionPath);
+  return assertSafeRepositoryPath(path.join(safeRoot, relativePath), {
+    allowMissingLeaf: true,
+  });
+}
+
+function safeOptionalRepositoryPath(value: string): string | undefined {
+  if (!value) return undefined;
+  try {
+    return assertSafeRepositoryPath(value, { allowMissingLeaf: true });
+  } catch {
+    return undefined;
+  }
+}
+
 function mapTaskModelTier(
   tier?: MissionTeamAssignment['model_hint']['tier']
 ): 'fast' | 'standard' | 'deep' | undefined {
@@ -209,14 +237,13 @@ function buildTaskGuidance(input: {
   }
 
   if (input.missionPath) {
-    const dispatchManifestPath = path.join(
+    const dispatchManifestPath = safeMissionArtifactPath(
       input.missionPath,
-      'evidence',
-      'workitem-dispatch-manifest.json'
+      'evidence/workitem-dispatch-manifest.json'
     );
     if (safeExistsSync(dispatchManifestPath)) {
       try {
-        const parsed = readJson<{ records?: Array<Record<string, unknown>> }>(dispatchManifestPath);
+        const parsed = loadMissionWorkItemDispatchManifestAtPath(dispatchManifestPath);
         const currentItemId = input.workItem?.item_id;
         const currentTeamRole = String(
           input.workItem?.metadata && typeof input.workItem.metadata === 'object'
@@ -249,35 +276,30 @@ function buildTaskGuidance(input: {
         for (const record of priorResponses) {
           const responsePath = String(record.response_path || '').trim();
           const reflectionPath = String(record.reflection_path || '').trim();
+          const safeResponsePath = safeOptionalRepositoryPath(responsePath);
+          const safeReflectionPath = safeOptionalRepositoryPath(reflectionPath);
+          if (!safeResponsePath) continue;
           const responseExcerpt = String(record.response_excerpt || '').trim();
           const recordTitle = String(record.title || '').trim();
-          seed.push(`Prior work item response: ${responsePath}`);
-          if (reflectionPath) seed.push(`Prior reflection: ${reflectionPath}`);
+          seed.push(`Prior work item response: ${safeResponsePath}`);
+          if (safeReflectionPath) seed.push(`Prior reflection: ${safeReflectionPath}`);
           if (recordTitle) seed.push(`Prior work item: ${recordTitle}`);
           if (responseExcerpt)
             seed.push(
               `Prior response excerpt: ${summarizeText(responseExcerpt, 160) || responseExcerpt}`
             );
-          if (responsePath && safeExistsSync(responsePath)) {
+          if (safeExistsSync(safeResponsePath)) {
             try {
-              const responsePayload = readJson<{
-                task_result?: {
-                  artifacts?: Array<{ path?: string; kind?: string }>;
-                  summary?: string;
-                };
-              }>(responsePath);
-              const artifacts = Array.isArray(responsePayload.task_result?.artifacts)
-                ? responsePayload.task_result.artifacts
-                : [];
-              for (const artifact of artifacts.slice(0, 3)) {
-                const artifactPath = String(artifact.path || '').trim();
-                if (artifactPath) {
+              const taskResult = loadMissionWorkItemDispatchResponseSeedAtPath(safeResponsePath);
+              for (const artifact of (taskResult?.artifacts || []).slice(0, 3)) {
+                const artifactPath = artifact.path.trim();
+                if (safeOptionalRepositoryPath(artifactPath)) {
                   seed.push(
                     `Prior artifact: ${artifactPath}${artifact.kind ? ` (${artifact.kind})` : ''}`
                   );
                 }
               }
-              const summary = String(responsePayload.task_result?.summary || '').trim();
+              const summary = taskResult?.summary?.trim() || '';
               if (summary) {
                 seed.push(`Prior task summary: ${summarizeText(summary, 180) || summary}`);
               }
@@ -346,10 +368,19 @@ function writeMissionContextRollup(
   rollupSummary: string
 ): string | undefined {
   if (!missionPath) return undefined;
-  const targetDir = path.join(missionPath, 'coordination', 'context-rollups');
+  const targetDir = safeMissionArtifactPath(missionPath, 'coordination/context-rollups');
   if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
-  const filePath = path.join(targetDir, `${pack.context_pack_id}.md`);
-  safeWriteFile(filePath, `${rollupSummary}\n`);
+  const filePath = safeMissionArtifactPath(
+    missionPath,
+    `coordination/context-rollups/${pack.context_pack_id}.md`
+  );
+  writeProvisionedText({
+    missionId: pack.scope.mission_id,
+    filePath,
+    targetPath: path.relative(missionPath, filePath).split(path.sep).join('/'),
+    missionPathHint: missionPath,
+    provisioned: provisionMissionEntry(`${rollupSummary}\n`),
+  });
   return filePath;
 }
 
@@ -483,18 +514,12 @@ function buildContextPackId(input: {
 
 function missionStatePath(missionId: string, tier: MissionTier): string {
   const missionPath = findMissionPath(missionId) || pathResolver.missionDir(missionId, tier);
-  return path.join(missionPath, 'mission-state.json');
+  return safeMissionArtifactPath(missionPath, 'mission-state.json');
 }
 
 function loadMissionState(missionId: string, tier: MissionTier): MissionStateSummary | null {
   const filePath = missionStatePath(missionId, tier);
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    const parsed = readJson<MissionStateSummary>(filePath);
-    return ensureMissionStateValidator()(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return loadMissionStateAtPath(filePath) as MissionStateSummary | null;
 }
 
 function missionContextSummary(input: {
@@ -585,10 +610,10 @@ function missionSources(input: {
       kind: 'mission_state',
       ref: `mission:${input.missionId}`,
       path: input.missionPath
-        ? path.join(input.missionPath, 'mission-state.json')
+        ? safeMissionArtifactPath(input.missionPath, 'mission-state.json')
         : missionStatePath(input.missionId, input.missionTier),
       summary: `Mission state for ${input.missionId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     },
   ];
 
@@ -601,7 +626,7 @@ function missionSources(input: {
       summary: input.missionTeamAssignment.agent_id
         ? `Role ${input.teamRole} assigned to ${input.missionTeamAssignment.agent_id}`
         : `Role ${input.teamRole} is unfilled`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -611,7 +636,7 @@ function missionSources(input: {
       ref: `project:${input.projectId}`,
       path: projectOperationalStatePath(input.projectId, input.missionTier, input.tenantSlug),
       summary: `Project state for ${input.projectId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -621,7 +646,7 @@ function missionSources(input: {
       ref: `track:${input.trackId}`,
       path: pathResolver.shared(`runtime/project-tracks/${input.trackId}.json`),
       summary: `Project track record for ${input.trackId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -631,7 +656,7 @@ function missionSources(input: {
       ref: `task-session:${input.taskSessionId}`,
       path: pathResolver.shared(`runtime/task-sessions/${input.taskSessionId}.json`),
       summary: `Task session ${input.taskSessionId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -640,7 +665,7 @@ function missionSources(input: {
       kind: 'work_item',
       ref: `work-item:${input.workItemId}`,
       summary: `Work item ${input.workItemId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
 
     const metadata = input.workItem.metadata as Record<string, unknown> | undefined;
@@ -653,7 +678,7 @@ function missionSources(input: {
         ref: `work-item-evidence:${targetPath}`,
         path: targetPath,
         summary: `Scoped review artifact for ${input.workItemId}: ${targetPath}`,
-        captured_at: new Date().toISOString(),
+        captured_at: nowIso(),
       });
     }
     const verificationDone = Array.isArray(metadata?.verification_done)
@@ -664,7 +689,7 @@ function missionSources(input: {
         kind: 'other',
         ref: `work-item-verification:${input.workItemId}:${sources.length + 1}`,
         summary: `Scoped verification: ${verification}`,
-        captured_at: new Date().toISOString(),
+        captured_at: nowIso(),
       });
     }
     const criterionEvidence = metadata?.criterion_evidence;
@@ -673,7 +698,7 @@ function missionSources(input: {
         kind: 'other',
         ref: `work-item-criterion-evidence:${input.workItemId}`,
         summary: `Scoped criterion evidence: ${JSON.stringify(criterionEvidence).slice(0, 2200)}`,
-        captured_at: new Date().toISOString(),
+        captured_at: nowIso(),
       });
     }
   }
@@ -684,7 +709,7 @@ function missionSources(input: {
       ref: hint.path,
       path: hint.path,
       summary: hint.title,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -694,7 +719,7 @@ function missionSources(input: {
       ref: skill.name,
       path: skill.path,
       summary: skill.description,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -889,10 +914,11 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
   }
 
   const missionTier = normalizeTier(input.missionState.tier);
-  const missionPath =
+  const missionPath = safeMissionPath(
     input.missionPath ||
-    findMissionPath(input.missionState.mission_id) ||
-    pathResolver.missionDir(input.missionState.mission_id, missionTier);
+      findMissionPath(input.missionState.mission_id) ||
+      pathResolver.missionDir(input.missionState.mission_id, missionTier)
+  );
   const projectId =
     input.projectState?.project_id ||
     input.missionState.relationships?.project?.project_id ||
@@ -1181,7 +1207,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
         workItemId,
       }),
     version: '1',
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     summary,
     scope,
     security_scope: securityScope,
@@ -1312,15 +1338,19 @@ export async function resolveMissionContextPack(
 }
 
 export function saveMissionContextPack(missionPath: string, pack: MissionContextPack): string {
-  const missionDir =
+  const missionDir = safeMissionPath(
     missionPath && safeExistsSync(missionPath)
       ? missionPath
       : path.isAbsolute(missionPath)
         ? missionPath
-        : pathResolver.rootResolve(missionPath);
-  const targetDir = path.join(missionDir, 'coordination', 'context-packs');
+        : pathResolver.rootResolve(missionPath)
+  );
+  const targetDir = safeMissionArtifactPath(missionDir, 'coordination/context-packs');
   if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
-  const filePath = path.join(targetDir, `${pack.context_pack_id}.json`);
+  const filePath = safeMissionArtifactPath(
+    missionDir,
+    `coordination/context-packs/${pack.context_pack_id}.json`
+  );
   const payload = {
     ...pack,
     context_pack_path: filePath,
@@ -1331,7 +1361,13 @@ export function saveMissionContextPack(missionPath: string, pack: MissionContext
       `Invalid mission context pack payload: ${validationErrors(validate).join('; ')}`
     );
   }
-  safeWriteFile(filePath, JSON.stringify(payload, null, 2));
+  writeProvisionedJson({
+    missionId: pack.scope.mission_id,
+    filePath,
+    targetPath: path.relative(missionDir, filePath).split(path.sep).join('/'),
+    missionPathHint: missionDir,
+    provisioned: provisionMissionEntry(payload),
+  });
   return filePath;
 }
 

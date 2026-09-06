@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/role-authority-map.schema.json",
   "version": "1.0.0",
   "description": "Maps the 28 knowledge roles to execution mode, persona, and authority_role. system_roles maintain Kyberion itself; mission_roles execute user work; context_roles are knowledge-only (no runtime authority).",
   "system_roles": [

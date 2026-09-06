@@ -249,7 +249,7 @@ describe('explainPolicyViolation', () => {
   it('diagnoses approval required', () => {
     const d = explainPolicyViolation('approval_required: enforceApprovalGate blocked this action');
     expect(d.violationType).toBe('approval_required');
-    expect(d.repairSteps.some((s) => s.includes('pnpm cli approval'))).toBe(true);
+    expect(d.repairSteps.some((s) => s.includes('pnpm kyberion approvals'))).toBe(true);
   });
 
   it('diagnoses tenant broker expired', () => {

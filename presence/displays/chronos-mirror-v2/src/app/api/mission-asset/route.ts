@@ -1,21 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 
-import {
-  getChronosAccessRoleOrThrow,
-  guardRequest,
-  roleToMissionRole,
-} from '../../../lib/api-guard';
+import { guardRequest } from '../../../lib/api-guard';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
-import { loadJson, safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
+import { loadState } from '@agent/core/mission-state';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
 import {
   resolveViewerContextForRequest,
+  strictViewerTier,
   strictViewerScopeTenantSlugs,
   ViewerContextError,
   viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
+import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
+import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
 
 const ALLOWED_PREFIXES = ['deliverables/', 'artifacts/', 'outputs/', 'evidence/'] as const;
 // Repo-relative mode (no missionId): where governed artifacts actually live.
@@ -33,9 +38,14 @@ function resolveMissionRoot(missionId: string): string | null {
   ];
 
   for (const root of roots) {
-    const candidate = path.join(root, missionId);
-    if (safeExistsSync(candidate)) {
-      return candidate;
+    try {
+      const safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+      const candidate = assertSafeRepositoryPath(path.join(safeRoot, missionId), {
+        allowMissingLeaf: true,
+      });
+      if (safeExistsSync(candidate) && safeLstat(candidate).isDirectory()) return candidate;
+    } catch {
+      // A missing, symlinked, or malformed mission root is not a readable asset scope.
     }
   }
 
@@ -63,6 +73,45 @@ function isAllowedRepoAssetPath(relativePath: string): boolean {
   return ALLOWED_REPO_PREFIXES.some((prefix) => relativePath.startsWith(prefix));
 }
 
+type AssetTier = 'personal' | 'confidential' | 'public';
+
+function normalizeAssetPath(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const normalized = value.replace(/\\/g, '/');
+  const root = pathResolver.rootDir().replace(/\\/g, '/').replace(/\/$/, '');
+  return normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
+}
+
+function tierFromPath(value: string | undefined): AssetTier | undefined {
+  const normalized = normalizeAssetPath(value);
+  const match = normalized?.match(
+    /(?:^|\/)active\/(?:missions|projects)\/(personal|confidential|public)(?:\/|$)/
+  );
+  return match?.[1] as AssetTier | undefined;
+}
+
+function tenantFromPath(value: string | undefined): string | undefined {
+  const normalized = normalizeAssetPath(value);
+  const match = normalized?.match(
+    /^active\/(?:missions|projects)\/(?:personal|confidential|public)\/([^/]+)\//
+  );
+  return match?.[1] && match[1] !== 'shared' ? match[1] : undefined;
+}
+
+function missionTier(missionId: string): AssetTier | undefined {
+  const missionPath = findMissionPath(missionId);
+  if (!missionPath) return undefined;
+  try {
+    const state = loadState(missionId);
+    if (state?.tier === 'personal' || state?.tier === 'confidential' || state?.tier === 'public') {
+      return state.tier;
+    }
+  } catch {
+    // Fall back to the governed mission directory shape below.
+  }
+  return tierFromPath(missionPath);
+}
+
 function artifactTenant(artifact: {
   tenant_slug?: string;
   mission_id?: string;
@@ -71,17 +120,39 @@ function artifactTenant(artifact: {
   if (!artifact.mission_id) return undefined;
   const missionPath = findMissionPath(artifact.mission_id);
   if (!missionPath) return undefined;
-  const statePath = path.join(missionPath, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return undefined;
   try {
-    const state = loadJson<{
-      tenant_slug?: string;
-      tenant_id?: string;
-    }>(statePath);
-    return state.tenant_slug || state.tenant_id;
+    const state = loadState(artifact.mission_id);
+    return state?.tenant_slug || state?.tenant_id;
   } catch {
     return undefined;
   }
+}
+
+export function resolveMissionAssetTier(input: {
+  artifact?: Parameters<typeof inferDeliverableTier>[0];
+  assetPath?: string;
+  missionId?: string;
+}): AssetTier | undefined {
+  const resolvedMissionTier = input.missionId ? missionTier(input.missionId) : undefined;
+  const pathTier = tierFromPath(input.assetPath);
+  if (resolvedMissionTier || pathTier) return resolvedMissionTier || pathTier;
+  return inferDeliverableTier(
+    input.artifact || { kind: '', storage_class: 'external_ref', artifact_id: '' },
+    normalizeAssetPath(input.artifact?.path),
+    undefined
+  );
+}
+
+export function resolveMissionAssetTenant(input: {
+  artifact?: Parameters<typeof inferDeliverableTier>[0];
+  assetPath?: string;
+  missionId?: string;
+}): string | undefined {
+  return (
+    tenantFromPath(input.assetPath) ||
+    (input.artifact ? artifactTenant(input.artifact) : undefined) ||
+    (input.missionId ? artifactTenant({ mission_id: input.missionId }) : undefined)
+  );
 }
 
 function contentTypeFor(filePath: string): string {
@@ -126,18 +197,19 @@ export async function GET(req: NextRequest) {
     const resolvedViewer = resolveViewerContextForRequest(req);
     if (resolvedViewer.response) return resolvedViewer.response;
 
-    const accessRole = getChronosAccessRoleOrThrow(req);
-    process.env.MISSION_ROLE = roleToMissionRole(accessRole);
+    const withViewerContext = <T>(operation: () => T): T =>
+      withViewerExecutionContext(resolvedViewer.context, operation);
 
-    const missionId = req.nextUrl.searchParams.get('missionId') || '';
-    const relativePath = req.nextUrl.searchParams.get('path') || '';
-    const artifactId = req.nextUrl.searchParams.get('artifactId') || '';
+    const missionId = readChronosStringParam(req.nextUrl.searchParams.get('missionId'));
+    const relativePath = readChronosStringParam(req.nextUrl.searchParams.get('path'));
+    const artifactId = readChronosStringParam(req.nextUrl.searchParams.get('artifactId'));
+    let artifact: Parameters<typeof inferDeliverableTier>[0] | undefined;
     const tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
     if (artifactId) {
-      const artifact = loadArtifactRecord(artifactId);
+      artifact = withViewerContext(() => loadArtifactRecord(artifactId));
       if (!artifact) return NextResponse.json({ error: 'Artifact not found' }, { status: 404 });
       if (
         tenantSlugs !== 'all' &&
@@ -151,15 +223,23 @@ export async function GET(req: NextRequest) {
     }
 
     let assetPath: string;
+    let assetTier: AssetTier | undefined;
     if (missionId) {
       if (!isAllowedMissionAssetPath(relativePath)) {
         return NextResponse.json({ error: 'Invalid mission asset request' }, { status: 400 });
       }
-      const missionRoot = resolveMissionRoot(missionId);
+      const missionRoot = withViewerContext(() => resolveMissionRoot(missionId));
       if (!missionRoot) {
         return NextResponse.json({ error: 'Mission not found' }, { status: 404 });
       }
       assetPath = path.join(missionRoot, relativePath);
+      assetTier = withViewerContext(() =>
+        resolveMissionAssetTier({
+          artifact: artifactId ? artifact : undefined,
+          assetPath,
+          missionId,
+        })
+      );
     } else {
       // repo-relative artifact mode: deliverables live in exports/tmp/missions;
       // tier enforcement stays with secure-io on the actual read below.
@@ -168,13 +248,54 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid mission asset request' }, { status: 400 });
       }
       assetPath = path.join(pathResolver.rootDir(), repoRelative);
+      assetTier = withViewerContext(() =>
+        resolveMissionAssetTier({
+          artifact: artifactId ? artifact : undefined,
+          assetPath,
+        })
+      );
+    }
+    try {
+      assetPath = withViewerContext(() =>
+        assertSafeRepositoryPath(assetPath, { allowMissingLeaf: true })
+      );
+    } catch {
+      return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
+    }
+    const pathTenant = tenantFromPath(assetPath);
+    const boundTenant = withViewerContext(() =>
+      resolveMissionAssetTenant({
+        artifact: artifactId ? artifact : undefined,
+        missionId: missionId || undefined,
+      })
+    );
+    if (pathTenant && boundTenant && pathTenant !== boundTenant) {
+      return NextResponse.json(
+        { error: 'Asset tenant binding does not match its path' },
+        { status: 403 }
+      );
+    }
+    const assetTenant = pathTenant || boundTenant;
+    if (assetTenant && tenantSlugs !== 'all' && !tenantSlugs.includes(assetTenant)) {
+      return NextResponse.json(
+        { error: 'Asset is outside the viewer tenant scope' },
+        { status: 403 }
+      );
+    }
+    if (!assetTier) {
+      return NextResponse.json({ error: 'Asset tier is unavailable' }, { status: 403 });
+    }
+    try {
+      strictViewerTier(resolvedViewer.context, assetTier);
+    } catch (error) {
+      return viewerErrorResponse(error, 403);
     }
     return withViewerExecutionContext(resolvedViewer.context, () => {
       if (!safeExistsSync(assetPath)) {
         return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
       }
 
-      const stats = safeStat(assetPath);
+      const stats = safeLstat(assetPath);
       if (!stats.isFile()) {
         return NextResponse.json({ error: 'Asset is not a file' }, { status: 400 });
       }

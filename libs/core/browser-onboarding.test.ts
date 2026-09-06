@@ -2,13 +2,24 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 const PROFILE_ROOT = pathResolver.sharedTmp('browser-onboarding-tests/profile');
 const PORTABLE_EMAIL_BACKEND = process.platform === 'darwin' ? 'mac_mailapp' : 'smtp';
 
+const { resolveActiveProfileRootMock } = vi.hoisted(() => ({
+  resolveActiveProfileRootMock: vi.fn(),
+}));
+
 vi.mock('./profile-root.js', () => ({
-  resolveActiveProfileRoot: () => PROFILE_ROOT,
+  resolveActiveProfileRoot: resolveActiveProfileRootMock,
 }));
 
 const validDraft = () => ({
@@ -46,6 +57,8 @@ const validDraft = () => ({
 
 beforeEach(() => {
   safeRmSync(pathResolver.sharedTmp('browser-onboarding-tests'), { recursive: true, force: true });
+  resolveActiveProfileRootMock.mockReset();
+  resolveActiveProfileRootMock.mockReturnValue(PROFILE_ROOT);
   if (PORTABLE_EMAIL_BACKEND === 'smtp') {
     vi.stubEnv('KYBERION_SMTP_HOST', 'smtp.test.invalid');
     vi.stubEnv('KYBERION_SMTP_USER', 'test-user');
@@ -68,6 +81,51 @@ describe('browser onboarding', () => {
     expect(preview.effects.some((effect) => effect.kind === 'providers')).toBe(true);
     expect(preview.effects.some((effect) => effect.kind === 'service')).toBe(true);
     expect(safeExistsSync(PROFILE_ROOT)).toBe(false);
+  });
+
+  it('rejects unknown fields at every onboarding request boundary', async () => {
+    const { previewBrowserOnboarding } = await import('./browser-onboarding.js');
+
+    expect(() => previewBrowserOnboarding({ ...validDraft(), unexpected: true })).toThrow(
+      /Unrecognized key/
+    );
+    expect(() =>
+      previewBrowserOnboarding({
+        ...validDraft(),
+        providers: { ...validDraft().providers, unexpected: true },
+      })
+    ).toThrow(/Unrecognized key/);
+    expect(() =>
+      previewBrowserOnboarding({
+        ...validDraft(),
+        tools: {
+          ...validDraft().tools,
+          mode_preference: { ...validDraft().tools.mode_preference, unexpected: true },
+        },
+      })
+    ).toThrow(/Unrecognized key/);
+  });
+
+  it('rejects a symlinked active profile root before reading onboarding state', async () => {
+    const targetRoot = pathResolver.sharedTmp('browser-onboarding-tests/redirect-target');
+    const linkedRoot = pathResolver.sharedTmp('browser-onboarding-tests/profile-link');
+    safeMkdir(targetRoot, { recursive: true });
+    safeSymlinkSync(targetRoot, linkedRoot);
+    resolveActiveProfileRootMock.mockReturnValue(linkedRoot);
+
+    const { previewBrowserOnboarding } = await import('./browser-onboarding.js');
+
+    expect(() => previewBrowserOnboarding(validDraft())).toThrow('[RESOURCE_PATH_SYMLINK]');
+  });
+
+  it('rejects a directory replacing the optional vision resource', async () => {
+    safeMkdir(path.join(PROFILE_ROOT, 'my-vision.md'), { recursive: true });
+
+    const { getBrowserOnboardingState } = await import('./browser-onboarding.js');
+
+    expect(() => getBrowserOnboardingState()).toThrow(
+      /\[BROWSER_ONBOARDING_RESOURCE\] vision must be a regular file/
+    );
   });
 
   it('applies identity, provider, tool, service, and receipt artifacts under the active profile', async () => {
@@ -204,6 +262,48 @@ describe('browser onboarding', () => {
         data: Buffer.from('bad'),
       })
     ).toThrow(/unsupported voice sample content type/);
+  });
+
+  it('rejects an invalid existing voice registry before onboarding overwrites it', async () => {
+    const voiceDir = path.join(PROFILE_ROOT, 'voice');
+    safeMkdir(voiceDir, { recursive: true });
+    safeWriteFile(path.join(voiceDir, 'profile-registry.json'), JSON.stringify({ profiles: [] }));
+    const samplePath = path.join(PROFILE_ROOT, 'voice', 'samples', 'my-voice', 'sample.webm');
+    safeMkdir(path.dirname(samplePath), { recursive: true });
+    safeWriteFile(samplePath, 'voice sample');
+
+    const { applyBrowserOnboarding } = await import('./browser-onboarding.js');
+    await expect(
+      applyBrowserOnboarding({
+        ...validDraft(),
+        voice: {
+          enabled: true,
+          profile_id: 'my-voice',
+          display_name: 'My Voice',
+          language: 'ja',
+          engine_id: 'mlx_audio_qwen3',
+          sample_refs: [samplePath],
+        },
+      })
+    ).rejects.toThrow(/Invalid catalog voice-profile-registry/);
+  });
+
+  it('rejects a symlinked voice sample profile before writing the sample', async () => {
+    const targetDir = pathResolver.sharedTmp('browser-onboarding-tests/voice-target');
+    const linkedDir = path.join(PROFILE_ROOT, 'voice', 'samples', 'my-voice');
+    safeMkdir(targetDir, { recursive: true });
+    safeMkdir(path.dirname(linkedDir), { recursive: true });
+    safeSymlinkSync(targetDir, linkedDir);
+
+    const { saveBrowserOnboardingVoiceSample } = await import('./browser-onboarding.js');
+    expect(() =>
+      saveBrowserOnboardingVoiceSample({
+        profileId: 'my-voice',
+        contentType: 'audio/webm',
+        data: Buffer.from('voice sample'),
+      })
+    ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    expect(safeExistsSync(path.join(targetDir, 'sample.webm'))).toBe(false);
   });
 
   it('keeps personal onboarding writes inside the sovereign concierge context', async () => {

@@ -22,32 +22,22 @@
 
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import {
+  loadGoldenOutputRegistryAtPath,
+  loadGoldenOutputSnapshotAtPath,
+  type GoldenOutputRegistryEntry,
+  type GoldenOutputSnapshot,
+} from '@agent/core/golden-output';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { nowIso } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
-import { defineScript, isDirectScript } from './lib/harness.js';
-
-interface GoldenRegistryEntry {
-  /** Stable pipeline identifier (matches `id` field in the ADF JSON). */
-  id: string;
-  /** Path to the ADF pipeline JSON, relative to project root. */
-  pipeline: string;
-  /** Optional human-readable note for why this pipeline is in the golden set. */
-  note?: string;
-  /** Optional input context to seed the run. */
-  input?: Record<string, unknown>;
-  /** Fields to elide from comparison (dot-paths into the result context). */
-  ignore_paths?: string[];
-}
-
-interface GoldenSnapshot {
-  generated_at: string;
-  pipeline_id: string;
-  pipeline_path: string;
-  result_hash: string;
-  /** Normalized projection of the result (the actual snapshot). */
-  result: unknown;
-}
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
 const REGISTRY_PATH = path.join(ROOT, 'tests', 'golden', 'pipelines.json');
@@ -59,24 +49,32 @@ const DEFAULT_IGNORE_PATHS = [
   'trace',
   'trace_summary',
   'trace_persisted_path',
+  'persistedPath',
+  'context.repo_root',
+  'context.platform_name',
+  'context.node_options',
+  'context.run_utc_now',
+  'context.__pipeline_options',
+  'context.trust_resolved',
+  'context.trace_persisted_path',
   'last_screenshot',
   'last_trace_path',
   'recorded_videos',
   '_persistedAt',
 ];
 
-function loadRegistry(): GoldenRegistryEntry[] {
+function loadRegistry(): GoldenOutputRegistryEntry[] {
   if (!safeExistsSync(REGISTRY_PATH)) return [];
-  return readJson<GoldenRegistryEntry[]>(REGISTRY_PATH);
+  return loadGoldenOutputRegistryAtPath(REGISTRY_PATH);
 }
 
-function loadSnapshot(id: string): GoldenSnapshot | null {
+function loadSnapshot(id: string): GoldenOutputSnapshot | null {
   const p = path.join(SNAPSHOTS_DIR, `${id}.json`);
   if (!safeExistsSync(p)) return null;
-  return readJson<GoldenSnapshot>(p);
+  return loadGoldenOutputSnapshotAtPath(p);
 }
 
-function writeSnapshot(snapshot: GoldenSnapshot): void {
+function writeSnapshot(snapshot: GoldenOutputSnapshot): void {
   withExecutionContext('ecosystem_architect', () => {
     if (!safeExistsSync(SNAPSHOTS_DIR)) safeMkdir(SNAPSHOTS_DIR, { recursive: true });
     const p = path.join(SNAPSHOTS_DIR, `${snapshot.pipeline_id}.json`);
@@ -125,16 +123,22 @@ async function runPipeline(
   // Lazy-import to keep CLI startup fast and to allow the script to load without a
   // built dist/ when only the registry is being inspected.
   const mod = await import('./run_pipeline.js' as string);
-  const adf = readJson<unknown>(path.join(ROOT, pipelinePath));
-  const steps = (adf as { steps?: unknown[] }).steps ?? [];
-  const runStepsFn = (mod as Record<string, unknown>).runSteps;
-  if (typeof runStepsFn !== 'function') {
-    throw new Error('run_pipeline.js does not export runSteps');
+  const executePipelineFileFn = (mod as Record<string, unknown>).executePipelineFile;
+  if (typeof executePipelineFileFn !== 'function') {
+    throw new Error('run_pipeline.js does not export executePipelineFile');
   }
-  return await (runStepsFn as (s: unknown[], i?: Record<string, unknown>) => Promise<unknown>)(
-    steps,
-    input
-  );
+  // Golden checks must exercise the same validated ADF lifecycle as production
+  // execution. Calling runSteps directly bypassed pipeline schema/guardrail
+  // validation and the canonical auto-repair hand-off.
+  return await (
+    executePipelineFileFn as (
+      inputPath: string,
+      options?: { context?: Record<string, unknown>; quiet?: boolean }
+    ) => Promise<unknown>
+  )(assertSafeRepositoryPath(path.join(ROOT, pipelinePath), { allowMissingLeaf: false }), {
+    context: input,
+    quiet: true,
+  });
 }
 
 interface Diagnostic {
@@ -143,7 +147,10 @@ interface Diagnostic {
   message: string;
 }
 
-async function checkOne(entry: GoldenRegistryEntry, rebaseline: boolean): Promise<Diagnostic[]> {
+async function checkOne(
+  entry: GoldenOutputRegistryEntry,
+  rebaseline: boolean
+): Promise<Diagnostic[]> {
   const diags: Diagnostic[] = [];
   let result: unknown;
   try {
@@ -159,8 +166,8 @@ async function checkOne(entry: GoldenRegistryEntry, rebaseline: boolean): Promis
 
   const normalized = normalizeResult(result, entry.ignore_paths ?? []);
   const newHash = hashResult(normalized);
-  const newSnap: GoldenSnapshot = {
-    generated_at: new Date().toISOString(),
+  const newSnap: GoldenOutputSnapshot = {
+    generated_at: nowIso(),
     pipeline_id: entry.id,
     pipeline_path: entry.pipeline,
     result_hash: newHash,
@@ -220,20 +227,23 @@ export const runCheckGoldenOutput = defineScript({
         : diags.length > 0
           ? '⚠️ '
           : '✅';
-      console.log(`  ${status}  ${entry.id} (${entry.pipeline})`);
+      context.print(`  ${status}  ${entry.id} (${entry.pipeline})`);
     }
 
     const errors = allDiags.filter((d) => d.severity === 'error');
     const warnings = allDiags.filter((d) => d.severity === 'warning');
 
     if (warnings.length > 0) {
-      console.log('\nWarnings:');
-      for (const w of warnings) console.log(`  - ${w.pipeline_id}: ${w.message}`);
+      context.print('\nWarnings:');
+      for (const w of warnings) context.print(`  - ${w.pipeline_id}: ${w.message}`);
     }
     if (errors.length > 0) {
-      console.error('\nErrors:');
-      for (const e of errors) console.error(`  - ${e.pipeline_id}: ${e.message}`);
-      throw new Error(`${errors.length} golden output violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['\nErrors:', ...errors.map((error) => `  - ${error.pipeline_id}: ${error.message}`)].join(
+          '\n'
+        )
+      );
     }
 
     if (rebaseline) {
@@ -241,6 +251,7 @@ export const runCheckGoldenOutput = defineScript({
     } else {
       context.print(`\n✅ Golden output check passed (${registry.length} pipelines).`);
     }
+    return { registry: registry.length, warnings, errors, rebaseline };
   },
 });
 

@@ -1,12 +1,9 @@
-import {
-  getMediaBackendRecord,
-  pathResolver,
-  safeMkdir,
-  safeWriteFile,
-  secureFetch,
-  sleep,
-  type MediaBackendRecord,
-} from '@agent/core';
+import { getMediaBackendRecord, type MediaBackendRecord } from '@agent/core/media-backend-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { secureFetch } from '@agent/core/network';
+import { sleep } from '@agent/core/async-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import * as path from 'node:path';
 
 export type VideoProviderStatus = 'submitted' | 'running' | 'succeeded' | 'failed' | 'canceled';
@@ -75,16 +72,20 @@ function asRecord(value: unknown): JsonRecord {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : {};
 }
 
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function requireEnv(...names: string[]): string {
   for (const name of names) {
-    const value = process.env[name]?.trim();
+    const value = getRegisteredEnvText(name)?.trim();
     if (value) return value;
   }
   throw new Error(`Video provider credential is missing. Set one of: ${names.join(', ')}`);
 }
 
 function baseUrl(envName: string, fallback: string): string {
-  return process.env[envName]?.trim().replace(/\/$/u, '') || fallback;
+  return getRegisteredEnvText(envName)?.trim().replace(/\/$/u, '') || fallback;
 }
 
 function egressContext(request?: Pick<VideoGenerationRequest, 'egress_tier' | 'tenant_slug'>) {
@@ -97,7 +98,7 @@ function egressContext(request?: Pick<VideoGenerationRequest, 'egress_tier' | 't
     : undefined;
 }
 
-async function jsonRequest<T>(
+async function jsonRequest(
   url: string,
   method: 'GET' | 'POST',
   options: {
@@ -106,8 +107,8 @@ async function jsonRequest<T>(
     params?: Record<string, string | number>;
     request?: VideoGenerationRequest;
   }
-): Promise<T> {
-  return secureFetch<T>({
+): Promise<JsonRecord> {
+  const response: unknown = await secureFetch({
     url,
     method,
     headers: options.headers,
@@ -116,6 +117,10 @@ async function jsonRequest<T>(
     authenticateRequest: true,
     kyberion_egress_context: egressContext(options.request),
   });
+  if (!isJsonRecord(response)) {
+    throw new Error(`Video provider response must be a JSON object: ${url}`);
+  }
+  return response;
 }
 
 async function downloadUrl(
@@ -123,7 +128,7 @@ async function downloadUrl(
   request?: VideoGenerationRequest,
   headers?: Record<string, string>
 ): Promise<Buffer> {
-  const data = await secureFetch<Buffer | ArrayBuffer>({
+  const data: unknown = await secureFetch({
     url,
     method: 'GET',
     headers,
@@ -131,7 +136,9 @@ async function downloadUrl(
     authenticateRequest: Boolean(headers?.Authorization),
     kyberion_egress_context: egressContext(request),
   });
-  return Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
+  if (Buffer.isBuffer(data)) return data;
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  throw new Error('Video provider download response must be binary data');
 }
 
 function statusFrom(value: unknown): VideoProviderStatus {
@@ -173,7 +180,11 @@ function runwayRatio(request: VideoGenerationRequest): string | undefined {
 
 function targetPath(request: VideoGenerationRequest, providerJobId: string): string {
   const configured = request.target_path?.trim();
-  if (configured) return configured;
+  if (configured) {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(configured), {
+      allowMissingLeaf: true,
+    });
+  }
   return pathResolver.sharedTmp(`video-generation/${providerJobId}.mp4`);
 }
 
@@ -219,7 +230,7 @@ class GoogleVeoProvider implements VideoGenerationProvider {
     const parameters: JsonRecord = {};
     if (request.aspect_ratio) parameters.aspectRatio = request.aspect_ratio;
     if (request.resolution) parameters.resolution = request.resolution;
-    const operation = await jsonRequest<JsonRecord>(
+    const operation = await jsonRequest(
       `${this.baseUrl()}/models/${encodeURIComponent(request.model)}:predictLongRunning`,
       'POST',
       {
@@ -243,7 +254,7 @@ class GoogleVeoProvider implements VideoGenerationProvider {
     const url = providerJobId.startsWith('http')
       ? providerJobId
       : `${this.baseUrl()}/${providerJobId.replace(/^\//u, '')}`;
-    const operation = await jsonRequest<JsonRecord>(url, 'GET', {
+    const operation = await jsonRequest(url, 'GET', {
       headers: { 'x-goog-api-key': key },
       request: requestContext,
     });
@@ -315,7 +326,7 @@ class RunwayProvider implements VideoGenerationProvider {
         ? { generateAudio: request.generate_audio }
         : {}),
     };
-    const task = await jsonRequest<JsonRecord>(`${this.baseUrl()}/image_to_video`, 'POST', {
+    const task = await jsonRequest(`${this.baseUrl()}/image_to_video`, 'POST', {
       headers: this.headers(),
       data: payload,
       request,
@@ -330,7 +341,7 @@ class RunwayProvider implements VideoGenerationProvider {
     providerJobId: string,
     request?: VideoGenerationRequest
   ): Promise<VideoGenerationStatus> {
-    const task = await jsonRequest<JsonRecord>(
+    const task = await jsonRequest(
       `${this.baseUrl()}/tasks/${encodeURIComponent(providerJobId)}`,
       'GET',
       {
@@ -383,13 +394,10 @@ class OpenAiSoraProvider implements VideoGenerationProvider {
         );
       }
     }
-    const response = await secureFetch<JsonRecord>({
-      url: `${this.baseUrl()}/videos`,
-      method: 'POST',
+    const response = await jsonRequest(`${this.baseUrl()}/videos`, 'POST', {
       headers: { Authorization: `Bearer ${this.key()}` },
       data: form,
-      authenticateRequest: true,
-      kyberion_egress_context: egressContext(request),
+      request,
     });
     const providerJobId = String(response.id || '');
     if (!providerJobId) throw new Error('OpenAI Sora submission did not return a video id');
@@ -405,7 +413,7 @@ class OpenAiSoraProvider implements VideoGenerationProvider {
     providerJobId: string,
     request?: VideoGenerationRequest
   ): Promise<VideoGenerationStatus> {
-    const response = await jsonRequest<JsonRecord>(
+    const response = await jsonRequest(
       `${this.baseUrl()}/videos/${encodeURIComponent(providerJobId)}`,
       'GET',
       {
@@ -459,7 +467,7 @@ class MiniMaxHailuoProvider implements VideoGenerationProvider {
       ...(request.first_frame_image ? { first_frame_image: request.first_frame_image } : {}),
       ...(request.last_frame_image ? { last_frame_image: request.last_frame_image } : {}),
     };
-    const response = await jsonRequest<JsonRecord>(`${this.baseUrl()}/video_generation`, 'POST', {
+    const response = await jsonRequest(`${this.baseUrl()}/video_generation`, 'POST', {
       headers: this.headers(),
       data: payload,
       request,
@@ -474,15 +482,11 @@ class MiniMaxHailuoProvider implements VideoGenerationProvider {
     providerJobId: string,
     request?: VideoGenerationRequest
   ): Promise<VideoGenerationStatus> {
-    const response = await jsonRequest<JsonRecord>(
-      `${this.baseUrl()}/query/video_generation`,
-      'GET',
-      {
-        headers: this.headers(),
-        params: { task_id: providerJobId },
-        request: request || this.requestByJob.get(providerJobId),
-      }
-    );
+    const response = await jsonRequest(`${this.baseUrl()}/query/video_generation`, 'GET', {
+      headers: this.headers(),
+      params: { task_id: providerJobId },
+      request: request || this.requestByJob.get(providerJobId),
+    });
     const fileId = typeof response.file_id === 'string' ? response.file_id : undefined;
     if (fileId) this.fileByJob.set(providerJobId, fileId);
     return {
@@ -499,7 +503,7 @@ class MiniMaxHailuoProvider implements VideoGenerationProvider {
   async download(status: VideoGenerationStatus, request?: VideoGenerationRequest): Promise<Buffer> {
     const fileId = status.file_id || this.fileByJob.get(status.provider_job_id);
     if (!fileId) throw new Error('MiniMax completed without a file id');
-    const response = await jsonRequest<JsonRecord>(`${this.baseUrl()}/files/retrieve`, 'GET', {
+    const response = await jsonRequest(`${this.baseUrl()}/files/retrieve`, 'GET', {
       headers: this.headers(),
       params: { file_id: fileId },
       request: request || this.requestByJob.get(status.provider_job_id),

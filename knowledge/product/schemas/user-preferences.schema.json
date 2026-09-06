@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/user-preferences.schema.json",
+  "title": "User Preferences",
+  "description": "Persisted user preference values. Preference keys and nested JSON values are intentionally extensible.",
+  "type": "object",
+  "additionalProperties": true
+}

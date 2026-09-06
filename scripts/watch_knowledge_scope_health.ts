@@ -1,21 +1,19 @@
 #!/usr/bin/env node
 /** KO-18: deterministic health report for registered tenant knowledge roots. */
 import * as path from 'node:path';
+import { buildTenantKnowledgeScopeSet } from '@agent/core/tenant-knowledge-retrieval';
+import { listTenantProfileSlugs, resolveTenant } from '@agent/core/tenant-registry';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  buildTenantKnowledgeScopeSet,
-  listTenantProfileSlugs,
-  pathResolver,
-  resolveTenant,
-  safeMkdir,
-  safeWriteFile,
-  safeExistsSync,
-  safeStat,
-  sendOpsAlert,
-  withExecutionContext,
-  type OpsAlertInput,
-} from '@agent/core';
+  readKnowledgeScopeHealthCount,
+  writeKnowledgeScopeHealthCount,
+} from '@agent/core/knowledge-scope-health-history';
+import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge-scope-check-policy';
+import { safeExistsSync, safeStat } from '@agent/core/secure-io';
+import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
+import { withExecutionContext } from '@agent/core/authority';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type HealthRow = {
@@ -47,6 +45,9 @@ export type KnowledgeScopeHealthReport = {
   tenants: HealthRow[];
 };
 
+export const KNOWLEDGE_SCOPE_HEALTH_USAGE =
+  'Usage: pnpm kyberion knowledge scope-health [--json] [--alert] [--fail] [--quiet]';
+
 export interface LegacyUnscopedFile {
   path: string;
   mtime_ms: number;
@@ -73,17 +74,7 @@ export function evaluateLegacyQuarantine(
 
 function legacyQuarantineTtlDays(): number {
   const policyPath = pathResolver.knowledge('product/governance/knowledge-scope-check.json');
-  try {
-    const parsed = readJson<{
-      legacy_quarantine_ttl_days?: unknown;
-    }>(policyPath);
-    return typeof parsed.legacy_quarantine_ttl_days === 'number' &&
-      parsed.legacy_quarantine_ttl_days >= 0
-      ? parsed.legacy_quarantine_ttl_days
-      : 14;
-  } catch {
-    return 14;
-  }
+  return loadKnowledgeScopeCheckPolicy(policyPath)?.legacy_quarantine_ttl_days ?? 14;
 }
 
 function healthHistoryPath(): string {
@@ -113,30 +104,11 @@ function listLegacyUnscopedFiles(): LegacyUnscopedFile[] {
 }
 
 function readPriorLegacyCount(): number | undefined {
-  const filePath = healthHistoryPath();
-  if (!safeExistsSync(filePath)) return undefined;
-  try {
-    const value = readJson<{
-      legacy_unscoped_file_count?: unknown;
-    }>(filePath);
-    return typeof value.legacy_unscoped_file_count === 'number'
-      ? value.legacy_unscoped_file_count
-      : undefined;
-  } catch {
-    return undefined;
-  }
+  return readKnowledgeScopeHealthCount(healthHistoryPath());
 }
 
 function persistLegacyCount(count: number, generatedAt: string): void {
-  const filePath = healthHistoryPath();
-  const parent = path.dirname(filePath);
-  if (!safeExistsSync(parent)) {
-    safeMkdir(parent, { recursive: true });
-  }
-  safeWriteFile(
-    filePath,
-    JSON.stringify({ generated_at: generatedAt, legacy_unscoped_file_count: count }, null, 2) + '\n'
-  );
+  writeKnowledgeScopeHealthCount(healthHistoryPath(), count, generatedAt);
 }
 
 function scanRows(): HealthRow[] {
@@ -177,7 +149,7 @@ function scanRows(): HealthRow[] {
 export function scanKnowledgeScopeHealth(
   options: { persistHistory?: boolean } = {}
 ): KnowledgeScopeHealthReport {
-  const generatedAt = new Date().toISOString();
+  const generatedAt = nowIso();
   const rows = scanRows();
   const legacyFiles = listLegacyUnscopedFiles();
   const legacyTtlDays = legacyQuarantineTtlDays();
@@ -248,32 +220,56 @@ function buildHealthAlert(report: KnowledgeScopeHealthReport): OpsAlertInput {
     recommendation:
       'Repair the registered tenant knowledge root or allowlist, then run the scope health watchdog again. Quarantine legacy feedback rather than copying it into a tenant scope without provenance.',
     options: [
-      'pnpm knowledge:scope-health -- --json',
-      'pnpm knowledge:scope-health -- --json --alert',
+      'pnpm kyberion knowledge scope-health --json',
+      'pnpm kyberion knowledge scope-health --json --alert',
       'Review active/shared/runtime/feedback-loop and the tenant registry before migration.',
     ],
     dedupe_key: 'knowledge-scope-health',
   };
 }
 
+function formatHealthReport(
+  report: KnowledgeScopeHealthReport,
+  alertReceipt?: { recorded_path: string; webhook_delivered: boolean }
+): string {
+  return [
+    `${report.status}: ${report.summary.healthy}/${report.summary.registered_tenants} tenant knowledge roots healthy; legacy=${report.summary.legacy_unscoped_file_count} (growth=${report.summary.legacy_unscoped_growth})`,
+    ...(alertReceipt
+      ? [
+          `[knowledge-scope-health] ops alert recorded at ${alertReceipt.recorded_path}; webhook=${alertReceipt.webhook_delivered ? 'delivered' : 'not-delivered'}`,
+        ]
+      : []),
+  ].join('\n');
+}
+
 export const runKnowledgeScopeHealth = defineScript({
   name: 'knowledge:scope-health',
-  flags: [],
-  run: ({ argv }) => {
-    const report = scanKnowledgeScopeHealth({ persistHistory: argv.includes('--alert') });
-    if (argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
-    else
-      console.log(
-        `${report.status}: ${report.summary.healthy}/${report.summary.registered_tenants} tenant knowledge roots healthy; legacy=${report.summary.legacy_unscoped_file_count} (growth=${report.summary.legacy_unscoped_growth})`
+  flags: ['json'],
+  run: ({ argv, json, quiet, print }) => {
+    if (argv.includes('--help') || argv.includes('-h')) {
+      print(
+        json
+          ? { status: 'help', usage: KNOWLEDGE_SCOPE_HEALTH_USAGE }
+          : KNOWLEDGE_SCOPE_HEALTH_USAGE
       );
-    if (argv.includes('--alert') && report.alerts.length > 0) {
-      const receipt = sendOpsAlert(buildHealthAlert(report));
-      if (!argv.includes('--quiet')) {
-        console.warn(
-          `[knowledge-scope-health] ops alert recorded at ${receipt.recorded_path}; webhook=${receipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
-        );
-      }
+      return;
     }
+
+    const report = scanKnowledgeScopeHealth({ persistHistory: argv.includes('--alert') });
+    let alertReceipt: ReturnType<typeof sendOpsAlert> | undefined;
+    if (argv.includes('--alert') && report.alerts.length > 0) {
+      alertReceipt = sendOpsAlert(buildHealthAlert(report));
+    }
+    const output = alertReceipt
+      ? {
+          ...report,
+          alert: {
+            recorded_path: alertReceipt.recorded_path,
+            webhook_delivered: alertReceipt.webhook_delivered,
+          },
+        }
+      : report;
+    print(json ? output : formatHealthReport(report, quiet ? undefined : alertReceipt));
     if (argv.includes('--fail') && report.status !== 'healthy') {
       throw new ScriptExitError(1, '', true);
     }

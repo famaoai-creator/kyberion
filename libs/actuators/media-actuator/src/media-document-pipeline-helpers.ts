@@ -1,29 +1,102 @@
-import {
-  loadJson,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-  pathResolver,
-  retry,
-  designDefaultsFromMediaTheme,
-} from '@agent/core';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { defineCatalog, nowIso } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { retry } from '@agent/core/async-utils';
+import { designDefaultsFromMediaTheme } from '@agent/core/native-pptx-engine/design-cascade';
 import {
   generateNativeDocx,
   generateNativePdf,
   generateNativePptx,
   generateNativeXlsx,
 } from '@agent/core/media-contracts';
+import type { PdfDesignProtocol } from '@agent/core/types/pdf-protocol';
+import type { PptxDesignProtocol, PptxSlide } from '@agent/core/types/pptx-protocol';
+import type { XlsxDesignProtocol } from '@agent/core/types/xlsx-protocol';
 import * as path from 'node:path';
 import {
   buildMediaGenerationBoundary,
   normalizeInvoiceDocumentBrief,
   type MediaBriefCategory,
+  type MediaDocumentCompositionCatalog,
+  type MediaGenerationBoundary,
+  type MediaTheme,
+  type DocumentCompositionPresetResolver,
   type ProtocolKind,
 } from './media-document-helpers.js';
+import type {
+  MediaReportDocxProtocol,
+  MediaReportPdfProtocol,
+} from './media-report-pipeline-helpers.js';
+import type { MediaTrackerXlsxProtocol } from './media-spreadsheet-pipeline-helpers.js';
+
+const DOCUMENT_LAYOUTS_PATH = pathResolver.rootResolve(
+  'knowledge/public/design-patterns/media-templates/document-layouts.json'
+);
+const DOCUMENT_LAYOUTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/document-layouts.schema.json'
+);
+
+interface DocumentLayoutCatalog {
+  documents: Record<
+    string,
+    {
+      default_template: string;
+      templates: Record<string, Record<string, unknown>>;
+    }
+  >;
+}
+
+interface MediaPptxLayoutFit {
+  overflows?: unknown[];
+  shrinkCount?: number;
+}
+
+export interface MediaPptxSlide extends PptxSlide {
+  metadata?: {
+    layoutFit?: MediaPptxLayoutFit;
+  };
+}
+
+export interface MediaPptxLayoutSummary {
+  status: 'pass' | 'shrunk' | 'overflow';
+  measurementModel: 'deterministic-width-table';
+  slideCount: number;
+  shrinkCount: number;
+  overflowCount: number;
+  overflowSlides: Array<{ slideIndex: number; slideId?: string; overflows: unknown[] }>;
+}
+
+export interface MediaPptxProtocol extends PptxDesignProtocol {
+  slides: MediaPptxSlide[];
+  metadata: {
+    composition: unknown;
+    generationBoundary: unknown;
+    promptGuide: unknown[];
+    sourceDesign: Record<string, unknown> | null;
+    designRecommendations: unknown[];
+    layoutDiagnostics?: MediaPptxLayoutSummary;
+  };
+}
+
+export interface MediaInvoicePdfProtocol extends Omit<PdfDesignProtocol, 'metadata'> {
+  metadata: {
+    title?: string;
+    subject?: string;
+    author?: string;
+    creationDate?: string;
+    composition: Record<string, unknown>;
+  };
+}
+
+const documentLayoutCatalog = defineCatalog<DocumentLayoutCatalog>({
+  id: 'document-layouts',
+  path: DOCUMENT_LAYOUTS_PATH,
+  schema: DOCUMENT_LAYOUTS_SCHEMA_PATH,
+});
 
 export interface MediaDocumentPipelineDeps {
-  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
-  loadDocumentCompositionCatalog: (rootDir: string) => any;
+  resolveNamedTheme: (rootDir: string, preferredTheme?: string) => MediaTheme | null;
+  loadDocumentCompositionCatalog: (rootDir: string) => MediaDocumentCompositionCatalog;
   buildPptxSlideFromPattern: (
     rootDir: string,
     data: any,
@@ -42,25 +115,22 @@ export interface MediaDocumentPipelineDeps {
   ) => any;
   buildSpreadsheetNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any) => any;
   buildDiagramNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any) => any;
-  buildReportDocxProtocol: (rootDir: string, brief: any) => any;
-  buildReportPdfProtocol: (rootDir: string, brief: any) => any;
-  buildTrackerSpreadsheetProtocol: (rootDir: string, brief: any) => any;
-  buildDocumentPdfProtocol: (rawBrief: any) => any;
-  normalizeXlsxDesignProtocol: (protocol: any) => any;
+  buildReportDocxProtocol: (rootDir: string, brief: any) => MediaReportDocxProtocol;
+  buildReportPdfProtocol: (rootDir: string, brief: any) => MediaReportPdfProtocol;
+  buildTrackerSpreadsheetProtocol: (rootDir: string, brief: any) => MediaTrackerXlsxProtocol;
+  buildDocumentPdfProtocol: (rawBrief: any) => MediaInvoicePdfProtocol;
+  normalizeXlsxDesignProtocol: (protocol: any) => XlsxDesignProtocol;
   resolveDocumentLayoutTemplate: (
     rootDir: string,
     brief: any
   ) => { templateId: string; template: any };
-  resolveDocumentCompositionPreset: (
-    rootDir: string,
-    brief: any
-  ) => { profileId: string; preset: any };
+  resolveDocumentCompositionPreset: DocumentCompositionPresetResolver;
   applyCompositionTemplate: (
     template: any,
     tokens: Record<string, string>,
     fallback?: string
   ) => string;
-  buildMediaGenerationBoundary: (outline: any) => any;
+  buildMediaGenerationBoundary: (outline: any) => MediaGenerationBoundary;
   normalizeBriefForCategory: (rootDir: string, input: any) => any;
   resolveMediaBriefCategory: (input: any) => MediaBriefCategory;
   generateDrawioDocument: (
@@ -70,7 +140,7 @@ export interface MediaDocumentPipelineDeps {
 }
 
 export function assertMediaProtocolLayoutReady(
-  protocol: any,
+  protocol: { metadata?: MediaPptxProtocol['metadata'] },
   options: { allowLayoutOverflow?: boolean } = {}
 ): void {
   const diagnostics = protocol?.metadata?.layoutDiagnostics;
@@ -90,23 +160,18 @@ export function assertMediaProtocolLayoutReady(
   );
 }
 
-export function summarizeMediaPptxLayout(protocol: any): {
-  status: 'pass' | 'shrunk' | 'overflow';
-  measurementModel: 'deterministic-width-table';
-  slideCount: number;
-  shrinkCount: number;
-  overflowCount: number;
-  overflowSlides: Array<{ slideIndex: number; slideId?: string; overflows: any[] }>;
-} {
-  const slides = Array.isArray(protocol?.slides) ? protocol.slides : [];
-  const overflowSlides = slides.flatMap((slide: any, index: number) => {
-    const overflows = slide?.metadata?.layoutFit?.overflows;
+export function summarizeMediaPptxLayout(protocol: {
+  slides?: MediaPptxSlide[];
+}): MediaPptxLayoutSummary {
+  const slides = Array.isArray(protocol.slides) ? protocol.slides : [];
+  const overflowSlides = slides.flatMap((slide, index) => {
+    const overflows = slide.metadata?.layoutFit?.overflows;
     return Array.isArray(overflows) && overflows.length > 0
       ? [{ slideIndex: index + 1, slideId: slide.id, overflows }]
       : [];
   });
   const shrinkCount = slides.reduce(
-    (sum: number, slide: any) => sum + Number(slide?.metadata?.layoutFit?.shrinkCount || 0),
+    (sum, slide) => sum + Number(slide.metadata?.layoutFit?.shrinkCount || 0),
     0
   );
   const overflowCount = overflowSlides.reduce((sum, slide) => sum + slide.overflows.length, 0);
@@ -124,14 +189,14 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
   function resolveDocumentCompositionPreset(
     rootDir: string,
     brief: any
-  ): { profileId: string; preset: any } {
+  ): ReturnType<DocumentCompositionPresetResolver> {
     return deps.resolveDocumentCompositionPreset(rootDir, brief);
   }
 
   function buildOutlineDrivenPptxProtocol(
     rootDir: string,
     outline: any
-  ): { protocol: any; theme: any; themeName: string } {
+  ): { protocol: MediaPptxProtocol; theme: any; themeName: string } {
     const theme = deps.resolveNamedTheme(rootDir, outline.recommended_theme);
     const themeColors = theme?.colors || theme?.theme?.colors || {};
     const canvas = { w: 10, h: 5.625 };
@@ -171,9 +236,9 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         contentData.splice(insertAt, 0, contentsSlide);
       }
     }
-    const protocol: any = {
+    const protocol: MediaPptxProtocol = {
       version: '3.0.0',
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso(),
       metadata: {
         composition: outline,
         generationBoundary:
@@ -198,7 +263,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       designDefaults: designDefaultsFromMediaTheme({
         colors: themeColors,
         fonts: theme?.fonts || theme?.theme?.fonts || {},
-        typography: theme?.typography || theme?.theme?.typography || {},
+        typography: theme?.typography || theme?.theme?.typography,
       }),
       slides: contentData.map((data: any, idx: number) =>
         deps.buildPptxSlideFromPattern(
@@ -219,7 +284,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
   function buildPresentationPptxProtocol(
     rootDir: string,
     brief: any
-  ): { protocol: any; outline: any; theme: any; themeName: string } {
+  ): { protocol: MediaPptxProtocol; outline: any; theme: any; themeName: string } {
     const outline = deps.buildProposalNarrativeOutline(rootDir, brief);
     const compiled = buildOutlineDrivenPptxProtocol(rootDir, outline);
     return { ...compiled, outline };
@@ -336,7 +401,12 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       title: brief.payload.title || brief.title || 'Diagram',
       theme: activeTheme,
       iconMap,
-      iconRoot: params.icon_root ? path.resolve(rootDir, resolve(params.icon_root)) : undefined,
+      iconRoot: params.icon_root
+        ? assertSafeRepositoryPath(
+            path.resolve(rootDir, String(resolve(params.icon_root) || '').trim()),
+            { allowMissingLeaf: true }
+          )
+        : undefined,
     });
     safeWriteFile(outPath, document);
   }
@@ -364,22 +434,22 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     rootDir: string,
     brief: any
   ): { templateId: string; template: any } {
-    const catalogPath = path.resolve(
-      rootDir,
-      'knowledge/public/design-patterns/media-templates/document-layouts.json'
+    const catalogPath = assertSafeRepositoryPath(
+      path.resolve(
+        rootDir,
+        'knowledge/public/design-patterns/media-templates/document-layouts.json'
+      ),
+      { allowMissingLeaf: true }
     );
-    if (!safeExistsSync(catalogPath)) {
-      throw new Error(`Document layout catalog not found: ${catalogPath}`);
+    let catalog: DocumentLayoutCatalog;
+    try {
+      catalog = documentLayoutCatalog.load();
+    } catch (error) {
+      if (String(error).includes('Catalog document-layouts is missing:')) {
+        throw new Error(`Document layout catalog not found: ${catalogPath}`);
+      }
+      throw error;
     }
-    const catalog = loadJson<{
-      documents: Record<
-        string,
-        {
-          default_template?: string;
-          templates?: Record<string, unknown>;
-        }
-      >;
-    }>(catalogPath);
     const documentType = brief.document_type || 'invoice';
     const documentCatalog = catalog.documents?.[documentType];
     if (!documentCatalog) {
@@ -412,7 +482,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     }
   }
 
-  function buildDocumentPdfProtocol(rawBrief: any): any {
+  function buildDocumentPdfProtocol(rawBrief: any): MediaInvoicePdfProtocol {
     const brief = normalizeInvoiceDocumentBrief(rawBrief);
     if (brief.document_type !== 'invoice') {
       throw new Error(
@@ -514,7 +584,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
 
     return {
       version: '1.0.0',
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso(),
       source: {
         format: 'markdown',
         title: brief.title || 'Invoice',
@@ -524,7 +594,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         title: brief.title || 'Invoice',
         subject: brief.document_profile || 'qualified-invoice',
         author: 'Kyberion Media-Actuator',
-        creationDate: new Date().toISOString(),
+        creationDate: nowIso(),
         composition: {
           kind: 'document-outline-adf',
           document_profile: brief.document_profile,

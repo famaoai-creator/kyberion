@@ -1,28 +1,30 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { auditChain } from '@agent/core/audit-chain';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
 import {
-  findChronosTokenRegistration,
-  isValidChronosScopeId,
-  isValidTenantSlug,
   readChronosTokenRegistrations,
-  toWireError,
+  type ChronosTokenRegistration,
+} from '@agent/core/chronos-access-registry';
+import {
   defaultSurfaceViewerTierAccess,
   narrowSurfaceViewerTier,
   narrowSurfaceViewerScope,
   narrowSurfaceViewerTenant,
+  resolveSurfaceViewerScope,
+  SurfaceViewerScopeError,
   resolveSurfaceViewerTierAccess,
   type SurfaceViewerScope,
-} from '@agent/core';
+} from '@agent/core/surface-mutation-guard';
+import { toWireError } from '@agent/core/wire-error';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   isChronosLoopbackRequest,
   resolveChronosAccessRole,
   resolveChronosToken,
-  resolveChronosTokenRegistration,
   type ChronosAccessRole,
 } from './api-guard';
-import type { ChronosTokenRegistration, OsKnowledgeTier } from '@agent/core';
+import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 
 export interface ViewerContext extends Omit<
@@ -53,64 +55,43 @@ function loadRegistry(): ChronosTokenRegistration[] | null {
   }
 }
 
-function resolveRegisteredEntry(token: string): ChronosTokenRegistration | null {
-  const registry = loadRegistry();
-  if (!registry) return resolveChronosTokenRegistration(token);
-  return findChronosTokenRegistration(token, registry);
-}
-
 function resolveServerTenant(): string {
   return (getRegisteredEnvText('KYBERION_TENANT') || '').trim();
 }
 
 export function resolveViewerContext(req: NextRequest): ViewerContext {
   const token = resolveChronosToken(req);
-  if (token) {
-    const registration = resolveRegisteredEntry(token);
-    if (registration) {
-      return {
-        role: registration.role,
-        tenantSlugs: registration.tenant_slugs,
-        organizationIds: registration.organization_ids ?? 'all',
-        projectIds: registration.project_ids ?? 'all',
-        tierAccess: resolveViewerTierAccess(registration.role, registration.tier_access),
-        source: 'token',
-        principalId: registration.label,
-      };
+  const local = isChronosLoopbackRequest(req);
+  const loopbackRole = token ? undefined : resolveChronosAccessRole(req) || undefined;
+  try {
+    return resolveSurfaceViewerScope({
+      token,
+      local,
+      serverTenant: resolveServerTenant(),
+      registrations: token ? loadRegistry() : null,
+      apiToken: getRegisteredEnvText('KYBERION_API_TOKEN'),
+      localadminToken: getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN'),
+      allowLoopback: Boolean(loopbackRole),
+      loopbackRole,
+      // Chronos preserves its existing all-tenant loopback compatibility
+      // boundary; remote credentials still require server tenant binding.
+      allowPersonalTier: false,
+    });
+  } catch (error) {
+    if (!(error instanceof SurfaceViewerScopeError)) throw error;
+    let message = error.message;
+    if (message === 'Unknown viewer token.') message = 'Unknown Chronos viewer token.';
+    if (message.includes('Remote viewer access requires')) {
+      message = 'Remote Chronos access requires server-side KYBERION_TENANT scope.';
     }
-    const role = resolveChronosAccessRole(req);
-    if (role) {
-      const tenant = resolveServerTenant();
-      if (!tenant && !isChronosLoopbackRequest(req)) {
-        throw new ViewerContextError(
-          403,
-          'Remote Chronos access requires server-side KYBERION_TENANT scope.'
-        );
-      }
-      return {
-        role,
-        tenantSlugs: tenant ? [tenant] : 'all',
-        organizationIds: 'all',
-        projectIds: 'all',
-        tierAccess: defaultTierAccess(role),
-        source: 'token',
-      };
+    if (message === 'A viewer principal is required.') {
+      message = 'A Chronos viewer principal is required.';
     }
-    throw new ViewerContextError(401, 'Unknown Chronos viewer token.');
+    if (message.includes('viewer tier scope exceeds')) {
+      message = `Chronos viewer tier access exceeds the ${loopbackRole || 'viewer'} role policy.`;
+    }
+    throw new ViewerContextError(error.status, message);
   }
-
-  const role = resolveChronosAccessRole(req);
-  if (role && isChronosLoopbackRequest(req)) {
-    return {
-      role,
-      tenantSlugs: 'all',
-      organizationIds: 'all',
-      projectIds: 'all',
-      tierAccess: defaultTierAccess(role),
-      source: 'loopback',
-    };
-  }
-  throw new ViewerContextError(401, 'A Chronos viewer principal is required.');
 }
 
 /** Chronos roles currently expose public/confidential; personal remains masked. */

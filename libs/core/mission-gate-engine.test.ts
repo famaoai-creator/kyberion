@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { evaluateMissionGate, recordMissionGateOverride } from './mission-gate-engine.js';
 
 const missionId = 'MSN-GATE-ENGINE-001';
@@ -66,6 +73,27 @@ describe('mission-gate-engine', () => {
     expect(gate.verdict).toBe('fail');
     expect(gate.reasons.join(' ')).toContain('Missing evidence');
     expect(gate.reasons.join(' ')).toContain('override denied');
+  });
+
+  it('does not treat a directory as evidence or a deliverable', async () => {
+    const directoryPath = `${missionPath}/evidence/replaced.md`;
+    safeMkdir(directoryPath, { recursive: true });
+
+    const gate = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'regular-file-gate',
+        checks: [
+          { kind: 'evidence_exists', params: { path: directoryPath } },
+          { kind: 'deliverable_quality', params: { path: directoryPath, kind: 'deck' } },
+        ],
+      },
+      evidenceDir: `${missionPath}/gates`,
+    });
+
+    expect(gate.verdict).toBe('fail');
+    expect(gate.reasons.join(' ')).toContain('Missing evidence');
+    expect(gate.reasons.join(' ')).toContain('must be a regular file');
   });
 
   it('passes deliverable_quality when the deck brief meets the rubric threshold', async () => {
@@ -174,7 +202,7 @@ describe('mission-gate-engine', () => {
     expect(passGate.verdict).toBe('pass');
     disposeFirstBackend();
 
-    registerReasoningBackend({
+    const disposeSecondBackend = registerReasoningBackend({
       name: 'fake-llm',
       prompt: async () =>
         '{"pass": false, "reasons": ["結論に根拠がない"], "improvements": ["出典を追加"]}',
@@ -186,6 +214,19 @@ describe('mission-gate-engine', () => {
     });
     expect(failGate.verdict).toBe('fail');
     expect(failGate.reasons.join(' ')).toContain('結論に根拠がない');
+    disposeSecondBackend();
+
+    registerReasoningBackend({
+      name: 'fake-llm',
+      prompt: async () => '{"pass":true,"metadata":{"__proto__":{"x":1}}}',
+    } as never);
+    const dangerousGate = await evaluateMissionGate({
+      missionId,
+      gate: gateDef,
+      evidenceDir: `${missionPath}/gates`,
+    });
+    expect(dangerousGate.verdict).toBe('fail');
+    expect(dangerousGate.reasons.join(' ')).toContain('dangerous JSON key');
     resetReasoningBackend();
   });
 
@@ -212,6 +253,42 @@ describe('mission-gate-engine', () => {
       confirmed_by: 'operator',
       source_gate_id: 'manual-review',
     });
+  });
+
+  it('writes an explicit recordPath as a file and rejects symlinked deliverables', async () => {
+    const recordPath = `${missionPath}/gates/explicit-record.json`;
+    const recorded = await evaluateMissionGate({
+      missionId: missionId,
+      gate: { id: 'explicit-record', checks: [] },
+      recordPath,
+    });
+
+    expect(recorded.verdict).toBe('pass');
+    expect(recorded.evidence_path).toBe(recordPath);
+    expect(JSON.parse(String(safeReadFile(recordPath, { encoding: 'utf8' })))).toMatchObject({
+      mission_id: missionId,
+      gate_id: 'explicit-record',
+      verdict: 'pass',
+    });
+
+    const targetPath = `${missionPath}/evidence/real-report.md`;
+    const linkedPath = `${missionPath}/evidence/linked-report.md`;
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    safeWriteFile(targetPath, '# report');
+    safeSymlinkSync(targetPath, linkedPath);
+    try {
+      const rejected = await evaluateMissionGate({
+        missionId,
+        gate: {
+          id: 'symlink-deliverable',
+          checks: [{ kind: 'deliverable_quality', params: { path: linkedPath, kind: 'text' } }],
+        },
+      });
+      expect(rejected.verdict).toBe('fail');
+      expect(rejected.reasons.join(' ')).toContain('Deliverable not found');
+    } finally {
+      safeRmSync(linkedPath, { force: true });
+    }
   });
 
   it('evaluates software quality lifecycle and traceability checks', async () => {
@@ -292,7 +369,13 @@ describe('mission-gate-engine', () => {
       version: '1.0.0',
       project_id: 'project-1',
       accountable_human_id: 'human:owner',
-      dor: [],
+      dor: [
+        {
+          check_id: 'DOR-1',
+          description: 'Scope is agreed',
+          status: 'passed',
+        },
+      ],
       acceptance_criteria: [
         {
           criterion_id: 'AC-1',
@@ -303,7 +386,13 @@ describe('mission-gate-engine', () => {
           evidence_refs: [],
         },
       ],
-      dod: [],
+      dod: [
+        {
+          check_id: 'DOD-1',
+          description: 'Regression evidence is attached',
+          status: 'passed',
+        },
+      ],
     };
     const gate = await evaluateMissionGate({
       missionId,
@@ -325,6 +414,50 @@ describe('mission-gate-engine', () => {
     expect(gate.verdict).toBe('fail');
     expect(gate.reasons.join(' ')).toContain('without evidence');
     expect(gate.reasons.join(' ')).toContain('not covered');
+  });
+
+  it('fails closed when quality gate payloads contain unknown fields', async () => {
+    const contract = {
+      version: '1.0.0',
+      project_id: 'project-1',
+      accountable_human_id: 'human:owner',
+      dor: [
+        { check_id: 'DOR-1', description: 'Ready', status: 'passed', evidence_refs: ['e:dor'] },
+      ],
+      acceptance_criteria: [
+        {
+          criterion_id: 'AC-1',
+          description: 'Returns 200',
+          requirement_refs: ['REQ-1'],
+          expected_result: '200',
+          status: 'passed',
+          evidence_refs: ['e:ac'],
+        },
+      ],
+      dod: [{ check_id: 'DOD-1', description: 'Done', status: 'passed', evidence_refs: ['e:dod'] }],
+      unexpected: true,
+    };
+    const inventory = {
+      version: '1.0.0',
+      project_id: 'project-1',
+      items: [],
+      unexpected: true,
+    };
+    const gate = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'malformed-software-quality-gate',
+        checks: [
+          { kind: 'quality_contract_valid', params: { contract } },
+          { kind: 'test_traceability', params: { contract, inventory } },
+        ],
+      },
+    });
+
+    expect(gate.verdict).toBe('fail');
+    expect(
+      gate.reasons.filter((reason) => reason.includes('No software quality contract'))
+    ).toHaveLength(2);
   });
 
   it('enforces a no-go quality report only in enforce mode', async () => {

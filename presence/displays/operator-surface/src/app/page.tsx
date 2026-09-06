@@ -9,7 +9,7 @@ import {
 import { emitMosRead } from '@/lib/audit-mos';
 import CapabilityDashboard from '@/components/CapabilityDashboard';
 import OsControlPlanePanel from '@/components/OsControlPlanePanel';
-import { renderStatus } from '@agent/core';
+import { renderStatus } from '@agent/core/ux-vocabulary';
 
 export const dynamic = 'force-dynamic';
 

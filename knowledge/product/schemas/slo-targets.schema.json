@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "slo-targets.schema.json",
+  "title": "Metrics SLO targets",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["default"],
+  "properties": {
+    "_note": { "type": "string" },
+    "default": { "$ref": "#/$defs/target" },
+    "critical_path": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/target" }
+    }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latency_ms"],
+      "properties": {
+        "latency_ms": { "type": "number", "minimum": 0 },
+        "success_rate": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    }
+  }
+}

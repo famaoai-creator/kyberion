@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-orchestration-payload-envelope.schema.json",
+  "title": "Mission Orchestration Payload Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "mission_id", "payload"],
+  "properties": {
+    "event_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "payload": { "type": "object", "additionalProperties": true }
+  }
+}

@@ -2,8 +2,18 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { compileSchemaFromPath, pathResolver, safeReadFile, safeReaddir } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+  safeExistsSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { handleAction } from './index.js';
+import { parseMeetingActionInput, parseMeetingActionResult } from './meeting-actuator-helpers.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -13,6 +23,53 @@ describe('meeting-actuator', () => {
     pathResolver.rootDir(),
     'knowledge/product/schemas/meeting-action.schema.json'
   );
+
+  it('normalizes the meeting bridge result envelope before audit and delivery', () => {
+    expect(
+      parseMeetingActionResult({
+        status: 'success',
+        action: 'status',
+        platform: 'meet',
+        join_backend: 'meeting-browser-driver',
+        elapsed: 1.25,
+      })
+    ).toMatchObject({ status: 'success', action: 'status', elapsed: 1.25 });
+  });
+
+  it('rejects malformed bridge result fields and primitive roots', () => {
+    expect(parseMeetingActionResult(null)).toBeUndefined();
+    expect(parseMeetingActionResult({ status: 'ok' })).toBeUndefined();
+    expect(
+      parseMeetingActionResult({ status: 'success', platform: { host: 'evil' } })
+    ).toBeUndefined();
+    expect(parseMeetingActionResult({ status: 'success', partial_state: 'true' })).toBeUndefined();
+    expect(parseMeetingActionResult({ status: 'success', elapsed: Number.NaN })).toBeUndefined();
+  });
+
+  it('uses foundation readers at the action and bridge JSON boundaries', () => {
+    const source = safeReadFile(
+      path.join(
+        pathResolver.rootDir(),
+        'libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts'
+      ),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(source).toContain("parseSafeJsonInput(normalized, 'meeting bridge result')");
+    expect(source).toContain("readJson<unknown>(inputPath, { label: 'meeting action input' })");
+    expect(source).not.toContain('handleAction(JSON.parse(inputContent))');
+  });
+
+  it('rejects malformed typed action input after safe JSON parsing', () => {
+    expect(() => parseMeetingActionInput([])).toThrow(/must be an object/);
+    expect(() => parseMeetingActionInput({ action: 'explode', params: {} })).toThrow(
+      /unknown action/
+    );
+    expect(() => parseMeetingActionInput({ action: 'join' })).toThrow(/params must be an object/);
+    expect(parseMeetingActionInput({ action: 'pipeline', steps: [] })).toEqual({
+      action: 'pipeline',
+      steps: [],
+    });
+  });
 
   it('emits a join action that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
@@ -105,14 +162,146 @@ describe('meeting-actuator', () => {
     expect((result as any).context.fairness.total_items).toBe(0);
     expect((result as any).context.fairness.dominant_speaker).toBeNull();
   });
+
+  it('rejects transcript paths outside the repository before reading them', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'extract_action_items',
+          params: { transcript_path: '/tmp/external-meeting-transcript.txt' },
+        },
+      ],
+    });
+
+    const error = (result as any).results.find((entry: any) => entry.error)?.error || '';
+    expect(error).toContain('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a directory transcript path before reading it', async () => {
+    const fixtureDir = pathResolver.active(`shared/tmp/meeting-transcript-${process.pid}`);
+    const transcriptDir = path.join(fixtureDir, 'transcript.txt');
+    safeMkdir(transcriptDir, { recursive: true });
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'apply',
+            op: 'extract_action_items',
+            params: { transcript_path: pathResolver.toRepoRelative(transcriptDir) },
+          },
+        ],
+      });
+
+      const error = result.results.find((entry) => entry.error)?.error || '';
+      expect(error).toContain('[MEETING_RESOURCE_FILE]');
+    } finally {
+      safeRmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it('normalizes a VTT transcript through the nested pipeline', async () => {
+    const fixtureDir = pathResolver.active(`shared/tmp/meeting-normalize-${process.pid}`);
+    const transcriptPath = path.join(fixtureDir, 'meeting.vtt');
+    safeMkdir(fixtureDir, { recursive: true });
+    safeWriteFile(
+      transcriptPath,
+      'WEBVTT\n\n00:00.000 --> 00:05.000\n<v Alice>Ship on Friday</v>\n',
+      { encoding: 'utf8' }
+    );
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'apply',
+            op: 'normalize_transcript',
+            params: {
+              transcript_path: pathResolver.toRepoRelative(transcriptPath),
+              export_as: 'normalized_transcript',
+            },
+          },
+        ],
+        context: {},
+      });
+
+      expect((result as any).status).toBe('succeeded');
+      const normalized = (result as any).context.normalized_transcript;
+      expect(normalized.format).toBe('vtt');
+      expect(normalized.transcript).toContain('[00:00] Alice: Ship on Friday');
+    } finally {
+      safeRmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves the next calendar meeting target through the nested pipeline', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'resolve_next_target',
+          params: {
+            events: [
+              {
+                title: 'Weekly Sync',
+                start: '2026-09-06T09:00:00+09:00',
+                end: '2026-09-06T09:30:00+09:00',
+                location: 'https://meet.google.com/abc-defg-hij',
+              },
+            ],
+            now: '2026-09-06T08:59:00+09:00',
+            export_as: 'meeting_target',
+          },
+        },
+      ],
+      context: {},
+    });
+
+    expect((result as any).status).toBe('succeeded');
+    expect((result as any).context.meeting_target).toMatchObject({
+      found: true,
+      platform: 'meet',
+      url: 'https://meet.google.com/abc-defg-hij',
+    });
+  });
+
+  it('fails chrome-extension join closed with setup guidance when no extension is connected', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'join',
+          params: {
+            url: 'https://meet.google.com/abc-defg-hij',
+            platform: 'meet',
+            join_backend: 'chrome-extension',
+            duration_sec: 0,
+            ws_port: 18779,
+            join_timeout_sec: 2,
+            export_as: 'join_result',
+          },
+        },
+      ],
+      context: {},
+    });
+
+    expect((result as any).status).toBe('succeeded');
+    const joinResult = (result as any).context.join_result;
+    expect(joinResult.status).toBe('error');
+    expect(String(joinResult.message)).toMatch(/extension|token|connect/i);
+  });
 });
 
 describe('meeting-actuator voice-consent gate', () => {
   const FIX_MISSION = 'MSN-MEETING-CONSENT-FIXTURE-001';
-  const fs = require('node:fs');
-  const path2 = require('node:path');
   const ROOT = pathResolver.rootDir();
-  const MISSION_DIR = path2.join(ROOT, 'active/missions/confidential', FIX_MISSION);
+  const MISSION_DIR = path.join(ROOT, 'active/missions/confidential', FIX_MISSION);
   let savedMission: string | undefined;
   let savedSudo: string | undefined;
   let savedPersona: string | undefined;
@@ -127,9 +316,9 @@ describe('meeting-actuator voice-consent gate', () => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     delete process.env.KYBERION_SUDO;
     delete process.env.KYBERION_TENANT;
-    fs.mkdirSync(path2.join(MISSION_DIR, 'evidence'), { recursive: true });
-    fs.writeFileSync(
-      path2.join(MISSION_DIR, 'mission-state.json'),
+    safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
+    safeWriteFile(
+      path.join(MISSION_DIR, 'mission-state.json'),
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
@@ -139,6 +328,11 @@ describe('meeting-actuator voice-consent gate', () => {
   });
 
   afterEach(() => {
+    try {
+      safeRmSync(MISSION_DIR, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
     if (savedMission === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = savedMission;
     if (savedSudo === undefined) delete process.env.KYBERION_SUDO;
@@ -147,11 +341,6 @@ describe('meeting-actuator voice-consent gate', () => {
     else process.env.KYBERION_PERSONA = savedPersona;
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
-    try {
-      fs.rmSync(MISSION_DIR, { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
   });
 
   it('denies speak() when voice-consent.json is missing', async () => {
@@ -168,8 +357,8 @@ describe('meeting-actuator voice-consent gate', () => {
   });
 
   it('denies speak() when consent != "granted"', async () => {
-    fs.writeFileSync(
-      path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
+    safeWriteFile(
+      path.join(MISSION_DIR, 'evidence/voice-consent.json'),
       JSON.stringify({ consent: 'pending' })
     );
     const { handleAction } = await import('./index.js');
@@ -182,8 +371,8 @@ describe('meeting-actuator voice-consent gate', () => {
   });
 
   it('denies speak() when consent is malformed', async () => {
-    fs.writeFileSync(
-      path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
+    safeWriteFile(
+      path.join(MISSION_DIR, 'evidence/voice-consent.json'),
       JSON.stringify({ consent: 'granted' })
     );
     const { handleAction } = await import('./index.js');
@@ -196,8 +385,8 @@ describe('meeting-actuator voice-consent gate', () => {
   });
 
   it('denies speak() when consent is expired', async () => {
-    fs.writeFileSync(
-      path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
+    safeWriteFile(
+      path.join(MISSION_DIR, 'evidence/voice-consent.json'),
       JSON.stringify({
         consent: 'granted',
         mission_id: FIX_MISSION,
@@ -215,8 +404,8 @@ describe('meeting-actuator voice-consent gate', () => {
   });
 
   it('denies speak() when consent belongs to another tenant', async () => {
-    fs.writeFileSync(
-      path2.join(MISSION_DIR, 'mission-state.json'),
+    safeWriteFile(
+      path.join(MISSION_DIR, 'mission-state.json'),
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
@@ -224,8 +413,8 @@ describe('meeting-actuator voice-consent gate', () => {
         tenant_slug: 'alpha-team',
       })
     );
-    fs.writeFileSync(
-      path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
+    safeWriteFile(
+      path.join(MISSION_DIR, 'evidence/voice-consent.json'),
       JSON.stringify({
         consent: 'granted',
         mission_id: FIX_MISSION,
@@ -258,8 +447,8 @@ describe('meeting-actuator voice-consent gate', () => {
   });
 
   it('allows speak() after consent is granted and emits a meeting audit entry', async () => {
-    fs.writeFileSync(
-      path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
+    safeWriteFile(
+      path.join(MISSION_DIR, 'evidence/voice-consent.json'),
       JSON.stringify({
         consent: 'granted',
         mission_id: FIX_MISSION,
@@ -268,12 +457,12 @@ describe('meeting-actuator voice-consent gate', () => {
       })
     );
 
-    const auditPath = path2.join(
+    const auditPath = path.join(
       ROOT,
       'active/shared/logs/audit',
       `audit-${new Date().toISOString().slice(0, 10)}.jsonl`
     );
-    const before = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
+    const before = safeExistsSync(auditPath) ? safeReadFile(auditPath, { encoding: 'utf8' }) : '';
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
       action: 'speak',
@@ -283,7 +472,7 @@ describe('meeting-actuator voice-consent gate', () => {
     expect(result.status).not.toBe('denied');
     expect(result.audit_event_id).toBeTruthy();
 
-    const after = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
+    const after = safeExistsSync(auditPath) ? safeReadFile(auditPath, { encoding: 'utf8' }) : '';
     expect(after).not.toBe(before);
     expect(after).toContain('meeting.speak');
     expect(after).toContain('voice-consent.json');

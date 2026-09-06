@@ -7,8 +7,17 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir } from './secure-io.js';
-import { findMissionPath, rootDir, shared } from './path-resolver.js';
+import { readJsonLines } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReaddir,
+} from './secure-io.js';
+import { findMissionPath, knowledge, rootDir, shared } from './path-resolver.js';
 import {
   appendValidatedJournalEvent,
   EventSourcingKernel,
@@ -75,6 +84,24 @@ export interface PipelineRunJournalHandle {
   readonly path: string;
   append(event: PipelineRunEventType, payload: Record<string, unknown>): PipelineRunJournalEvent;
   state(): PipelineRunJournalState;
+}
+
+const PIPELINE_JOURNAL_SCHEMA_PATH = knowledge(
+  'product/schemas/pipeline-run-journal-event.schema.json'
+);
+
+function pipelineJournalCatalog(filePath: string): GovernedCatalog<PipelineRunJournalEvent> {
+  return defineCatalog<PipelineRunJournalEvent>({
+    id: 'pipeline-run-journal-event',
+    path: filePath,
+    schema: PIPELINE_JOURNAL_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularPipelineJournalFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[PIPELINE_JOURNAL] journal must be a regular file: ${filePath}`);
+  }
 }
 
 interface PipelineJournalProjection {
@@ -161,20 +188,26 @@ function appendPipelineJournalEvent(
   event: PipelineRunEventType,
   payload: Record<string, unknown>
 ): PipelineRunJournalEvent {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  ensureRegularPipelineJournalFile(safeFilePath);
   return appendValidatedJournalEvent({
     kernel: pipelineJournalKernel,
     opName: `pipeline.${event}`,
     payload,
-    journalPath: filePath,
+    journalPath: safeFilePath,
     seq: sequence,
-    buildEnvelope: ({ seq, ts, payload: validated }) => ({
-      version: PIPELINE_RUN_JOURNAL_VERSION,
-      sequence: seq,
-      run_id: runId,
-      event,
-      timestamp: ts,
-      payload: validated as Record<string, unknown>,
-    }),
+    buildEnvelope: ({ seq, ts, payload: validated }) =>
+      pipelineJournalCatalog(safeFilePath).validate(
+        {
+          version: PIPELINE_RUN_JOURNAL_VERSION,
+          sequence: seq,
+          run_id: runId,
+          event,
+          timestamp: ts,
+          payload: validated as Record<string, unknown>,
+        },
+        safeFilePath
+      ),
   });
 }
 
@@ -186,7 +219,10 @@ function journalDir(missionId?: string): string {
 }
 
 export function pipelineRunJournalPath(runId: string, missionId?: string): string {
-  return path.join(journalDir(missionId), `${normalizedSegment(runId)}.jsonl`);
+  return assertSafeRepositoryPath(
+    path.join(journalDir(missionId), `${normalizedSegment(runId)}.jsonl`),
+    { allowMissingLeaf: true }
+  );
 }
 
 function candidateJournalPaths(runId: string): string[] {
@@ -196,11 +232,22 @@ function candidateJournalPaths(runId: string): string[] {
     const base = path.join(rootDir(), 'active', 'missions', tier);
     if (!safeExistsSync(base)) continue;
     for (const missionId of safeReaddir(base)) {
-      const candidate = path.join(base, missionId, 'coordination', 'pipeline-runs', `${id}.jsonl`);
+      let candidate: string;
+      try {
+        candidate = assertSafeRepositoryPath(
+          path.join(base, missionId, 'coordination', 'pipeline-runs', `${id}.jsonl`),
+          { allowMissingLeaf: true }
+        );
+      } catch {
+        // A stale or hostile mission entry must not widen discovery to an
+        // external target, but it also must not hide valid journals in the
+        // remaining governed mission directories.
+        continue;
+      }
       if (safeExistsSync(candidate)) candidates.push(candidate);
     }
   }
-  const missionId = process.env.MISSION_ID?.trim();
+  const missionId = getRegisteredEnvText('MISSION_ID')?.trim();
   if (missionId) candidates.push(pipelineRunJournalPath(id, missionId));
   return [...new Set(candidates)];
 }
@@ -275,20 +322,38 @@ function migrateEvent(raw: unknown): PipelineRunJournalEvent {
 }
 
 export function readPipelineRunJournal(filePath: string): PipelineRunJournalState {
-  if (!safeExistsSync(filePath)) throw new Error(`[PIPELINE_JOURNAL] not found: ${filePath}`);
-  const lines = String(safeReadFile(filePath, { encoding: 'utf8' }))
-    .split('\n')
-    .filter((line) => line.trim().length > 0);
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath))
+    throw new Error(`[PIPELINE_JOURNAL] not found: ${safeFilePath}`);
+  ensureRegularPipelineJournalFile(safeFilePath);
+  let rows: Array<{ value: unknown; lineNumber: number }>;
+  try {
+    rows = readJsonLines(safeFilePath, {
+      onMalformed: 'throw',
+      map: (value, lineNumber) => ({ value, lineNumber }),
+    });
+  } catch {
+    throw new Error('[PIPELINE_JOURNAL] corrupt JSONL journal; refusing to resume');
+  }
   const events: PipelineRunJournalEvent[] = [];
   let previousSequence = 0;
-  for (const line of lines) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      throw new Error('[PIPELINE_JOURNAL] corrupt JSONL journal; refusing to resume');
+  const catalog = pipelineJournalCatalog(safeFilePath);
+  for (const { value: parsed, lineNumber } of rows) {
+    const source = `${safeFilePath}:${lineNumber}`;
+    const originalVersion =
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? Number(
+            (parsed as Record<string, unknown>).version ?? (parsed as Record<string, unknown>).v
+          )
+        : Number.NaN;
+    const migrated = migrateEvent(parsed);
+    // Version 3 has a closed envelope. Validate the raw record before
+    // migration so an unknown top-level key cannot be silently discarded by
+    // the legacy normalizer.
+    if (originalVersion === PIPELINE_RUN_JOURNAL_VERSION) {
+      catalog.validate(parsed, source);
     }
-    const event = migrateEvent(parsed);
+    const event = catalog.validate(migrated, source);
     if (events.length > 0 && event.sequence <= previousSequence) {
       throw new Error('[PIPELINE_JOURNAL] non-monotonic event sequence; refusing to resume');
     }
@@ -323,7 +388,7 @@ export function readPipelineRunJournal(filePath: string): PipelineRunJournalStat
   }) as PipelineJournalProjection;
   const state: PipelineRunJournalState = {
     run_id: runId,
-    path: filePath,
+    path: safeFilePath,
     events,
     completed_nodes: new Map(Object.entries(projection.completed_nodes)),
   };

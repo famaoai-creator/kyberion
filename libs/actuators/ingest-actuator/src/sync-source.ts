@@ -46,12 +46,12 @@
 
 import {
   advanceSyncCursor,
-  executeServicePreset,
-  logger,
   readSyncCursor,
   recordSyncFailure,
   type SyncCursorKind,
-} from '@agent/core';
+} from '@agent/core/ingest-sync-cursors';
+import { executeServicePreset } from '@agent/core/service-engine';
+import { logger } from '@agent/core/core';
 
 export type SyncSourceSystem = 'box' | 'slack' | 'confluence';
 

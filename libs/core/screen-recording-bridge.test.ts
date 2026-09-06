@@ -82,4 +82,26 @@ describe('createScreenRecordingBridge', () => {
     expect(result.frame_count).toBe(2);
     expect(result.fps).toBe(12);
   });
+
+  it('rejects an archive output outside the repository', async () => {
+    const bridge = createScreenRecordingBridge({
+      frame_redactor: async (frame) => frame,
+      capture_bridge: {
+        bridge_id: 'screen-capture-bridge',
+        probe: vi.fn(async () => ({
+          bridge_id: 'screen-capture-bridge',
+          platform: 'darwin',
+          backend: 'stub',
+          available: true,
+        })),
+        captureScreenshot: vi.fn(),
+        captureStream: async function* () {},
+        pipeTo: vi.fn(),
+      },
+    });
+
+    await expect(bridge.recordToMp4('/tmp/outside-screen.mp4')).rejects.toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
 });

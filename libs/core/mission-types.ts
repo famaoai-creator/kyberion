@@ -42,6 +42,8 @@ export interface MissionState {
     outcome_ids?: string[];
   };
   tenant_id?: string;
+  /** Organization scope associated with the mission (legacy top-level field). */
+  organization_id?: string;
   /**
    * Tenant slug for multi-tenant isolation (lowercase, ^[a-z][a-z0-9-]{1,30}$).
    * When set, tier-guard rejects writes/reads under another tenant's
@@ -93,6 +95,9 @@ export interface MissionState {
   completed_at?: string;
   execution_mode: 'local' | 'delegated';
   relationships?: {
+    organization?: {
+      organization_id?: string;
+    };
     prerequisites?: string[];
     successors?: string[];
     blockers?: string[];

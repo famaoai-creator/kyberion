@@ -1,10 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { safeRmSync } from './secure-io.js';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   assertFencedWriterLease,
+  getWriterLeaseMetrics,
+  loadWriterLeaseMetrics,
+  resetWriterLeaseMetrics,
   renewFencedWriterLease,
   renewFencedWriterLeaseSync,
+  writerLeaseMetricsPath,
   withFencedWriterLease,
   withFencedWriterLeaseSync,
 } from './writer-lease.js';
@@ -12,7 +22,10 @@ import {
 const root = path.resolve(`active/shared/tmp/writer-lease-${process.pid}`);
 const leasePath = path.join(root, 'coordination', 'writer-lease.json');
 
-afterEach(() => safeRmSync(root, { recursive: true, force: true }));
+afterEach(() => {
+  safeRmSync(root, { recursive: true, force: true });
+  resetWriterLeaseMetrics();
+});
 
 describe('withFencedWriterLease (PI-16)', () => {
   it('increments the fence and releases an expired lease after a successful write', async () => {
@@ -39,6 +52,7 @@ describe('withFencedWriterLease (PI-16)', () => {
 
   it('rejects a live lease held by another owner and corrupt records', async () => {
     let clock = 5_000;
+    const events: string[] = [];
     const { safeWriteFile } = await import('./secure-io.js');
     safeWriteFile(
       leasePath,
@@ -55,9 +69,14 @@ describe('withFencedWriterLease (PI-16)', () => {
         ownerId: 'owner-b',
         leasePath,
         nowMs: () => clock,
+        onEvent: (event) => events.push(event.type),
         fn: () => undefined,
       })
     ).rejects.toThrow('WRITER_LEASE_BUSY');
+    expect(events).toEqual(['rejected']);
+    expect(getWriterLeaseMetrics('mission:PI16-B')).toMatchObject([
+      { resource_id: 'mission:PI16-B', rejected: 1 },
+    ]);
 
     safeWriteFile(leasePath, '{broken');
     await expect(
@@ -69,6 +88,42 @@ describe('withFencedWriterLease (PI-16)', () => {
         fn: () => undefined,
       })
     ).rejects.toThrow('WRITER_LEASE_CORRUPT');
+
+    safeWriteFile(
+      leasePath,
+      JSON.stringify({
+        resource_id: 'mission:PI16-B',
+        owner_id: 'owner-a',
+        fence: 4,
+        expires_at_ms: clock + 1_000,
+        unexpected: true,
+      })
+    );
+    await expect(
+      withFencedWriterLease({
+        resourceId: 'mission:PI16-B',
+        ownerId: 'owner-c',
+        nowMs: () => clock,
+        leasePath,
+        fn: () => undefined,
+      })
+    ).rejects.toThrow('WRITER_LEASE_CORRUPT');
+  });
+
+  it('rejects a symlinked lease leaf before reading its contents', async () => {
+    const targetPath = path.join(root, 'lease-target.json');
+    safeMkdir(root, { recursive: true });
+    safeWriteFile(targetPath, '{}');
+    safeSymlinkSync(targetPath, leasePath);
+
+    await expect(
+      withFencedWriterLease({
+        resourceId: 'mission:PI16-SYMLINK',
+        ownerId: 'owner-symlink',
+        leasePath,
+        fn: () => undefined,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
   it('rejects a stale owner/fence token even when the lease record is valid', async () => {
@@ -191,5 +246,57 @@ describe('withFencedWriterLease (PI-16)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('aggregates lifecycle events by resource without exposing lease payloads', async () => {
+    const resourceId = 'mission:PI16-METRICS';
+    await withFencedWriterLease({
+      resourceId,
+      ownerId: 'owner-metrics',
+      leasePath,
+      fn: () => undefined,
+    });
+
+    expect(getWriterLeaseMetrics(resourceId)).toEqual([
+      {
+        resource_id: resourceId,
+        acquired: 1,
+        renewed: 0,
+        released: 1,
+        rejected: 0,
+      },
+    ]);
+    expect(getWriterLeaseMetrics(resourceId)[0]).not.toHaveProperty('owner_id');
+    resetWriterLeaseMetrics();
+    expect(loadWriterLeaseMetrics(writerLeaseMetricsPath(leasePath), resourceId)).toEqual([
+      {
+        resource_id: resourceId,
+        acquired: 1,
+        renewed: 0,
+        released: 1,
+        rejected: 0,
+      },
+    ]);
+    expect(
+      String(safeReadFile(writerLeaseMetricsPath(leasePath), { encoding: 'utf8' }))
+    ).not.toContain('owner-metrics');
+  });
+
+  it('fails closed for malformed durable metrics', () => {
+    const metricsPath = writerLeaseMetricsPath(leasePath);
+    safeWriteFile(
+      metricsPath,
+      JSON.stringify({
+        'mission:PI16-BAD': {
+          resource_id: 'mission:PI16-BAD',
+          acquired: 'one',
+          renewed: 0,
+          released: 0,
+          rejected: 0,
+        },
+      })
+    );
+
+    expect(loadWriterLeaseMetrics(metricsPath)).toEqual([]);
   });
 });

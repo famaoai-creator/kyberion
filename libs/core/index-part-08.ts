@@ -4,58 +4,47 @@ export {
   loadMediaStylePolicyCatalog,
   resolveSignalToneRank,
   resolveBorderKeySides,
-  resetMediaStylePolicyCatalogCache,
 } from './media-style-policy.js';
 
 export {
   loadMediaSignalEntryPolicyCatalog,
   resolveMediaSignalEntryPolicy,
-  resetMediaSignalEntryPolicyCatalogCache,
 } from './media-signal-entry-policy.js';
 
-export {
-  loadTrackerSheetPolicyCatalog,
-  resetTrackerSheetPolicyCatalogCache,
-} from './tracker-sheet-policy.js';
+export { loadTrackerSheetPolicyCatalog } from './tracker-sheet-policy.js';
 
 export {
   loadMediaThemeRolePolicyCatalog,
   resolveThemeColorRole,
   resolveThemeHexRole,
-  resetMediaThemeRolePolicyCatalogCache,
 } from './media-theme-role-policy.js';
 
 export {
   loadMediaDrawioEdgePolicyCatalog,
   resolveDrawioEdgeLabelStyleParts,
   resolveDrawioEdgeRoutingStyleParts,
-  resetMediaDrawioEdgePolicyCatalogCache,
 } from './media-drawio-edge-policy.js';
 
 export {
   loadMediaDrawioBoundaryPolicyCatalog,
   resolveDrawioBoundaryIconCandidates,
   resolveDrawioBoundaryPaletteOverride,
-  resetMediaDrawioBoundaryPolicyCatalogCache,
 } from './media-drawio-boundary-policy.js';
 
 export {
   loadMediaDrawioTierOrderCatalog,
   resolveMediaDrawioTierRank,
-  resetMediaDrawioTierOrderCatalogCache,
 } from './media-drawio-tier-order.js';
 
 export {
   loadMediaDrawioSortPolicyCatalog,
   resolveMediaDrawioGroupRank,
   resolveMediaDrawioTypeRank,
-  resetMediaDrawioSortPolicyCatalogCache,
 } from './media-drawio-sort-policy.js';
 
 export {
   loadMediaDrawioSecurityGroupOrderCatalog,
   resolveMediaDrawioSecurityGroupRelationPrefix,
-  resetMediaDrawioSecurityGroupOrderCatalogCache,
 } from './media-drawio-security-group-order.js';
 
 export {
@@ -63,21 +52,18 @@ export {
   resolveDocumentProfileCandidates,
   resolveDocumentProfileKeywords,
   resolveDocumentTypeFromClues,
-  resetDocumentInferencePolicyCatalogCache,
 } from './document-inference-policy.js';
 
 export {
   loadDocumentContentsPolicyCatalog,
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
-  resetDocumentContentsPolicyCatalogCache,
 } from './document-contents-policy.js';
 
 export {
   loadDocumentOutlineLabelPolicyCatalog,
   resolveReportSectionTitle,
   resolveReportSummaryTitle,
-  resetDocumentOutlineLabelPolicyCatalogCache,
 } from './document-outline-label-policy.js';
 
 export {
@@ -85,19 +71,16 @@ export {
   resolvePromotedReportAudience,
   resolvePromotedReportOutputFormat,
   resolvePromotedReportTemplateSections,
-  resetPromotedReportTemplatePolicyCatalogCache,
 } from './promoted-report-template-policy.js';
 
 export {
   loadOnboardingSummaryPolicyCatalog,
   resolveOnboardingSummaryPolicy,
-  resetOnboardingSummaryPolicyCatalogCache,
 } from './onboarding-summary-policy.js';
 
 export {
   loadOnboardingFlowPolicyCatalog,
   resolveOnboardingFlowPolicy,
-  resetOnboardingFlowPolicyCatalogCache,
   resolveOnboardingText,
 } from './onboarding-flow-policy.js';
 
@@ -105,61 +88,50 @@ export type { LocalizedOnboardingText } from './onboarding-flow-policy.js';
 
 export * from './onboarding-context.js';
 
+export * from './onboarding-state.js';
+
+export * from './onboarding-apply-input.js';
+
 export {
   loadMissionDistillMarkdownPolicyCatalog,
   resolveMissionDistillMarkdownPolicy,
-  resetMissionDistillMarkdownPolicyCatalogCache,
 } from './mission-distill-markdown-policy.js';
 
 export {
   loadMissionLedgerPolicyCatalog,
   resolveMissionLedgerPolicy,
-  resetMissionLedgerPolicyCatalogCache,
 } from './mission-ledger-policy.js';
 
 export {
   loadProviderCliCapabilityReportPolicyCatalog,
   resolveProviderCliCapabilityReportPolicy,
-  resetProviderCliCapabilityReportPolicyCatalogCache,
 } from './provider-cli-capability-report-policy.js';
 
 export {
   loadMissionJournalPolicyCatalog,
   resolveMissionJournalPolicy,
-  resetMissionJournalPolicyCatalogCache,
 } from './mission-journal-policy.js';
 
 export {
   loadPilotStrategyPolicyCatalog,
   resolvePilotStrategyPolicy,
-  resetPilotStrategyPolicyCatalogCache,
 } from './pilot-strategy-policy.js';
 
 export {
   loadProductionEvidenceSummaryPolicyCatalog,
   resolveProductionEvidenceSummaryPolicy,
-  resetProductionEvidenceSummaryPolicyCatalogCache,
 } from './production-evidence-summary-policy.js';
 
-export {
-  loadChangelogPolicyCatalog,
-  resolveChangelogPolicy,
-  resetChangelogPolicyCatalogCache,
-} from './changelog-policy.js';
+export { loadChangelogPolicyCatalog, resolveChangelogPolicy } from './changelog-policy.js';
 
 export { resolveProposalSectionKeywords } from './media-semantic-map.js';
 
 export {
   loadSpreadsheetStylePolicyCatalog,
   resolveSpreadsheetStyleIndex,
-  resetSpreadsheetStylePolicyCatalogCache,
 } from './spreadsheet-style-policy.js';
 
-export {
-  isLegacyMediaOp,
-  loadLegacyMediaOpsCatalog,
-  resetLegacyMediaOpsCatalogCache,
-} from './legacy-media-ops.js';
+export { isLegacyMediaOp, loadLegacyMediaOpsCatalog } from './legacy-media-ops.js';
 
 export { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 
@@ -223,6 +195,12 @@ export {
   type StructuredOutputSchemaName,
   type StructuredOutputSchemaRef,
 } from './structured-output-contracts.js';
+
+export {
+  loadMissionWorkItemDispatchResponseSeedAtPath,
+  type MissionWorkItemDispatchResponseArtifact,
+  type MissionWorkItemDispatchResponseSeed,
+} from './mission-workitem-dispatch-response.js';
 
 export {
   getVoiceBridge,
@@ -308,7 +286,13 @@ export * from './mission-process-task-expansion.js';
 
 export * from './mission-review-gates.js';
 
+export * from './skill-index.js';
+
 export * from './mission-team-index.js';
+
+export * from './agent-performance-index.js';
+
+export * from './model-performance-index.js';
 
 export * from './delegation-preflight.js';
 

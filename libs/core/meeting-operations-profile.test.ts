@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMeetingOperationsBrief,
   getMeetingBriefQuestions,
+  loadMeetingOperationsProfileAtPath,
   selectMeetingRoleSet,
 } from './meeting-operations-profile.js';
 import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
+import { pathResolver } from './path-resolver.js';
 
 const profile: MeetingOperationsProfile = {
   kind: 'meeting-operations-profile',
@@ -58,6 +60,16 @@ const profile: MeetingOperationsProfile = {
 };
 
 describe('meeting-operations-profile', () => {
+  it('loads the persisted profile through its schema-bound catalog', () => {
+    const loaded = loadMeetingOperationsProfileAtPath(
+      pathResolver.knowledge('product/schemas/meeting-operations-profile.example.json')
+    );
+
+    expect(loaded.kind).toBe('meeting-operations-profile');
+    expect(loaded.profile_id).toBeTruthy();
+    expect(loaded.brief_question_sets.length).toBeGreaterThan(0);
+  });
+
   it('selects brief questions and role sets by purpose', () => {
     const questions = getMeetingBriefQuestions(profile, 'planning');
     expect(questions.questions).toEqual(['What is being decided?', 'Who can make the final call?']);

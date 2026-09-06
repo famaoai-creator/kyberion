@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pathResolver, safeExecResult, safeExistsSync } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExecResult,
+  safeExistsSync,
+  safeLstat,
+} from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import { readRequestObject } from '../../../../lib/request-input';
 import {
   conciergeText,
   resolveConciergeLocale,
   type ConciergeMessageKey,
 } from '../../../../lib/i18n';
 import { findHygieneInquiry, readMissionStatus } from '../../../../lib/hygiene-server';
+import { resolveConciergeViewer } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +41,8 @@ const CONTROLLER_TIMEOUT_MS = 120_000;
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
 
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
@@ -40,7 +50,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   try {
     const { id } = await context.params;
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const parsedBody = await readRequestObject(req, 'request body', ['decision', 'note']);
+    if (!parsedBody.ok)
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
+    const { body } = parsedBody;
     const decision = ALLOWED_DECISIONS.includes(body?.decision as HygieneDecision)
       ? (body.decision as HygieneDecision)
       : null;
@@ -54,14 +67,24 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     // Only missions the hygiene report currently classifies as stalled are
     // actionable here — the card list and this guard read the same report, so
     // the route can never reach beyond what the operator was shown.
-    const inquiry = findHygieneInquiry(missionId);
+    const inquiry = findHygieneInquiry(missionId, resolved.context);
     if (!inquiry) {
       return NextResponse.json({ ok: false, error: t('api.hygiene.not_found') }, { status: 404 });
     }
 
     const rootDir = pathResolver.rootDir();
     const controllerPath = pathResolver.rootResolve(CONTROLLER_RELATIVE);
-    if (!safeExistsSync(controllerPath)) {
+    let controllerReady = false;
+    try {
+      const safeControllerPath = assertSafeRepositoryPath(controllerPath, {
+        allowMissingLeaf: true,
+      });
+      controllerReady =
+        safeExistsSync(safeControllerPath) && safeLstat(safeControllerPath).isFile();
+    } catch {
+      controllerReady = false;
+    }
+    if (!controllerReady) {
       console.error(`[concierge/hygiene] mission controller build missing: ${controllerPath}`);
       return NextResponse.json({ ok: false, error: t('api.hygiene.failed') }, { status: 503 });
     }

@@ -14,52 +14,31 @@
  *
  * スキーマは README.md 参照。
  */
-import { safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { resolveLocale } from '@agent/core/locale';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { reviewLayerMarkup } from '../report-review/review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import {
+  loadMissionBriefAtPath,
+  type MissionBrief,
+  type MissionBriefFlowStep,
+  type MissionBriefRisk,
+  type MissionBriefRole,
+} from './mission-brief.js';
 
-/** MO-11: the brief schema (README.md). Every field is optional — the renderer
- *  degrades to “—” rather than failing on a partially drafted brief. */
-export interface MissionBriefFlowStep {
-  step?: string | number;
-  title?: string;
-  detail?: string;
-  pipeline?: string;
-}
-export interface MissionBriefRisk {
-  risk?: string;
-  level?: string;
-  mitigation?: string;
-}
-export interface MissionBriefRole {
-  who?: string;
-  role?: string;
-}
-export interface MissionBrief {
-  missionId?: string;
-  title?: string;
-  intent?: string;
-  persona?: string;
-  tier?: string;
-  sovereignSwitch?: string;
-  victoryConditions?: string[];
-  scope?: { in?: string[]; out?: string[] };
-  flow?: MissionBriefFlowStep[];
-  roles?: MissionBriefRole[];
-  deliverables?: string[];
-  risks?: MissionBriefRisk[];
-  openItems?: string[];
-  gate?: { sudoGate?: string; riskLevel?: string; approvalRequired?: boolean };
-  estimate?: { effort?: string; cost?: string };
-  projectId?: string;
-  projectPath?: string;
-  trackId?: string;
-  trackType?: string;
-  lifecycleModel?: string;
-}
+export {
+  loadMissionBriefAtPath,
+  type MissionBrief,
+  type MissionBriefFlowStep,
+  type MissionBriefRisk,
+  type MissionBriefRole,
+} from './mission-brief.js';
 
 const HTML_ESCAPES: Record<string, string> = {
   '<': '&lt;',
@@ -333,7 +312,15 @@ function renderGateSection(
           body: JSON.stringify({ requestId: cfg.requestId, decision: d, decidedBy: who, note: note, reasonCategory: reason || undefined })
         });
         var body = await res.json();
-        if (!res.ok || !body.ok) { status.textContent = '失敗: ' + (body.error || res.status); return; }
+        var validBody = body && typeof body === 'object' && !Array.isArray(body);
+        var responseError = validBody && typeof body.error === 'string' ? body.error : String(res.status);
+        var responseRequestId = validBody && typeof body.requestId === 'string' ? body.requestId : '';
+        var responseStatus = validBody && typeof body.status === 'string' ? body.status : '';
+        if (!res.ok || !validBody || body.ok !== true || responseRequestId !== cfg.requestId ||
+            (responseStatus !== 'approved' && responseStatus !== 'rejected')) {
+          status.textContent = '失敗: ' + responseError;
+          return;
+        }
         document.getElementById('mg-gate').setAttribute('data-decision', body.status);
         status.textContent = (body.status === 'approved' ? '✅ ' + MG_MESSAGES.approvedShort : '✏️ ' + MG_MESSAGES.changesShort) +
           ' — ' + MG_MESSAGES.submitted.replace('__REQUEST_ID__', body.requestId);
@@ -342,6 +329,14 @@ function renderGateSection(
       }
     }
   </script>`;
+}
+
+export function resolveRenderBriefInputPath(filePath: string): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+}
+
+export function resolveRenderBriefOutputPath(filePath: string): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
 }
 
 /** CLI: static preview only. Deciding requires serve-brief (see below). */
@@ -353,13 +348,14 @@ export const runRenderBrief = defineScript({
     if (!src) {
       throw new ScriptExitError(1, 'usage: render-brief <mission-brief.json> [out.html]');
     }
-    const out = argv[1] || src.replace(/\.json$/iu, '') + '.html';
-    if (!safeExistsSync(src)) {
+    const safeSrc = resolveRenderBriefInputPath(src);
+    if (!safeExistsSync(safeSrc) || !safeLstat(safeSrc).isFile()) {
       throw new ScriptExitError(1, `brief not found: ${src}`);
     }
-    const brief = readJson<MissionBrief>(src);
+    const out = resolveRenderBriefOutputPath(argv[1] || safeSrc.replace(/\.json$/iu, '') + '.html');
+    const brief = loadMissionBriefAtPath(safeSrc);
     const rendered = renderMissionBriefHtml(brief);
-    safeWriteFile(out, rendered, { mkdir: true, encoding: 'utf8' });
+    safeWriteFile(resolveRenderBriefOutputPath(out), rendered, { mkdir: true, encoding: 'utf8' });
     print(`rendered mission brief → ${out}`);
     print(missingStaticPreviewMessage());
     print(`  node dist/scripts/mission_alignment_request.js --mission <ID>`);

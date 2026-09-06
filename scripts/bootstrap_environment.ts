@@ -20,14 +20,15 @@ import {
   bootstrapManifest,
   listEnvironmentManifestIds,
   loadEnvironmentManifest,
-  logger,
   probeManifest,
   verifyReady,
-} from '@agent/core';
+} from '@agent/core/environment-capability';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
 import { isDirectScript } from './lib/harness.js';
 import { defineScript, ScriptExitError } from './lib/harness.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
+import { setRegisteredEnv } from '@agent/core/foundation';
 
 // Register every probe so the manifest's `kind: 'probe'` entries
 // resolve. This import is for side effects only.
@@ -110,8 +111,8 @@ async function processManifest(
   return { ok: missingRequired === 0, unsatisfied: missingRequired };
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'bootstrap_environment', ...args])
     .option('manifest', { type: 'string' })
     .option('all', { type: 'boolean', default: false })
     .option('list', { type: 'boolean', default: false })
@@ -137,7 +138,7 @@ async function main(): Promise<void> {
   }
 
   const missionId = argv.mission ? String(argv.mission) : undefined;
-  if (missionId) process.env.MISSION_ID = missionId;
+  if (missionId) setRegisteredEnv('MISSION_ID', missionId);
 
   const targetIds = argv.all
     ? listEnvironmentManifestIds()
@@ -178,8 +179,8 @@ if (
   void defineScript({
     name: 'env:bootstrap',
     flags: [],
-    run() {
-      return main();
+    run({ argv }) {
+      return main(argv);
     },
   })();
 }

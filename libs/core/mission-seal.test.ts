@@ -17,6 +17,8 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+const mockSealState = vi.hoisted(() => ({ encryptedOutputDirectory: false }));
+
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
   return {
@@ -35,7 +37,11 @@ vi.mock('./secure-io.js', async () => {
       if (command === 'openssl' && args[0] === 'enc') {
         const inPath = args[args.indexOf('-in') + 1]!;
         const outPath = args[args.indexOf('-out') + 1]!;
-        fs.writeFileSync(outPath, `ENC(${fs.readFileSync(inPath, 'utf8')})`);
+        if (mockSealState.encryptedOutputDirectory) {
+          fs.mkdirSync(outPath, { recursive: true });
+        } else {
+          fs.writeFileSync(outPath, `ENC(${fs.readFileSync(inPath, 'utf8')})`);
+        }
         return '';
       }
       if (command === 'openssl' && args[0] === 'rsautl') {
@@ -65,6 +71,18 @@ function seedPolicyFile(root: string): void {
   const target = path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'), target);
+  const schemaTarget = path.join(
+    root,
+    'knowledge',
+    'product',
+    'schemas',
+    'mission-management.schema.json'
+  );
+  fs.mkdirSync(path.dirname(schemaTarget), { recursive: true });
+  fs.copyFileSync(
+    path.join(REPO_ROOT, 'knowledge/product/schemas/mission-management.schema.json'),
+    schemaTarget
+  );
 }
 
 describe('sealMission (AL-02)', () => {
@@ -152,12 +170,16 @@ describe('sealMission (AL-02)', () => {
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(
       configPath,
-      JSON.stringify({ directories: { archive: 'custom/archive/root' } })
+      JSON.stringify({ version: '1.1.0', directories: { archive: 'custom/archive/root' } })
     );
     expect(mod.missionSealArchiveDir('M-X')).toBe(
       path.join(tmpRoot, 'custom', 'archive', 'root', 'M-X', 'seal')
     );
     fs.rmSync(configPath);
+  });
+
+  it('rejects a mission id that could create a nested archive path', () => {
+    expect(() => mod.missionSealArchiveDir('../outside')).toThrow('[MISSION_SEAL_SCOPE]');
   });
 
   it('returns undefined when the mission does not exist', async () => {
@@ -172,6 +194,18 @@ describe('sealMission (AL-02)', () => {
       expect(await mod.sealMission(MISSION_ID)).toBeUndefined();
     } finally {
       fs.writeFileSync(keyPath, backup);
+    }
+  });
+
+  it('rejects a non-file encrypted output before hashing or anchoring it', async () => {
+    const sealDir = path.join(tmpRoot, 'active', 'missions', MISSION_ID, 'seal');
+    mockSealState.encryptedOutputDirectory = true;
+    try {
+      await expect(mod.sealMission(MISSION_ID)).resolves.toBeUndefined();
+      expect(fs.statSync(path.join(sealDir, `${MISSION_ID}.enc`)).isDirectory()).toBe(true);
+    } finally {
+      mockSealState.encryptedOutputDirectory = false;
+      fs.rmSync(sealDir, { recursive: true, force: true });
     }
   });
 });

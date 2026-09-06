@@ -166,6 +166,20 @@ describe('ceo-surface-summary', () => {
     }
   });
 
+  it('localizes operator-home action keys for the CEO briefing', () => {
+    const home = makeHomeSummary();
+    home.nextAction = {
+      title: 'Review the software quality recommendation',
+      next_action_key: 'operator_home:next_action.review_quality',
+      reason: 'fixture',
+      next_action_type: 'inspect_artifact',
+    };
+
+    expect(composeCeoSurfaceSummary({ home, notifications: [] }).briefing.next_action_ja).toBe(
+      '品質に関する提案を確認'
+    );
+  });
+
   it('never leaks internal machinery vocabulary into the briefing', () => {
     const summary = composeCeoSurfaceSummary({
       home: makeHomeSummary(),

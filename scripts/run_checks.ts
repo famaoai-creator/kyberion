@@ -1,6 +1,8 @@
-import { pathResolver, safeExecResultAsync } from '@agent/core';
-import { defineCatalog, readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExecResultAsync } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type Gate = {
   id: string;
@@ -9,6 +11,7 @@ type Gate = {
   args?: string[];
   script?: string;
   timeout_ms?: number;
+  baseline?: string;
   owner: string;
   rationale: string;
 };
@@ -58,34 +61,57 @@ function isValidScope(value: string | undefined): value is Gate['scope'] {
   return value !== undefined && VALID_SCOPES.has(value as Gate['scope']);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 export function validateGateManifest(manifest: GateManifest, availableScripts?: Set<string>): void {
-  if (!manifest || !Array.isArray(manifest.gates)) {
+  if (!isRecord(manifest) || !Array.isArray(manifest.gates)) {
     throw new Error('ci gate manifest must contain a gates array');
   }
+  if (manifest.version !== 1) {
+    throw new Error(`ci gate manifest version must be 1: ${String(manifest.version)}`);
+  }
   const ids = new Set<string>();
-  for (const gate of manifest.gates) {
-    if (!gate.id || ids.has(gate.id)) {
+  for (const candidate of manifest.gates) {
+    if (!isRecord(candidate)) {
+      throw new Error('ci gate manifest entries must be objects');
+    }
+    const gate = candidate as unknown as Gate;
+    if (typeof gate.id !== 'string' || !gate.id.trim() || ids.has(gate.id)) {
       throw new Error(
         `ci gate manifest contains a duplicate or empty gate id: ${gate.id || '(empty)'}`
       );
     }
-    if (!isValidScope(gate.scope)) {
+    if (typeof gate.scope !== 'string' || !isValidScope(gate.scope)) {
       throw new Error(`ci gate ${gate.id} has an invalid scope: ${String(gate.scope)}`);
     }
-    const hasExecutable = Boolean(gate.executable);
-    const hasScript = Boolean(gate.script);
+    if (typeof gate.owner !== 'string' || !gate.owner.trim()) {
+      throw new Error(`ci gate ${gate.id} must declare a non-empty owner`);
+    }
+    if (typeof gate.rationale !== 'string' || !gate.rationale.trim()) {
+      throw new Error(`ci gate ${gate.id} must declare a non-empty rationale`);
+    }
+    if (
+      gate.args !== undefined &&
+      (!Array.isArray(gate.args) || gate.args.some((arg) => typeof arg !== 'string'))
+    ) {
+      throw new Error(`ci gate ${gate.id} args must be an array of strings`);
+    }
+    if (
+      gate.timeout_ms !== undefined &&
+      (!Number.isSafeInteger(gate.timeout_ms) || gate.timeout_ms <= 0)
+    ) {
+      throw new Error(`ci gate ${gate.id} timeout_ms must be a positive integer`);
+    }
+    const hasExecutable = typeof gate.executable === 'string' && gate.executable.trim().length > 0;
+    const hasScript = typeof gate.script === 'string' && gate.script.trim().length > 0;
     if (hasExecutable === hasScript) {
       throw new Error(`ci gate ${gate.id} must declare exactly one of executable or script`);
     }
     if (hasExecutable) {
       if (!Array.isArray(gate.args)) {
         throw new Error(`ci gate ${gate.id} executable gates must declare args`);
-      }
-      if (
-        gate.timeout_ms !== undefined &&
-        (!Number.isSafeInteger(gate.timeout_ms) || gate.timeout_ms <= 0)
-      ) {
-        throw new Error(`ci gate ${gate.id} timeout_ms must be a positive integer`);
       }
       const command = [gate.executable, ...gate.args].join(' ');
       if (/run_checks|pnpm\s+(run\s+)?(check|validate)|run_pipeline/.test(command)) {
@@ -104,8 +130,9 @@ export function validateGateManifest(manifest: GateManifest, availableScripts?: 
 
 export function loadGateManifest(): GateManifest {
   const manifest = gateManifestCatalog.load();
-  const packageJson = readJson<{ scripts?: Record<string, string> }>(
-    pathResolver.rootResolve('package.json')
+  const packageJson = readSafeJsonFile<{ scripts?: Record<string, string> }>(
+    pathResolver.rootResolve('package.json'),
+    'package manifest for check runner'
   );
   validateGateManifest(manifest, new Set(Object.keys(packageJson.scripts || {})));
   return manifest;
@@ -130,7 +157,10 @@ export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?:
   return scoped;
 }
 
-export async function main(argv: string[] = []): Promise<number> {
+export async function main(
+  argv: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<number> {
   const args = argv[0] === '--' ? argv.slice(1) : argv;
   const supportedFlags = new Set(['--scope', '--only', '--json']);
   for (let index = 0; index < args.length; index += 1) {
@@ -139,11 +169,8 @@ export async function main(argv: string[] = []): Promise<number> {
     if (!supportedFlags.has(flag)) {
       const json = args.includes('--json');
       const message = `unknown check option: ${flag}`;
-      if (json)
-        console.log(
-          JSON.stringify({ scope: undefined, results: [], failed: 0, error: message }, null, 2)
-        );
-      else console.error(`[check] ERROR ${message}`);
+      if (json) print({ scope: undefined, results: [], failed: 0, error: message });
+      else print(`[check] ERROR ${message}`);
       return 1;
     }
     if (
@@ -152,11 +179,8 @@ export async function main(argv: string[] = []): Promise<number> {
     ) {
       const json = args.includes('--json');
       const message = `${flag} requires a value`;
-      if (json)
-        console.log(
-          JSON.stringify({ scope: undefined, results: [], failed: 0, error: message }, null, 2)
-        );
-      else console.error(`[check] ERROR ${message}`);
+      if (json) print({ scope: undefined, results: [], failed: 0, error: message });
+      else print(`[check] ERROR ${message}`);
       return 1;
     }
   }
@@ -166,11 +190,8 @@ export async function main(argv: string[] = []): Promise<number> {
   const only = onlyIndex >= 0 ? args[onlyIndex + 1] : undefined;
   const json = args.includes('--json');
   const error = (message: string): number => {
-    if (json)
-      console.log(
-        JSON.stringify({ scope: scopeValue, results: [], failed: 0, error: message }, null, 2)
-      );
-    else console.error(`[check] ERROR ${message}`);
+    if (json) print({ scope: scopeValue, results: [], failed: 0, error: message });
+    else print(`[check] ERROR ${message}`);
     return 1;
   };
   if (!isValidScope(scopeValue)) return error(`unknown check scope: ${String(scopeValue)}`);
@@ -233,15 +254,15 @@ export async function main(argv: string[] = []): Promise<number> {
     Array.from({ length: Math.min(MAX_CONCURRENT_GATES, gates.length) }, () => worker())
   );
   const failed = results.filter((result) => result.status === 'failed');
-  if (json) console.log(JSON.stringify({ scope, results, failed: failed.length }, null, 2));
+  if (json) print({ scope, results, failed: failed.length });
   else {
-    console.log(`[check] scope=${scope} gates=${results.length} failed=${failed.length}`);
+    print(`[check] scope=${scope} gates=${results.length} failed=${failed.length}`);
     for (const result of results) {
-      console.log(`- ${result.status.toUpperCase()} ${result.id}`);
+      print(`- ${result.status.toUpperCase()} ${result.id}`);
       if (result.status === 'failed') {
-        if (result.stderr) console.log(`  stderr: ${result.stderr}`);
-        if (result.stdout) console.log(`  stdout: ${result.stdout}`);
-        if (result.error) console.log(`  error: ${result.error}`);
+        if (result.stderr) print(`  stderr: ${result.stderr}`);
+        if (result.stdout) print(`  stdout: ${result.stdout}`);
+        if (result.error) print(`  error: ${result.error}`);
       }
     }
   }
@@ -250,9 +271,9 @@ export async function main(argv: string[] = []): Promise<number> {
 
 export const runChecks = defineScript({
   name: 'check',
-  flags: [],
+  flags: ['json', 'quiet'],
   async run(context) {
-    const status = await main(context.argv);
+    const status = await main(context.argv, context.print);
     if (status !== 0) throw new Error(`check command failed with exit code ${status}`);
   },
 });

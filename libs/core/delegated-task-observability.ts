@@ -1,16 +1,19 @@
 import { appendJsonLine } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import { getMissionAgentInputQueue, type AgentInputQueueEntry } from './agent-input-queue.js';
 import { enqueueDelegationNotification } from './delegation-notifications.js';
 import { sanitizeGapSamples } from './gap-phase.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -115,18 +118,24 @@ export type DelegatedTaskWorkerHandler = (wake: DelegatedTaskWorkerWake) => Prom
 // observability files (resolved lazily per call).
 function resolveTracePath(): string {
   const override = getRegisteredEnvText('KYBERION_DELEGATION_TRACE_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('observability/delegations.jsonl');
+  const candidate = override
+    ? pathResolver.rootResolve(override)
+    : pathResolver.shared('observability/delegations.jsonl');
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 function resolveStoreDir(): string {
   const override = getRegisteredEnvText('KYBERION_DELEGATION_STORE_DIR')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('observability/delegations');
+  const candidate = override
+    ? pathResolver.rootResolve(override)
+    : pathResolver.shared('observability/delegations');
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 function ensureTraceDir(): void {
-  const traceDir = resolveTracePath().replace(/[/\\][^/\\]+$/, '');
+  const traceDir = assertSafeRepositoryPath(path.dirname(resolveTracePath()), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(traceDir)) {
     safeMkdir(traceDir, { recursive: true });
   }
@@ -142,7 +151,25 @@ function recordPath(delegationId: string): string {
     .trim()
     .replace(/[^a-zA-Z0-9._-]+/g, '-');
   if (!safeId) throw new Error('Delegation id is required.');
-  return `${resolveStoreDir()}/${safeId}.json`;
+  return assertSafeRepositoryPath(path.join(resolveStoreDir(), `${safeId}.json`), {
+    allowMissingLeaf: true,
+  });
+}
+
+const DELEGATED_TASK_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/delegated-task-record.schema.json'
+);
+
+function delegatedTaskRecordCatalog(filePath: string) {
+  return defineCatalog<DelegatedTaskRecord>({
+    id: 'delegated-task-record',
+    path: filePath,
+    schema: DELEGATED_TASK_RECORD_SCHEMA_PATH,
+  });
+}
+
+function loadDelegatedTaskRecordCatalog(filePath: string): DelegatedTaskRecord {
+  return delegatedTaskRecordCatalog(filePath).load();
 }
 
 function childInboxPath(childSessionId: string): string {
@@ -150,7 +177,9 @@ function childInboxPath(childSessionId: string): string {
     .trim()
     .replace(/[^a-zA-Z0-9._-]+/g, '-');
   if (!safeId) throw new Error('Child session id is required.');
-  return path.join(resolveStoreDir(), 'child-inbox', `${safeId}.jsonl`);
+  return assertSafeRepositoryPath(path.join(resolveStoreDir(), 'child-inbox', `${safeId}.jsonl`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function requireDelegatedTaskRecord(
@@ -214,8 +243,8 @@ export function buildDelegatedTaskWorkerProcessSpec(
     command: process.execPath,
     args: [
       '--import',
-      pathResolver.rootResolve('scripts/ts-loader.mjs'),
-      pathResolver.rootResolve('scripts/delegated_task_worker.ts'),
+      assertSafeRepositoryPath(pathResolver.rootResolve('scripts/ts-loader.mjs')),
+      assertSafeRepositoryPath(pathResolver.rootResolve('scripts/delegated_task_worker.ts')),
       '--delegation-id',
       delegationId,
       '--owner',
@@ -408,11 +437,13 @@ function persistRecord(trace: DelegatedTaskTrace): void {
 }
 
 function persistRecordStrict(trace: DelegatedTaskTrace): void {
-  const dir = resolveStoreDir();
+  const dir = assertSafeRepositoryPath(resolveStoreDir(), { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   const { trace_id, ...rest } = trace;
   const record: DelegatedTaskRecord = { delegation_id: trace_id, ...rest };
-  safeWriteFile(recordPath(trace_id), `${JSON.stringify(record, null, 2)}\n`);
+  const filePath = recordPath(trace_id);
+  const canonical = delegatedTaskRecordCatalog(filePath).validate(record, filePath);
+  safeWriteFile(filePath, `${JSON.stringify(canonical, null, 2)}\n`);
 }
 
 export function startDelegatedTaskTrace(input: {
@@ -432,7 +463,7 @@ export function startDelegatedTaskTrace(input: {
   const trace: DelegatedTaskTrace = {
     trace_id: randomUUID(),
     kind: 'delegated_task',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     status: 'started',
     owner: input.owner,
     instruction: input.instruction,
@@ -468,7 +499,7 @@ export function completeDelegatedTaskTrace(
   const gapPhases = outcome.gapPhases
     ? sanitizeGapSamples(outcome.gapPhases, (message) => logger.warn(message))
     : undefined;
-  const completedAt = new Date().toISOString();
+  const completedAt = nowIso();
   const completed: DelegatedTaskTrace = {
     ...trace,
     completed_at: completedAt,
@@ -523,7 +554,7 @@ export function cancelDelegatedTaskTrace(
   trace: DelegatedTaskTrace,
   reason = 'cancelled by caller'
 ): DelegatedTaskTrace {
-  const cancelledAt = new Date().toISOString();
+  const cancelledAt = nowIso();
   const cancelled: DelegatedTaskTrace = {
     ...trace,
     completed_at: cancelledAt,
@@ -569,7 +600,7 @@ export function claimDelegatedTaskActivation(
       ...record,
       activation_count: 1,
       activation_id: randomUUID(),
-      activated_at: new Date().toISOString(),
+      activated_at: nowIso(),
       activation_status: 'claimed',
     };
     const { delegation_id, ...rest } = activated;
@@ -602,7 +633,7 @@ export function recordDelegatedTaskActivationFailure(
     }
     if (record.activation_failure) return record;
 
-    const failedAt = new Date().toISOString();
+    const failedAt = nowIso();
     const failure: DelegatedTaskRecord = {
       ...record,
       activation_status: 'failed',
@@ -653,7 +684,7 @@ export function recordDelegatedTaskActivationCompletion(
     if (record.activation_failure) return record;
     if (record.activation_status === 'completed') return record;
 
-    const completedAt = new Date().toISOString();
+    const completedAt = nowIso();
     const completed: DelegatedTaskRecord = {
       ...record,
       activation_status: 'completed',
@@ -695,7 +726,7 @@ export function createDelegationHandle(input: {
   const trace = startDelegatedTaskTrace({
     owner:
       input.owner ||
-      process.env.MISSION_ROLE ||
+      getRegisteredEnvText('MISSION_ROLE') ||
       getRegisteredEnvText('KYBERION_PERSONA') ||
       'reasoning-backend',
     instruction: input.instruction,
@@ -754,10 +785,8 @@ export function createDelegationHandle(input: {
 export function loadDelegatedTaskRecord(delegationId: string): DelegatedTaskRecord | null {
   try {
     const filePath = recordPath(delegationId);
-    if (!safeExistsSync(filePath)) return null;
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as DelegatedTaskRecord;
-    return parsed && typeof parsed.delegation_id === 'string' ? parsed : null;
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
+    return loadDelegatedTaskRecordCatalog(filePath);
   } catch {
     return null;
   }
@@ -770,7 +799,7 @@ export function loadDelegatedTaskRecord(delegationId: string): DelegatedTaskReco
 export function listActiveDelegatedTaskRecords(limit = 8): DelegatedTaskRecord[] {
   const boundedLimit = Math.max(0, Math.floor(limit));
   if (boundedLimit === 0) return [];
-  const dir = resolveStoreDir();
+  const dir = assertSafeRepositoryPath(resolveStoreDir(), { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) return [];
   const records: DelegatedTaskRecord[] = [];
   for (const entry of safeReaddir(dir)) {

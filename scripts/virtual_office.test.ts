@@ -26,6 +26,19 @@ describe('virtual office surface', () => {
       path.join(tmpRoot, 'knowledge', 'product', 'schemas'),
       { recursive: true }
     );
+    fs.mkdirSync(path.join(tmpRoot, 'knowledge', 'product', 'governance'), { recursive: true });
+    fs.copyFileSync(
+      fileURLToPath(
+        new URL('../knowledge/product/governance/process-definition-registry.json', import.meta.url)
+      ),
+      path.join(tmpRoot, 'knowledge', 'product', 'governance', 'process-definition-registry.json')
+    );
+    fs.copyFileSync(
+      fileURLToPath(
+        new URL('../knowledge/product/governance/agent-policies.yaml', import.meta.url)
+      ),
+      path.join(tmpRoot, 'knowledge', 'product', 'governance', 'agent-policies.yaml')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.KYBERION_CUSTOMER = 'acme';
 
@@ -38,7 +51,19 @@ describe('virtual office surface', () => {
         mission_id: 'MSN-OFFICE-1',
         status: 'active',
         mission_type: 'development',
+        tier: 'confidential',
         tenant_slug: 'acme-prod',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'abc1234',
+          latest_commit: 'abc1234',
+          checkpoints: [],
+        },
+        history: [],
       })
     );
     fs.writeFileSync(
@@ -67,7 +92,19 @@ describe('virtual office surface', () => {
         mission_id: 'MSN-OFFICE-2',
         status: 'active',
         mission_type: 'operations',
+        tier: 'confidential',
         tenant_slug: 'beta',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'abc1234',
+          latest_commit: 'abc1234',
+          checkpoints: [],
+        },
+        history: [],
       })
     );
     fs.writeFileSync(
@@ -89,7 +126,19 @@ describe('virtual office surface', () => {
       JSON.stringify({
         mission_id: 'MSN-OFFICE-OLD',
         status: 'archived',
+        tier: 'confidential',
         tenant_slug: 'acme-prod',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'abc1234',
+          latest_commit: 'abc1234',
+          checkpoints: [],
+        },
+        history: [],
       })
     );
     const customerRoot = path.join(tmpRoot, 'customer', 'acme');
@@ -181,9 +230,10 @@ describe('virtual office surface', () => {
       })
     );
     const betaRoot = path.join(tmpRoot, 'customer', 'beta');
-    fs.mkdirSync(path.join(customerRoot, 'deals'), { recursive: true });
+    const acmeTenantRoot = path.join(tmpRoot, 'customer', 'acme-prod');
+    fs.mkdirSync(path.join(acmeTenantRoot, 'deals'), { recursive: true });
     fs.writeFileSync(
-      path.join(customerRoot, 'deals', 'DEAL-ACME-PROD.json'),
+      path.join(acmeTenantRoot, 'deals', 'DEAL-ACME-PROD.json'),
       JSON.stringify({
         kind: 'deal',
         deal_id: 'DEAL-ACME-PROD',
@@ -447,6 +497,29 @@ describe('virtual office surface', () => {
       ),
       JSON.stringify(session, null, 2)
     );
+    const alertDir = path.join(tmpRoot, 'active', 'shared', 'observability');
+    fs.mkdirSync(alertDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(alertDir, 'ops-alerts.jsonl'),
+      `${JSON.stringify({
+        id: 'office-alert-1',
+        timestamp: '2026-08-08T00:00:00.000Z',
+        suppressed: false,
+        severity: 'warning',
+        title: 'Governed office alert',
+        context: {},
+        recommendation: 'review',
+      })}\n${JSON.stringify({
+        id: 'office-alert-invalid',
+        timestamp: '2026-08-08T00:01:00.000Z',
+        suppressed: false,
+        severity: 'warning',
+        title: 'Invalid office alert',
+        context: [],
+        recommendation: 'ignore',
+      })}\n`,
+      'utf8'
+    );
 
     mod = await import('./virtual_office.js');
   });
@@ -524,6 +597,21 @@ describe('virtual office surface', () => {
     expect(html.indexOf('MSN-OFFICE-OLD')).toBeGreaterThan(html.indexOf('Archive'));
   });
 
+  it('projects only schema-valid ops alerts onto the bulletin board', () => {
+    const snapshot = mod.collectOfficeSnapshot();
+    expect(snapshot.alerts).toContainEqual({
+      title: 'Governed office alert',
+      severity: 'warning',
+    });
+    expect(snapshot.alerts.map((alert) => alert.title)).not.toContain('Invalid office alert');
+  });
+
+  it('keeps generated HTML inside the repository', async () => {
+    await expect(mod.generateOnce('/tmp/kyberion-office.html')).rejects.toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
   it('narrows to a registered tenant and fails closed for an unknown tenant', () => {
     const previousTenant = process.env.KYBERION_TENANT;
     try {
@@ -553,6 +641,29 @@ describe('virtual office surface', () => {
     } finally {
       if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
       else process.env.KYBERION_TENANT = previousTenant;
+    }
+  });
+
+  it('does not ingest a symlinked mission directory', () => {
+    const linkedMission = path.join(tmpRoot, 'active', 'missions', 'MSN-OFFICE-LINKED');
+    const outsideMission = path.join(tmpRoot, 'outside-mission');
+    fs.mkdirSync(outsideMission, { recursive: true });
+    fs.writeFileSync(
+      path.join(outsideMission, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MSN-OFFICE-LINKED',
+        status: 'active',
+        tenant_slug: 'acme-prod',
+      })
+    );
+    fs.symlinkSync(outsideMission, linkedMission, 'dir');
+
+    try {
+      const snapshot = mod.collectOfficeSnapshot();
+      expect(snapshot.rooms.map((room) => room.mission_id)).not.toContain('MSN-OFFICE-LINKED');
+    } finally {
+      fs.unlinkSync(linkedMission);
+      fs.rmSync(outsideMission, { recursive: true, force: true });
     }
   });
 

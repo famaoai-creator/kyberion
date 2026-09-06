@@ -2,6 +2,14 @@ import type {
   MissionProposal,
   SlackMissionProposalActionPayload,
 } from './channel-surface-types.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import type { SupportedLocale } from './locale-normalize.js';
+import { t } from './t.js';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+  type IntentResolutionContract,
+} from './intent-resolution-contract.js';
 
 function valueOrFallback(value: string | undefined, fallback: string): string {
   return value?.trim() || fallback;
@@ -13,13 +21,26 @@ function valueOrFallback(value: string | undefined, fallback: string): string {
  * The plain-text fallback intentionally keeps the numbered grammar so that
  * clients without interactive blocks can use the same confirmation contract.
  */
-export function buildSlackMissionProposalBlocks(proposal: MissionProposal): any[] {
-  const summary = valueOrFallback(proposal.summary, 'Mission proposal');
+export function buildSlackMissionProposalBlocks(
+  proposal: MissionProposal,
+  intentResolution?: IntentResolutionContract,
+  locale?: SupportedLocale
+): any[] {
+  const contractLocale: SupportedLocale = locale ?? 'en';
+  const uiLocale: SupportedLocale = locale ?? 'ja';
+  const summary = valueOrFallback(
+    proposal.summary,
+    t('bridge:mission_proposal_fallback', undefined, uiLocale)
+  );
   const missionType = valueOrFallback(proposal.mission_type, 'development');
   const tier = valueOrFallback(proposal.tier, 'public');
   const persona = valueOrFallback(proposal.assigned_persona, 'Ecosystem Architect');
   const why = valueOrFallback(proposal.why, 'This request is ready to be turned into a mission.');
-  const fields = [`*Type*\n${missionType}`, `*Tier*\n${tier}`, `*Persona*\n${persona}`];
+  const fields = [
+    t('bridge:mission_issued_type', { missionType }, uiLocale),
+    t('bridge:mission_issued_tier', { tier }, uiLocale),
+    t('bridge:mission_issued_persona', { persona }, uiLocale),
+  ];
   if (proposal.vision_ref) fields.push(`*Vision*\n${proposal.vision_ref}`);
 
   return [
@@ -27,7 +48,7 @@ export function buildSlackMissionProposalBlocks(proposal: MissionProposal): any[
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Mission proposal*\n*${summary}*\n${why}`,
+        text: `*${t('bridge:mission_proposal_fallback', undefined, uiLocale)}*\n*${summary}*\n${why}`,
       },
     },
     {
@@ -39,7 +60,17 @@ export function buildSlackMissionProposalBlocks(proposal: MissionProposal): any[
       elements: [
         {
           type: 'mrkdwn',
-          text: '承認するとミッションを作成して実行を開始します。待つと保留、拒否すると提案を破棄します。',
+          text: [
+            t('chronos:chronos_mission_confirm_alert_message', undefined, uiLocale),
+            ...(intentResolution
+              ? [
+                  `${t('bridge:contract_authority', undefined, contractLocale)}: ${renderIntentAuthorityLabel(intentResolution.authority_level, contractLocale)}`,
+                  `${t('bridge:contract_next_action', undefined, contractLocale)}: ${intentResolution.next_action.label}`,
+                  `${t('bridge:contract_consequence', undefined, contractLocale)}: ${intentResolution.next_action.consequence}`,
+                  `${t('bridge:contract_outcome', undefined, contractLocale)}: ${renderIntentOutcomeLabel(intentResolution.outcome_kind, contractLocale)}`,
+                ]
+              : []),
+          ].join('\n'),
         },
       ],
     },
@@ -49,7 +80,10 @@ export function buildSlackMissionProposalBlocks(proposal: MissionProposal): any[
         {
           type: 'button',
           style: 'primary',
-          text: { type: 'plain_text', text: '実行する' },
+          text: {
+            type: 'plain_text',
+            text: t('chronos:chronos_approve_start', undefined, uiLocale),
+          },
           action_id: 'slack_mission_proposal_decide',
           value: JSON.stringify({
             decision: 'approved',
@@ -58,7 +92,10 @@ export function buildSlackMissionProposalBlocks(proposal: MissionProposal): any[
         {
           type: 'button',
           style: 'danger',
-          text: { type: 'plain_text', text: 'やめる' },
+          text: {
+            type: 'plain_text',
+            text: t('bridge:approval_reject_button', undefined, uiLocale),
+          },
           action_id: 'slack_mission_proposal_decide',
           value: JSON.stringify({
             decision: 'rejected',
@@ -69,14 +106,33 @@ export function buildSlackMissionProposalBlocks(proposal: MissionProposal): any[
   ];
 }
 
-export function slackMissionProposalFallbackText(proposal: MissionProposal): string {
-  const summary = valueOrFallback(proposal.summary, 'Mission proposal');
-  return `${summary}\n1) 作成する 2) やめる`;
+export function slackMissionProposalFallbackText(
+  proposal: MissionProposal,
+  intentResolution?: IntentResolutionContract,
+  locale?: SupportedLocale
+): string {
+  const contractLocale: SupportedLocale = locale ?? 'en';
+  const uiLocale: SupportedLocale = locale ?? 'ja';
+  const summary = valueOrFallback(
+    proposal.summary,
+    t('bridge:mission_proposal_fallback', undefined, uiLocale)
+  );
+  return [
+    `${summary}\n${t('bridge:mission_proposal_confirmation_choices', undefined, uiLocale)}`,
+    ...(intentResolution
+      ? [
+          `${t('bridge:contract_authority', undefined, contractLocale)}: ${renderIntentAuthorityLabel(intentResolution.authority_level, contractLocale)}`,
+          `${t('bridge:contract_next_action', undefined, contractLocale)}: ${intentResolution.next_action.label}`,
+          `${t('bridge:contract_consequence', undefined, contractLocale)}: ${intentResolution.next_action.consequence}`,
+          `${t('bridge:contract_outcome', undefined, contractLocale)}: ${renderIntentOutcomeLabel(intentResolution.outcome_kind, contractLocale)}`,
+        ]
+      : []),
+  ].join('\n');
 }
 
 export function parseSlackMissionProposalAction(value: string): SlackMissionProposalActionPayload {
-  const parsed = JSON.parse(value) as Partial<SlackMissionProposalActionPayload>;
-  if (parsed.decision !== 'approved' && parsed.decision !== 'rejected') {
+  const parsed = parseSafeJsonObjectInput(value, 'Slack mission proposal action');
+  if (!parsed || (parsed.decision !== 'approved' && parsed.decision !== 'rejected')) {
     throw new Error('Invalid Slack mission proposal decision');
   }
   return { decision: parsed.decision };

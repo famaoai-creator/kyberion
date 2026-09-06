@@ -1,14 +1,16 @@
 import * as path from 'node:path';
-import { logger } from '@agent/core';
-import { pathResolver } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { loadA2AEnvelopeAtPath } from '@agent/core/a2a-envelope';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { A2AMessage } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
-import { readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { nowIso } from '@agent/core/foundation';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
-async function main() {
-  const argv = await createStandardYargs()
+export async function main(args: string[] = [], print: (value: unknown) => void = () => undefined) {
+  const argv = await createStandardYargs(['node', 'run_a2a', ...args])
     .option('input', {
       alias: 'i',
       type: 'string',
@@ -18,14 +20,13 @@ async function main() {
     .parseSync();
 
   const inputPath = String(argv.input);
-  const resolvedInput = path.isAbsolute(inputPath)
-    ? inputPath
-    : pathResolver.rootResolve(inputPath);
-  const a2aMsg = readJson<A2AMessage>(resolvedInput);
-
-  if (!a2aMsg.header || !a2aMsg.payload) {
-    throw new Error('Invalid A2A Message: Missing header or payload.');
+  const resolvedInput = assertSafeRepositoryPath(
+    path.isAbsolute(inputPath) ? inputPath : pathResolver.resolve(inputPath)
+  );
+  if (!safeLstat(resolvedInput).isFile()) {
+    throw new Error(`A2A input must be a regular file: ${inputPath}`);
   }
+  const a2aMsg = loadA2AEnvelopeAtPath(resolvedInput);
 
   logger.info(
     `🚀 [A2A_GATEWAY] Receiving A2A message [ID: ${a2aMsg.header.msg_id}] from ${a2aMsg.header.sender}`
@@ -44,12 +45,12 @@ async function main() {
         sender: 'kyberion:nerve',
         receiver: a2aMsg.header.sender,
         performative: 'result',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       payload: result,
     };
 
-    console.log(JSON.stringify(response, null, 2));
+    print(response);
     logger.success(
       `✅ [A2A_GATEWAY] A2A interaction completed for Conversation: ${a2aMsg.header.conversation_id}`
     );
@@ -61,9 +62,9 @@ async function main() {
 
 export const runA2A = defineScript({
   name: 'a2a:run',
-  flags: [],
-  run() {
-    return main();
+  flags: ['json', 'quiet'],
+  run({ argv, print }) {
+    return main(stripSharedScriptFlags(argv), print);
   },
 });
 

@@ -82,4 +82,20 @@ describe('in-room minutes recorder', () => {
       })
     ).rejects.toThrow(/recording consent/);
   });
+
+  it('rejects a transcript path replaced by a directory before starting capture', async () => {
+    const transcriptPath = path.join(missionEvidenceDir(missionId), 'transcript.md');
+    safeMkdir(transcriptPath, { recursive: true });
+
+    try {
+      await expect(
+        startInRoomMinutesSession({
+          missionId,
+          mic: { command: fixtureCommand(), sampleRateHz: 16000 },
+        })
+      ).rejects.toThrow('[IN_ROOM_MINUTES_RESOURCE] transcript must be a regular file');
+    } finally {
+      safeRmSync(transcriptPath, { recursive: true, force: true });
+    }
+  });
 });

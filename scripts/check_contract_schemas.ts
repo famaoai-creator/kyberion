@@ -1,11 +1,6 @@
-import * as addFormatsModule from 'ajv-formats';
-import {
-  compileSchemaFromPath,
-  buildPromotedMemoryRecord,
-  createDistillCandidateRecord,
-  safeExistsSync,
-  safeReaddir,
-} from '@agent/core';
+import { buildPromotedMemoryRecord } from '@agent/core/promoted-memory';
+import { createDistillCandidateRecord } from '@agent/core/distill-candidate-registry';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
   findUnmanagedGoldenScenarioCatalogs,
@@ -22,9 +17,8 @@ import { createPolicyAndManifestChecks } from './check_contract_schemas_policy_c
 import { createContractSchemaChecksPart1 } from './check_contract_schemas_checks_1.js';
 import { createContractSchemaChecksPart2 } from './check_contract_schemas_checks_2.js';
 import { createContractSchemaChecksPart3 } from './check_contract_schemas_checks_3.js';
-import { createAjv, createAjv2020 } from '@agent/core/foundation';
-
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+import { compileSchema, createAjv2020 } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function createChecks(): ContractCheck[] {
   const workPolicy = readGovernanceJson('knowledge/product/governance/work-policy.json');
@@ -888,11 +882,8 @@ function createChecks(): ContractCheck[] {
   ];
 }
 
-function main() {
-  const ajv = createAjv();
-  addFormats(ajv);
+export function checkContractSchemas(): string[] {
   const ajv2020 = createAjv2020({ validateSchema: false });
-  addFormats(ajv2020);
   const violations: string[] = [];
   const legacySchemaRoot = pathResolver.rootResolve('schemas');
   if (
@@ -911,7 +902,7 @@ function main() {
   }
 
   for (const check of createChecks()) {
-    const validate = compileSchemaFromPath(ajv, pathResolver.rootResolve(check.schemaPath));
+    const validate = compileSchema(pathResolver.rootResolve(check.schemaPath));
     for (const payload of check.validPayloads) {
       const ok = validate(payload);
       if (!ok) {
@@ -928,9 +919,9 @@ function main() {
     }
   }
 
-  const a2uiValidate = compileSchemaFromPath(
-    ajv2020,
-    pathResolver.rootResolve('knowledge/product/schemas/a2ui-message.schema.json')
+  const a2uiValidate = compileSchema(
+    pathResolver.rootResolve('knowledge/product/schemas/a2ui-message.schema.json'),
+    ajv2020
   );
   const a2uiMessages = [
     {
@@ -970,16 +961,27 @@ function main() {
     violations.push('a2ui-message: expected invalid payload to fail');
   }
 
-  if (violations.length > 0) {
-    console.error('[check:contract-schemas] violations detected:');
-    for (const violation of violations) {
-      console.error(`- ${violation}`);
-    }
-    process.exitCode = 1;
-    return;
-  }
-
-  console.log('[check:contract-schemas] OK');
+  return violations;
 }
 
-main();
+export const runCheckContractSchemas = defineScript({
+  name: 'check:contract-schemas',
+  flags: [],
+  run(context) {
+    const violations = checkContractSchemas();
+    if (violations.length > 0) {
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.map((violation) => `- ${violation}`)].join('\n')
+      );
+    }
+    context.print('[check:contract-schemas] OK');
+    return { violations };
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_contract_schemas.ts') ||
+  isDirectScript(import.meta.url, 'check_contract_schemas.js')
+)
+  void runCheckContractSchemas();

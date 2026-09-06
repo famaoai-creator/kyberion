@@ -2,13 +2,35 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   installCoreEnvironmentProbes,
+  isRegularAuditChainPath,
   nodeVersionSatisfiesFloor,
+  parseNodeEnginesRange,
   parseEnginesNodeFloor,
   playwrightBrowsersDir,
   probeExplicitReasoningBackend,
 } from './environment-capability-probes.js';
 import { probeManifest, type EnvironmentManifest } from './environment-capability.js';
 import * as pathResolver from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+
+describe('audit-chain resource loader', () => {
+  const fixtureRoot = pathResolver.sharedTmp('environment-audit-chain-loader-test');
+
+  afterEach(() => {
+    safeRmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it('accepts only an existing regular audit-chain file', () => {
+    const filePath = path.join(fixtureRoot, 'audit-chain.jsonl');
+    const directoryPath = path.join(fixtureRoot, 'audit-chain-directory.jsonl');
+    safeWriteFile(filePath, '{"id":"audit-1"}\n', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(isRegularAuditChainPath(filePath)).toBe(true);
+    expect(isRegularAuditChainPath(directoryPath)).toBe(false);
+    expect(isRegularAuditChainPath(path.join(fixtureRoot, 'missing.jsonl'))).toBe(false);
+  });
+});
 
 describe('parseEnginesNodeFloor', () => {
   it('parses a >= range', () => {
@@ -25,6 +47,20 @@ describe('parseEnginesNodeFloor', () => {
     expect(parseEnginesNodeFloor('*')).toBeNull();
     expect(parseEnginesNodeFloor('')).toBeNull();
   });
+});
+
+describe('parseNodeEnginesRange', () => {
+  it('reads only a non-empty string node engine range from object roots', () => {
+    expect(parseNodeEnginesRange({ engines: { node: '>=24.0.0' } })).toBe('>=24.0.0');
+    expect(parseNodeEnginesRange({ engines: { node: '  ' } })).toBeNull();
+  });
+
+  it.each([null, [], 'invalid', { engines: [] }, { engines: { node: 24 } }])(
+    'fails closed for malformed package shapes: %p',
+    (value) => {
+      expect(parseNodeEnginesRange(value)).toBeNull();
+    }
+  );
 });
 
 describe('nodeVersionSatisfiesFloor', () => {
@@ -108,7 +144,11 @@ describe('probeExplicitReasoningBackend (LC-04d: explicit selection is probed sp
 
   it('anthropic requires ANTHROPIC_API_KEY', async () => {
     await expect(
-      probeExplicitReasoningBackend('anthropic', { ANTHROPIC_API_KEY: 'k' })
+      probeExplicitReasoningBackend(
+        'anthropic',
+        { ANTHROPIC_API_KEY: 'k' },
+        { anthropicProbe: async () => ({ available: true }) }
+      )
     ).resolves.toEqual({ available: true });
     const missing = await probeExplicitReasoningBackend('anthropic', {});
     expect(missing.available).toBe(false);

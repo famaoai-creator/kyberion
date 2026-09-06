@@ -15,9 +15,7 @@ function preferTypeScriptSourceForJsImports() {
         return null;
       }
 
-      const importerPath = importer.startsWith('file://')
-        ? fileURLToPath(importer)
-        : importer;
+      const importerPath = importer.startsWith('file://') ? fileURLToPath(importer) : importer;
       const resolved = path.resolve(path.dirname(importerPath), source);
       const base = resolved.slice(0, resolved.lastIndexOf('.'));
       const candidates = [
@@ -47,6 +45,19 @@ export default defineConfig({
     include: [
       '**/src/**/*.test.ts',
       '**/src/**/*.test.js',
+      // Presence Studio keeps route/security contract tests beside the
+      // server split rather than under src; include them in the root suite
+      // so the contracts are not silently skipped by the default glob.
+      'presence/displays/presence-studio/**/*.test.ts',
+      // The Nexus bridge is a production daemon outside a package src tree;
+      // keep its parser/resource-boundary tests in the root suite as well.
+      'presence/bridge/**/*.test.ts',
+      // Voice Hub is another production daemon outside a package src tree;
+      // keep its runtime-boundary tests in the root suite as well.
+      'satellites/voice-hub/**/*.test.ts',
+      // Concierge keeps browser/API contract tests in a package-level test
+      // directory; include them so its surface contracts are not skipped.
+      'presence/displays/concierge/test/**/*.test.ts',
       'libs/core/**/*.test.ts',
       'libs/actuators/**/*.test.ts',
       'libs/shared-*/**/*.test.ts',
@@ -139,7 +150,6 @@ export default defineConfig({
         find: '@agent/shared-network',
         replacement: path.resolve(rootDir, './libs/shared-network/src/index.ts'),
       },
-
     ],
   },
 });

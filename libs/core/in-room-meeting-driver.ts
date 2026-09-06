@@ -17,6 +17,7 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 
 import type { AudioBus } from './audio-bus.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
 import {
@@ -103,7 +104,7 @@ export class InRoomMeetingJoinDriver implements MeetingJoinDriver {
       session_id: `in-room-${Date.now().toString(36)}`,
       platform: 'in_room',
       status: 'in_meeting',
-      joined_at: new Date().toISOString(),
+      joined_at: nowIso(),
     };
     let left = false;
     let speaking = false;
@@ -172,7 +173,7 @@ export class InRoomMeetingJoinDriver implements MeetingJoinDriver {
       leave: async (): Promise<void> => {
         left = true;
         state.status = 'ended';
-        state.left_at = new Date().toISOString();
+        state.left_at = nowIso();
         await mic.stop();
       },
     };

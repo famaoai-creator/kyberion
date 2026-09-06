@@ -1,33 +1,29 @@
 /* eslint-disable no-restricted-imports -- long-lived OAuth callback server; IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import * as readline from 'node:readline';
-import {
-  beginInteractiveServiceOAuth,
-  logger,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { beginInteractiveServiceOAuth } from '@agent/core/oauth-broker';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 let activeCleanup: (() => void) | undefined;
+type Print = (value: unknown) => void;
+const defaultPrint: Print = (value) => logger.info(String(value));
 
-async function main(args: string[] = []): Promise<void> {
+export async function main(args: string[] = [], print: Print = defaultPrint): Promise<void> {
+  const usage =
+    'Usage: KYBERION_OAUTH_SERVICE_ID=<service_name> node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts';
   if (args.includes('--help') || args.includes('-h')) {
-    console.log(
-      'Usage: KYBERION_OAUTH_SERVICE_ID=<service_name> node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts'
-    );
+    print(usage);
     throw new ScriptExitError(0, '', true);
   }
   const serviceId = String(
     getRegisteredEnvText('KYBERION_OAUTH_SERVICE_ID') || args[0] || ''
   ).trim();
   if (!serviceId) {
-    console.error(
-      'Usage: KYBERION_OAUTH_SERVICE_ID=<service_name> node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts'
-    );
+    print(usage);
     throw new ScriptExitError(1, '', true);
   }
   const callbackHost = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_HOST') || '127.0.0.1';
@@ -52,108 +48,130 @@ async function main(args: string[] = []): Promise<void> {
     if (!server.killed) server.kill('SIGTERM');
   };
   activeCleanup = cleanup;
-  process.once('SIGINT', () => {
-    cleanup();
-    process.exitCode = 130;
+  let rejectSignal: (error: ScriptExitError) => void = () => undefined;
+  const signalPromise = new Promise<never>((_, reject) => {
+    rejectSignal = reject;
   });
-  process.once('SIGTERM', () => {
+  const onSigint = () => {
     cleanup();
-    process.exitCode = 143;
-  });
+    rejectSignal(new ScriptExitError(130, '', true));
+  };
+  const onSigterm = () => {
+    cleanup();
+    rejectSignal(new ScriptExitError(143, '', true));
+  };
+  process.once('SIGINT', onSigint);
+  process.once('SIGTERM', onSigterm);
   process.once('exit', cleanup);
 
   logger.info(`Starting OAuth callback surface on ${redirectUri}...`);
-  await new Promise<void>((resolve, reject) => {
-    const timeout = Date.now() + 10_000;
-    const poll = async () => {
-      try {
-        const health = await fetch(`http://${callbackHost}:${callbackPort}/health`);
-        if (health.ok) {
+  try {
+    await Promise.race([
+      new Promise<void>((resolve, reject) => {
+        const timeout = Date.now() + 10_000;
+        const poll = async () => {
+          try {
+            const health = await fetch(`http://${callbackHost}:${callbackPort}/health`);
+            if (health.ok) {
+              resolve();
+              return;
+            }
+          } catch {
+            // Keep polling until the server responds or the timeout elapses.
+          }
+          if (Date.now() >= timeout) {
+            reject(new Error('OAuth callback surface did not become healthy in time'));
+            return;
+          }
+          setTimeout(poll, 250).unref?.();
+        };
+
+        server.once('exit', (code, signal) => {
+          if (!shuttingDown && code !== 0 && signal !== 'SIGTERM') {
+            reject(new Error(`OAuth callback surface exited early (${code ?? signal})`));
+          }
+        });
+        server.once('error', (error) => reject(error));
+        void poll();
+      }),
+      signalPromise,
+    ]);
+
+    const result = beginInteractiveServiceOAuth(serviceId, { redirectUri });
+    const summaryPath = `${runtimeDir}/${serviceId}-setup.json`;
+    safeWriteFile(
+      summaryPath,
+      JSON.stringify(
+        {
+          serviceId,
+          redirectUri,
+          authorizationUrl: result.authorizationUrl,
+          state: result.state,
+          scopes: result.scopes,
+          ts: nowIso(),
+        },
+        null,
+        2
+      ) + '\n'
+    );
+
+    print('');
+    print(`Service: ${serviceId}`);
+    print(`Redirect URI: ${redirectUri}`);
+    print(`Authorization URL: ${result.authorizationUrl}`);
+    print('');
+    print('Open the URL above, approve the request, then return here.');
+    print('Press ENTER after the browser shows Authorization Complete.');
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    await Promise.race([
+      new Promise<void>((resolve) => {
+        rl.question('', () => {
+          rl.close();
+          resolve();
+        });
+      }),
+      signalPromise,
+    ]);
+
+    cleanup();
+    await Promise.race([
+      new Promise<void>((resolve) => {
+        if (server.exitCode !== null) {
           resolve();
           return;
         }
-      } catch {
-        // Keep polling until the server responds or the timeout elapses.
-      }
-      if (Date.now() >= timeout) {
-        reject(new Error('OAuth callback surface did not become healthy in time'));
-        return;
-      }
-      setTimeout(poll, 250).unref?.();
-    };
+        server.once('exit', () => resolve());
+      }),
+      signalPromise,
+    ]);
 
-    server.once('exit', (code, signal) => {
-      if (!shuttingDown && code !== 0 && signal !== 'SIGTERM') {
-        reject(new Error(`OAuth callback surface exited early (${code ?? signal})`));
-      }
-    });
-    server.once('error', (error) => reject(error));
-    void poll();
-  });
-
-  const result = beginInteractiveServiceOAuth(serviceId, { redirectUri });
-  const summaryPath = `${runtimeDir}/${serviceId}-setup.json`;
-  safeWriteFile(
-    summaryPath,
-    JSON.stringify(
-      {
-        serviceId,
-        redirectUri,
-        authorizationUrl: result.authorizationUrl,
-        state: result.state,
-        scopes: result.scopes,
-        ts: new Date().toISOString(),
-      },
-      null,
-      2
-    ) + '\n'
-  );
-
-  console.log('');
-  console.log(`Service: ${serviceId}`);
-  console.log(`Redirect URI: ${redirectUri}`);
-  console.log(`Authorization URL: ${result.authorizationUrl}`);
-  console.log('');
-  console.log('Open the URL above, approve the request, then return here.');
-  console.log('Press ENTER after the browser shows Authorization Complete.');
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  await new Promise<void>((resolve) => {
-    rl.question('', () => {
-      rl.close();
-      resolve();
-    });
-  });
-
-  cleanup();
-  await new Promise<void>((resolve) => {
-    if (server.exitCode !== null) {
-      resolve();
-      return;
-    }
-    server.once('exit', () => resolve());
-  });
-
-  console.log(
-    `OAuth connection setup complete. Tokens should be stored in knowledge/personal/connections/${serviceId}.json`
-  );
+    print(
+      `OAuth connection setup complete. Tokens should be stored in knowledge/personal/connections/${serviceId}.json`
+    );
+  } finally {
+    process.off('SIGINT', onSigint);
+    process.off('SIGTERM', onSigterm);
+    process.off('exit', cleanup);
+  }
 }
 
 export const runOAuthSetup = defineScript({
   name: 'oauth:setup',
   flags: [],
-  run: async ({ argv }) => {
-    await runOAuthSetupForService(argv[0]);
-  },
+  run: ({ argv, print }) => runOAuthSetupForService(argv[0], print),
 });
 
-export async function runOAuthSetupForService(serviceId: string): Promise<void> {
+export async function runOAuthSetupForService(
+  serviceId: string,
+  print: Print = defaultPrint
+): Promise<void> {
   try {
-    await main([serviceId]);
+    await main([serviceId], print);
   } catch (error) {
     activeCleanup?.();
     throw error;

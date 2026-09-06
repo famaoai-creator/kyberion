@@ -3,7 +3,7 @@ import {
   shutdownAgentRuntimeViaDaemon,
   getAgentRuntimeSupervisorHealth,
   type AgentRuntimeSupervisorSnapshot,
-} from '@agent/core';
+} from '@agent/core/agent-runtime-supervisor-client';
 import { auditAction, toActionResult, HUD_PEER_ID, type ActionResult } from './dispatch.js';
 
 export async function restartRuntime(

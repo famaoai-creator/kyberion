@@ -6,7 +6,10 @@ import {
 } from './src/knowledge-index.js';
 import { secureFetch } from './network.js';
 import { resolveFallbackLocationSummary } from './location-fallback.js';
-import { buildContextualIntentFrame } from './contextual-intent-frame.js';
+import {
+  buildContextualIntentFrame,
+  type ContextualIntentFrame,
+} from './contextual-intent-frame.js';
 import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
 import {
   recordSchedulePreference,
@@ -15,10 +18,14 @@ import {
 import { recordContextualIntentLearning } from './contextual-intent-learning.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import { resolveSurfaceIntent } from './router-contract.js';
+import type { IntentResolutionPacket } from './intent-resolution.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { currentScope } from './scope-context.js';
 import { safeExec } from './secure-io.js';
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import type {
   SurfaceConversationResult,
   SurfaceDelegationResult,
@@ -195,12 +202,15 @@ async function listCalendarEvents(params: {
   const output = await safeExec('osascript', ['-l', 'JavaScript', '-e', script]);
   const trimmed = String(output).trim();
   if (!trimmed) return [];
-  const parsed = JSON.parse(trimmed);
+  const parsed = parseSafeJsonInput(trimmed, 'Calendar query response');
   return Array.isArray(parsed) ? parsed : [];
 }
 
-async function readScheduleAgenda(queryText: string): Promise<string> {
-  const frame = buildContextualIntentFrame(queryText);
+async function readScheduleAgenda(
+  queryText: string,
+  contextualFrame?: ContextualIntentFrame
+): Promise<string> {
+  const frame = contextualFrame || buildContextualIntentFrame(queryText);
   const clarificationDecision = assessContextualClarification({
     intentId: 'schedule-read-agenda',
     text: queryText,
@@ -318,7 +328,7 @@ function formatExecutionReceipt(params: {
   return JSON.stringify(
     {
       kind: 'execution-receipt',
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       intent_id: params.intentId || 'unknown',
       execution_shape: params.shape || 'unknown',
       command: params.command || '',
@@ -405,6 +415,58 @@ function extractLocationHint(queryText: string): string | null {
   return stripped;
 }
 
+export interface SurfaceWeatherGeocodeCandidate {
+  name?: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface SurfaceWeatherCurrent {
+  temperature_2m?: number;
+  weather_code?: number;
+  wind_speed_10m?: number;
+  relative_humidity_2m?: number;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+export function parseSurfaceWeatherGeocodeResponse(
+  value: unknown
+): SurfaceWeatherGeocodeCandidate[] | undefined {
+  if (!isRecord(value) || !Array.isArray(value.results)) return undefined;
+  return value.results.flatMap((entry): SurfaceWeatherGeocodeCandidate[] => {
+    if (!isRecord(entry)) return [];
+    const latitude = finiteNumber(entry.latitude);
+    const longitude = finiteNumber(entry.longitude);
+    if (latitude === undefined || longitude === undefined) return [];
+    return [
+      {
+        ...(typeof entry.name === 'string' && entry.name.trim() ? { name: entry.name } : {}),
+        latitude,
+        longitude,
+      },
+    ];
+  });
+}
+
+export function parseSurfaceWeatherForecastResponse(
+  value: unknown
+): { current: SurfaceWeatherCurrent } | undefined {
+  if (!isRecord(value) || !isRecord(value.current)) return undefined;
+  const current: SurfaceWeatherCurrent = {};
+  const temperature = finiteNumber(value.current.temperature_2m);
+  const weatherCode = finiteNumber(value.current.weather_code);
+  const wind = finiteNumber(value.current.wind_speed_10m);
+  const humidity = finiteNumber(value.current.relative_humidity_2m);
+  if (temperature !== undefined) current.temperature_2m = temperature;
+  if (weatherCode !== undefined) current.weather_code = weatherCode;
+  if (wind !== undefined) current.wind_speed_10m = wind;
+  if (humidity !== undefined) current.relative_humidity_2m = humidity;
+  return { current };
+}
+
 async function fetchWeatherSummary(queryText: string): Promise<string> {
   const locationHint = extractLocationHint(queryText);
   let latitude: number | undefined;
@@ -419,17 +481,19 @@ async function fetchWeatherSummary(queryText: string): Promise<string> {
     if (!geocodingUrl) {
       throw new Error('weather geocoding endpoint is not configured');
     }
-    const geocode = await secureFetch<any>({
-      method: 'GET',
-      url: geocodingUrl,
-      params: {
-        name: locationHint,
-        count: 1,
-        language: 'ja',
-        format: 'json',
-      },
-    });
-    const candidate = geocode?.results?.[0];
+    const geocode = parseSurfaceWeatherGeocodeResponse(
+      await secureFetch<unknown>({
+        method: 'GET',
+        url: geocodingUrl,
+        params: {
+          name: locationHint,
+          count: 1,
+          language: 'ja',
+          format: 'json',
+        },
+      })
+    );
+    const candidate = geocode?.[0];
     latitude = candidate?.latitude;
     longitude = candidate?.longitude;
     label = candidate?.name || locationHint;
@@ -444,16 +508,18 @@ async function fetchWeatherSummary(queryText: string): Promise<string> {
     throw new Error('weather forecast endpoint is not configured');
   }
 
-  const weather = await secureFetch<any>({
-    method: 'GET',
-    url: forecastUrl,
-    params: {
-      latitude,
-      longitude,
-      current: 'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m',
-      timezone: 'auto',
-    },
-  });
+  const weather = parseSurfaceWeatherForecastResponse(
+    await secureFetch<unknown>({
+      method: 'GET',
+      url: forecastUrl,
+      params: {
+        latitude,
+        longitude,
+        current: 'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m',
+        timezone: 'auto',
+      },
+    })
+  );
   const current = weather?.current || {};
   const temperature = current.temperature_2m;
   const weatherCode = current.weather_code;
@@ -517,11 +583,24 @@ function structuredSurfaceQueryText(context: {
 }
 
 function resolvedSurfaceIntent(context: {
-  input: { surfaceText?: string; query?: string; threadContext?: string };
+  input: {
+    surfaceText?: string;
+    query?: string;
+    threadContext?: string;
+    scope?: { tier?: 'personal' | 'confidential' | 'public'; tenant_slug?: string };
+  };
   structuredQuery?: string;
   resolvedIntent?: ReturnType<typeof resolveSurfaceIntent>;
+  resolutionPacket?: IntentResolutionPacket;
 }): ReturnType<typeof resolveSurfaceIntent> {
-  return context.resolvedIntent || resolveSurfaceIntent(structuredSurfaceQueryText(context));
+  return (
+    context.resolvedIntent ||
+    resolveSurfaceIntent(structuredSurfaceQueryText(context), {
+      tier: context.input.scope?.tier,
+      tenantId: context.input.scope?.tenant_slug,
+      packet: context.resolutionPacket,
+    })
+  );
 }
 
 function deriveSurfaceQueryRole(context: { input: { surface?: string } }): string | undefined {

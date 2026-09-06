@@ -1,10 +1,26 @@
 import * as yaml from 'js-yaml';
 import { createLogger } from './logger.js';
 import { getFoundationIo } from './foundation/io.js';
+import { isRecord } from './foundation/text.js';
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, pathResolver } from './path-resolver.js';
 
 const logger = createLogger('policy-engine');
+
+const POLICY_OPERATORS = [
+  'eq',
+  'ne',
+  'gt',
+  'lt',
+  'gte',
+  'lte',
+  'in',
+  'contains',
+  'matches',
+] as const;
+const POLICY_ACTIONS = ['allow', 'deny', 'block', 'audit'] as const;
+type PolicyOperator = (typeof POLICY_OPERATORS)[number];
+type PolicyAction = (typeof POLICY_ACTIONS)[number];
 
 /**
  * Declarative Policy Engine v1.0
@@ -19,12 +35,12 @@ const logger = createLogger('policy-engine');
 
 export interface PolicyRule {
   field: string;
-  operator: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'contains' | 'matches';
-  value: any;
+  operator: PolicyOperator;
+  value: unknown;
   condition_field?: string;
-  condition_operator?: string;
-  condition_value?: any;
-  action: 'allow' | 'deny' | 'block' | 'audit';
+  condition_operator?: PolicyRule['operator'];
+  condition_value?: unknown;
+  action: PolicyAction;
   priority: number;
   message?: string;
   rate_limit?: { max: number; window_seconds: number; message?: string };
@@ -54,7 +70,100 @@ export interface PolicyContext {
   agent_ring?: number;
   delegation_depth?: number;
   has_capability?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function optionalEnum<const T extends string>(value: unknown, values: readonly T[]): T | undefined {
+  return typeof value === 'string' && values.includes(value as T) ? (value as T) : undefined;
+}
+
+function optionalFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeRateLimit(value: unknown): PolicyRule['rate_limit'] | undefined {
+  if (!isRecord(value)) return undefined;
+  const max = optionalFiniteNumber(value.max);
+  const windowSeconds = optionalFiniteNumber(value.window_seconds);
+  if (
+    max === undefined ||
+    windowSeconds === undefined ||
+    max < 0 ||
+    !Number.isSafeInteger(max) ||
+    windowSeconds <= 0
+  ) {
+    return undefined;
+  }
+  return {
+    max,
+    window_seconds: windowSeconds,
+    ...(nonEmptyString(value.message) ? { message: value.message } : {}),
+  };
+}
+
+function normalizePolicyRule(value: unknown): PolicyRule | null {
+  if (!isRecord(value)) return null;
+  const operator = optionalEnum(value.operator, POLICY_OPERATORS);
+  const action = optionalEnum(value.action, POLICY_ACTIONS);
+  const priority = optionalFiniteNumber(value.priority);
+  if (
+    !nonEmptyString(value.field) ||
+    operator === undefined ||
+    action === undefined ||
+    priority === undefined ||
+    !Number.isSafeInteger(priority) ||
+    !Object.prototype.hasOwnProperty.call(value, 'value')
+  ) {
+    return null;
+  }
+  const conditionField =
+    value.condition_field === undefined
+      ? undefined
+      : nonEmptyString(value.condition_field)
+        ? value.condition_field
+        : null;
+  const conditionOperator =
+    value.condition_operator === undefined
+      ? undefined
+      : optionalEnum(value.condition_operator, POLICY_OPERATORS);
+  if (
+    conditionField === null ||
+    (value.condition_operator !== undefined && conditionOperator === undefined)
+  ) {
+    return null;
+  }
+  const rateLimit =
+    value.rate_limit === undefined ? undefined : normalizeRateLimit(value.rate_limit);
+  if (value.rate_limit !== undefined && rateLimit === undefined) return null;
+  return {
+    field: value.field,
+    operator,
+    value: value.value,
+    ...(conditionField !== undefined ? { condition_field: conditionField } : {}),
+    ...(conditionOperator !== undefined ? { condition_operator: conditionOperator } : {}),
+    ...(value.condition_value !== undefined ? { condition_value: value.condition_value } : {}),
+    action,
+    priority,
+    ...(nonEmptyString(value.message) ? { message: value.message } : {}),
+    ...(rateLimit !== undefined ? { rate_limit: rateLimit } : {}),
+  };
+}
+
+function normalizePolicy(value: unknown): Policy | null {
+  if (!isRecord(value) || !nonEmptyString(value.name) || !Array.isArray(value.rules)) return null;
+  const rules = value.rules
+    .map((rule) => normalizePolicyRule(rule))
+    .filter((rule): rule is PolicyRule => rule !== null);
+  if (rules.length === 0) return null;
+  return {
+    name: value.name,
+    ...(nonEmptyString(value.description) ? { description: value.description } : {}),
+    rules,
+  };
 }
 
 class PolicyEngineImpl {
@@ -63,42 +172,51 @@ class PolicyEngineImpl {
   private rateLimitCounters: Map<string, { count: number; windowStart: number }> = new Map();
 
   loadFromFile(filePath?: string): void {
+    this.policies = [];
+    this.declaredPolicyCount = 0;
     const root = pathResolver.rootDir();
     const policyPath =
       filePath || path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
 
-    if (!getFoundationIo().exists(policyPath)) {
-      logger.warn(`[POLICY_ENGINE] Policy file not found: ${policyPath}`);
+    let safePolicyPath: string;
+    let content: string;
+    try {
+      safePolicyPath = assertSafeRepositoryPath(policyPath, { allowMissingLeaf: true });
+      content = getFoundationIo().readFile(safePolicyPath, {
+        label: 'agent policy file',
+      });
+    } catch (error: unknown) {
+      logger.warn(
+        `[POLICY_ENGINE] Policy file unavailable: ${error instanceof Error ? error.message : String(error)}`
+      );
       return;
     }
-
-    const content = getFoundationIo().readFile(policyPath);
     // SA-05: a hand-rolled "simple YAML" parser silently produced empty
     // rules arrays for every policy (nested lists were unsupported), so the
     // engine never enforced anything. Parse with js-yaml; a parse failure
     // leaves zero policies loaded, and evaluate() fails closed on that.
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = yaml.load(content);
-    } catch (err: any) {
-      logger.error(`[POLICY_ENGINE] Failed to parse ${policyPath}: ${err?.message || err}`);
+    } catch (err: unknown) {
+      logger.error(
+        `[POLICY_ENGINE] Failed to parse ${safePolicyPath}: ${err instanceof Error ? err.message : String(err)}`
+      );
       return;
     }
 
-    if (parsed?.policies && Array.isArray(parsed.policies)) {
-      this.declaredPolicyCount = parsed.policies.length;
-      this.policies = parsed.policies.filter(
-        (policy: any) =>
-          policy &&
-          typeof policy === 'object' &&
-          Array.isArray(policy.rules) &&
-          policy.rules.length > 0
-      );
-      const dropped = parsed.policies.length - this.policies.length;
+    const declaredPolicies =
+      isRecord(parsed) && Array.isArray(parsed.policies) ? parsed.policies : [];
+    this.declaredPolicyCount = declaredPolicies.length;
+    this.policies = declaredPolicies
+      .map((policy) => normalizePolicy(policy))
+      .filter((policy): policy is Policy => policy !== null);
+    if (declaredPolicies.length > 0) {
+      const dropped = declaredPolicies.length - this.policies.length;
       if (dropped > 0) {
         // Task 2.3: never run silently on fewer rules than the file declares.
         logger.warn(
-          `[POLICY_ENGINE] ${dropped} policy(ies) dropped (no parseable rules) — check ${policyPath}`
+          `[POLICY_ENGINE] ${dropped} policy(ies) dropped (no parseable rules) — check ${safePolicyPath}`
         );
       }
       logger.info(`[POLICY_ENGINE] Loaded ${this.policies.length} policies`);
@@ -130,7 +248,7 @@ class PolicyEngineImpl {
         if (rule.condition_field) {
           const condMet = this.evalOperator(
             context[rule.condition_field],
-            (rule.condition_operator as any) || 'eq',
+            rule.condition_operator || 'eq',
             rule.condition_value
           );
           if (!condMet) continue;
@@ -195,7 +313,11 @@ class PolicyEngineImpl {
     };
   }
 
-  private evalOperator(fieldValue: any, operator: PolicyRule['operator'], ruleValue: any): boolean {
+  private evalOperator(
+    fieldValue: unknown,
+    operator: PolicyRule['operator'],
+    ruleValue: unknown
+  ): boolean {
     switch (operator) {
       case 'eq':
         return fieldValue === ruleValue;

@@ -1,10 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import {
-  loadJsonIfPresent as loadOptionalJson,
-  safeExistsSync,
-  safeReadFile,
-} from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale } from './locale-normalize.js';
@@ -23,6 +21,7 @@ import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   appendDealNote,
   getActiveDealForChannel,
+  loadPriceBook,
   openDeal,
   summarizeDealForConversation,
   type DealRecord,
@@ -36,6 +35,7 @@ import {
   summarizeOpenQuestionsForPrompt,
   type CustomerConversationMode,
 } from './customer-conversation-modes.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 /**
  * E2E-06 Task 2: customer-mode conversation.
@@ -69,6 +69,28 @@ const ESCALATION_MARKER = '[NEEDS_OPERATOR]';
 const CONCIERGE_ESCALATION_HOLD_REPLY_KEY = 'concierge_escalation_hold_reply';
 const ESCALATION_HOLD_REPLY_FALLBACK_EN = 'We will confirm and get back to you shortly.';
 
+const SOLUTION_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/solution-catalog.schema.json'
+);
+
+/** Load customer-facing solution claims only through the catalog boundary. */
+export function loadSolutionCatalogAtPath(filePath: string): Record<string, unknown> | null {
+  try {
+    const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+    if (!safeLstat(safeFilePath).isFile()) return null;
+    return defineCatalog<Record<string, unknown>>({
+      id: 'solution-catalog',
+      path: safeFilePath,
+      schema: SOLUTION_CATALOG_SCHEMA_PATH,
+    }).load();
+  } catch (error: unknown) {
+    logger.warn(
+      `[customer-conversation] ignoring invalid solution catalog ${filePath}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
+}
+
 /**
  * Resolves the language-appropriate "we will confirm and get back to you"
  * phrase. `explicitLanguage` is the customer's bound language (free text,
@@ -99,34 +121,36 @@ export interface CustomerConversationResult {
   mode: CustomerConversationMode;
 }
 
-function readJsonIfPresent(filePath: string): Record<string, unknown> | null {
-  return loadOptionalJson<Record<string, unknown>>(filePath);
-}
-
 function loadGroundingSources(tenantSlug: string): {
   catalog: string;
   priceBook: string;
   tenantNotes: string;
   sources: string[];
 } {
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[CUSTOMER_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
   const sources: string[] = [];
-  const catalogPath = pathResolver.knowledge('public/sales/solution-catalog.json');
-  const catalog = readJsonIfPresent(catalogPath);
+  const catalogPath = assertSafeRepositoryPath(
+    pathResolver.knowledge('public/sales/solution-catalog.json'),
+    { allowMissingLeaf: true }
+  );
+  const catalog = loadSolutionCatalogAtPath(catalogPath);
   if (catalog) sources.push('solution-catalog');
 
-  const priceBookPath =
-    [
-      pathResolver.knowledge(path.join('confidential', tenantSlug, 'sales', 'price-book.json')),
-      pathResolver.knowledge('product/sales/price-book.json'),
-    ].find((candidate) => safeExistsSync(candidate)) || '';
-  const priceBook = priceBookPath ? readJsonIfPresent(priceBookPath) : null;
+  const priceBook = loadPriceBook(tenantSlug);
   if (priceBook) sources.push('price-book');
 
-  const tenantSalesDir = pathResolver.knowledge(path.join('confidential', tenantSlug, 'sales'));
+  const tenantSalesDir = assertSafeRepositoryPath(
+    pathResolver.knowledge(path.join('confidential', tenantSlug, 'sales')),
+    { allowMissingLeaf: true }
+  );
   let tenantNotes = '';
-  const notesPath = path.join(tenantSalesDir, 'notes.md');
-  if (safeExistsSync(notesPath)) {
-    tenantNotes = String(safeReadFile(notesPath, { encoding: 'utf8' })).slice(0, 4000);
+  const notesPath = assertSafeRepositoryPath(path.join(tenantSalesDir, 'notes.md'), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(notesPath) && safeLstat(notesPath).isFile()) {
+    tenantNotes = readTextFile(notesPath).slice(0, 4000);
     sources.push('tenant-sales-notes');
   }
 
@@ -315,6 +339,10 @@ export interface SendToCustomerInput {
   title: string;
   body: string;
   correlationId?: string;
+  /** Trusted execution-boundary presence for the outbound approval gate. */
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
   /** Delivery function supplied by the calling bridge (channel-specific). */
   deliver: (text: string) => Promise<unknown>;
 }
@@ -435,6 +463,9 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
       input.correlationId ||
       `customer-outbound:${input.binding.tenantSlug}:${Date.now().toString(36)}`,
     channel: input.binding.binding.surface,
+    ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
+    ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
+    ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
     draft: {
       title: floorViolations.length > 0 ? `⚠ ${input.title}` : input.title,
       summary: `${violationNote}${input.body.slice(0, 400)}`,

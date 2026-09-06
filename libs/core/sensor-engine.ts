@@ -9,7 +9,7 @@ import { appendJsonLine } from './foundation/json.js';
  */
 
 import { createLogger } from './logger.js';
-import { pathResolver } from './path-resolver.js';
+import { stimuliJournalPath } from './stimuli-journal.js';
 
 const logger = createLogger('sensor-engine');
 
@@ -29,8 +29,6 @@ export interface SensorEvent {
   priority?: number;
   ttl?: number;
 }
-
-const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 
 /**
  * Base Sensor class providing common GUSP stimulus emission.
@@ -72,7 +70,7 @@ export abstract class KyberionSensor {
     };
 
     try {
-      appendJsonLine(STIMULI_PATH, stimulus);
+      appendJsonLine(stimuliJournalPath(), stimulus);
       logger.info(`📡 [SENSOR:${this.config.id}] Emitted: ${event.intent}`);
     } catch (err) {
       logger.error(`❌ [SENSOR:${this.config.id}] Failed to emit stimulus: ${err}`);

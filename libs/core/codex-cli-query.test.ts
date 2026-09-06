@@ -7,9 +7,11 @@ import {
   resolveCodexBinary,
   runCodexCliQuery,
 } from './codex-cli-query.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeWriteFile: vi.fn(),
   safeReadFile: vi.fn(),
   safeRmSync: vi.fn(),
@@ -22,9 +24,18 @@ vi.mock('./secure-io.js', async () => {
   return {
     ...actual,
     safeExecResult: mocks.safeExecResult,
+    safeLstat: mocks.safeLstat,
     safeWriteFile: mocks.safeWriteFile,
     safeReadFile: mocks.safeReadFile,
     safeRmSync: mocks.safeRmSync,
+  };
+});
+
+vi.mock('./foundation/text.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./foundation/text.js')>();
+  return {
+    ...actual,
+    readTextFile: (filePath: string) => mocks.safeReadFile(filePath),
   };
 });
 
@@ -195,6 +206,7 @@ describe('codex-cli-query', () => {
 
     beforeEach(() => {
       mocks.safeWriteFile.mockReset();
+      mocks.safeLstat.mockReset().mockReturnValue({ isFile: () => true });
       mocks.safeReadFile.mockReset().mockReturnValue(JSON.stringify({ ok: true }));
       mocks.safeRmSync.mockReset();
       mocks.spawnMock.mockReset();
@@ -282,6 +294,29 @@ describe('codex-cli-query', () => {
       expect(mocks.spawnMock).not.toHaveBeenCalled();
       expect(mocks.safeWriteFile).not.toHaveBeenCalled();
     });
+
+    it('ambient read-only sandbox overrides a write-mode query before spawn', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+      const policy = resolveSandboxPolicy({
+        provider: 'codex',
+        mode: 'read-only',
+        networkAccess: true,
+      });
+
+      await withSandboxPolicy(policy, () =>
+        runCodexCliQuery({
+          systemPrompt: 'sys',
+          userPrompt: 'usr',
+          schema: z.object({ ok: z.boolean() }),
+          mode: 'workspace-write',
+          options: { bin: 'codex', model: 'codex-default', cwd: 'fake/workspace' },
+        })
+      );
+
+      const [, argv] = mocks.spawnMock.mock.calls[0];
+      expect(argv).toEqual(expect.arrayContaining(['--sandbox', 'read-only']));
+      expect(argv).not.toContain('workspace-write');
+    });
   });
 
   describe('wall-clock budget wiring (XP-06)', () => {
@@ -308,6 +343,23 @@ describe('codex-cli-query', () => {
       expect(opts).toMatchObject({ provider: 'codex', budgetMs: 54321 });
       expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
       expect(typeof fn).toBe('function');
+    });
+
+    it('fails closed when the CLI output path is not a regular file', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+      mocks.safeLstat.mockImplementation((filePath: string) => ({
+        isFile: () => !filePath.includes('kyberion-codex-output-'),
+      }));
+
+      await expect(
+        runCodexCliQuery({
+          systemPrompt: 'sys',
+          userPrompt: 'usr',
+          schema: z.object({ ok: z.boolean() }),
+          options: { bin: 'codex' },
+        })
+      ).rejects.toThrow(/structured output must be a regular file/);
+      expect(mocks.safeReadFile).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,9 +1,16 @@
 import { createHash } from 'node:crypto';
+import { unlinkSync } from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   createDistillCandidateRecord,
   loadDistillCandidateRecord,
@@ -14,6 +21,7 @@ import {
   applyBackgroundReviewSkillPatch,
   applyBackgroundReviewMemoryConsolidationPatch,
   createBackgroundReviewApprovalRequest,
+  loadManagedSkillProvenanceAtPath,
 } from './background-review-patch.js';
 import { approvalRequestLogicalPath, decideApprovalRequest } from './approval-store.js';
 
@@ -23,6 +31,7 @@ const createdSkillDirs: string[] = [];
 const createdMemoryRefs: string[] = [];
 const createdBackupRefs: string[] = [];
 const createdApprovalRefs: string[] = [];
+const createdExternalTargets: string[] = [];
 
 function targetRef(suffix: string): string {
   const ref = `pipelines/background-review-patch-test-${process.pid}-${suffix}.json`;
@@ -141,6 +150,9 @@ afterEach(() => {
     for (const ref of createdPipelineRefs.splice(0)) {
       safeRmSync(pathResolver.rootResolve(ref), { force: true });
     }
+    for (const target of createdExternalTargets.splice(0)) {
+      safeRmSync(target, { force: true });
+    }
     for (const dir of createdSkillDirs.splice(0)) {
       safeRmSync(dir, { recursive: true, force: true });
     }
@@ -168,6 +180,58 @@ afterEach(() => {
 });
 
 describe('background-review-patch', () => {
+  it('loads managed skill provenance through the canonical schema and skill binding', () => {
+    const ref = writeManagedSkill('loader');
+    const sidecar = pathResolver.rootResolve(
+      `${ref.slice(0, ref.lastIndexOf('/'))}/provenance.json`
+    );
+
+    expect(loadManagedSkillProvenanceAtPath(sidecar, ref)).toMatchObject({
+      managed_by: 'background-review',
+      owner: 'background-review-agent',
+      skill_ref: ref,
+      allow_append_only: true,
+    });
+  });
+
+  it('rejects malformed or non-file managed skill provenance', () => {
+    const ref = writeManagedSkill('loader-invalid');
+    const sidecar = pathResolver.rootResolve(
+      `${ref.slice(0, ref.lastIndexOf('/'))}/provenance.json`
+    );
+    withExecutionContext('ecosystem_architect', () =>
+      safeWriteFile(
+        sidecar,
+        `${JSON.stringify({
+          version: 1,
+          managed_by: 'background-review',
+          owner: 'background-review-agent',
+          skill_ref: ref,
+          allow_append_only: true,
+          registered_by: 'operator-test',
+          unexpected: true,
+        })}\n`
+      )
+    );
+    expect(() => loadManagedSkillProvenanceAtPath(sidecar, ref)).toThrow(
+      'Invalid catalog background-review-managed-skill-provenance'
+    );
+
+    withExecutionContext('ecosystem_architect', () => {
+      safeRmSync(sidecar, { force: true });
+      safeMkdir(sidecar, { recursive: true });
+    });
+    try {
+      expect(() => loadManagedSkillProvenanceAtPath(sidecar, ref)).toThrow(
+        'must be a regular file'
+      );
+    } finally {
+      withExecutionContext('ecosystem_architect', () =>
+        safeRmSync(sidecar, { recursive: true, force: true })
+      );
+    }
+  });
+
   it('applies an approved hash-bound append step and keeps a backup', () => {
     const ref = targetRef('success');
     const before = writePipeline(ref, {
@@ -232,6 +296,66 @@ describe('background-review-patch', () => {
     ).toThrow(/pre-image hash mismatch/);
     expect(safeReadFile(pathResolver.rootResolve(ref), { encoding: 'utf8' })).toBe(before);
     expect(loadDistillCandidateRecord(candidate.candidate_id)?.status).toBe('proposed');
+  });
+
+  it('rejects a pipeline target that traverses a symbolic link', () => {
+    const ref = targetRef('symlink');
+    const absolute = pathResolver.rootResolve(ref);
+    const target = pathResolver.shared(
+      `tmp/background-review-target-${process.pid}-${Date.now()}.json`
+    );
+    createdExternalTargets.push(target);
+    withExecutionContext('ecosystem_architect', () => {
+      safeWriteFile(
+        target,
+        JSON.stringify({ action: 'pipeline', name: 'symlink-target', version: '1.0.0', steps: [] })
+      );
+      safeSymlinkSync(target, absolute);
+    });
+    const candidate = saveProposal({
+      candidateId: `PATCH-TEST-${process.pid}-SYMLINK`,
+      targetRef: ref,
+      patch: { operation: 'append_step', step: { op: 'system:log', params: { message: 'x' } } },
+    });
+
+    try {
+      expect(() =>
+        applyBackgroundReviewPipelinePatch({
+          candidateId: candidate.candidate_id,
+          expectedSha256: '0'.repeat(64),
+          approvedBy: 'operator-test',
+          approvalRef: 'approval-test-symlink',
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      unlinkSync(absolute);
+    }
+  });
+
+  it('rejects a pipeline target replaced by a directory', () => {
+    const ref = targetRef('directory');
+    const absolute = pathResolver.rootResolve(ref);
+    const candidate = saveProposal({
+      candidateId: `PATCH-TEST-${process.pid}-DIRECTORY`,
+      targetRef: ref,
+      patch: { operation: 'append_step', step: { op: 'system:log', params: { message: 'x' } } },
+    });
+    withExecutionContext('ecosystem_architect', () => safeMkdir(absolute, { recursive: true }));
+
+    try {
+      expect(() =>
+        applyBackgroundReviewPipelinePatch({
+          candidateId: candidate.candidate_id,
+          expectedSha256: '0'.repeat(64),
+          approvedBy: 'operator-test',
+          approvalRef: 'approval-test-directory',
+        })
+      ).toThrow(/target must be a regular file/);
+    } finally {
+      withExecutionContext('ecosystem_architect', () =>
+        safeRmSync(absolute, { recursive: true, force: true })
+      );
+    }
   });
 
   it('rejects a patch that fails pipeline guardrails', () => {

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 // Stub secure-io to use real temp fs so we can test file operations
 vi.mock('./secure-io.js', async () => {
@@ -20,6 +21,7 @@ vi.mock('./secure-io.js', async () => {
       actual.mkdirSync(path.dirname(p), { recursive: true });
       actual.writeFileSync(p, data);
     },
+    assertSafeRepositoryPath: (p: string) => p,
     // AL-04: soft-delete moves + deletion audit appends.
     safeAppendFileSync: (p: string, data: string) => {
       actual.mkdirSync(path.dirname(p), { recursive: true });
@@ -62,18 +64,26 @@ vi.mock('./foundation/io.js', () => ({
 let tmpDir: string;
 let logsDir: string;
 let dataVaultDir: string;
+const pathResolverMock = vi.hoisted(() => ({ rootDir: '', repoRoot: process.cwd() }));
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 vi.mock('./path-resolver.js', () => ({
+  pathResolver: {
+    // lock-utils evaluates rootDir while this mock is being hoisted, before
+    // beforeEach initializes the per-test fixture.
+    rootDir: () => pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
+  },
   sharedTmp: (sub = '') => path.join(tmpDir, sub),
   shared: (sub = '') => {
     const base = path.dirname(tmpDir); // active/shared
     return path.join(base, sub);
   },
   sharedLogsAudit: (sub = '') => path.join(path.dirname(tmpDir), 'logs', 'audit', sub),
+  knowledge: (sub = '') => path.join(pathResolverMock.repoRoot, 'knowledge', sub),
   // Repo root of the temp fixture: tmpDir is <root>/active/shared/tmp, so
   // repo-relative paths ('active/shared/...', 'active/archive/.trash/...')
   // resolve exactly as they do in the real tree.
-  rootDir: () => testRootDir(),
+  rootDir: () => pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
 }));
 
 vi.mock('./core.js', () => ({
@@ -84,6 +94,7 @@ import {
   scanTmp,
   rotateLogs,
   scanRuntime,
+  scanDataVault,
   sweepDelegationChildren,
   sweepTrash,
   restoreFromTrash,
@@ -91,12 +102,17 @@ import {
   runJanitor,
   runJanitorIfStale,
   readJanitorLastRunMs,
+  readJanitorLastSubmissionMs,
+  writeJanitorSubmissionMarker,
+  readSchedulerOpsAlertDays,
+  writeSchedulerOpsAlertDay,
   listUncoveredRuntimeDirs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_TRASH_GRACE_DAYS,
   TRASH_REPO_SUBPATH,
   type DelegationChildRecord,
 } from './storage-janitor.js';
+import { fetchWithVaultCache } from './data-vault.js';
 import {
   RETENTION_CATALOG_REPO_PATH,
   RETENTION_DAY_MS,
@@ -162,8 +178,14 @@ describe('storage-janitor', () => {
     tmpDir = path.join(base, 'active', 'shared', 'tmp');
     logsDir = path.join(base, 'active', 'shared', 'logs');
     dataVaultDir = path.join(base, 'active', 'shared', 'data-vault');
+    pathResolverMock.rootDir = testRootDir();
     fs.mkdirSync(tmpDir, { recursive: true });
     fs.mkdirSync(logsDir, { recursive: true });
+    fs.mkdirSync(path.join(base, 'knowledge/product/schemas'), { recursive: true });
+    fs.copyFileSync(
+      path.join(REPO_ROOT, 'knowledge/product/schemas/storage-retention-catalog.schema.json'),
+      path.join(base, 'knowledge/product/schemas/storage-retention-catalog.schema.json')
+    );
   });
 
   afterEach(() => {
@@ -304,6 +326,29 @@ describe('storage-janitor', () => {
       const result = scanRuntime({ dryRun: false });
       expect(result.deleted).toContain(oldDelta);
       expect(fs.existsSync(oldDelta)).toBe(false);
+    });
+  });
+
+  describe('scanDataVault', () => {
+    it('deletes expired valid entries but leaves malformed entries untouched', async () => {
+      await fetchWithVaultCache('notion', 'expired', () => ({ value: 1 }), {
+        projectId: 'janitor-test',
+        ttlMs: 60_000,
+      });
+      const validFile = path.join(dataVaultDir, fs.readdirSync(dataVaultDir)[0]!);
+      const persisted = JSON.parse(fs.readFileSync(validFile, 'utf8')) as Record<string, unknown>;
+      persisted.expiresAt = new Date(Date.now() - 1_000).toISOString();
+      fs.writeFileSync(validFile, JSON.stringify(persisted));
+
+      const malformedFile = path.join(dataVaultDir, 'malformed.json');
+      writeFile(malformedFile, '{not-json');
+
+      const result = scanDataVault({ dryRun: false });
+
+      expect(result.deleted).toContain(validFile);
+      expect(fs.existsSync(validFile)).toBe(false);
+      expect(result.deleted).not.toContain(malformedFile);
+      expect(fs.existsSync(malformedFile)).toBe(true);
     });
   });
 
@@ -851,6 +896,63 @@ describe('storage-janitor', () => {
       const report = runJanitorIfStale({ dryRun: true });
       expect(report).not.toBeNull();
       expect(readJanitorLastRunMs()).toBeNull();
+    });
+
+    it('validates janitor submission markers and rejects malformed or non-file state', () => {
+      expect(readJanitorLastSubmissionMs()).toBeNull();
+
+      writeJanitorSubmissionMarker();
+      expect(readJanitorLastSubmissionMs()).not.toBeNull();
+
+      const markerPath = path.join(
+        path.dirname(tmpDir),
+        'runtime',
+        'state',
+        'janitor-last-submit.json'
+      );
+      fs.writeFileSync(
+        markerPath,
+        JSON.stringify({
+          submitted_at: new Date().toISOString(),
+          pipeline_id: 'storage-janitor',
+          dry_run: false,
+          unexpected: true,
+        })
+      );
+      expect(readJanitorLastSubmissionMs()).toBeNull();
+
+      fs.rmSync(markerPath, { force: true });
+      fs.mkdirSync(markerPath, { recursive: true });
+      expect(readJanitorLastSubmissionMs()).toBeNull();
+    });
+
+    it('validates scheduler alert-day markers and preserves valid keys on update', () => {
+      expect(readSchedulerOpsAlertDays()).toBeNull();
+
+      writeSchedulerOpsAlertDay('scheduler_alive', new Date('2026-08-09T12:00:00.000Z'));
+      expect(readSchedulerOpsAlertDays()).toEqual({ scheduler_alive: '2026-08-09' });
+
+      writeSchedulerOpsAlertDay('failed_schedules', new Date('2026-08-09T12:00:00.000Z'));
+      expect(readSchedulerOpsAlertDays()).toEqual({
+        scheduler_alive: '2026-08-09',
+        failed_schedules: '2026-08-09',
+      });
+
+      const markerPath = path.join(
+        path.dirname(tmpDir),
+        'runtime',
+        'state',
+        'scheduler-ops-alert-days.json'
+      );
+      fs.writeFileSync(
+        markerPath,
+        JSON.stringify({ scheduler_alive: '2026-08-09', unexpected: true })
+      );
+      expect(readSchedulerOpsAlertDays()).toBeNull();
+
+      fs.rmSync(markerPath, { force: true });
+      fs.mkdirSync(markerPath, { recursive: true });
+      expect(readSchedulerOpsAlertDays()).toBeNull();
     });
   });
 });

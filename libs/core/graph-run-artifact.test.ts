@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { safeReadFile, safeRmSync } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import { createAgentCollaborationEvent } from './agent-collaboration-events.js';
 import { composeAgentCollaborationProjection } from './agent-collaboration-projection.js';
 import { deriveExecutionGraph } from './graph-scheduler.js';
-import { createGraphRunArtifact, recordGraphRunNode } from './graph-run-artifact.js';
+import {
+  createGraphRunArtifact,
+  persistGraphRunArtifact,
+  recordGraphRunNode,
+} from './graph-run-artifact.js';
 
 describe('graph run artifact', () => {
   it('captures node outcomes and projects them into collaboration graph surfaces', () => {
@@ -48,5 +54,29 @@ describe('graph run artifact', () => {
         expect.objectContaining({ from: 'run-graph:run-1', to: 'trace:trace-1' }),
       ])
     );
+  });
+
+  it('rejects an explicit artifact path outside the repository', () => {
+    const artifact = createGraphRunArtifact({ nodes: [], edges: [] } as never, 'run-boundary');
+    expect(() => persistGraphRunArtifact(artifact, '/tmp/graph-run-artifact.json')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
+  it('persists the catalog canonical payload', () => {
+    const artifact = {
+      ...createGraphRunArtifact({ nodes: [], edges: [] } as never, 'run-canonical'),
+      $schema: 'https://example.invalid/graph-run-artifact.json',
+    } as ReturnType<typeof createGraphRunArtifact> & { $schema: string };
+    const target = pathResolver.sharedTmp('graph-run-artifact-canonical.json');
+
+    try {
+      persistGraphRunArtifact(artifact, target);
+      const persisted = JSON.parse(String(safeReadFile(target, { encoding: 'utf8' })));
+      expect(persisted.$schema).toBeUndefined();
+      expect(persisted.artifact_path).toBe(target);
+    } finally {
+      safeRmSync(target);
+    }
   });
 });

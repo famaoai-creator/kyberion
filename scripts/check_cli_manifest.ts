@@ -1,6 +1,8 @@
-import { pathResolver, safeExistsSync } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 export interface CliEntrypoint {
   id: string;
@@ -17,10 +19,22 @@ export interface CliCommand {
   audience: 'user' | 'operator' | 'dev';
 }
 
+export interface CliScriptCommand {
+  id: string;
+  script?: string;
+  module?: string;
+  args?: string[];
+  command: string;
+  noun: string;
+  verb: string;
+  audience: 'user' | 'operator' | 'dev';
+}
+
 export interface CliManifest {
   version: number;
   commands: CliCommand[];
   entrypoints: CliEntrypoint[];
+  script_commands?: CliScriptCommand[];
 }
 
 const cliManifestCatalog = defineCatalog<CliManifest>({
@@ -33,7 +47,112 @@ export function loadCliManifest(): CliManifest {
   return cliManifestCatalog.load();
 }
 
-export function checkCliManifest(manifest = loadCliManifest()): string[] {
+export interface CliManifestCheckOptions {
+  packageScripts?: ReadonlySet<string>;
+}
+
+export const MAX_PACKAGE_SCRIPTS = 120;
+
+export function resolveCliModulePath(module: string, allowMissingLeaf = false): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(module), { allowMissingLeaf });
+}
+
+function loadPackageScriptNames(): Set<string> {
+  const packageJson = readSafeJsonFile<{ scripts?: Record<string, string> }>(
+    pathResolver.rootResolve('package.json'),
+    'package manifest for CLI manifest check'
+  );
+  return new Set(Object.keys(packageJson.scripts || {}));
+}
+
+function checkScriptCommands(
+  manifest: CliManifest,
+  packageScripts: ReadonlySet<string>,
+  failures: string[]
+): void {
+  if (packageScripts.size > MAX_PACKAGE_SCRIPTS) {
+    failures.push(
+      `package scripts exceed the SX-05 ratchet: ${packageScripts.size} > ${MAX_PACKAGE_SCRIPTS}`
+    );
+  }
+  if (manifest.script_commands === undefined) return;
+  if (!Array.isArray(manifest.script_commands) || manifest.script_commands.length === 0) {
+    failures.push('script_commands must be a non-empty script command registry');
+    return;
+  }
+
+  const ids = new Set<string>();
+  const scripts = new Set<string>();
+  const commands = new Set<string>();
+  const registeredCommands = new Set(manifest.commands.map((command) => command.command));
+  for (const command of manifest.script_commands) {
+    if (!command.id || ids.has(command.id)) {
+      failures.push(`script command id must be unique: ${command.id || '<missing>'}`);
+    }
+    ids.add(command.id);
+    if (commands.has(command.command)) {
+      failures.push(`script command must be unique: ${command.command || '<default>'}`);
+    }
+    commands.add(command.command);
+    if (registeredCommands.has(command.command)) {
+      failures.push(
+        `script command collides with command registry: ${command.command || '<default>'}`
+      );
+    }
+    if ((!command.script && !command.module) || (command.script && command.module)) {
+      failures.push(
+        `script command must declare exactly one of script or module: ${command.id || '<missing>'}`
+      );
+    }
+    if (command.script && scripts.has(command.script)) {
+      failures.push(`script command must be unique: ${command.script}`);
+    }
+    if (command.script) {
+      scripts.add(command.script);
+    }
+    if (command.module) {
+      try {
+        const modulePath = resolveCliModulePath(command.module, true);
+        if (!safeExistsSync(modulePath)) {
+          failures.push(`script command module does not exist: ${command.module}`);
+        }
+      } catch (error) {
+        failures.push(
+          `script command module path is invalid: ${command.module} (${error instanceof Error ? error.message : String(error)})`
+        );
+      }
+    }
+    if (command.args && !Array.isArray(command.args)) {
+      failures.push(`script command args must be an array: ${command.id || '<missing>'}`);
+    }
+    if (!command.command || !command.noun || !command.verb) {
+      failures.push(
+        `script command ${command.id || '<missing>'} must declare command, noun, and verb`
+      );
+    }
+    if (!['user', 'operator', 'dev'].includes(command.audience)) {
+      failures.push(`script command ${command.id || '<missing>'} has invalid audience`);
+    }
+    if (command.script && !packageScripts.has(command.script)) {
+      failures.push(`script command references missing package script: ${command.script}`);
+    }
+    const expectedCommand = `${command.noun} ${command.verb}`.trim();
+    if (command.command !== expectedCommand) {
+      failures.push(`script command noun/verb mismatch: ${command.script} -> ${command.command}`);
+    }
+  }
+
+  for (const script of packageScripts) {
+    if (!scripts.has(script)) {
+      failures.push(`package script missing command registry entry: ${script}`);
+    }
+  }
+}
+
+export function checkCliManifest(
+  manifest = loadCliManifest(),
+  options: CliManifestCheckOptions = {}
+): string[] {
   const failures: string[] = [];
   if (!Number.isInteger(manifest.version) || manifest.version < 1) {
     failures.push('version must be a positive integer');
@@ -54,6 +173,9 @@ export function checkCliManifest(manifest = loadCliManifest()): string[] {
         failures.push(`command id must be unique: ${command.id || '<missing>'}`);
       }
       commandIds.add(command.id);
+      if (registeredCommands.has(command.command)) {
+        failures.push(`command must be unique: ${command.command || '<default>'}`);
+      }
       registeredCommands.add(command.command);
       if (!command.noun || !command.verb || !command.entry) {
         failures.push(`command ${command.id || '<missing>'} must declare noun, verb, and entry`);
@@ -68,8 +190,19 @@ export function checkCliManifest(manifest = loadCliManifest()): string[] {
       failures.push(`entrypoint id must be unique: ${entrypoint.id || '<missing>'}`);
     }
     ids.add(entrypoint.id);
-    if (!entrypoint.module || !safeExistsSync(pathResolver.rootResolve(entrypoint.module))) {
+    if (!entrypoint.module) {
       failures.push(`${entrypoint.id}: module does not exist: ${entrypoint.module}`);
+    } else {
+      try {
+        const modulePath = resolveCliModulePath(entrypoint.module, true);
+        if (!safeExistsSync(modulePath)) {
+          failures.push(`${entrypoint.id}: module does not exist: ${entrypoint.module}`);
+        }
+      } catch (error) {
+        failures.push(
+          `${entrypoint.id}: module path is invalid: ${entrypoint.module} (${error instanceof Error ? error.message : String(error)})`
+        );
+      }
     }
     if (!Array.isArray(entrypoint.commands) || entrypoint.commands.length === 0) {
       failures.push(`${entrypoint.id}: commands must be a non-empty array`);
@@ -101,6 +234,7 @@ export function checkCliManifest(manifest = loadCliManifest()): string[] {
   if (commands.get('') !== 'operator-home') {
     failures.push('empty command must route to operator-home');
   }
+  checkScriptCommands(manifest, options.packageScripts || loadPackageScriptNames(), failures);
   return failures;
 }
 
@@ -110,7 +244,7 @@ export const runCheckCliManifest = defineScript({
   run(context): void {
     const failures = checkCliManifest();
     if (failures.length > 0) {
-      throw new Error(failures.join('; '));
+      throw new ScriptExitError(1, failures.map((failure) => `- ${failure}`).join('\n'));
     }
     context.print('[check:cli-manifest] OK');
   },

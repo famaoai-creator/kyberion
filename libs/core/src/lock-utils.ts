@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { createLogger } from '../logger.js';
+import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
+import { isVitestProcess } from '../foundation/env.js';
 
 const logger = createLogger('lock-utils');
 
@@ -15,7 +17,7 @@ export interface LockIo {
 let lockIo: LockIo | undefined;
 
 function testLockIo(): LockIo | undefined {
-  if (!process.env.VITEST) return undefined;
+  if (!isVitestProcess()) return undefined;
   return (
     globalThis as typeof globalThis & {
       __kyberionVitestIo?: { lockIo?: LockIo };
@@ -71,7 +73,7 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
         lockFile,
         JSON.stringify({
           pid: process.pid,
-          ts: new Date().toISOString(),
+          ts: nowIso(),
           id: resourceId,
         })
       );
@@ -178,7 +180,7 @@ export function withLockSync<T>(resourceId: string, fn: () => T, timeoutMs = 500
     try {
       io.createExclusive(
         lockFile,
-        JSON.stringify({ pid: process.pid, ts: new Date().toISOString(), id: resourceId })
+        JSON.stringify({ pid: process.pid, ts: nowIso(), id: resourceId })
       );
     } catch (err: any) {
       if (err?.code !== 'EEXIST') throw err;

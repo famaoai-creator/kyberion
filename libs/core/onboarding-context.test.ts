@@ -5,6 +5,7 @@ import {
   applyOnboardingFirstWork,
   loadOnboardingContextBinding,
   loadOnboardingFirstWorkRecord,
+  readOptionalOnboardingFile,
   resolveOnboardingContext,
   resolveOnboardingFirstWork,
 } from './onboarding-context.js';
@@ -13,6 +14,7 @@ import { applyTenantActivation } from './tenant-activation.js';
 import { loadProjectRecord } from './project-registry.js';
 import {
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeRmSync,
   safeUnlinkSync,
@@ -81,6 +83,21 @@ function bindAndActivate(): void {
 afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
 
 describe('onboarding context binding', () => {
+  it('reads only regular existing files for onboarding snapshots', () => {
+    const filePath = path.join(rootDir, 'customer', 'acme-ai', 'onboarding', 'snapshot.json');
+    const directoryPath = path.join(rootDir, 'customer', 'acme-ai', 'onboarding', 'snapshot-dir');
+    safeWriteFile(filePath, '{"ok":true}', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(readOptionalOnboardingFile(filePath, 'snapshot')).toBe('{"ok":true}');
+    expect(readOptionalOnboardingFile(path.join(rootDir, 'missing.json'), 'snapshot')).toBe(
+      undefined
+    );
+    expect(() => readOptionalOnboardingFile(directoryPath, 'snapshot')).toThrow(
+      /must be a regular file/
+    );
+  });
+
   it('resolves customer, tenant, and organization without writing', () => {
     seedFixture();
     const result = resolveOnboardingContext({
@@ -228,6 +245,20 @@ describe('onboarding context binding', () => {
       tenant_slug: 'acme-prod',
       work_shape: 'routine_operation',
     });
+  });
+
+  it('fails closed when an onboarding binding is a directory instead of a record', () => {
+    seedFixture();
+    safeMkdir(path.join(rootDir, 'customer/acme-ai/onboarding/organization-context.json'), {
+      recursive: true,
+    });
+
+    expect(() => loadOnboardingContextBinding('acme-ai', rootDir)).toThrow(/regular file/);
+    expect(
+      safeLstat(
+        path.join(rootDir, 'customer/acme-ai/onboarding/organization-context.json')
+      ).isDirectory()
+    ).toBe(true);
   });
 
   it('bootstraps a project entirely under the supplied root', () => {

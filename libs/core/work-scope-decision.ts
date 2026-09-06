@@ -1,7 +1,5 @@
-import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   normalizeExecutionShape,
   projectExecutionShapeToWorkflowShape,
@@ -112,24 +110,14 @@ export interface WorkScopePolicy {
   rules: WorkScopeRule[];
 }
 
-let policyValidateFn: ValidateFunction | null = null;
-
-function ensurePolicyValidator(): ValidateFunction {
-  if (policyValidateFn) return policyValidateFn;
-  policyValidateFn = compileSchema(POLICY_SCHEMA_PATH);
-  return policyValidateFn;
-}
+const policyCatalog = defineCatalog<WorkScopePolicy>({
+  id: 'work-scope-policy',
+  path: POLICY_PATH,
+  schema: POLICY_SCHEMA_PATH,
+});
 
 export function loadWorkScopePolicy(): WorkScopePolicy {
-  const value = readJson<WorkScopePolicy>(POLICY_PATH);
-  const validate = ensurePolicyValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid work-scope-policy: ${errors}`);
-  }
-  return value;
+  return policyCatalog.load();
 }
 
 function normalizeBoolean(value: unknown): boolean {

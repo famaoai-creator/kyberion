@@ -3,12 +3,31 @@ import {
   eventScopeFromRecord,
   eventScopeMatches,
   normalizeEventScope,
+  parseEventScopeInput,
   parseEventScopeFromRecord,
   redactEventScopeForShared,
   resolveEventScopeAgainstAuthority,
 } from './event-scope.js';
 
 describe('event scope', () => {
+  it('strictly parses untrusted scope input before normalization', () => {
+    expect(
+      parseEventScopeInput({ tier: 'confidential', tenant_slug: 'client-a', scope_kind: 'tenant' })
+    ).toEqual({ tier: 'confidential', tenant_slug: 'client-a', scope_kind: 'tenant' });
+
+    for (const value of [
+      null,
+      [],
+      { tier: ['confidential'] },
+      { tenant_slug: { value: 'client-a' } },
+      { tier: 'unknown' },
+      { scope_kind: 'unknown' },
+      { tenant_slug: 'client-a', unexpected: 'widen-scope' },
+    ]) {
+      expect(() => parseEventScopeInput(value)).toThrow('EVENT_SCOPE_INPUT_INVALID');
+    }
+  });
+
   it('distinguishes system events from tenant/entity events', () => {
     expect(normalizeEventScope({ tier: 'public' })).toMatchObject({
       scope_kind: 'system',

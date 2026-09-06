@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createConciergeWebThemePack, webThemePackToCssVars } from '@agent/core';
+import { createConciergeWebThemePack, webThemePackToCssVars } from '@agent/core/web-design-system';
 
 export const dynamic = 'force-dynamic';
 

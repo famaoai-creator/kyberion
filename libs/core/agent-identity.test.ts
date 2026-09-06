@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeAppendFileSync, safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import {
   activateAgentIdentity,
@@ -252,6 +252,22 @@ describe('agent-identity — accountable ownership and uniqueness', () => {
 // ---------------------------------------------------------------------------
 
 describe('agent-identity — lifecycle and restart replay', () => {
+  it('rejects an external journal path before reading or writing it', () => {
+    expect(
+      () => new AgentIdentityJournal({ journalPath: '/tmp/agent-identity-external.jsonl' })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
+  it('fails closed when the identity journal is replaced by a directory', () => {
+    const journalPath = nextJournalPath();
+    const resolvedJournalPath = pathResolver.rootResolve(journalPath);
+    safeMkdir(resolvedJournalPath, { recursive: true });
+
+    expect(() => new AgentIdentityJournal({ journalPath }).restore()).toThrow(
+      'journal must be a regular file'
+    );
+  });
+
   it('issue -> activate -> suspend -> retire, with fresh replay seeing the same state at every step', () => {
     const issued = issueTestIdentity('lifecycle-agent', {
       displayName: 'Lifecycle Agent',

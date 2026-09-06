@@ -70,20 +70,20 @@ pnpm pipeline --input pipelines/baseline-check.json
 
 ```bash
 pnpm install
-pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm build
-pnpm setup:report --persona first-time-user
-pnpm surfaces:reconcile
+pnpm kyberion setup report --persona first-time-user
+pnpm surfaces reconcile
 pnpm onboard
 ```
 
 TTY がない場合は、identity の dry-run を確認してから適用する。
 
 ```bash
-pnpm onboard:apply \
+pnpm onboard apply \
   --identity knowledge/public/templates/onboarding/identity.example.json \
   --dry-run
-pnpm onboard:apply \
+pnpm onboard apply \
   --identity <reviewed-identity-json>
 ```
 
@@ -107,7 +107,7 @@ pnpm check -- --only tenant-registry
 
 registry が `active` でない tenant、未登録 tenant、tier 名と衝突する tenant は後続の
 binding と activation に進めない。customer stance を切り替えても、registry の正本は
-変わらない。`pnpm company:onboard --tenant-slug <tenant>` はこの登録と context binding を
+変わらない。`pnpm onboard company --tenant-slug <tenant>` はこの登録と context binding を
 まとめて行う governed facade だが、適用後の consistency check と activation は省略しない。
 
 ### Step 3: customer stance と organization を結合する

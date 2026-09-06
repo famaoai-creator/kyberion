@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 
 export type ChainAlg = 'sha256' | 'hmac-sha256';
 
@@ -16,7 +17,7 @@ export interface ChainIntegrityIo {
 let chainIo: ChainIntegrityIo | undefined;
 
 function testChainIntegrityIo(): ChainIntegrityIo | undefined {
-  if (!process.env.VITEST) return undefined;
+  if (!isVitestProcess()) return undefined;
   return (
     globalThis as typeof globalThis & {
       __kyberionVitestIo?: { chainIo?: ChainIntegrityIo };

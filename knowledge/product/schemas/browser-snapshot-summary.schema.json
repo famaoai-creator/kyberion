@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/browser-snapshot-summary.schema.json",
+  "title": "Browser Snapshot Summary",
+  "description": "Persisted browser snapshot metadata projected by Presence Studio.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "minLength": 1 },
+    "tab_id": { "type": "string" },
+    "url": { "type": "string" },
+    "title": { "type": "string" },
+    "element_count": { "type": "integer", "minimum": 0 }
+  }
+}

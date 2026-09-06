@@ -1,45 +1,48 @@
+import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
+import { classifyError } from '@agent/core/error-classifier';
+import { logger } from '@agent/core/core';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
+import { pathResolver } from '@agent/core/path-resolver';
+import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning-backend';
 import {
-  validateAndRepairAdf,
-  classifyError,
-  logger,
-  safeReadFile,
-  safeExistsSync,
-  resolveVars,
-  evaluateCondition,
-  pathResolver,
-  getReasoningBackend,
-  delegateStructured,
   createApprovalRequest,
-  loadApprovalRequest,
   isApprovalRequestExpired,
-  selectJudgeRoute,
-  resolveMaxRouteHops,
-  detectRouteCycle,
-  compactStepOutputContext,
+  loadApprovalRequest,
+} from '@agent/core/approval-store';
+import { detectRouteCycle, resolveMaxRouteHops, selectJudgeRoute } from '@agent/core/judge-route';
+import { compactStepOutputContext } from '@agent/core/output-artifacts';
+import {
   executeAdfSteps,
   skipAdfStep,
+  type AdfRunResult,
+  type AdfSkippedStep,
   type AdfStep,
   type AdfStepHandlers,
   type AdfStepHooks,
-  type AdfRunResult,
-  type AdfSkippedStep,
-  getDefaultWorkerEventStream,
-  getDefaultLifecycleHookEngine,
+} from '@agent/core/adf-engine';
+import {
   fireLifecycleHooks,
+  getDefaultLifecycleHookEngine,
+} from '@agent/core/lifecycle-hook-engine';
+import { getDefaultWorkerEventStream } from '@agent/core/worker-event-stream';
+import {
   withActuatorForwardingPort,
   type ActuatorForwardRequest,
   type ActuatorForwardingPort,
-  runToolCallBatch,
-  resolveOpAccessClaims,
-  type ResourceClaim,
-  type OpInputDomain,
-  hashPipelineOutput,
-  deriveExecutionGraph,
+} from '@agent/core/actuator-forwarding-port';
+import { runToolCallBatch } from '@agent/core/tool-call-scheduler';
+import { resolveOpAccessClaims, type OpInputDomain } from '@agent/core/op-input-contracts';
+import { hashPipelineOutput } from '@agent/core/pipeline-run-journal';
+import { deriveExecutionGraph } from '@agent/core/graph-scheduler';
+import type { ResourceClaim } from '@agent/core/tool-call-scheduler';
+import {
   createGraphRunArtifact,
-  recordGraphRunNode,
   persistGraphRunArtifact,
+  recordGraphRunNode,
   type GraphRunArtifact,
-} from '@agent/core';
+} from '@agent/core/graph-run-artifact';
 
 import { z } from 'zod';
 import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline-contract';
@@ -72,7 +75,16 @@ import {
   isSkip,
   dispatchLeafOp,
   findStepByIdRecursive,
+  hasBoundApproval,
 } from './pipeline-execution-part-control.js';
+
+export function readPipelineIncludeTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 /**
  * AR-01 Phase B: retry + autonomous-repair extracted into a higher-order
  * function that wraps a single step-execution attempt, instead of being
@@ -106,15 +118,19 @@ export async function runWithRepair(
             `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
           );
         }
-        const repair = await validateAndRepairAdf(opts.pipelinePath!, 'pipeline-adf', {
+        const repaired = await attemptAutonomousRepair({
           step: { op: step.op, id: step.id, params: step.params },
           failure,
-          delegationOptions: {
+          pipelinePath: opts.pipelinePath,
+          trustResolved: opts.trustResolved,
+          projectTrustApprovalId: opts.projectTrustApprovalId,
+          policy: {
             ...(stepPolicy.effort ? { effort: stepPolicy.effort } : {}),
             ...(stepPolicy.budget ? { budget: stepPolicy.budget } : {}),
           },
+          logPrefix: '[SYS_PIPELINE:REPAIR]',
         });
-        if (repair.repaired) {
+        if (repaired) {
           if (!opts.quiet) {
             logger.success(
               `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
@@ -124,7 +140,10 @@ export async function runWithRepair(
             // Reload fully from disk to get the REPAIRED definition. Search
             // recursively — the failing step may be nested inside
             // core:if/foreach/while/on_error.fallback — and match by id only.
-            const refreshedPipeline = await readValidatedWorkflowAdf(opts.pipelinePath!);
+            const refreshedPipeline = await readValidatedWorkflowAdf(opts.pipelinePath!, {
+              trustResolved: opts.trustResolved,
+              projectTrustApprovalId: opts.projectTrustApprovalId,
+            });
             const refreshedStep = step.id
               ? findStepByIdRecursive(refreshedPipeline.steps, step.id)
               : undefined;
@@ -405,13 +424,14 @@ export async function runStepsInternal(
                 actorId: `pipeline:${opts.runId || 'pending'}`,
                 actorRole: 'pipeline',
                 stepId,
+                ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
                 ...(existing?.requestedByContext?.targetStepId
                   ? { targetStepId: existing.requestedByContext.targetStepId }
                   : {}),
-                ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+                ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
               },
               source: {
-                ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+                ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
                 agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
               },
               draft: {
@@ -454,11 +474,12 @@ export async function runStepsInternal(
           actorId: `pipeline:${opts.runId || 'pending'}`,
           actorRole: 'pipeline',
           stepId,
+          ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
           ...(targetStepId ? { targetStepId } : {}),
-          ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+          ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
         },
         source: {
-          ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+          ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
           agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
         },
         draft: {
@@ -918,7 +939,7 @@ export async function runStepsInternal(
           `core:include: circular reference detected — ${fragmentRef} is already in the include chain`
         );
       }
-      const fragmentRaw = String(safeReadFile(fragmentPath, { encoding: 'utf8' }));
+      const fragmentRaw = readPipelineIncludeTextFile(fragmentPath);
       const fragmentJson = parseFragmentJson(fragmentRaw, fragmentRef);
       const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({
         ...s,
@@ -1213,7 +1234,7 @@ export async function runStepsInternal(
       try {
         nextCtx = compactStepOutputContext(ctx, outputKeys, {
           maxInlineChars: Number((initialCtx.__pipeline_options as any)?.max_inline_output_chars),
-          missionId: String(ctx.mission_id || process.env.MISSION_ID || 'shared'),
+          missionId: String(ctx.mission_id || registeredEnv('MISSION_ID') || 'shared'),
           stepOp: normalizedOp,
           stepNumber,
           recordArtifact: (artifactPath, description) => {
@@ -1281,6 +1302,9 @@ export async function runStepsInternal(
           Number(pipelineOptions?.max_concurrency) > 0
             ? Number(pipelineOptions?.max_concurrency)
             : 1,
+        ...(opts.hasHuman !== undefined ? { hasHuman: opts.hasHuman } : {}),
+        approvalGranted: (step, context) =>
+          hasBoundApproval(step as PipelineAdfStep, context as Record<string, unknown>),
         resumeCompletedNodeIds: new Set(opts.resumeState?.completed_nodes.keys()),
         onGraphNodeSettled: graphArtifact
           ? (node, outcome, durationMs) =>

@@ -1,10 +1,69 @@
 import * as path from 'node:path';
-import { safeWriteFile, safeExistsSync, safeMkdir, pathResolver } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import {
+  assertSafeRepositoryPath,
+  safeWriteFile,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineCatalog, nowIso } from '@agent/core/foundation';
 import yargs from 'yargs';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-export async function main(args: string[] = []) {
+type Print = (value: unknown) => void;
+
+type RegistryType = 'harness' | 'gateway';
+
+type CapabilityRegistry = {
+  version: string;
+  capabilities: Array<Record<string, unknown>>;
+};
+
+const REGISTRY_SCHEMA_PATHS: Record<RegistryType, string> = {
+  harness: pathResolver.knowledge('product/schemas/harness-capability-registry.schema.json'),
+  gateway: pathResolver.knowledge('product/schemas/gateway-capability-registry.schema.json'),
+};
+const ADAPTER_SCHEMA_PATHS: Record<RegistryType, string> = {
+  harness: pathResolver.knowledge('product/schemas/harness-capability-entry.schema.json'),
+  gateway: pathResolver.knowledge('product/schemas/gateway-adapter-profile.schema.json'),
+};
+
+export function loadAdapterPayloadAtPath(
+  adapterPath: string,
+  type: RegistryType
+): Record<string, unknown> {
+  return defineCatalog<Record<string, unknown>>({
+    id: `registry-manager-${type}-adapter`,
+    path: assertSafeRepositoryPath(adapterPath),
+    schema: ADAPTER_SCHEMA_PATHS[type],
+  }).load();
+}
+
+export function loadCapabilityRegistryAtPath(
+  registryPath: string,
+  type: RegistryType
+): CapabilityRegistry {
+  return defineCatalog<CapabilityRegistry>({
+    id: `registry-manager-${type}-registry`,
+    path: assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true }),
+    schema: REGISTRY_SCHEMA_PATHS[type],
+  }).load();
+}
+
+export function validateCapabilityRegistry(
+  registryPath: string,
+  type: RegistryType,
+  registry: CapabilityRegistry
+): CapabilityRegistry {
+  return defineCatalog<CapabilityRegistry>({
+    id: `registry-manager-${type}-registry`,
+    path: assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true }),
+    schema: REGISTRY_SCHEMA_PATHS[type],
+  }).validate(registry, registryPath);
+}
+
+export async function main(args: string[] = [], print: Print = () => undefined) {
   const argv = await yargs(args)
     .option('adapter', {
       type: 'string',
@@ -25,12 +84,18 @@ export async function main(args: string[] = []) {
     })
     .parse();
 
-  const adapterPath = path.resolve(process.cwd(), argv.adapter);
+  const adapterPath = assertSafeRepositoryPath(pathResolver.resolve(argv.adapter), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(adapterPath)) {
     throw new Error(`Input file not found: ${adapterPath}`);
   }
+  if (!safeLstat(adapterPath).isFile()) {
+    throw new Error(`Input adapter must be a regular file: ${adapterPath}`);
+  }
 
-  const payload = readJson<Record<string, unknown>>(adapterPath);
+  const type = argv.type as RegistryType;
+  const payload = loadAdapterPayloadAtPath(adapterPath, type);
   const capabilityId = payload.capability_id || payload.id;
   if (!capabilityId) {
     throw new Error('Payload missing capability_id');
@@ -40,45 +105,63 @@ export async function main(args: string[] = []) {
   const tierDir =
     argv.tier === 'public' ? 'knowledge/product/governance' : `knowledge/${argv.tier}/governance`;
   const registryPath = `${tierDir}/${argv.type}-capability-registry.json`;
-  const absRegistryPath = pathResolver.rootResolve(registryPath);
-  const absTierDir = pathResolver.rootResolve(tierDir);
+  const absRegistryPath = assertSafeRepositoryPath(pathResolver.rootResolve(registryPath), {
+    allowMissingLeaf: true,
+  });
+  const absTierDir = assertSafeRepositoryPath(pathResolver.rootResolve(tierDir), {
+    allowMissingLeaf: true,
+  });
 
   if (!safeExistsSync(absTierDir)) {
     safeMkdir(absTierDir, { recursive: true });
   }
 
-  let registry: any = { version: '1.0.0', capabilities: [] };
   if (safeExistsSync(absRegistryPath)) {
-    registry = readJson<Record<string, unknown>>(absRegistryPath);
+    if (!safeLstat(absRegistryPath).isFile()) {
+      throw new Error(`Capability registry must be a regular file: ${absRegistryPath}`);
+    }
   }
+  let registry: CapabilityRegistry = safeExistsSync(absRegistryPath)
+    ? loadCapabilityRegistryAtPath(absRegistryPath, type)
+    : { version: '1.0.0', capabilities: [] };
 
   const existingIndex = registry.capabilities.findIndex(
     (c: any) => c.capability_id === capabilityId
   );
 
-  if (argv.type === 'harness') {
+  if (type === 'harness') {
     // Harness capabilities are stored inline
     if (existingIndex >= 0) {
       registry.capabilities[existingIndex] = payload;
     } else {
       registry.capabilities.push(payload);
     }
-  } else if (argv.type === 'gateway') {
+  } else if (type === 'gateway') {
     // Gateway capabilities store the profile as a separate artifact and point to it
     const adaptersDir = `${tierDir}/adapters`;
-    const absAdaptersDir = pathResolver.rootResolve(adaptersDir);
+    const absAdaptersDir = assertSafeRepositoryPath(pathResolver.rootResolve(adaptersDir), {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(absAdaptersDir)) {
       safeMkdir(absAdaptersDir, { recursive: true });
     }
-    const absTargetAdapterPath = path.join(absAdaptersDir, path.basename(adapterPath));
-    safeWriteFile(absTargetAdapterPath, JSON.stringify(payload, null, 2));
+    const absTargetAdapterPath = assertSafeRepositoryPath(
+      path.join(absAdaptersDir, path.basename(adapterPath)),
+      { allowMissingLeaf: true }
+    );
+    const validatedPayload = defineCatalog<Record<string, unknown>>({
+      id: `registry-manager-${type}-adapter`,
+      path: absTargetAdapterPath,
+      schema: ADAPTER_SCHEMA_PATHS[type],
+    }).validate(payload, absTargetAdapterPath);
+    safeWriteFile(absTargetAdapterPath, JSON.stringify(validatedPayload, null, 2));
 
     const newEntry = {
       capability_id: capabilityId,
       adapter_profile_path: path.relative(pathResolver.rootDir(), absTargetAdapterPath),
       status: payload.status || 'experimental',
       description: payload.description || payload.notes || '',
-      added_at: new Date().toISOString(),
+      added_at: nowIso(),
     };
 
     if (existingIndex >= 0) {
@@ -91,8 +174,9 @@ export async function main(args: string[] = []) {
     }
   }
 
+  registry = validateCapabilityRegistry(absRegistryPath, type, registry);
   safeWriteFile(absRegistryPath, JSON.stringify(registry, null, 2));
-  console.log(
+  print(
     `[REGISTRY_MANAGER] Successfully registered ${capabilityId} into ${argv.tier} tier (${argv.type} registry).`
   );
 }
@@ -104,6 +188,6 @@ if (
   void defineScript({
     name: 'registry:manage',
     flags: [],
-    run: ({ argv }) => main(argv),
+    run: ({ argv, print }) => main(argv, print),
   })();
 }

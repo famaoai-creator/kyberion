@@ -1,15 +1,13 @@
-import * as addFormatsModule from 'ajv-formats';
 import type { ValidateFunction } from 'ajv';
 import {
   assetProvenanceRef,
-  compileSchemaFromPath,
   findAssetByContentHash,
   findAssetBySource,
-  pathResolver,
-  signA2AContent,
-  verifyA2AContent,
-  type IngestLedgerPathOptions,
-} from '@agent/core';
+} from '@agent/core/ingest-asset-ledger';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { pathResolver } from '@agent/core/path-resolver';
+import { signA2AContent, verifyA2AContent } from '@agent/core/a2a-envelope-signature';
+import type { IngestLedgerPathOptions } from '@agent/core/ingest-asset-ledger';
 import { createAjv } from '@agent/core/foundation';
 
 export type KnowledgeTier = 'personal' | 'confidential' | 'public';
@@ -54,9 +52,7 @@ const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/knowledge-package.schema.json'
 );
-const addFormats = (addFormatsModule as any).default || addFormatsModule;
 const ajv = createAjv();
-addFormats(ajv);
 const validateSchema: ValidateFunction = compileSchemaFromPath(ajv, SCHEMA_PATH);
 
 function stableValue(value: unknown): unknown {

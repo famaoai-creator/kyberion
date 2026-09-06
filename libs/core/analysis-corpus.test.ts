@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { buildAnalysisCorpusSnippets, rankAnalysisRefs } from './analysis-corpus.js';
+import { pathResolver } from './path-resolver.js';
 
 describe('analysis-corpus', () => {
   it('builds snippets from governed knowledge refs', () => {
@@ -18,6 +21,44 @@ describe('analysis-corpus', () => {
       'knowledge/product/incidents/post-mortem-20260228.md',
     ]);
     expect(snippets.every((item) => !item.ref.startsWith('vault/'))).toBe(true);
+  });
+
+  it('rejects an allowed lexical ref that traverses a symlink', () => {
+    const target = pathResolver.sharedTmp(`analysis-corpus-target-${process.pid}.md`);
+    const link = pathResolver.rootResolve(`active/projects/analysis-corpus-link-${process.pid}.md`);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.writeFileSync(target, '# External\n\nThis content must not become model-visible.\n');
+    fs.rmSync(link, { force: true });
+    fs.symlinkSync(target, link);
+    try {
+      expect(
+        buildAnalysisCorpusSnippets([
+          pathResolver.toRepoRelative(link),
+          'knowledge/product/incidents/post-mortem-20260228.md',
+        ])
+      ).toHaveLength(1);
+    } finally {
+      fs.rmSync(link, { force: true });
+      fs.rmSync(target, { force: true });
+    }
+  });
+
+  it('ignores an allowed lexical ref that resolves to a directory', () => {
+    const directory = pathResolver.rootResolve(
+      `active/projects/analysis-corpus-directory-${process.pid}`
+    );
+    fs.mkdirSync(directory, { recursive: true });
+    try {
+      expect(
+        buildAnalysisCorpusSnippets([
+          pathResolver.toRepoRelative(directory),
+          'knowledge/product/incidents/post-mortem-20260228.md',
+        ])
+      ).toHaveLength(1);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('ranks refs toward active target and scope before broad knowledge', () => {

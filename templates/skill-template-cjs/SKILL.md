@@ -1,5 +1,5 @@
 ---
-name: {{SKILL_NAME}}
+name: { { SKILL_NAME } }
 description: >-
   Extracts and processes data for {{SKILL_NAME}} purposes.
 status: implemented
@@ -21,7 +21,7 @@ tags:
 
 ## Overview
 
-Briefly describes the activity this skill performs in the third person. Avoid using "I" or "this skill can". Focus on what it *does* (e.g., "Generates professional reports from raw metrics").
+Briefly describes the activity this skill performs in the third person. Avoid using "I" or "this skill can". Focus on what it _does_ (e.g., "Generates professional reports from raw metrics").
 
 ## Capabilities
 
@@ -37,7 +37,7 @@ Briefly describes the activity this skill performs in the third person. Avoid us
 ## Usage
 
 ```bash
-npm run cli -- run {{SKILL_NAME}} --out result.json
+pnpm kyberion run {{SKILL_NAME}} --out result.json
 ```
 
 ## Progressive Disclosure

@@ -13,8 +13,12 @@ const mocks = vi.hoisted(() => ({
     (target: string) => target.endsWith('mock_blockchain.jsonl') || target.endsWith('manifest.json')
   ),
   pathResolver: {
+    rootDir: vi.fn(() => '/repo'),
     active: vi.fn((relPath: string) => `/repo/active/${relPath}`),
     rootResolve: vi.fn((relPath: string) => `/repo/${relPath}`),
+    knowledge: vi.fn((relPath: string) => `/repo/knowledge/${relPath}`),
+    shared: vi.fn((relPath = '') => `/repo/active/shared/${relPath}`),
+    resolve: vi.fn((relPath: string) => relPath),
   },
   logger: {
     info: vi.fn(),
@@ -30,26 +34,49 @@ const mocks = vi.hoisted(() => ({
   retry: vi.fn(async (fn: () => Promise<void> | void) => await fn()),
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual<any>('@agent/core');
-  return {
-    ...actual,
-    safeReadFile: mocks.safeReadFile,
-    safeAppendFileSync: mocks.safeAppendFileSync,
-    safeMkdir: mocks.safeMkdir,
-    safeExistsSync: mocks.safeExistsSync,
-    pathResolver: mocks.pathResolver,
-    logger: mocks.logger,
-    createStandardYargs: mocks.createStandardYargs,
-    classifyError: mocks.classifyError,
-    retry: mocks.retry,
-  };
-});
-
 vi.mock('@agent/core/foundation', () => ({
   appendJsonLine: vi.fn((_target: string, data: string) => {
     writes.push(JSON.stringify(data));
   }),
+  nowIso: vi.fn(() => '2026-01-01T00:00:00.000Z'),
+  isRecord: (value: unknown): value is Record<string, unknown> =>
+    Boolean(value) && typeof value === 'object' && !Array.isArray(value),
+  readJsonLines: vi.fn(
+    <T>(
+      target: string,
+      options: { map?: (value: unknown, lineNumber: number, rawLine: string) => T } = {}
+    ) => {
+      const raw = target.endsWith('mock_blockchain.jsonl') ? writes.join('') : '';
+      return raw
+        .split(/\r?\n/)
+        .filter((line) => line.trim())
+        .map((line, index) => {
+          const value = JSON.parse(line);
+          const mapped = options.map ? options.map(value, index + 1, line) : (value as T);
+          return mapped;
+        });
+    }
+  ),
+}));
+
+vi.mock('@agent/core/core', () => ({ logger: mocks.logger }));
+vi.mock('@agent/core/secure-io', () => ({
+  safeReadFile: mocks.safeReadFile,
+  safeMkdir: mocks.safeMkdir,
+  safeExistsSync: mocks.safeExistsSync,
+  assertSafeRepositoryPath: vi.fn((candidate: string) => candidate),
+}));
+vi.mock('@agent/core/path-resolver', () => ({
+  ...mocks.pathResolver,
+  pathResolver: mocks.pathResolver,
+}));
+vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
+vi.mock('@agent/core/recovery-policy', () => ({
+  createGovernedRetryOptionsBuilder: vi.fn(
+    ({ defaults }: { defaults: unknown }) =>
+      () =>
+        defaults
+  ),
 }));
 
 import { handleAction } from './index.js';
@@ -103,7 +130,6 @@ describe('blockchain-actuator behavior', () => {
         hash: 'sha256:def456',
       },
     });
-
     const result = await handleAction({
       action: 'verify_anchor',
       params: {

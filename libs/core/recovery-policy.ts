@@ -18,6 +18,8 @@ export interface GovernedRetryOptionsInput {
   additionalShouldRetry?: (error: Error, category: string) => boolean;
 }
 
+export type GovernedRetryOptionsBuilderInput = Omit<GovernedRetryOptionsInput, 'override'>;
+
 const DEFAULT_RETRY_KEYS = ['retry', 'default_retry'] as const;
 const DEFAULT_FALLBACK_CATEGORIES = [
   'network',
@@ -39,7 +41,6 @@ function getManifestCatalog(manifestPath: string): GovernedCatalog<RecoveryManif
     id: 'actuator-manifest-recovery-policy',
     path: manifestPath,
     schema: ACTUATOR_MANIFEST_SCHEMA_PATH,
-    fallback: {},
   });
   manifestCatalogs.set(manifestPath, catalog);
   return catalog;
@@ -51,12 +52,8 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 
 /** Load only the recovery_policy envelope from an actuator manifest. */
 export function loadRecoveryPolicy(manifestPath: string): RecoveryPolicy {
-  try {
-    const manifest = getManifestCatalog(manifestPath).load();
-    return isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-  } catch {
-    return {};
-  }
+  const manifest = getManifestCatalog(manifestPath).load();
+  return isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
 }
 
 /**
@@ -96,4 +93,11 @@ export function buildGovernedRetryOptions({
       return categoryAllowed || Boolean(additionalShouldRetry?.(error, category));
     },
   };
+}
+
+/** Create the small actuator-local adapter without duplicating policy wiring. */
+export function createGovernedRetryOptionsBuilder(
+  input: GovernedRetryOptionsBuilderInput
+): (override?: Record<string, unknown>) => RetryOptions {
+  return (override) => buildGovernedRetryOptions({ ...input, override });
 }

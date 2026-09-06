@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getOpInputContract, safeReadFile, safeRmSync, validateOpInput } from '@agent/core';
+import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
+import { safeReadFile, safeRmSync } from '@agent/core/secure-io';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 
 describe('browser-actuator phase 1-3 contracts', () => {

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   buildShellClaudeCliBackendFromEnv,
   isClaudeCliPlaceholderFailure,
@@ -8,6 +10,7 @@ import {
   resolveClaudeCliFallbackCandidates,
   ShellClaudeCliBackend,
 } from './shell-claude-cli-backend.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -56,6 +59,16 @@ function createChild(stdoutText: string, exitCode = 0): any {
 }
 
 describe('shell-claude-cli-backend', () => {
+  it('routes Claude CLI environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/shell-claude-cli-backend.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('returns null when the availability probe fails', () => {
     const backend = buildShellClaudeCliBackendFromEnv(
       { KYBERION_CLAUDE_CLI_BIN: 'claude' } as NodeJS.ProcessEnv,
@@ -244,6 +257,23 @@ describe('shell-claude-cli-backend', () => {
       const [, argv] = spawnMock.mock.calls[0];
       const permissionModeIndex = argv.indexOf('--permission-mode');
       expect(argv[permissionModeIndex + 1]).toBe('plan');
+    });
+
+    it('ambient read-only sandbox applies the explorer mapping to an unprofiled delegation', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+      const policy = resolveSandboxPolicy({
+        provider: 'claude',
+        mode: 'read-only',
+        networkAccess: true,
+      });
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+
+      await withSandboxPolicy(policy, () => backend.delegateTask('inspect the thing'));
+
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toContain('--allowedTools');
+      expect(argv).not.toContain('bypassPermissions');
+      expect(argv).not.toContain('--dangerously-skip-permissions');
     });
   });
 

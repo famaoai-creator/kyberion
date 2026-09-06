@@ -7,6 +7,8 @@ import {
   type IMessageStimulus,
 } from './imessage-utils.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   safeExistsSync,
   safeLstat,
@@ -126,15 +128,19 @@ function normalizeBaseUrl(value: string): string | null {
 export function resolveBlueBubblesConfig(
   env: Record<string, string | undefined> = process.env
 ): BlueBubblesConfig | null {
-  const baseUrl = normalizeBaseUrl(String(env.KYBERION_BLUEBUBBLES_URL || ''));
-  const password = String(env.KYBERION_BLUEBUBBLES_PASSWORD || '').trim();
+  const baseUrl = normalizeBaseUrl(getRegisteredEnvText('KYBERION_BLUEBUBBLES_URL', { env }) || '');
+  const password = (getRegisteredEnvText('KYBERION_BLUEBUBBLES_PASSWORD', { env }) || '').trim();
   if (!baseUrl || !password) return null;
-  const rawMethod = String(env.KYBERION_BLUEBUBBLES_SEND_METHOD || 'private-api')
+  const rawMethod = (
+    getRegisteredEnvText('KYBERION_BLUEBUBBLES_SEND_METHOD', { env }) || 'private-api'
+  )
     .trim()
     .toLowerCase();
   const sendMethod: BlueBubblesConfig['sendMethod'] =
     rawMethod === 'imessage' ? 'imessage' : 'private-api';
-  const webhookSecret = String(env.KYBERION_BLUEBUBBLES_WEBHOOK_SECRET || '').trim();
+  const webhookSecret = (
+    getRegisteredEnvText('KYBERION_BLUEBUBBLES_WEBHOOK_SECRET', { env }) || ''
+  ).trim();
   return {
     baseUrl,
     password,
@@ -147,8 +153,8 @@ export function resolveBlueBubblesConfig(
 export function evaluateBlueBubblesConfiguration(
   env: Record<string, string | undefined> = process.env
 ): BlueBubblesConfigurationReport {
-  const rawUrl = String(env.KYBERION_BLUEBUBBLES_URL || '').trim();
-  const password = String(env.KYBERION_BLUEBUBBLES_PASSWORD || '').trim();
+  const rawUrl = (getRegisteredEnvText('KYBERION_BLUEBUBBLES_URL', { env }) || '').trim();
+  const password = (getRegisteredEnvText('KYBERION_BLUEBUBBLES_PASSWORD', { env }) || '').trim();
   const baseUrl = normalizeBaseUrl(rawUrl);
   if (!rawUrl && !password) {
     return {
@@ -206,13 +212,15 @@ export function evaluateBlueBubblesConfiguration(
     baseUrl,
     capabilities: {
       send_text: true,
-      receive_webhooks: Boolean(String(env.KYBERION_BLUEBUBBLES_WEBHOOK_SECRET || '').trim()),
+      receive_webhooks: Boolean(
+        (getRegisteredEnvText('KYBERION_BLUEBUBBLES_WEBHOOK_SECRET', { env }) || '').trim()
+      ),
       group_target: true,
       // The documented multipart send endpoint requires the Private API;
       // inbound binary download remains disabled until its bounded contract
       // is verified against the installed server.
       send_attachments:
-        String(env.KYBERION_BLUEBUBBLES_SEND_METHOD || 'private-api')
+        (getRegisteredEnvText('KYBERION_BLUEBUBBLES_SEND_METHOD', { env }) || 'private-api')
           .trim()
           .toLowerCase() !== 'imessage',
       receive_attachments: true,
@@ -583,7 +591,7 @@ export function parseBlueBubblesWebhook(payload: unknown): IMessageStimulus | nu
     id,
     sender: sender || 'unknown',
     text,
-    date: String(data.dateCreated || data.date || new Date().toISOString()),
+    date: String(data.dateCreated || data.date || nowIso()),
     isFromMe: false,
     chatId: chatGuid,
     chatGuid,

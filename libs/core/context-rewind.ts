@@ -20,6 +20,7 @@
  */
 
 import { logger } from './core.js';
+import { nowIso } from './foundation/time.js';
 import type { ToolDefinition } from './reasoning-backend.js';
 import type { WorkerContextMessage } from './worker-context-compaction.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
@@ -87,7 +88,7 @@ export class RewindableWorkerContext {
       id,
       messageIndex: this.messages.length,
       effectCount: this.effectCount,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso(),
     });
     return id;
   }

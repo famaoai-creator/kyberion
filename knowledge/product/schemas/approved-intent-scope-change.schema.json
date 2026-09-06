@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "approved-intent-scope-change.schema.json",
+  "title": "Approved intent scope change",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "change_id",
+    "mission_id",
+    "approved_by",
+    "approved_at",
+    "reason",
+    "previous_origin_snapshot_id",
+    "new_origin_snapshot_id",
+    "intent"
+  ],
+  "properties": {
+    "change_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "approved_by": { "type": "string", "minLength": 1 },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "reason": { "type": "string", "minLength": 1 },
+    "previous_origin_snapshot_id": { "type": ["string", "null"] },
+    "new_origin_snapshot_id": { "type": "string", "minLength": 1 },
+    "intent": { "$ref": "#/$defs/intent" }
+  },
+  "$defs": {
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["goal"],
+      "properties": {
+        "goal": { "type": "string", "minLength": 1 },
+        "constraints": { "type": "array", "items": { "type": "string" } },
+        "deliverables": { "type": "array", "items": { "type": "string" } },
+        "excluded": { "type": "array", "items": { "type": "string" } },
+        "stakeholders": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

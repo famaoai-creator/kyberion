@@ -2,12 +2,10 @@ import { createLogger } from './logger.js';
 import { agentRegistry } from './agent-registry.js';
 import { stopAgentRuntime } from './agent-runtime-supervisor.js';
 import { shutdownAgentRuntimeViaDaemon } from './agent-runtime-supervisor-client.js';
-import { trustEngine } from './trust-engine.js';
+import { loadTrustPolicy, trustEngine, type TrustPolicyAnomalyDetection } from './trust-engine.js';
 import { auditChain } from './audit-chain.js';
-import { pathResolver } from './path-resolver.js';
-import { loadJson } from './secure-io.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
 import { registerGovernanceActionSink } from './governance-action-recorder.js';
+import { registerKillSwitchTerminationRegistrar } from './delegation-concurrency.js';
 
 const logger = createLogger('kill-switch');
 
@@ -17,35 +15,11 @@ export interface AnomalyIndicator {
   threshold: string;
 }
 
-interface TrustPolicyAnomalyDetection {
-  rapid_fire: { max_actions: number; window_ms: number };
-  policy_violations: { max_violations: number; window_ms: number };
-  trust_degradation: { min_drop_percent: number; window_ms: number };
-}
-
 let _cachedAnomalyConfig: TrustPolicyAnomalyDetection | null = null;
 
 function loadAnomalyConfig(): TrustPolicyAnomalyDetection {
   if (_cachedAnomalyConfig) return _cachedAnomalyConfig;
-  try {
-    const filePath = pathResolver.knowledge('product/governance/trust-policy.json');
-    const data = loadJson<{
-      anomaly_detection?: TrustPolicyAnomalyDetection;
-    }>(filePath);
-    _cachedAnomalyConfig = data.anomaly_detection ?? null;
-  } catch (err) {
-    const defaults: TrustPolicyAnomalyDetection = {
-      rapid_fire: { max_actions: 10, window_ms: 5000 },
-      policy_violations: { max_violations: 3, window_ms: 600000 },
-      trust_degradation: { min_drop_percent: 15, window_ms: 3600000 },
-    };
-    recordConfigFallback({
-      knowledgePath: 'product/governance/trust-policy.json',
-      error: err,
-      defaults: { anomaly_detection: defaults },
-    });
-    _cachedAnomalyConfig = defaults;
-  }
+  _cachedAnomalyConfig = loadTrustPolicy().anomaly_detection ?? null;
   if (!_cachedAnomalyConfig) {
     _cachedAnomalyConfig = {
       rapid_fire: { max_actions: 10, window_ms: 5000 },
@@ -99,6 +73,8 @@ export function onKillSwitchTermination(listener: KillSwitchTerminationListener)
     if (idx >= 0) terminationListeners.splice(idx, 1);
   };
 }
+
+registerKillSwitchTerminationRegistrar(onKillSwitchTermination);
 
 function notifyKillSwitchTermination(agentId: string, reason: string): void {
   for (const listener of terminationListeners) {
@@ -219,6 +195,10 @@ class KillSwitchImpl {
         agentId: 'system',
         correlationId: `kill:${agentId}:${Date.now()}`,
         channel: 'system',
+        // Kill-switch evaluation is an automated safety boundary; it may
+        // isolate immediately, but it must never manufacture an operator
+        // prompt from a background process.
+        nonInteractive: true,
         draft: {
           title: `Kill Switch Triggered: ${agentId}`,
           summary: `Anomalies detected: ${anomalies.join(', ')}`,

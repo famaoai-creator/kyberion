@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-working-memory-entries.schema.json",
+  "title": "Mission Working Memory Entries",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["entry_id", "mission_id", "scope", "key", "value", "writer_agent", "created_at"],
+    "properties": {
+      "entry_id": { "type": "string", "minLength": 1 },
+      "mission_id": { "type": "string", "minLength": 1 },
+      "scope": { "enum": ["mission", "task", "agent"] },
+      "key": { "type": "string", "minLength": 1 },
+      "value": { "type": "string" },
+      "writer_agent": { "type": "string", "minLength": 1 },
+      "task_id": { "type": "string", "minLength": 1 },
+      "scope_context": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tier"],
+        "properties": {
+          "tier": { "enum": ["personal", "confidential", "public"] },
+          "tenant_slug": { "type": "string" },
+          "tenant_id": { "type": "string" },
+          "organization_id": { "type": "string" },
+          "project_id": { "type": "string" },
+          "mission_id": { "type": "string" },
+          "task_id": { "type": "string" },
+          "session_id": { "type": "string" },
+          "work_shape": { "type": "string" },
+          "customer_stance": { "type": "string" },
+          "viewer_principal": { "type": "string" },
+          "nhi_id": { "type": "string" },
+          "owner_nhi": { "type": "string" },
+          "retention_policy": { "type": "string" },
+          "allowed_audience": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "promotion_policy": { "enum": ["same_scope", "brokered", "human_review"] },
+          "provenance_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "redacted": { "type": "boolean" }
+        }
+      },
+      "created_at": { "type": "string", "minLength": 1 },
+      "metadata": { "type": "object", "additionalProperties": true }
+    }
+  }
+}

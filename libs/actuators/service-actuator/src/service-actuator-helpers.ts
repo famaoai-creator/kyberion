@@ -1,49 +1,61 @@
 import {
-  logger,
-  loadJson,
+  appendJsonLine,
+  defineCatalog,
+  getRegisteredEnv,
+  getRegisteredEnvText,
+  isRecord,
+  readJsonIfPresent,
+  type GovernedCatalog,
+} from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import {
   safeExec,
-  safeReadFile,
   safeWriteFile,
   safeExistsSync,
   safeMkdir,
   safeOpenAppendFile,
-  retry,
-  runtimeSupervisor,
-  spawnManagedProcess,
-  stopManagedProcess,
-  derivePipelineStatus,
-  resolveServiceBinding,
-  capabilityEntry,
-  executeServicePreset,
-  executeMcp,
+  assertSafeRepositoryPath,
+} from '@agent/core/secure-io';
+import { retry } from '@agent/core/async-utils';
+import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
+import { derivePipelineStatus } from '@agent/core/pipeline-contract';
+import { resolveServiceBinding } from '@agent/core/service-binding';
+import * as pathResolver from '@agent/core/path-resolver';
+import { executeServicePreset, executeMcp } from '@agent/core/service-engine';
+import {
   beginServiceOAuth,
   exchangeServiceOAuthCode,
   refreshServiceOAuthToken,
-  validateServiceAuth,
-  pathResolver,
-  buildGovernedRetryOptions,
-  loadServiceEndpointsCatalog,
-  getServicePresetRecord,
+} from '@agent/core/oauth-broker';
+import { validateServiceAuth } from '@agent/core/service-validator';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
+import { getServicePresetRecord } from '@agent/core/service-preset-registry';
+import {
   CloudflareOsControlPlane,
-  withEgressPayloadContext,
-  validateContextSecurityScope,
+  type IntroductionMode,
+  type OsKnowledgeTier,
+  type ResourceScope,
+} from '@agent/core/cloudflare-os-control-plane';
+import { withEgressPayloadContext, type EgressPayloadContext } from '@agent/core/egress-policy';
+import {
   describeServiceHarness,
   planServiceOperation,
   verifyServiceOperationResult,
   createServiceExecutionReceipt,
   persistServiceExecutionReceipt,
-  recordServiceCall,
-  runOpPreflight,
-  ensureDefaultOpPreflight,
   type ServiceExecutionReceipt,
+} from '@agent/core/service-harness';
+import { recordServiceCall } from '@agent/core/service-recording-session';
+import {
+  validateContextSecurityScope,
   type ContextSecurityScope,
-  type EgressPayloadContext,
-  type IntroductionMode,
-  type OsKnowledgeTier,
-  type ResourceScope,
-} from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
-import { getRegisteredEnv } from '@agent/core/foundation';
+} from '@agent/core/context-security-scope';
+import { capabilityEntry } from '@agent/core/path-resolver';
+import { parseServicePidRegistry, type ServicePidRegistry } from '@agent/core/service-pid-registry';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { secureFetch } from '@agent/core/network';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
@@ -62,6 +74,22 @@ export interface ServiceAction {
   }>;
   context?: Record<string, any>;
 }
+
+export interface ServiceActionExecutionOptions {
+  /** Trusted caller-side presence signal for approval-gated service actions. */
+  hasHuman?: boolean;
+  /** Trusted caller-side resolver for an already-bound approval decision. */
+  approvalGranted?: (input: ServiceAction) => boolean | Promise<boolean>;
+}
+
+export interface ServiceManifestEntry {
+  path: string;
+  description?: string;
+  preset_path?: string;
+  env?: Record<string, string>;
+}
+
+export type ServiceManifest = Record<string, ServiceManifestEntry>;
 
 type RetryPolicy = {
   maxRetries?: number;
@@ -83,23 +111,103 @@ const DEFAULT_PIPELINE_RETRY: Required<RetryPolicy> = {
 };
 const PID_FILE = pathResolver.shared('services-pids.json');
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
+const SERVICE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-manifest.schema.json'
+);
+const serviceManifestCatalogs = new Map<string, GovernedCatalog<ServiceManifest>>();
 const cloudflareOsControlPlane = new CloudflareOsControlPlane();
+const DANGEROUS_DYNAMIC_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function serviceManifestCatalogAtPath(manifestPath: string): GovernedCatalog<ServiceManifest> {
+  const existing = serviceManifestCatalogs.get(manifestPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<ServiceManifest>({
+    id: 'service-manifest',
+    path: manifestPath,
+    schema: SERVICE_MANIFEST_SCHEMA_PATH,
+  });
+  serviceManifestCatalogs.set(manifestPath, catalog);
+  return catalog;
+}
+
+function resolveServiceRepositoryPath(ref: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
+}
+
+function isSafeServiceId(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/u.test(value);
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Service params/context/steps intentionally accept provider-specific fields.
+ * Keep that dynamic contract, but never pass prototype-control keys through the
+ * actuator boundary where they could be merged into runtime state.
+ */
+function hasSafeDynamicServiceTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(hasSafeDynamicServiceTree);
+  if (!isRecord(value)) return true;
+  return Object.entries(value).every(
+    ([key, nested]) => !DANGEROUS_DYNAMIC_KEYS.has(key) && hasSafeDynamicServiceTree(nested)
+  );
+}
+
+/** Validate a persisted service manifest before reconcile can start or stop services. */
+export function parseServiceManifest(value: unknown): ServiceManifest | null {
+  if (!isRecord(value)) return null;
+
+  const manifest: ServiceManifest = {};
+  for (const [serviceId, candidate] of Object.entries(value)) {
+    if (!isSafeServiceId(serviceId) || !isRecord(candidate) || !nonEmptyString(candidate.path)) {
+      return null;
+    }
+    if (candidate.description !== undefined && typeof candidate.description !== 'string') {
+      return null;
+    }
+    if (candidate.preset_path !== undefined && !nonEmptyString(candidate.preset_path)) {
+      return null;
+    }
+
+    let env: Record<string, string> | undefined;
+    if (candidate.env !== undefined) {
+      if (!isRecord(candidate.env)) return null;
+      env = {};
+      for (const [key, envValue] of Object.entries(candidate.env)) {
+        if (!key || key === '__proto__' || key === 'constructor' || key === 'prototype') {
+          return null;
+        }
+        if (typeof envValue !== 'string') return null;
+        env[key] = envValue;
+      }
+    }
+
+    manifest[serviceId] = {
+      path: candidate.path,
+      ...(typeof candidate.description === 'string' ? { description: candidate.description } : {}),
+      ...(typeof candidate.preset_path === 'string' ? { preset_path: candidate.preset_path } : {}),
+      ...(env ? { env } : {}),
+    };
+  }
+  return manifest;
+}
 
 function serviceResourceId(serviceId: string): string {
   return `service:${serviceId}`;
 }
 
-function loadPids() {
-  if (!safeExistsSync(PID_FILE)) return {};
+function loadPids(): ServicePidRegistry {
   try {
-    const content = safeReadFile(PID_FILE, { encoding: 'utf8' }) as string;
-    return JSON.parse(content);
+    const parsed = readJsonIfPresent<unknown>(PID_FILE);
+    return parseServicePidRegistry(parsed) ?? {};
   } catch (_) {
     return {};
   }
 }
 
-function savePids(pids: any) {
+function savePids(pids: ServicePidRegistry) {
   safeWriteFile(PID_FILE, JSON.stringify(pids, null, 2));
 }
 
@@ -133,14 +241,11 @@ function emitRecoveryStimulus(serviceId: string) {
   appendJsonLine(STIMULI_PATH, stimulus);
 }
 
-function buildPipelineRetryPolicy(stepRetry: RetryPolicy | undefined): Required<RetryPolicy> {
-  return buildGovernedRetryOptions({
-    manifestPath: SERVICE_ACTUATOR_MANIFEST_PATH,
-    defaults: DEFAULT_PIPELINE_RETRY,
-    override: stepRetry,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  }) as Required<RetryPolicy>;
-}
+const buildPipelineRetryPolicy = createGovernedRetryOptionsBuilder({
+  manifestPath: SERVICE_ACTUATOR_MANIFEST_PATH,
+  defaults: DEFAULT_PIPELINE_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 function resolveServiceBaseUrl(serviceId: string): string {
   try {
@@ -195,7 +300,7 @@ function unregisterServiceRuntime(serviceId: string) {
   runtimeSupervisor.unregister(serviceResourceId(serviceId));
 }
 
-async function startService(id: string, service: any, pids: any) {
+async function startService(id: string, service: ServiceManifestEntry, pids: ServicePidRegistry) {
   const rootDir = pathResolver.rootDir();
   const scriptPath = path.join(rootDir, service.path);
   const builtEntry = capabilityEntry(id);
@@ -225,13 +330,19 @@ async function startService(id: string, service: any, pids: any) {
   });
   const child = managed.child;
   child.unref();
-  pids[id] = child.pid;
+  if (typeof child.pid === 'number' && Number.isSafeInteger(child.pid) && child.pid > 0) {
+    pids[id] = child.pid;
+  }
   registerServiceRuntime(id, child.pid, scriptPath);
   logger.success(`  - ${id} started (PID: ${child.pid}).`);
 }
 
-export async function handleAction(input: ServiceAction, onEvent?: (data: any) => void) {
-  const admitted = await admitServiceAction(input);
+export async function handleAction(
+  input: ServiceAction,
+  onEvent?: (data: any) => void,
+  options: ServiceActionExecutionOptions = {}
+) {
+  const admitted = await admitServiceAction(input, options);
   input = admitted;
   if (input.action === 'pipeline') {
     const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
@@ -240,17 +351,22 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
     for (const step of steps) {
       logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
       const stepResult = await retry(async () => {
-        return await handleSingleAction({
-          service_id: step.params.service_id,
-          mode: step.op.toUpperCase() as ServiceAction['mode'],
-          action: step.params.action,
-          params: step.params.params,
-          auth: step.params.auth,
-          method: step.params.method,
-          // The pipeline envelope is authoritative. A step may add context
-          // but cannot weaken or redirect the parent mission scope.
-          context: { ...(step.params.context || {}), ...input.context },
-        });
+        return await handleSingleAction(
+          {
+            service_id: step.params.service_id,
+            mode: step.op.toUpperCase() as ServiceAction['mode'],
+            action: step.params.action,
+            params: step.params.params,
+            auth: step.params.auth,
+            method: step.params.method,
+            // The pipeline envelope is authoritative. A step may add context
+            // but cannot weaken or redirect the parent mission scope.
+            context: { ...(step.params.context || {}), ...input.context },
+          },
+          undefined,
+          false,
+          options
+        );
       }, buildPipelineRetryPolicy(step.params.retry));
 
       const exportKey = step.params.export_as || 'last_service_result';
@@ -259,7 +375,7 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
     }
     if (input.context?.context_path) {
       safeWriteFile(
-        pathResolver.rootResolve(input.context.context_path),
+        resolveServiceRepositoryPath(input.context.context_path),
         JSON.stringify(ctx, null, 2)
       );
     }
@@ -271,9 +387,10 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
 async function handleSingleAction(
   input: ServiceAction,
   onEvent?: (data: any) => void,
-  alreadyAdmitted = false
+  alreadyAdmitted = false,
+  options: ServiceActionExecutionOptions = {}
 ) {
-  if (!alreadyAdmitted) input = await admitServiceAction(input);
+  if (!alreadyAdmitted) input = await admitServiceAction(input, options);
   logger.info(
     `🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`
   );
@@ -372,10 +489,14 @@ async function handleSingleAction(
  * dispatch normally arrives through run_pipeline, but direct CLI, harness,
  * and embedded callers must receive the same serial preflight waterfall.
  */
-async function admitServiceAction(input: ServiceAction): Promise<ServiceAction> {
+async function admitServiceAction(
+  input: ServiceAction,
+  options: ServiceActionExecutionOptions = {}
+): Promise<ServiceAction> {
+  if (!hasSafeDynamicServiceTree(input)) {
+    throw new Error('[POLICY_VIOLATION] Service action payload contains a reserved prototype key');
+  }
   ensureDefaultOpPreflight();
-  const approvalGranted =
-    input.params?._approval_granted === true || input.context?._approval_granted === true;
   const preflight = await runOpPreflight({
     op: `service:${String(input.mode || input.action || 'unknown').toLowerCase()}:${input.action || 'unknown'}`,
     params: input as unknown as Record<string, unknown>,
@@ -383,8 +504,12 @@ async function admitServiceAction(input: ServiceAction): Promise<ServiceAction> 
     source: 'actuator',
     requiresApproval:
       input.params?._approval_required === true || input.context?._approval_required === true,
-    approvalGranted,
+    approvalGranted: options.approvalGranted ? await options.approvalGranted(input) : false,
+    ...(options.hasHuman !== undefined ? { hasHuman: options.hasHuman } : {}),
   });
+  if (preflight.decision === 'allow' && !hasSafeDynamicServiceTree(preflight.input)) {
+    throw new Error('[POLICY_VIOLATION] Service preflight produced a reserved prototype key');
+  }
   if (preflight.decision !== 'allow') {
     throw new Error(
       `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Service operation was not admitted.'}`
@@ -480,7 +605,7 @@ function resolveTrustedScope(
   if (errors.length > 0) {
     throw new Error(`[POLICY_VIOLATION] Invalid service security_scope: ${errors.join('; ')}`);
   }
-  const runtimeMissionId = String(process.env.MISSION_ID || '').trim();
+  const runtimeMissionId = String(getRegisteredEnvText('MISSION_ID') || '').trim();
   if (required && (!runtimeMissionId || runtimeMissionId !== scope.mission_id)) {
     throw new Error('[POLICY_VIOLATION] Service security_scope is not bound to the active mission');
   }
@@ -599,13 +724,23 @@ function recordServiceObservation(observation: PreparedObservation | null, _resu
 }
 
 async function reconcileServices(input: ServiceAction) {
-  const manifestPath = pathResolver.rootResolve(input.params.manifest_path);
-  const manifest = loadJson<unknown>(manifestPath);
+  const manifestPath = resolveServiceRepositoryPath(input.params.manifest_path);
+  let manifest: ServiceManifest | null;
+  try {
+    const catalog = serviceManifestCatalogAtPath(manifestPath);
+    catalog.reset();
+    manifest = parseServiceManifest(catalog.load());
+  } catch {
+    manifest = null;
+  }
+  if (!manifest) {
+    throw new Error(`Service manifest has an invalid shape: ${manifestPath}`);
+  }
   const pids = loadPids();
   let changed = false;
 
   for (const [id, pid] of Object.entries(pids)) {
-    if (!isRunning(pid as number)) {
+    if (!isRunning(pid)) {
       unregisterServiceRuntime(id);
       delete pids[id];
       changed = true;
@@ -616,7 +751,7 @@ async function reconcileServices(input: ServiceAction) {
 
   for (const [id, service] of Object.entries(manifest)) {
     if (!pids[id] || !isRunning(pids[id])) {
-      const authRes = await validateServiceAuth(id, (service as any).preset_path);
+      const authRes = await validateServiceAuth(id, service.preset_path);
       if (!authRes.valid) {
         logger.error(
           `⚠️ [RECONCILE] Auth validation failed for ${id}: ${authRes.reason}. Skipping start.`
@@ -635,9 +770,9 @@ async function reconcileServices(input: ServiceAction) {
   if (input.params.cleanup) {
     for (const [id, pid] of Object.entries(pids)) {
       if (!manifest[id]) {
-        if (isRunning(pid as number)) {
+        if (isRunning(pid)) {
           try {
-            process.kill(pid as number, 'SIGTERM');
+            process.kill(pid, 'SIGTERM');
           } catch (_) {
             /* best-effort cleanup */
           }

@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-orchestration-journal-entry.schema.json",
+  "title": "Mission Orchestration Journal Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ts",
+    "event_id",
+    "event_type",
+    "mission_id",
+    "status",
+    "payload_hash",
+    "operation",
+    "outcome"
+  ],
+  "properties": {
+    "ts": { "type": "string", "minLength": 1 },
+    "event_id": { "type": "string", "minLength": 1 },
+    "event_type": {
+      "enum": [
+        "mission_issue_requested",
+        "mission_team_prewarm_requested",
+        "mission_kickoff_requested",
+        "mission_followup_requested",
+        "mission_reconciliation_requested",
+        "mission_distillation_requested",
+        "mission_completion_requested",
+        "mission_control_requested",
+        "mission_worker_recovery_requested",
+        "surface_control_requested"
+      ]
+    },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["enqueued", "completed", "failed"] },
+    "payload_hash": { "type": "string", "minLength": 1 },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "attempt"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["run", "compaction", "handoff", "checkpoint"] },
+        "attempt": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["pending", "completed", "declined", "aborted", "failed", "suspended"]
+        },
+        "reason": { "type": "string" }
+      }
+    },
+    "requested_by": { "type": "string", "minLength": 1 },
+    "causation_id": { "type": "string", "minLength": 1 },
+    "correlation_id": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope_kind", "tier"],
+      "properties": {
+        "scope_kind": {
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string" },
+        "tenant_id": { "type": "string" },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "work_shape": { "type": "string" },
+        "customer_stance": { "type": "string" },
+        "viewer_principal": { "type": "string" },
+        "nhi_id": { "type": "string" }
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@ import { auditChain } from './audit-chain.js';
 import { metrics } from './metrics.js';
 import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 import { detectTier, validateWritePermission } from './tier-guard.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 /**
  * Claude Code hook bridge (Direction A: Claude Code as front-end → Kyberion).
@@ -222,7 +223,7 @@ export function summarizeTranscriptUsage(transcriptText: string): CliUsageSummar
     if (!trimmed) continue;
     let obj: any;
     try {
-      obj = JSON.parse(trimmed);
+      obj = parseSafeJsonInput(trimmed, 'Claude transcript entry');
     } catch {
       continue;
     }

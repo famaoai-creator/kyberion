@@ -1,8 +1,11 @@
-import { logger, defineCatalogBackedActuator } from '@agent/core';
-import { fileURLToPath } from 'node:url';
-import * as path from 'node:path';
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { handleAction } from './code-pipeline-helpers.js';
-import { runActuatorCli } from '@agent/core';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 
 export const actuator = defineCatalogBackedActuator({
@@ -14,18 +17,13 @@ export const actuator = defineCatalogBackedActuator({
 const main = async () => {
   await runActuatorCli({
     name: 'code-actuator',
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+if (isDirectEntry(import.meta.url, 'libs/actuators/code-actuator/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, 'code-actuator');
 }
 
 export { handleAction };

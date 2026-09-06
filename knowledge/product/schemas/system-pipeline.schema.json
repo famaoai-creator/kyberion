@@ -293,6 +293,10 @@
                 "type": "string",
                 "description": "File or directory path"
               },
+              "allow_symlink_leaf": {
+                "type": "boolean",
+                "description": "Allow a read-only probe to inspect a symlink at the final path component"
+              },
               "pattern": {
                 "type": "string",
                 "description": "Regex pattern"

@@ -1,3 +1,5 @@
+import { getRegisteredEnvText } from '@agent/core/foundation';
+
 /**
  * Server-side voice-hub endpoint resolution shared by the /api/voice/*
  * proxy routes. The browser cannot reach the voice-hub daemon
@@ -7,5 +9,7 @@
  * route (VOICE_HUB_URL).
  */
 export function voiceHubUrl(): string {
-  return process.env.VOICE_HUB_URL || `http://127.0.0.1:${process.env.VOICE_HUB_PORT || '3032'}`;
+  const configuredUrl = getRegisteredEnvText('VOICE_HUB_URL');
+  const configuredPort = getRegisteredEnvText('VOICE_HUB_PORT') || '3032';
+  return configuredUrl || `http://127.0.0.1:${configuredPort}`;
 }

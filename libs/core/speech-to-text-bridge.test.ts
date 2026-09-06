@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
 vi.mock('./path-resolver.js', async () => {
@@ -18,7 +17,8 @@ vi.mock('./policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
-import { rootResolve } from './path-resolver.js';
+import { pathResolver, rootResolve } from './path-resolver.js';
+import { safeReadFile, safeSymlinkSync, safeUnlinkSync } from './secure-io.js';
 import {
   getSpeechToTextBridge,
   getSpeechToTextBridges,
@@ -26,7 +26,11 @@ import {
   registerSpeechToTextBridge,
   resetSpeechToTextBridge,
   normalizeSpeechToTextResult,
+  parseSpeechToTextCapabilities,
   stubSpeechToTextBridge,
+  ShellSpeechToTextBridge,
+  installFluidAudioSpeechToTextBridgeIfAvailable,
+  installShellSpeechToTextBridgeIfAvailable,
   type SpeechToTextBridge,
 } from './speech-to-text-bridge.js';
 
@@ -35,8 +39,12 @@ describe('speech-to-text-bridge', () => {
   const mockResolve = rootResolve as unknown as ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stt-'));
-    mockResolve.mockImplementation((rel: string) => path.join(tmpDir, rel));
+    tmpDir = pathResolver.sharedTmp(`stt-${process.pid}`);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.mkdirSync(tmpDir, { recursive: true });
+    mockResolve.mockImplementation((rel: string) =>
+      path.isAbsolute(rel) ? rel : path.join(tmpDir, rel)
+    );
   });
 
   afterEach(() => {
@@ -69,6 +77,92 @@ describe('speech-to-text-bridge', () => {
     await expect(stubSpeechToTextBridge.transcribe({ audioPath: 'call.wav' })).rejects.toThrow(
       /no transcript backend/u
     );
+  });
+
+  it('rejects a directory used as a transcript sidecar', async () => {
+    const audioAbs = path.join(tmpDir, 'directory-sidecar.wav');
+    fs.writeFileSync(audioAbs, 'fake-audio');
+    fs.mkdirSync(`${audioAbs}.transcript.txt`);
+
+    await expect(
+      stubSpeechToTextBridge.transcribe({ audioPath: 'directory-sidecar.wav' })
+    ).rejects.toThrow('[stt-bridge] transcript sidecar must be a regular file');
+  });
+  it('rejects audio paths outside the repository', async () => {
+    await expect(
+      stubSpeechToTextBridge.transcribe({ audioPath: '/tmp/external-call.wav' })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects audio paths traversing a symbolic link', async () => {
+    const targetPath = path.join(tmpDir, 'target.wav');
+    const linkPath = path.join(tmpDir, 'linked.wav');
+    fs.writeFileSync(targetPath, 'fake-audio');
+    safeSymlinkSync(targetPath, linkPath);
+    try {
+      await expect(stubSpeechToTextBridge.transcribe({ audioPath: linkPath })).rejects.toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+    } finally {
+      safeUnlinkSync(linkPath);
+    }
+  });
+
+  it('rejects a shell transcript output path outside the repository', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'call.wav'), 'fake-audio');
+    const bridge = new ShellSpeechToTextBridge({ command: "printf 'hello'" });
+    await expect(
+      bridge.transcribe({ audioPath: 'call.wav', outputPath: '/tmp/external-transcript.txt' })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a directory passed as shell audio input', async () => {
+    fs.mkdirSync(path.join(tmpDir, 'audio-directory'));
+    const bridge = new ShellSpeechToTextBridge({ command: "printf 'hello'" });
+
+    await expect(bridge.transcribe({ audioPath: 'audio-directory' })).rejects.toThrow(
+      '[stt-bridge] audio input must be a regular file'
+    );
+  });
+  it('normalizes structured shell output and drops malformed segments', async () => {
+    const audioPath = path.join(tmpDir, 'structured.wav');
+    fs.writeFileSync(audioPath, 'fake-audio');
+    const bridge = new ShellSpeechToTextBridge({
+      command: `printf '%s' '{"text":"hello","capabilities":{"timestamps":true,"granularity":"segment"},"segments":[{"start_sec":0,"end_sec":1,"text":"hello"},null,{"start_sec":"bad"}]}'`,
+      structuredOutput: true,
+    });
+
+    const result = await bridge.transcribe({ audioPath: 'structured.wav' });
+
+    expect(result.text).toBe('hello');
+    expect(result.capabilities).toEqual({ timestamps: true, granularity: 'segment' });
+    expect(result.segments).toEqual([{ start_sec: 0, end_sec: 1, text: 'hello' }]);
+  });
+
+  it('rejects structured output whose root is not a JSON object', async () => {
+    const audioPath = path.join(tmpDir, 'invalid-structured.wav');
+    fs.writeFileSync(audioPath, 'fake-audio');
+    const bridge = new ShellSpeechToTextBridge({
+      command: "printf '%s' '[1,2]'",
+      structuredOutput: true,
+    });
+
+    await expect(bridge.transcribe({ audioPath: 'invalid-structured.wav' })).rejects.toThrow(
+      'structured output was not valid JSON'
+    );
+  });
+
+  it('normalizes configured capabilities and rejects malformed shapes', () => {
+    expect(
+      parseSpeechToTextCapabilities({ timestamps: true, granularity: 'word', local_only: true })
+    ).toEqual({ timestamps: true, granularity: 'word', local_only: true });
+    expect(parseSpeechToTextCapabilities([])).toBeUndefined();
+    expect(
+      parseSpeechToTextCapabilities({ timestamps: 'true', granularity: 'segment' })
+    ).toBeUndefined();
+    expect(
+      parseSpeechToTextCapabilities({ timestamps: true, granularity: 'invalid' })
+    ).toBeUndefined();
   });
 
   it('resolves a registered bridge', () => {
@@ -135,5 +229,51 @@ describe('speech-to-text-bridge', () => {
     );
     expect(result.capabilities).toEqual({ timestamps: false, granularity: 'none' });
     expect(result.segments).toEqual([]);
+  });
+
+  it('installs configured STT bridges from the injected environment', () => {
+    expect(
+      installShellSpeechToTextBridgeIfAvailable({
+        KYBERION_STT_COMMAND: 'whisper --file {{audio}}',
+        KYBERION_STT_CAPABILITIES: JSON.stringify({
+          timestamps: true,
+          granularity: 'segment',
+        }),
+        KYBERION_STT_PRIORITY: '7',
+      })
+    ).toBe(true);
+    expect(getSpeechToTextBridge().name).toBe('shell');
+    expect(getSpeechToTextBridge().priority).toBe(7);
+    expect(getSpeechToTextCapabilities(getSpeechToTextBridge())).toEqual({
+      timestamps: true,
+      granularity: 'segment',
+    });
+
+    resetSpeechToTextBridge();
+    expect(
+      installFluidAudioSpeechToTextBridgeIfAvailable({
+        KYBERION_FLUID_AUDIO_STT_COMMAND: 'parakeet --audio {{audio}}',
+      })
+    ).toBe(true);
+    expect(getSpeechToTextBridge().name).toBe('fluid-audio-parakeet');
+  });
+
+  it('keeps explicit shell STT ahead of the FluidAudio fallback', () => {
+    expect(
+      installFluidAudioSpeechToTextBridgeIfAvailable({
+        KYBERION_STT_COMMAND: 'whisper --file {{audio}}',
+        KYBERION_FLUID_AUDIO_STT_COMMAND: 'parakeet --audio {{audio}}',
+      })
+    ).toBe(false);
+  });
+
+  it('routes STT environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(path.join(pathResolver.rootDir(), 'libs/core/speech-to-text-bridge.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 });

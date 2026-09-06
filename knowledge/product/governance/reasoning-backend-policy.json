@@ -6,7 +6,10 @@
     "nemotron": "nemotron-api",
     "grok": "grok-cli",
     "grok-build": "grok-cli",
-    "xai": "grok-api"
+    "xai": "grok-api",
+    "cursor": "cursor-cli",
+    "cursor-agent": "cursor-cli",
+    "opencode": "opencode-cli"
   },
   "allowed_modes": [
     "claude-cli",
@@ -19,6 +22,8 @@
     "grok-cli",
     "grok-api",
     "copilot",
+    "cursor-cli",
+    "opencode-cli",
     "local",
     "ollama",
     "vllm",
@@ -50,6 +55,10 @@
     {
       "env": "KYBERION_GROK_API_KEY",
       "mode": "grok-api"
+    },
+    {
+      "env": "CURSOR_API_KEY",
+      "mode": "cursor-cli"
     },
     {
       "env": "KYBERION_NEMOTRON_URL",
@@ -118,6 +127,16 @@
       "env_any": ["GROK_CLI", "GROK_VERSION"],
       "provider": "grok",
       "mode": "grok-cli"
+    },
+    {
+      "env_any": ["CURSOR_CLI", "CURSOR_AGENT"],
+      "provider": "cursor",
+      "mode": "cursor-cli"
+    },
+    {
+      "env_any": ["OPENCODE_CLI", "OPENCODE_VERSION"],
+      "provider": "opencode",
+      "mode": "opencode-cli"
     }
   ],
   "provider_fallback_order": [
@@ -140,6 +159,14 @@
     {
       "provider": "copilot",
       "mode": "copilot"
+    },
+    {
+      "provider": "cursor",
+      "mode": "cursor-cli"
+    },
+    {
+      "provider": "opencode",
+      "mode": "opencode-cli"
     }
   ],
   "default_mode": "claude-cli",

@@ -1,6 +1,9 @@
-import { pathResolver, resolveVocabularyEntry, safeReadFile } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
+import { loadSurfaceRoleCatalog } from '@agent/core/surface-role-catalog';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const UX_CONTRACT_DOCS = [
   'README.md',
@@ -11,14 +14,15 @@ export const UX_CONTRACT_DOCS = [
 const INTERNAL_TERMS = /\b(?:mission|actuator|ADF|packet|ledger|capability bundle)\b/giu;
 const EXTERNAL_TERMS = [/\brequest\b/iu, /\bplan\b/iu, /\bresult\b/iu, /\bnext action\b/iu];
 
-interface SurfaceRole {
-  id: string;
-  enabled: boolean;
-  tagline_key?: string;
+export function readUxContractDocsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 function read(relativePath: string): string {
-  return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) || '');
+  return readUxContractDocsTextFile(pathResolver.rootResolve(relativePath));
 }
 
 function frontDoor(markdown: string): string {
@@ -41,10 +45,8 @@ export function checkUxContractDocs(): string[] {
       if (!term.test(door)) failures.push(`${relativePath}: missing plain-language term ${term}`);
     }
   }
-  const roles = readJson<{ roles?: SurfaceRole[] }>(
-    pathResolver.knowledge('product/governance/surface-roles.json')
-  );
-  for (const role of roles.roles || []) {
+  const roles = loadSurfaceRoleCatalog();
+  for (const role of roles.roles) {
     if (!role.enabled) continue;
     if (!role.tagline_key) {
       failures.push(`${role.id}: enabled surface is missing tagline_key`);
@@ -65,13 +67,15 @@ export const runCheckUxContractDocs = defineScript({
   run(context) {
     const failures = checkUxContractDocs();
     if (failures.length > 0) {
-      console.error('[check:ux-contract-docs] FAILED');
-      for (const failure of failures) console.error(`- ${failure}`);
-      throw new Error(`${failures.length} UX contract violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...failures.map((failure) => `- ${failure}`)].join('\n')
+      );
     }
     context.print(
       `[check:ux-contract-docs] OK (${UX_CONTRACT_DOCS.length} documents and surface taglines)`
     );
+    return { failures };
   },
 });
 

@@ -1,12 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { readJson, readJsonLines } from './foundation/json.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import {
+  assertSafeRepositoryPath,
   safeCreateExclusiveFileSync,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -79,20 +84,61 @@ export interface DeliverableInboxQuery {
 const INBOX_PATH = pathResolver.shared(path.join('inbox', 'entries.jsonl'));
 const INBOX_LOCK_PATH = `${INBOX_PATH}.lock`;
 const LOCK_TIMEOUT_MS = 5000;
+const INBOX_ENTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/deliverable-inbox-entry.schema.json'
+);
+
+function inboxPath(): string {
+  return assertSafeRepositoryPath(INBOX_PATH, { allowMissingLeaf: true });
+}
+
+function inboxLockPath(): string {
+  return assertSafeRepositoryPath(INBOX_LOCK_PATH, { allowMissingLeaf: true });
+}
 
 function ensureInboxDir(): void {
-  safeMkdir(path.dirname(INBOX_PATH), { recursive: true });
+  const filePath = inboxPath();
+  safeMkdir(path.dirname(filePath), { recursive: true });
+}
+
+function inboxEntryCatalog(filePath: string): GovernedCatalog<DeliverableInboxEntry> {
+  return defineCatalog<DeliverableInboxEntry>({
+    id: 'deliverable-inbox-entry',
+    path: filePath,
+    schema: INBOX_ENTRY_SCHEMA_PATH,
+  });
 }
 
 function sleepSync(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-function isStaleLock(lockPath: string): boolean {
+export function normalizeInboxLockRecord(value: unknown): { pid: number } | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.pid !== 'number' ||
+    !Number.isInteger(value.pid) ||
+    value.pid <= 0
+  ) {
+    return undefined;
+  }
+  return { pid: value.pid };
+}
+
+export function isRegularInboxLockPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
   try {
-    const raw = String(safeReadFile(lockPath, { encoding: 'utf8' }) || '');
-    const parsed = JSON.parse(raw) as { pid?: number };
-    if (typeof parsed.pid !== 'number') return true;
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isStaleLock(lockPath: string): boolean {
+  if (!isRegularInboxLockPath(lockPath)) return false;
+  try {
+    const parsed = normalizeInboxLockRecord(readJson<unknown>(lockPath));
+    if (!parsed) return true;
     process.kill(parsed.pid, 0);
     return false;
   } catch (error: any) {
@@ -104,16 +150,17 @@ function isStaleLock(lockPath: string): boolean {
 
 function withInboxLock<T>(fn: () => T): T {
   ensureInboxDir();
+  const lockPath = inboxLockPath();
   const startedAt = Date.now();
   let ownsLock = false;
 
   while (Date.now() - startedAt < LOCK_TIMEOUT_MS) {
     try {
       safeCreateExclusiveFileSync(
-        INBOX_LOCK_PATH,
+        lockPath,
         JSON.stringify({
           pid: process.pid,
-          created_at: new Date().toISOString(),
+          created_at: nowIso(),
           resource: 'deliverable-inbox',
         })
       );
@@ -121,8 +168,8 @@ function withInboxLock<T>(fn: () => T): T {
       break;
     } catch (error: any) {
       if (error?.code !== 'EEXIST') throw error;
-      if (isStaleLock(INBOX_LOCK_PATH)) {
-        safeUnlinkSync(INBOX_LOCK_PATH);
+      if (isStaleLock(lockPath)) {
+        safeUnlinkSync(lockPath);
         continue;
       }
       sleepSync(50 + Math.floor(Math.random() * 50));
@@ -136,41 +183,54 @@ function withInboxLock<T>(fn: () => T): T {
   try {
     return fn();
   } finally {
-    safeUnlinkSync(INBOX_LOCK_PATH);
+    safeUnlinkSync(lockPath);
   }
 }
 
-function parseEntry(line: string): DeliverableInboxEntry | null {
-  const trimmed = line.trim();
-  if (!trimmed) return null;
-  try {
-    const parsed = JSON.parse(trimmed) as DeliverableInboxEntry;
-    if (!parsed || typeof parsed.entry_id !== 'string') return null;
-    if (!Array.isArray(parsed.artifact_paths)) parsed.artifact_paths = [];
-    if (typeof parsed.status !== 'string') parsed.status = 'unread';
-    if (typeof parsed.created_at !== 'string') parsed.created_at = new Date().toISOString();
-    if (typeof parsed.updated_at !== 'string') parsed.updated_at = parsed.created_at;
-    if (typeof parsed.title !== 'string') parsed.title = parsed.entry_id;
-    if (typeof parsed.summary !== 'string') parsed.summary = '';
-    return parsed;
-  } catch {
-    return null;
-  }
+function normalizeEntry(value: unknown): DeliverableInboxEntry | null {
+  if (!isRecord(value)) return null;
+  const parsed = { ...value } as Partial<DeliverableInboxEntry>;
+  if (typeof parsed.entry_id !== 'string') return null;
+  return parsed as DeliverableInboxEntry;
 }
 
 function readInboxEntries(): DeliverableInboxEntry[] {
-  if (!safeExistsSync(INBOX_PATH)) return [];
-  const raw = String(safeReadFile(INBOX_PATH, { encoding: 'utf8' }) || '');
-  return raw
-    .split(/\r?\n/u)
-    .map(parseEntry)
-    .filter((entry): entry is DeliverableInboxEntry => Boolean(entry));
+  const filePath = inboxPath();
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[DELIVERABLE_INBOX] entries must be a regular file: ${filePath}`);
+  }
+  const catalog = inboxEntryCatalog(filePath);
+  return readJsonLines<DeliverableInboxEntry | null>(inboxPath(), {
+    onMalformed: (error) => {
+      if (
+        error instanceof Error &&
+        (error.message.startsWith('Invalid catalog deliverable-inbox-entry') ||
+          error.message.startsWith('[DELIVERABLE_INBOX]'))
+      ) {
+        throw error;
+      }
+    },
+    map: (value, lineNumber) => {
+      const normalized = normalizeEntry(value);
+      if (!normalized) return null;
+      const entry = catalog.validate(normalized, `${filePath}:${lineNumber}`);
+      validateDeliverableRoleSections(entry);
+      return entry;
+    },
+  }).filter((entry): entry is DeliverableInboxEntry => Boolean(entry));
 }
 
 function writeInboxEntries(entries: DeliverableInboxEntry[]): void {
   ensureInboxDir();
-  const serialized = entries.map((entry) => JSON.stringify(entry)).join('\n');
-  safeWriteFile(INBOX_PATH, serialized ? `${serialized}\n` : '');
+  const filePath = inboxPath();
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[DELIVERABLE_INBOX] entries must be a regular file: ${filePath}`);
+  }
+  const catalog = inboxEntryCatalog(filePath);
+  const serialized = entries
+    .map((entry) => JSON.stringify(catalog.validate(entry, filePath)))
+    .join('\n');
+  safeWriteFile(filePath, serialized ? `${serialized}\n` : '');
 }
 
 function normalizeStatusFilter(
@@ -221,7 +281,7 @@ export function addInboxEntry(input: {
   roleSections?: DeliverableRoleSection[];
   integratedSummary?: string;
 }): DeliverableInboxEntry {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const entry: DeliverableInboxEntry = {
     entry_id: input.entryId || `INBOX-${randomUUID().slice(0, 8).toUpperCase()}`,
     mission_id: input.missionId?.trim() || undefined,
@@ -339,7 +399,7 @@ export function markInboxEntry(
       ...(verdictNote ? { verdict_note: verdictNote } : {}),
       ...(verdictReasonCategory ? { verdict_reason_category: verdictReasonCategory } : {}),
       ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     };
     writeInboxEntries(entries);
     return entries[index];
@@ -386,7 +446,7 @@ export function acceptInboxEntryWithHumanReceipt(input: {
     const index = entries.findIndex((entry) => entry.entry_id === input.entryId.trim());
     if (index < 0) return null;
     const entry = entries[index];
-    const now = new Date().toISOString();
+    const now = nowIso();
     const updated: DeliverableInboxEntry = {
       ...entry,
       status: 'accepted',
@@ -435,7 +495,7 @@ export function finalizeAcceptedDeliverable(input: {
     if (digest !== entry.acceptance_receipt.artifact_digest) {
       throw new Error('[POLICY_VIOLATION] Deliverable changed after human acceptance');
     }
-    const now = new Date().toISOString();
+    const now = nowIso();
     const updated: DeliverableInboxEntry = {
       ...entry,
       updated_at: now,

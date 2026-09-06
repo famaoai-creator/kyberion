@@ -18,16 +18,26 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { readTextFile } from './foundation/text.js';
 import { metrics } from './metrics.js';
 import type { MissionWorkingMemory } from './mission-working-memory.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { notifyAllDynamicInjectionRegistries } from './dynamic-injection.js';
 import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from './lifecycle-hook-engine.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { checkProviderEgress } from './provider-egress-gate.js';
+import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
 
 export type WorkerContextRole = 'system' | 'user' | 'assistant' | 'tool_use' | 'tool_result';
 
@@ -116,6 +126,8 @@ export interface CompactWorkerContextOptions {
   scope?: ScopeContext;
   /** Provider used by the summary callback, when known. */
   summaryProvider?: string;
+  /** Ambient payload scope applied while the summary callback calls a provider. */
+  summaryReasoningScope?: ReasoningPayloadScope;
   /** Token usage measured by the last provider call, used as a hybrid anchor. */
   lastProviderUsageTokens?: number;
   /** Number of leading messages represented by the provider usage anchor. */
@@ -181,7 +193,7 @@ export function isPromptTooLongError(error: unknown): boolean {
 }
 
 function readEnvTokens(name: string): number | undefined {
-  const raw = process.env[name];
+  const raw = getRegisteredEnvText(name);
   if (!raw?.trim()) return undefined;
   const value = Number(raw);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
@@ -289,9 +301,20 @@ function extractPreviousSummary(messages: readonly WorkerContextMessage[]): stri
   return match?.[1]?.trim() || undefined;
 }
 
+export function isRegularUpdateSummaryPromptPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function loadUpdateSummaryPrompt(): string {
-  if (!safeExistsSync(UPDATE_SUMMARY_PROMPT_PATH)) return FALLBACK_UPDATE_SUMMARY_PROMPT;
-  return String(safeReadFile(UPDATE_SUMMARY_PROMPT_PATH, { encoding: 'utf8' }) || '').trim();
+  if (!isRegularUpdateSummaryPromptPath(UPDATE_SUMMARY_PROMPT_PATH)) {
+    return FALLBACK_UPDATE_SUMMARY_PROMPT;
+  }
+  return readTextFile(UPDATE_SUMMARY_PROMPT_PATH).trim();
 }
 
 function renderUpdateSummaryInput(transcript: string, context: CompactionSummaryContext): string {
@@ -389,7 +412,10 @@ export function loadCarryover(
       .filter((entry) => entry.key === CARRYOVER_WORKING_MEMORY_KEY);
     const latest = entries[entries.length - 1];
     if (!latest) return null;
-    const parsed = JSON.parse(latest.value) as CompactionCarryover;
+    const parsed = parseSafeJsonInput(
+      latest.value,
+      'worker compaction carryover'
+    ) as CompactionCarryover;
     return parsed && typeof parsed.goal === 'string' ? parsed : null;
   } catch {
     return null;
@@ -480,7 +506,10 @@ function persistSummaryArtifact(input: {
             })
           )
         : pathResolver.sharedTmp(path.join('context-compaction', missionSlug)));
-    const absolutePath = path.join(dir, `compaction-summary-${crypto.randomUUID()}.md`);
+    const absolutePath = assertSafeRepositoryPath(
+      path.join(dir, `compaction-summary-${crypto.randomUUID()}.md`),
+      { allowMissingLeaf: true }
+    );
     safeMkdir(path.dirname(absolutePath), { recursive: true });
     const body = [
       '# Auto-compaction summary',
@@ -626,10 +655,14 @@ export async function compactWorkerContext(
           retainedTail: tail,
           reason,
         };
-        const summary = await options.summarize(
-          renderUpdateSummaryInput(renderTranscriptForSummary(head), summaryContext),
+        const summaryInput = renderUpdateSummaryInput(
+          renderTranscriptForSummary(head),
           summaryContext
         );
+        const runSummary = () => options.summarize!(summaryInput, summaryContext);
+        const summary = options.summaryReasoningScope
+          ? await withReasoningPayloadScope(options.summaryReasoningScope, runSummary)
+          : await runSummary();
         summaryArtifactPath = persistSummaryArtifact({
           summary,
           carryover,

@@ -13,7 +13,7 @@ tags:
     observability,
     governance,
   ]
-last_updated: 2026-08-17
+last_updated: 2026-08-29
 status: active
 ---
 
@@ -45,7 +45,7 @@ UX 経路は正準 chain(`tenant_slug → organization_id → project_id → mis
 ### UX
 
 - 「今どの tenant/org/project か」を出す手段が **CLI・Chronos・MCP のいずれにも無い**。289 の pnpm script に `scope`/`whoami` 相当なし。`onboarding:context show` は binding 表示で `currentScope()` を反映しない。`run_doctor.ts:170` は誤変数 `KYBERION_TENANT_ID` を読む。
-- 切替 facade なし。`pnpm tenant` は create/update/…で `use` なし、`pnpm org` は role 管理、唯一の永続スイッチャ `customer:switch` は **stance**(chain 外)を書く。`current_mission_focus.json` は `{mission_id, ts}` のみで `shared/` 直下(区画なし)。
+- 切替 facade なし。`pnpm tenant` は create/update/…で `use` なし、`pnpm organization role` は role 管理、唯一の永続スイッチャ `customer:switch` は **stance**(chain 外)を書く。`current_mission_focus.json` は `{mission_id, ts}` のみで `shared/` 直下(区画なし)。
 - ranker の scope 除外は `continue` のみ(`context_ranker.ts:229`)で件数も理由も出ない。scope を深くすると deepest root のみになり **doc が減るのに無言**。
 - `mission create/start` は `tier:'confidential'` 既定で tenant 未指定を許容(`mission_controller.ts:421-428,505-511`)。`[SCOPE_CONTEXT_INVALID]` に是正案なし。tenant root が解決できても **0 件**のとき無警告(現に `knowledge/confidential/kyberion-service-studio/` は空)。
 - 正準配置 `confidential/{tenant}/organizations/{org}/projects/{project}/…` はコード(`entityRoot()`)にしか無く、`pnpm knowledge place` 相当がない。実ツリーに `organizations/` 階層は未出現。
@@ -152,7 +152,7 @@ KS-16 checker を PR CI に入れ意味論検査へ拡張し、新区画を rete
 ## 受け入れ条件
 
 1. `pnpm scope --json` と MCP `kyberion.scope.current` が同一の `{scope, provenance, knowledge_roots}` を返し、各フィールドの出所が明示される。
-2. `pnpm scope use --tenant A --project P` 後の `pnpm knowledge:rank --explain` が active roots と `excluded_by_scope` 件数を出力し、`mission-state.json` のみの環境でも `MISSION_ID` から同じ scope が推論される(provenance=`mission-state`)。
+2. `pnpm scope use --tenant A --project P` 後の `pnpm kyberion knowledge rank --explain` が active roots と `excluded_by_scope` 件数を出力し、`mission-state.json` のみの環境でも `MISSION_ID` から同じ scope が推論される(provenance=`mission-state`)。
 3. pack render に `Scope-rejected knowledge` 行が出て、dispatch observability の件数と一致する。同 project 配下 doc が pack で common doc より上位。
 4. tenant A の intent-contract outcome / usage / gap 記録が tenant B の候補選択・ranking・curation report に一切現れない。
 5. tenant retrieval が空だったミッションは gap lane に記録され、3 回以上で promotion queue に ingest 提案候補が 1 件立つ(自動起票・承認は手動)。

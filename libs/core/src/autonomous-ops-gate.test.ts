@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver, safeMkdir, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import {
   evaluateAutonomousOpsAction,
   getAutonomousOpsPolicy,
-  resetAutonomousOpsPolicyCache,
+  _resetAutonomousOpsPolicyCacheForTests,
 } from '../autonomous-ops-gate.js';
 
 describe('autonomous-ops-gate', () => {
@@ -13,7 +14,7 @@ describe('autonomous-ops-gate', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     delete process.env.KYBERION_AUTONOMOUS_OPS_POLICY_PATH;
-    resetAutonomousOpsPolicyCache();
+    _resetAutonomousOpsPolicyCacheForTests();
   });
 
   it('loads the governed policy and classifies actions', () => {
@@ -81,7 +82,7 @@ describe('autonomous-ops-gate', () => {
       )
     );
     vi.stubEnv('KYBERION_AUTONOMOUS_OPS_POLICY_PATH', overridePath);
-    resetAutonomousOpsPolicyCache();
+    _resetAutonomousOpsPolicyCacheForTests();
 
     const overridePolicy = getAutonomousOpsPolicy();
     expect(overridePolicy.version).toBe('override');
@@ -90,7 +91,7 @@ describe('autonomous-ops-gate', () => {
     ).toBe('auto');
 
     safeWriteFile(overridePath, '{invalid json');
-    resetAutonomousOpsPolicyCache();
+    _resetAutonomousOpsPolicyCacheForTests();
     const degraded = evaluateAutonomousOpsAction({ actionId: 'custom_action' });
     expect(degraded.decision).toBe('approve');
     expect(degraded.allowed).toBe(false);
@@ -99,7 +100,20 @@ describe('autonomous-ops-gate', () => {
 
   it('fails closed when the policy file is missing', () => {
     vi.stubEnv('KYBERION_AUTONOMOUS_OPS_POLICY_PATH', `${tmpDir}/missing-policy.json`);
-    resetAutonomousOpsPolicyCache();
+    _resetAutonomousOpsPolicyCacheForTests();
+
+    const degraded = evaluateAutonomousOpsAction({ actionId: 'baseline_health_scan' });
+    expect(degraded.decision).toBe('approve');
+    expect(degraded.allowed).toBe(false);
+    expect(degraded.reason).toContain('unavailable or invalid');
+  });
+
+  it('fails closed when the policy override is outside the repository', () => {
+    vi.stubEnv(
+      'KYBERION_AUTONOMOUS_OPS_POLICY_PATH',
+      '/tmp/kyberion-autonomous-ops-policy-external.json'
+    );
+    _resetAutonomousOpsPolicyCacheForTests();
 
     const degraded = evaluateAutonomousOpsAction({ actionId: 'baseline_health_scan' });
     expect(degraded.decision).toBe('approve');

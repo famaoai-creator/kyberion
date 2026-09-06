@@ -25,32 +25,43 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as nodePath from 'node:path';
 import { z } from 'zod';
 import {
-  safeReadFile,
-  safeReaddir,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeExec,
-  pathResolver,
-  spawnManagedProcess,
-  stopManagedProcess,
-  resolveMcpRequestContext,
-  assertMcpCallerRole,
-  assertProtocolServiceRegistered,
-  normalizeEventScope,
-  recordProtocolServiceLifecycle,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
+import { assertMcpCallerRole, resolveMcpRequestContext } from '@agent/core/mcp-request-context';
+import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
+import { normalizeEventScope } from '@agent/core/event-scope';
+import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
+import { logger } from '@agent/core/core';
+import {
+  defineCatalog,
+  getRegisteredEnvText,
+  isRecord,
+  nowIso,
+  readTextFile,
+} from '@agent/core/foundation';
+import {
   computeApprovalPayloadHash,
-  resolveScopeResolution,
   createApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
-  formatWireError,
-  runOpPreflight,
-  ensureDefaultOpPreflight,
-} from '@agent/core';
-import { buildKnowledgeIndex, queryKnowledge, executeServicePreset } from '@agent/core';
-import { recordHumanKnowledgeFeedback } from '@agent/core';
+} from '@agent/core/approval-store';
+import { resolveScopeResolution } from '@agent/core/scope-context';
+import { formatWireError } from '@agent/core/wire-error';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { buildKnowledgeIndex, queryKnowledge } from '@agent/core/knowledge-index';
+import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loop';
+import { executeServicePreset } from '@agent/core/service-engine';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
 import {
   listPendingApprovalsForCowork,
@@ -58,8 +69,9 @@ import {
   recordAuditExportRequest,
 } from '@agent/core/approval-cowork-adapter.js';
 import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
-import { getRegisteredEnvText } from '@agent/core/foundation';
-import type { EventScope, McpRequestContext } from '@agent/core';
+import type { EventScope } from '@agent/core/event-scope';
+import type { McpRequestContext } from '@agent/core/mcp-request-context';
+import { parseMcpTextPayload, parseSafeJsonObject } from './mcp-json.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -70,7 +82,7 @@ const SERVER_VERSION = '0.1.0';
 const REPO_ROOT = pathResolver.rootDir();
 
 /** Path to the MCP tool catalog (allowlist). */
-const CATALOG_PATH = nodePath.join(REPO_ROOT, 'knowledge/product/governance/mcp-tool-catalog.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/mcp-tool-catalog.json');
 
 /** Path to the compiled pipeline runner script. */
 const PIPELINE_RUNNER = nodePath.join(REPO_ROOT, 'dist/scripts/run_pipeline.js');
@@ -100,6 +112,14 @@ interface ToolCatalogEntry {
   allowed_tiers?: string[];
   requires_approval?: boolean;
 }
+
+const mcpToolCatalog = defineCatalog<ToolCatalog>({
+  id: 'mcp-tool-catalog',
+  path: CATALOG_PATH,
+  schema: pathResolver.knowledge('product/schemas/mcp-tool-catalog.schema.json'),
+  fallback: { pipeline_run_allowlist: [], tools: [] },
+  fallbackOnInvalid: true,
+});
 
 interface McpApprovalResult {
   allowed: boolean;
@@ -209,12 +229,7 @@ function ensureMcpApproval(params: {
 }
 
 function loadCatalog(): ToolCatalog {
-  try {
-    const raw = safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string;
-    return JSON.parse(raw) as ToolCatalog;
-  } catch {
-    return { pipeline_run_allowlist: [] };
-  }
+  return mcpToolCatalog.load();
 }
 
 function catalogEntry(catalog: ToolCatalog, toolName: string): ToolCatalogEntry {
@@ -230,6 +245,49 @@ function catalogEntry(catalog: ToolCatalog, toolName: string): ToolCatalogEntry 
   return entry;
 }
 
+interface McpStructuredError {
+  message: string;
+}
+
+interface McpStructuredContent {
+  ok: boolean;
+  data?: unknown;
+  error?: McpStructuredError;
+}
+
+const MCP_STRUCTURED_OUTPUT_SCHEMA = {
+  ok: z.boolean(),
+  data: z.unknown().optional(),
+  error: z.object({ message: z.string() }).optional(),
+};
+
+type McpToolInputSchema = NonNullable<Parameters<McpServer['registerTool']>[1]['inputSchema']>;
+
+/**
+ * Keep legacy text content stable while exposing one machine-readable result
+ * shape to MCP clients. Handlers historically returned either JSON text or
+ * raw command output, so the adapter deliberately normalizes at the wire
+ * boundary instead of forcing every domain handler to share serialization
+ * details.
+ */
+function withMcpStructuredContent(result: unknown): CallToolResult {
+  const resultRecord = isRecord(result) ? result : {};
+  if (resultRecord.structuredContent) return result as unknown as CallToolResult;
+
+  const textItem = Array.isArray(resultRecord.content)
+    ? resultRecord.content.find(
+        (item): item is Record<string, unknown> =>
+          isRecord(item) && item.type === 'text' && typeof item.text === 'string'
+      )
+    : undefined;
+  const text = typeof textItem?.text === 'string' ? textItem.text : '';
+  const structuredContent: McpStructuredContent = resultRecord.isError
+    ? { ok: false, error: { message: text } }
+    : { ok: true, data: parseMcpTextPayload(text) };
+
+  return { ...resultRecord, structuredContent } as unknown as CallToolResult;
+}
+
 function registerGovernedTool(
   server: McpServer,
   catalog: ToolCatalog,
@@ -238,60 +296,70 @@ function registerGovernedTool(
   schema: Record<string, unknown>,
   handler: (args: any) => Promise<any>
 ): void {
-  server.tool(name, description, schema, async (args: any) => {
-    try {
-      ensureDefaultOpPreflight();
-      const entry = catalogEntry(catalog, name);
-      const context = resolveMcpRequestContext({
-        requested_tenant: typeof args?.tenant === 'string' ? args.tenant : undefined,
-        requested_tier:
+  server.registerTool(
+    name,
+    {
+      description,
+      inputSchema: schema as McpToolInputSchema,
+      outputSchema: MCP_STRUCTURED_OUTPUT_SCHEMA,
+    },
+    async (args: any) => {
+      try {
+        ensureDefaultOpPreflight();
+        const entry = catalogEntry(catalog, name);
+        const context = resolveMcpRequestContext({
+          requested_tenant: typeof args?.tenant === 'string' ? args.tenant : undefined,
+          requested_tier:
+            args?.tier === 'public' || args?.tier === 'confidential' || args?.tier === 'personal'
+              ? args.tier
+              : undefined,
+          mission_id: typeof args?.mission_id === 'string' ? args.mission_id : undefined,
+          task_id: typeof args?.task_id === 'string' ? args.task_id : undefined,
+        });
+        const requestedTier =
           args?.tier === 'public' || args?.tier === 'confidential' || args?.tier === 'personal'
             ? args.tier
-            : undefined,
-        mission_id: typeof args?.mission_id === 'string' ? args.mission_id : undefined,
-        task_id: typeof args?.task_id === 'string' ? args.task_id : undefined,
-      });
-      const requestedTier =
-        args?.tier === 'public' || args?.tier === 'confidential' || args?.tier === 'personal'
-          ? args.tier
-          : undefined;
-      if (requestedTier && !entry.allowed_tiers!.includes(requestedTier)) {
-        throw new Error(`[MCP_TIER_DENIED] tier '${requestedTier}' is not allowed for ${name}`);
-      }
-      assertMcpCallerRole(context, entry.allowed_caller_roles!, name);
-      const preflight = await runOpPreflight({
-        op: name,
-        params: args as Record<string, unknown>,
-        context: context as unknown as Record<string, unknown>,
-        source: 'mcp',
-        // Approval-gated MCP tools perform their scope-bound approval check
-        // inside the handler; do not duplicate that check before its payload
-        // hash and exact scope are available.
-        requiresApproval: entry.requires_approval === true,
-        approvalGranted: entry.requires_approval === true,
-      });
-      if (preflight.decision !== 'allow') {
-        return {
+            : undefined;
+        if (requestedTier && !entry.allowed_tiers!.includes(requestedTier)) {
+          throw new Error(`[MCP_TIER_DENIED] tier '${requestedTier}' is not allowed for ${name}`);
+        }
+        assertMcpCallerRole(context, entry.allowed_caller_roles!, name);
+        const preflight = await runOpPreflight({
+          op: name,
+          params: args as Record<string, unknown>,
+          context: context as unknown as Record<string, unknown>,
+          source: 'mcp',
+          // Approval-gated MCP tools perform their scope-bound approval check
+          // inside the handler; do not duplicate that check before its payload
+          // hash and exact scope are available.
+          requiresApproval: entry.requires_approval === true,
+          approvalGranted: entry.requires_approval === true,
+        });
+        if (preflight.decision !== 'allow') {
+          return withMcpStructuredContent({
+            content: [
+              {
+                type: 'text' as const,
+                text: formatWireError(
+                  new Error(preflight.reason || `MCP operation ${name} was not admitted`),
+                  'MCP operation blocked'
+                ),
+              },
+            ],
+            isError: true,
+          });
+        }
+        return withMcpStructuredContent(await handler(preflight.input));
+      } catch (err) {
+        return withMcpStructuredContent({
           content: [
-            {
-              type: 'text' as const,
-              text: formatWireError(
-                new Error(preflight.reason || `MCP operation ${name} was not admitted`),
-                'MCP operation blocked'
-              ),
-            },
+            { type: 'text' as const, text: formatWireError(err, 'MCP tool request failed') },
           ],
           isError: true,
-        };
+        });
       }
-      return await handler(preflight.input);
-    } catch (err) {
-      return {
-        content: [{ type: 'text' as const, text: formatWireError(err, 'MCP tool request failed') }],
-        isError: true,
-      };
     }
-  });
+  );
 }
 
 function isPipelineAllowed(inputPath: string, catalog: ToolCatalog): boolean {
@@ -299,6 +367,30 @@ function isPipelineAllowed(inputPath: string, catalog: ToolCatalog): boolean {
   return catalog.pipeline_run_allowlist.some((p) => p.replace(/^\.\//, '') === normalised);
 }
 
+function resolveRegularRepositoryFile(filePath: string, label: string): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return safePath;
+}
+
+function tryResolveRegularRepositoryFile(filePath: string): string | null {
+  try {
+    return resolveRegularRepositoryFile(filePath, 'Resource');
+  } catch {
+    return null;
+  }
+}
+
+function auditExportScriptUnavailable() {
+  return {
+    content: [
+      { type: 'text' as const, text: 'Audit export script not built. Run pnpm build first.' },
+    ],
+    isError: true as const,
+  };
+}
 // ─── Tool implementations ─────────────────────────────────────────────────────
 
 interface PipelineListEntry {
@@ -322,12 +414,15 @@ function listPipelines(catalog: ToolCatalog): PipelineListEntry[] {
     const relPath = `pipelines/${entry}`;
     const runnable = isPipelineAllowed(relPath, catalog);
     try {
-      const raw = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(raw);
+      const safePath = resolveRegularRepositoryFile(fullPath, `Pipeline '${relPath}'`);
+      const raw = readTextFile(safePath);
+      const parsed = parseSafeJsonObject(raw);
+      if (!parsed) throw new Error(`Invalid pipeline metadata: ${relPath}`);
       results.push({
-        name: parsed.pipeline_id ?? entry.replace('.json', ''),
+        name:
+          typeof parsed.pipeline_id === 'string' ? parsed.pipeline_id : entry.replace('.json', ''),
         path: relPath,
-        description: parsed.description ?? '',
+        description: typeof parsed.description === 'string' ? parsed.description : '',
         runnable_via_mcp: runnable,
       });
     } catch {
@@ -342,7 +437,6 @@ function listPipelines(catalog: ToolCatalog): PipelineListEntry[] {
 
   return results;
 }
-
 // ─── Background pipeline jobs ─────────────────────────────────────────────────
 //
 // Long pipelines exceed the 60s synchronous window, so pipeline.run can start
@@ -362,7 +456,6 @@ interface PipelineJob {
 }
 
 const pipelineJobs = new Map<string, PipelineJob>();
-
 function startPipelineJob(input: string, absInput: string, extraArgs: string[]): PipelineJob {
   const jobId = `plj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const resourceId = `mcp-pipeline-job:${jobId}`;
@@ -370,7 +463,7 @@ function startPipelineJob(input: string, absInput: string, extraArgs: string[]):
     job_id: jobId,
     input,
     status: 'running',
-    started_at: new Date().toISOString(),
+    started_at: nowIso(),
     output_tail: '',
   };
   pipelineJobs.set(jobId, job);
@@ -396,7 +489,7 @@ function startPipelineJob(input: string, absInput: string, extraArgs: string[]):
   const timeout = setTimeout(() => {
     if (job.status === 'running') {
       job.status = 'timed_out';
-      job.finished_at = new Date().toISOString();
+      job.finished_at = nowIso();
       stopManagedProcess(resourceId, child);
     }
   }, PIPELINE_JOB_TIMEOUT_MS);
@@ -406,7 +499,7 @@ function startPipelineJob(input: string, absInput: string, extraArgs: string[]):
     clearTimeout(timeout);
     if (job.status === 'running') {
       job.status = 'failed';
-      job.finished_at = new Date().toISOString();
+      job.finished_at = nowIso();
       appendOutput(`\n[job] spawn error: ${err}`);
     }
     stopManagedProcess(resourceId, null);
@@ -416,7 +509,7 @@ function startPipelineJob(input: string, absInput: string, extraArgs: string[]):
     if (job.status === 'running') {
       job.exit_code = code;
       job.status = code === 0 ? 'succeeded' : 'failed';
-      job.finished_at = new Date().toISOString();
+      job.finished_at = nowIso();
     }
     stopManagedProcess(resourceId, null);
   });
@@ -464,14 +557,24 @@ function listCapabilities(): { actuator: string; ops: string[] }[] {
   }
 
   for (const dir of dirs) {
-    const manifestPath = nodePath.join(actuatorsDir, dir, 'manifest.json');
-    if (!safeExistsSync(manifestPath)) continue;
+    let manifestPath: string;
     try {
-      const raw = safeReadFile(manifestPath, { encoding: 'utf8' }) as string;
-      const manifest = JSON.parse(raw);
+      manifestPath = resolveRegularRepositoryFile(
+        nodePath.join(actuatorsDir, dir, 'manifest.json'),
+        `Actuator '${dir}' manifest`
+      );
+      const raw = readTextFile(manifestPath);
+      const manifest = parseSafeJsonObject(raw);
+      if (!manifest) throw new Error(`Invalid actuator manifest: ${dir}`);
+      const capabilities = Array.isArray(manifest.capabilities)
+        ? manifest.capabilities.filter(
+            (capability): capability is Record<string, unknown> =>
+              isRecord(capability) && typeof capability.op === 'string'
+          )
+        : [];
       results.push({
-        actuator: manifest.actuator_id ?? dir,
-        ops: (manifest.capabilities ?? []).map((c: { op: string }) => c.op),
+        actuator: typeof manifest.actuator_id === 'string' ? manifest.actuator_id : dir,
+        ops: capabilities.map((capability) => capability.op as string),
       });
     } catch {
       results.push({ actuator: dir, ops: [] });
@@ -480,7 +583,6 @@ function listCapabilities(): { actuator: string; ops: string[] }[] {
 
   return results;
 }
-
 function searchCapabilities(
   query: string,
   maxResults: number
@@ -717,13 +819,22 @@ export function createKyberionMcpServer(): McpServer {
           extraArgs.push('--vars', JSON.stringify(vars));
         }
         const absInput = nodePath.isAbsolute(input) ? input : nodePath.join(REPO_ROOT, input);
-        if (!safeExistsSync(absInput)) {
-          return {
-            content: [{ type: 'text' as const, text: `Pipeline file not found: ${input}` }],
-            isError: true,
-          };
+        let safeInput: string;
+        try {
+          safeInput = resolveRegularRepositoryFile(absInput, 'Pipeline file');
+        } catch (error) {
+          if (!safeExistsSync(absInput)) {
+            return {
+              content: [{ type: 'text' as const, text: `Pipeline file not found: ${input}` }],
+              isError: true,
+            };
+          }
+          throw error;
         }
-        if (!safeExistsSync(PIPELINE_RUNNER)) {
+        let safeRunner: string;
+        try {
+          safeRunner = resolveRegularRepositoryFile(PIPELINE_RUNNER, 'Pipeline runner');
+        } catch {
           return {
             content: [
               { type: 'text' as const, text: 'Pipeline runner not built. Run pnpm build first.' },
@@ -732,7 +843,7 @@ export function createKyberionMcpServer(): McpServer {
           };
         }
         if (background) {
-          const job = startPipelineJob(input, absInput, extraArgs);
+          const job = startPipelineJob(input, safeInput, extraArgs);
           return {
             content: [
               {
@@ -750,7 +861,7 @@ export function createKyberionMcpServer(): McpServer {
             ],
           };
         }
-        const output = safeExec('node', [PIPELINE_RUNNER, '--input', absInput, ...extraArgs], {
+        const output = safeExec('node', [safeRunner, '--input', safeInput, ...extraArgs], {
           cwd: REPO_ROOT,
           timeoutMs: PIPELINE_TIMEOUT_MS,
           maxOutputMB: 5,
@@ -1086,12 +1197,63 @@ export function createKyberionMcpServer(): McpServer {
       mission_id: z.string().optional().describe('Mission ID that produced this artifact'),
       trace_id: z.string().optional().describe('Pipeline trace ID'),
       next_action: z.string().optional().describe('Suggested next action for the operator'),
+      intent_resolution: z
+        .object({
+          request_id: z.string(),
+          normalized_intent: z.string(),
+          missing_inputs: z.array(z.string()),
+          resolution_shape: z.enum([
+            'direct_answer',
+            'task_session',
+            'mission',
+            'project_bootstrap',
+          ]),
+          outcome_kind: z.enum([
+            'answer',
+            'artifact',
+            'approval_ready_plan',
+            'service_change',
+            'status_report',
+          ]),
+          authority_level: z.enum([
+            'autonomous',
+            'approval_required',
+            'human_clarification_required',
+          ]),
+          next_action: z.object({
+            kind: z.enum(['request_approval', 'provide_input', 'continue']),
+            label: z.string(),
+            consequence: z.string(),
+          }),
+          project_context: z
+            .object({ project_id: z.string().optional(), confidence: z.number() })
+            .optional(),
+          rationale: z.string(),
+        })
+        .optional()
+        .describe('Structured intent-resolution explanation for the Cowork operator'),
     },
-    async ({ title, summary, content, content_type, mission_id, trace_id, next_action }) => {
+    async ({
+      title,
+      summary,
+      content,
+      content_type,
+      mission_id,
+      trace_id,
+      next_action,
+      intent_resolution,
+    }) => {
       try {
         const deliveryId = deliverToCowork(
           [{ content, content_type: content_type ?? 'text/plain', description: title }],
-          { title, summary, missionId: mission_id, traceId: trace_id, nextAction: next_action }
+          {
+            title,
+            summary,
+            missionId: mission_id,
+            traceId: trace_id,
+            nextAction: next_action,
+            intentResolution: intent_resolution,
+          }
         );
         return {
           content: [
@@ -1282,18 +1444,9 @@ export function createKyberionMcpServer(): McpServer {
           to,
           verifyOnly: false,
         });
-        if (!safeExistsSync(AUDIT_EXPORT_SCRIPT)) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: 'Audit export script not built. Run pnpm build first.',
-              },
-            ],
-            isError: true,
-          };
-        }
-        const args = [AUDIT_EXPORT_SCRIPT];
+        const auditExportScript = tryResolveRegularRepositoryFile(AUDIT_EXPORT_SCRIPT);
+        if (!auditExportScript) return auditExportScriptUnavailable();
+        const args = [auditExportScript];
         if (from) args.push('--from', from);
         if (to) args.push('--to', to);
         if (effectiveTenant) args.push('--tenant', effectiveTenant);
@@ -1334,18 +1487,9 @@ export function createKyberionMcpServer(): McpServer {
           requestedBy: requested_by ?? 'cowork-operator',
           verifyOnly: true,
         });
-        if (!safeExistsSync(AUDIT_EXPORT_SCRIPT)) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: 'Audit export script not built. Run pnpm build first.',
-              },
-            ],
-            isError: true,
-          };
-        }
-        const args = [AUDIT_EXPORT_SCRIPT, '--verify-only'];
+        const auditExportScript = tryResolveRegularRepositoryFile(AUDIT_EXPORT_SCRIPT);
+        if (!auditExportScript) return auditExportScriptUnavailable();
+        const args = [auditExportScript, '--verify-only'];
         if (effectiveTenant) args.push('--tenant', effectiveTenant);
         const output = safeExec('node', args, {
           cwd: REPO_ROOT,
@@ -1420,7 +1564,7 @@ export async function startMcpServerStdio(): Promise<void> {
         requestedBy: principalId,
       });
     } catch (error) {
-      console.error(`[MCP] stop lifecycle receipt unavailable: ${error}`);
+      logger.error(`[MCP] stop lifecycle receipt unavailable: ${error}`);
     } finally {
       await transport.close();
     }

@@ -2,13 +2,21 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import * as pathResolver from './path-resolver.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import type { MissionState } from './mission-types.js';
 import {
   activateMissionOnGateProgress,
   applyProcessTemplatePlan,
   evaluatePhaseEntryGate,
   evaluateStoredMissionGate,
+  isRegularProcessPlanningArtifactPath,
   markPhaseTasksCompleted,
   markPhaseTasksForRework,
   planProcessTemplateTasks,
@@ -18,7 +26,9 @@ import {
   buildPlannerRetryPrompt,
   packetRequiresIndependentReview,
   parsePlanningReviewVerdict,
+  renderProcessTemplateSkeleton,
 } from './mission-planning-packet.js';
+import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
 
 const missionId = 'MSN-PROCESS-PLAN-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -75,6 +85,92 @@ afterEach(() => {
 });
 
 describe('mission process planning', () => {
+  it('does not read a directory replacement as a task board', () => {
+    const directoryPath = `${missionPath}/TASK_BOARD-directory.md`;
+    safeMkdir(directoryPath, { recursive: true });
+    try {
+      expect(isRegularProcessPlanningArtifactPath(directoryPath)).toBe(false);
+      safeRmSync(`${missionPath}/TASK_BOARD.md`, { force: true });
+      safeMkdir(`${missionPath}/TASK_BOARD.md`, { recursive: true });
+
+      const result = applyProcessTemplatePlan({
+        missionId,
+        missionDir: missionPath,
+        design: presentationDesign(),
+      });
+
+      expect(result.taskBoardUpdated).toBe(false);
+    } finally {
+      safeRmSync(directoryPath, { recursive: true, force: true });
+      safeRmSync(`${missionPath}/TASK_BOARD.md`, { recursive: true, force: true });
+      safeWriteFile(`${missionPath}/TASK_BOARD.md`, `# Task Board: ${missionId}\n`);
+    }
+  });
+
+  it('rejects an external mission directory before writing a process plan', () => {
+    expect(() =>
+      applyProcessTemplatePlan({
+        missionId,
+        missionDir: '/tmp/kyberion-external-mission',
+        design: presentationDesign(),
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a symlinked mission artifact before reading or overwriting it', () => {
+    const outsidePath = pathResolver.rootResolve('active/shared/tmp/external-next-tasks.json');
+    safeWriteFile(outsidePath, JSON.stringify([{ task_id: 'external-task' }]));
+    safeSymlinkSync(outsidePath, `${missionPath}/NEXT_TASKS.json`);
+
+    try {
+      expect(() =>
+        applyProcessTemplatePlan({
+          missionId,
+          missionDir: missionPath,
+          design: presentationDesign(),
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(outsidePath, { force: true });
+    }
+  });
+
+  it('renders a process skeleton from an existing confidential mission root', () => {
+    const confidentialMissionId = 'MSN-PROCESS-CONFIDENTIAL';
+    const confidentialMissionPath = pathResolver.missionDir(confidentialMissionId, 'confidential');
+    safeMkdir(confidentialMissionPath, { recursive: true });
+    safeWriteFile(
+      `${confidentialMissionPath}/mission-state.json`,
+      JSON.stringify({
+        ...makeMissionState(),
+        mission_id: confidentialMissionId,
+        tier: 'confidential',
+        process_template: { workflow_id: 'confidential-workflow', phases: ['plan'] },
+      })
+    );
+    try {
+      expect(renderProcessTemplateSkeleton(confidentialMissionId)).toContain(
+        'Process template: confidential-workflow'
+      );
+    } finally {
+      safeRmSync(confidentialMissionPath, { recursive: true, force: true });
+    }
+  });
+
+  it('does not render malformed seeded task records into the planner prompt', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([
+        { task_id: 'seed-1', origin: 'process_template', phase: 'plan' },
+        { task_id: 42, origin: 'process_template', phase: 'plan' },
+      ])
+    );
+
+    const prompt = renderProcessTemplateSkeleton(missionId);
+    expect(prompt).toContain('Process template:');
+    expect(prompt).not.toContain('seed-1 (phase: plan)');
+  });
+
   it('expands the presentation process template into NEXT_TASKS.json, gates, and the task board', () => {
     const result = applyProcessTemplatePlan({
       missionId,
@@ -110,6 +206,26 @@ describe('mission process planning', () => {
     expect(board).toContain('exit gate: `PRESENTATION_APPROVAL_GATE`');
   });
 
+  it('records every process-plan artifact through the provisioned receipt contract', () => {
+    const result = applyProcessTemplatePlan({
+      missionId,
+      missionDir: missionPath,
+      design: presentationDesign(),
+    });
+
+    const records = loadProvisionedEntryRecords(missionId).filter(
+      (record) => record.phase === 'verified'
+    );
+    const targets = new Set(records.map((record) => record.target_path));
+
+    expect(targets).toContain('NEXT_TASKS.json');
+    expect(targets).toContain('TASK_BOARD.md');
+    for (const gatePath of result.gatePaths) {
+      expect(targets).toContain(gatePath.slice(`${missionPath}/`.length).replaceAll('\\', '/'));
+    }
+    expect(records).toHaveLength(result.gatePaths.length + 2);
+  });
+
   it('refuses to overwrite a planner-authored NEXT_TASKS.json without --force', () => {
     safeWriteFile(
       `${missionPath}/NEXT_TASKS.json`,
@@ -127,6 +243,22 @@ describe('mission process planning', () => {
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
     );
     expect(preserved[0].task_id).toBe('planner-task-1');
+  });
+
+  it('fails closed instead of replacing malformed NEXT_TASKS.json', () => {
+    const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
+    safeWriteFile(nextTasksPath, JSON.stringify({ malformed: true }));
+
+    expect(() =>
+      applyProcessTemplatePlan({
+        missionId,
+        missionDir: missionPath,
+        design: presentationDesign(),
+      })
+    ).toThrow('Invalid catalog mission-next-tasks');
+    expect(safeReadFile(nextTasksPath, { encoding: 'utf8' })).toBe(
+      JSON.stringify({ malformed: true })
+    );
   });
 
   it('overwrites with force and re-plans template-authored files without force', () => {
@@ -333,6 +465,9 @@ describe('mission planning packet helpers', () => {
       gaps: ['planning review verdict block missing'],
     });
     expect(parsePlanningReviewVerdict('{"approve":"yes"}').approve).toBe(false);
+    expect(parsePlanningReviewVerdict('{"approve":true,"meta":{"__proto__":{}}}').approve).toBe(
+      false
+    );
   });
 
   it('requires independent review for high-risk task packets', () => {

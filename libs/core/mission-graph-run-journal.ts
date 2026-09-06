@@ -1,4 +1,6 @@
-import { appendJsonLine } from './foundation/json.js';
+import * as path from 'node:path';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * Durable graph-run journal for mission follow-up dispatch (GE-05).
  *
@@ -7,9 +9,14 @@ import { appendJsonLine } from './foundation/json.js';
  * process stops between node completion and NEXT_TASKS persistence.
  */
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
+import { withFencedWriterLeaseSync, writerLeaseResourceId } from './writer-lease.js';
 
 export const MISSION_GRAPH_RUN_JOURNAL_VERSION = 1;
+const JOURNAL_EVENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-graph-run-journal-event.schema.json'
+);
 
 export type MissionGraphRunEventType = 'graph_started' | 'node_state' | 'graph_finished';
 export type MissionGraphNodeState = 'completed' | 'rework' | 'blocked' | 'failed';
@@ -51,6 +58,14 @@ export interface MissionGraphRunJournalHandle {
   state(): MissionGraphRunJournalState;
 }
 
+function journalEventCatalog(filePath: string) {
+  return defineCatalog<MissionGraphRunJournalEvent>({
+    id: 'mission-graph-run-journal-event',
+    path: filePath,
+    schema: JOURNAL_EVENT_SCHEMA_PATH,
+  });
+}
+
 function safeSegment(value: string): string {
   const normalized = String(value || '').trim();
   const segment = normalized.replace(/[^a-zA-Z0-9._-]/gu, '_');
@@ -59,7 +74,22 @@ function safeSegment(value: string): string {
 }
 
 function journalPath(missionId: string, runId: string): string {
-  return `${pathResolver.missionDir(missionId, 'public')}/coordination/graph-run-${safeSegment(runId)}.jsonl`;
+  const missionPath = assertSafeRepositoryPath(
+    pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, 'public'),
+    { allowMissingLeaf: true }
+  );
+  return assertSafeRepositoryPath(
+    `${missionPath}/coordination/graph-run-${safeSegment(runId)}.jsonl`,
+    { allowMissingLeaf: true }
+  );
+}
+
+function regularJournalPath(filePath: string): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (safeExistsSync(safePath) && !safeLstat(safePath).isFile()) {
+    throw new Error(`[MISSION_GRAPH_JOURNAL] journal must be a regular file: ${safePath}`);
+  }
+  return safePath;
 }
 
 function appendEvent(
@@ -70,25 +100,61 @@ function appendEvent(
   event: MissionGraphRunEventType,
   payload: Record<string, unknown>
 ): MissionGraphRunJournalEvent {
+  const safeFilePath = regularJournalPath(filePath);
   const envelope: MissionGraphRunJournalEvent = {
     version: MISSION_GRAPH_RUN_JOURNAL_VERSION,
     sequence,
     run_id: runId,
     mission_id: missionId.toUpperCase(),
     event,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     payload,
   };
-  appendJsonLine(filePath, envelope);
-  return envelope;
+  const validated = journalEventCatalog(safeFilePath).validate(envelope, safeFilePath);
+  appendJsonLine(safeFilePath, validated);
+  return validated;
+}
+
+function appendFencedEvent(
+  filePath: string,
+  missionId: string,
+  runId: string,
+  event: MissionGraphRunEventType,
+  payload: Record<string, unknown>
+): MissionGraphRunJournalEvent {
+  const missionPath = assertSafeRepositoryPath(
+    pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, 'public'),
+    { allowMissingLeaf: true }
+  );
+  const leasePath = assertSafeRepositoryPath(`${missionPath}/coordination/writer-lease.json`, {
+    allowMissingLeaf: true,
+  });
+  return withFencedWriterLeaseSync({
+    resourceId: writerLeaseResourceId(leasePath),
+    ownerId: `process:${process.pid}`,
+    leasePath,
+    fn: () => {
+      const safeFilePath = regularJournalPath(filePath);
+      const currentSequence = safeExistsSync(safeFilePath)
+        ? readJsonLines<MissionGraphRunJournalEvent>(safeFilePath, {
+            map: (value) => parseEvent(value, missionId, runId, journalEventCatalog(safeFilePath)),
+          }).reduce((max, current) => Math.max(max, current.sequence), 0)
+        : 0;
+      return appendEvent(safeFilePath, missionId, runId, currentSequence + 1, event, payload);
+    },
+  });
 }
 
 function parseEvent(
-  line: string,
+  value: unknown,
   expectedMissionId: string,
-  expectedRunId: string
+  expectedRunId: string,
+  catalog: GovernedCatalog<MissionGraphRunJournalEvent>
 ): MissionGraphRunJournalEvent {
-  const parsed = JSON.parse(line) as Partial<MissionGraphRunJournalEvent>;
+  const parsed = catalog.validate(
+    value,
+    `${catalog.path()}`
+  ) as Partial<MissionGraphRunJournalEvent>;
   if (
     parsed.version !== MISSION_GRAPH_RUN_JOURNAL_VERSION ||
     parsed.mission_id !== expectedMissionId.toUpperCase() ||
@@ -140,16 +206,14 @@ export function loadMissionGraphRunJournal(
     .trim()
     .toUpperCase();
   const normalizedRunId = safeSegment(runId);
-  const filePath = journalPath(normalizedMissionId, normalizedRunId);
+  const filePath = regularJournalPath(journalPath(normalizedMissionId, normalizedRunId));
   if (!safeExistsSync(filePath)) {
     throw new Error(`[MISSION_GRAPH_JOURNAL] run not found: ${normalizedRunId}`);
   }
-  const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
-  const events = raw
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => parseEvent(line, normalizedMissionId, normalizedRunId));
+  const catalog = journalEventCatalog(filePath);
+  const events = readJsonLines<MissionGraphRunJournalEvent>(filePath, {
+    map: (value) => parseEvent(value, normalizedMissionId, normalizedRunId, catalog),
+  });
   let expectedSequence = 1;
   let taskIds: string[] = [];
   const nodeStates = new Map<string, MissionGraphRunNodeState>();
@@ -201,23 +265,21 @@ export function openOrCreateMissionGraphRunJournal(input: {
     .trim()
     .toUpperCase();
   const runId = safeSegment(input.runId);
-  const filePath = journalPath(missionId, runId);
+  const filePath = regularJournalPath(journalPath(missionId, runId));
   if (!safeExistsSync(filePath)) {
-    safeMkdir(`${pathResolver.missionDir(missionId, 'public')}/coordination`);
-    appendEvent(filePath, missionId, runId, 1, 'graph_started', {
+    safeMkdir(path.dirname(filePath));
+    appendFencedEvent(filePath, missionId, runId, 'graph_started', {
       task_ids: Array.from(
         new Set(input.taskIds.map((taskId) => String(taskId).trim()).filter(Boolean))
       ),
     });
   }
-  const initialState = loadMissionGraphRunJournal(missionId, runId);
-  let sequence = initialState.events.reduce((max, event) => Math.max(max, event.sequence), 0);
+  loadMissionGraphRunJournal(missionId, runId);
   return {
     runId,
     path: filePath,
     append: (event, payload) => {
-      const envelope = appendEvent(filePath, missionId, runId, sequence + 1, event, payload);
-      sequence = envelope.sequence;
+      const envelope = appendFencedEvent(filePath, missionId, runId, event, payload);
       return envelope;
     },
     state: () => loadMissionGraphRunJournal(missionId, runId),

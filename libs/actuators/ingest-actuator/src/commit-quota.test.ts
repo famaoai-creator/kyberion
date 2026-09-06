@@ -16,17 +16,16 @@
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { INGEST_QUOTA_POLICY_REPO_PATH, ingestQuotaCounterPath } from '@agent/core/ingest-quota';
+import { readAssetLedger } from '@agent/core/ingest-asset-ledger';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  INGEST_QUOTA_POLICY_REPO_PATH,
-  ingestQuotaCounterPath,
-  pathResolver,
-  readAssetLedger,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { commitIngest } from './commit.js';
 import { normalizeCard, type NormalizeCardResult } from './normalize-card.js';
 
@@ -103,7 +102,13 @@ beforeAll(() => {
   safeWriteFile(
     policyPath,
     JSON.stringify(
-      { max_files_per_day: 2, max_bytes_per_day: 1024 * 1024, warn_ratio: 0.9 },
+      {
+        version: '1.0.0',
+        max_files_per_day: 2,
+        max_bytes_per_day: 1024 * 1024,
+        warn_ratio: 0.9,
+        tenant_overrides: {},
+      },
       null,
       2
     )

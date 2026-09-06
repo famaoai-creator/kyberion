@@ -52,6 +52,25 @@ describe('channel-surface async request store', () => {
     expect(listed[0]?.result_text).toBe('done');
   });
 
+  it('does not return a schema-invalid request from single-record lookup', () => {
+    const request = createSurfaceAsyncRequest({
+      surface: 'presence',
+      channel: 'voice',
+      threadTs: 'voice-thread',
+      senderAgentId: 'kyberion:voice-hub',
+      surfaceAgentId: 'presence-surface-agent',
+      receiverAgentId: 'chronos-mirror',
+      query: 'invalid fixture',
+      acceptedText: 'accepted',
+    });
+    safeWriteFile(
+      pathResolver.resolve(`active/shared/runtime/presence/requests/${request.request_id}.json`),
+      '[]'
+    );
+
+    expect(getSurfaceAsyncRequest('presence', request.request_id)).toBeNull();
+  });
+
   it('stores surface notifications', () => {
     enqueueSurfaceNotification({
       surface: 'presence',

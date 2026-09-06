@@ -1,7 +1,11 @@
 import type { ValidateFunction } from 'ajv';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { clamp, isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import {
   inferGovernedDeliveryMode,
   type IntentCompilerProvider,
@@ -133,12 +137,28 @@ function createRequestId() {
   return `assistant-compiler-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function assertRequestIdPathSegment(requestId: string): string {
+  const normalized = String(requestId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[ASSISTANT_COMPILER_REQUEST_ID] request id must be a single path segment`);
+  }
+  return normalized;
+}
+
 export function getAssistantCompilerRequestPath(requestId: string) {
-  return pathResolver.sharedTmp(`assistant-compiler-requests/${requestId}.json`);
+  const safeRequestId = assertRequestIdPathSegment(requestId);
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`assistant-compiler-requests/${safeRequestId}.json`),
+    { allowMissingLeaf: true }
+  );
 }
 
 export function getAssistantCompilerResultPath(requestId: string) {
-  return pathResolver.sharedTmp(`assistant-compiler-results/${requestId}.json`);
+  const safeRequestId = assertRequestIdPathSegment(requestId);
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`assistant-compiler-results/${safeRequestId}.json`),
+    { allowMissingLeaf: true }
+  );
 }
 
 export function validateAssistantCompilerRequest(value: unknown): {
@@ -210,13 +230,8 @@ function normalizeExecutionShape(value: unknown): IntentContract['resolution']['
 }
 
 function inferTaskType(text: string, rawResolution?: unknown): string | undefined {
-  if (
-    typeof rawResolution === 'object' &&
-    rawResolution &&
-    typeof (rawResolution as any).task_type === 'string'
-  ) {
-    return (rawResolution as any).task_type;
-  }
+  const resolution = isRecord(rawResolution) ? rawResolution : undefined;
+  if (typeof resolution?.task_type === 'string') return resolution.task_type;
   if (typeof rawResolution === 'string' && rawResolution.toLowerCase().includes('presentation'))
     return 'presentation_deck';
   if (
@@ -262,11 +277,14 @@ function normalizeIntentContractFromRaw(
     rawIntentContract && typeof rawIntentContract === 'object'
       ? (rawIntentContract as Record<string, unknown>)
       : {};
+  const goal = isRecord(raw.goal) ? raw.goal : undefined;
+  const resolution = isRecord(raw.resolution) ? raw.resolution : undefined;
+  const approval = isRecord(raw.approval) ? raw.approval : undefined;
   const goalSummary =
     typeof raw.goal === 'string'
       ? raw.goal
-      : typeof raw.goal === 'object' && raw.goal && typeof (raw.goal as any).summary === 'string'
-        ? (raw.goal as any).summary
+      : typeof goal?.summary === 'string'
+        ? goal.summary
         : executionBrief?.summary || request.source_text;
   const requiredInputs = Array.isArray(raw.required_inputs)
     ? raw.required_inputs.map(String).filter(Boolean)
@@ -277,10 +295,9 @@ function normalizeIntentContractFromRaw(
         .filter(Boolean)
     : executionBrief?.deliverables ||
       (request.source_text.includes('パワーポイント') ? ['artifact:pptx'] : []);
-  const approvalValue =
-    typeof raw.approval === 'object' && raw.approval
-      ? Boolean((raw.approval as any).requires_approval)
-      : raw.approval === 'required';
+  const approvalValue = approval
+    ? Boolean(approval.requires_approval)
+    : raw.approval === 'required';
   const inferredTaskType = executionBrief?.target_actuators?.includes('pptx-generator')
     ? 'presentation_deck'
     : inferTaskType(request.source_text, raw.resolution);
@@ -292,17 +309,13 @@ function normalizeIntentContractFromRaw(
     goal: {
       summary: goalSummary,
       success_condition:
-        typeof raw.goal === 'object' &&
-        raw.goal &&
-        typeof (raw.goal as any).success_condition === 'string'
-          ? (raw.goal as any).success_condition
+        typeof goal?.success_condition === 'string'
+          ? goal.success_condition
           : `${goalSummary} を governed artifact として成立させる。`,
     },
     resolution: {
       execution_shape: normalizeExecutionShape(
-        typeof raw.resolution === 'object' && raw.resolution
-          ? (raw.resolution as any).execution_shape
-          : raw.resolution
+        resolution ? resolution.execution_shape : raw.resolution
       ),
       task_type: inferredTaskType,
     },
@@ -316,7 +329,7 @@ function normalizeIntentContractFromRaw(
       typeof raw.clarification_needed === 'boolean'
         ? raw.clarification_needed
         : requiredInputs.length > 0,
-    confidence: typeof raw.confidence === 'number' ? Math.min(1, Math.max(0, raw.confidence)) : 0.6,
+    confidence: typeof raw.confidence === 'number' ? clamp(raw.confidence, 0, 1) : 0.6,
     why:
       typeof raw.why === 'string' && raw.why.trim().length > 0
         ? raw.why
@@ -350,21 +363,22 @@ function normalizeClarificationPacket(
               reason: 'The request cannot be executed safely without this input.',
             };
           }
+          const questionRecord = isRecord(question) ? question : {};
           return {
             id:
-              typeof (question as any)?.id === 'string'
-                ? (question as any).id
+              typeof questionRecord.id === 'string'
+                ? questionRecord.id
                 : contract.required_inputs[index] ||
                   briefQuestions[index]?.id ||
                   `missing_input_${index + 1}`,
             question:
-              typeof (question as any)?.question === 'string'
-                ? (question as any).question
+              typeof questionRecord.question === 'string'
+                ? questionRecord.question
                 : briefQuestions[index]?.question ||
                   `Please provide ${contract.required_inputs[index] || 'the missing input'}.`,
             reason:
-              typeof (question as any)?.reason === 'string'
-                ? (question as any).reason
+              typeof questionRecord.reason === 'string'
+                ? questionRecord.reason
                 : briefQuestions[index]?.reason ||
                   'The request cannot be executed safely without this input.',
           };
@@ -470,13 +484,11 @@ export function normalizeAssistantCompilerResult(
   if (directValidation.valid && directValidation.value) return directValidation.value;
 
   const raw = rawValue && typeof rawValue === 'object' ? (rawValue as Record<string, unknown>) : {};
+  const rawIntentContract = isRecord(raw.intent_contract) ? raw.intent_contract : undefined;
+  const rawSource = isRecord(raw.source) ? raw.source : undefined;
   const executionBriefSeed = toExecutionBriefSeed(request, {
     intentId:
-      typeof raw.intent_contract === 'object' &&
-      raw.intent_contract &&
-      typeof (raw.intent_contract as any).intent_id === 'string'
-        ? (raw.intent_contract as any).intent_id
-        : undefined,
+      typeof rawIntentContract?.intent_id === 'string' ? rawIntentContract.intent_id : undefined,
   });
   let executionBrief = normalizeExecutionBrief(raw.execution_brief, executionBriefSeed);
   const intentContract = normalizeIntentContractFromRaw(
@@ -508,7 +520,7 @@ export function normalizeAssistantCompilerResult(
   const result: AssistantCompilerResult = {
     kind: 'assistant-compiler-result',
     request_id: request.request_id,
-    compiled_at: new Date().toISOString(),
+    compiled_at: nowIso(),
     execution_brief: executionBrief,
     intent_contract: intentContract,
     work_loop: workLoop,
@@ -516,17 +528,11 @@ export function normalizeAssistantCompilerResult(
     source: {
       compiler: 'assistant-subagent',
       provider:
-        typeof raw.source === 'object' &&
-        raw.source &&
-        typeof (raw.source as any).provider === 'string'
-          ? (raw.source as any).provider
+        typeof rawSource?.provider === 'string'
+          ? rawSource.provider
           : request.delegation.preferred_provider,
       model:
-        typeof raw.source === 'object' &&
-        raw.source &&
-        typeof (raw.source as any).model === 'string'
-          ? (raw.source as any).model
-          : request.delegation.preferred_model,
+        typeof rawSource?.model === 'string' ? rawSource.model : request.delegation.preferred_model,
     },
   };
 
@@ -546,7 +552,7 @@ export function buildAssistantCompilerRequest(
   const request: AssistantCompilerRequest = {
     kind: 'assistant-compiler-request',
     request_id: requestId,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     source: input.source,
     source_text: input.sourceText,
     context: {
@@ -582,12 +588,13 @@ export function buildAssistantCompilerRequest(
 }
 
 export function writeAssistantCompilerRequest(request: AssistantCompilerRequest): string {
-  const validation = validateAssistantCompilerRequest(request);
-  if (!validation.valid) {
-    throw new Error(`Invalid assistant compiler request: ${validation.errors.join('; ')}`);
-  }
   const requestPath = getAssistantCompilerRequestPath(request.request_id);
-  safeWriteFile(requestPath, JSON.stringify(request, null, 2));
+  const validated = defineCatalog<AssistantCompilerRequest>({
+    id: 'assistant-compiler-request',
+    path: requestPath,
+    schema: REQUEST_SCHEMA_PATH,
+  }).validate(request, requestPath);
+  safeWriteFile(requestPath, JSON.stringify(validated, null, 2));
   return requestPath;
 }
 
@@ -604,11 +611,30 @@ export function writeAssistantCompilerResult(
   result: AssistantCompilerResult,
   outputPath?: string
 ): string {
-  const validation = validateAssistantCompilerResult(result);
-  if (!validation.valid) {
-    throw new Error(`Invalid assistant compiler result: ${validation.errors.join('; ')}`);
+  const defaultPath = getAssistantCompilerResultPath(result.request_id);
+  const targetPath = outputPath ? assertAssistantCompilerResultPath(outputPath) : defaultPath;
+  const validated = defineCatalog<AssistantCompilerResult>({
+    id: 'assistant-compiler-result',
+    path: targetPath,
+    schema: RESULT_SCHEMA_PATH,
+  }).validate(result, targetPath);
+  safeWriteFile(targetPath, JSON.stringify(validated, null, 2));
+  return targetPath;
+}
+
+function assertAssistantCompilerResultPath(outputPath: string): string {
+  const targetPath = assertSafeRepositoryPath(outputPath, { allowMissingLeaf: true });
+  const resultRoot = path.resolve(pathResolver.sharedTmp('assistant-compiler-results'));
+  const relative = path.relative(resultRoot, targetPath);
+  if (
+    !relative ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error(
+      '[ASSISTANT_COMPILER_RESULT_SCOPE] output path must remain inside the governed result store'
+    );
   }
-  const targetPath = outputPath || getAssistantCompilerResultPath(result.request_id);
-  safeWriteFile(targetPath, JSON.stringify(result, null, 2));
   return targetPath;
 }

@@ -148,7 +148,7 @@ last_updated: 2026-07-13
 
 - Available: deterministic planning across calendar, meeting, email, document, presentation, browser, and connected-system domains.
 - Available: effect classification (`read`, `draft`, `external_write`, `financial_commit`) with explicit missing-input and approval boundaries.
-- Available: `pnpm cli -- task plan` for read-only previews and `pnpm cli -- task start` for governed Task Session creation.
+- Available: `pnpm kyberion task plan` for read-only previews and `pnpm kyberion task start` for governed Task Session creation.
 - Available: `productivity-task-orchestration.json` dry-run template that emits a review package and receipt with no external effects or network access.
 - Next: bind calendar mutation, meeting participation, email delivery, and browser checkout executors to authenticated approval records and effect payload hashes.
 - Next: add customer-overlay defaults for preferred calendars, meeting providers, service bindings, document themes, and payment limits.

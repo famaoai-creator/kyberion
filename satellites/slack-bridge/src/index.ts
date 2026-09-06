@@ -1,72 +1,115 @@
 import { App, LogLevel } from '@slack/bolt';
-import { installProcessGuards } from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
-import { pathToFileURL } from 'node:url';
+import { installProcessGuards } from '@agent/core/process-guards';
+import { defineScript, isDirectScript } from '@agent/core/script-harness';
+import { appendJsonLine, getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('slack-bridge');
+import { logger } from '@agent/core/core';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { stimuliJournalPath } from '@agent/core/stimuli-journal';
 import {
-  resolveOperatorLocale,
-  logger,
-  pathResolver,
   emitChannelSurfaceEvent,
-  resolveServiceBinding,
-  prepareSlackSurfaceArtifact,
-  recordSlackSurfaceArtifact,
-  runSurfaceMessageConversation,
-  runChannelTurn,
-  formatChannelThreadContext,
-  type ChannelAdapter,
-  type RunChannelTurnOptions,
-  type SurfaceConversationResult,
   recordSlackDelivery,
-  recordSlackKnowledgeReaction,
-  createSurfaceOutboxDrainGuard,
-  drainSurfaceOutbox,
-  deriveSlackDelegationReceiver,
+  recordSlackSurfaceArtifact,
+} from '@agent/core/surface-artifact-store';
+import { resolveServiceBinding } from '@agent/core/service-binding';
+import {
+  prepareSlackSurfaceArtifact,
+  runSurfaceMessageConversation,
+} from '@agent/core/channel-surface';
+import {
+  formatChannelThreadContext,
+  runChannelTurn,
+  type ChannelAdapter,
+  type ChannelTypingHandle,
+  type RunChannelTurnOptions,
+} from '@agent/core/channel-adapter';
+import type { SurfaceConversationResult } from '@agent/core/channel-surface-types';
+import { recordSlackKnowledgeReaction } from '@agent/core/knowledge-feedback-loop';
+import { createSurfaceOutboxDrainGuard, drainSurfaceOutbox } from '@agent/core/surface-delivery';
+import { deriveSlackDelegationReceiver } from '@agent/core/surface-runtime-router';
+import {
+  buildSlackOnboardingBlocks,
+  buildSlackOnboardingModal,
+  handleSlackOnboardingTurn,
   isEnvironmentInitialized,
-  getSlackMissionProposalState,
-  saveSlackMissionProposalState,
+  parseSlackOnboardingAction,
+} from '@agent/core/slack-onboarding';
+import {
+  buildMissionIssuanceReply,
   clearSlackMissionProposalState,
+  getSlackMissionProposalState,
   isSlackMissionConfirmation,
   isSlackMissionRejection,
   issueSlackMissionFromProposal,
-  handleSlackOnboardingTurn,
-  buildSlackOnboardingBlocks,
-  buildSlackOnboardingModal,
-  parseSlackOnboardingAction,
-  createSlackApprovalRequest,
-  buildSlackApprovalBlocks,
-  parseSlackApprovalAction,
-  applySurfaceApprovalDecision,
+  saveSlackMissionProposalState,
+} from '@agent/core/surface-mission-proposals';
+import {
   buildSlackApprovalAskWhyBlocks,
+  buildSlackApprovalBlocks,
+  createSlackApprovalRequest,
+  parseSlackApprovalAction,
+  parseSlackAskWhyAction,
+} from '@agent/core/slack-approval-ui';
+import {
+  applySurfaceApprovalDecision,
+  resolveSurfaceApprovalAskWhy,
+} from '@agent/core/surface-approval-ui';
+import {
   buildSlackMissionProposalBlocks,
   parseSlackMissionProposalAction,
   slackMissionProposalFallbackText,
-  parseSlackAskWhyAction,
-  resolveSurfaceApprovalAskWhy,
-  dispatchPresenceFrame,
+} from '@agent/core/slack-mission-proposal-ui';
+import { dispatchPresenceFrame } from '@agent/core/presence-bridge';
+import {
   buildBridgeEmptyReplyText,
   chunkSurfaceMessage,
   postBridgeError,
-  resolveCustomerBinding,
-  runCustomerConversation,
-  evaluateSurfaceActorAccess,
   sendSurfaceTextWithFallback,
+} from '@agent/core/bridge-error-reply';
+import { resolveCustomerBinding } from '@agent/core/customer-channel-binding';
+import { runCustomerConversation } from '@agent/core/customer-conversation';
+import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
+import { renderIntentAuthorityLabel } from '@agent/core/intent-resolution-contract';
+import {
   buildAutomationSlackModal,
   extractAutomationSlackFormValues,
+  parseAutomationSlackModalMetadata,
+} from '@agent/core/automation-blueprint-slack';
+import {
   findAutomationBlueprint,
   parseAutomationSlashRequest,
-  parseAutomationSlackModalMetadata,
   registerAutomationBlueprint,
-} from '@agent/core';
+} from '@agent/core/automation-blueprint';
+import { t } from '@agent/core/t';
+
+type SlackClient = InstanceType<typeof App>['client'];
+type SlackModalView = NonNullable<Parameters<SlackClient['views']['open']>[0]['view']>;
+
+function errorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function readValueAt(value: unknown, path: readonly string[]): unknown {
+  let current: unknown = value;
+  for (const key of path) {
+    if (!current || typeof current !== 'object') return undefined;
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
+}
+
+function readStringAt(value: unknown, path: readonly string[]): string {
+  const resolved = readValueAt(value, path);
+  return typeof resolved === 'string' ? resolved : '';
+}
 
 /**
  * Slack Sensory Satellite (Socket Mode) v1.0
  * Ingests Slack messages as GUSP v2.0 Stimuli.
  */
 
-const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const SLACK_SURFACE_AGENT_ID = 'slack-surface-agent';
 
 function recordSlackConversationOutcome(params: {
@@ -114,7 +157,46 @@ interface SlackThreadRepliesClient {
   };
 }
 
-async function collectSlackThreadContext(
+interface SlackReactionClient {
+  reactions: {
+    add(input: { channel: string; timestamp: string; name: string }): Promise<unknown>;
+    remove(input: { channel: string; timestamp: string; name: string }): Promise<unknown>;
+  };
+}
+
+/**
+ * UX-02: Slack has no bot typing API, so use a short-lived reaction as the
+ * provider-specific typing handle. Creating the handle is deliberately part
+ * of `runChannelTurn` after thread context has been resolved; a failed history
+ * lookup must not leave an orphaned 👀 reaction on the user's message.
+ */
+export async function createSlackTypingHandle(
+  client: SlackReactionClient,
+  channel: string,
+  timestamp: string
+): Promise<ChannelTypingHandle> {
+  let added = false;
+  try {
+    await client.reactions.add({ channel, timestamp, name: 'eyes' });
+    added = true;
+  } catch (reactionErr: unknown) {
+    logger.warn(`[SlackBridge] typing reaction failed: ${errorDetail(reactionErr)}`);
+  }
+
+  return {
+    async stop() {
+      if (!added) return;
+      added = false;
+      try {
+        await client.reactions.remove({ channel, timestamp, name: 'eyes' });
+      } catch {
+        // The reaction may already be gone; this is cosmetic state.
+      }
+    },
+  };
+}
+
+export async function collectSlackThreadContext(
   client: SlackThreadRepliesClient,
   channel: string,
   threadTs: string,
@@ -131,7 +213,7 @@ async function collectSlackThreadContext(
         authorLabel: String(message.username || message.user || 'unknown'),
         text: String(message.text || ''),
       }));
-    return formatChannelThreadContext('Slack', entries);
+    return formatChannelThreadContext('Slack', entries, resolveOperatorLocale());
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(`⚠️ [SlackBridge] Failed to fetch thread history: ${message}`);
@@ -164,10 +246,16 @@ export function runSlackChannelTurn(
 ): Promise<SurfaceConversationResult> {
   return runChannelTurn(
     adapter,
-    { text: request.text, channel: request.channel, threadTs: request.threadTs },
+    {
+      text: request.text,
+      channel: request.channel,
+      threadTs: request.threadTs,
+      locale: resolveOperatorLocale(),
+    },
     ({ threadContext }) =>
       runSurfaceMessageConversation({
         surface: 'slack',
+        locale: resolveOperatorLocale(),
         text: request.text,
         channel: request.channel,
         threadTs: request.threadTs,
@@ -187,7 +275,7 @@ export function runSlackChannelTurn(
 }
 
 async function postOnboardingReply(
-  client: any,
+  client: SlackClient,
   channel: string,
   threadTs: string,
   text: string,
@@ -198,7 +286,7 @@ async function postOnboardingReply(
 }
 
 async function postSlackTextWithBlocks(
-  client: any,
+  client: SlackClient,
   params: { channel: string; thread_ts?: string; text: string; blocks?: unknown[] }
 ) {
   return sendSurfaceTextWithFallback({
@@ -214,7 +302,7 @@ async function postSlackTextWithBlocks(
 }
 
 async function postSlackText(
-  client: any,
+  client: SlackClient,
   params: { channel: string; thread_ts?: string; text: string }
 ) {
   let response;
@@ -234,7 +322,7 @@ async function postSlackText(
 }
 
 async function postApprovalRequest(
-  client: any,
+  client: SlackClient,
   params: {
     channel: string;
     threadTs: string;
@@ -247,14 +335,27 @@ async function postApprovalRequest(
       severity?: 'low' | 'medium' | 'high';
     };
     sourceText?: string;
+    intentResolution?: import('@agent/core/intent-resolution-contract').IntentResolutionContract;
   }
 ) {
   const record = createSlackApprovalRequest(params);
+  const locale = resolveOperatorLocale();
   return postSlackTextWithBlocks(client, {
     channel: params.channel,
     thread_ts: params.threadTs,
-    text: `Approval required: ${record.title}`,
-    blocks: buildSlackApprovalBlocks(record),
+    text: [
+      `${t('bridge:approval_heading', { surface: 'Slack' }, locale)}: ${record.title}`,
+      ...(params.intentResolution
+        ? [
+            `${t('bridge:contract_authority', undefined, locale)}: ${renderIntentAuthorityLabel(
+              params.intentResolution.authority_level,
+              locale
+            )}`,
+            `${t('bridge:contract_next_action', undefined, locale)}: ${params.intentResolution.next_action.label}`,
+          ]
+        : []),
+    ].join('\n'),
+    blocks: buildSlackApprovalBlocks(record, params.intentResolution, locale),
   });
 }
 
@@ -273,25 +374,41 @@ async function reflectSlackPresence(params: {
       subtitle: params.subtitle,
       transcript: params.transcript || [],
     });
-  } catch (error: any) {
-    logger.warn(`⚠️ [SlackBridge] Presence reflect failed: ${error?.message || error}`);
+  } catch (error: unknown) {
+    logger.warn(
+      `⚠️ [SlackBridge] Presence reflect failed: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
 function automationRegistrationReply(
   registration: ReturnType<typeof registerAutomationBlueprint>
 ): string {
-  const delivery = registration.scheduled.deliver_to
-    ? ` → ${registration.scheduled.deliver_to.surface}:${registration.scheduled.deliver_to.channel}`
+  const locale = resolveOperatorLocale();
+  const scheduled = registration.scheduled;
+  if (!scheduled) {
+    return t('bridge:automation_missing_bindings', undefined, locale);
+  }
+  const cron = scheduled.trigger.cron;
+  if (!cron) {
+    return t(
+      'bridge:automation_registration_failed',
+      { detail: 'the schedule is missing a cron expression' },
+      locale
+    );
+  }
+  const timezone = scheduled.trigger.timezone ? ` (${scheduled.trigger.timezone})` : '';
+  const delivery = scheduled.deliver_to
+    ? ` → ${scheduled.deliver_to.surface}:${scheduled.deliver_to.channel}`
     : '';
   return [
-    `スケジュールを登録しました: ${registration.scheduled.name}`,
-    `cron: ${registration.scheduled.trigger.cron}${registration.scheduled.trigger.timezone ? ` (${registration.scheduled.trigger.timezone})` : ''}${delivery}`,
+    t('bridge:automation_registered', { name: scheduled.name }, locale),
+    t('bridge:automation_registered_cron', { cron, timezone, delivery }, locale),
   ].join('\n');
 }
 
 async function postAutomationReply(
-  client: any,
+  client: SlackClient,
   params: { channel: string; user: string; threadTs?: string; text: string }
 ): Promise<void> {
   await client.chat.postEphemeral({
@@ -305,23 +422,13 @@ async function postAutomationReply(
 function formatSlackMissionIssuedReply(
   issued: Awaited<ReturnType<typeof issueSlackMissionFromProposal>>
 ): string {
-  return [
-    `Mission ${issued.missionId} started.`,
-    `Type: ${issued.missionType}`,
-    `Tier: ${issued.tier}`,
-    `Persona: ${issued.persona}`,
-    issued.routingDecision
-      ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`
-      : undefined,
-    issued.orchestrationStatus === 'queued'
-      ? 'Background orchestration has been queued.'
-      : 'Background orchestration could not be queued.',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  return buildMissionIssuanceReply(issued, {
+    locale: resolveOperatorLocale(),
+    includeDetails: true,
+  });
 }
 
-async function processSlackOutbox(client: any) {
+async function processSlackOutbox(client: SlackClient) {
   return drainSurfaceOutbox(
     'slack',
     async (message) => {
@@ -330,6 +437,7 @@ async function processSlackOutbox(client: any) {
         thread_ts: message.thread_ts || undefined,
         text: message.text,
       });
+      if (!response) throw new Error('Slack outbox delivery returned no response.');
       recordSlackDelivery(
         message.correlation_id,
         message.channel,
@@ -344,15 +452,18 @@ async function processSlackOutbox(client: any) {
 
 const runSlackOutbox = createSurfaceOutboxDrainGuard('slack');
 
-async function start() {
-  process.env.MISSION_ROLE ||= 'slack_bridge';
+async function start(_args: string[] = []) {
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'slack_bridge');
+  }
   const binding = resolveServiceBinding('slack', 'secret-guard');
   const appToken = binding.appToken;
   const botToken = binding.accessToken;
 
   if (!appToken || !botToken) {
     logger.error('❌ Missing Slack service binding (access token or app token).');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const app = new App({
@@ -367,8 +478,8 @@ async function start() {
   // authorization and transport; validation and registry writes stay in core.
   app.command('/kyberion', async ({ ack, command, client, respond }) => {
     await ack();
-    const actorId = String((command as any).user_id || '');
-    const channel = String((command as any).channel_id || '');
+    const actorId = readStringAt(command, ['user_id']);
+    const channel = readStringAt(command, ['channel_id']);
     try {
       const access = evaluateSurfaceActorAccess('slack', actorId);
       if (!access.allowed)
@@ -376,14 +487,14 @@ async function start() {
       if (!channel || !actorId)
         throw new Error('Slack automation request is missing actor or channel.');
 
-      const request = parseAutomationSlashRequest(String((command as any).text || ''));
+      const request = parseAutomationSlashRequest(readStringAt(command, ['text']));
       const entry = findAutomationBlueprint(request.blueprint_id);
       const values: Record<string, string> = { ...request.values };
       const deliverySlot = entry.blueprint.delivery?.channel_slot;
       if (deliverySlot && !Object.hasOwn(values, deliverySlot)) values[deliverySlot] = channel;
 
       if (request.open_form) {
-        const triggerId = String((command as any).trigger_id || '');
+        const triggerId = readStringAt(command, ['trigger_id']);
         if (!triggerId) throw new Error('Slack automation form requires a trigger_id.');
         await client.views.open({
           trigger_id: triggerId,
@@ -397,7 +508,9 @@ async function start() {
               actor_id: actorId,
             },
             values
-          ) as any,
+            // Core owns the provider-neutral modal shape; this is the single
+            // typed Slack API boundary for that already-validated payload.
+          ) as unknown as SlackModalView,
         });
         return;
       }
@@ -411,7 +524,7 @@ async function start() {
       const detail = error instanceof Error ? error.message : String(error);
       await respond({
         response_type: 'ephemeral',
-        text: `スケジュール登録を実行できませんでした: ${detail}`,
+        text: t('bridge:automation_registration_failed', { detail }, resolveOperatorLocale()),
       });
     }
   });
@@ -421,8 +534,8 @@ async function start() {
     let metadata;
     let actorId = '';
     try {
-      metadata = parseAutomationSlackModalMetadata(String((view as any).private_metadata || ''));
-      actorId = String((body as any).user?.id || '');
+      metadata = parseAutomationSlackModalMetadata(readStringAt(view, ['private_metadata']));
+      actorId = readStringAt(body, ['user', 'id']);
       if (actorId !== metadata.actor_id) throw new Error('Slack automation modal actor mismatch.');
       const access = evaluateSurfaceActorAccess('slack', actorId);
       if (!access.allowed)
@@ -432,7 +545,10 @@ async function start() {
       if (entry.blueprint.pipeline_ref !== metadata.pipeline_ref) {
         throw new Error('Slack automation modal pipeline reference mismatch.');
       }
-      const values = extractAutomationSlackFormValues(entry.blueprint, (view as any).state?.values);
+      const values = extractAutomationSlackFormValues(
+        entry.blueprint,
+        readValueAt(view, ['state', 'values'])
+      );
       const deliverySlot = entry.blueprint.delivery?.channel_slot;
       if (deliverySlot && !Object.hasOwn(values, deliverySlot))
         values[deliverySlot] = metadata.channel;
@@ -455,7 +571,7 @@ async function start() {
           channel: metadata.channel,
           user: metadata.actor_id,
           threadTs: metadata.thread_ts,
-          text: `スケジュール登録を実行できませんでした: ${detail}`,
+          text: t('bridge:automation_registration_failed', { detail }, resolveOperatorLocale()),
         });
       } else {
         logger.error(`❌ [SlackBridge] Automation modal handling failed: ${detail}`);
@@ -464,8 +580,8 @@ async function start() {
   });
 
   const outboxTimer = setInterval(() => {
-    runSlackOutbox(() => processSlackOutbox(app.client)).catch((err: any) => {
-      logger.error(`❌ [SlackBridge] Outbox poll failed: ${err.message}`);
+    runSlackOutbox(() => processSlackOutbox(app.client)).catch((err: unknown) => {
+      logger.error(`❌ [SlackBridge] Outbox poll failed: ${errorDetail(err)}`);
     });
   }, 3000);
   outboxTimer.unref?.();
@@ -542,7 +658,7 @@ async function start() {
         `📥 [SlackBridge] Ingesting stimulus ${artifact.stimulus.id} from ${message.user}`
       );
       recordSlackSurfaceArtifact(artifact);
-      appendJsonLine(STIMULI_PATH, artifact.stimulus);
+      appendJsonLine(stimuliJournalPath(), artifact.stimulus);
 
       const initialized = isEnvironmentInitialized();
 
@@ -586,7 +702,7 @@ async function start() {
         const response = await client.chat.postMessage({
           channel: message.channel,
           thread_ts: threadTs,
-          text: 'ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。',
+          text: t('bridge:mission_proposal_cancelled', undefined, resolveOperatorLocale()),
         });
         recordSlackDelivery(
           artifact.correlationId,
@@ -621,34 +737,6 @@ async function start() {
         return;
       }
 
-      // UX-02: Slack has no bot typing API — show 👀 on the user's message
-      // while we work and swap it for ✅ when the reply lands. Reaction
-      // failures are cosmetic and must never block the reply.
-      const typingReaction = { added: false };
-      try {
-        await client.reactions.add({
-          channel: message.channel,
-          timestamp: message.ts,
-          name: 'eyes',
-        });
-        typingReaction.added = true;
-      } catch (reactionErr: any) {
-        logger.warn(`[SlackBridge] typing reaction failed: ${reactionErr?.message || reactionErr}`);
-      }
-      const clearTypingReaction = async () => {
-        if (!typingReaction.added) return;
-        typingReaction.added = false;
-        try {
-          await client.reactions.remove({
-            channel: message.channel,
-            timestamp: message.ts,
-            name: 'eyes',
-          });
-        } catch {
-          /* reaction may already be gone — cosmetic */
-        }
-      };
-
       const forcedReceiver = deriveSlackDelegationReceiver(message.text);
       const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
       await reflectSlackPresence({
@@ -662,7 +750,7 @@ async function start() {
         actorId: message.user,
         threadContext: () =>
           collectSlackThreadContext(client, message.channel, threadTs, message.ts),
-        typing: () => ({ stop: clearTypingReaction }),
+        typing: () => createSlackTypingHandle(client, message.channel, message.ts),
         shouldSend: ({ result }) =>
           !result.missionProposals?.length && result.approvalRequests.length === 0,
         send: async ({ text }) => {
@@ -671,6 +759,7 @@ async function start() {
             thread_ts: threadTs,
             text,
           });
+          if (!response) throw new Error('Slack delivery returned no response.');
           recordSlackDelivery(
             artifact.correlationId,
             message.channel,
@@ -712,7 +801,9 @@ async function start() {
                 transcript: [
                   {
                     speaker: 'Slack Surface',
-                    text: conversation.text || 'Approval is required before continuing.',
+                    text:
+                      conversation.text ||
+                      t('bridge:approval_required_fallback', undefined, resolveOperatorLocale()),
                   },
                 ],
               });
@@ -734,6 +825,7 @@ async function start() {
                   requestedBy: SLACK_SURFACE_AGENT_ID,
                   draft: approval,
                   sourceText,
+                  intentResolution: conversation.intentResolution,
                 });
               }
               return;
@@ -772,8 +864,16 @@ async function start() {
               const response = await postSlackTextWithBlocks(client, {
                 channel: message.channel,
                 thread_ts: threadTs,
-                text: slackMissionProposalFallbackText(proposal),
-                blocks: buildSlackMissionProposalBlocks(proposal),
+                text: slackMissionProposalFallbackText(
+                  proposal,
+                  conversation.intentResolution,
+                  resolveOperatorLocale()
+                ),
+                blocks: buildSlackMissionProposalBlocks(
+                  proposal,
+                  conversation.intentResolution,
+                  resolveOperatorLocale()
+                ),
               });
               recordSlackDelivery(
                 artifact.correlationId,
@@ -826,8 +926,8 @@ async function start() {
           },
         }
       );
-    } catch (err: any) {
-      logger.error(`❌ [SlackBridge] Ingestion failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`❌ [SlackBridge] Ingestion failed: ${errorDetail(err)}`);
       // UX-01: surface a vocabulary-based error to the user (rate-limited per thread).
       await postBridgeError({
         conversationKey: `slack:${message.channel}:${threadTs}`,
@@ -841,10 +941,9 @@ async function start() {
   });
 
   app.event('reaction_added', async ({ event, client }) => {
-    const reactionEvent = event as any;
-    const actorId = reactionEvent.user || '';
-    const channel = reactionEvent.item?.channel || '';
-    const messageTs = reactionEvent.item?.ts || '';
+    const actorId = readStringAt(event, ['user']);
+    const channel = readStringAt(event, ['item', 'channel']);
+    const messageTs = readStringAt(event, ['item', 'ts']);
     if (!channel || !messageTs || !actorId) return;
     const access = evaluateSurfaceActorAccess('slack', actorId);
     if (!access.allowed) {
@@ -858,18 +957,21 @@ async function start() {
         inclusive: true,
         limit: 1,
       });
-      const message = (history as any).messages?.[0];
-      const metadata = message?.metadata?.event_payload || message?.metadata || {};
+      const message = history.messages?.[0];
+      const metadata =
+        readValueAt(message, ['metadata', 'event_payload']) ||
+        readValueAt(message, ['metadata']) ||
+        {};
       const documentPath =
-        metadata.knowledge_document_path ||
-        metadata.document_path ||
-        String(message?.text || '').match(
+        readStringAt(metadata, ['knowledge_document_path']) ||
+        readStringAt(metadata, ['document_path']) ||
+        readStringAt(message, ['text']).match(
           /\b(knowledge\/(?:product|confidential|personal)\/[^\s>]+)/u
         )?.[1];
       if (!documentPath) return;
       const binding = resolveCustomerBinding('slack', channel);
       const target = recordSlackKnowledgeReaction({
-        reaction: reactionEvent.reaction || '',
+        reaction: readStringAt(event, ['reaction']),
         document_path: documentPath,
         actor: actorId,
         channel,
@@ -887,7 +989,7 @@ async function start() {
           slack_channel: channel,
           feedback_path: target,
           tenant_slug: binding?.tenantSlug,
-          reaction: reactionEvent.reaction,
+          reaction: readStringAt(event, ['reaction']),
         });
       }
     } catch (error) {
@@ -901,8 +1003,8 @@ async function start() {
     await ack();
 
     try {
-      const payload = parseSlackApprovalAction((action as any).value);
-      const actorId = (body as any).user?.id || 'unknown';
+      const payload = parseSlackApprovalAction(readStringAt(action, ['value']));
+      const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
       const access = evaluateSurfaceActorAccess('slack', actorId);
       if (!access.allowed) {
         logger.warn(
@@ -910,8 +1012,9 @@ async function start() {
         );
         return;
       }
-      const channel = (body as any).channel?.id;
-      const threadTs = (body as any).message?.thread_ts || (body as any).message?.ts;
+      const channel = readStringAt(body, ['channel', 'id']);
+      const threadTs =
+        readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
       if (!channel || !threadTs) throw new Error('Slack approval action is missing channel/thread');
       const updated = applySurfaceApprovalDecision({
         surface: 'slack',
@@ -936,22 +1039,23 @@ async function start() {
         await client.chat.postMessage({
           channel: updated.channel,
           thread_ts: updated.threadTs,
-          text: 'どこが期待と違いましたか？(スキップ可)',
+          text: t('bridge:approval_ask_why', undefined, resolveOperatorLocale()),
           blocks: buildSlackApprovalAskWhyBlocks(updated.id),
         });
       }
-    } catch (err: any) {
-      logger.error(`❌ [SlackBridge] Approval decision handling failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`❌ [SlackBridge] Approval decision handling failed: ${errorDetail(err)}`);
     }
   });
 
   app.action('slack_mission_proposal_decide', async ({ ack, action, body, client }) => {
     await ack();
     try {
-      const payload = parseSlackMissionProposalAction((action as any).value);
-      const channel = (body as any).channel?.id;
-      const threadTs = (body as any).message?.thread_ts || (body as any).message?.ts;
-      const actorId = (body as any).user?.id || 'unknown';
+      const payload = parseSlackMissionProposalAction(readStringAt(action, ['value']));
+      const channel = readStringAt(body, ['channel', 'id']);
+      const threadTs =
+        readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
+      const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
       const access = evaluateSurfaceActorAccess('slack', actorId);
       if (!access.allowed) {
         logger.warn(
@@ -967,7 +1071,7 @@ async function start() {
         await client.chat.postMessage({
           channel,
           thread_ts: threadTs,
-          text: 'このミッション提案はすでに処理済みか期限切れです。',
+          text: t('bridge:mission_proposal_expired', undefined, resolveOperatorLocale()),
         });
         return;
       }
@@ -977,7 +1081,11 @@ async function start() {
         await client.chat.postMessage({
           channel,
           thread_ts: threadTs,
-          text: `ミッション提案をキャンセルしました（<@${actorId}>）。`,
+          text: t(
+            'bridge:mission_proposal_cancelled_by',
+            { actor: `<@${actorId}>` },
+            resolveOperatorLocale()
+          ),
         });
         return;
       }
@@ -994,16 +1102,18 @@ async function start() {
         thread_ts: threadTs,
         text: formatSlackMissionIssuedReply(issued),
       });
-    } catch (err: any) {
-      logger.error(`❌ [SlackBridge] Mission proposal decision handling failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(
+        `❌ [SlackBridge] Mission proposal decision handling failed: ${errorDetail(err)}`
+      );
     }
   });
 
   app.action('slack_approval_askwhy', async ({ ack, action, body, client }) => {
     await ack();
     try {
-      const payload = parseSlackAskWhyAction((action as any).value);
-      const actorId = (body as any).user?.id || 'unknown';
+      const payload = parseSlackAskWhyAction(readStringAt(action, ['value']));
+      const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
       const access = evaluateSurfaceActorAccess('slack', actorId);
       if (!access.allowed) {
         logger.warn(
@@ -1011,8 +1121,9 @@ async function start() {
         );
         return;
       }
-      const channel = (body as any).channel?.id;
-      const threadTs = (body as any).message?.thread_ts || (body as any).message?.ts;
+      const channel = readStringAt(body, ['channel', 'id']);
+      const threadTs =
+        readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
       if (!channel || !threadTs)
         throw new Error('Slack approval reason action is missing channel/thread');
       const resolved = resolveSurfaceApprovalAskWhy({
@@ -1028,8 +1139,8 @@ async function start() {
         thread_ts: threadTs,
         text: resolved.reply,
       });
-    } catch (err: any) {
-      logger.error(`❌ [SlackBridge] Ask-why handling failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`❌ [SlackBridge] Ask-why handling failed: ${errorDetail(err)}`);
     }
   });
 
@@ -1037,7 +1148,7 @@ async function start() {
     await ack();
 
     try {
-      const payload = parseSlackOnboardingAction((action as any).value);
+      const payload = parseSlackOnboardingAction(readStringAt(action, ['value']));
       const onboarding = handleSlackOnboardingTurn({
         channel: payload.channel,
         threadTs: payload.threadTs,
@@ -1051,8 +1162,8 @@ async function start() {
         onboarding.replyText,
         onboarding.completed
       );
-    } catch (err: any) {
-      logger.error(`❌ [SlackBridge] Onboarding button handling failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`❌ [SlackBridge] Onboarding button handling failed: ${errorDetail(err)}`);
     }
   });
 
@@ -1060,13 +1171,13 @@ async function start() {
     await ack();
 
     try {
-      const payload = parseSlackOnboardingAction((action as any).value);
+      const payload = parseSlackOnboardingAction(readStringAt(action, ['value']));
       await client.views.open({
-        trigger_id: (body as any).trigger_id,
+        trigger_id: readStringAt(body, ['trigger_id']),
         view: buildSlackOnboardingModal(payload),
       });
-    } catch (err: any) {
-      logger.error(`❌ [SlackBridge] Opening onboarding modal failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`❌ [SlackBridge] Opening onboarding modal failed: ${errorDetail(err)}`);
     }
   });
 
@@ -1089,8 +1200,8 @@ async function start() {
         onboarding.replyText,
         onboarding.completed
       );
-    } catch (err: any) {
-      logger.error(`❌ [SlackBridge] Onboarding modal submission failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`❌ [SlackBridge] Onboarding modal submission failed: ${errorDetail(err)}`);
     }
   });
 
@@ -1102,14 +1213,15 @@ async function start() {
 // Same guard as the Telegram bridge: only a direct `node index.js` invocation
 // starts the bridge, so importing this module in a test cannot open a Socket
 // Mode connection — and a leaked VITEST env cannot silently no-op a real start.
-const directEntry = process.argv[1]
-  ? pathToFileURL(process.argv[1]).href === import.meta.url
-  : false;
-if (directEntry && !process.env.VITEST) {
-  start().catch((err) => {
-    logger.error(`SlackBridge crashed: ${err.message}`);
-    process.exit(1);
-  });
+const directEntry = isDirectScript(import.meta.url, 'satellites/slack-bridge/src/index.ts');
+const runSlackBridge = defineScript({
+  name: 'slack-bridge',
+  async run({ argv }) {
+    await start(['node', 'satellites/slack-bridge/src/index.ts', ...argv]);
+  },
+});
+if (directEntry && !getRegisteredEnvText('VITEST')) {
+  void runSlackBridge();
 } else if (directEntry) {
   logger.warn('[SlackBridge] VITEST is set — suppressing the direct-entry start.');
 }

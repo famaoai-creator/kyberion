@@ -1,7 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CollaborationEventBatcher } from './collaboration-stream';
+import { CollaborationEventBatcher, collaborationEventVisibleToTier } from './collaboration-stream';
 
 describe('collaboration stream batching', () => {
+  it('uses embedded scope tier and rejects unknown legacy tier', () => {
+    expect(
+      collaborationEventVisibleToTier(
+        { scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-a' } },
+        'confidential',
+        ['public']
+      )
+    ).toBe(false);
+    expect(
+      collaborationEventVisibleToTier(
+        { scope: { scope_kind: 'tenant', tier: 'public', tenant_slug: 'tenant-a' } },
+        'confidential',
+        ['public']
+      )
+    ).toBe(false);
+    expect(
+      collaborationEventVisibleToTier(
+        { scope: { scope_kind: 'tenant', tier: 'public', tenant_slug: 'tenant-a' } },
+        undefined,
+        ['public']
+      )
+    ).toBe(true);
+    expect(collaborationEventVisibleToTier({}, undefined, ['public', 'confidential'])).toBe(false);
+  });
+
   it('emits the first event immediately and batches the rest by type', () => {
     vi.useFakeTimers();
     const emitted: string[][] = [];

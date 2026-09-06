@@ -15,15 +15,13 @@
  *     [--mission-id MSN-123]
  */
 
-import {
-  dispatchProcedure,
-  validateServiceRecording,
-  withExecutionContext,
-  loadProcedures,
-  resolveAllowlistedRecordingRef,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
+import { getRegisteredEnvText } from '@agent/core/foundation';
+import { loadServiceRecordingAtPath } from '@agent/core/service-recording';
+import { withExecutionContext } from '@agent/core/authority';
+import { loadProcedures, resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { parseSafeJsonObjectInput } from './lib/json-input.js';
 
 function parseArgs(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -66,25 +64,20 @@ export const main = defineScript({
     if (!recordingAbs)
       throw new ScriptExitError(1, `procedure "${procedureId}" has no allowlisted recording_ref`);
 
-    let raw: unknown;
+    let recording;
     try {
-      raw = readJson<unknown>(recordingAbs!);
+      recording = loadServiceRecordingAtPath(recordingAbs);
     } catch (err) {
       throw new ScriptExitError(
         1,
-        `failed to read recording: ${err instanceof Error ? err.message : String(err)}`
+        `service recording invalid: ${err instanceof Error ? err.message : String(err)}`
       );
     }
-    const recording = validateServiceRecording(raw);
-    if (!recording.value)
-      throw new ScriptExitError(1, `service recording invalid: ${recording.errors.join('; ')}`);
 
     let inputs: Record<string, unknown> = {};
     if (args['inputs']) {
       try {
-        const parsed = JSON.parse(args['inputs']);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) inputs = parsed;
-        else throw new Error('must be a JSON object');
+        inputs = parseSafeJsonObjectInput(args['inputs'], '--inputs') || {};
       } catch (err) {
         throw new ScriptExitError(
           1,
@@ -93,11 +86,12 @@ export const main = defineScript({
       }
     }
 
-    const missionId = args['mission-id'] || process.env.MISSION_ID || `MSN-PROC-${procedureId}`;
+    const missionId =
+      args['mission-id'] || getRegisteredEnvText('MISSION_ID') || `MSN-PROC-${procedureId}`;
     const result = await withExecutionContext('surface_runtime', () =>
       dispatchProcedure({
         procedure: entry!,
-        serviceRecording: recording.value!,
+        serviceRecording: recording,
         serviceInputs: inputs,
         agentId: 'run-service-procedure',
         missionId,

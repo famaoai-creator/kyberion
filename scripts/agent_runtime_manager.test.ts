@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(async () => ({
     agentId: 'demo-agent-1234',
@@ -18,7 +21,12 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(() => ({ agentId: 'demo-agent-1234' })),
   getSnapshot: vi.fn(() => null),
   loadAgentManifests: vi.fn(() => [
-    { agentId: 'manifest-a', autoSpawn: true, trustRequired: false, systemPrompt: 'Manifest A\nmore text' },
+    {
+      agentId: 'manifest-a',
+      autoSpawn: true,
+      trustRequired: false,
+      systemPrompt: 'Manifest A\nmore text',
+    },
   ]),
   getAgentManifest: vi.fn(() => ({
     systemPrompt: 'Manifest A\nmore text',
@@ -37,19 +45,41 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core/cli-utils', () => ({
   createStandardYargs: vi.fn(),
+}));
+
+vi.mock('@agent/core/agent-lifecycle', () => ({
   agentLifecycle: { spawn: mocks.spawn, shutdown: mocks.shutdown, getSnapshot: mocks.getSnapshot },
+}));
+
+vi.mock('@agent/core/agent-registry', () => ({
   agentRegistry: { list: mocks.list, get: mocks.get },
+}));
+
+vi.mock('@agent/core/agent-manifest', () => ({
   loadAgentManifests: mocks.loadAgentManifests,
   getAgentManifest: mocks.getAgentManifest,
+}));
+
+vi.mock('@agent/core/core', () => ({
   logger: mocks.logger,
-  pathResolver: { rootDir: vi.fn(() => '/tmp/kyberion') },
+}));
+
+vi.mock('@agent/core/audit-chain', () => ({
   auditChain: { record: mocks.record },
+}));
+
+vi.mock('@agent/core/error-classifier', () => ({
   classifyError: mocks.classifyError,
 }));
 
-import { inspectAgent, listManifests, listRunningAgents, spawnAgent } from './agent_runtime_manager.js';
+import {
+  inspectAgent,
+  listManifests,
+  listRunningAgents,
+  spawnAgent,
+} from './agent_runtime_manager.js';
 
 describe('agent_runtime_manager', () => {
   beforeEach(() => {
@@ -57,58 +87,74 @@ describe('agent_runtime_manager', () => {
   });
 
   it('prints a running agent table', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await listRunningAgents();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('AGENT_ID'));
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('demo-agent-1234'));
-    spy.mockRestore();
+    const print = vi.fn();
+    await listRunningAgents(print);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('AGENT_ID'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('demo-agent-1234'));
   });
 
   it('prints manifest listing rows', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await listManifests();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('MANIFEST_ID'));
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('manifest-a'));
-    spy.mockRestore();
+    const print = vi.fn();
+    await listManifests(print);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('MANIFEST_ID'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('manifest-a'));
   });
 
   it('spawns an agent from the manifest defaults', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await spawnAgent('manifest-a', { missionId: 'MSN-TEST' });
+    const print = vi.fn();
+    await spawnAgent('manifest-a', { missionId: 'MSN-TEST' }, print);
     expect(mocks.spawn).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: 'claude',
         modelId: 'claude-3.5-sonnet',
         missionId: 'MSN-TEST',
-      }),
+      })
     );
-    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'agent.manual_spawn' }));
-    spy.mockRestore();
+    expect(mocks.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'agent.manual_spawn' })
+    );
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('demo-agent-1234'));
   });
 
   it('audits classified spawn failures before rethrowing', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     mocks.spawn.mockRejectedValueOnce(new Error('permission denied by runtime policy'));
 
-    await expect(spawnAgent('manifest-a', { missionId: 'MSN-TEST' })).rejects.toThrow('permission denied');
+    await expect(spawnAgent('manifest-a', { missionId: 'MSN-TEST' }, vi.fn())).rejects.toThrow(
+      'permission denied'
+    );
 
     expect(mocks.classifyError).toHaveBeenCalledWith(expect.any(Error));
-    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'agent.manual_spawn',
-      operation: 'manifest-a',
-      result: 'failed',
-      metadata: expect.objectContaining({
-        classification: expect.objectContaining({ category: 'policy_violation' }),
-      }),
-    }));
+    expect(mocks.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'agent.manual_spawn',
+        operation: 'manifest-a',
+        result: 'failed',
+        metadata: expect.objectContaining({
+          classification: expect.objectContaining({ category: 'policy_violation' }),
+        }),
+      })
+    );
     expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('policy_violation'));
-    spy.mockRestore();
   });
 
   it('inspects a registered but inactive agent', async () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await inspectAgent('demo-agent-1234');
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('registered but not actively managed'));
-    spy.mockRestore();
+    const print = vi.fn();
+    await inspectAgent('demo-agent-1234', print);
+    expect(print).toHaveBeenCalledWith(
+      expect.stringContaining('registered but not actively managed')
+    );
+  });
+
+  it('delegates command failures to the shared script harness', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/agent_runtime_manager.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).not.toContain('console.log(');
+    expect(source).not.toContain('console.error(');
+    expect(source).not.toContain('process.exitCode = 1');
   });
 });

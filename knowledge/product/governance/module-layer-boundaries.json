@@ -1,8 +1,30 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/module-layer-boundaries.schema.json",
   "version": 1,
   "layers": ["foundation", "contracts", "domain", "orchestration"],
-  "facade_patterns": ["libs/core/index.ts", "libs/core/index-part-*.ts"],
+  "facade_patterns": [
+    "libs/core/index.ts",
+    "libs/core/index-part-*.ts",
+    "libs/core/channel-surface.ts",
+    "libs/core/agent-runtime-supervisor.ts"
+  ],
+  "direction_exceptions": [
+    {
+      "source": "libs/core/secure-io.ts",
+      "target": "libs/core/audit-chain.ts",
+      "reason": "audit-chain must receive the secure persistence adapter during secure-io bootstrap"
+    },
+    {
+      "source": "libs/core/secure-io.ts",
+      "target": "libs/core/sandbox-policy.ts",
+      "reason": "secure-io enforces the active provider sandbox before filesystem and network operations"
+    },
+    {
+      "source": "libs/core/secure-io.ts",
+      "target": "libs/core/tier-guard.ts",
+      "reason": "secure-io enforces tenant and tier permissions at every governed filesystem boundary"
+    }
+  ],
   "patterns": [
     { "layer": "foundation", "pattern": "libs/core/foundation/**" },
     { "layer": "foundation", "pattern": "libs/core/secure-io.ts" },
@@ -13,6 +35,7 @@
     { "layer": "foundation", "pattern": "libs/core/governance-action-recorder.ts" },
     { "layer": "foundation", "pattern": "libs/core/sensitive-path-policy.ts" },
     { "layer": "foundation", "pattern": "libs/core/policy-engine.ts" },
+    { "layer": "foundation", "pattern": "libs/core/src/lock-utils.ts" },
     { "layer": "contracts", "pattern": "libs/core/structured-output-contracts.ts" },
     { "layer": "contracts", "pattern": "libs/core/context-boundary.ts" },
     { "layer": "contracts", "pattern": "libs/core/worker-goal.ts" },
@@ -46,6 +69,17 @@
     { "layer": "orchestration", "pattern": "libs/core/*orchestrat*.ts" },
     { "layer": "orchestration", "pattern": "libs/core/surface-runtime-conversation-data.ts" },
     { "layer": "orchestration", "pattern": "libs/core/*dispatcher*.ts" },
+    { "layer": "orchestration", "pattern": "scripts/run_service_procedure.ts" },
+    { "layer": "orchestration", "pattern": "scripts/run_mission_orchestration_event_worker.ts" },
+    { "layer": "orchestration", "pattern": "scripts/background_review_mission_e2e.ts" },
+    { "layer": "orchestration", "pattern": "scripts/browser_bridge_host.ts" },
+    { "layer": "orchestration", "pattern": "scripts/kyberion_home.ts" },
+    { "layer": "orchestration", "pattern": "scripts/cli.ts" },
+    { "layer": "orchestration", "pattern": "scripts/kyberion.ts" },
+    { "layer": "orchestration", "pattern": "scripts/bindings.ts" },
+    { "layer": "orchestration", "pattern": "scripts/check_seam_multiplicity.ts" },
+    { "layer": "orchestration", "pattern": "scripts/generate_capability_seams.ts" },
+    { "layer": "orchestration", "pattern": "scripts/demos/*.ts" },
     { "layer": "orchestration", "pattern": "libs/core/*worker*.ts" }
   ],
   "default_layer": "domain"

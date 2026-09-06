@@ -1,7 +1,8 @@
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, loadJson } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
   normalizeEventScope,
   resolveEventScopeAgainstAuthority,
@@ -13,6 +14,73 @@ import {
   type MissionOrchestrationEvent,
   type MissionOrchestrationEventType,
 } from './mission-orchestration-event-contract.js';
+
+const EVENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-orchestration-event.schema.json'
+);
+const PAYLOAD_ENVELOPE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-orchestration-payload-envelope.schema.json'
+);
+
+function missionOrchestrationEventCatalog(eventPath: string) {
+  return defineCatalog<Partial<MissionOrchestrationEvent>>({
+    id: 'mission-orchestration-event',
+    path: eventPath,
+    schema: EVENT_SCHEMA_PATH,
+  });
+}
+
+interface MissionOrchestrationPayloadEnvelope<TPayload = Record<string, unknown>> {
+  event_id: string;
+  mission_id: string;
+  payload: TPayload;
+}
+
+function missionOrchestrationPayloadEnvelopeCatalog(payloadPath: string) {
+  return defineCatalog<MissionOrchestrationPayloadEnvelope>({
+    id: 'mission-orchestration-payload-envelope',
+    path: payloadPath,
+    schema: PAYLOAD_ENVELOPE_SCHEMA_PATH,
+  });
+}
+
+export function validateMissionOrchestrationPayloadEnvelope<TPayload = Record<string, unknown>>(
+  value: unknown,
+  sourcePath: string
+): MissionOrchestrationPayloadEnvelope<TPayload> {
+  return missionOrchestrationPayloadEnvelopeCatalog(sourcePath).validate(
+    value,
+    sourcePath
+  ) as MissionOrchestrationPayloadEnvelope<TPayload>;
+}
+
+/** Load a mission payload envelope through schema, regular-file, and event bindings. */
+export function loadMissionOrchestrationPayloadEnvelopeAtPath<TPayload = Record<string, unknown>>(
+  payloadPath: string,
+  expectedEventId: string,
+  expectedMissionId: string
+): MissionOrchestrationPayloadEnvelope<TPayload> {
+  const safePayloadPath = assertSafeRepositoryPath(payloadPath, { allowMissingLeaf: false });
+  if (!safeLstat(safePayloadPath).isFile()) {
+    throw new Error(
+      `[MISSION_ORCHESTRATION_PAYLOAD_INVALID] payload must be a regular file: ${payloadPath}`
+    );
+  }
+  const envelope = missionOrchestrationPayloadEnvelopeCatalog(
+    safePayloadPath
+  ).load() as MissionOrchestrationPayloadEnvelope<TPayload>;
+  if (envelope.event_id !== expectedEventId) {
+    throw new Error(
+      `[MISSION_ORCHESTRATION_PAYLOAD_SCOPE_MISMATCH] payload belongs to event ${envelope.event_id}, expected ${expectedEventId}`
+    );
+  }
+  if (envelope.mission_id.toUpperCase() !== expectedMissionId.toUpperCase()) {
+    throw new Error(
+      `[MISSION_ORCHESTRATION_PAYLOAD_SCOPE_MISMATCH] payload belongs to mission ${envelope.mission_id}, expected ${expectedMissionId}`
+    );
+  }
+  return envelope;
+}
 
 function resolveMissionOrchestrationScope(
   missionId: string,
@@ -27,20 +95,34 @@ function resolveMissionOrchestrationScope(
             supplied.tenant_slug,
             supplied.tier!
           );
-          return safeExistsSync(candidate) ? candidate : undefined;
+          try {
+            const safeCandidate = assertSafeRepositoryPath(candidate, { allowMissingLeaf: false });
+            return safeExistsSync(safeCandidate) ? safeCandidate : undefined;
+          } catch {
+            return undefined;
+          }
         })()
       : undefined);
-  const statePath = locatedMissionPath ? `${locatedMissionPath}/mission-state.json` : undefined;
+  let statePath: string | undefined;
   try {
-    const state = statePath ? readJson<Record<string, unknown>>(statePath) : {};
+    statePath = locatedMissionPath
+      ? assertSafeRepositoryPath(path.join(locatedMissionPath, 'mission-state.json'), {
+          allowMissingLeaf: false,
+        })
+      : undefined;
+  } catch {
+    statePath = undefined;
+  }
+  try {
+    const state = statePath ? loadMissionStateAtPath(statePath) : null;
     const authority = normalizeEventScope({
       mission_id: missionId,
-      tier: (state.tier_scope || state.tier || 'public') as EventScope['tier'],
-      ...(typeof state.tenant_slug === 'string' ? { tenant_slug: state.tenant_slug } : {}),
-      ...(typeof state.organization_id === 'string'
-        ? { organization_id: state.organization_id }
+      tier: state?.tier || 'public',
+      ...(state?.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
+      ...(state?.organization_id ? { organization_id: state.organization_id } : {}),
+      ...(state?.relationships?.project?.project_id
+        ? { project_id: state.relationships.project.project_id }
         : {}),
-      ...(typeof state.project_id === 'string' ? { project_id: state.project_id } : {}),
     });
     return resolveEventScopeAgainstAuthority(authority, supplied, {
       mission_id: missionId,
@@ -76,7 +158,18 @@ function isSafePayloadReference(
 export function loadMissionOrchestrationEvent<TPayload = Record<string, unknown>>(
   eventPath: string
 ): MissionOrchestrationEvent<TPayload> {
-  const parsed = loadJson<Partial<MissionOrchestrationEvent<TPayload>>>(eventPath);
+  const safeEventPath = assertSafeRepositoryPath(eventPath, { allowMissingLeaf: false });
+  let parsed: Partial<MissionOrchestrationEvent<TPayload>>;
+  try {
+    parsed = missionOrchestrationEventCatalog(safeEventPath).load() as Partial<
+      MissionOrchestrationEvent<TPayload>
+    >;
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    throw new Error(
+      `[MISSION_ORCHESTRATION_EVENT_INVALID] ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
   if (
     typeof parsed.event_id !== 'string' ||
     typeof parsed.event_type !== 'string' ||
@@ -96,23 +189,20 @@ export function loadMissionOrchestrationEvent<TPayload = Record<string, unknown>
         '[MISSION_ORCHESTRATION_EVENT_INVALID] payload_ref is outside the mission payload store'
       );
     }
-    const payloadEnvelope = JSON.parse(
-      String(
-        safeReadFile(pathResolver.rootResolve(parsed.payload_ref), { encoding: 'utf8' }) || '{}'
-      )
-    ) as { event_id?: unknown; mission_id?: unknown; payload?: unknown };
-    if (
-      payloadEnvelope.event_id !== parsed.event_id ||
-      payloadEnvelope.mission_id !== parsed.mission_id.toUpperCase() ||
-      !payloadEnvelope.payload ||
-      typeof payloadEnvelope.payload !== 'object' ||
-      Array.isArray(payloadEnvelope.payload)
-    ) {
+    const payloadPath = assertSafeRepositoryPath(pathResolver.rootResolve(parsed.payload_ref), {
+      allowMissingLeaf: false,
+    });
+    try {
+      parsed.payload = loadMissionOrchestrationPayloadEnvelopeAtPath<TPayload>(
+        payloadPath,
+        parsed.event_id,
+        parsed.mission_id
+      ).payload;
+    } catch (error) {
       throw new Error(
-        '[MISSION_ORCHESTRATION_EVENT_INVALID] mission payload reference envelope is invalid'
+        `[MISSION_ORCHESTRATION_EVENT_INVALID] ${error instanceof Error ? error.message : String(error)}`
       );
     }
-    parsed.payload = payloadEnvelope.payload as TPayload;
   }
   return {
     ...parsed,

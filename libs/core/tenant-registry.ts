@@ -1,37 +1,30 @@
 import * as path from 'node:path';
 import { customerDirForSlug } from './customer-resolver.js';
 import * as pathResolver from './path-resolver.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord, readTextFile } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   safeExistsSync,
-  loadJson,
   safeMkdir,
-  safeReadFile,
+  safeLstat,
   safeReaddir,
   safeWriteFile,
+  assertSafeRepositoryPath,
 } from './secure-io.js';
 
 const TENANT_GROUP_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const TENANT_GROUP_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/tenant-group.schema.json'
 );
-let tenantGroupValidate: ReturnType<typeof compileSchema> | undefined;
 // Resolved at module load against the real repo root on purpose: the schema is
 // tracked source, not fixture data — hermetic tests that pass a fixture
 // rootDir still validate against the canonical schema.
 const TENANT_PROFILE_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/tenant-profile.schema.json'
 );
-let tenantProfileValidate: ReturnType<typeof compileSchema> | undefined;
-
-function getTenantGroupValidator() {
-  return (tenantGroupValidate ??= compileSchema(TENANT_GROUP_SCHEMA_PATH));
-}
-
-function getTenantProfileValidator() {
-  return (tenantProfileValidate ??= compileSchema(TENANT_PROFILE_SCHEMA_PATH));
-}
 
 /** Declared ingest source system for a tenant (DA-01). */
 export interface TenantIngestSource {
@@ -89,6 +82,28 @@ export interface TenantGroupProfile {
   metadata?: Record<string, unknown>;
 }
 
+function validateTenantProfile(
+  profile: unknown,
+  sourcePath = TENANT_PROFILE_SCHEMA_PATH
+): TenantProfile {
+  return defineCatalog<TenantProfile>({
+    id: 'tenant-profile',
+    path: sourcePath,
+    schema: TENANT_PROFILE_SCHEMA_PATH,
+  }).validate(profile, sourcePath);
+}
+
+function validateTenantGroupProfile(
+  profile: TenantGroupProfile,
+  sourcePath = TENANT_GROUP_SCHEMA_PATH
+): TenantGroupProfile {
+  return defineCatalog<TenantGroupProfile>({
+    id: 'tenant-group-profile',
+    path: sourcePath,
+    schema: TENANT_GROUP_SCHEMA_PATH,
+  }).validate(profile, sourcePath);
+}
+
 /** Status gate shared by every tenant-bound writer. */
 export function assertTenantOperational(profile: TenantProfile, operation = 'operation'): void {
   if (profile.status !== 'active') {
@@ -112,13 +127,11 @@ function assertTenantGroupId(groupId: string): void {
 
 function assertTenantGroupProfile(profile: TenantGroupProfile): void {
   const groupId = profile.tenant_group_id;
-  const validate = getTenantGroupValidator();
-  const ok = validate(profile);
-  if (ok) return;
-  const details = (validate.errors || [])
-    .map((err) => `${err.instancePath || '/'} ${err.message || 'schema violation'}`)
-    .join('; ');
-  throw new Error(`[tenant-registry] invalid tenant group profile '${groupId}': ${details}`);
+  try {
+    validateTenantGroupProfile(profile, tenantGroupPath(groupId));
+  } catch (error) {
+    throw new Error(`[tenant-registry] invalid tenant group profile '${groupId}': ${error}`);
+  }
 }
 
 export function tenantProfileDir(options: TenantRegistryPathOptions = {}): string {
@@ -137,29 +150,86 @@ export function tenantProfilePath(slug: string, options: TenantRegistryPathOptio
 /** Codepoint-sorted slugs of every tenant profile file in the profile directory. */
 export function listTenantProfileSlugs(options: TenantRegistryPathOptions = {}): string[] {
   const dir = tenantProfileDir(options);
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
+  let safeDir: string;
+  try {
+    safeDir = assertSafeRepositoryPath(dir, {
+      allowMissingLeaf: true,
+      rootDir: options.rootDir,
+    });
+  } catch {
+    return [];
+  }
+  if (!safeExistsSync(safeDir)) return [];
+  return safeReaddir(safeDir)
     .filter((entry) => entry.endsWith('.json'))
+    .filter((entry) => {
+      try {
+        return safeLstat(path.join(safeDir, entry)).isFile();
+      } catch {
+        return false;
+      }
+    })
     .map((entry) => entry.slice(0, -'.json'.length))
     .filter(isValidTenantSlug)
     .sort();
 }
 
-function assertTenantProfile(profile: TenantProfile): void {
-  const slug = profile?.tenant_slug ?? 'unknown';
-  const validate = getTenantProfileValidator();
-  const ok = validate(profile);
-  if (ok) return;
-  const details = (validate.errors || [])
-    .map((err) => `${err.instancePath || '/'} ${err.message || 'schema violation'}`)
-    .join('; ');
-  throw new Error(`[tenant-registry] invalid tenant profile '${slug}': ${details}`);
+function assertTenantProfile(profile: unknown): asserts profile is TenantProfile {
+  const slug =
+    isRecord(profile) && typeof profile.tenant_slug === 'string' ? profile.tenant_slug : 'unknown';
+  try {
+    validateTenantProfile(profile, `tenant profile '${slug}'`);
+  } catch (error) {
+    throw new Error(`[tenant-registry] invalid tenant profile '${slug}': ${error}`);
+  }
 }
 
 /** Default repo-relative knowledge root for a tenant (DA-01). */
 export function defaultTenantKnowledgeRoot(slug: string): string {
   assertTenantSlug(slug);
   return `knowledge/confidential/${slug}`;
+}
+
+/**
+ * Resolve a profile-declared knowledge root without allowing cross-tenant
+ * placement, traversal, or a symlinked component to change its identity.
+ * The final leaf may be absent because resolveTenant is also used before
+ * tenant knowledge is first created.
+ */
+function resolveTenantKnowledgeRootPath(
+  rootDir: string,
+  tenantSlug: string,
+  knowledgeRoot: string
+): string {
+  const normalized = knowledgeRoot.replace(/\\/g, '/').replace(/\/+$/, '');
+  const expectedPrefix = `knowledge/confidential/${tenantSlug}`;
+  if (normalized !== expectedPrefix && !normalized.startsWith(`${expectedPrefix}/`)) {
+    throw new Error(
+      `[tenant-registry] tenant '${tenantSlug}' knowledge_root must remain under '${expectedPrefix}'`
+    );
+  }
+
+  const base = path.resolve(rootDir);
+  const absolute = path.resolve(base, normalized);
+  const relative = path.relative(base, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[tenant-registry] tenant '${tenantSlug}' knowledge_root escapes registry root`
+    );
+  }
+
+  try {
+    return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true, rootDir: base });
+  } catch (error) {
+    if (String((error as Error)?.message).includes('[RESOURCE_PATH_SYMLINK]')) {
+      throw new Error(
+        `[tenant-registry] tenant '${tenantSlug}' knowledge_root traverses a symbolic link`
+      );
+    }
+    throw new Error(
+      `[tenant-registry] tenant '${tenantSlug}' knowledge_root could not be inspected safely`
+    );
+  }
 }
 
 /** Underlying failure text, without its trailing period, so a suffix reads as one sentence. */
@@ -191,14 +261,30 @@ export function readTenantProfile(
   options: TenantRegistryPathOptions = {}
 ): TenantProfile | null {
   const file = tenantProfilePath(slug, options);
-  if (!safeExistsSync(file)) return null;
+  let safeFile: string;
+  try {
+    safeFile = assertSafeRepositoryPath(file, {
+      allowMissingLeaf: true,
+      rootDir: options.rootDir,
+    });
+  } catch (error) {
+    const reason = String((error as Error)?.message ?? error);
+    if (reason.includes('[RESOURCE_PATH_SYMLINK]')) {
+      throw new Error(`[tenant-registry] tenant profile '${slug}' traverses a symbolic link`);
+    }
+    throw new Error(`[tenant-registry] tenant profile '${slug}' could not be inspected safely`);
+  }
+  if (!safeExistsSync(safeFile)) return null;
   // Read and parse are reported separately on purpose. Profiles normally live in
   // the personal tier, where secure-io denies unauthorized readers ("Sovereign
   // Sanctuary"); folding that denial into a "not valid JSON" message sent
   // callers looking for a corrupt file instead of a missing execution context.
   let source: string;
   try {
-    source = safeReadFile(file, { encoding: 'utf8' }) as string;
+    if (!safeLstat(safeFile).isFile()) {
+      throw new Error('tenant profile must be a regular file');
+    }
+    source = readTextFile(safeFile);
   } catch (error) {
     throw new Error(
       `[tenant-registry] tenant profile '${slug}' could not be read (${file}): ${describeCause(
@@ -206,9 +292,9 @@ export function readTenantProfile(
       )}${profileReadHint(file)}`
     );
   }
-  let profile: TenantProfile;
+  let profile: unknown;
   try {
-    profile = JSON.parse(source) as TenantProfile;
+    profile = parseSafeJsonInput(source, `tenant profile '${slug}'`);
   } catch (error) {
     throw new Error(
       `[tenant-registry] tenant profile '${slug}' is not valid JSON (${file}): ${(error as Error).message}`
@@ -239,13 +325,15 @@ export function writeTenantProfile(
     knowledge_root: profile.knowledge_root || defaultTenantKnowledgeRoot(profile.tenant_slug),
   };
   assertTenantProfile(normalized);
+  const rootDir = options.rootDir ?? pathResolver.rootDir();
+  const knowledgeRootPath = resolveTenantKnowledgeRootPath(
+    rootDir,
+    normalized.tenant_slug,
+    normalized.knowledge_root!
+  );
   const file = tenantProfilePath(normalized.tenant_slug, options);
   safeMkdir(path.dirname(file), { recursive: true });
   safeWriteFile(file, JSON.stringify(normalized, null, 2) + '\n', { encoding: 'utf8' });
-  const knowledgeRootPath = path.resolve(
-    options.rootDir ?? pathResolver.rootDir(),
-    normalized.knowledge_root!
-  );
   if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
   return normalized;
 }
@@ -270,12 +358,31 @@ export function resolveTenant(
   }
   assertTenantOperational(profile, 'tenant-bound operation');
   const knowledgeRoot = profile.knowledge_root ?? defaultTenantKnowledgeRoot(slug);
-  const overlayDir = customerDirForSlug(slug, rootDir);
+  const knowledgeRootPath = resolveTenantKnowledgeRootPath(rootDir, slug, knowledgeRoot);
+  let safeOverlayDir: string | null = null;
+  try {
+    const overlayDir = customerDirForSlug(slug, rootDir);
+    const candidate = assertSafeRepositoryPath(overlayDir, {
+      allowMissingLeaf: true,
+      rootDir,
+    });
+    if (safeExistsSync(candidate)) safeOverlayDir = candidate;
+  } catch (error) {
+    const reason = String((error as Error)?.message ?? error);
+    if (reason.includes('[RESOURCE_PATH_SYMLINK]')) {
+      throw new Error(
+        `[tenant-registry] tenant '${slug}' customer overlay traverses a symbolic link`
+      );
+    }
+    throw new Error(
+      `[tenant-registry] tenant '${slug}' customer overlay could not be inspected safely`
+    );
+  }
   return {
     profile,
     knowledge_root: knowledgeRoot,
-    knowledge_root_path: path.join(rootDir, knowledgeRoot),
-    customer_overlay_root: safeExistsSync(overlayDir) ? overlayDir : null,
+    knowledge_root_path: knowledgeRootPath,
+    customer_overlay_root: safeOverlayDir,
   };
 }
 
@@ -290,11 +397,10 @@ export function tenantGroupPath(groupId: string): string {
 
 export function ensureDefaultTenantProfile(): TenantProfile {
   const file = tenantProfilePath('default');
-  if (safeExistsSync(file)) {
-    return loadJson<TenantProfile>(file);
-  }
+  const existing = readTenantProfile('default');
+  if (existing) return existing;
 
-  const now = new Date().toISOString();
+  const now = nowIso();
   const profile: TenantProfile = {
     tenant_slug: 'default',
     tenant_id: 'default',

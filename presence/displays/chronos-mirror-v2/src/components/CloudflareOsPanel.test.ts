@@ -17,7 +17,8 @@ describe('Chronos Cloudflare OS panel contract', () => {
     expect(source).toContain('AbortController');
     expect(source).toContain('requestSequence');
     expect(source).toContain("uxText('chronos_os_control_plane'");
-    expect(source).toContain('!response.ok || payload.ok === false');
+    expect(source).toContain('parseCloudflareOsResponse');
+    expect(source).toContain('payload.snapshot.heldActions');
     expect(source).not.toContain('/decision');
     expect(source).not.toContain('/apply');
     expect(source).not.toContain('applyError');

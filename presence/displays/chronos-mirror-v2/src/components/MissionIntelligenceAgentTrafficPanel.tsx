@@ -5,7 +5,6 @@ import { messageToneClass, messageTypeLabel } from './MissionIntelligenceViewHel
 
 export function MissionIntelligenceAgentTrafficPanel(context: Record<string, any>) {
   const {
-    data,
     mt,
     panelVisible,
     messageMissionFilter,

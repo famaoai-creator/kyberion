@@ -4,9 +4,28 @@ import * as path from 'node:path';
 
 // Mock dependencies before importing the module under test
 vi.mock('../secure-io.js', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeReadFile: (filePath: string, _opts: any) => {
     return fs.readFileSync(filePath, 'utf8');
   },
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
+}));
+
+vi.mock('../foundation/json.js', () => ({
+  readJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+}));
+
+vi.mock('../foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+    loadJsonIfPresent: <T>(filePath: string) =>
+      fs.existsSync(filePath) ? (JSON.parse(fs.readFileSync(filePath, 'utf8')) as T) : null,
+    appendFile: (filePath: string, content: string) => fs.appendFileSync(filePath, content),
+    exists: (filePath: string) => fs.existsSync(filePath),
+    readFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: (filePath: string, content: string) => fs.writeFileSync(filePath, content),
+  }),
 }));
 
 vi.mock('../core.js', () => ({
@@ -19,11 +38,12 @@ vi.mock('../core.js', () => ({
 
 import { resolveRef, handleStepError } from './pipeline-engine.js';
 
-const TMP_FILE = '/tmp/test-sub-pipeline.json';
+const TMP_FILE = path.join(process.cwd(), 'active/shared/tmp/test-sub-pipeline.json');
 
 describe('pipeline-engine', () => {
   beforeEach(() => {
     // Clean up temp files before each test
+    fs.mkdirSync(path.dirname(TMP_FILE), { recursive: true });
     if (fs.existsSync(TMP_FILE)) {
       fs.unlinkSync(TMP_FILE);
     }
@@ -79,8 +99,42 @@ describe('pipeline-engine', () => {
 
     it('throws on missing file', async () => {
       await expect(
-        resolveRef('/tmp/nonexistent-pipeline-xyz.json', {}, { _refDepth: 0 }, (v: any) => v)
+        resolveRef(
+          'active/shared/tmp/nonexistent-pipeline-xyz.json',
+          {},
+          { _refDepth: 0 },
+          (v: unknown) => v
+        )
       ).rejects.toThrow();
+    });
+
+    it('rejects a referenced file that is not a valid pipeline ADF', async () => {
+      fs.writeFileSync(TMP_FILE, JSON.stringify({ steps: { invalid: true } }));
+
+      await expect(resolveRef(TMP_FILE, {}, {}, (v: unknown) => v)).rejects.toThrow(
+        'Invalid pipeline ADF'
+      );
+    });
+
+    it('rejects refs outside the repository root', async () => {
+      await expect(
+        resolveRef('/tmp/test-sub-pipeline.json', {}, {}, (v: unknown) => v)
+      ).rejects.toThrow('[PIPELINE_SCOPE]');
+    });
+
+    it('rejects refs reached through a symbolic link', async () => {
+      const target = path.join(path.dirname(TMP_FILE), 'pipeline-target.json');
+      const link = path.join(path.dirname(TMP_FILE), 'pipeline-link.json');
+      try {
+        fs.writeFileSync(target, JSON.stringify({ steps: [] }));
+        fs.symlinkSync(target, link);
+        await expect(resolveRef(link, {}, { _refDepth: 0 }, (v: unknown) => v)).rejects.toThrow(
+          '[PIPELINE_SCOPE]'
+        );
+      } finally {
+        if (fs.existsSync(link)) fs.unlinkSync(link);
+        if (fs.existsSync(target)) fs.unlinkSync(target);
+      }
     });
   });
 
@@ -129,6 +183,19 @@ describe('pipeline-engine', () => {
         fallbackSteps,
         expect.objectContaining({ _error: expect.any(Object) })
       );
+    });
+
+    it('rejects a fallback ref that resolves to a non-string path', async () => {
+      await expect(
+        handleStepError(
+          testError,
+          testStep,
+          { strategy: 'fallback', ref: '{{fallback_ref}}' },
+          testCtx,
+          vi.fn(),
+          () => ({ invalid: true })
+        )
+      ).rejects.toThrow('fallback ref must resolve to a non-empty string');
     });
   });
 });

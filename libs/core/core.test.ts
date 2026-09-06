@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import { ui, fileUtils } from './core.js';
 import {
   detectTier,
@@ -50,6 +52,14 @@ describe('core library bundle', () => {
   afterEach(() => {
     vi.useRealTimers();
     process.argv = [...originalArgv];
+  });
+
+  it('routes mission-aware core reads through the governed environment accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/core.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain('process.env.MISSION_ID');
+    expect(source).toContain("getRegisteredEnvText('MISSION_ID')");
   });
 
   describe('tier-guard', () => {
@@ -124,6 +134,7 @@ describe('core library bundle', () => {
     it('should parse JSON safely or throw', () => {
       expect((safeJsonParse('{"a":1}', 'test') as any).a).toBe(1);
       expect(() => safeJsonParse('invalid', 'test')).toThrow('Invalid test');
+      expect(() => safeJsonParse('{"__proto__":{"x":1}}', 'test')).toThrow('Invalid test');
     });
 
     it('should detect missing arguments', () => {

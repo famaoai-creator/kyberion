@@ -1,36 +1,87 @@
 import {
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
-} from '@agent/core';
-import { loadJsonCatalog, loadMediaDesignSystemsCatalog } from './media-catalog-loaders.js';
+} from '@agent/core/media-theme-role-policy';
+import { defineCatalog } from '@agent/core/foundation';
+import * as path from 'node:path';
+import {
+  cloneJsonValue,
+  deepMergeCatalog,
+  loadMediaDesignSystemsCatalog,
+  readJsonFilesRecursively,
+} from './media-catalog-loaders.js';
 
-function loadSemanticRenderTokenCatalog(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens',
-    filePath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens.json',
-    fallback: { defaults: { content: {} }, semantics: {}, signal_tones: {} },
+export interface SemanticRenderTokenCatalog {
+  version: string;
+  defaults: Record<string, SemanticRenderTokens>;
+  semantics: Record<string, SemanticRenderTokens>;
+  signal_tones: Record<string, number>;
+}
+
+export type SemanticRenderTokens = Record<string, Record<string, unknown>>;
+
+export interface MediaPptxPalette {
+  dk1: string;
+  dk2: string;
+  lt1: string;
+  lt2: string;
+  accent1: string;
+  accent2: string;
+}
+
+export function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderTokenCatalog {
+  const aggregationSeed: SemanticRenderTokenCatalog = {
+    version: '1.0.0',
+    defaults: { content: {} },
+    semantics: {},
+    signal_tones: {},
+  };
+  const catalog = defineCatalog<SemanticRenderTokenCatalog>({
+    id: 'semantic-render-tokens',
+    path: path.resolve(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/semantic-render-tokens.json'
+    ),
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/semantic-render-tokens.schema.json'),
   });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/semantic-render-tokens'
+  );
+  const docs = readJsonFilesRecursively(directoryPath);
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce(
+    (acc, doc) => deepMergeCatalog(acc, doc),
+    cloneJsonValue(aggregationSeed)
+  );
+  return catalog.validate(merged, directoryPath);
 }
 
 export function resolveSemanticRenderTokens(
   rootDir: string,
   semanticType?: string,
   designSystemId?: string
-): any {
+): SemanticRenderTokens {
   const catalog = loadSemanticRenderTokenCatalog(rootDir);
   const key = String(semanticType || 'content').trim() || 'content';
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
-  const systemOverrides = designSystemId
+  const defaultTokens: SemanticRenderTokens = catalog.defaults.content || {};
+  const semanticTokens: SemanticRenderTokens = catalog.semantics[key] || {};
+  const systemOverrides: SemanticRenderTokens = designSystemId
     ? designSystems.systems?.[designSystemId]?.semantic_overrides?.[key] || {}
     : {};
   return {
-    ...(catalog.defaults?.content || {}),
-    ...(catalog.semantics?.[key] || {}),
+    ...defaultTokens,
+    ...semanticTokens,
     ...systemOverrides,
   };
 }
 
-export function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
+export function resolveThemeColorRole(
+  palette: MediaPptxPalette,
+  accentHex: string,
+  role?: string
+): string {
   const resolvedRole = resolveThemeColorRolePolicy(role, 'secondary');
   switch (resolvedRole) {
     case 'accent':
@@ -43,7 +94,7 @@ export function resolveThemeColorRole(palette: any, accentHex: string, role?: st
 }
 
 export function resolveThemeHexColor(
-  themeColors: any,
+  themeColors: Record<string, unknown>,
   role?: string,
   fallback = '#334155'
 ): string {

@@ -1,9 +1,9 @@
 {
   "action": "pipeline",
   "name": "meeting-facilitation-workflow",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "AI-led meeting session: join → listen N seconds → leave. Emits a transcript artifact for downstream action-item and fairness follow-up pipelines. Supports Google Meet, Microsoft Teams, and Zoom.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles. v2.1: live join via meeting:join (browser-playwright + live-caption capture) replaces the retired-CLI stub.",
   "context": {
     "persona_name": "Operator",
     "profile_id": "operator-default-v1",
@@ -39,26 +39,18 @@
     {
       "id": "join_session",
       "role": "sink",
-      "op": "system:log",
+      "op": "meeting:join",
+      "produces": { "channel": "join_result", "type": "MeetingJoinResult" },
       "params": {
-        "message": "Meeting browser join CLI was retired; instantiate this template with meeting-actuator join_backend=browser-playwright before live use."
-      }
-    },
-    {
-      "id": "log_session",
-      "role": "sink",
-      "op": "system:log",
-      "params": {
-        "message": "Meeting join skipped: browser join CLI is retired until this template is instantiated with meeting-actuator."
-      }
-    },
-    {
-      "id": "write_transcript_stub",
-      "role": "sink",
-      "op": "code:write_artifact",
-      "params": {
-        "path": "{{transcript_path}}",
-        "content": "# Meeting Transcript\n\nPersona: {{persona_name}}\nMeeting URL: {{meeting_url}}\nListen Duration: {{listen_duration_sec}}s\nAgenda:\n- {{agenda[0]}}\n- {{agenda[1]}}\n\nSession result: meeting join skipped; instantiate this template with meeting-actuator for live capture.\n"
+        "platform": "{{platform}}",
+        "url": "{{meeting_url}}",
+        "meeting_id": "{{meeting_id}}",
+        "passcode": "{{passcode}}",
+        "display_name": "{{display_name}}",
+        "duration_sec": "{{listen_duration_sec}}",
+        "transcript_path": "{{transcript_path}}",
+        "screenshot_path": "{{screenshot_path}}",
+        "python_bin": "{{python_bin}}"
       }
     },
     {

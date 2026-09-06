@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "monitoring-rules.schema.json",
+  "title": "Documentation-only monitoring rules",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "documentation_only": { "const": true },
+    "version": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "slo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": { "$ref": "#/$defs/slo" },
+        "critical_path": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/slo" }
+        }
+      },
+      "required": ["default", "critical_path"]
+    },
+    "benchmarking": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "iterations": { "type": "integer", "minimum": 1 },
+        "output_dir": { "type": "string", "minLength": 1 }
+      },
+      "required": ["iterations", "output_dir"]
+    },
+    "pulse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "error_thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "degraded": { "type": "number", "minimum": 0 },
+            "critical": { "type": "number", "minimum": 0 }
+          },
+          "required": ["degraded", "critical"]
+        },
+        "interval_ms": { "type": "integer", "minimum": 1 },
+        "stimuli_path": { "type": "string", "minLength": 1 }
+      },
+      "required": ["error_thresholds", "interval_ms", "stimuli_path"]
+    },
+    "quarantine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "consecutive_breaches_threshold": { "type": "integer", "minimum": 1 },
+        "target_status": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled", "consecutive_breaches_threshold", "target_status"]
+    }
+  },
+  "$defs": {
+    "slo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "latency_ms": { "type": "number", "minimum": 0 },
+        "success_rate": { "type": "number", "minimum": 0, "maximum": 100 }
+      },
+      "required": ["latency_ms", "success_rate"]
+    }
+  },
+  "required": [
+    "$schema",
+    "documentation_only",
+    "version",
+    "name",
+    "slo",
+    "benchmarking",
+    "pulse",
+    "quarantine"
+  ]
+}

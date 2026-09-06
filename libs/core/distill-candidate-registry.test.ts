@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { createDistillCandidateRecord, listDistillCandidateRecords, loadDistillCandidateRecord, saveDistillCandidateRecord, updateDistillCandidateRecord } from './distill-candidate-registry.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  createDistillCandidateRecord,
+  listDistillCandidateRecords,
+  loadDistillCandidateRecord,
+  saveDistillCandidateRecord,
+  updateDistillCandidateRecord,
+} from './distill-candidate-registry.js';
 import { buildOrganizationWorkLoopSummary } from './work-design.js';
 
 describe('distill-candidate-registry', () => {
+  it('returns null for a missing candidate', () => {
+    expect(loadDistillCandidateRecord('DSC-MISSING-REGRESSION')).toBeNull();
+  });
+
   it('creates and persists distill candidates', () => {
     const workLoop = buildOrganizationWorkLoopSummary({
       intentId: 'generate-presentation',
@@ -34,7 +46,36 @@ describe('distill-candidate-registry', () => {
     expect(loaded?.title).toBe('Promote reusable deck pattern');
     expect(loaded?.track_id).toBe('TRK-TEST-REL1');
     expect(loaded?.work_loop?.resolution.execution_shape).toBe('task_session');
-    expect(listDistillCandidateRecords().some((item) => item.candidate_id === record.candidate_id)).toBe(true);
+    expect(
+      listDistillCandidateRecords().some((item) => item.candidate_id === record.candidate_id)
+    ).toBe(true);
+  });
+
+  it('persists the canonical candidate payload after updating its timestamp', () => {
+    const candidateId = 'DSC-TEST-CANONICAL';
+    const filePath = pathResolver.shared(`runtime/distill-candidates/${candidateId}.json`);
+    const record = createDistillCandidateRecord({
+      candidate_id: candidateId,
+      source_type: 'artifact',
+      title: 'Canonical candidate',
+      summary: 'Candidate metadata is canonicalized before persistence.',
+      status: 'proposed',
+      target_kind: 'pattern',
+      $schema: 'governance-metadata',
+    } as unknown as Parameters<typeof createDistillCandidateRecord>[0]);
+
+    try {
+      saveDistillCandidateRecord(record);
+      const persisted = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as Record<
+        string,
+        unknown
+      >;
+      expect(persisted).not.toHaveProperty('$schema');
+      expect(persisted.candidate_id).toBe(candidateId);
+      expect(persisted.updated_at).toBeTypeOf('string');
+    } finally {
+      safeRmSync(filePath, { force: true });
+    }
   });
 
   it('updates promotion state and ref', () => {

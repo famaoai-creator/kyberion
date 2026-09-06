@@ -14,6 +14,7 @@ The **Presence Layer** is the perceptual extension of the Kyberion CLI Nexus. It
 ## 1. Philosophy: The Sensory Nexus
 
 The "Nexus" is the active dialogue session between the User and the Agent in the terminal. The Presence Layer expands this Nexus by giving the Agent:
+
 - **Ears & Eyes (Sensors)**: Ability to receive asynchronous or real-time stimuli from external sources.
 - **Presence (Displays)**: Ability to manifest its thought process and knowledge in a visual or public medium.
 
@@ -27,13 +28,13 @@ After the mission/runtime refactor, the Presence Layer also acts as a boundary b
 
 All external interactions are categorized by **Channels**, each defined in `presence/bridge/channel-registry.json`.
 
-| Channel | Priority | Mode | Nature |
-| :--- | :--- | :--- | :--- |
-| **Terminal** | 10 | REALTIME | Primary direct interaction (Low latency). |
-| **Visual** | 9 | REALTIME | Screen capture and visual state (Prototype). |
-| **Voice** | 8 | REALTIME | High-priority auditory commands (Urgent). |
-| **Slack** | 5 | BATCH | Asynchronous collaboration (Delayed response). |
-| **Pulse** | 3 | BATCH | Background system events (Passive). |
+| Channel      | Priority | Mode     | Nature                                         |
+| :----------- | :------- | :------- | :--------------------------------------------- |
+| **Terminal** | 10       | REALTIME | Primary direct interaction (Low latency).      |
+| **Visual**   | 9        | REALTIME | Screen capture and visual state (Prototype).   |
+| **Voice**    | 8        | REALTIME | High-priority auditory commands (Urgent).      |
+| **Slack**    | 5        | BATCH    | Asynchronous collaboration (Delayed response). |
+| **Pulse**    | 3        | BATCH    | Background system events (Passive).            |
 
 ## 3. The Intervention Protocol (How I Perceive)
 
@@ -55,7 +56,7 @@ The **Nexus Daemon** (`presence/bridge/nexus-daemon.js`) can physically inject s
 
 - **Supported Terminals**: iTerm2 (Primary), VS Code Integrated Terminal (Fallback).
 - **Trigger**: New `PENDING` stimulus detected + Terminal state is IDLE.
-- **Injected Format**: 
+- **Injected Format**:
   ```text
   [SENSORY_INPUT_BEGIN]
   Source: <channel_id>
@@ -89,16 +90,20 @@ Chronos Mirror v2 may hold a cached runtime handle for UX efficiency, but it sho
 Provides the Agent with the ability to capture and interpret the physical state of the workspace.
 
 ### 5.1. Modular Driver Architecture
+
 Visual sensing uses a **Driver Strategy Pattern** for cross-platform support:
+
 - **Orchestrator (`presence/sensors/visual-sensor.js`)**: Detects OS and delegates to drivers.
 - **Drivers**:
-    - `macos-driver.js`: Uses native `screencapture`.
-    - *Linux/Windows drivers planned.*
+  - `macos-driver.js`: Uses native `screencapture`.
+  - _Linux/Windows drivers planned._
 
 ### 5.2. CLI Usage
+
 Manual capture trigger:
+
 ```bash
-npm run cli -- system visual-capture [screen|window]
+pnpm kyberion system visual-capture [screen|window]
 ```
 
 ## 6. 🛡️ Service Management & Watchdog
@@ -133,12 +138,12 @@ To add a new sensory input:
 1.  **Register Channel**: Update `presence/bridge/channel-registry.json`.
 2.  **Write Stimulus**: Append a JSON line to `presence/bridge/runtime/stimuli.jsonl`:
     ```json
-    { 
-      "timestamp": "ISO-8601-TS", 
-      "source_channel": "your-id", 
-      "delivery_mode": "REALTIME|BATCH", 
-      "payload": "Message", 
-      "status": "PENDING" 
+    {
+      "timestamp": "ISO-8601-TS",
+      "source_channel": "your-id",
+      "delivery_mode": "REALTIME|BATCH",
+      "payload": "Message",
+      "status": "PENDING"
     }
     ```
 3.  **Mirror Observability**: Append an explainable event under `active/shared/observability/channels/<channel>/`.

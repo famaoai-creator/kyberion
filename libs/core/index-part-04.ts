@@ -39,6 +39,8 @@ export * from './service-runtime-policy.js';
 
 export * from './service-runtime-registry.js';
 
+export * from './service-pid-registry.js';
+
 export * from './voice-tts-config.js';
 
 export * from './voice-runtime-policy.js';
@@ -273,6 +275,7 @@ export {
   getVaultEntry,
   invalidateVaultEntry,
   listVaultEntries,
+  loadVaultEntryAtPath,
 } from './data-vault.js';
 
 export type {
@@ -327,6 +330,10 @@ export * from './agent-mediator.js';
 export * from './acp-mediator.js';
 
 export * from './copilot-acp-reasoning-backend.js';
+
+export * from './cursor-cli-reasoning-backend.js';
+
+export * from './opencode-cli-reasoning-backend.js';
 
 export * from './agent-adapter.js';
 

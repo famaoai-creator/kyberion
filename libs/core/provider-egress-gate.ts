@@ -38,10 +38,9 @@
  * See docs/developer/improvement-plans-2026-07/
  * CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-03.
  */
-import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { detectTier, TIERS } from './tier-guard.js';
 import type { TierLevel } from './types.js';
 import { sendOpsAlert } from './ops-alert.js';
@@ -72,26 +71,26 @@ type PolicyLoadResult =
   | { status: 'missing' }
   | { status: 'invalid'; reason: string };
 
-let cachedValidator: ValidateFunction | null = null;
 let cachedPolicyPath: string | null = null;
 let cachedResult: PolicyLoadResult | null = null;
 
 function policyPath(): string {
-  return (
-    getRegisteredEnvText('KYBERION_PROVIDER_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH
-  );
+  const configured =
+    getRegisteredEnvText('KYBERION_PROVIDER_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
-function ensureValidator(): ValidateFunction {
-  if (cachedValidator) return cachedValidator;
-  cachedValidator = compileSchema(SCHEMA_PATH);
-  return cachedValidator;
-}
+const policyCatalog = defineCatalog<ProviderEgressPolicyFile>({
+  id: 'provider-egress-policy',
+  path: policyPath,
+  schema: SCHEMA_PATH,
+});
 
 /** Test-only: force the next `loadProviderEgressPolicy` to re-read + re-validate. */
-export function resetProviderEgressPolicyCache(): void {
+export function _resetProviderEgressPolicyCacheForTests(): void {
   cachedPolicyPath = null;
   cachedResult = null;
+  policyCatalog.reset();
 }
 
 /**
@@ -102,7 +101,17 @@ export function resetProviderEgressPolicyCache(): void {
  * crashing the caller.
  */
 export function loadProviderEgressPolicy(): PolicyLoadResult {
-  const filePath = policyPath();
+  let filePath: string;
+  try {
+    filePath = policyPath();
+  } catch (error) {
+    cachedPolicyPath = null;
+    cachedResult = {
+      status: 'invalid',
+      reason: error instanceof Error ? error.message : String(error),
+    };
+    return cachedResult;
+  }
   if (cachedResult && cachedPolicyPath === filePath) return cachedResult;
   cachedPolicyPath = filePath;
 
@@ -111,17 +120,7 @@ export function loadProviderEgressPolicy(): PolicyLoadResult {
     return cachedResult;
   }
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw);
-    const validate = ensureValidator();
-    if (!validate(parsed)) {
-      cachedResult = {
-        status: 'invalid',
-        reason: `schema violation: ${validate.errors?.map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ') || 'unknown'}`,
-      };
-      return cachedResult;
-    }
-    cachedResult = { status: 'ok', policy: parsed as ProviderEgressPolicyFile };
+    cachedResult = { status: 'ok', policy: policyCatalog.load() };
     return cachedResult;
   } catch (err) {
     cachedResult = {
@@ -324,6 +323,10 @@ const REASONING_IDENTIFIER_TO_PROVIDER_ID: Readonly<Record<string, string>> = {
   'shell-grok-cli': 'grok',
   'grok-api': 'grok',
   grok: 'grok',
+  'cursor-cli': 'cursor',
+  cursor: 'cursor',
+  'opencode-cli': 'opencode',
+  opencode: 'opencode',
 };
 
 /** Map a reasoning mode or backend name to a provider id known to the egress policy, when possible. */

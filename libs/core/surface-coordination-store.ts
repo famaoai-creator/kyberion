@@ -2,17 +2,18 @@ import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
-  loadJson,
   safeMkdir,
   safeMoveSync,
   safeReaddir,
   safeRmSync,
-  safeStat,
+  safeLstat,
 } from './secure-io.js';
 import {
   appendGovernedArtifactJsonl,
@@ -38,6 +39,28 @@ import type {
   SurfaceNotificationRecord,
   SurfaceOutboxMessage,
 } from './channel-surface-types.js';
+
+const SURFACE_OUTBOX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-outbox-message.schema.json'
+);
+const SURFACE_ASYNC_REQUEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-async-request.schema.json'
+);
+const SURFACE_NOTIFICATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-notification.schema.json'
+);
+const SURFACE_DEAD_TARGET_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-dead-target.schema.json'
+);
+const SURFACE_DEAD_LETTER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-dead-letter.schema.json'
+);
+
+const surfaceOutboxCatalog = defineCatalog<SurfaceOutboxMessage>({
+  id: 'surface-outbox-message',
+  path: SURFACE_OUTBOX_SCHEMA_PATH,
+  schema: SURFACE_OUTBOX_SCHEMA_PATH,
+});
 
 function resolveSurfaceScope(scope?: EventScopeInput): EventScope {
   return normalizeEventScope(scope || { scope_kind: 'system', tier: 'public' });
@@ -174,16 +197,166 @@ function surfaceDeadTargetBase(surface: SurfaceAsyncChannel): string {
 }
 
 function collectJsonFiles(root: string, recursive: boolean): string[] {
-  if (!safeExistsSync(root)) return [];
-  return safeReaddir(root)
+  let safeRoot: string;
+  try {
+    safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeRoot)) return [];
+    const rootStat = safeLstat(safeRoot);
+    if (!rootStat.isDirectory()) return [];
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('[RESOURCE_PATH_SYMLINK]') ||
+        (error as NodeJS.ErrnoException).code === 'ENOENT')
+    ) {
+      return [];
+    }
+    throw error;
+  }
+  return safeReaddir(safeRoot)
     .sort()
     .flatMap((name) => {
       if (name === '.quarantine') return [];
       const child = path.join(root, name);
-      const stat = safeStat(child);
-      if (stat.isDirectory()) return recursive ? collectJsonFiles(child, true) : [];
-      return stat.isFile() && name.endsWith('.json') ? [child] : [];
+      try {
+        const safeChild = assertSafeRepositoryPath(child, { allowMissingLeaf: true });
+        const stat = safeLstat(safeChild);
+        if (stat.isDirectory()) return recursive ? collectJsonFiles(child, true) : [];
+        return stat.isFile() && name.endsWith('.json') ? [safeChild] : [];
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.message.includes('[RESOURCE_PATH_SYMLINK]') ||
+            (error as NodeJS.ErrnoException).code === 'ENOENT')
+        ) {
+          return [];
+        }
+        throw error;
+      }
     });
+}
+
+function loadGovernedSurfaceRecordAtPath<T>(
+  filePath: string,
+  catalogId: string,
+  schemaPath: string
+): T {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[SURFACE_COORDINATION] ${catalogId} must be a regular file: ${filePath}`);
+  }
+  return defineCatalog<T>({ id: catalogId, path: safeFilePath, schema: schemaPath }).load();
+}
+
+function loadSurfaceAsyncRequestAtPath(
+  filePath: string,
+  surface: SurfaceAsyncChannel
+): SurfaceAsyncRequestRecord {
+  const request = loadGovernedSurfaceRecordAtPath<SurfaceAsyncRequestRecord>(
+    filePath,
+    'surface-async-request',
+    SURFACE_ASYNC_REQUEST_SCHEMA_PATH
+  );
+  if (request.surface !== surface) {
+    throw new Error(
+      `[SURFACE_ASYNC_REQUEST_SCOPE_MISMATCH] expected surface ${surface}, got ${request.surface}`
+    );
+  }
+  if (!isPersistedScope(request.scope)) {
+    throw new Error('[SURFACE_ASYNC_REQUEST] persisted scope is invalid');
+  }
+  return request;
+}
+
+function loadSurfaceNotificationAtPath(
+  filePath: string,
+  surface: SurfaceAsyncChannel
+): SurfaceNotificationRecord {
+  const notification = loadGovernedSurfaceRecordAtPath<SurfaceNotificationRecord>(
+    filePath,
+    'surface-notification',
+    SURFACE_NOTIFICATION_SCHEMA_PATH
+  );
+  if (notification.surface !== surface) {
+    throw new Error(
+      `[SURFACE_NOTIFICATION_SCOPE_MISMATCH] expected surface ${surface}, got ${notification.surface}`
+    );
+  }
+  if (!isPersistedScope(notification.scope)) {
+    throw new Error('[SURFACE_NOTIFICATION] persisted scope is invalid');
+  }
+  return notification;
+}
+
+function loadSurfaceDeadTargetAtPath(
+  filePath: string,
+  surface: SurfaceAsyncChannel
+): SurfaceDeadTargetRecord {
+  const target = loadGovernedSurfaceRecordAtPath<SurfaceDeadTargetRecord>(
+    filePath,
+    'surface-dead-target',
+    SURFACE_DEAD_TARGET_SCHEMA_PATH
+  );
+  if (target.surface !== surface) {
+    throw new Error(
+      `[SURFACE_DEAD_TARGET_SCOPE_MISMATCH] expected surface ${surface}, got ${target.surface}`
+    );
+  }
+  if (!isPersistedScope(target.scope)) {
+    throw new Error('[SURFACE_DEAD_TARGET] persisted scope is invalid');
+  }
+  return target;
+}
+
+function loadSurfaceDeadLetterAtPath(
+  filePath: string,
+  surface: SurfaceAsyncChannel
+): SurfaceDeadLetterRecord {
+  const deadLetter = loadGovernedSurfaceRecordAtPath<SurfaceDeadLetterRecord>(
+    filePath,
+    'surface-dead-letter',
+    SURFACE_DEAD_LETTER_SCHEMA_PATH
+  );
+  if (deadLetter.surface !== surface) {
+    throw new Error(
+      `[SURFACE_DEAD_LETTER_SCOPE_MISMATCH] expected surface ${surface}, got ${deadLetter.surface}`
+    );
+  }
+  if (!isPersistedScope(deadLetter.scope)) {
+    throw new Error('[SURFACE_DEAD_LETTER] persisted scope is invalid');
+  }
+  return deadLetter;
+}
+
+export function loadSurfaceOutboxMessageAtPath(
+  filePath: string,
+  surface: SurfaceAsyncChannel
+): SurfaceOutboxMessage {
+  const record = loadGovernedSurfaceRecordAtPath<SurfaceOutboxMessage>(
+    filePath,
+    'surface-outbox-message',
+    SURFACE_OUTBOX_SCHEMA_PATH
+  );
+  if (record.surface !== surface) {
+    throw new Error(
+      `[SURFACE_OUTBOX_SCOPE_MISMATCH] expected surface ${surface}, got ${record.surface}`
+    );
+  }
+  if (!isPersistedScope(record.scope)) {
+    throw new Error('[SURFACE_OUTBOX] persisted scope is invalid');
+  }
+  return record;
+}
+
+function validateSurfaceOutboxMessage(
+  record: SurfaceOutboxMessage,
+  sourcePath: string
+): SurfaceOutboxMessage {
+  const validated = surfaceOutboxCatalog.validate(record, sourcePath);
+  if (!isPersistedScope(validated.scope)) {
+    throw new Error('[SURFACE_OUTBOX] persisted scope is invalid');
+  }
+  return validated;
 }
 
 function hasPathSegments(filePath: string, parts: string[]): boolean {
@@ -260,126 +433,6 @@ function quarantineSurfaceRecordFile(
       `[surface-coordination] failed to quarantine malformed ${recordKind} surface=${surface} file=${fileName}: ${quarantineError instanceof Error ? quarantineError.message : String(quarantineError)}`
     );
   }
-}
-
-function isSurfaceAsyncRequestRecord(
-  value: unknown,
-  surface: SurfaceAsyncChannel
-): value is SurfaceAsyncRequestRecord {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const record = value as Record<string, unknown>;
-  return (
-    record.surface === surface &&
-    typeof record.request_id === 'string' &&
-    typeof record.channel === 'string' &&
-    typeof record.thread_ts === 'string' &&
-    typeof record.sender_agent_id === 'string' &&
-    typeof record.surface_agent_id === 'string' &&
-    typeof record.receiver_agent_id === 'string' &&
-    typeof record.query === 'string' &&
-    typeof record.accepted_text === 'string' &&
-    (record.status === 'pending' || record.status === 'completed' || record.status === 'failed') &&
-    typeof record.created_at === 'string' &&
-    typeof record.updated_at === 'string' &&
-    isPersistedScope(record.scope)
-  );
-}
-
-function isSurfaceNotificationRecord(
-  value: unknown,
-  surface: SurfaceAsyncChannel
-): value is SurfaceNotificationRecord {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const record = value as Record<string, unknown>;
-  return (
-    record.surface === surface &&
-    typeof record.notification_id === 'string' &&
-    typeof record.channel === 'string' &&
-    typeof record.thread_ts === 'string' &&
-    typeof record.source_agent_id === 'string' &&
-    typeof record.title === 'string' &&
-    typeof record.text === 'string' &&
-    (record.status === 'info' || record.status === 'success' || record.status === 'error') &&
-    typeof record.created_at === 'string' &&
-    isPersistedScope(record.scope)
-  );
-}
-
-function isSurfaceOutboxMessage(
-  value: unknown,
-  surface: SurfaceAsyncChannel
-): value is SurfaceOutboxMessage {
-  if (!value || typeof value !== 'object') return false;
-  const record = value as unknown as Record<string, unknown>;
-  return (
-    record.surface === surface &&
-    typeof record.message_id === 'string' &&
-    record.message_id.length > 0 &&
-    typeof record.correlation_id === 'string' &&
-    typeof record.channel === 'string' &&
-    typeof record.thread_ts === 'string' &&
-    typeof record.text === 'string' &&
-    (record.source === 'surface' || record.source === 'nerve' || record.source === 'system') &&
-    typeof record.created_at === 'string' &&
-    isPersistedScope(record.scope) &&
-    (record.deduplication_key === undefined ||
-      (typeof record.deduplication_key === 'string' && record.deduplication_key.length > 0))
-  );
-}
-
-function isSurfaceDeadLetterRecord(
-  value: unknown,
-  surface: SurfaceAsyncChannel
-): value is SurfaceDeadLetterRecord {
-  if (!isSurfaceOutboxMessage(value, surface)) return false;
-  const record = value as unknown as Record<string, unknown>;
-  const failure = record.failure;
-  if (!failure || typeof failure !== 'object' || Array.isArray(failure)) return false;
-  const failureRecord = failure as Record<string, unknown>;
-  return (
-    record.kind === 'surface-dead-letter' &&
-    typeof record.dead_letter_id === 'string' &&
-    record.dead_letter_id.length > 0 &&
-    typeof record.dead_lettered_at === 'string' &&
-    (failureRecord.kind === 'too_long' ||
-      failureRecord.kind === 'bad_format' ||
-      failureRecord.kind === 'forbidden' ||
-      failureRecord.kind === 'not_found' ||
-      failureRecord.kind === 'rate_limited' ||
-      failureRecord.kind === 'transient') &&
-    typeof failureRecord.retryable === 'boolean' &&
-    typeof failureRecord.reason === 'string' &&
-    failureRecord.reason.length > 0
-  );
-}
-
-function isSurfaceDeadTargetRecord(
-  value: unknown,
-  surface: SurfaceAsyncChannel
-): value is SurfaceDeadTargetRecord {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const record = value as Record<string, unknown>;
-  const failure = record.failure;
-  if (!failure || typeof failure !== 'object' || Array.isArray(failure)) return false;
-  const failureRecord = failure as Record<string, unknown>;
-  return (
-    record.surface === surface &&
-    typeof record.channel === 'string' &&
-    record.channel.length > 0 &&
-    isPersistedScope(record.scope) &&
-    Number.isInteger(record.consecutive_failures) &&
-    Number(record.consecutive_failures) > 0 &&
-    typeof record.marked_at === 'string' &&
-    (failureRecord.kind === 'too_long' ||
-      failureRecord.kind === 'bad_format' ||
-      failureRecord.kind === 'forbidden' ||
-      failureRecord.kind === 'not_found' ||
-      failureRecord.kind === 'rate_limited' ||
-      failureRecord.kind === 'transient') &&
-    typeof failureRecord.retryable === 'boolean' &&
-    typeof failureRecord.reason === 'string' &&
-    failureRecord.reason.length > 0
-  );
 }
 
 function quarantineSurfaceOutboxFile(
@@ -487,8 +540,8 @@ export function createSurfaceAsyncRequest(params: {
     query: params.query,
     accepted_text: params.acceptedText,
     status: 'pending',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: nowIso(),
+    updated_at: nowIso(),
     scope,
   };
   writeJsonAs(
@@ -506,8 +559,12 @@ export function getSurfaceAsyncRequest(
 ): SurfaceAsyncRequestRecord | null {
   const resolved = findRecordPath(asyncRequestBase(surface), requestId, { scope }, 'requests');
   if (!resolved) return null;
-  const request = readJson<SurfaceAsyncRequestRecord>(resolved);
-  return recordMatchesScope(request, scopeFilter(scope)) ? request : null;
+  try {
+    const request = loadSurfaceAsyncRequestAtPath(resolved, surface);
+    return recordMatchesScope(request, scopeFilter(scope)) ? request : null;
+  } catch {
+    return null;
+  }
 }
 
 export function updateSurfaceAsyncRequest(
@@ -524,7 +581,7 @@ export function updateSurfaceAsyncRequest(
     request_id: current.request_id,
     surface: current.surface,
     scope: current.scope,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   writeJsonAs(
     surfaceCoordinationRole(surface),
@@ -542,11 +599,8 @@ export function listSurfaceAsyncRequests(
   return recordFiles(asyncRequestBase(surface), options, 'requests')
     .flatMap((filePath) => {
       try {
-        const parsed = loadJson<unknown>(filePath);
-        if (!isSurfaceAsyncRequestRecord(parsed, surface)) {
-          throw new Error('surface async-request schema violation');
-        }
-        return recordMatchesScope(parsed, filter) ? [parsed] : [];
+        const request = loadSurfaceAsyncRequestAtPath(filePath, surface);
+        return recordMatchesScope(request, filter) ? [request] : [];
       } catch (error) {
         quarantineSurfaceRecordFile(
           surface,
@@ -584,7 +638,7 @@ export function enqueueSurfaceNotification(params: {
     title: params.title,
     text: params.text,
     status: params.status || 'info',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     scope,
   };
   writeJsonAs(
@@ -603,11 +657,8 @@ export function listSurfaceNotifications(
   return recordFiles(notificationBase(surface), options, 'notifications')
     .flatMap((filePath) => {
       try {
-        const parsed = loadJson<unknown>(filePath);
-        if (!isSurfaceNotificationRecord(parsed, surface)) {
-          throw new Error('surface notification schema violation');
-        }
-        return recordMatchesScope(parsed, filter) ? [parsed] : [];
+        const notification = loadSurfaceNotificationAtPath(filePath, surface);
+        return recordMatchesScope(notification, filter) ? [notification] : [];
       } catch (error) {
         quarantineSurfaceRecordFile(
           surface,
@@ -675,15 +726,13 @@ export function enqueueSurfaceOutboxMessage(params: {
     thread_ts: params.threadTs,
     text: params.text,
     source: params.source || 'system',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     scope,
     ...(deduplicationKey ? { deduplication_key: deduplicationKey } : {}),
   };
-  return writeJsonAs(
-    surfaceCoordinationRole(params.surface),
-    surfaceOutboxLogicalPath(params.surface, record.message_id, scope),
-    record
-  );
+  const outputPath = surfaceOutboxLogicalPath(params.surface, record.message_id, scope);
+  const validated = validateSurfaceOutboxMessage(record, outputPath);
+  return writeJsonAs(surfaceCoordinationRole(params.surface), outputPath, validated);
 }
 
 export function getSurfaceDeadTarget(
@@ -697,11 +746,7 @@ export function getSurfaceDeadTarget(
   );
   if (!safeExistsSync(resolved)) return null;
   try {
-    const parsed = loadJson<unknown>(resolved);
-    if (!isSurfaceDeadTargetRecord(parsed, surface)) {
-      throw new Error('surface dead-target schema violation');
-    }
-    return parsed;
+    return loadSurfaceDeadTargetAtPath(resolved, surface);
   } catch (error) {
     quarantineSurfaceDeadTargetFile(
       surface,
@@ -727,7 +772,7 @@ export function markSurfaceDeadTarget(
     failure,
     scope: normalizedScope,
     consecutive_failures: (current?.consecutive_failures || 0) + 1,
-    marked_at: current?.marked_at || new Date().toISOString(),
+    marked_at: current?.marked_at || nowIso(),
   };
   writeJsonAs(
     surfaceCoordinationRole(surface),
@@ -746,7 +791,8 @@ export function clearSurfaceDeadTarget(
   const resolved = pathResolver.resolve(
     surfaceDeadTargetLogicalPath(surface, channel, normalizedScope)
   );
-  if (safeExistsSync(resolved)) safeRmSync(resolved, { force: true });
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (safeExistsSync(safeResolved)) safeRmSync(safeResolved, { force: true });
 }
 
 export function listSurfaceDeadTargets(
@@ -759,11 +805,8 @@ export function listSurfaceDeadTargets(
       const dir = path.dirname(filePath);
       const name = path.basename(filePath);
       try {
-        const parsed = loadJson<unknown>(filePath);
-        if (!isSurfaceDeadTargetRecord(parsed, surface)) {
-          throw new Error('surface dead-target schema violation');
-        }
-        return recordMatchesScope(parsed, filter) ? [parsed] : [];
+        const target = loadSurfaceDeadTargetAtPath(filePath, surface);
+        return recordMatchesScope(target, filter) ? [target] : [];
       } catch (error) {
         quarantineSurfaceDeadTargetFile(surface, dir, name, error);
         return [];
@@ -781,10 +824,7 @@ export function listSurfaceOutboxMessages(
     const dir = path.dirname(filePath);
     const name = path.basename(filePath);
     try {
-      const parsed = loadJson<unknown>(filePath);
-      if (!isSurfaceOutboxMessage(parsed, surface)) {
-        throw new Error('surface outbox schema violation');
-      }
+      const parsed = loadSurfaceOutboxMessageAtPath(filePath, surface);
       return recordMatchesScope(parsed, filter) ? [parsed] : [];
     } catch (error) {
       quarantineSurfaceOutboxFile(surface, dir, name, error);
@@ -807,7 +847,9 @@ export function clearSurfaceOutboxMessage(
     return;
   }
   const resolved = findRecordPath(surfaceOutboxBase(surface), messageId, { scope }, 'outbox');
-  if (resolved) safeRmSync(resolved, { force: true });
+  if (resolved) {
+    safeRmSync(assertSafeRepositoryPath(resolved, { allowMissingLeaf: true }), { force: true });
+  }
 }
 
 export function updateSurfaceOutboxMessage(
@@ -827,12 +869,10 @@ export function updateSurfaceOutboxMessage(
     surface: current.surface,
     scope: current.scope,
   };
-  writeJsonAs(
-    surfaceCoordinationRole(surface),
-    surfaceOutboxLogicalPath(surface, messageId, current.scope),
-    next
-  );
-  return next;
+  const outputPath = surfaceOutboxLogicalPath(surface, messageId, current.scope);
+  const validated = validateSurfaceOutboxMessage(next, outputPath);
+  writeJsonAs(surfaceCoordinationRole(surface), outputPath, validated);
+  return validated;
 }
 
 export function deadLetterSurfaceOutboxMessage(
@@ -851,7 +891,7 @@ export function deadLetterSurfaceOutboxMessage(
     kind: 'surface-dead-letter',
     dead_letter_id: `${surface.toUpperCase()}-DLQ-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     failure,
-    dead_lettered_at: new Date().toISOString(),
+    dead_lettered_at: nowIso(),
   };
   writeJsonAs(
     surfaceCoordinationRole(surface),
@@ -871,11 +911,8 @@ export function listSurfaceDeadLetters(
     const dir = path.dirname(filePath);
     const name = path.basename(filePath);
     try {
-      const parsed = loadJson<unknown>(filePath);
-      if (!isSurfaceDeadLetterRecord(parsed, surface)) {
-        throw new Error('surface dead-letter schema violation');
-      }
-      return recordMatchesScope(parsed, filter) ? [parsed] : [];
+      const deadLetter = loadSurfaceDeadLetterAtPath(filePath, surface);
+      return recordMatchesScope(deadLetter, filter) ? [deadLetter] : [];
     } catch (error) {
       quarantineSurfaceDeadLetterFile(surface, dir, name, error);
       return [];
@@ -909,11 +946,8 @@ export function replaySurfaceDeadLetter(
   if (!record) {
     throw new Error(`[NOT_FOUND] Surface dead-letter does not exist: ${surface}/${deadLetterId}`);
   }
-  if (!isSurfaceOutboxMessage(record, surface)) {
-    throw new Error(
-      '[POLICY_VIOLATION] Surface dead-letter payload is not a valid outbox message.'
-    );
-  }
+  // listSurfaceDeadLetters() has already applied the dead-letter schema and
+  // surface binding before a record can reach the replay mutation.
   const recordScope = record.scope || requestedScope;
   if (!recordMatchesScope(record, requestedScope)) {
     throw new Error('[POLICY_VIOLATION] Surface dead-letter scope does not match the caller.');
@@ -965,7 +999,7 @@ export function replaySurfaceDeadLetter(
     {
       ...record,
       replay_count: (record.replay_count || 0) + 1,
-      last_replayed_at: new Date().toISOString(),
+      last_replayed_at: nowIso(),
       last_replay_message_id: messageId,
       last_replayed_by: operatorId,
     }

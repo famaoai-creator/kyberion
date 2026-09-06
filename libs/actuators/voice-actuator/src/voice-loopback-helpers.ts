@@ -1,18 +1,11 @@
-import {
-  getVoiceProfileRecord,
-  getVoiceTtsLanguageConfig,
-  pathResolver,
-  resolveVoiceEngineForPlatform,
-  safeExec,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  type AudioChunk,
-  type AudioFormat,
-  type TtsLoopbackVerificationRequest,
-  type TtsSource,
-} from '@agent/core';
-import { isRecord } from '@agent/core/foundation';
+import { getVoiceProfileRecord } from '@agent/core/voice-profile-registry';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveVoiceEngineForPlatform } from '@agent/core/voice-engine-registry';
+import { safeExec, safeMkdir, safeReadFile, safeRmSync } from '@agent/core/secure-io';
+import type { AudioChunk, AudioFormat } from '@agent/core/meeting-session-types';
+import type { TtsLoopbackVerificationRequest, TtsSource } from '@agent/core/tts-loopback-verifier';
+import { isRecord, nowIso } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { renderNativeArtifact } from './voice-runtime-helpers.js';
 
@@ -52,7 +45,7 @@ export function createDeterministicLoopbackStt(expectedText: string): {
           is_final: true,
           text: expectedText,
           confidence: 1,
-          emitted_at: new Date().toISOString(),
+          emitted_at: nowIso(),
         };
       }
     },

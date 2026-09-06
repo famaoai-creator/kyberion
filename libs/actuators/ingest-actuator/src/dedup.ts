@@ -13,8 +13,14 @@
  */
 
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+} from '@agent/core/secure-io';
+import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
 
 export const DEFAULT_INGEST_REGISTRY_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
@@ -50,31 +56,54 @@ export interface DedupResult {
 
 function resolveRegistryPath(registryPath?: string): string {
   const candidate = registryPath?.trim() || DEFAULT_INGEST_REGISTRY_PATH;
-  return path.isAbsolute(candidate) ? candidate : pathResolver.rootResolve(candidate);
+  return assertSafeRepositoryPath(
+    path.isAbsolute(candidate) ? candidate : pathResolver.rootResolve(candidate),
+    { allowMissingLeaf: true }
+  );
+}
+
+function assertTargetPath(targetPath: string | undefined): void {
+  if (targetPath === undefined) return;
+  if (path.isAbsolute(targetPath)) {
+    throw new Error('ingest:dedup — target_path must be repository-relative');
+  }
+  assertSafeRepositoryPath(pathResolver.rootResolve(targetPath), { allowMissingLeaf: true });
+}
+
+function isSha256(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/iu.test(value);
+}
+
+/** Validate a registry row before it participates in duplicate detection. */
+export function parseIngestRegistryRecord(value: unknown): IngestRegistryRecord | undefined {
+  if (!isRecord(value) || !isSha256(value.content_sha256)) return undefined;
+  if (typeof value.first_seen !== 'string' || !Number.isFinite(Date.parse(value.first_seen))) {
+    return undefined;
+  }
+  for (const key of ['source_system', 'source_id', 'target_path'] as const) {
+    if (value[key] !== undefined && (typeof value[key] !== 'string' || !value[key].trim())) {
+      return undefined;
+    }
+  }
+  return value as unknown as IngestRegistryRecord;
 }
 
 function readRegistry(absPath: string): IngestRegistryRecord[] {
   if (!safeExistsSync(absPath)) return [];
-  const raw = String(safeReadFile(absPath, { encoding: 'utf8' }) || '');
-  const records: IngestRegistryRecord[] = [];
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const record = JSON.parse(trimmed) as IngestRegistryRecord;
-      if (record && typeof record.content_sha256 === 'string') records.push(record);
-    } catch {
-      // Corrupt line: skip rather than block ingestion — the registry is
-      // append-only evidence, not the source of truth for card content.
-    }
+  if (!safeLstat(absPath).isFile()) {
+    throw new Error(`ingest:dedup — registry_path must be a regular file: ${absPath}`);
   }
-  return records;
+  return readJsonLines<unknown>(absPath, { onMalformed: 'skip' }).flatMap((value) => {
+    const record = parseIngestRegistryRecord(value);
+    return record ? [record] : [];
+  });
 }
 
 export function dedupContent(input: DedupInput): DedupResult {
-  if (!input?.content_sha256 || typeof input.content_sha256 !== 'string') {
+  if (!isSha256(input?.content_sha256)) {
     throw new Error('ingest:dedup — content_sha256 is required');
   }
+  assertTargetPath(input.target_path);
   const absPath = resolveRegistryPath(input.registry_path);
   const records = readRegistry(absPath);
 
@@ -100,7 +129,7 @@ export function dedupContent(input: DedupInput): DedupResult {
       content_sha256: input.content_sha256,
       ...(input.source_system !== undefined ? { source_system: input.source_system } : {}),
       ...(input.source_id !== undefined ? { source_id: input.source_id } : {}),
-      first_seen: input.now ?? new Date().toISOString(),
+      first_seen: input.now ?? nowIso(),
       ...(input.target_path !== undefined ? { target_path: input.target_path } : {}),
     };
     safeMkdir(path.dirname(absPath), { recursive: true });

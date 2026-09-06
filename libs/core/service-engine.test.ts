@@ -77,6 +77,20 @@ vi.mock('./service-binding.js', async () => {
   };
 });
 
+vi.mock('./service-preset-registry.js', () => ({
+  getServicePresetRecord: (serviceId: string, presetPathHint?: string) => {
+    const raw = mocks.safeReadFile(presetPathHint || `${serviceId}.json`, {
+      encoding: 'utf8',
+    });
+    if (raw === undefined || raw === '') return null;
+    const parsed = JSON.parse(String(raw)) as Record<string, unknown>;
+    return {
+      service_id: serviceId,
+      ...parsed,
+    };
+  },
+}));
+
 vi.mock('./secure-io.js', async () => {
   const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
@@ -89,10 +103,55 @@ vi.mock('./secure-io.js', async () => {
     safeExistsSync: mocks.safeExistsSync,
     safeReaddir: mocks.safeReaddir,
     safeStat: mocks.safeStat,
+    // loadServiceConnectionAtPath gates reads on safeLstat before the governed
+    // catalog load — a virtual (non-filesystem) overlay path is never a real
+    // regular file, so it must resolve here rather than hitting the real,
+    // policy-enforced implementation.
+    safeLstat: (filePath: string) =>
+      filePath.startsWith('/virtual/') ? { isFile: () => true } : actual.safeLstat(filePath),
     loadJson: <T>(filePath: string): T => {
       const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
       return JSON.parse(String(raw)) as T;
     },
+    assertSafeRepositoryPath: (filePath: string): string => filePath,
+  };
+});
+
+// defineCatalog (foundation/governed-catalog.ts) gates its load() on
+// FoundationIo's exists()/stat(), which secure-io.ts registers with a direct
+// reference to its own real internal functions at module-evaluation time —
+// overriding the exported `safeExistsSync` above does not reach that
+// already-registered object, so route FoundationIo through the same doubles.
+vi.mock('./foundation/io.js', async () => {
+  const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+  return {
+    getFoundationIo: () => ({
+      // A schema-compile read falls through the ./foundation/json.js mock to
+      // this one when the per-test safeReadFile stub has no fixture for it —
+      // route those to the real reader instead of failing JSON.parse('').
+      loadJson: <T>(filePath: string): T => {
+        const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
+        if (raw === undefined || raw === '') return actual.loadJson(filePath) as T;
+        return JSON.parse(String(raw)) as T;
+      },
+      loadJsonIfPresent: <T>(filePath: string): T | null => {
+        const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
+        if (raw === undefined || raw === '') return actual.loadJsonIfPresent(filePath) as T | null;
+        try {
+          return JSON.parse(String(raw)) as T;
+        } catch {
+          return null;
+        }
+      },
+      appendFile: () => undefined,
+      exists: (filePath: string) =>
+        filePath.startsWith('/virtual/') ? true : mocks.safeExistsSync(filePath),
+      readFile: (filePath: string) => String(mocks.safeReadFile(filePath, { encoding: 'utf8' })),
+      stat: (filePath: string) =>
+        filePath.startsWith('/virtual/') ? { mtimeMs: 1, size: 1 } : mocks.safeStat(filePath),
+      writeFile: () => undefined,
+    }),
+    registerFoundationIo: vi.fn(),
   };
 });
 

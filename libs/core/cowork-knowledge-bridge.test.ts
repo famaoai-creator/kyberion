@@ -4,24 +4,30 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // ── vi.hoisted ────────────────────────────────────────────────────────────────
 const {
   mockSafeExistsSync,
+  mockSafeLstat,
   mockSafeReadFile,
   mockSafeReaddir,
   mockSafeWriteFile,
   mockSafeMkdir,
+  mockAssertSafeRepositoryPath,
   mockCreateCandidate,
   mockEnqueueCandidate,
   mockListCandidates,
   mockDeliverToCowork,
 } = vi.hoisted(() => ({
   mockSafeExistsSync: vi.fn(),
+  mockSafeLstat: vi.fn(() => ({ isFile: () => true })),
   mockSafeReadFile: vi.fn(),
   mockSafeReaddir: vi.fn(),
   mockSafeWriteFile: vi.fn(),
   mockSafeMkdir: vi.fn(),
+  mockAssertSafeRepositoryPath: vi.fn((filePath: string) => filePath),
   mockCreateCandidate: vi.fn(),
   mockEnqueueCandidate: vi.fn(),
   mockListCandidates: vi.fn().mockReturnValue([]),
@@ -29,12 +35,32 @@ const {
 }));
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: mockAssertSafeRepositoryPath,
   safeExistsSync: mockSafeExistsSync,
+  safeLstat: mockSafeLstat,
   safeReadFile: mockSafeReadFile,
   safeReaddir: mockSafeReaddir,
   safeWriteFile: mockSafeWriteFile,
   safeMkdir: mockSafeMkdir,
-  loadJson: <T>(filePath: string): T => JSON.parse(String(mockSafeReadFile(filePath))) as T,
+  loadJson: <T>(filePath: string): T => {
+    if (filePath.includes('cowork-sync-policy.schema.json')) {
+      return JSON.parse(
+        fs.readFileSync(
+          path.resolve('knowledge/product/schemas/cowork-sync-policy.schema.json'),
+          'utf8'
+        )
+      ) as T;
+    }
+    if (filePath.includes('cowork-sync-state.schema.json')) {
+      return JSON.parse(
+        fs.readFileSync(
+          path.resolve('knowledge/product/schemas/cowork-sync-state.schema.json'),
+          'utf8'
+        )
+      ) as T;
+    }
+    return JSON.parse(String(mockSafeReadFile(filePath))) as T;
+  },
   loadJsonIfPresent: <T>(filePath: string): T | null => {
     try {
       return JSON.parse(String(mockSafeReadFile(filePath))) as T;
@@ -65,8 +91,48 @@ vi.mock('./cowork-surface.js', () => ({
   deliverToCowork: mockDeliverToCowork,
 }));
 
+import { registerFoundationIo } from './foundation/io.js';
+
+registerFoundationIo({
+  loadJson: <T>(filePath: string): T => {
+    if (filePath.includes('cowork-sync-policy.schema.json')) {
+      return JSON.parse(
+        fs.readFileSync(
+          path.resolve('knowledge/product/schemas/cowork-sync-policy.schema.json'),
+          'utf8'
+        )
+      ) as T;
+    }
+    if (filePath.includes('cowork-sync-state.schema.json')) {
+      return JSON.parse(
+        fs.readFileSync(
+          path.resolve('knowledge/product/schemas/cowork-sync-state.schema.json'),
+          'utf8'
+        )
+      ) as T;
+    }
+    return JSON.parse(String(mockSafeReadFile(filePath))) as T;
+  },
+  loadJsonIfPresent: <T>(filePath: string): T | null => {
+    try {
+      return JSON.parse(String(mockSafeReadFile(filePath))) as T;
+    } catch {
+      return null;
+    }
+  },
+  appendFile: () => undefined,
+  exists: (filePath: string) => mockSafeExistsSync(filePath),
+  readFile: (filePath: string) => String(mockSafeReadFile(filePath)),
+  stat: (filePath: string) => {
+    const size = String(mockSafeReadFile(filePath)).length;
+    return { mtimeMs: size, size };
+  },
+  writeFile: () => undefined,
+});
+
 import {
   ingestCoworkArtifacts,
+  loadCoworkSyncStateAtPath,
   supplyKnowledgeToCowork,
   runCoworkKnowledgeSync,
 } from './cowork-knowledge-bridge.js';
@@ -78,6 +144,7 @@ function sha256(content: string): string {
 }
 
 const FAKE_POLICY = JSON.stringify({
+  version: '1.0.0',
   cowork_to_kyberion: {
     default_sensitivity_tier: 'confidential',
     default_ratification_required: true,
@@ -92,12 +159,20 @@ const FAKE_POLICY = JSON.stringify({
       ],
       default: 'confidential',
     },
+    leakage_prevention: { block_promotion_if_evidence_refs_contain: [] },
+    idempotency: { strategy: 'content_hash_sha256' },
   },
   kyberion_to_cowork: {
     allowed_tiers: ['public'],
     domains: ['procedures'],
-    delivery: { max_hints_per_sync: 10 },
+    delivery: {
+      channel: 'cowork',
+      format: 'markdown',
+      max_hints_per_sync: 10,
+      idempotency: { strategy: 'content_hash_sha256', state_file: 'state.json' },
+    },
   },
+  conflict_resolution: { strategy: 'append_prefer_newer', overwrite_requires_approval: true },
 });
 
 /** Default safeExistsSync that returns false for policy & state, true otherwise */
@@ -108,6 +183,46 @@ function defaultExistsImpl(p: string): boolean {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('Cowork sync state loader', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSafeExistsSync.mockReturnValue(true);
+    mockSafeLstat.mockReturnValue({ isFile: () => true });
+  });
+
+  it('loads a valid state through the canonical schema', () => {
+    const state = {
+      ingested: { 'work/summary.md': 'hash-1' },
+      supplied: {},
+      last_sync_at: '2026-06-22T00:00:00Z',
+    };
+    mockSafeReadFile.mockReturnValue(JSON.stringify(state));
+
+    expect(loadCoworkSyncStateAtPath('/repo/active/shared/runtime/cowork-sync-state.json')).toEqual(
+      state
+    );
+  });
+
+  it('rejects schema-invalid and non-file state before sync use', () => {
+    mockSafeReadFile.mockReturnValue(
+      JSON.stringify({
+        ingested: {},
+        supplied: {},
+        last_sync_at: '2026-06-22T00:00:00Z',
+        unexpected: true,
+      })
+    );
+    expect(() =>
+      loadCoworkSyncStateAtPath('/repo/active/shared/runtime/cowork-sync-state.json')
+    ).toThrow('Invalid catalog cowork-sync-state');
+
+    mockSafeLstat.mockReturnValueOnce({ isFile: () => false });
+    expect(() =>
+      loadCoworkSyncStateAtPath('/repo/active/shared/runtime/cowork-sync-state.json')
+    ).toThrow('state must be a regular file');
+  });
+});
 
 describe('ingestCoworkArtifacts()', () => {
   beforeEach(() => {
@@ -145,6 +260,42 @@ describe('ingestCoworkArtifacts()', () => {
     expect(result.enqueued).toBe(0);
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('File not found');
+    expect(mockCreateCandidate).not.toHaveBeenCalled();
+  });
+
+  it('directory replacement を artifact 本文として読み込まない', () => {
+    mockSafeExistsSync.mockImplementation(defaultExistsImpl);
+    mockSafeLstat.mockImplementation((p: string) => ({
+      isFile: () => !p.includes('/work/directory.md'),
+    }));
+    mockSafeReadFile.mockReturnValue('artifact content');
+
+    const result = ingestCoworkArtifacts(['work/directory.md']);
+
+    expect(result.enqueued).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('must be a regular file');
+    expect(mockCreateCandidate).not.toHaveBeenCalled();
+  });
+
+  it('repository 外の artifact path を読み込まない', () => {
+    mockSafeExistsSync.mockImplementation(defaultExistsImpl);
+    mockAssertSafeRepositoryPath.mockImplementation((filePath: string) => {
+      if (filePath.includes('outside')) {
+        throw new Error('[RESOURCE_PATH_SCOPE] resource path is outside the repository root');
+      }
+      return filePath;
+    });
+
+    const result = ingestCoworkArtifacts(['../../outside-artifact.md']);
+
+    expect(result.enqueued).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('[RESOURCE_PATH_SCOPE]');
+    expect(mockSafeReadFile).not.toHaveBeenCalledWith(
+      expect.stringContaining('outside-artifact.md'),
+      expect.anything()
+    );
     expect(mockCreateCandidate).not.toHaveBeenCalled();
   });
 
@@ -218,6 +369,20 @@ describe('ingestCoworkArtifacts()', () => {
     expect(result.enqueued).toBe(1);
     expect(mockCreateCandidate).toHaveBeenCalledWith(
       expect.objectContaining({ sensitivityTier: 'personal', ratificationRequired: true })
+    );
+  });
+
+  it('schema-invalid policy falls back to the safe confidential default', () => {
+    mockSafeExistsSync.mockImplementation((p: string) => !p.includes('cowork-sync-state'));
+    mockSafeReadFile.mockImplementation((p: string) =>
+      p.includes('cowork-sync-policy') ? JSON.stringify({ version: '1.0.0' }) : 'artifact content'
+    );
+
+    const result = ingestCoworkArtifacts(['artifact.md']);
+
+    expect(result.enqueued).toBe(1);
+    expect(mockCreateCandidate).toHaveBeenCalledWith(
+      expect.objectContaining({ sensitivityTier: 'confidential', ratificationRequired: true })
     );
   });
 });

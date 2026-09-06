@@ -1,8 +1,12 @@
 import { appendJsonLine } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { isRecord } from './foundation/text.js';
 import type { ValidateFunction } from 'ajv';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import * as crypto from 'node:crypto';
+import * as path from 'node:path';
+import { isValidTenantSlug } from './entity-scope.js';
 
 import { logger } from './core.js';
 import { withExecutionContext } from './authority.js';
@@ -18,9 +22,9 @@ import {
   type PeerMessageResponderContext,
 } from './peer-messaging.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
   safeWriteFile,
@@ -139,8 +143,6 @@ export interface CreatePeerConversationResponderOptions {
     | void;
 }
 
-const ajv = createAjv();
-
 const SESSION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/peer-conversation-session.schema.json'
 );
@@ -150,6 +152,8 @@ const MESSAGE_SCHEMA_PATH = pathResolver.knowledge(
 const RUNTIME_ROOT = 'active/shared/runtime/peer-conversations';
 const OBSERVABILITY_ROOT = 'active/shared/observability/peer-conversations';
 const GOVERNED_ROLE = 'infrastructure_sentinel' as const;
+const PEER_ID_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
+const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 let sessionValidateFn: ValidateFunction | null = null;
 let messageValidateFn: ValidateFunction | null = null;
@@ -159,8 +163,7 @@ function randomId(prefix: string): string {
 }
 
 function loadSchemaValidator(schemaPath: string): ValidateFunction {
-  const raw = safeReadFile(schemaPath, { encoding: 'utf8' }) as string;
-  return ajv.compile(JSON.parse(raw));
+  return compileSchema(schemaPath);
 }
 
 function ensureSessionValidator(): ValidateFunction {
@@ -179,32 +182,90 @@ function errorsFrom(validate: ValidateFunction): string[] {
   );
 }
 
+function normalizeTenantId(tenantId: string): string {
+  const normalized = String(tenantId || '').trim();
+  if (!isValidTenantSlug(normalized)) {
+    throw new Error(`invalid_peer_conversation_tenant_id:${normalized || 'missing'}`);
+  }
+  return normalized;
+}
+
+function normalizePeerId(peerId: string): string {
+  const normalized = String(peerId || '').trim();
+  if (!PEER_ID_PATTERN.test(normalized)) {
+    throw new Error(`invalid_peer_conversation_peer_id:${normalized || 'missing'}`);
+  }
+  return normalized;
+}
+
+function normalizeSessionId(sessionId: string): string {
+  const normalized = String(sessionId || '').trim();
+  if (!SESSION_ID_PATTERN.test(normalized)) {
+    throw new Error(`invalid_peer_conversation_session_id:${normalized || 'missing'}`);
+  }
+  return normalized;
+}
+
+function safeConversationPath(logicalPath: string): string {
+  return assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
+    allowMissingLeaf: true,
+  });
+}
+
 function peerRoot(tenantId: string, peerId: string): string {
-  return `${RUNTIME_ROOT}/tenants/${tenantId}/peers/${peerId}`;
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  return path.dirname(
+    safeConversationPath(
+      `${RUNTIME_ROOT}/tenants/${normalizedTenantId}/peers/${normalizedPeerId}/.path-check`
+    )
+  );
 }
 
 function sessionsRoot(tenantId: string, peerId: string): string {
-  return `${peerRoot(tenantId, peerId)}/sessions`;
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  return path.dirname(
+    safeConversationPath(
+      `${RUNTIME_ROOT}/tenants/${normalizedTenantId}/peers/${normalizedPeerId}/sessions/.path-check`
+    )
+  );
 }
 
 function sessionPath(tenantId: string, peerId: string, sessionId: string): string {
-  return `${sessionsRoot(tenantId, peerId)}/${sessionId}.json`;
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  return safeConversationPath(
+    `${RUNTIME_ROOT}/tenants/${normalizedTenantId}/peers/${normalizedPeerId}/sessions/${normalizedSessionId}.json`
+  );
+}
+
+function peerConversationSessionCatalog(filePath: string) {
+  return defineCatalog<PeerConversationSession>({
+    id: 'peer-conversation-session',
+    path: filePath,
+    schema: SESSION_SCHEMA_PATH,
+  });
 }
 
 function eventsPath(tenantId: string, peerId: string): string {
-  return `${OBSERVABILITY_ROOT}/tenants/${tenantId}/peers/${peerId}/events.jsonl`;
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  return safeConversationPath(
+    `${OBSERVABILITY_ROOT}/tenants/${normalizedTenantId}/peers/${normalizedPeerId}/events.jsonl`
+  );
 }
 
 function ensurePeerDir(tenantId: string, peerId: string): void {
   withExecutionContext(GOVERNED_ROLE, () => {
-    const runtimeDir = pathResolver.resolve(peerRoot(tenantId, peerId));
-    const observabilityDir = pathResolver.resolve(
-      `${OBSERVABILITY_ROOT}/tenants/${tenantId}/peers/${peerId}`
-    );
+    const runtimeDir = peerRoot(tenantId, peerId);
+    const observabilityDir = path.dirname(eventsPath(tenantId, peerId));
     if (!safeExistsSync(runtimeDir)) safeMkdir(runtimeDir, { recursive: true });
     if (!safeExistsSync(observabilityDir)) safeMkdir(observabilityDir, { recursive: true });
-    if (!safeExistsSync(pathResolver.resolve(sessionsRoot(tenantId, peerId)))) {
-      safeMkdir(pathResolver.resolve(sessionsRoot(tenantId, peerId)), { recursive: true });
+    const sessionsDir = sessionsRoot(tenantId, peerId);
+    if (!safeExistsSync(sessionsDir)) {
+      safeMkdir(sessionsDir, { recursive: true });
     }
   });
 }
@@ -255,6 +316,58 @@ function validatePeerConversationMessage(message: unknown): {
   };
 }
 
+const PEER_CONVERSATION_MESSAGE_KINDS: readonly PeerConversationMessageKind[] = [
+  'open',
+  'message',
+  'reply',
+  'handoff',
+  'close',
+  'status',
+];
+const PEER_CONVERSATION_DIRECTIONS: readonly PeerConversationDirection[] = ['inbound', 'outbound'];
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/** Validate a transcript entry before projecting an untrusted peer response. */
+export function parsePeerConversationTranscriptEntry(
+  value: unknown
+): PeerConversationTranscriptEntry {
+  if (!isRecord(value)) throw new Error('invalid_peer_conversation_transcript_entry');
+  for (const field of ['message_id', 'sender_peer_id', 'recipient_peer_id', 'created_at']) {
+    if (!isNonEmptyString(value[field])) {
+      throw new Error(`invalid_peer_conversation_transcript_${field}`);
+    }
+  }
+  if (
+    !PEER_CONVERSATION_MESSAGE_KINDS.includes(value.kind as PeerConversationMessageKind) ||
+    !PEER_CONVERSATION_DIRECTIONS.includes(value.direction as PeerConversationDirection) ||
+    typeof value.text !== 'string'
+  ) {
+    throw new Error('invalid_peer_conversation_transcript_fields');
+  }
+  for (const field of ['reply_to_message_id'] as const) {
+    if (value[field] !== undefined && !isNonEmptyString(value[field])) {
+      throw new Error(`invalid_peer_conversation_transcript_${field}`);
+    }
+  }
+  for (const field of ['related_work_item_ids'] as const) {
+    if (
+      value[field] !== undefined &&
+      (!Array.isArray(value[field]) || value[field].some((entry) => !isNonEmptyString(entry)))
+    ) {
+      throw new Error(`invalid_peer_conversation_transcript_${field}`);
+    }
+  }
+  for (const field of ['metadata', 'payload'] as const) {
+    if (value[field] !== undefined && !isRecord(value[field])) {
+      throw new Error(`invalid_peer_conversation_transcript_${field}`);
+    }
+  }
+  return value as unknown as PeerConversationTranscriptEntry;
+}
+
 function defaultSessionTitle(topic: string, remotePeerId: string): string {
   return `${topic} with ${remotePeerId}`;
 }
@@ -262,14 +375,18 @@ function defaultSessionTitle(topic: string, remotePeerId: string): string {
 export function createPeerConversationSession(
   input: CreatePeerConversationSessionInput
 ): PeerConversationSession {
+  const tenantId = normalizeTenantId(input.tenantId);
+  const localPeerId = normalizePeerId(input.localPeerId);
+  const remotePeerId = normalizePeerId(input.remotePeerId);
+  const sessionId = input.sessionId ? normalizeSessionId(input.sessionId) : undefined;
   const now = nowIso();
   const session: PeerConversationSession = {
-    tenant_id: input.tenantId,
+    tenant_id: tenantId,
     session_id:
-      input.sessionId ||
+      sessionId ||
       `PCS-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-    local_peer_id: input.localPeerId,
-    remote_peer_id: input.remotePeerId,
+    local_peer_id: localPeerId,
+    remote_peer_id: remotePeerId,
     topic: input.topic,
     title: input.title || defaultSessionTitle(input.topic, input.remotePeerId),
     status: 'open',
@@ -303,8 +420,16 @@ export function loadPeerConversationSession(
 ): PeerConversationSession | null {
   const filePath = pathResolver.resolve(sessionPath(tenantId, peerId, sessionId));
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as PeerConversationSession;
+  let parsed: PeerConversationSession;
+  try {
+    parsed = peerConversationSessionCatalog(filePath).load();
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    logger.warn(
+      `[peer-conversation] invalid session ${peerId}/${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
   const result = validatePeerConversationSession(parsed);
   if (!result.valid) {
     logger.warn(
@@ -331,13 +456,17 @@ export function listPeerConversationSessions(
 export function appendPeerConversationTranscript(
   input: AppendPeerConversationMessageInput
 ): PeerConversationSession {
+  const tenantId = normalizeTenantId(input.tenantId);
+  const localPeerId = normalizePeerId(input.localPeerId);
+  const remotePeerId = normalizePeerId(input.remotePeerId);
+  const sessionId = normalizeSessionId(input.sessionId);
   const session =
-    loadPeerConversationSession(input.tenantId, input.localPeerId, input.sessionId) ||
+    loadPeerConversationSession(tenantId, localPeerId, sessionId) ||
     createPeerConversationSession({
-      tenantId: input.tenantId,
-      sessionId: input.sessionId,
-      localPeerId: input.localPeerId,
-      remotePeerId: input.remotePeerId,
+      tenantId,
+      sessionId,
+      localPeerId,
+      remotePeerId,
       topic: input.payload?.topic ? String(input.payload.topic) : input.kind,
       title: input.payload?.title ? String(input.payload.title) : undefined,
       relatedWorkItemIds: input.relatedWorkItemIds,
@@ -348,8 +477,8 @@ export function appendPeerConversationTranscript(
     message_id: input.messageId || randomId('PCM'),
     kind: input.kind,
     direction: input.direction,
-    sender_peer_id: input.direction === 'outbound' ? input.localPeerId : input.remotePeerId,
-    recipient_peer_id: input.direction === 'outbound' ? input.remotePeerId : input.localPeerId,
+    sender_peer_id: input.direction === 'outbound' ? localPeerId : remotePeerId,
+    recipient_peer_id: input.direction === 'outbound' ? remotePeerId : localPeerId,
     text: input.text,
     created_at: nowIso(),
     ...(input.replyToMessageId ? { reply_to_message_id: input.replyToMessageId } : {}),
@@ -375,7 +504,7 @@ export function appendPeerConversationTranscript(
   session.last_message_at = entry.created_at;
   session.updated_at = entry.created_at;
   savePeerConversationSession(session);
-  recordEvent(input.tenantId, input.localPeerId, {
+  recordEvent(tenantId, localPeerId, {
     type: 'conversation_message_recorded',
     session_id: session.session_id,
     direction: input.direction,
@@ -479,17 +608,28 @@ export async function sendPeerConversationMessageToPeer(
     timeoutMs: input.timeoutMs,
   });
 
-  const response = receipt.response as any;
-  if (response?.reply && typeof response.reply === 'object') {
-    const reply = response.reply as Partial<PeerConversationTranscriptEntry>;
+  const response = receipt.response;
+  let responseRecord: Record<string, unknown> | undefined;
+  if (response !== undefined && !isRecord(response)) {
+    throw new Error('invalid_peer_conversation_response');
+  }
+  if (response !== undefined) responseRecord = response as Record<string, unknown>;
+  if (responseRecord?.reply !== undefined) {
+    const reply = parsePeerConversationTranscriptEntry(responseRecord.reply);
+    if (
+      reply.sender_peer_id !== input.recipientPeerId ||
+      reply.recipient_peer_id !== input.senderPeerId
+    ) {
+      throw new Error('peer_conversation_reply_identity_mismatch');
+    }
     appendPeerConversationTranscript({
       tenantId: input.tenantId,
       sessionId,
       localPeerId: input.senderPeerId,
       remotePeerId: input.recipientPeerId,
-      kind: (reply.kind as PeerConversationMessageKind) || 'reply',
+      kind: reply.kind,
       direction: 'inbound',
-      text: String(reply.text || ''),
+      text: reply.text,
       replyToMessageId: reply.reply_to_message_id || envelope.message_id,
       relatedWorkItemIds: reply.related_work_item_ids || input.relatedWorkItemIds,
       metadata: reply.metadata,
@@ -510,10 +650,8 @@ export async function sendPeerConversationMessageToPeer(
 
 export function clearPeerConversationRuntime(tenantId: string, peerId: string): void {
   withExecutionContext(GOVERNED_ROLE, () => {
-    const runtimeDir = pathResolver.resolve(peerRoot(tenantId, peerId));
-    const observabilityDir = pathResolver.resolve(
-      `${OBSERVABILITY_ROOT}/tenants/${tenantId}/peers/${peerId}`
-    );
+    const runtimeDir = peerRoot(tenantId, peerId);
+    const observabilityDir = path.dirname(eventsPath(tenantId, peerId));
     if (safeExistsSync(runtimeDir)) safeRmSync(runtimeDir, { recursive: true, force: true });
     if (safeExistsSync(observabilityDir))
       safeRmSync(observabilityDir, { recursive: true, force: true });
@@ -523,8 +661,10 @@ export function clearPeerConversationRuntime(tenantId: string, peerId: string): 
 export function createPeerConversationResponder(
   options: CreatePeerConversationResponderOptions
 ): PeerMessageResponder {
+  const responderPeerId = normalizePeerId(options.peerId);
+  const responderTenantId = normalizeTenantId(options.tenantId);
   return async (context: PeerMessageResponderContext): Promise<unknown> => {
-    if (context.envelope.tenant_id !== options.tenantId) {
+    if (context.envelope.tenant_id !== responderTenantId) {
       throw new Error(`peer_conversation_tenant_mismatch:${context.envelope.message_id}`);
     }
     const payload = validatePeerConversationMessage(context.envelope.payload);
@@ -537,9 +677,9 @@ export function createPeerConversationResponder(
       throw new Error(`peer_conversation_tenant_mismatch:${message.session_id}`);
     }
     const session = appendPeerConversationTranscript({
-      tenantId: options.tenantId,
+      tenantId: responderTenantId,
       sessionId: message.session_id,
-      localPeerId: options.peerId,
+      localPeerId: responderPeerId,
       remotePeerId: context.envelope.sender_peer_id,
       kind: message.message_kind,
       direction: 'inbound',
@@ -562,29 +702,39 @@ export function createPeerConversationResponder(
     })) as Partial<PeerConversationResponderResult> | void;
 
     const replyResult = maybeReply as Partial<PeerConversationResponderResult> | undefined;
-    const replyText = replyResult?.reply?.text || `Received by ${options.peerId}: ${message.text}`;
-    const reply: PeerConversationTranscriptEntry = replyResult?.reply || {
-      message_id: randomId('PCR'),
-      kind: message.message_kind === 'close' ? 'close' : 'reply',
-      direction: 'outbound',
-      sender_peer_id: options.peerId,
-      recipient_peer_id: context.envelope.sender_peer_id,
-      text: replyText,
-      created_at: nowIso(),
-      ...(message.related_work_item_ids?.length
-        ? { related_work_item_ids: [...new Set(message.related_work_item_ids)] }
-        : {}),
-      ...(message.reply_to_message_id ? { reply_to_message_id: message.reply_to_message_id } : {}),
-      payload: {
-        conversation_session_id: session.session_id,
-        peer_id: options.peerId,
-      },
-    };
+    const suppliedReply = replyResult?.reply;
+    const reply = suppliedReply
+      ? parsePeerConversationTranscriptEntry(suppliedReply)
+      : parsePeerConversationTranscriptEntry({
+          message_id: randomId('PCR'),
+          kind: message.message_kind === 'close' ? 'close' : 'reply',
+          direction: 'outbound',
+          sender_peer_id: responderPeerId,
+          recipient_peer_id: context.envelope.sender_peer_id,
+          text: `Received by ${responderPeerId}: ${message.text}`,
+          created_at: nowIso(),
+          ...(message.related_work_item_ids?.length
+            ? { related_work_item_ids: [...new Set(message.related_work_item_ids)] }
+            : {}),
+          ...(message.reply_to_message_id
+            ? { reply_to_message_id: message.reply_to_message_id }
+            : {}),
+          payload: {
+            conversation_session_id: session.session_id,
+            peer_id: responderPeerId,
+          },
+        });
+    if (
+      reply.sender_peer_id !== responderPeerId ||
+      reply.recipient_peer_id !== context.envelope.sender_peer_id
+    ) {
+      throw new Error('peer_conversation_reply_identity_mismatch');
+    }
 
     const updatedSession = appendPeerConversationTranscript({
-      tenantId: options.tenantId,
+      tenantId: responderTenantId,
       sessionId: message.session_id,
-      localPeerId: options.peerId,
+      localPeerId: responderPeerId,
       remotePeerId: context.envelope.sender_peer_id,
       kind: reply.kind,
       direction: 'outbound',

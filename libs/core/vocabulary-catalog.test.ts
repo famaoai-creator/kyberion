@@ -5,11 +5,6 @@ import {
   resolveVocabularyEntry,
 } from './vocabulary-catalog.js';
 import { createBrowserVocabularyResolver } from './locale-normalize.js';
-import {
-  renderBrowserVocabularyMessage,
-  renderBrowserVocabularyText,
-  resolveBrowserVocabularyEntry,
-} from './locale-normalize.js';
 
 afterEach(() => {
   _resetVocabularyCatalogCacheForTests();

@@ -1,7 +1,18 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeCopyFileSync, safeExistsSync, safeMkdir, safeStat, safeWriteFile } from './secure-io.js';
-import { getVoiceSampleIngestionPolicy, type VoiceSampleIngestionPolicy } from './voice-sample-ingestion-policy.js';
+import { nowIso } from './foundation/time.js';
+import {
+  assertSafeRepositoryPath,
+  safeCopyFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeStat,
+  safeWriteFile,
+} from './secure-io.js';
+import {
+  getVoiceSampleIngestionPolicy,
+  type VoiceSampleIngestionPolicy,
+} from './voice-sample-ingestion-policy.js';
 
 export interface VoiceSampleCollectionItem {
   sample_id: string;
@@ -31,11 +42,13 @@ export interface VoiceSampleCollectionManifest {
   request_id: string;
   created_at: string;
   profile_draft?: VoiceSampleCollectionProfileDraft;
-  samples: Array<VoiceSampleCollectionItem & {
-    staged_path: string;
-    bytes: number;
-    extension: string;
-  }>;
+  samples: Array<
+    VoiceSampleCollectionItem & {
+      staged_path: string;
+      bytes: number;
+      extension: string;
+    }
+  >;
   summary: {
     sample_count: number;
     total_sample_bytes: number;
@@ -65,7 +78,7 @@ function normalizedExtension(filePath: string): string {
 
 function validateCollectionRequest(
   input: VoiceSampleCollectionRequest,
-  policy: VoiceSampleIngestionPolicy,
+  policy: VoiceSampleIngestionPolicy
 ): void {
   if (!String(input.request_id || '').trim()) {
     throw new Error('collect_voice_samples requires request_id');
@@ -80,12 +93,21 @@ function validateCollectionRequest(
 
 export function collectVoiceSamples(
   input: VoiceSampleCollectionRequest,
-  policy: VoiceSampleIngestionPolicy = getVoiceSampleIngestionPolicy(),
+  policy: VoiceSampleIngestionPolicy = getVoiceSampleIngestionPolicy()
 ): VoiceSampleCollectionResult {
   validateCollectionRequest(input, policy);
-  const allowedExtensions = new Set(policy.sample_limits.allowed_extensions.map((ext) => ext.toLowerCase()));
+  const requestId = String(input.request_id || '').trim();
+  if (requestId === '.' || requestId === '..' || /[\\/]/u.test(requestId)) {
+    throw new Error('collect_voice_samples request_id must be a single safe path segment');
+  }
+  const allowedExtensions = new Set(
+    policy.sample_limits.allowed_extensions.map((ext) => ext.toLowerCase())
+  );
   const seenSourcePaths = new Set<string>();
-  const collectionDir = pathResolver.sharedTmp(`voice-sample-collection/${input.request_id}`);
+  const collectionDir = assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`voice-sample-collection/${requestId}`),
+    { allowMissingLeaf: true }
+  );
   safeMkdir(collectionDir, { recursive: true });
 
   let totalSampleBytes = 0;
@@ -103,14 +125,15 @@ export function collectVoiceSamples(
       }
       seenSourcePaths.add(samplePath);
     }
-    if (!safeExistsSync(samplePath)) {
+    const resolvedSamplePath = assertSafeRepositoryPath(samplePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(resolvedSamplePath)) {
       throw new Error(`sample file does not exist (${samplePath})`);
     }
     const extension = normalizedExtension(samplePath);
     if (!allowedExtensions.has(extension)) {
       throw new Error(`sample ${sample.sample_id} extension .${extension} is not allowed`);
     }
-    const stats = safeStat(samplePath);
+    const stats = safeStat(resolvedSamplePath);
     if (stats.size < policy.sample_limits.min_sample_bytes) {
       throw new Error(`sample ${sample.sample_id} is too small (${stats.size} bytes)`);
     }
@@ -119,11 +142,23 @@ export function collectVoiceSamples(
     }
 
     totalSampleBytes += stats.size;
-    const stagedPath = path.join(collectionDir, `${sample.sample_id}.${extension}`);
-    safeCopyFileSync(samplePath, stagedPath);
-    const transcriptPath = `${samplePath}.transcript.txt`;
+    const sampleId = String(sample.sample_id).trim();
+    if (sampleId === '.' || sampleId === '..' || /[\\/]/u.test(sampleId)) {
+      throw new Error(`sample ${sample.sample_id} must use a single safe path segment`);
+    }
+    const stagedPath = assertSafeRepositoryPath(
+      path.join(collectionDir, `${sampleId}.${extension}`),
+      { allowMissingLeaf: true }
+    );
+    safeCopyFileSync(resolvedSamplePath, stagedPath);
+    const transcriptPath = assertSafeRepositoryPath(`${resolvedSamplePath}.transcript.txt`, {
+      allowMissingLeaf: true,
+    });
     if (safeExistsSync(transcriptPath)) {
-      safeCopyFileSync(transcriptPath, `${stagedPath}.transcript.txt`);
+      safeCopyFileSync(
+        transcriptPath,
+        assertSafeRepositoryPath(`${stagedPath}.transcript.txt`, { allowMissingLeaf: true })
+      );
     }
     return {
       ...sample,
@@ -136,7 +171,7 @@ export function collectVoiceSamples(
   const manifest: VoiceSampleCollectionManifest = {
     kind: 'voice_sample_collection_manifest',
     request_id: input.request_id,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     ...(input.profile_draft ? { profile_draft: input.profile_draft } : {}),
     samples: stagedSamples,
     summary: {
@@ -145,7 +180,12 @@ export function collectVoiceSamples(
       collection_dir: collectionDir,
     },
   };
-  const manifestPath = path.join(collectionDir, 'collection-manifest.json');
+  const manifestPath = assertSafeRepositoryPath(
+    path.join(collectionDir, 'collection-manifest.json'),
+    {
+      allowMissingLeaf: true,
+    }
+  );
   safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
 
   return {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportTraceOtlp, finalizeAndPersist, persistTrace, TraceContext } from './trace.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeReadFile, safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeSymlinkSync } from '../secure-io.js';
 import { validateTraceReplay } from '../trace-schema.js';
 
 const originalEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
@@ -16,6 +16,14 @@ afterEach(() => {
 });
 
 describe('trace OTLP bridge', () => {
+  it('type-checks exact attributes for governed span names', () => {
+    const context = new TraceContext('workflow.test');
+    context.startSpan('mission', { mission_id: 'M1' });
+    // @ts-expect-error governed span attributes reject undeclared keys
+    context.startSpan('mission', { undeclared: true });
+    context.endSpan('ok');
+  });
+
   it('is disabled unless an OTLP endpoint is configured', async () => {
     delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
     const trace = new TraceContext('workflow.test').finalize();
@@ -63,5 +71,20 @@ describe('trace OTLP bridge', () => {
     expect(() => persistTrace(malformed as never, { dir: traceTestDir })).toThrow(
       '[TRACE_SCHEMA_INVALID]'
     );
+  });
+
+  it('rejects a trace log directory that traverses a symbolic link', () => {
+    const targetDir = pathResolver.sharedTmp(`trace-log-target-${process.pid}`);
+    const linkedDir = pathResolver.sharedTmp(`trace-log-link-${process.pid}`);
+    safeMkdir(targetDir, { recursive: true });
+    safeSymlinkSync(targetDir, linkedDir, 'dir');
+    try {
+      expect(() =>
+        persistTrace(new TraceContext('workflow.symlink').finalize(), { dir: linkedDir })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(linkedDir, { recursive: true, force: true });
+      safeRmSync(targetDir, { recursive: true, force: true });
+    }
   });
 });

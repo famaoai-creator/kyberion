@@ -1,6 +1,12 @@
 import express from 'express';
-import { installProcessGuards, slugify } from '@agent/core';
-import { appendJsonLine, getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { installProcessGuards } from '@agent/core/process-guards';
+import {
+  appendJsonLine,
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonInput,
+  setRegisteredEnv,
+} from '@agent/core/foundation';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
@@ -11,115 +17,61 @@ import * as path from 'node:path';
 installProcessGuards('voice-hub');
 import {
   buildPresenceAssistantReplyTimeline,
-  applyBrowserConversationCommand,
-  buildAnalysisCorpusSnippets,
-  buildAnalysisExecutionContract,
-  buildAnalysisFindingCandidates,
-  classifyAnalysisImpactBands,
-  buildAnalysisIntentSupport,
-  attachArtifactRecordToTaskSession,
-  buildProjectBootstrapWorkItems,
-  classifyBrowserConversationCommand,
-  classifySurfaceQueryIntent,
-  classifyTaskSessionIntent,
-  findServiceBootstrapEntriesByUtterance,
-  getServiceBootstrapCatalogEntryByServiceId,
-  confirmBrowserConversationCandidate,
-  createTaskSession,
-  createBrowserConversationCommand,
-  executeBrowserConversationAction,
-  createArtifactRecord,
-  createDistillCandidateRecord,
-  findIntentOutcomePattern,
-  listServiceBindingRecords,
   buildPresenceVoiceIngressTimeline,
-  createSurfaceAsyncRequest,
   createPresenceVoiceStimulus,
-  compileUserIntentFlow,
-  deriveSurfaceDelegationReceiver,
-  enqueueSurfaceNotification,
   estimateSpeechDurationMs,
-  extractSurfaceBlocks,
-  getSurfaceAgentCatalogEntry,
-  getSurfaceAsyncRequest,
-  formatSurfaceRecoveryAction,
-  getVoiceTtsLanguageConfig,
-  getVoiceProfileRecord,
+} from '@agent/core/presence-surface';
+import { getSurfaceAgentCatalogEntry } from '@agent/core/surface-agent-catalog';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
+import { getVoiceProfileRecord } from '@agent/core/voice-profile-registry';
+import {
   getVoiceEngineRegistry,
-  getVoiceSelectionSnapshot,
   resolveVoiceEngineForPlatform,
-  resolveVoiceTtsAdapter,
-  resolveVoiceSttAdapter,
   type VoiceEngineRecord,
-  getActiveBrowserConversationSession,
-  getActiveTaskSession,
-  getSurfaceQueryProviderConfig,
-  currentScope,
-  createVirtualDeviceInventoryBridge,
-  extractSurfaceKnowledgeQuery,
-  extractSurfaceWebSearchQuery,
-  listAgentRuntimeSnapshots,
-  listDistillCandidateRecords,
-  loadProjectRecord,
-  loadProjectTrackRecord,
-  resolveProjectRecordForText,
-  resolveProjectTrackRecordForText,
-  saveProjectRecord,
-  saveProjectTrackRecord,
-  saveMissionSeedRecord,
-  saveServiceBindingRecord,
-  listSurfaceAsyncRequests,
-  listSurfaceNotifications,
-  buildSurfaceAsyncAcceptedReply,
-  loadSurfaceManifest,
-  loadSurfaceState,
-  logger,
-  parseSurfaceActionRoutingDecision,
-  normalizeSurfaceDefinition,
-  pathResolver,
+} from '@agent/core/voice-engine-registry';
+import { getVoiceSelectionSnapshot } from '@agent/core/voice-selection-preferences';
+import {
+  resolveVoiceSttAdapter,
+  resolveVoiceTtsAdapter,
+} from '@agent/core/voice-provider-adapters';
+import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
+import {
   parseVoiceSttBackend,
-  probeSurfaceHealth,
-  readSurfaceLogTail,
-  reflectPresenceAgentReply,
-  resolveWorkDesign,
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
-  runSurfaceConversation,
-  runSurfaceMessageConversation,
-  formatChannelTurnText,
+  type VoiceSttAvailability,
+} from '@agent/core/voice-stt';
+import { ShellSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
+import { formatChannelTurnText } from '@agent/core/channel-adapter';
+import { t } from '@agent/core/t';
+import {
   resolveIntentResolutionContract,
-  safeExec,
+  type IntentResolutionContract,
+} from '@agent/core/intent-resolution-contract';
+import { runSurfaceConversation, runSurfaceMessageConversation } from '@agent/core/channel-surface';
+import {
+  assertSafeRepositoryPath,
   buildSafeExecEnv,
   safeReadFile,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReaddir,
-  updateSurfaceAsyncRequest,
-  safeWriteFile,
-  saveArtifactRecord,
-  saveDistillCandidateRecord,
-  updateTaskSession,
-  saveTaskSession,
-  recordTaskSessionHistory,
-  createBrowserConversationSession,
-  type BrowserConversationSession,
-  assessBrowserDistillCandidate,
-  assessMissionSeedCandidate,
-  assessTaskDistillCandidate,
-  recordBrowserConversationHistory,
-  saveBrowserConversationSession,
-  formatClarificationPacket,
-  resolveFallbackLocationCoordinates,
-  resolveFallbackLocationSummary,
-  resolveManagedToolPythonBin,
-  probeToolRuntime,
-  listenNativeSpeech,
-  resolveVoiceTaskDistillTargetKind,
-  resolveVoiceTaskProfile,
-  recordVoiceSample,
-  type TaskSession,
-  type IntentResolutionContract,
-} from '@agent/core';
+  safeRmSync,
+} from '@agent/core/secure-io';
+import { resolveManagedToolPythonBin, probeToolRuntime } from '@agent/core/tool-runtime-registry';
+import { listenNativeSpeech } from '@agent/core/native-speech-listen-bridge';
+import { buildNativeTtsCommand } from '@agent/core/native-tts';
+import { normalizeEventScope } from '@agent/core/event-scope';
+import { recordVoiceSample } from '@agent/core/voice-sample-recorder';
+import { logger } from '@agent/core/core';
+import * as pathResolver from '@agent/core/path-resolver';
+import type { EventScopeInput } from '@agent/core/event-scope';
+import {
+  parseVoiceBridgeResponse,
+  parseVoiceTranscriptionResponse,
+  readVoiceHubEventScope,
+  readVoiceHubRequestObject,
+} from './request-input.js';
 
 interface VoiceHubRecord {
   id: string;
@@ -142,10 +94,6 @@ function resolveVoiceHubPythonBin(): string {
   const legacyVenvPython = pathResolver.rootResolve('.venv/bin/python3');
   if (safeExistsSync(legacyVenvPython)) return legacyVenvPython;
   return 'python3';
-}
-
-function renderVoiceTemplate(template: string, values: Record<string, string | undefined>): string {
-  return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key: string) => values[key] ?? '');
 }
 
 interface VoiceHubResponseRecord {
@@ -172,41 +120,34 @@ interface ConversationTurn {
   text: string;
 }
 
-interface PresenceLocationContext {
-  latitude: number;
-  longitude: number;
-  accuracy?: number;
-  timestamp: string;
-  source?: string;
-}
-
-interface WebSearchResult {
-  title: string;
-  url: string;
-  snippet?: string;
-}
-
-type TaskSessionShape = TaskSession;
-
 const app = express();
 const server = createServer(app);
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-const PORT = Number(process.env.VOICE_HUB_PORT || 3032);
-const HOST = process.env.VOICE_HUB_HOST || '127.0.0.1';
-const PRESENCE_STUDIO_URL = process.env.PRESENCE_STUDIO_URL || 'http://127.0.0.1:3031';
+const PORT = Number(getRegisteredEnvText('VOICE_HUB_PORT') || 3032);
+const HOST = getRegisteredEnvText('VOICE_HUB_HOST') || '127.0.0.1';
+const PRESENCE_STUDIO_URL = getRegisteredEnvText('PRESENCE_STUDIO_URL') || 'http://127.0.0.1:3031';
 const PRESENCE_SURFACE_WARMUP_QUERY = 'Reply with exactly: Ready.';
 
-process.env.MISSION_ROLE ||= 'surface_runtime';
+if (!getRegisteredEnvText('MISSION_ROLE')) {
+  setRegisteredEnv('MISSION_ROLE', 'surface_runtime');
+}
 
 const recent: VoiceHubRecord[] = [];
 const recentResponses = new Map<string, VoiceHubResponseRecord>();
 const inflightResponses = new Map<string, Promise<VoiceHubResponseRecord>>();
 const conversationMemory = new Map<string, ConversationTurn[]>();
-const activeTaskExecutions = new Set<string>();
 let activeSpeechProcess: ChildProcess | null = null;
 let activeSpeechState: SpeechPlaybackState = { status: 'idle' };
 let recentSpeechGuardState: RecentSpeechGuardState = {};
+
+function resolveRegularRepositoryFile(filePath: string, label: string): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return safePath;
+}
 
 function normalizeSpeechEchoText(text: string): string {
   return text
@@ -382,8 +323,15 @@ async function transcribeWithWhisperCpp(
   if (!adapter.cli_path || !adapter.model_path) {
     return { ok: false, error: 'whisper_cpp_paths_not_configured' };
   }
-  const cliPath = pathResolver.resolve(adapter.cli_path);
-  const modelPath = pathResolver.resolve(adapter.model_path);
+  const cliPath = resolveRegularRepositoryFile(
+    pathResolver.resolve(adapter.cli_path),
+    'Whisper CLI'
+  );
+  const modelPath = resolveRegularRepositoryFile(
+    pathResolver.resolve(adapter.model_path),
+    'Whisper model'
+  );
+  const safeInputPath = resolveRegularRepositoryFile(inputPath, 'STT input');
   const workingDirectory = path.dirname(cliPath);
   return new Promise((resolve, reject) => {
     const lang = locale.toLowerCase().startsWith('ja') ? 'ja' : 'auto';
@@ -393,7 +341,7 @@ async function transcribeWithWhisperCpp(
         '-m',
         modelPath,
         '-f',
-        inputPath,
+        safeInputPath,
         '-l',
         lang,
         '--no-timestamps',
@@ -428,7 +376,7 @@ async function transcribeWithWhisperCpp(
   });
 }
 
-async function transcribeWithMlxWhisper(
+async function transcribeWithManagedPythonBridge(
   inputPath: string,
   locale: string,
   adapter: ReturnType<typeof resolveVoiceSttAdapter>
@@ -437,7 +385,11 @@ async function transcribeWithMlxWhisper(
   if (!pythonBin)
     return { ok: false, error: `${adapter.runtime_id || 'managed'}_runtime_not_installed` };
   if (!adapter.bridge_script) return { ok: false, error: 'managed_stt_bridge_not_configured' };
-  const bridgeScript = pathResolver.rootResolve(adapter.bridge_script);
+  const bridgeScript = resolveRegularRepositoryFile(
+    pathResolver.rootResolve(adapter.bridge_script),
+    'STT bridge script'
+  );
+  const safeInputPath = resolveRegularRepositoryFile(inputPath, 'STT input');
   return new Promise((resolve) => {
     const child = spawn(pythonBin, [bridgeScript], {
       cwd: pathResolver.rootDir(),
@@ -456,11 +408,15 @@ async function transcribeWithMlxWhisper(
     child.on('error', (error) => resolve({ ok: false, error: error.message }));
     child.on('close', (code) => {
       const lines = stdout.trim().split(/\n+/).filter(Boolean);
-      let payload: { text?: unknown; status?: unknown; error?: unknown } | null = null;
+      let payload: ReturnType<typeof parseVoiceBridgeResponse>;
       try {
-        payload = lines.length ? JSON.parse(lines[lines.length - 1]) : null;
+        payload = lines.length
+          ? parseVoiceBridgeResponse(
+              parseSafeJsonInput(lines[lines.length - 1], 'voice bridge response')
+            )
+          : undefined;
       } catch {
-        payload = null;
+        payload = undefined;
       }
       const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
       if (code === 0 && payload?.status === 'success' && text) {
@@ -472,14 +428,14 @@ async function transcribeWithMlxWhisper(
         error:
           (typeof payload?.error === 'string' ? payload.error : undefined) ||
           stderr.trim().slice(0, 500) ||
-          `mlx_whisper_failed_${code ?? 'unknown'}`,
+          `${adapter.backend}_failed_${code ?? 'unknown'}`,
       });
     });
     child.stdin.end(
       JSON.stringify({
         action: 'transcribe',
         params: {
-          audio_path: inputPath,
+          audio_path: safeInputPath,
           language: locale.toLowerCase().startsWith('ja') ? 'ja' : undefined,
         },
       })
@@ -500,10 +456,11 @@ async function transcribeWithOpenAiCompatibleServer(
     };
   }
 
-  const audio = safeReadFile(inputPath, { encoding: null }) as Buffer;
+  const safeInputPath = resolveRegularRepositoryFile(inputPath, 'STT input');
+  const audio = safeReadFile(safeInputPath, { encoding: null }) as Buffer;
   const audioBytes = new Uint8Array(audio);
   const form = new FormData();
-  form.append('file', new Blob([audioBytes], { type: 'audio/wav' }), path.basename(inputPath));
+  form.append('file', new Blob([audioBytes], { type: 'audio/wav' }), path.basename(safeInputPath));
   form.append('model', serverConfig.model);
   if (locale.toLowerCase().startsWith('ja')) {
     form.append('language', 'ja');
@@ -529,8 +486,15 @@ async function transcribeWithOpenAiCompatibleServer(
     };
   }
 
-  const payload = (await response.json()) as { text?: string };
-  const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
+  const payload = parseVoiceTranscriptionResponse(await response.json());
+  if (!payload) {
+    return {
+      ok: false,
+      error: 'stt_server_invalid_response',
+      backend: serverConfig.provider,
+    };
+  }
+  const text = payload.text.trim();
   return {
     ok: text.length > 0,
     text,
@@ -540,16 +504,37 @@ async function transcribeWithOpenAiCompatibleServer(
 }
 
 function getAvailableSttBackends() {
-  const availability = {
+  const availability: VoiceSttAvailability = {
     server: false,
+    fluidAudio: false,
+    fasterWhisper: false,
     mlxWhisper: false,
     whisperCpp: false,
     nativeSpeech: false,
   };
-  for (const backend of ['server', 'mlx_whisper', 'whisper_cpp', 'native_speech'] as const) {
+  for (const backend of [
+    'server',
+    'fluid_audio',
+    'faster_whisper',
+    'mlx_whisper',
+    'whisper_cpp',
+    'native_speech',
+  ] as const) {
     const adapter = resolveVoiceSttAdapter(backend);
     if (adapter.adapter_id === 'openai_compatible_server') {
       availability.server = resolveVoiceSttServerConfig(process.env) !== null;
+    } else if (adapter.adapter_id === 'fluid_audio_native') {
+      availability.fluidAudio = Boolean(
+        process.platform === 'darwin' &&
+        getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
+      );
+    } else if (adapter.adapter_id === 'faster_whisper_python' && adapter.runtime_id) {
+      availability.fasterWhisper = Boolean(
+        process.platform === 'win32' &&
+        (getRegisteredEnvText('KYBERION_WINDOWS_STT_BACKEND') === 'faster_whisper' ||
+          getRegisteredEnvText('KYBERION_STT_MODEL_DIR')?.trim()) &&
+        probeToolRuntime(adapter.runtime_id, 'installed').installed
+      );
     } else if (adapter.adapter_id === 'managed_python_bridge' && adapter.runtime_id) {
       availability.mlxWhisper = probeToolRuntime(adapter.runtime_id, 'installed').installed;
     } else if (adapter.adapter_id === 'whisper_cpp_cli') {
@@ -570,6 +555,31 @@ function getAvailableSttBackends() {
   };
 }
 
+async function transcribeWithFluidAudio(
+  inputPath: string,
+  locale: string
+): Promise<{ ok: boolean; text?: string; error?: string }> {
+  const command = getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim();
+  if (!command) return { ok: false, error: 'fluid_audio_command_not_configured' };
+
+  const bridge = new ShellSpeechToTextBridge({
+    name: 'fluid-audio-parakeet',
+    command,
+    structuredOutput: true,
+    timeoutMs: Number(getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS')) || undefined,
+  });
+  const transcriptPath = `${inputPath}.transcript.txt`;
+  try {
+    const result = await bridge.transcribe({ audioPath: inputPath, language: locale });
+    const text = result.text.trim();
+    return text ? { ok: true, text } : { ok: false, error: 'empty_transcript' };
+  } catch (error: any) {
+    return { ok: false, error: error?.message || String(error) };
+  } finally {
+    if (safeExistsSync(transcriptPath)) safeRmSync(transcriptPath, { force: true });
+  }
+}
+
 async function transcribeRecordedAudio(
   inputPath: string,
   locale: string,
@@ -586,9 +596,19 @@ async function transcribeRecordedAudio(
         continue;
       }
 
-      if (adapter.adapter_id === 'managed_python_bridge') {
-        const result = await transcribeWithMlxWhisper(inputPath, locale, adapter);
-        if (result.ok) return { ...result, backend: 'mlx_whisper' };
+      if (adapter.adapter_id === 'fluid_audio_native') {
+        const result = await transcribeWithFluidAudio(inputPath, locale);
+        if (result.ok) return { ...result, backend: 'fluid_audio' };
+        lastError = result.error || lastError;
+        continue;
+      }
+
+      if (
+        adapter.adapter_id === 'managed_python_bridge' ||
+        adapter.adapter_id === 'faster_whisper_python'
+      ) {
+        const result = await transcribeWithManagedPythonBridge(inputPath, locale, adapter);
+        if (result.ok) return { ...result, backend: parseVoiceSttBackend(backend) };
         lastError = result.error || lastError;
         continue;
       }
@@ -653,13 +673,21 @@ async function runVoiceTtsPythonBridge(
   if (engine.runtime_id && !resolveManagedToolPythonBin(engine.runtime_id)) {
     throw new Error(`TTS runtime ${engine.runtime_id} is not installed`);
   }
-  const bridgeScript = pathResolver.rootResolve(engine.bridge_script);
+  const bridgeScript = resolveRegularRepositoryFile(
+    pathResolver.rootResolve(engine.bridge_script),
+    'TTS bridge script'
+  );
   const tmpPath = pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
   const samples = profile?.sample_refs || [];
-  const refAudio = samples.length > 0 ? pathResolver.rootResolve(samples[0]) : undefined;
-  const refTextFile = refAudio ? `${refAudio}.transcript.txt` : undefined;
+  const refAudio =
+    samples.length > 0
+      ? resolveRegularRepositoryFile(pathResolver.rootResolve(samples[0]), 'Voice reference audio')
+      : undefined;
+  const refTextFile = refAudio
+    ? assertSafeRepositoryPath(`${refAudio}.transcript.txt`, { allowMissingLeaf: true })
+    : undefined;
   let refText: string | undefined;
-  if (refTextFile && safeExistsSync(refTextFile)) {
+  if (refTextFile && safeExistsSync(refTextFile) && safeLstat(refTextFile).isFile()) {
     refText = (safeReadFile(refTextFile, { encoding: 'utf8' }) as string).trim();
   }
 
@@ -677,50 +705,56 @@ async function runVoiceTtsPythonBridge(
     },
   });
 
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(pythonBin, [bridgeScript], {
-      cwd: pathResolver.rootDir(),
-      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
-      stdio: ['pipe', 'pipe', 'pipe'],
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(pythonBin, [bridgeScript], {
+        cwd: pathResolver.rootDir(),
+        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (chunk) => {
+        stdout += String(chunk).slice(0, 2_000_000);
+      });
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk).slice(0, 200_000);
+      });
+      child.on('error', reject);
+      child.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`${engine.engine_id} bridge failed: ${stderr.trim() || stdout.trim()}`));
+          return;
+        }
+        const lines = stdout.trim().split(/\n+/).filter(Boolean);
+        let result: ReturnType<typeof parseVoiceBridgeResponse>;
+        try {
+          result = lines.length
+            ? parseVoiceBridgeResponse(
+                parseSafeJsonInput(lines[lines.length - 1], 'voice bridge response')
+              )
+            : undefined;
+        } catch {
+          reject(new Error(`${engine.engine_id} bridge returned non-JSON output`));
+          return;
+        }
+        if (result?.status !== 'success') {
+          reject(
+            new Error(
+              typeof result?.error === 'string' ? result.error : `${engine.engine_id} bridge failed`
+            )
+          );
+          return;
+        }
+        resolve();
+      });
+      child.stdin.end(payload);
     });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk).slice(0, 2_000_000);
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk).slice(0, 200_000);
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`${engine.engine_id} bridge failed: ${stderr.trim() || stdout.trim()}`));
-        return;
-      }
-      const lines = stdout.trim().split(/\n+/).filter(Boolean);
-      let result: { status?: unknown; error?: unknown } | null = null;
-      try {
-        result = lines.length ? JSON.parse(lines[lines.length - 1]) : null;
-      } catch {
-        reject(new Error(`${engine.engine_id} bridge returned non-JSON output`));
-        return;
-      }
-      if (result?.status !== 'success') {
-        reject(
-          new Error(
-            typeof result?.error === 'string' ? result.error : `${engine.engine_id} bridge failed`
-          )
-        );
-        return;
-      }
-      resolve();
-    });
-    child.stdin.end(payload);
-  });
-
-  if (!safeExistsSync(tmpPath))
-    throw new Error(`${engine.engine_id} bridge produced no audio artifact`);
-  return tmpPath;
+    return resolveRegularRepositoryFile(tmpPath, `${engine.engine_id} bridge artifact`);
+  } catch (error) {
+    if (safeExistsSync(tmpPath)) safeRmSync(tmpPath, { force: true });
+    throw error;
+  }
 }
 
 async function playVoiceArtifact(
@@ -728,8 +762,9 @@ async function playVoiceArtifact(
   text: string,
   engineId: string
 ): Promise<void> {
+  const safeArtifactPath = resolveRegularRepositoryFile(artifactPath, 'TTS artifact');
   await new Promise<void>((resolve, reject) => {
-    const player = spawn('/usr/bin/afplay', [artifactPath], {
+    const player = spawn('/usr/bin/afplay', [safeArtifactPath], {
       cwd: pathResolver.rootDir(),
       env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -777,19 +812,24 @@ async function speakWithVoiceEngine(
       languageProfile.voice,
       languageProfile.rate
     );
-    await playVoiceArtifact(artifactPath, text, engine.engine_id);
+    try {
+      await playVoiceArtifact(artifactPath, text, engine.engine_id);
+    } finally {
+      if (safeExistsSync(artifactPath)) safeRmSync(artifactPath, { force: true });
+    }
     return;
   }
   if (adapter.adapter_id === 'native_tts') {
-    const child = spawn(
-      '/usr/bin/say',
-      ['-v', languageProfile.voice, '-r', String(languageProfile.rate), text],
-      {
-        cwd: pathResolver.rootDir(),
-        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
-        stdio: ['ignore', 'ignore', 'pipe'],
-      }
-    );
+    const command = buildNativeTtsCommand(text, {
+      voice: languageProfile.voice,
+      rate: languageProfile.rate,
+    });
+    if (!command) throw new Error(`Native TTS is unsupported on ${process.platform}`);
+    const child = spawn(command.cmd, command.args, {
+      cwd: pathResolver.rootDir(),
+      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
     activeSpeechProcess = child;
     activeSpeechState = {
       status: 'speaking',
@@ -821,7 +861,6 @@ async function speakWithVoiceEngine(
 
 async function speakReplyManaged(text: string): Promise<void> {
   await stopSpeechPlayback('replace_reply');
-  if (process.platform !== 'darwin') return;
 
   const language = detectReplyLanguage(text);
   const normalized = normalizeTextForTts(text, language);
@@ -860,8 +899,9 @@ async function processIngest(input: {
   speaker: string;
   reflect: boolean;
   autoReply: boolean;
+  scope?: EventScopeInput;
 }) {
-  const { requestId, text, intent, sourceId, speaker, reflect, autoReply } = input;
+  const { requestId, text, intent, sourceId, speaker, reflect, autoReply, scope } = input;
   if (shouldSuppressEchoTranscript(text)) {
     return {
       statusCode: 202,
@@ -940,7 +980,40 @@ async function processIngest(input: {
     let speechError: string | undefined;
     if (autoReply) {
       try {
-        const generatedReply = await generateReply(text, { sessionKey });
+        const locale = detectReplyLanguage(text);
+        let generatedReply: { text: string; intentResolution?: IntentResolutionContract };
+        try {
+          const result = await runSurfaceMessageConversation(
+            buildPresenceSurfaceConversationMessageInput(
+              buildPresenceConversationPrompt(text, sessionKey),
+              {
+                surfaceText: text,
+                delegationSummaryInstruction:
+                  'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
+                scope,
+                locale,
+              }
+            )
+          );
+          const formattedText = formatChannelTurnText(result, {
+            includeContract: false,
+            locale,
+          }).trim();
+          generatedReply = {
+            text: formattedText || buildVoiceFallbackReply(text),
+            intentResolution: result.intentResolution,
+          };
+        } catch (error: any) {
+          logger.warn(`[voice-hub] Shared surface conversation failed: ${error?.message || error}`);
+          generatedReply = {
+            text: buildVoiceFallbackReply(text),
+            intentResolution: resolveIntentResolutionContract(text, {
+              locale,
+              tier: scope?.tier,
+              tenantId: scope?.tenant_slug,
+            }),
+          };
+        }
         replyText = generatedReply.text;
         intentResolution = generatedReply.intentResolution;
         rememberConversationTurn(sessionKey, 'assistant', replyText);
@@ -975,13 +1048,13 @@ async function processIngest(input: {
         // Single attempt with .catch — a failing error announcement must not
         // recurse into another announcement.
         const language = detectReplyLanguage(text);
-        const spokenFallback =
-          language === 'ja'
-            ? 'うまく処理できませんでした。もう一度お願いします。'
-            : 'I could not process that. Please try again.';
+        const spokenFallback = t('surface:voice_hub_error_fallback', undefined, language);
         rememberConversationTurn(sessionKey, 'assistant', spokenFallback);
         replyText = spokenFallback;
-        intentResolution = resolveIntentResolutionContract(text);
+        intentResolution = resolveIntentResolutionContract(text, {
+          tier: scope?.tier,
+          tenantId: scope?.tenant_slug,
+        });
         speakReplyManaged(spokenFallback)
           .then(() => {
             logger.info('[voice-hub] spoke error fallback');
@@ -1080,6 +1153,8 @@ function buildPresenceSurfaceConversationMessageInput(
     forcedReceiver?: string;
     delegationSummaryInstruction?: string;
     surfaceText?: string;
+    locale?: SupportedLocale;
+    scope?: EventScopeInput;
   }
 ): Parameters<typeof runSurfaceMessageConversation>[0] {
   return {
@@ -1093,6 +1168,8 @@ function buildPresenceSurfaceConversationMessageInput(
     agentId: 'presence-surface-agent',
     forcedReceiver: options?.forcedReceiver,
     delegationSummaryInstruction: options?.delegationSummaryInstruction,
+    locale: options?.locale,
+    scope: options?.scope,
   };
 }
 
@@ -1134,10 +1211,7 @@ function buildCapabilityReply(language: SupportedLocale): string {
   const capabilities = (
     profile?.capabilities || ['presence', 'surface', 'conversation', 'realtime']
   ).join(', ');
-  if (language === 'ja') {
-    return `この surface では短い会話、リアルタイム応答、状態案内ができます。主な capability は ${capabilities} です。重い実行や durable な作業は Chronos など別の runtime に回します。`;
-  }
-  return `On this surface I can handle short conversation, realtime replies, and status guidance. My main capabilities here are ${capabilities}. Heavier execution and durable work should be routed to Chronos or another runtime.`;
+  return t('surface:voice_hub_capability_summary', { capabilities }, language);
 }
 
 function buildVoiceFallbackReply(userText: string): string {
@@ -1147,76 +1221,37 @@ function buildVoiceFallbackReply(userText: string): string {
 
   if (language === 'ja') {
     if (/^(こんにちは|こんばんは|おはよう|やあ|もしもし)/.test(trimmed)) {
-      return 'こんにちは。ここでは短い会話や状態案内ができます。必要なら Chronos や他の runtime に回します。';
+      return t('surface:voice_hub_greeting', undefined, language);
     }
     if (/(何ができる|なにができる|できること|何できる|何をしてくれる)/.test(trimmed)) {
       return buildCapabilityReply('ja');
     }
     if (/(ありがとう|助かった|了解)/.test(trimmed)) {
-      return '了解です。続けてどうぞ。短い相談ならこのまま返せます。';
+      return t('surface:voice_hub_thanks', undefined, language);
     }
     if (/[?？]$/.test(trimmed)) {
-      return '質問は受け取れています。ここでは短く答えつつ、必要なら適切な runtime に案内します。もう少し具体的に聞いてください。';
+      return t('surface:voice_hub_question', undefined, language);
     }
-    return '受け取りました。この surface では短い会話と案内ができます。必要なら次の一歩を一緒に整理します。';
+    return t('surface:voice_hub_received', undefined, language);
   }
 
   if (/^(hello|hi|hey)\b/.test(normalized)) {
-    return 'Hello. I can handle short conversation and quick guidance here, and route heavier work if needed.';
+    return t('surface:voice_hub_greeting', undefined, language);
   }
   if (/\b(what can you do|capabilities|help)\b/.test(normalized)) {
     return buildCapabilityReply('en');
   }
   if (/\b(thanks|thank you)\b/.test(normalized)) {
-    return 'Understood. Continue whenever you are ready.';
+    return t('surface:voice_hub_thanks', undefined, language);
   }
   if (/[?]$/.test(trimmed)) {
-    return 'I can help with short conversation and quick guidance here. Ask a more specific question and I will answer directly or route it properly.';
+    return t('surface:voice_hub_question', undefined, language);
   }
-  return 'I received that. I can handle short conversation and quick guidance here, and route heavier work when needed.';
+  return t('surface:voice_hub_received', undefined, language);
 }
 
 function withTimeoutSignal(timeoutMs: number): AbortSignal {
   return AbortSignal.timeout(timeoutMs);
-}
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#x2F;/g, '/');
-}
-
-async function generateReply(
-  userText: string,
-  context: { sessionKey: string }
-): Promise<{ text: string; intentResolution?: IntentResolutionContract }> {
-  try {
-    const result = await runSurfaceMessageConversation(
-      buildPresenceSurfaceConversationMessageInput(
-        buildPresenceConversationPrompt(userText, context.sessionKey),
-        {
-          surfaceText: userText,
-          delegationSummaryInstruction:
-            'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
-        }
-      )
-    );
-    const text = formatChannelTurnText(result, { includeContract: false }).trim();
-    return {
-      text: text || buildVoiceFallbackReply(userText),
-      intentResolution: result.intentResolution,
-    };
-  } catch (error: any) {
-    logger.warn(`[voice-hub] Shared surface conversation failed: ${error?.message || error}`);
-    return {
-      text: buildVoiceFallbackReply(userText),
-      intentResolution: resolveIntentResolutionContract(userText),
-    };
-  }
 }
 
 ensureStimuliDir();
@@ -1226,7 +1261,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     recent: recent.length,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   });
 });
 
@@ -1242,25 +1277,43 @@ app.get('/api/speech/state', (_req, res) => {
 });
 
 app.post('/api/stop-speaking', async (req, res) => {
-  const reason = typeof req.body?.reason === 'string' ? req.body.reason : 'manual_stop';
-  const result = await stopSpeechPlayback(reason);
-  res.json(result);
+  try {
+    const body = readVoiceHubRequestObject(req.body === undefined ? {} : req.body);
+    const reason = typeof body.reason === 'string' ? body.reason : 'manual_stop';
+    const result = await stopSpeechPlayback(reason);
+    res.json(result);
+  } catch (error: unknown) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+  }
 });
 
 app.post('/api/ingest-text', async (req, res) => {
-  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  let body: Record<string, unknown>;
+  try {
+    body = readVoiceHubRequestObject(req.body === undefined ? {} : req.body);
+  } catch (error: unknown) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
   if (!text) {
     return res.status(400).json({ error: 'text is required' });
   }
 
-  const intent = typeof req.body?.intent === 'string' ? req.body.intent : 'conversation';
-  const sourceId = typeof req.body?.source_id === 'string' ? req.body.source_id : 'local-mic';
-  const speaker = typeof req.body?.speaker === 'string' ? req.body.speaker : 'User';
-  const reflect = req.body?.reflect_to_surface !== false;
-  const autoReply = req.body?.auto_reply !== false;
+  const intent = typeof body.intent === 'string' ? body.intent : 'conversation';
+  const sourceId = typeof body.source_id === 'string' ? body.source_id : 'local-mic';
+  const speaker = typeof body.speaker === 'string' ? body.speaker : 'User';
+  const reflect = body.reflect_to_surface !== false;
+  const autoReply = body.auto_reply !== false;
+  let scope: EventScopeInput | undefined;
+  try {
+    const parsedScope = readVoiceHubEventScope(body.scope);
+    scope = parsedScope ? normalizeEventScope(parsedScope) : undefined;
+  } catch (error: unknown) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+  }
   const requestId =
-    typeof req.body?.request_id === 'string' && req.body.request_id.trim()
-      ? req.body.request_id.trim()
+    typeof body.request_id === 'string' && body.request_id.trim()
+      ? body.request_id.trim()
       : `vh-${requestFingerprint({ text, intent, sourceId, speaker })}-${randomUUID().slice(0, 8)}`;
 
   const result = await processIngest({
@@ -1271,38 +1324,39 @@ app.post('/api/ingest-text', async (req, res) => {
     speaker,
     reflect,
     autoReply,
+    scope,
   });
   return res.status(result.statusCode).json(result.body);
 });
 
 app.post('/api/listen-once', async (req, res) => {
+  let body: Record<string, unknown>;
+  try {
+    body = readVoiceHubRequestObject(req.body === undefined ? {} : req.body);
+  } catch (error: unknown) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+  }
   const requestId =
-    typeof req.body?.request_id === 'string' && req.body.request_id.trim()
-      ? req.body.request_id.trim()
+    typeof body.request_id === 'string' && body.request_id.trim()
+      ? body.request_id.trim()
       : randomUUID();
   const locale =
-    typeof req.body?.locale === 'string' && req.body.locale.trim()
-      ? req.body.locale.trim()
-      : 'ja-JP';
-  const timeoutSeconds = Number.isFinite(req.body?.timeout_seconds)
-    ? Number(req.body.timeout_seconds)
-    : 8;
-  const intent = typeof req.body?.intent === 'string' ? req.body.intent : 'conversation';
-  const speaker = typeof req.body?.speaker === 'string' ? req.body.speaker : 'User';
+    typeof body.locale === 'string' && body.locale.trim() ? body.locale.trim() : 'ja-JP';
+  const timeoutSeconds = Number.isFinite(body.timeout_seconds) ? Number(body.timeout_seconds) : 8;
+  const intent = typeof body.intent === 'string' ? body.intent : 'conversation';
+  const speaker = typeof body.speaker === 'string' ? body.speaker : 'User';
   const deviceId =
-    typeof req.body?.device_id === 'string' && req.body.device_id.trim()
-      ? req.body.device_id.trim()
-      : undefined;
-  const reflect = req.body?.reflect_to_surface !== false;
-  const autoReply = req.body?.auto_reply !== false;
-  const requestedBackend = req.body?.backend;
+    typeof body.device_id === 'string' && body.device_id.trim() ? body.device_id.trim() : undefined;
+  const reflect = body.reflect_to_surface !== false;
+  const autoReply = body.auto_reply !== false;
+  const selection = getVoiceSelectionSnapshot();
+  const requestedBackend =
+    typeof body.backend === 'string' && body.backend.trim()
+      ? parseVoiceSttBackend(body.backend)
+      : selection.preferences.stt_backend;
   const startedAt = Date.now();
   const availability = getAvailableSttBackends();
-  const backendOrder = resolveVoiceSttBackendOrder(
-    parseVoiceSttBackend(requestedBackend),
-    availability,
-    process.env
-  );
+  const backendOrder = resolveVoiceSttBackendOrder(requestedBackend, availability, process.env);
 
   logger.info(
     `[voice-hub] native STT start request=${requestId} locale=${locale} device=${deviceId || 'default'} timeout=${timeoutSeconds}s`
@@ -1438,8 +1492,12 @@ app.post('/api/listen-once', async (req, res) => {
 app.get('/api/stt/backends', (_req, res) => {
   const available = getAvailableSttBackends();
   const serverConfig = resolveVoiceSttServerConfig(process.env);
-  const selected = resolveVoiceSttBackendOrder('auto', available, process.env);
   const selection = getVoiceSelectionSnapshot();
+  const selected = resolveVoiceSttBackendOrder(
+    selection.preferences.stt_backend,
+    available,
+    process.env
+  );
   res.json({
     ok: true,
     available,

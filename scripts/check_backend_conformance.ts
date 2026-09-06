@@ -1,11 +1,12 @@
 import * as path from 'node:path';
 import {
-  pathResolver,
   runBackendConformance,
-  safeMkdir,
-  safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
+  runBackendSandboxConformance,
+  type BackendConformanceReport,
+} from '@agent/core/backend-conformance';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function arg(argv: string[], name: string): string | undefined {
@@ -20,8 +21,17 @@ export const runCheckBackendConformance = defineScript({
     const out =
       arg(context.argv, '--out') ||
       pathResolver.rootResolve('active/shared/runtime/backend-conformance.json');
-    const report = runBackendConformance();
-    const outputPath = pathResolver.resolve(out);
+    const sandbox = context.argv.includes('--live-sandbox');
+    const report: BackendConformanceReport = sandbox
+      ? {
+          ...runBackendConformance(),
+          probe: 'live-cli-version-help+sandbox',
+          sandbox: runBackendSandboxConformance(),
+        }
+      : runBackendConformance();
+    const outputPath = assertSafeRepositoryPath(pathResolver.resolve(out), {
+      allowMissingLeaf: true,
+    });
     withExecutionContext('ecosystem_architect', () => {
       safeMkdir(path.dirname(outputPath), { recursive: true });
       safeWriteFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);

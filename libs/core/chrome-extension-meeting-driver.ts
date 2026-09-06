@@ -25,6 +25,8 @@ import { appendJsonLine } from './foundation/json.js';
 import type { AudioBus } from './audio-bus.js';
 import { randomBytes } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { createLogger } from './logger.js';
 import { ocrImage } from './ocr-bridge.js';
 import { pathResolver } from './path-resolver.js';
@@ -67,6 +69,16 @@ const MAX_AI_TEXT = 12_000;
 interface ExtensionEvent {
   event: string;
   [k: string]: unknown;
+}
+
+export function parseChromeExtensionEvent(raw: string): ExtensionEvent | undefined {
+  try {
+    const parsed = parseSafeJsonObjectInput(raw, 'Chrome extension event');
+    if (!parsed || typeof parsed.event !== 'string' || !parsed.event.trim()) return undefined;
+    return parsed as ExtensionEvent;
+  } catch {
+    return undefined;
+  }
 }
 
 // Minimal structural type so we don't hard-fail typecheck if `ws` types drift.
@@ -184,7 +196,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
     } = {
       session_id: sessionId,
       source: 'chrome-built-in-ai',
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
       summary: null,
       insights: null,
       suggestions: null,
@@ -192,7 +204,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
       screen_context: [],
     };
     const writeAiDocument = (at?: string): void => {
-      aiDocument.updated_at = at ?? new Date().toISOString();
+      aiDocument.updated_at = at ?? nowIso();
       safeWriteFile(summaryPath, `${JSON.stringify(aiDocument, null, 2)}\n`);
     };
     // Shared-screen frames. A frame bypasses the text PII scrubber entirely, so
@@ -206,7 +218,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
 
     const recordAiEvent = (kind: 'summary' | 'insights' | 'suggestions', e: ExtensionEvent) => {
       const { event: _event, control_token: _token, ...payload } = e;
-      const entry = { kind, ...payload, received_at: new Date().toISOString() };
+      const entry = { kind, ...payload, received_at: nowIso() };
       aiDocument[kind] = entry;
       aiDocument.history.push(entry);
       if (aiDocument.history.length > MAX_AI_HISTORY) {
@@ -250,7 +262,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
       }
       const text = scrubContent(ocr.text || '').scrubbed_text.trim();
       aiDocument.screen_context.push({
-        at: new Date().toISOString(),
+        at: nowIso(),
         frame: frameFile,
         provider: ocr.provider,
         provider_data_egress: ocr.providerDataEgress,
@@ -273,7 +285,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
       session_id: sessionId,
       platform: 'meet',
       status: 'connecting',
-      joined_at: new Date().toISOString(),
+      joined_at: nowIso(),
     };
 
     const wss = new WebSocketServer({ host, port });
@@ -302,7 +314,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
         is_final: true,
         text: trimmed,
         ...(speaker ? { speaker_label: speaker } : {}),
-        emitted_at: new Date().toISOString(),
+        emitted_at: nowIso(),
       });
       wakeCaptionWaiter();
     };
@@ -314,14 +326,28 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
     };
     const waitEvent = (name: string, timeoutMs: number): Promise<ExtensionEvent> =>
       new Promise((resolve, reject) => {
-        const timer = setTimeout(
-          () => reject(new Error(`timed out waiting for extension event '${name}'`)),
-          timeoutMs
-        );
-        onEvent(name, (e) => {
+        let settled = false;
+        let listener: (e: ExtensionEvent) => void;
+        const remove = (): void => {
+          const current = eventWaiters.get(name) ?? [];
+          const remaining = current.filter((candidate) => candidate !== listener);
+          if (remaining.length > 0) eventWaiters.set(name, remaining);
+          else eventWaiters.delete(name);
+        };
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          remove();
+          reject(new Error(`timed out waiting for extension event '${name}'`));
+        }, timeoutMs);
+        listener = (e): void => {
+          if (settled) return;
+          settled = true;
           clearTimeout(timer);
+          remove();
           resolve(e);
-        });
+        };
+        onEvent(name, listener);
       });
     const dispatch = (e: ExtensionEvent): void => {
       const list = eventWaiters.get(e.event);
@@ -334,6 +360,33 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
     const send = (cmd: Record<string, unknown>): void => {
       if (!socket) throw new Error('extension is not connected to the control channel');
       socket.send(JSON.stringify(cmd));
+    };
+
+    let transportClosed = false;
+    const closeTransport = async (): Promise<void> => {
+      if (transportClosed) return;
+      transportClosed = true;
+      if (frameSeq > 0) {
+        try {
+          safeRmSync(pathResolver.shared(framesDir));
+          logger.info(`discarded ${frameSeq} shared-screen frame(s)`);
+        } catch (err) {
+          logger.warn(`could not discard shared-screen frames: ${(err as Error).message}`);
+        }
+      }
+      try {
+        socket?.close();
+      } catch {
+        /* noop */
+      }
+      await new Promise<void>((resolve) => {
+        const t = setTimeout(resolve, 2_000);
+        wss.close(() => {
+          clearTimeout(t);
+          resolve();
+        });
+      });
+      await bus.close().catch(() => undefined);
     };
 
     const joinCmd = {
@@ -367,7 +420,8 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
         let authenticated = false;
         candidate.on('message', (...margs: unknown[]) => {
           try {
-            const parsed = JSON.parse(String(margs[0])) as ExtensionEvent;
+            const parsed = parseChromeExtensionEvent(String(margs[0]));
+            if (!parsed) return;
             if (!authenticated) {
               if (parsed.event !== 'hello' || parsed.auth_token !== authToken) {
                 candidate.close();
@@ -405,7 +459,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
                   ? { speaker: redactMeetingText(parsed.speaker) }
                   : {}),
               };
-              appendJsonLine(captionsPath, { ...safeCaption, ts: new Date().toISOString() });
+              appendJsonLine(captionsPath, { ...safeCaption, ts: nowIso() });
               pushCaption(
                 typeof safeCaption.text === 'string' ? safeCaption.text : '',
                 typeof safeCaption.speaker === 'string' ? safeCaption.speaker : undefined
@@ -450,12 +504,17 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
       });
     });
 
-    await connected;
-    state.status = 'connecting';
-
-    const joined = await waitEvent('joined', joinTimeoutMs).catch((err) => {
-      throw new Error(`extension failed to join the meeting: ${(err as Error).message}`);
-    });
+    let joined: ExtensionEvent;
+    try {
+      await connected;
+      state.status = 'connecting';
+      joined = await waitEvent('joined', joinTimeoutMs).catch((err) => {
+        throw new Error(`extension failed to join the meeting: ${(err as Error).message}`);
+      });
+    } catch (err) {
+      await closeTransport();
+      throw err;
+    }
     state.status = 'in_meeting';
     logger.info(
       `joined meeting (captions → ${captionsPath}) detail=${JSON.stringify(joined.detail ?? {})}`
@@ -495,6 +554,19 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
           logger.warn(`chat send failed: ${(err as Error).message}`);
         }
       },
+      raiseHand: async (): Promise<{ already: boolean }> => {
+        const ack = waitEvent('raised_hand', 15_000).catch(() => undefined);
+        send({ cmd: 'raise_hand' });
+        const event = (await ack) as { already?: unknown } | undefined;
+        return { already: Boolean(event?.already) };
+      },
+      admit: async (name?: string): Promise<{ admitted: number }> => {
+        const ack = waitEvent('admitted', 15_000).catch(() => undefined);
+        send({ cmd: 'admit', ...(typeof name === 'string' && name ? { name } : {}) });
+        const event = (await ack) as { admitted?: unknown } | undefined;
+        const admitted = typeof event?.admitted === 'number' ? event.admitted : 0;
+        return { admitted };
+      },
       async *transcriptInput(): AsyncIterable<TranscriptChunk> {
         while (!left) {
           while (captionQueue.length > 0) {
@@ -514,7 +586,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
               utterance_id: `${sessionId}-tick-${captionSeq}`,
               is_final: false,
               text: '',
-              emitted_at: new Date().toISOString(),
+              emitted_at: nowIso(),
             };
           }
         }
@@ -531,32 +603,10 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
           /* best-effort leave */
         } finally {
           state.status = 'ended';
-          state.left_at = new Date().toISOString();
+          state.left_at = nowIso();
           // Raw frames are working material for the OCR step only. What survives
           // the session is the redacted text in the summary document.
-          if (frameSeq > 0) {
-            try {
-              safeRmSync(pathResolver.shared(framesDir));
-              logger.info(`discarded ${frameSeq} shared-screen frame(s)`);
-            } catch (err) {
-              logger.warn(`could not discard shared-screen frames: ${(err as Error).message}`);
-            }
-          }
-          try {
-            socket?.close();
-          } catch {
-            /* noop */
-          }
-          // Guard wss.close: the callback may not fire while a client socket
-          // lingers, so cap the wait.
-          await new Promise<void>((resolve) => {
-            const t = setTimeout(resolve, 2_000);
-            wss.close(() => {
-              clearTimeout(t);
-              resolve();
-            });
-          });
-          await bus.close().catch(() => undefined);
+          await closeTransport();
         }
       },
     };

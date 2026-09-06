@@ -1,19 +1,11 @@
 import * as path from 'node:path';
-import addFormatsModule from 'ajv-formats';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { listProjectRecords, loadProjectRecord } from './project-registry.js';
 import { loadState } from './mission-state.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { createAjv } from './foundation/ajv.js';
+import { nowIso } from './foundation/time.js';
 import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
-
-type AddFormatsPlugin = (instance: ReturnType<typeof createAjv>) => void;
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormatsPlugin }).default ||
-  (addFormatsModule as unknown as AddFormatsPlugin);
-const ajv = createAjv();
-addFormats(ajv);
 
 import {
   validatorFor,
@@ -93,7 +85,7 @@ const LEARNING_FILE_NAME = 'candidate.json';
 
 export function buildOrganizationOperationRecord(
   input: BuildOrganizationOperationInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationOperationRecord {
   const record: OrganizationOperationRecord = {
     version: '1.0.0',
@@ -157,7 +149,7 @@ export interface BuildOrganizationCadenceInput {
  */
 export function buildOrganizationCadence(
   input: BuildOrganizationCadenceInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationCadenceRecord {
   const existing = loadOrganizationCadence(input.cadenceId, {
     organizationId: input.organizationId,
@@ -226,7 +218,7 @@ export interface OrganizationDecisionAddition {
  */
 export function buildOrganizationDecision(
   input: BuildOrganizationDecisionInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationDecisionAddition {
   if (!input.options.length) {
     throw new Error('At least one --option is required for decision add.');
@@ -294,7 +286,7 @@ export interface BuildOrganizationProjectLinkInput {
 
 export function buildOrganizationProjectLink(
   input: BuildOrganizationProjectLinkInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationOperationalState {
   const state = loadOrganizationOperationalState(input.organizationId, {
     tier: input.tier,
@@ -715,7 +707,7 @@ export function reconcileOrganizationState(query: {
       ),
     });
     if (query.apply) {
-      const now = new Date().toISOString();
+      const now = nowIso();
       const nextState: OrganizationOperationalState = {
         ...state,
         active_operation_ids: operations

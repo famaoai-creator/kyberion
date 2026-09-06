@@ -73,7 +73,7 @@
 2. 既存能力を MCP ツールとして登録（薄いアダプタ。新ロジックは書かず既存 CLI/関数を呼ぶ）:
    - `kyberion.pipeline.run`（`run_pipeline.js` ラップ） / `kyberion.pipeline.list`
    - `kyberion.mission.create|status|journal`（`mission_controller.js` ラップ）
-   - `kyberion.knowledge.search|read`（`knowledge:rank` / knowledge-index）
+   - `kyberion.knowledge.search|read`（`kyberion knowledge rank` / knowledge-index）
    - `kyberion.capability.list`（`CAPABILITIES_GUIDE.md` / actuator-manifest-index）
 3. 全ツール引数を zod/ajv で検証し、出力は `SkillOutput` 形式に正規化。
 4. tier ガード: MCP 経由のデフォルト可視範囲を `public` + 明示許可した `confidential/{project}` に限定（`tier-guard.ts` を再利用）。

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/audio-device-lease.schema.json",
+  "title": "Audio Device Lease",
+  "description": "Persisted exclusive lease record for one audio device session.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "lease_id",
+    "device_uid",
+    "pid",
+    "session_id",
+    "acquired_at",
+    "expires_at",
+    "heartbeat_at"
+  ],
+  "properties": {
+    "lease_id": { "type": "string", "format": "uuid" },
+    "device_uid": { "type": "string", "minLength": 1 },
+    "pid": { "type": "integer", "minimum": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "acquired_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "heartbeat_at": { "type": "string", "format": "date-time" }
+  }
+}

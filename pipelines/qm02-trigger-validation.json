@@ -32,7 +32,7 @@
       "role": "source",
       "op": "system:shell",
       "produces": { "channel": "script_integrity", "type": "ShellResult" },
-      "params": { "cmd": "pnpm run check:script-integrity" }
+      "params": { "cmd": "pnpm run check -- --scope pr --only script-integrity" }
     },
     {
       "id": "report",

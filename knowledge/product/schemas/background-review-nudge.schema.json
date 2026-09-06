@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/background-review-nudge.schema.json",
+  "title": "Background Review Nudge State",
+  "description": "Persisted non-blocking review reminder state for one session.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "session_id",
+    "turns_since_review",
+    "tool_calls_since_review",
+    "review_pending",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "session_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "turns_since_review": { "type": "integer", "minimum": 0 },
+    "tool_calls_since_review": { "type": "integer", "minimum": 0 },
+    "review_pending": { "type": "boolean" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

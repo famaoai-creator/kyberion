@@ -1,13 +1,21 @@
 /** Execution brief archetypes, rendering, preflight, and status read-model helpers. */
 
 import {
-  loadJson,
+  defineCatalog,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+  readJson,
+} from '@agent/core/foundation';
+import {
+  assertSafeRepositoryPath,
   safeReadFile,
   safeExec,
   safeExistsSync,
-  validatePipelineAdf,
-  pathResolver,
-} from '@agent/core';
+  safeLstat,
+} from '@agent/core/secure-io';
+import { validatePipelineAdf } from '@agent/core/pipeline-contract';
+import { pathResolver } from '@agent/core/path-resolver';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import type {
@@ -17,32 +25,79 @@ import type {
   ExecutionPlanSetJob,
   PipelineBundleJob,
 } from './orchestrator-helpers.js';
+import {
+  parseActuatorRequestArchetypeCatalog,
+  type ActuatorRequestArchetype,
+  type ActuatorRequestArchetypeCatalog,
+} from './orchestrator-archetype-catalog.js';
 
 const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge(
   'product/orchestration/actuator-request-archetypes.json'
 );
+const ACTUATOR_ARCHETYPES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/actuator-request-archetypes.schema.json'
+);
+const PROJECT_MISSION_LEDGER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/project-mission-ledger.schema.json'
+);
 
-export function loadActuatorRequestArchetypes(): any {
-  if (!safeExistsSync(ACTUATOR_ARCHETYPES_PATH)) {
-    throw new Error(`Archetype catalog not found: ${ACTUATOR_ARCHETYPES_PATH}`);
-  }
-  return loadJson<unknown>(ACTUATOR_ARCHETYPES_PATH);
+interface ProjectMissionLedgerEntry {
+  mission_id: string;
+  relationship_type: string;
+  status: string;
+  summary: string;
+  [key: string]: unknown;
 }
-export function detectRequestArchetype(requestText: string, catalog: any): any {
+
+interface ProjectMissionLedger {
+  project_id: string;
+  project_name?: string;
+  entries: ProjectMissionLedgerEntry[];
+  [key: string]: unknown;
+}
+
+const actuatorRequestArchetypeCatalog = defineCatalog<ActuatorRequestArchetypeCatalog>({
+  id: 'actuator-request-archetypes',
+  path: ACTUATOR_ARCHETYPES_PATH,
+  schema: ACTUATOR_ARCHETYPES_SCHEMA_PATH,
+});
+
+export function loadActuatorRequestArchetypes(): ActuatorRequestArchetypeCatalog {
+  const parsed = parseActuatorRequestArchetypeCatalog(actuatorRequestArchetypeCatalog.load());
+  if (!parsed) {
+    throw new Error(`Archetype catalog has an invalid shape: ${ACTUATOR_ARCHETYPES_PATH}`);
+  }
+  return parsed;
+}
+
+export function loadProjectMissionLedger(filePath: string): ProjectMissionLedger {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  return defineCatalog<ProjectMissionLedger>({
+    id: 'project-mission-ledger',
+    path: safeFilePath,
+    schema: PROJECT_MISSION_LEDGER_SCHEMA_PATH,
+  }).load();
+}
+export type DetectedRequestArchetype = ActuatorRequestArchetype & { score: number };
+
+export function detectRequestArchetype(
+  requestText: string,
+  catalog: ActuatorRequestArchetypeCatalog
+): DetectedRequestArchetype {
   const text = normalizeRequestTextForArchetypeDetection(requestText);
-  const archetypes = Array.isArray(catalog?.archetypes) ? catalog.archetypes : [];
-  const scored = archetypes.map((archetype: any) => {
-    const hits = (archetype.trigger_keywords || []).filter((keyword: string) =>
-      text.includes(String(keyword).toLowerCase())
+  const scored = catalog.archetypes.map((archetype) => {
+    const hits = archetype.trigger_keywords.filter((keyword) =>
+      text.includes(keyword.toLowerCase())
     ).length;
     return { ...archetype, score: hits };
   });
-  scored.sort((a: any, b: any) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score);
   const best = scored[0];
   if (best && best.score > 0) return best;
   return (
-    scored.find((item: any) => item.id === catalog.default_archetype) || {
+    scored.find((item) => item.id === catalog.default_archetype) || {
       id: 'structured-delivery',
+      trigger_keywords: [],
       score: 0,
       summary_template:
         'Generic structured delivery request requiring normalization before execution.',
@@ -480,7 +535,9 @@ export function renderPipelineBundleJob(
     };
   }
 
-  const templateFullPath = pathResolver.rootResolve(job.template_path);
+  const templateFullPath = assertSafeRepositoryPath(pathResolver.rootResolve(job.template_path), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(templateFullPath)) {
     return {
       ...job,
@@ -489,7 +546,17 @@ export function renderPipelineBundleJob(
     };
   }
 
-  const raw = loadJson<Record<string, unknown>>(templateFullPath) as Record<string, unknown>;
+  if (!safeLstat(templateFullPath).isFile()) {
+    return {
+      ...job,
+      output_path: renderedOutputPath,
+      skipped_reason: `template is not a regular file: ${job.template_path}`,
+    };
+  }
+  const raw = parseSafeJsonObjectValue(
+    readJson(templateFullPath),
+    `pipeline template ${job.template_path}`
+  );
   const renderedPipeline = applyPathOverrides(raw, job.parameter_overrides || {}, variables);
   return {
     ...job,
@@ -686,11 +753,7 @@ export function executeExecutionPlanSet(
         timeoutMs: 120000,
       });
       let parsed: unknown = rawOutput.trim();
-      try {
-        parsed = JSON.parse(rawOutput);
-      } catch {
-        // leave as raw string
-      }
+      parsed = parseJsonCommandOutput(rawOutput);
       const reportedStatus =
         typeof parsed === 'object' && parsed && 'status' in (parsed as Record<string, unknown>)
           ? String((parsed as Record<string, unknown>).status)
@@ -737,9 +800,10 @@ export function collectCommandHealth(command: string, args: string[]) {
 
 export function parseJsonCommandOutput(output: string): unknown {
   try {
-    return JSON.parse(output);
-  } catch {
-    return { raw: output.trim() };
+    return parseSafeJsonInput(output, 'command output', { preserveParseError: true });
+  } catch (error) {
+    if (error instanceof SyntaxError) return { raw: output.trim() };
+    throw error;
   }
 }
 
@@ -829,9 +893,10 @@ export function deriveStatusNextActions(
         id: 'fix-esm-integrity',
         priority: 'now',
         next_action_type: 'execute_now',
-        action: 'Run `pnpm run check:esm` and resolve import/runtime mismatches',
+        action:
+          'Run `pnpm run check -- --scope pr --only esm` and resolve import/runtime mismatches',
         reason: finding.detail || finding.message,
-        suggested_command: 'pnpm run check:esm',
+        suggested_command: 'pnpm run check -- --scope pr --only esm',
         suggested_followup_request: 'ESM integrity の失敗箇所を修正してください。',
       });
       continue;
@@ -841,9 +906,10 @@ export function deriveStatusNextActions(
         id: 'fix-catalog-integrity',
         priority: 'now',
         next_action_type: 'execute_now',
-        action: 'Run `pnpm run check:catalogs` and repair invalid orchestration catalogs',
+        action:
+          'Run `pnpm run check -- --scope full --only catalogs` and repair invalid orchestration catalogs',
         reason: finding.detail || finding.message,
-        suggested_command: 'pnpm run check:catalogs',
+        suggested_command: 'pnpm run check -- --scope full --only catalogs',
         suggested_followup_request: 'catalog integrity の失敗箇所を修正してください。',
       });
       continue;
@@ -927,17 +993,20 @@ export function collectMissionStatusSnapshot(targetId?: string) {
   const missionFiles = getAllFiles(missionRoot, { maxDepth: 4 }).filter((filePath) =>
     filePath.endsWith('mission-state.json')
   );
-  const missions = missionFiles.map((filePath) => {
+  const missions = missionFiles.flatMap((filePath) => {
     const logicalPath = path.relative(pathResolver.rootDir(), filePath);
-    const state = loadJson(filePath) as Record<string, any>;
-    return {
-      mission_id: String(state.mission_id || path.basename(path.dirname(filePath))),
-      tier: String(state.tier || 'unknown'),
-      status: String(state.status || 'unknown'),
-      project_id: state.relationships?.project?.project_id || null,
-      assigned_persona: state.assigned_persona || null,
-      path: logicalPath,
-    };
+    const state = loadStateAtPath(filePath);
+    if (!state) return [];
+    return [
+      {
+        mission_id: state.mission_id || path.basename(path.dirname(filePath)),
+        tier: state.tier,
+        status: state.status,
+        project_id: state.relationships?.project?.project_id || null,
+        assigned_persona: state.assigned_persona || null,
+        path: logicalPath,
+      },
+    ];
   });
   const target = targetId
     ? missions.find((item) => item.mission_id === targetId || item.project_id === targetId) || null
@@ -967,12 +1036,14 @@ export function collectProjectStatusSnapshot(targetProjectId?: string) {
     for (const readmePath of readmes) {
       const projectRoot = path.dirname(readmePath);
       const ledgerPath = path.join(projectRoot, '04_control', 'mission-ledger.json');
-      const readme = safeReadFile(readmePath, { encoding: 'utf8' }) as string;
+      const readme = safeReadFile(assertSafeRepositoryPath(readmePath), {
+        encoding: 'utf8',
+      }) as string;
       const titleLine =
         readme.split('\n').find((line) => line.startsWith('# ')) || '# Unknown Project';
-      const ledger = safeExistsSync(ledgerPath)
-        ? loadJson<{ project_id?: unknown; entries?: unknown }>(ledgerPath)
-        : { entries: [] };
+      const ledger: ProjectMissionLedger = safeExistsSync(ledgerPath)
+        ? loadProjectMissionLedger(ledgerPath)
+        : { project_id: '', entries: [] };
       const entries = Array.isArray(ledger.entries) ? ledger.entries : [];
       projectEntries.push({
         project_id: ledger.project_id || null,

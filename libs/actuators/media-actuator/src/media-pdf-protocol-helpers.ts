@@ -1,5 +1,6 @@
-import { resolveBorderKeySides } from '@agent/core';
+import { resolveBorderKeySides } from '@agent/core/media-style-policy';
 import type { PdfDesignProtocol } from '@agent/core/media-contracts';
+import { nowIso } from '@agent/core/foundation';
 import * as mediaPdfHelpers from './media-pdf-helpers.js';
 
 export interface PdfToPptxHints {
@@ -24,7 +25,14 @@ export interface PdfToPptxHints {
     pageTitlePos?: { x: number; y: number; w: number; h: number };
     bodyPos?: { x: number; y: number; w: number; h: number };
   };
-  theme?: { dk1?: string; dk2?: string; lt1?: string; lt2?: string; accent1?: string; accent2?: string };
+  theme?: {
+    dk1?: string;
+    dk2?: string;
+    lt1?: string;
+    lt2?: string;
+    accent1?: string;
+    accent2?: string;
+  };
 }
 
 export interface PdfToXlsxHints {
@@ -73,14 +81,34 @@ export interface PdfToXlsxHints {
     accent2?: string;
   };
   alignment?: {
-    horizontal?: 'general' | 'left' | 'center' | 'right' | 'fill' | 'justify' | 'centerContinuous' | 'distributed';
+    horizontal?:
+      | 'general'
+      | 'left'
+      | 'center'
+      | 'right'
+      | 'fill'
+      | 'justify'
+      | 'centerContinuous'
+      | 'distributed';
     vertical?: 'top' | 'center' | 'bottom' | 'justify' | 'distributed';
     wrapText?: boolean;
   };
   border?: {
-    style?: 'thin' | 'medium' | 'thick' | 'double' | 'dotted' | 'dashed'
-      | 'dashDot' | 'dashDotDot' | 'mediumDashed' | 'mediumDashDot'
-      | 'mediumDashDotDot' | 'slantDashDot' | 'hair' | 'none';
+    style?:
+      | 'thin'
+      | 'medium'
+      | 'thick'
+      | 'double'
+      | 'dotted'
+      | 'dashed'
+      | 'dashDot'
+      | 'dashDotDot'
+      | 'mediumDashed'
+      | 'mediumDashDot'
+      | 'mediumDashDotDot'
+      | 'slantDashDot'
+      | 'hair'
+      | 'none';
     color?: string;
   };
   subMerge?: {
@@ -199,7 +227,10 @@ export function getXlsxColLetter(columnIndex: number): string {
   return result || 'A';
 }
 
-export function buildPptxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hints?: PdfToPptxHints): any {
+export function buildPptxProtocolFromPdfDesign(
+  pdfDesign: PdfDesignProtocol,
+  hints?: PdfToPptxHints
+): any {
   const resolvedHints: PdfToPptxHints = {
     canvas: { ...DEFAULT_PDF_TO_PPTX_HINTS.canvas, ...(hints?.canvas || {}) },
     features: { ...DEFAULT_PDF_TO_PPTX_HINTS.features, ...(hints?.features || {}) },
@@ -215,8 +246,13 @@ export function buildPptxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
     h: Number(resolvedHints.canvas?.fallbackH || 5.625),
   };
   const summaryBullets = mediaPdfHelpers.chunkTextToBullets(
-    pageTexts.map((page) => page.text || '').join('\n').trim() || pdfDesign.content?.text || '',
-    4,
+    pageTexts
+      .map((page) => page.text || '')
+      .join('\n')
+      .trim() ||
+      pdfDesign.content?.text ||
+      '',
+    4
   );
 
   const slides = [
@@ -229,10 +265,14 @@ export function buildPptxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
           pos: resolvedHints.layout?.titlePos || DEFAULT_PDF_TO_PPTX_HINTS.layout!.titlePos!,
           text: title,
           style: {
-            fontSize: resolvedHints.style?.titleFontSize || DEFAULT_PDF_TO_PPTX_HINTS.style!.titleFontSize!,
+            fontSize:
+              resolvedHints.style?.titleFontSize || DEFAULT_PDF_TO_PPTX_HINTS.style!.titleFontSize!,
             bold: true,
-            color: resolvedHints.style?.defaultTextColor || DEFAULT_PDF_TO_PPTX_HINTS.style!.defaultTextColor!,
-            fontFamily: resolvedHints.style?.fontFamily || DEFAULT_PDF_TO_PPTX_HINTS.style!.fontFamily!,
+            color:
+              resolvedHints.style?.defaultTextColor ||
+              DEFAULT_PDF_TO_PPTX_HINTS.style!.defaultTextColor!,
+            fontFamily:
+              resolvedHints.style?.fontFamily || DEFAULT_PDF_TO_PPTX_HINTS.style!.fontFamily!,
             align: 'left',
           },
         },
@@ -240,11 +280,15 @@ export function buildPptxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
           type: 'text',
           placeholderType: 'body',
           pos: { x: 0.9, y: 1.9, w: 8.2, h: 2.8 },
-          text: summaryBullets.length > 0 ? summaryBullets.map((item) => `• ${item}`).join('\n') : 'Converted from PDF design.',
+          text:
+            summaryBullets.length > 0
+              ? summaryBullets.map((item) => `• ${item}`).join('\n')
+              : 'Converted from PDF design.',
           style: {
             fontSize: 18,
             color: resolvedHints.theme?.dk2 || DEFAULT_PDF_TO_PPTX_HINTS.theme!.dk2!,
-            fontFamily: resolvedHints.style?.fontFamily || DEFAULT_PDF_TO_PPTX_HINTS.style!.fontFamily!,
+            fontFamily:
+              resolvedHints.style?.fontFamily || DEFAULT_PDF_TO_PPTX_HINTS.style!.fontFamily!,
             align: 'left',
           },
         },
@@ -252,11 +296,21 @@ export function buildPptxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
     },
     ...pageTexts.map((page, index) => {
       const pageArea = (page?.width || 960) * (page?.height || 540);
-      const positionedClipBlocks = mediaPdfHelpers.buildPositionedSlideClipBlocksFromPdfPage(page, canvas);
-      const positionedElements = mediaPdfHelpers.buildPositionedSlideElementsFromPdfPage(page, canvas);
+      const positionedClipBlocks = mediaPdfHelpers.buildPositionedSlideClipBlocksFromPdfPage(
+        page,
+        canvas
+      );
+      const positionedElements = mediaPdfHelpers.buildPositionedSlideElementsFromPdfPage(
+        page,
+        canvas
+      );
       const positionedImages = mediaPdfHelpers.buildPositionedSlideImagesFromPdfPage(page, canvas);
       const dominantBackgroundImage = resolvedHints.features?.fullPageImageOverlay
-        ? (Array.isArray(page?.images) ? page.images.find((image: any) => (((image.width || 0) * (image.height || 0)) >= pageArea * 0.85)) : null)
+        ? Array.isArray(page?.images)
+          ? page.images.find(
+              (image: any) => (image.width || 0) * (image.height || 0) >= pageArea * 0.85
+            )
+          : null
         : null;
       const backgroundImageElement = dominantBackgroundImage
         ? {
@@ -268,71 +322,104 @@ export function buildPptxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
         : null;
       const overlayMode = Boolean(backgroundImageElement);
       const foregroundImages = dominantBackgroundImage
-        ? positionedImages.filter((element: any) => element.imagePath !== dominantBackgroundImage.path)
+        ? positionedImages.filter(
+            (element: any) => element.imagePath !== dominantBackgroundImage.path
+          )
         : positionedImages;
       const effectiveClipBlocks = overlayMode ? [] : positionedClipBlocks;
-      const ocrOverlayElements = overlayMode ? mediaPdfHelpers.buildPositionedSlideOcrElementsFromPdfPage(page, canvas) : [];
+      const ocrOverlayElements = overlayMode
+        ? mediaPdfHelpers.buildPositionedSlideOcrElementsFromPdfPage(page, canvas)
+        : [];
       const effectiveElements = overlayMode
-        ? (ocrOverlayElements.length > 0
-            ? ocrOverlayElements
-            : positionedElements
-                .filter((element: any) => element.type === 'text')
-                .filter((element: any) => (element.style?.bold || 0) || (element.style?.fontSize || 0) >= 18 || (element.text || '').length >= 24)
-                .slice(0, 6))
+        ? ocrOverlayElements.length > 0
+          ? ocrOverlayElements
+          : positionedElements
+              .filter((element: any) => element.type === 'text')
+              .filter(
+                (element: any) =>
+                  element.style?.bold ||
+                  0 ||
+                  (element.style?.fontSize || 0) >= 18 ||
+                  (element.text || '').length >= 24
+              )
+              .slice(0, 6)
         : positionedElements;
       const fallbackBullets = mediaPdfHelpers.isGridLikePdfPage(page)
         ? mediaPdfHelpers.buildGridPageSummary(page.text || '', 8)
         : mediaPdfHelpers.chunkTextToBullets(page.text || '', 8);
       return {
         id: `pdf-page-${index + 1}`,
-        elements: effectiveElements.length > 0 || foregroundImages.length > 0 || Boolean(backgroundImageElement)
-          ? [
-              {
-                type: 'text',
-                placeholderType: 'title',
-                pos: { x: 0.35, y: 0.25, w: 9.1, h: 0.45 },
-                text: `Page ${page.pageNumber || index + 1}`,
-                style: { fontSize: 14, bold: true, color: '64748B', fontFamily: 'Aptos', align: 'right' },
-              },
-              ...(backgroundImageElement ? [backgroundImageElement] : []),
-              ...effectiveClipBlocks,
-              ...foregroundImages,
-              ...effectiveElements,
-            ]
-          : [
-              {
-                type: 'text',
-                placeholderType: 'title',
-                pos: resolvedHints.layout?.pageTitlePos || DEFAULT_PDF_TO_PPTX_HINTS.layout!.pageTitlePos!,
-                text: `Page ${page.pageNumber || index + 1}`,
-                style: {
-                  fontSize: resolvedHints.style?.pageTitleFontSize || DEFAULT_PDF_TO_PPTX_HINTS.style!.pageTitleFontSize!,
-                  bold: true,
-                  color: resolvedHints.style?.defaultTextColor || DEFAULT_PDF_TO_PPTX_HINTS.style!.defaultTextColor!,
-                  fontFamily: resolvedHints.style?.fontFamily || DEFAULT_PDF_TO_PPTX_HINTS.style!.fontFamily!,
-                  align: 'left',
+        elements:
+          effectiveElements.length > 0 ||
+          foregroundImages.length > 0 ||
+          Boolean(backgroundImageElement)
+            ? [
+                {
+                  type: 'text',
+                  placeholderType: 'title',
+                  pos: { x: 0.35, y: 0.25, w: 9.1, h: 0.45 },
+                  text: `Page ${page.pageNumber || index + 1}`,
+                  style: {
+                    fontSize: 14,
+                    bold: true,
+                    color: '64748B',
+                    fontFamily: 'Aptos',
+                    align: 'right',
+                  },
                 },
-              },
-              {
-                type: 'text',
-                placeholderType: 'body',
-                pos: resolvedHints.layout?.bodyPos || DEFAULT_PDF_TO_PPTX_HINTS.layout!.bodyPos!,
-                text: fallbackBullets.join('\n') || '(No extractable page text)',
-                style: {
-                  fontSize: resolvedHints.style?.bodyFontSize || DEFAULT_PDF_TO_PPTX_HINTS.style!.bodyFontSize!,
-                  color: resolvedHints.style?.bodyTextColor || DEFAULT_PDF_TO_PPTX_HINTS.style!.bodyTextColor!,
-                  fontFamily: resolvedHints.style?.fontFamily || DEFAULT_PDF_TO_PPTX_HINTS.style!.fontFamily!,
-                  align: 'left',
+                ...(backgroundImageElement ? [backgroundImageElement] : []),
+                ...effectiveClipBlocks,
+                ...foregroundImages,
+                ...effectiveElements,
+              ]
+            : [
+                {
+                  type: 'text',
+                  placeholderType: 'title',
+                  pos:
+                    resolvedHints.layout?.pageTitlePos ||
+                    DEFAULT_PDF_TO_PPTX_HINTS.layout!.pageTitlePos!,
+                  text: `Page ${page.pageNumber || index + 1}`,
+                  style: {
+                    fontSize:
+                      resolvedHints.style?.pageTitleFontSize ||
+                      DEFAULT_PDF_TO_PPTX_HINTS.style!.pageTitleFontSize!,
+                    bold: true,
+                    color:
+                      resolvedHints.style?.defaultTextColor ||
+                      DEFAULT_PDF_TO_PPTX_HINTS.style!.defaultTextColor!,
+                    fontFamily:
+                      resolvedHints.style?.fontFamily ||
+                      DEFAULT_PDF_TO_PPTX_HINTS.style!.fontFamily!,
+                    align: 'left',
+                  },
                 },
-              },
-            ],
+                {
+                  type: 'text',
+                  placeholderType: 'body',
+                  pos: resolvedHints.layout?.bodyPos || DEFAULT_PDF_TO_PPTX_HINTS.layout!.bodyPos!,
+                  text: fallbackBullets.join('\n') || '(No extractable page text)',
+                  style: {
+                    fontSize:
+                      resolvedHints.style?.bodyFontSize ||
+                      DEFAULT_PDF_TO_PPTX_HINTS.style!.bodyFontSize!,
+                    color:
+                      resolvedHints.style?.bodyTextColor ||
+                      DEFAULT_PDF_TO_PPTX_HINTS.style!.bodyTextColor!,
+                    fontFamily:
+                      resolvedHints.style?.fontFamily ||
+                      DEFAULT_PDF_TO_PPTX_HINTS.style!.fontFamily!,
+                    align: 'left',
+                  },
+                },
+              ],
       };
     }),
   ];
 
   return {
     version: '3.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     canvas,
     theme: {
       dk1: resolvedHints.theme?.dk1 || DEFAULT_PDF_TO_PPTX_HINTS.theme!.dk1!,
@@ -349,14 +436,18 @@ export function buildPptxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
   };
 }
 
-export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hints?: PdfToXlsxHints): any {
+export function buildXlsxProtocolFromPdfDesign(
+  pdfDesign: PdfDesignProtocol,
+  hints?: PdfToXlsxHints
+): any {
   const H = {
     grid: { ...DEFAULT_PDF_TO_XLSX_HINTS.grid, ...(hints?.grid || {}) },
     desk: { ...DEFAULT_PDF_TO_XLSX_HINTS.desk, ...(hints?.desk || {}) },
     columnWidths: {
       ...DEFAULT_PDF_TO_XLSX_HINTS.columnWidths,
       ...(hints?.columnWidths || {}),
-      breakpoints: hints?.columnWidths?.breakpoints || DEFAULT_PDF_TO_XLSX_HINTS.columnWidths.breakpoints,
+      breakpoints:
+        hints?.columnWidths?.breakpoints || DEFAULT_PDF_TO_XLSX_HINTS.columnWidths.breakpoints,
     },
     rowHeight: { ...DEFAULT_PDF_TO_XLSX_HINTS.rowHeight, ...(hints?.rowHeight || {}) },
     view: { ...DEFAULT_PDF_TO_XLSX_HINTS.view, ...(hints?.view || {}) },
@@ -371,7 +462,7 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
   const pages = Array.isArray(pdfDesign.content?.pages) ? pdfDesign.content.pages : [];
   const emptyProtocol = {
     version: '3.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     theme: {
       name: 'PDF Import',
       colors: H.theme,
@@ -395,7 +486,9 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
   if (pages.length === 0) return emptyProtocol;
 
   const clusterCoords = (values: number[], tolerance: number): number[] => {
-    const sorted = [...new Set(values.filter((value) => Number.isFinite(value)))].sort((a, b) => a - b);
+    const sorted = [...new Set(values.filter((value) => Number.isFinite(value)))].sort(
+      (a, b) => a - b
+    );
     if (sorted.length === 0) return [];
     const clusters: number[] = [sorted[0]];
     for (let index = 1; index < sorted.length; index += 1) {
@@ -422,7 +515,12 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
   type StyleEntry = { fill?: string; fontSize?: number; fontColor?: string; borderKey?: string };
   const styleEntries: StyleEntry[] = [];
   const styleKeyToIndex = new Map<string, number>();
-  const ensureCellStyle = (fill?: string, fontSize?: number, fontColor?: string, borderKey?: string): number => {
+  const ensureCellStyle = (
+    fill?: string,
+    fontSize?: number,
+    fontColor?: string,
+    borderKey?: string
+  ): number => {
     const normalizedFill = fill ? fill.replace('#', '').toUpperCase() : '';
     const normalizedFontColor = fontColor ? fontColor.replace('#', '').toUpperCase() : '';
     const key = `${normalizedFill}|${fontSize || 0}|${normalizedFontColor}|${borderKey || ''}`;
@@ -443,11 +541,12 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
     const rects = elements.filter((element: any) => element.type === 'rect');
     const clips = elements.filter((element: any) => element.type === 'clip');
     const borders = elements.filter((element: any) => element.type === 'border');
-    const texts = elements.filter((element: any) => (
-      !['rect', 'line', 'ellipse', 'clip', 'border'].includes(element.type)
-      && typeof element.text === 'string'
-      && element.text.trim()
-    ));
+    const texts = elements.filter(
+      (element: any) =>
+        !['rect', 'line', 'ellipse', 'clip', 'border'].includes(element.type) &&
+        typeof element.text === 'string' &&
+        element.text.trim()
+    );
 
     const pageWidth = page?.width || 842;
     const pageHeight = page?.height || 595;
@@ -455,12 +554,13 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
 
     const mergedRects: any[] = [];
     for (const rect of rects) {
-      const existing = mergedRects.find((candidate: any) => (
-        Math.abs(candidate.x - rect.x) < H.grid.rectMergeTolerance
-        && Math.abs(candidate.y - rect.y) < H.grid.rectMergeTolerance
-        && Math.abs(candidate.width - rect.width) < H.grid.rectMergeTolerance
-        && Math.abs(candidate.height - rect.height) < H.grid.rectMergeTolerance
-      ));
+      const existing = mergedRects.find(
+        (candidate: any) =>
+          Math.abs(candidate.x - rect.x) < H.grid.rectMergeTolerance &&
+          Math.abs(candidate.y - rect.y) < H.grid.rectMergeTolerance &&
+          Math.abs(candidate.width - rect.width) < H.grid.rectMergeTolerance &&
+          Math.abs(candidate.height - rect.height) < H.grid.rectMergeTolerance
+      );
       if (existing) {
         if (rect.fillColor && !existing.fillColor) existing.fillColor = rect.fillColor;
         if (rect.strokeColor && !existing.strokeColor) existing.strokeColor = rect.strokeColor;
@@ -469,7 +569,9 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
       mergedRects.push({ ...rect });
     }
 
-    const cellRects = mergedRects.filter((rect: any) => ((rect.width || 0) * (rect.height || 0)) < pageArea * H.grid.bgAreaThreshold);
+    const cellRects = mergedRects.filter(
+      (rect: any) => (rect.width || 0) * (rect.height || 0) < pageArea * H.grid.bgAreaThreshold
+    );
     const rawXValues: number[] = [];
     const rawYValues: number[] = [];
 
@@ -497,7 +599,12 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
       if (y - lastAddedY <= H.grid.clusterTolerance) continue;
       const above = baseYBounds.filter((bound) => bound <= y).pop();
       const below = baseYBounds.find((bound) => bound > y);
-      if (above !== undefined && below !== undefined && y - above > H.grid.clusterTolerance && below - y > H.grid.clusterTolerance) {
+      if (
+        above !== undefined &&
+        below !== undefined &&
+        y - above > H.grid.clusterTolerance &&
+        below - y > H.grid.clusterTolerance
+      ) {
         rawYValues.push(y);
       }
       lastAddedY = y;
@@ -508,9 +615,13 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
 
     if (xBounds.length > 5) {
       const xGaps = xBounds.slice(1).map((value, index) => value - xBounds[index]);
-      const smallGaps = xGaps.filter((gap) => gap >= H.desk.smallGapRange[0] && gap <= H.desk.smallGapRange[1]);
+      const smallGaps = xGaps.filter(
+        (gap) => gap >= H.desk.smallGapRange[0] && gap <= H.desk.smallGapRange[1]
+      );
       if (smallGaps.length >= H.desk.minSmallGapCount) {
-        const medianSmall = [...smallGaps].sort((left, right) => left - right)[Math.floor(smallGaps.length / 2)];
+        const medianSmall = [...smallGaps].sort((left, right) => left - right)[
+          Math.floor(smallGaps.length / 2)
+        ];
         const extraBounds: number[] = [];
         for (let index = 0; index < xGaps.length; index += 1) {
           const gap = xGaps[index];
@@ -533,12 +644,14 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
         index: index + 1,
         height: 18,
         customHeight: true,
-        cells: [{
-          ref: `A${index + 1}`,
-          type: 'inlineStr',
-          value: String(text.text || '').trim(),
-          styleIndex: ensureCellStyle(undefined, text.fontSize, text.color, ''),
-        }],
+        cells: [
+          {
+            ref: `A${index + 1}`,
+            type: 'inlineStr',
+            value: String(text.text || '').trim(),
+            styleIndex: ensureCellStyle(undefined, text.fontSize, text.color, ''),
+          },
+        ],
       }));
       return {
         id: `sheet${pageIndex + 1}`,
@@ -546,7 +659,11 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
         state: 'visible',
         dimension: `A1:A${Math.max(1, fallbackRows.length)}`,
         sheetView: { showGridLines: H.view.showGridLines, zoomScale: H.view.zoomScale },
-        pageSetup: { orientation: H.pageSetup.orientation, paperSize: H.pageSetup.paperSize, scale: H.pageSetup.scale },
+        pageSetup: {
+          orientation: H.pageSetup.orientation,
+          paperSize: H.pageSetup.paperSize,
+          scale: H.pageSetup.scale,
+        },
         columns: [{ min: 1, max: 1, width: 42, customWidth: true }],
         rows: fallbackRows,
         mergeCells: [],
@@ -559,9 +676,10 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
     const columns = [];
     for (let index = 0; index < xBounds.length - 1; index += 1) {
       const widthPt = xBounds[index + 1] - xBounds[index];
-      let widthChars = H.columnWidths.defaultRatio > 0
-        ? Math.max(1.9, Number((widthPt / H.columnWidths.defaultRatio).toFixed(1)))
-        : 2;
+      let widthChars =
+        H.columnWidths.defaultRatio > 0
+          ? Math.max(1.9, Number((widthPt / H.columnWidths.defaultRatio).toFixed(1)))
+          : 2;
       for (const breakpoint of H.columnWidths.breakpoints) {
         if (widthPt <= breakpoint.maxPt) {
           widthChars = breakpoint.chars;
@@ -576,23 +694,35 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
     const occupied = Array.from({ length: numRows }, () => new Array(numCols).fill(false));
     const mergeCells: Array<{ ref: string }> = [];
 
-    const xGapsForDesk = xBounds.slice(1).map((value, index) => value - xBounds[index]).filter((gap) => gap >= 5 && gap <= 15);
+    const xGapsForDesk = xBounds
+      .slice(1)
+      .map((value, index) => value - xBounds[index])
+      .filter((gap) => gap >= 5 && gap <= 15);
     const deskColCount = xGapsForDesk.length >= 3 ? H.desk.columnsPerUnit : 1;
     const maxMergeColsForFill = deskColCount + H.desk.maxFillMergeExtraCols;
 
     for (const rect of cellRects) {
-      const isFillOnly = Boolean(rect.fillColor) && !cellRects.some((candidate: any) => (
-        candidate !== rect
-        && !candidate.fillColor
-        && Math.abs((candidate.x || 0) - (rect.x || 0)) < H.grid.rectMergeTolerance
-        && Math.abs((candidate.y || 0) - (rect.y || 0)) < H.grid.rectMergeTolerance
-        && Math.abs((candidate.width || 0) - (rect.width || 0)) < H.grid.rectMergeTolerance
-        && Math.abs((candidate.height || 0) - (rect.height || 0)) < H.grid.rectMergeTolerance
-      ));
+      const isFillOnly =
+        Boolean(rect.fillColor) &&
+        !cellRects.some(
+          (candidate: any) =>
+            candidate !== rect &&
+            !candidate.fillColor &&
+            Math.abs((candidate.x || 0) - (rect.x || 0)) < H.grid.rectMergeTolerance &&
+            Math.abs((candidate.y || 0) - (rect.y || 0)) < H.grid.rectMergeTolerance &&
+            Math.abs((candidate.width || 0) - (rect.width || 0)) < H.grid.rectMergeTolerance &&
+            Math.abs((candidate.height || 0) - (rect.height || 0)) < H.grid.rectMergeTolerance
+        );
       const startCol = snapToGrid(Math.round(rect.x || 0), xBounds);
       const startRow = snapToGrid(Math.round(rect.y || 0), yBounds);
-      const endCol = Math.min(snapToGrid(Math.round((rect.x || 0) + (rect.width || 0)), xBounds), numCols);
-      const endRow = Math.min(snapToGrid(Math.round((rect.y || 0) + (rect.height || 0)), yBounds), numRows);
+      const endCol = Math.min(
+        snapToGrid(Math.round((rect.x || 0) + (rect.width || 0)), xBounds),
+        numCols
+      );
+      const endRow = Math.min(
+        snapToGrid(Math.round((rect.y || 0) + (rect.height || 0)), yBounds),
+        numRows
+      );
       if (startCol >= numCols || startRow >= numRows) continue;
       const spanCols = endCol - startCol;
       const spanRows = endRow - startRow;
@@ -605,13 +735,21 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
           .filter((text: any) => {
             const x = text.x || 0;
             const y = text.y || 0;
-            return x >= xBounds[startCol] - 5 && x < xBounds[endCol] + 5 && y >= yBounds[startRow] - 5 && y < yBounds[endRow] + 5;
+            return (
+              x >= xBounds[startCol] - 5 &&
+              x < xBounds[endCol] + 5 &&
+              y >= yBounds[startRow] - 5 &&
+              y < yBounds[endRow] + 5
+            );
           })
           .sort((left: any, right: any) => (left.y || 0) - (right.y || 0));
         let lastTextRow = startRow;
         for (const text of rectTexts) {
           const textRow = snapToGrid(Math.round(text.y || 0), yBounds);
-          if (textRow > lastTextRow + H.subMerge.textGapRows && textRow > subMergeRows[subMergeRows.length - 1]) {
+          if (
+            textRow > lastTextRow + H.subMerge.textGapRows &&
+            textRow > subMergeRows[subMergeRows.length - 1]
+          ) {
             subMergeRows.push(textRow);
           }
           lastTextRow = Math.max(lastTextRow, textRow);
@@ -648,8 +786,14 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
       if (!rect.fillColor) continue;
       const startCol = snapToGrid(Math.round(rect.x || 0), xBounds);
       const startRow = snapToGrid(Math.round(rect.y || 0), yBounds);
-      const endCol = Math.min(snapToGrid(Math.round((rect.x || 0) + (rect.width || 0)), xBounds), numCols);
-      const endRow = Math.min(snapToGrid(Math.round((rect.y || 0) + (rect.height || 0)), yBounds), numRows);
+      const endCol = Math.min(
+        snapToGrid(Math.round((rect.x || 0) + (rect.width || 0)), xBounds),
+        numCols
+      );
+      const endRow = Math.min(
+        snapToGrid(Math.round((rect.y || 0) + (rect.height || 0)), yBounds),
+        numRows
+      );
       for (let row = startRow; row < endRow; row += 1) {
         for (let col = startCol; col < endCol; col += 1) {
           cellFillMap.set(`${row},${col}`, rect.fillColor);
@@ -675,7 +819,10 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
         for (let row = 0; row < numRows; row += 1) {
           if (Math.abs(yBounds[row] - borderY) <= H.grid.borderSnapTolerance) {
             for (let col = 0; col < numCols; col += 1) {
-              if (xBounds[col] >= borderX1 - H.grid.borderSnapTolerance && xBounds[col + 1] <= borderX2 + H.grid.borderSnapTolerance) {
+              if (
+                xBounds[col] >= borderX1 - H.grid.borderSnapTolerance &&
+                xBounds[col + 1] <= borderX2 + H.grid.borderSnapTolerance
+              ) {
                 getCellBorders(row, col).top = true;
                 if (row > 0) getCellBorders(row - 1, col).bottom = true;
               }
@@ -683,7 +830,10 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
           }
           if (Math.abs(yBounds[row + 1] - borderY) <= H.grid.borderSnapTolerance) {
             for (let col = 0; col < numCols; col += 1) {
-              if (xBounds[col] >= borderX1 - H.grid.borderSnapTolerance && xBounds[col + 1] <= borderX2 + H.grid.borderSnapTolerance) {
+              if (
+                xBounds[col] >= borderX1 - H.grid.borderSnapTolerance &&
+                xBounds[col + 1] <= borderX2 + H.grid.borderSnapTolerance
+              ) {
                 getCellBorders(row, col).bottom = true;
                 if (row + 1 < numRows) getCellBorders(row + 1, col).top = true;
               }
@@ -697,7 +847,10 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
         for (let col = 0; col < numCols; col += 1) {
           if (Math.abs(xBounds[col] - borderX) <= H.grid.borderSnapTolerance) {
             for (let row = 0; row < numRows; row += 1) {
-              if (yBounds[row] >= borderY1 - H.grid.borderSnapTolerance && yBounds[row + 1] <= borderY2 + H.grid.borderSnapTolerance) {
+              if (
+                yBounds[row] >= borderY1 - H.grid.borderSnapTolerance &&
+                yBounds[row + 1] <= borderY2 + H.grid.borderSnapTolerance
+              ) {
                 getCellBorders(row, col).left = true;
                 if (col > 0) getCellBorders(row, col - 1).right = true;
               }
@@ -705,7 +858,10 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
           }
           if (Math.abs(xBounds[col + 1] - borderX) <= H.grid.borderSnapTolerance) {
             for (let row = 0; row < numRows; row += 1) {
-              if (yBounds[row] >= borderY1 - H.grid.borderSnapTolerance && yBounds[row + 1] <= borderY2 + H.grid.borderSnapTolerance) {
+              if (
+                yBounds[row] >= borderY1 - H.grid.borderSnapTolerance &&
+                yBounds[row + 1] <= borderY2 + H.grid.borderSnapTolerance
+              ) {
                 getCellBorders(row, col).right = true;
                 if (col + 1 < numCols) getCellBorders(row, col + 1).left = true;
               }
@@ -755,10 +911,12 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
           .map((text: any, textIndex: number) => ({ text, textIndex }))
           .filter(({ text, textIndex }) => {
             if (usedTexts.has(textIndex)) return false;
-            return (text.x || 0) >= cellX - H.grid.textCellTolerance
-              && (text.x || 0) < searchEndX + H.grid.textCellTolerance
-              && (text.y || 0) >= rowY - H.grid.textCellTolerance
-              && (text.y || 0) < searchEndY + H.grid.textCellTolerance;
+            return (
+              (text.x || 0) >= cellX - H.grid.textCellTolerance &&
+              (text.x || 0) < searchEndX + H.grid.textCellTolerance &&
+              (text.y || 0) >= rowY - H.grid.textCellTolerance &&
+              (text.y || 0) < searchEndY + H.grid.textCellTolerance
+            );
           })
           .sort((left, right) => {
             const deltaY = (left.text.y || 0) - (right.text.y || 0);
@@ -781,15 +939,21 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
         cellValue = cellValue.trim();
         cellTexts.forEach(({ textIndex }) => usedTexts.add(textIndex));
 
-        const dominantFontSize = cellTexts.map(({ text }) => text.fontSize).find((value) => Number.isFinite(value));
-        const dominantFontColor = cellTexts.map(({ text }) => text.color).find((value) => typeof value === 'string');
+        const dominantFontSize = cellTexts
+          .map(({ text }) => text.fontSize)
+          .find((value) => Number.isFinite(value));
+        const dominantFontColor = cellTexts
+          .map(({ text }) => text.color)
+          .find((value) => typeof value === 'string');
         const fillColor = cellFillMap.get(`${rowIndex},${colIndex}`);
         const cellBorders = cellBorderMap.get(`${rowIndex},${colIndex}`);
         const borderKey = cellBorders
           ? `${cellBorders.top ? 'T' : ''}${cellBorders.bottom ? 'B' : ''}${cellBorders.left ? 'L' : ''}${cellBorders.right ? 'R' : ''}`
           : '';
         const hasStyle = fillColor || dominantFontSize || dominantFontColor || borderKey;
-        const styleIndex = hasStyle ? ensureCellStyle(fillColor, dominantFontSize, dominantFontColor, borderKey) : 0;
+        const styleIndex = hasStyle
+          ? ensureCellStyle(fillColor, dominantFontSize, dominantFontColor, borderKey)
+          : 0;
 
         cells.push({
           ref: cellRef,
@@ -814,7 +978,11 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
       state: 'visible',
       dimension: `A1:${lastColLetter}${numRows}`,
       sheetView: { showGridLines: H.view.showGridLines, zoomScale: H.view.zoomScale },
-      pageSetup: { orientation: H.pageSetup.orientation, paperSize: H.pageSetup.paperSize, scale: H.pageSetup.scale },
+      pageSetup: {
+        orientation: H.pageSetup.orientation,
+        paperSize: H.pageSetup.paperSize,
+        scale: H.pageSetup.scale,
+      },
       columns,
       rows: sheetRows,
       mergeCells,
@@ -824,7 +992,11 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
     };
   });
 
-  const defaultFont = { name: H.fonts.defaultName, size: H.fonts.defaultSize, color: { rgb: H.fonts.defaultColor } };
+  const defaultFont = {
+    name: H.fonts.defaultName,
+    size: H.fonts.defaultSize,
+    color: { rgb: H.fonts.defaultColor },
+  };
   const noBorder = {};
   const noFill = { patternType: 'none' as const };
   const grayFill = { patternType: 'gray125' as const };
@@ -833,19 +1005,24 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
   const fonts: any[] = [defaultFont];
   const fills: any[] = [noFill, grayFill];
   const borders: any[] = [noBorder];
-  const cellXfs: any[] = [{
-    font: defaultFont,
-    fill: noFill,
-    border: noBorder,
-    alignment: {
-      horizontal: H.alignment.horizontal,
-      vertical: H.alignment.vertical,
-      wrapText: H.alignment.wrapText,
+  const cellXfs: any[] = [
+    {
+      font: defaultFont,
+      fill: noFill,
+      border: noBorder,
+      alignment: {
+        horizontal: H.alignment.horizontal,
+        vertical: H.alignment.vertical,
+        wrapText: H.alignment.wrapText,
+      },
     },
-  }];
+  ];
 
   const fontCache = new Map<string, any>();
-  fontCache.set(`${H.fonts.defaultSize}|${H.fonts.defaultColor.replace('#', '').toUpperCase()}`, defaultFont);
+  fontCache.set(
+    `${H.fonts.defaultSize}|${H.fonts.defaultColor.replace('#', '').toUpperCase()}`,
+    defaultFont
+  );
   const fillCache = new Map<string, any>();
   fillCache.set('', noFill);
   const borderCache = new Map<string, any>();
@@ -898,7 +1075,7 @@ export function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hin
 
   return {
     version: '3.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     theme: {
       name: 'PDF Import',
       colors: H.theme,

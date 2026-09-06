@@ -88,6 +88,12 @@ describe('execution feedback loop', () => {
     });
   });
 
+  it('rejects an invalid existing feedback store instead of resetting it', () => {
+    safeWriteFile(feedbackPath, '{"version":"1.0.0","entries":[{}]}\n');
+
+    expect(() => loadExecutionFeedbackStore()).toThrow('Invalid catalog execution-feedback');
+  });
+
   it('materializes a non-positive result as a reviewable procedure candidate', () => {
     const feedback = recordExecutionFeedback({
       scenario_id: 'use-case-browser-invoice',

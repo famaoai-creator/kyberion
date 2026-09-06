@@ -1,11 +1,24 @@
-import { buildSafeExecEnv, safeExec, safeExistsSync, safeReadFile } from '@agent/core';
+import * as path from 'node:path';
+import {
+  assertSafeRepositoryPath,
+  buildSafeExecEnv,
+  safeExec,
+  safeExistsSync,
+  safeLstat,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readTextFile } from '@agent/core/foundation';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseSafeJsonObjectInput } from './lib/json-input.js';
+
+type Print = (value: unknown) => void;
 
 type ArgMap = Record<string, string | boolean>;
 
-function printUsage(): void {
-  console.log('Usage: pnpm google-workspace-meet -- <create> [options]');
-  console.log('  pnpm google-workspace-meet -- create --json \'{"summary":"Planning"}\'');
+function printUsage(print: Print): void {
+  print('Usage: pnpm google-workspace-meet -- <create> [options]');
+  print('  pnpm google-workspace-meet -- create --json \'{"summary":"Planning"}\'');
 }
 
 function parseArgs(argv: string[]): { command: string; args: ArgMap; help: boolean } {
@@ -33,52 +46,60 @@ function getString(args: ArgMap, key: string, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
-function readPayload(args: ArgMap): Record<string, unknown> {
+export function readPayload(args: ArgMap): Record<string, unknown> {
   const payloadFile = getString(args, '--payload-file');
   if (payloadFile) {
-    if (!safeExistsSync(payloadFile)) {
-      throw new Error(`payload file not found: ${payloadFile}`);
+    const resolvedPayloadFile = assertSafeRepositoryPath(
+      path.isAbsolute(payloadFile) ? payloadFile : pathResolver.resolve(payloadFile),
+      { allowMissingLeaf: false }
+    );
+    if (!safeExistsSync(resolvedPayloadFile)) {
+      throw new Error(`payload file not found: ${resolvedPayloadFile}`);
     }
-    const raw = String(safeReadFile(payloadFile, { encoding: 'utf8' }) || '').trim();
+    if (!safeLstat(resolvedPayloadFile).isFile()) {
+      throw new Error(`payload file must be a regular file: ${resolvedPayloadFile}`);
+    }
+    const raw = readTextFile(resolvedPayloadFile).trim();
     if (!raw) {
-      throw new Error(`payload file is empty: ${payloadFile}`);
+      throw new Error(`payload file is empty: ${resolvedPayloadFile}`);
     }
-    return JSON.parse(raw);
+    return parseSafeJsonObjectInput(raw, 'Google Workspace Meet payload') || {};
   }
 
   const rawJson = getString(args, '--json', '{}').trim();
   if (!rawJson) return {};
-  return JSON.parse(rawJson);
+  return parseSafeJsonObjectInput(rawJson, 'Google Workspace Meet payload') || {};
 }
 
-async function main(argv: string[]): Promise<void> {
+async function main(argv: string[], print: Print = () => undefined): Promise<void> {
   const { command, args, help } = parseArgs(argv);
 
   if (help || command === 'help') {
-    printUsage();
+    printUsage(print);
     return;
   }
 
   if (command !== 'create') {
-    printUsage();
+    printUsage(print);
     throw new Error(`unknown command '${command}' (expected create)`);
   }
 
   const payload = readPayload(args);
   const env = buildSafeExecEnv({
-    CLOUDSDK_PYTHON: getString(args, '--cloudsdk-python') || process.env.CLOUDSDK_PYTHON,
+    CLOUDSDK_PYTHON:
+      getString(args, '--cloudsdk-python') || getRegisteredEnvText('CLOUDSDK_PYTHON'),
   });
   const output = safeExec('gws', ['meet', 'spaces', 'create', '--json', JSON.stringify(payload)], {
     env,
     timeoutMs: 120000,
   }).trim();
-  console.log(output);
+  print(output);
 }
 
 const script = defineScript({
   name: 'google-workspace:meet',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'google_workspace_meet.ts') ||

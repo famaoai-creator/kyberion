@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   clearMeshMessageBrokerNamespace,
   createMeshMessageBroker,
+  listMeshDeliveries,
   MeshHubCommandLoop,
 } from './mesh-message-broker.js';
 import type { MeshRequest } from './mesh-hub-contract.js';
@@ -160,6 +162,53 @@ describe('mesh-message-broker', () => {
         storage_class: 'artifact_store',
       },
     });
+  });
+
+  it('skips malformed persisted delivery rows without breaking the listing', async () => {
+    const namespace = 'mesh-message-broker-test';
+    const broker = createMeshMessageBroker({ namespace });
+    activeBroker = broker;
+    const requestTime = new Date().toISOString();
+    await broker.acceptMeshRequest(
+      buildRequest({
+        requestId: 'meshreq-malformed-row',
+        idempotencyKey: 'idem-malformed-row',
+        createdAt: requestTime,
+        ttlMs: 60_000,
+      }),
+      { now: requestTime }
+    );
+    const file = namespacePath(namespace, 'deliveries.jsonl');
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeWriteFile(`${file}`, `${String(safeReadFile(file, { encoding: 'utf8' }))}[]\nnot-json\n`);
+    });
+
+    await expect(listMeshDeliveries(namespace)).resolves.toHaveLength(1);
+  });
+
+  it('rejects a persisted delivery JSONL path replaced by a directory', async () => {
+    const namespace = 'mesh-message-broker-test';
+    const broker = createMeshMessageBroker({ namespace });
+    activeBroker = broker;
+    const requestTime = new Date().toISOString();
+    await broker.acceptMeshRequest(
+      buildRequest({
+        requestId: 'meshreq-regular-file',
+        idempotencyKey: 'idem-regular-file',
+        createdAt: requestTime,
+        ttlMs: 60_000,
+      }),
+      { now: requestTime }
+    );
+    const file = namespacePath(namespace, 'deliveries.jsonl');
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeRmSync(file);
+      safeMkdir(file);
+    });
+
+    await expect(listMeshDeliveries(namespace)).rejects.toThrow(
+      'mesh-hub persisted JSONL must be a regular file'
+    );
   });
 
   it('fences a second writer and rejects reentrant commands deterministically', async () => {

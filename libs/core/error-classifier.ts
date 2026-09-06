@@ -1,5 +1,4 @@
 import { pathResolver } from './path-resolver.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
 import { recordUnclassifiedError } from './unclassified-error-registry.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -81,22 +80,10 @@ function buildTestFn(entry: RuleFileEntry): (m: string, code?: string | number) 
     (codes.size > 0 && code !== undefined && codes.has(String(code)));
 }
 
-const DEFAULT_ERROR_CLASSIFIER_RULES: ErrorClassifierRulesFile = {
-  rules: [],
-  policy_violation_patterns: [],
-};
-
 const errorClassifierCatalog = defineCatalog<ErrorClassifierRulesFile>({
   id: 'error-classifier-rules',
   path: () => pathResolver.knowledge('product/governance/error-classifier-rules.json'),
   schema: 'knowledge/product/schemas/error-classifier-rules.schema.json',
-  fallback: DEFAULT_ERROR_CLASSIFIER_RULES,
-  onFallback: (error, defaults) =>
-    recordConfigFallback({
-      knowledgePath: 'product/governance/error-classifier-rules.json',
-      error,
-      defaults,
-    }),
 });
 
 let _cachedRules: ClassifierRule[] | null = null;

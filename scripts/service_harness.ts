@@ -1,25 +1,25 @@
 #!/usr/bin/env node
-import { createStandardYargs } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { handleAction } from '../libs/actuators/service-actuator/src/service-actuator-helpers.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 type HarnessAction = 'describe' | 'plan' | 'verify' | 'receipt';
 
 function parseObject(value: string, name: string): Record<string, unknown> {
   try {
-    const parsed = JSON.parse(value);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('must be a JSON object');
-    }
-    return parsed as Record<string, unknown>;
+    return parseSafeJsonObjectValue(parseSafeJsonInput(value, `--${name}`), `--${name}`);
   } catch (error) {
     throw new Error(`--${name} ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
-async function main(args: string[] = []): Promise<void> {
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
   // pnpm passes the conventional separator through to the script. Remove it
-  // so `pnpm run service:harness -- --service ...` behaves like direct Node
+  // so `pnpm kyberion service harness --service ...` behaves like direct Node
   // execution while preserving yargs' normal option parsing.
   const normalizedArgs = args[0] === '--' ? args.slice(1) : args;
 
@@ -68,13 +68,13 @@ async function main(args: string[] = []): Promise<void> {
     action,
     params,
   });
-  console.log(JSON.stringify(result, null, 2));
+  print(result);
 }
 
 export const runServiceHarness = defineScript({
   name: 'service:harness',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json', 'quiet'],
+  run: ({ argv, print }) => main(stripSharedScriptFlags(argv), print),
 });
 
 if (

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
  * I18N-07 proof-of-locale, continued: `t()`'s fallback behavior when a key
  * genuinely lacks a third-locale entry.
  *
- * The real catalog never has this gap today — `pnpm check:catalogs`
+ * The real catalog never has this gap today — `pnpm run check -- --scope full --only catalogs`
  * requires every `required_locales` member for every key, so a checked-in
  * catalog with a `qps-ploc`-less key would already fail CI before this test
  * ever runs. To exercise the fallback logic itself (not just its absence in
