@@ -23687,3 +23687,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: ingest dedup の JSONL registry loader、SX-03
 - **変更**: append-only content-hash registryの行読み込みを手書き `safeReadFile` + 行ごとの `parseSafeJsonInput` から foundation `readJsonLines`へ統一した。regular-file／repository path boundary、malformed行skip、`parseIngestRegistryRecord`のshape validation、duplicate／supersede semanticsは維持した。
 - **検証**: ingest dedup **1 file／9 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1748
+
+- **対象**: secret actuator の vault keychain registry loader、SX-03／security boundary
+- **変更**: vault mediation内の `safeReadFile` + `parseSafeJsonInput` を foundation `readJson`へ統一した。`withSensitivePathMediation`、vault path、missing／malformed時の空registry fallback、registry mutation semanticsは維持した。
+- **検証**: secret actuator **1 file／8 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
