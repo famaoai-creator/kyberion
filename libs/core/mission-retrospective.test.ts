@@ -253,7 +253,10 @@ describe('mission retrospective loop', () => {
       prompt_tokens: 110,
       completion_tokens: 45,
       total_tokens: 155,
-      cost_usd: 0.01233,
+      // The supervisor entry has no registry under KYBERION_ROOT, and the
+      // default cost rate is zero since the fallback registry was removed, so
+      // only the execution-metrics entry contributes cost.
+      cost_usd: 0.0123,
       entries: 2,
     });
     expect(stats.token_usage.by_model['agy-runtime-model']).toMatchObject({
