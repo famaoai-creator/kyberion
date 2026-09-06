@@ -1,16 +1,10 @@
-import {
-  isRecord,
-  nowIso,
-  parseSafeJsonInput,
-  parseSafeJsonObjectValue,
-} from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/adf-engine';
 import { distillHttpResponse } from '@agent/core/observation-distill';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
 import { secureFetch } from '@agent/core/network';
 import {
-  safeReadFile,
   assertSafeRepositoryPath,
   safeWriteFile,
   safeMkdir,
@@ -106,13 +100,7 @@ function readNetworkContext(filePath: string): Record<string, unknown> {
   if (!isExistingRegularFile(filePath)) {
     throw new Error(`network context must be an existing regular file: ${filePath}`);
   }
-  return parseSafeJsonObjectValue(
-    parseSafeJsonInput(
-      String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
-      'network context'
-    ),
-    'network context'
-  );
+  return parseSafeJsonObjectValue(readJson(filePath), 'network context');
 }
 
 export type PipelineStep = NetworkPipelineStep;

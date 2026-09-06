@@ -23579,3 +23579,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: orchestrator／system actuator の reconcile strategy loader、SX-03
 - **変更**: 2つの reconcile 経路に残っていた `safeReadFile` + `parseSafeJsonInput` の同型 persisted JSON 読み込みを foundation `readJson` へ統一した。repository／regular-file 境界、project trust／preflight、`parsePersistedPipelineStrategy` の domain validation は維持した。
 - **検証**: reconcile／strategy targeted tests **2 files／8 tests passed**、対象 ESLint、Prettier、`git diff --check`。system actuator 全体 suite は既存の `open_file` OS automation test 1件が失敗したが、reconcile targeted tests は通過している。CI／provider 実機受入は継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1730
+
+- **対象**: network actuator の persisted `context_path` loader、SX-03
+- **変更**: network pipeline に残っていた `safeReadFile` + `parseSafeJsonInput` の context loader を foundation `readJson` へ統一した。regular-file boundary と safe object validation は維持し、reader 境界をテストでも明示した。
+- **検証**: network actuator／A2A transport **2 files／32 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
