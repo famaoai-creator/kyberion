@@ -10,9 +10,9 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { parseSafeJsonInput } from './foundation/json.js';
+import { readJsonLines } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { clamp, isRecord, readTextFile } from './foundation/text.js';
+import { clamp, isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeAppendFileSync,
@@ -322,19 +322,11 @@ export function normalizeTriggerRecord(value: unknown): TriggerRecord | null {
 function readRecords(storePath: string): TriggerRecord[] {
   if (!safeExistsSync(storePath)) return [];
   assertTriggerStoreFile(storePath);
-  const raw = readTextFile(storePath, { maxSizeMB: 5 });
-  const records: TriggerRecord[] = [];
-  for (const line of raw.split(/\r?\n/u)) {
-    if (!line.trim()) continue;
-    try {
-      const parsed: unknown = parseSafeJsonInput(line, 'trigger record');
-      const record = normalizeTriggerRecord(parsed);
-      if (record) records.push(record);
-    } catch {
-      // A torn record must not erase the valid history before it.
-    }
-  }
-  return records;
+  return readJsonLines<TriggerRecord | null>(storePath, {
+    onMalformed: 'skip',
+    readOptions: { maxSizeMB: 5 },
+    map: normalizeTriggerRecord,
+  }).filter((record): record is TriggerRecord => record !== null);
 }
 
 function assertTriggerStoreFile(storePath: string): void {

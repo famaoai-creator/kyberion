@@ -47,11 +47,13 @@ export interface ReadJsonLinesOptions<T> {
   onMalformed?: 'throw' | 'skip' | ((error: unknown, lineNumber: number) => void);
   /** Optional domain parser. The second argument is the one-based line number. */
   map?: (value: unknown, lineNumber: number) => T;
+  /** Options forwarded to the governed text reader for the whole JSONL file. */
+  readOptions?: FoundationReadOptions;
 }
 
 export function readJsonLines<T>(filePath: string, options: ReadJsonLinesOptions<T> = {}): T[] {
   if (!getFoundationIo().exists(filePath)) return [];
-  const raw = readTextFile(filePath);
+  const raw = readTextFile(filePath, options.readOptions);
   const records: T[] = [];
   for (const [index, line] of raw.split(/\r?\n/).entries()) {
     if (!line.trim()) continue;

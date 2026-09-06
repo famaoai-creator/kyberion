@@ -23849,3 +23849,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: contract semver checker の actuator contract schema loader、SX-03／SX-04／SX-06
 - **変更**: repository-bound contract schema の手書きtext読込＋JSON parseを foundation `readJson`へ統一した。invalid JSONをraw text fingerprintへフォールバックする既存互換、manifest／baseline loader、semver classification semanticsは維持し、source-contract testを新しい共通reader契約へ更新した。
 - **検証**: contract-semver **1 file／20 tests passed**、foundation adoption **1 file／7 tests passed**、対象2ファイルのESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1775
+
+- **対象**: trigger runner の bounded delivery JSONL loader、SX-03／SX-07／PI-03
+- **変更**: foundation `readJsonLines` に governed text reader の `readOptions` forwarding を追加し、既存の5MB read limitを保持したまま trigger receipt JSONLの手書き行分割・parseを共通化した。regular-file boundary、malformed／torn row skip、authority／tenant normalization、idempotency semanticsは維持した。
+- **検証**: foundation JSONL／trigger runner **2 files／26 tests passed**、foundation adoption **1 file／7 tests passed**、対象3ファイルのESLint、Prettier、`git diff --check`。
