@@ -12,6 +12,13 @@ const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(() => ({ stdout: '', stderr: '', status: 0 })),
   safeExistsSync: vi.fn(() => true),
   safeStat: vi.fn(() => ({ size: 4096 })),
+  // governed-catalog's `.load()` calls the real `safeLstat` (imported
+  // straight from secure-io.js, not routed through FoundationIo) once
+  // `exists()` reports true. The manifest/job fixtures here are faked
+  // through `safeExistsSync`/FoundationIo rather than written to real disk
+  // under the mocked `/tmp/...` roots, so the real lstat would ENOENT —
+  // fake it to match `safeExistsSync`.
+  safeLstat: vi.fn(() => ({ isFile: () => true, isSymbolicLink: () => false })),
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
   assertSafeRepositoryPath: vi.fn((candidate: string) => {
@@ -165,6 +172,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeExecResult: mocks.safeExecResult,
   safeExistsSync: mocks.safeExistsSync,
   safeStat: mocks.safeStat,
+  safeLstat: mocks.safeLstat,
   safeMkdir: mocks.safeMkdir,
   safeReadFile: mocks.safeReadFile,
   safeWriteFile: mocks.safeWriteFile,
@@ -222,8 +230,7 @@ vi.mock('@agent/core/video-render-backend', async (importOriginal) => ({
 
 async function installMockFoundationIo(): Promise<void> {
   const foundation = await import('@agent/core/foundation');
-  const actualSecureIo =
-    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  const nodeFs = await import('node:fs');
   const actualPathResolver = await vi.importActual<typeof import('@agent/core/path-resolver')>(
     '@agent/core/path-resolver'
   );
@@ -239,8 +246,16 @@ async function installMockFoundationIo(): Promise<void> {
   };
   const readFile = (filePath: string): string => {
     const normalizedPath = String(filePath).replaceAll('\\', '/');
+    // `governed-catalog.ts` imports `compileSchema` straight from
+    // `./ajv.js`, not through the `@agent/core/foundation` barrel, so
+    // mocking that barrel's `compileSchema` export (above) never reaches it
+    // — real schema compilation (and thus a real schema read) still runs.
+    // This file also mocks `@agent/core/path-resolver`'s `rootDir` to
+    // `/tmp`, which would make secure-io's own tier-guard reject a real
+    // absolute repo path as "outside project root". Read the real schema
+    // straight off disk to sidestep that self-inflicted guard mismatch.
     return normalizedPath.includes('/product/schemas/')
-      ? actualSecureIo.safeReadFile(resolveActualPath(filePath), { encoding: 'utf8' })
+      ? nodeFs.readFileSync(resolveActualPath(filePath), 'utf8')
       : String(mocks.safeReadFile(filePath));
   };
   foundation.registerFoundationIo({
@@ -279,7 +294,12 @@ describe('video-composition-actuator', () => {
     const { safeReadFile } = await import('@agent/core/secure-io');
     vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
       if (String(filePath).includes('manifest.json')) {
-        return JSON.stringify({ recovery_policy: {} });
+        return JSON.stringify({
+          actuator_id: 'video-composition-actuator',
+          version: '0.0.0-test',
+          capabilities: [],
+          recovery_policy: {},
+        });
       }
       return '{}';
     });
@@ -1076,7 +1096,12 @@ describe('video-composition-actuator', () => {
       const { safeReadFile } = await import('@agent/core/secure-io');
       vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
         if (String(filePath).includes('manifest.json'))
-          return JSON.stringify({ recovery_policy: {} });
+          return JSON.stringify({
+            actuator_id: 'video-composition-actuator',
+            version: '0.0.0-test',
+            capabilities: [],
+            recovery_policy: {},
+          });
         if (String(filePath).endsWith('hook.html')) {
           return '<style>.a { animation: kb-in-fade-rise 0.8s ease both; }</style>';
         }
@@ -1098,7 +1123,12 @@ describe('video-composition-actuator', () => {
       const { safeReadFile } = await import('@agent/core/secure-io');
       vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
         if (String(filePath).includes('manifest.json'))
-          return JSON.stringify({ recovery_policy: {} });
+          return JSON.stringify({
+            actuator_id: 'video-composition-actuator',
+            version: '0.0.0-test',
+            capabilities: [],
+            recovery_policy: {},
+          });
         if (String(filePath).endsWith('hook.html')) {
           return '<script>const seed = Math.random();</script>';
         }
@@ -1118,7 +1148,12 @@ describe('video-composition-actuator', () => {
       const { safeReadFile } = await import('@agent/core/secure-io');
       vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
         if (String(filePath).includes('manifest.json'))
-          return JSON.stringify({ recovery_policy: {} });
+          return JSON.stringify({
+            actuator_id: 'video-composition-actuator',
+            version: '0.0.0-test',
+            capabilities: [],
+            recovery_policy: {},
+          });
         if (String(filePath).endsWith('hook.html')) {
           return '<script>const t = Date.now();</script>';
         }

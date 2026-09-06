@@ -15,7 +15,13 @@ describe('working-memory period resource boundary', () => {
     expect(source).toContain('function normalizeWeeklyPeriod(');
     expect(source).toContain('const journalPath = assertSafeRepositoryPath(');
     expect(source).toContain('const weeklyPath = assertSafeRepositoryPath(');
-    expect(source).toContain('parseSafeJsonInput(');
-    expect(source).not.toContain('readJson');
+    // Contract updated 2026-09: `readJson` (foundation) delegates to
+    // secure-io's `secureLoadJson`, which still runs the raw text through
+    // `parseSafeJsonInput` internally (see libs/core/secure-io.ts) plus a
+    // guarded `safeReadFile`. Calling `readJson` directly is therefore at
+    // least as safe as the previous manual
+    // `parseSafeJsonInput(safeReadFile(...))` pairing, so the boundary now
+    // requires the higher-level governed reader instead of the raw helper.
+    expect(source).toContain('readJson(');
   });
 });
