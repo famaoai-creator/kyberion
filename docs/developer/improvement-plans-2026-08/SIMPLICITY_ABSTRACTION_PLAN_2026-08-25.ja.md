@@ -23357,3 +23357,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/claude_code_hook.ts`、`scripts/claude_code_hook.entrypoint.test.ts`、PI-03
 - **変更**: Claude Code hookのStop transcript本文readを`readClaudeCodeHookTranscript`のoperation-time regular-file境界へ統一し、directory／symlink replacementをCLI usage metrics判定へ到達させないようにした。既存のhook protocol、fail-open、best-effort usage semanticsは維持した。
 - **検証**: Claude Code hook **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1693
+
+- **対象**: `scripts/compliance_checker.ts`、`scripts/compliance_checker.test.ts`、PI-03
+- **変更**: compliance checkerの対象ファイル本文readを`readComplianceTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtier／confidential marker判定へ到達させないようにした。既存のwrite permission、marker scan、read-error skip semanticsは維持した。
+- **検証**: compliance checker **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
