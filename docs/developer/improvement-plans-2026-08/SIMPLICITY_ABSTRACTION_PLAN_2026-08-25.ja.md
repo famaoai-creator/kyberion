@@ -22626,6 +22626,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: `IntentResolutionContract` の `next_action` label／consequence に `SupportedLocale` を渡せるようにし、surface conversation inputからorchestratorまでlocaleを伝播した。4 bridgeのoperator localeがtext-only formatterだけでなく、契約を直接描画するsurfaceの次アクション文言にも反映される。省略時の既定値、intent packet、tenant／tier、approval gateは維持した。
 - **検証**: intent contract／surface interaction／orchestrator／4 bridge **8 files／83 tests passed**、root typecheck、Prettier、`git diff --check`。12 surfaceの全面contract描画、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1578
+
+- **対象**: `libs/core/surface-approval-ui.ts`、`libs/core/surface-mission-proposals.ts`、Telegram／Discord／iMessage bridge、generic approval／proposalテスト、SX-08b／SX-09b
+- **変更**: generic approval text と mission proposal confirmation にoptionalな `SupportedLocale` を追加し、Telegram／Discord／iMessage bridgeのoperator localeを渡すようにした。Slackで先行したlocale境界を3 bridgeのapproval／proposal fallbackにも揃え、省略時の既存日本語、approval state、proposal state、external delivery gateは維持した。
+- **検証**: generic approval／proposal／3 bridge **5 test files／46 tests passed**、root typecheck、Prettier、`git diff --check`。12 surfaceの全面contract描画、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
