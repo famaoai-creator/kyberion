@@ -22985,3 +22985,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/core.ts`、core-file-utils test、PI-03
 - **変更**: legacy `fileUtils.readJson` の raw read 前へ operation-time の regular-file 検査を追加し、directory replacement を cache／JSON parseへ到達させないようにした。既存の cache、malformed JSON、role/session config fallback semantics は維持した。
 - **検証**: core-file-utils **2 files／2 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1631
+
+- **対象**: `libs/core/oauth-session-store.ts`、oauth-session-store test、PI-03
+- **変更**: OAuth callback lock metadata read 前へ operation-time の regular-file 検査を追加し、directory replacement を stale lock 判定／unlinkへ到達させないようにした。既存の callback TTL、exclusive lock、session validation semantics は維持した。
+- **検証**: oauth-session-store **2 files／7 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
