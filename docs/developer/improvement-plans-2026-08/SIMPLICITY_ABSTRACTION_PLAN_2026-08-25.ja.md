@@ -24071,3 +24071,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: text bridge の argv 境界、SX-06
 - **変更**: Telegram／Discord／iMessage／Slack の内部起動関数に残っていた `process.argv` fallback を除去した。実行時の argv は shared harness から明示的に渡し、import／テスト時に process-wide argv を暗黙参照しない境界へ揃えた。4 bridge の既存 direct-entry semantics は維持した。
 - **検証**: 4 bridge contract／process-exit **4 files／39 tests passed**、production `process.argv` 残存は terminal-hud と refactor utility の2箇所のみ、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1812
+
+- **対象**: Terminal HUD の package entrypoint、SX-06
+- **変更**: Terminal HUDの直接 `process.argv` 参照と import side-effect 起動を、`@agent/core/script-harness` の明示 argv entrypointへ移した。root `pnpm tui --dev` は process argvを書き換えず、packageの exported `main(args)` を直接呼び出す。Inkの表示・once/panel option semanticsは維持した。
+- **検証**: Terminal HUD entrypoint **1 file／2 tests passed**、`@presence/terminal-hud` build、production `process.argv` 残存は refactor utility の1箇所のみ、対象ESLint、Prettier、`git diff --check`。
