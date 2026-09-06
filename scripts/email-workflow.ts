@@ -7,12 +7,19 @@ import {
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
 import { readTextFile } from '@agent/core/foundation';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;
 
 const SHARED_FLAGS = new Set(['--json', '--dry-run', '--check', '--quiet']);
+
+export function readEmailWorkflowTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function parseArgs(argv: string[]): { command: string; args: ArgMap } {
   if (argv.includes('--help') || argv.includes('-h')) return { command: 'help', args: {} };
@@ -58,7 +65,7 @@ function getBoolean(args: ArgMap, key: string): boolean {
 
 function readTextFileIfExists(filePath: string): string {
   if (!safeExistsSync(filePath)) return '';
-  return readTextFile(filePath);
+  return readEmailWorkflowTextFile(filePath);
 }
 
 async function main(argv: string[], dryRun = false) {
