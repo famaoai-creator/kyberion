@@ -162,6 +162,13 @@ interface WebAppProfileIndexRecord {
 }
 
 const rootDir = pathResolver.rootDir();
+
+export function readCliTextFile(filePath: string, label: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 const ORCHESTRATOR_PACKET_DIR = path.join(rootDir, 'active/shared/tmp/orchestrator');
 let activeCliArgs: string[] = [];
 let activeCliPrint: Print = () => undefined;
@@ -515,7 +522,7 @@ function printArtifactInfo(targetPath: string) {
   printText(`Size: ${stat.size} bytes`);
   printText(`Modified: ${stat.mtime.toISOString()}`);
   if (['.json', '.md', '.txt', '.log', '.adf', '.xml', '.yaml', '.yml'].includes(ext)) {
-    const content = readTextFile(resolvedPath);
+    const content = readCliTextFile(resolvedPath, 'artifact');
     const preview = content.split('\n').slice(0, 40).join('\n');
     printText('\nPreview:\n');
     printText(preview);
@@ -646,7 +653,7 @@ function loadPacketFile(targetPath: string): PacketFile {
   if (!safeExistsSync(resolvedPath)) {
     throw new Error(`Packet file not found: ${targetPath}`);
   }
-  const content = readTextFile(resolvedPath);
+  const content = readCliTextFile(resolvedPath, 'packet file');
   let parsed: unknown;
   try {
     parsed = parseSafeJsonInput(content, 'Packet file');
@@ -1335,7 +1342,7 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     }
     const resolvedPreviewPath = pathResolver.rootResolve(filePath);
     assertPipelinePreviewResourcePath(resolvedPreviewPath);
-    const content = readTextFile(resolvedPreviewPath);
+    const content = readCliTextFile(resolvedPreviewPath, 'pipeline preview file');
     const pipeline = parseSafeJsonInput(content, 'Pipeline preview file');
     const preview = previewPipeline(pipeline);
 
