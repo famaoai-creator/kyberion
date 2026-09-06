@@ -13,6 +13,7 @@ import {
   viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
+import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
 
 export async function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -24,22 +25,22 @@ export async function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   const limit = Number(req.nextUrl.searchParams.get('limit') || 24);
-  const status = req.nextUrl.searchParams.get('status') || '';
-  const missionId = req.nextUrl.searchParams.get('missionId') || '';
-  const pipelineId = req.nextUrl.searchParams.get('pipelineId') || '';
-  const actuator = req.nextUrl.searchParams.get('actuator') || '';
-  const query = req.nextUrl.searchParams.get('query') || '';
-  const traceId = req.nextUrl.searchParams.get('traceId') || '';
+  const status = readChronosStringParam(req.nextUrl.searchParams.get('status'));
+  const missionId = readChronosStringParam(req.nextUrl.searchParams.get('missionId'));
+  const pipelineId = readChronosStringParam(req.nextUrl.searchParams.get('pipelineId'));
+  const actuator = readChronosStringParam(req.nextUrl.searchParams.get('actuator'));
+  const query = readChronosStringParam(req.nextUrl.searchParams.get('query'));
+  const traceId = readChronosStringParam(req.nextUrl.searchParams.get('traceId'));
   let organizationIds: ReturnType<typeof strictViewerScopeOrganizationIds>;
   let projectIds: ReturnType<typeof strictViewerScopeProjectIds>;
   try {
     organizationIds = strictViewerScopeOrganizationIds(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('organization_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization_id'))
     );
     projectIds = strictViewerScopeProjectIds(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('project_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id'))
     );
   } catch (error) {
     return viewerErrorResponse(error);

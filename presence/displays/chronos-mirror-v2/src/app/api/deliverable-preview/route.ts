@@ -13,6 +13,7 @@ import {
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
+import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
 
 function artifactTenant(artifact: {
   tenant_slug?: string;
@@ -72,7 +73,7 @@ export function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   try {
-    const artifactId = req.nextUrl.searchParams.get('artifactId')?.trim() || '';
+    const artifactId = readChronosStringParam(req.nextUrl.searchParams.get('artifactId'));
     if (!artifactId) {
       return NextResponse.json({ error: 'Missing artifactId' }, { status: 400 });
     }
@@ -83,7 +84,7 @@ export function GET(req: NextRequest) {
 
     const tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
     if (
       tenantSlugs !== 'all' &&
