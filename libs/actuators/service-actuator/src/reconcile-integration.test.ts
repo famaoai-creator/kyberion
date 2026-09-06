@@ -81,7 +81,7 @@ vi.mock('@agent/core/service-engine', () => ({
   executeServicePreset: mocks.executeServicePreset,
   executeMcp: vi.fn(),
 }));
-vi.mock('@agent/core/src/pfc/ServiceValidator', () => ({
+vi.mock('@agent/core/service-validator', () => ({
   validateServiceAuth: mocks.validateServiceAuth,
 }));
 vi.mock('@agent/core/cloudflare-os-control-plane', () => ({
