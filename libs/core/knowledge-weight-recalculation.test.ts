@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
   applyKnowledgeRankingWeightProposal,
+  isRegularKnowledgeWeightsGovernancePath,
   loadKnowledgeRankingWeightProposal,
   proposeKnowledgeRankingWeightRecalculation,
 } from './knowledge-weight-recalculation.js';
@@ -31,6 +32,16 @@ describe('proposeKnowledgeRankingWeightRecalculation', () => {
     safeRmSync(root, { recursive: true, force: true });
     if (originalUsagePath === undefined) delete process.env[envKey];
     else process.env[envKey] = originalUsagePath;
+  });
+
+  it('accepts only regular files for governance backups', () => {
+    const filePath = path.join(root, 'knowledge-weights.json');
+    const directoryPath = path.join(root, 'knowledge-weights-directory.json');
+    safeWriteFile(filePath, '{}', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(isRegularKnowledgeWeightsGovernancePath(filePath)).toBe(true);
+    expect(isRegularKnowledgeWeightsGovernancePath(directoryPath)).toBe(false);
   });
 
   it('proposes a bounded tenant override without mutating governance JSON', () => {

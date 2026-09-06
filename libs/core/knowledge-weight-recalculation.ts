@@ -84,6 +84,15 @@ function knowledgeWeightProposalCatalog(filePath: string) {
   });
 }
 
+export function isRegularKnowledgeWeightsGovernancePath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 /** Load a persisted proposal through the shared schema/path boundary. */
 export function loadKnowledgeRankingWeightProposal(
   filePath: string
@@ -259,7 +268,9 @@ export function applyKnowledgeRankingWeightProposal(input: {
       },
     },
   };
-  const previous = safeExistsSync(governancePath) ? readTextFile(governancePath) : '';
+  const previous = isRegularKnowledgeWeightsGovernancePath(governancePath)
+    ? readTextFile(governancePath)
+    : '';
   if (previous) {
     safeWriteFile(`${governancePath}.previous`, previous, { mkdir: true, encoding: 'utf8' });
     safeWriteFile(`${governancePath}.history/knowledge-weights-${Date.now()}.json`, previous, {
