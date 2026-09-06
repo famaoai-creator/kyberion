@@ -6,7 +6,7 @@ import {
   viewerErrorResponse,
   withViewerExecutionContextAsync,
 } from '../../../lib/viewer-context';
-import { readChronosJsonObject } from '../../../lib/request-input';
+import { readChronosJsonObject, readChronosStringParam } from '../../../lib/request-input';
 import {
   chronosViewerCanAccessAgentScope,
   parseChronosAgentsBody,
@@ -45,13 +45,15 @@ export async function GET(req: NextRequest) {
       ]);
 
       // ?providers=true returns installed provider info with models
-      if (req.nextUrl.searchParams.get('providers') === 'true') {
-        const providers = discoverProviders(req.nextUrl.searchParams.get('refresh') === 'true');
+      if (readChronosStringParam(req.nextUrl.searchParams.get('providers')) === 'true') {
+        const providers = discoverProviders(
+          readChronosStringParam(req.nextUrl.searchParams.get('refresh')) === 'true'
+        );
         return NextResponse.json({ status: 'ok', accessRole, providers });
       }
 
       // ?manifests=true returns available agent definitions
-      if (req.nextUrl.searchParams.get('manifests') === 'true') {
+      if (readChronosStringParam(req.nextUrl.searchParams.get('manifests')) === 'true') {
         const profiles = loadAgentProfileIndex();
         const manifests = loadAgentManifests().map((m) => ({
           agentId: m.agentId,

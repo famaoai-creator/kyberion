@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
 
-  const limit = Number(req.nextUrl.searchParams.get('limit') || 24);
+  const limit = Number(readChronosStringParam(req.nextUrl.searchParams.get('limit')) || 24);
   const status = readChronosStringParam(req.nextUrl.searchParams.get('status'));
   const missionId = readChronosStringParam(req.nextUrl.searchParams.get('missionId'));
   const pipelineId = readChronosStringParam(req.nextUrl.searchParams.get('pipelineId'));
