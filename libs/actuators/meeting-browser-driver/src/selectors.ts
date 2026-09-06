@@ -210,3 +210,93 @@ export function selectorsForPlatform(platform: MeetingPlatform): MeetingPreJoinS
       return MEET_SELECTORS;
   }
 }
+
+/**
+ * In-meeting selectors for live-caption capture (`transcriptInput`).
+ * Live-caption DOM is the brittlest layer after pre-join UI: vendors
+ * re-skin it without notice, and caption availability depends on the
+ * meeting (host must allow captions / transcription). Every list is
+ * ordered best-effort-first and every entry is overridable per
+ * deployment via `selectors_override`. When no container matches, the
+ * driver reports `partial_state` instead of failing the session.
+ */
+export interface MeetingInMeetingSelectors {
+  /** "Turn on captions / CC" toggle (best effort — may already be on). */
+  captions_toggle: string[];
+  /** Live-caption text region(s), polled for innerText. */
+  captions_container: string[];
+}
+
+export const MEET_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
+  captions_toggle: [
+    // Backported from tools/meet-copilot-extension (Meet verified live)
+    'button[aria-label*="Turn on captions" i]',
+    'button[aria-label*="字幕をオンにする"]',
+    'button[aria-label*="字幕を表示"]',
+    'button[aria-label*="captions" i]',
+    '[data-tooltip*="captions" i]',
+  ],
+  captions_container: [
+    // Backported from tools/meet-copilot-extension (Meet verified live)
+    '[aria-label*="字幕"] [jsname]',
+    'div[jsname][aria-live="polite"]',
+    '[aria-label="Captions"]',
+    '[aria-label="字幕"]',
+    'div[jsname="dsyhDe"]',
+    'div[jsname="YrF9Sd"]',
+  ],
+};
+
+export const ZOOM_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
+  captions_toggle: [
+    // Backported from tools/meet-copilot-extension (best effort)
+    'button[aria-label*="字幕を表示"]',
+    'button[aria-label*="show captions" i]',
+    'button[aria-label*="ライブ文字起こし"]',
+    'button[aria-label*="closed caption" i]',
+    'button[aria-label*="字幕" i]',
+  ],
+  captions_container: [
+    // Backported from tools/meet-copilot-extension (best effort)
+    '[class*="live-transcription-subtitle"]',
+    '[class*="caption" i]',
+    '.closed-caption__window',
+    '[aria-label*="closed caption" i]',
+    'div[class*="closed-caption" i]',
+  ],
+};
+
+export const TEAMS_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
+  captions_toggle: [
+    // Backported from tools/meet-copilot-extension (best effort)
+    'button[aria-label*="ライブ キャプションをオンに"]',
+    'button[aria-label*="turn on live captions" i]',
+    'button[aria-label*="字幕をオンに"]',
+    'button[data-tid="toggle-cc"]',
+    'button[aria-label*="captions" i]',
+    'button[aria-label*="字幕" i]',
+    'button[aria-label*="Live captions" i]',
+  ],
+  captions_container: [
+    // Backported from tools/meet-copilot-extension (best effort)
+    '[data-tid="closed-caption-v2-window-wrapper"]',
+    '[data-tid*="closed-caption"]',
+    '[data-tid*="caption" i]',
+    'div[data-tid="closed-captions-renderer"]',
+    '[aria-label*="Live captions" i]',
+    '[aria-label*="ライブ キャプション" i]',
+  ],
+};
+
+export function inMeetingSelectorsForPlatform(
+  platform: MeetingPlatform
+): MeetingInMeetingSelectors {
+  switch (platform) {
+    case 'zoom':
+      return ZOOM_IN_MEETING_SELECTORS;
+    case 'teams':
+      return TEAMS_IN_MEETING_SELECTORS;
+    default:
+      return MEET_IN_MEETING_SELECTORS;
+  }
+}

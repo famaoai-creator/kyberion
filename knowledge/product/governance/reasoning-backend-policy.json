@@ -8,7 +8,8 @@
     "grok-build": "grok-cli",
     "xai": "grok-api",
     "cursor": "cursor-cli",
-    "cursor-agent": "cursor-cli"
+    "cursor-agent": "cursor-cli",
+    "opencode": "opencode-cli"
   },
   "allowed_modes": [
     "claude-cli",
@@ -22,6 +23,7 @@
     "grok-api",
     "copilot",
     "cursor-cli",
+    "opencode-cli",
     "local",
     "ollama",
     "vllm",
@@ -130,6 +132,11 @@
       "env_any": ["CURSOR_CLI", "CURSOR_AGENT"],
       "provider": "cursor",
       "mode": "cursor-cli"
+    },
+    {
+      "env_any": ["OPENCODE_CLI", "OPENCODE_VERSION"],
+      "provider": "opencode",
+      "mode": "opencode-cli"
     }
   ],
   "provider_fallback_order": [
@@ -156,6 +163,10 @@
     {
       "provider": "cursor",
       "mode": "cursor-cli"
+    },
+    {
+      "provider": "opencode",
+      "mode": "opencode-cli"
     }
   ],
   "default_mode": "claude-cli",

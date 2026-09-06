@@ -270,14 +270,46 @@ describe('Meeting Copilot service worker', () => {
 
     expect(harness.hooks.relayed).toContainEqual({ type: 'meet:set_mic', on: true });
   });
+
+  it('relays declared raise_hand and admit gestures to the content script', async () => {
+    const harness = await createHarness();
+    const socket = harness.openSocket();
+    const controlToken = 'test-control-token-012345678901234567890123456789';
+    socket.onmessage?.({ data: JSON.stringify({ cmd: 'session', control_token: controlToken }) });
+    socket.onmessage?.({
+      data: JSON.stringify({ cmd: 'raise_hand', control_token: controlToken }),
+    });
+    socket.onmessage?.({
+      data: JSON.stringify({ cmd: 'admit', control_token: controlToken, name: 'Taro' }),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(harness.hooks.relayed).toContainEqual({ type: 'meet:raise_hand' });
+    expect(harness.hooks.relayed).toContainEqual({ type: 'meet:admit', name: 'Taro' });
+    expect(socket.sent.join('\n')).toContain('"raised_hand"');
+    expect(socket.sent.join('\n')).toContain('"admitted"');
+  });
+
+  it('rejects malformed raise_hand and admit control messages', async () => {
+    const harness = await createHarness();
+    const socket = harness.openSocket();
+    const controlToken = 'test-control-token-012345678901234567890123456789';
+    socket.onmessage?.({ data: JSON.stringify({ cmd: 'session', control_token: controlToken }) });
+    socket.onmessage?.({ data: JSON.stringify({ cmd: 'raise_hand' }) });
+    socket.onmessage?.({
+      data: JSON.stringify({ cmd: 'admit', control_token: controlToken, name: 123 }),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(harness.hooks.relayed).toHaveLength(0);
+  });
 });
 
 /**
  * The caption extractor lives inside content.js's IIFE (it must, it runs in the
  * page). Lift the pure part out of the source so these assertions run against
  * the code that actually ships rather than a copy that can drift.
- */
-function loadCaptionExtractor(): () => (next: string) => string {
+ */ function loadCaptionExtractor(): () => (next: string) => string {
   const source = readFileSync(
     path.resolve(__dirname, '../tools/meet-copilot-extension/content.js'),
     'utf8'
@@ -331,5 +363,26 @@ describe('Meeting Copilot caption extraction', () => {
     extract('同じ内容です');
     extract('同じ内容ですが続きます');
     expect(extract('同じ内容ですが続きます')).toBe('');
+  });
+});
+
+describe('Meeting Copilot declared gestures', () => {
+  it('registers raise_hand/admit selectors and handlers in content.js', () => {
+    const source = readFileSync(
+      path.resolve(__dirname, '../tools/meet-copilot-extension/content.js'),
+      'utf8'
+    );
+    for (const token of [
+      'raiseHand:',
+      'lowerHand:',
+      'admit:',
+      'admitAll:',
+      'async function raiseHand',
+      'async function admitParticipants',
+      'meet:raise_hand',
+      'meet:admit',
+    ]) {
+      expect(source, `content.js should contain ${token}`).toContain(token);
+    }
   });
 });

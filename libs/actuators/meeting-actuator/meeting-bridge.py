@@ -208,10 +208,14 @@ class MeetingBridge:
              duration_sec=0, name=None, profile_id=None, audio_path=None,
              screenshot_path=None, python_bin=None, provider=None,
              provider_profile_id=None, execution_profile_id=None, mode=None,
-             node=None, audio_bridge=None, url_policy=None):
+             node=None, audio_bridge=None, url_policy=None,
+             transcript_path=None, headed=False, user_data_dir=None,
+             enable_captions=True):
         """Run the full meeting session via playwright-meet-join.mjs.
 
         duration_sec=0 means join, take a screenshot, and immediately leave.
+        duration_sec>0 with transcript_path captures live captions into
+        the transcript file while the session is open.
         """
         sys.stderr.write(
             f"[bridge] join platform={platform} provider={provider} mode={mode} "
@@ -239,29 +243,38 @@ class MeetingBridge:
                 platform=platform,
             )
 
-        cmd = ["node", str(PLAYWRIGHT_JOIN),
-               "--url", url,
-               "--name", name or DEFAULT_DISPLAY_NAME,
-               "--wait", str(int(duration_sec))]
-
-        if passcode:
-            cmd += ["--passcode", passcode]
-        if meeting_id:
-            cmd += ["--meeting-id", meeting_id]
+        payload = {
+            "action": "join",
+            "params": {
+                "platform": platform,
+                "url": url,
+                "name": name or DEFAULT_DISPLAY_NAME,
+                "meeting_id": meeting_id,
+                "passcode": passcode,
+                "wait": int(duration_sec),
+                "transcript_path": transcript_path,
+                "profile_id": profile_id,
+                "headed": bool(headed),
+                "user_data_dir": user_data_dir,
+                "enable_captions": bool(enable_captions),
+            },
+        }
+        # audio_path is a legacy record-local path hint; caption capture
+        # writes transcript_path instead.
         if audio_path:
-            cmd += ["--audio", audio_path]
+            payload["params"]["audio_path"] = audio_path
         if screenshot_path:
-            cmd += ["--screenshot", screenshot_path]
-        if python_bin:
-            cmd += ["--python", python_bin]
+            payload["params"]["screenshot_path"] = screenshot_path
 
         sys.stderr.write(
-            f"[bridge] running: {' '.join(cmd[:6])} ... "
+            f"[bridge] running playwright-meet-join.mjs "
             f"profile={provider_profile_id or execution_profile_id or 'n/a'}\n"
         )
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True, cwd=str(ROOT),
+                ["node", str(PLAYWRIGHT_JOIN)],
+                input=json.dumps(payload),
+                capture_output=True, text=True, cwd=str(ROOT),
                 timeout=max(120, int(duration_sec) + 60),
             )
         except subprocess.TimeoutExpired:
@@ -372,14 +385,29 @@ class MeetingBridge:
 
     # ---- listen -------------------------------------------------- #
 
-    def listen(self, duration_sec=10, transcript_path=None):
-        """Receive audio.
+    def listen(self, duration_sec=10, transcript_path=None, url=None,
+               platform="auto", name=None, profile_id=None,
+               passcode=None, meeting_id=None, headed=False,
+               user_data_dir=None):
+        """Receive the meeting.
 
         When join() runs as a full session (duration_sec > 0), listen is
         a no-op — the playwright browser is already capturing the meeting.
-        As a standalone action, this stub waits duration_sec seconds.
+        As a standalone action WITH a url, listen joins with live-caption
+        capture for duration_sec and leaves (cross-process sessions cannot
+        attach to an in-progress join, so listen owns its own session).
+        Without a url it keeps the legacy wait behavior and reports
+        partial_state.
         """
-        sys.stderr.write(f"[bridge] listen duration={duration_sec}\n")
+        if url:
+            return self.join(
+                platform, url=url, meeting_id=meeting_id,
+                passcode=passcode, duration_sec=duration_sec,
+                name=name, profile_id=profile_id,
+                transcript_path=transcript_path, headed=headed,
+                user_data_dir=user_data_dir,
+            )
+        sys.stderr.write(f"[bridge] listen duration={duration_sec} (no url: wait only)\n")
         try:
             duration = max(0, int(duration_sec))
         except (TypeError, ValueError):
@@ -483,6 +511,10 @@ def main():
                 node=params.get("node"),
                 audio_bridge=params.get("audio_bridge"),
                 url_policy=params.get("url_policy"),
+                transcript_path=params.get("transcript_path"),
+                headed=params.get("headed", False),
+                user_data_dir=params.get("user_data_dir"),
+                enable_captions=params.get("enable_captions", True),
             )
         elif action == "speak":
             result = bridge.speak(
@@ -497,6 +529,14 @@ def main():
             result = bridge.listen(
                 duration_sec=params.get("duration_sec", 10),
                 transcript_path=params.get("transcript_path"),
+                url=params.get("url"),
+                platform=params.get("platform", "auto"),
+                name=params.get("name") or params.get("display_name"),
+                profile_id=params.get("profile_id"),
+                passcode=params.get("passcode"),
+                meeting_id=params.get("meeting_id"),
+                headed=params.get("headed", False),
+                user_data_dir=params.get("user_data_dir"),
             )
         elif action == "chat":
             result = bridge.chat(params.get("text", ""))

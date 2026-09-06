@@ -151,7 +151,10 @@
             "collect_and_register_voice_profile",
             "register_voice_profile",
             "transcribe",
-            "transcribe_voice_sample"
+            "transcribe_voice_sample",
+            "normalize_audio",
+            "render_talking_avatar",
+            "output_to_virtual_camera"
           ]
         },
         "params": { "type": "object" }
@@ -203,7 +206,10 @@
                       "collect_and_register_voice_profile",
                       "register_voice_profile",
                       "transcribe",
-                      "transcribe_voice_sample"
+                      "transcribe_voice_sample",
+                      "normalize_audio",
+                      "render_talking_avatar",
+                      "output_to_virtual_camera"
                     ]
                   },
                   "params": { "type": "object" }

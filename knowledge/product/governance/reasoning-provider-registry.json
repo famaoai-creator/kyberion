@@ -146,6 +146,19 @@
       "env_keys": ["CURSOR_API_KEY", "CURSOR_CLI", "CURSOR_AGENT", "KYBERION_CURSOR_CLI_BIN"]
     },
     {
+      "mode": "opencode-cli",
+      "provider": "opencode",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "input_modalities": ["text"]
+      },
+      "env_keys": ["OPENCODE_CLI", "OPENCODE_VERSION", "KYBERION_OPENCODE_CLI_BIN"]
+    },
+    {
       "mode": "local",
       "provider": "local",
       "module": "./reasoning-openai-compatible-provider",

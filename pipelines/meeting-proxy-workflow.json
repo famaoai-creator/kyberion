@@ -1,9 +1,9 @@
 {
   "action": "pipeline",
   "name": "meeting-proxy-workflow",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Meeting proxy: join with cloned voice → listen → extract action items. Supports Google Meet, Teams, and Zoom. persona_name / profile_id / display_name control the bot identity.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as without roles.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as without roles. v2.1: live join via meeting:join (browser-playwright + live-caption capture) replaces the retired-CLI stub.",
   "context": {
     "persona_name": "the operator",
     "profile_id": "operator-default-v1",
@@ -42,17 +42,18 @@
     {
       "id": "join_session",
       "role": "sink",
-      "op": "system:log",
+      "op": "meeting:join",
+      "produces": { "channel": "join_result", "type": "MeetingJoinResult" },
       "params": {
-        "message": "Meeting browser join CLI was retired; use meeting-actuator join_backend=browser-playwright. Requested meeting_url={{meeting_url}}, display_name={{display_name}}."
-      }
-    },
-    {
-      "id": "log_session",
-      "role": "sink",
-      "op": "system:log",
-      "params": {
-        "message": "Meeting join skipped: browser join CLI is retired until this workflow is instantiated with meeting-actuator."
+        "platform": "{{platform}}",
+        "url": "{{meeting_url}}",
+        "meeting_id": "{{meeting_id}}",
+        "passcode": "{{passcode}}",
+        "display_name": "{{display_name}}",
+        "duration_sec": "{{listen_duration_sec}}",
+        "transcript_path": "{{transcript_output}}",
+        "screenshot_path": "{{screenshot_path}}",
+        "python_bin": "{{python_bin}}"
       }
     },
     {

@@ -49,9 +49,11 @@ import { getReasoningBackend } from '@agent/core/reasoning-backend';
 import { setRegisteredEnv } from '@agent/core/foundation';
 import type {
   AudioFormat,
+  MeetingSession,
   MeetingTarget,
   TranscriptChunk,
 } from '@agent/core/meeting-session-types';
+import { startMeetingCommandLoop } from './meeting_commands.js';
 import type { ConversationAgent } from '@agent/core/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathToFileURL } from 'node:url';
@@ -381,6 +383,16 @@ async function main(args: string[] = []): Promise<void> {
     .option('barge-in-rms-multiplier', { type: 'number', default: 2.5 })
     .option('barge-in-min-duration-ms', { type: 'number', default: 160 })
     .option('headed', { type: 'boolean', default: false })
+    .option('interactive-commands', {
+      type: 'boolean',
+      describe:
+        'read mid-meeting verbs (status, raise-hand, admit, chat, leave) from stdin; defaults to on when stdin is a TTY',
+    })
+    .option('allow-admit', {
+      type: 'boolean',
+      default: false,
+      describe: 'grant host authority for the admit verb in this run (audited)',
+    })
     .option('account-slug', { type: 'string', default: 'default' })
     .option('skip-bootstrap-check', { type: 'boolean', default: false })
     .parseSync();
@@ -392,6 +404,7 @@ async function main(args: string[] = []): Promise<void> {
     actuator: 'meeting-participate',
   });
   let exitCode = 0;
+  let commandLoop: ReturnType<typeof startMeetingCommandLoop> | null = null;
 
   try {
     // Fail-closed on missing environment-capability receipt unless the
@@ -549,6 +562,31 @@ async function main(args: string[] = []): Promise<void> {
       trace,
     });
 
+    // Interactive verbs: the coordinator owns the session loop, so hold
+    // the live session here and let stdin drive declared gestures.
+    let liveSession: MeetingSession | null = null;
+    const interactiveOpt = argv['interactive-commands'];
+    const interactive =
+      typeof interactiveOpt === 'boolean' ? interactiveOpt : Boolean(process.stdin.isTTY);
+    const commandLoopInteractive = interactive
+      ? startMeetingCommandLoop({
+          context: {
+            getSession: () => liveSession,
+            allowAdmit: Boolean(argv['allow-admit']),
+            onOutput: (message: string) => logger.info(`[participate-cmd] ${message}`),
+            onTrace: (event: string, detail?: Record<string, unknown>) => {
+              trace.addEvent(event, (detail ?? {}) as Record<string, string | number | boolean>);
+            },
+          },
+        })
+      : null;
+    commandLoop = commandLoopInteractive;
+    if (commandLoop) {
+      logger.info(
+        '[participate-cli] interactive commands on (status, raise-hand, admit, chat, leave)'
+      );
+    }
+
     logger.info(
       `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform} voice_profile=${voiceProfile?.profile_id ?? 'not_required'})`
     );
@@ -567,7 +605,12 @@ async function main(args: string[] = []): Promise<void> {
       barge_in_min_duration_ms: Math.max(20, Number(argv['barge-in-min-duration-ms'])),
       transcript_source:
         runtimePlan.transport_mode === 'captions_first' ? 'driver_captions' : 'stt',
+      onSession: (session) => {
+        liveSession = session;
+      },
     });
+    commandLoop?.stop();
+    await commandLoop?.done.catch(() => undefined);
     logger.info('');
     logger.info(`📋 Participation report:`);
     logger.info(`   session_id: ${report.session_id}`);
@@ -583,6 +626,7 @@ async function main(args: string[] = []): Promise<void> {
     logger.error(err?.message ?? String(err));
     exitCode = 1;
   } finally {
+    commandLoop?.stop();
     const persisted = finalizeAndPersist(trace);
     logger.info(`📋 meeting_participate trace: ${persisted.path}`);
     if (exitCode !== 0) {

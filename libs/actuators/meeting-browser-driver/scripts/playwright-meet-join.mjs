@@ -1,8 +1,10 @@
 #!/usr/bin/env node
+import path from 'node:path';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { StubAudioBus } from '@agent/core/audio-bus';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import {
   resolveMeetingPlatformFromUrl,
   validateMeetingTarget,
@@ -67,6 +69,9 @@ async function runJoin(params = {}) {
     speaker_device: params.speaker_device,
     camera_device: params.camera_device,
     step_timeout_ms: params.step_timeout_ms,
+    enable_captions: params.enable_captions !== false,
+    caption_poll_ms: params.caption_poll_ms,
+    in_meeting_selectors_override: params.in_meeting_selectors_override,
   });
 
   const probe = await driver.probe();
@@ -90,19 +95,75 @@ async function runJoin(params = {}) {
     0,
     Number.parseInt(String(params.wait ?? params.duration_sec ?? 0), 10) || 0
   );
-  if (durationSec > 0) {
-    await new Promise((resolve) => setTimeout(resolve, durationSec * 1000));
+
+  // Live-caption capture while the session is open. The transcript file
+  // uses `[mm:ss] Speaker: text` lines so `meeting:normalize_transcript`
+  // passes it straight through into meeting-followup.
+  const transcriptPath = String(params.transcript_path || '').trim();
+  const cues = [];
+  const t0 = Date.now();
+  let captionsAvailable = false;
+  if (transcriptPath && durationSec > 0 && typeof session.transcriptInput === 'function') {
+    const deadline = t0 + durationSec * 1000;
+    try {
+      const consume = (async () => {
+        for await (const chunk of session.transcriptInput()) {
+          captionsAvailable = true;
+          cues.push({
+            tSec: Math.max(0, Math.round((Date.now() - t0) / 1000)),
+            speaker: chunk.speaker_label || '',
+            text: chunk.text || '',
+          });
+        }
+      })();
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      await session.leave();
+      // Drain briefly so trailing captions flush.
+      await Promise.race([consume, new Promise((resolve) => setTimeout(resolve, 2000))]);
+    } catch (err) {
+      logger.error(`[playwright-meet-join] caption capture failed: ${err?.message ?? err}`);
+    }
+  } else {
+    if (durationSec > 0) {
+      await new Promise((resolve) => setTimeout(resolve, durationSec * 1000));
+    }
+    await session.leave();
   }
 
-  await session.leave();
+  let transcript_written = false;
+  if (transcriptPath && cues.length > 0) {
+    const lines = cues
+      .filter((cue) => cue.text.trim())
+      .map(
+        (cue) =>
+          `[${String(Math.floor(cue.tSec / 60)).padStart(2, '0')}:${String(cue.tSec % 60).padStart(2, '0')}] ${cue.speaker.trim() || 'Unknown'}: ${cue.text.trim()}`
+      );
+    const safeTranscriptPath = assertSafeRepositoryPath(path.resolve(transcriptPath), {
+      allowMissingLeaf: true,
+    });
+    safeMkdir(path.dirname(safeTranscriptPath), { recursive: true });
+    safeWriteFile(safeTranscriptPath, `${lines.join('\n')}\n`, { encoding: 'utf8' });
+    transcript_written = lines.length > 0;
+  }
 
-  return {
+  const result = {
     status: 'success',
     platform,
     join_backend: driver.driver_id,
     message: `joined and left ${platform}`,
-    partial_state: false,
+    partial_state: transcriptPath ? !transcript_written : false,
   };
+  if (transcriptPath) {
+    result.transcript_path = transcriptPath;
+    result.caption_cues = cues.length;
+    result.captions_available = captionsAvailable;
+    if (!transcript_written) {
+      result.partial_reason = 'no live captions captured (see selectors_override)';
+    }
+  }
+  return result;
 }
 
 async function main() {

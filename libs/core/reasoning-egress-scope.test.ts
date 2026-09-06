@@ -180,6 +180,7 @@ describe('backend classification', () => {
     expect(reasoningBackendEndpoint('anthropic')).toContain('api.anthropic.com');
     expect(reasoningBackendEndpoint('gemini')).toContain('googleapis.com');
     expect(reasoningBackendEndpoint('cursor-cli')).toContain('api.cursor.com');
+    expect(reasoningBackendEndpoint('opencode-cli')).toContain('opencode.ai');
   });
 
   it('maps an unknown provider to an invalid host', () => {
