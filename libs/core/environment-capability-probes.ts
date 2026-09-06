@@ -24,7 +24,14 @@ import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
-import { safeExistsSync, safeReaddir, safeStat, safeExec } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+  safeStat,
+  safeExec,
+} from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { normalizePersistedAuditEntry } from './audit-chain.js';
@@ -159,6 +166,13 @@ export async function probeExplicitReasoningBackend(
       )
         ? { available: true }
         : unavailable('`cursor-agent --version` failed');
+    case 'opencode-cli':
+      return binaryProbe(
+        getRegisteredEnvText('KYBERION_OPENCODE_CLI_BIN', { env })?.trim() || 'opencode',
+        ['--version']
+      )
+        ? { available: true }
+        : unavailable('`opencode --version` failed');
     case 'anthropic': {
       const probe = await anthropicProbe(env);
       return probe.available
@@ -394,10 +408,14 @@ export function nodeVersionSatisfiesFloor(
 }
 
 function readRootEnginesNodeRange(): string | null {
+  return readNodeEnginesRangeFromFile(pathResolver.rootResolve('package.json'));
+}
+
+export function readNodeEnginesRangeFromFile(filePath: string): string | null {
   try {
-    const pkgPath = pathResolver.rootResolve('package.json');
-    if (!safeExistsSync(pkgPath)) return null;
-    return parseNodeEnginesRange(readJson<unknown>(pkgPath));
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+    return parseNodeEnginesRange(readJson<unknown>(safePath));
   } catch {
     return null;
   }

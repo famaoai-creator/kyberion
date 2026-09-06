@@ -22817,3 +22817,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/policy-engine.ts`、policy-engine test、PI-03
 - **変更**: PolicyEngine の policy override read を `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。repository 外の path と directory replacement は YAML parse 前に拒否し、既存の policy normalization と lazy default load semantics は変更していない。
 - **検証**: policy-engine **2 files／8 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
+
+## 2026-09-06 再レビュー実装 1603
+
+- **対象**: `libs/core/environment-capability-probes.ts`、environment capability test、PI-03
+- **変更**: environment capability の `package.json` engines read を governed regular-file loader `readNodeEnginesRangeFromFile` へ切り出した。directory replacement と repository 外 path は node floor parse 前に拒否し、既存の probe 判定を維持した。
+- **検証**: environment capability **2 files／40 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
