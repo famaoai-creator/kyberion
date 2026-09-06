@@ -5,6 +5,7 @@ import { buildBridgeEmptyReplyText } from '@agent/core/bridge-error-reply';
 import { createSurfaceApprovalRequest } from '@agent/core/channel-surface';
 import { withExecutionContext } from '@agent/core/authority';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { t } from '@agent/core/t';
 import * as pathResolver from '@agent/core/path-resolver';
 import { safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import type {
@@ -208,9 +209,12 @@ describe('telegram bridge thread context', () => {
 
     const context = buildTelegramThreadContextFromEntries(entries);
 
-    expect(context).toContain('Recent Telegram thread context:');
-    expect(context).toContain('User (alice): 最初の相談');
-    expect(context).toContain('Assistant: 了解しました');
+    const locale = resolveOperatorLocale();
+    expect(context).toContain(t('bridge:thread_context', { channel: 'Telegram' }, locale));
+    expect(context).toContain(
+      t('bridge:thread_user', { author: 'alice', text: '最初の相談' }, locale)
+    );
+    expect(context).toContain(t('bridge:thread_assistant', { text: '了解しました' }, locale));
   });
 
   it('returns undefined for empty history', () => {
@@ -241,7 +245,9 @@ describe('telegram bridge thread context', () => {
 
     expect(captured.conversationInputs).toHaveLength(2);
     expect(captured.conversationInputs[0].threadContext).toBeUndefined();
-    expect(captured.conversationInputs[1].threadContext).toContain('User (alice): 最初の相談');
+    expect(captured.conversationInputs[1].threadContext).toContain(
+      t('bridge:thread_user', { author: 'alice', text: '最初の相談' }, resolveOperatorLocale())
+    );
     expect(captured.conversationInputs[1].threadContext).not.toContain('それで、どうなりましたか');
   });
 

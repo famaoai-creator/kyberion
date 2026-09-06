@@ -243,7 +243,8 @@ function buildThreadContext(message: {
         text: [entry.text, formatIMessageAttachmentSummary(entry.attachments)]
           .filter(Boolean)
           .join('\n'),
-      }))
+      })),
+      resolveOperatorLocale()
     ) || ''
   );
 }

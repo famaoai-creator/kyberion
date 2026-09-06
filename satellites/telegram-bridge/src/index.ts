@@ -257,7 +257,7 @@ function appendTelegramThreadHistory(entry: TelegramThreadHistoryEntry): void {
 export function buildTelegramThreadContextFromEntries(
   entries: TelegramThreadHistoryEntry[]
 ): string | undefined {
-  return formatChannelThreadContext('Telegram', entries);
+  return formatChannelThreadContext('Telegram', entries, resolveOperatorLocale());
 }
 
 function buildTelegramThreadContext(threadTs: string): string | undefined {
