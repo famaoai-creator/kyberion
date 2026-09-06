@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { readTextFile } from '@agent/core/foundation';
+import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
@@ -404,7 +405,8 @@ export async function handleTaskCommand(
     throw new Error('task request is required; pass it as text or with --request');
   }
 
-  const plan = buildProductivityTaskPlan(request);
+  const resolutionPacket = resolveIntentResolutionPacket(request);
+  const plan = buildProductivityTaskPlan(request, { resolutionPacket });
 
   if (subcommand === 'plan') {
     if (outputPath) {
@@ -417,7 +419,7 @@ export async function handleTaskCommand(
     return;
   }
 
-  const classified = classifyTaskSessionIntent(request);
+  const classified = classifyTaskSessionIntent(request, resolutionPacket);
   const composite = plan.domains.length > 1;
   const missing = [
     ...new Set([...(classified?.requirements?.missing || []), ...plan.missing_inputs]),
