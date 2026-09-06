@@ -23717,3 +23717,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: deliverable inbox lock の persisted JSON loader、SX-03／SX-12
 - **変更**: regular-file確認後のlock JSON読み込みを `readTextFile` + `parseSafeJsonInput` から foundation `readJson`へ統一した。lock path safety、malformed／invalid PIDのstale扱い、process existence／EPERM判定、exclusive lock lifecycleは変更していない。
 - **検証**: deliverable inbox **1 file／8 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1753
+
+- **対象**: shared-nerve reflex definition loader、SX-03／SX-11
+- **変更**: repository-bound `.adf.json` reflex定義の `readTextFile` + `parseSafeJsonInput` を foundation `readJson`へ統一した。reflex directory／regular-file／symlink boundary、malformed定義のskip、action validation、dispatch authority semanticsは維持し、テストdoubleもcanonical readerへ更新した。
+- **検証**: reflex-engine **1 file／14 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
