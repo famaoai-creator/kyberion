@@ -4,6 +4,7 @@ import {
   getRegisteredEnvBool,
   getRegisteredEnvText,
   nowIso,
+  parseSafeJsonObjectValue,
   parseSafeJsonInput,
 } from '@agent/core/foundation';
 import { installProcessGuards } from '@agent/core/process-guards';
@@ -588,7 +589,9 @@ app.get('/runtime', (req, res) => {
 app.post('/sessions', (req, res) => {
   let input;
   try {
-    input = parseTerminalSessionCreateInput(req.body === undefined ? {} : req.body);
+    input = parseTerminalSessionCreateInput(
+      parseSafeJsonObjectValue(req.body === undefined ? {} : req.body, 'terminal session request')
+    );
   } catch (error: unknown) {
     return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
   }
