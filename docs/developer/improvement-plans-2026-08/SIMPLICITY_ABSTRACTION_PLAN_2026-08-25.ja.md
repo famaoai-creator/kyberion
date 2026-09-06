@@ -22823,3 +22823,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/environment-capability-probes.ts`、environment capability test、PI-03
 - **変更**: environment capability の `package.json` engines read を governed regular-file loader `readNodeEnginesRangeFromFile` へ切り出した。directory replacement と repository 外 path は node floor parse 前に拒否し、既存の probe 判定を維持した。
 - **検証**: environment capability **2 files／40 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
+
+## 2026-09-06 再レビュー実装 1604
+
+- **対象**: `libs/core/mission-project-ledger.ts`、mission-project-reassignment test、PI-03
+- **変更**: project mission ledger の既存 markdown leaf を `ensureProjectMissionLedgerExists` で operation-time に regular-file 検証し、directory replacement を `readTextFile` 前に拒否するようにした。JSON ledger 側と同じ明示的な `PROJECT_MISSION_LEDGER` error semantics を維持した。
+- **検証**: mission-project-reassignment **2 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
