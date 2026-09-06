@@ -2,8 +2,16 @@ import * as path from 'node:path';
 import { validateWritePermission, scanForConfidentialMarkers } from '@agent/core/tier-guard';
 import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import yargs from 'yargs';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+
+export function readComplianceTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 export async function runComplianceScan(args: string[] = []): Promise<{
   status: 'passed' | 'failed';
@@ -36,7 +44,7 @@ export async function runComplianceScan(args: string[] = []): Promise<{
 
     // 2. Check Content-based Markers (PII, Secrets, Confidentiality)
     try {
-      const content = readTextFile(file);
+      const content = readComplianceTextFile(file);
       const scan = scanForConfidentialMarkers(content);
       if (scan.hasMarkers) {
         violations.push(
