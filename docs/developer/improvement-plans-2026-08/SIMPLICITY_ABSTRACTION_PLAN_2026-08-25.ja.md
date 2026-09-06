@@ -23621,3 +23621,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: orchestrator super-nerve の macro include loader、SX-03／SX-04
 - **変更**: `core:call`／`core:include` の persisted macro JSON 読み込みを foundation `readJson` へ統一した。repository／trust／regular-file boundary、nested step shape validation、dangerous-key rejection は維持し、既存の reader mock を回帰テストへ接続した。
 - **検証**: super-nerve／resolver **2 files／19 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1737
+
+- **対象**: core secret-guard の auth grants loader、SX-03／security boundary
+- **変更**: sensitive path mediation 付きの auth grants JSON 読み込みを、旧 `safeReadFile` + `parseSafeJsonInput` から既存 `readSensitiveJson`／foundation `readJson` 経路へ統一した。secret path mediation、grant shape validation、malformed／dangerous record の fail-closed 挙動は維持し、test double も foundation safe parser を使用するよう整合させた。
+- **検証**: secret-guard branch／base **2 files／18 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
