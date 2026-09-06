@@ -94,6 +94,14 @@ describe('imessage bridge processing note', () => {
       })
     );
     expect(source).not.toContain('process.exit(');
+    expect(source).toContain(
+      "import { defineScript, isDirectScript } from '@agent/core/script-harness'"
+    );
+    expect(source).toContain("name: 'imessage-bridge'");
+    expect(source).toContain(
+      "await main(['node', 'satellites/imessage-bridge/src/index.ts', ...argv])"
+    );
+    expect(source).not.toContain('main().catch(');
   });
 
   it('keeps file input inside the repository and limited to regular files', () => {

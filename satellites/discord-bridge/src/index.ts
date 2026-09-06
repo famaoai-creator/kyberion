@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { isDirectEntry } from '@agent/core/direct-entry';
+import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import {
   appendJsonLine,
   getRegisteredEnvText,
@@ -495,8 +495,8 @@ async function drainDiscordOutbox(client: Client): Promise<void> {
 
 const runDiscordOutbox = createSurfaceOutboxDrainGuard('discord');
 
-async function main() {
-  const argv = await createStandardYargs(process.argv)
+async function main(args: string[] = process.argv) {
+  const argv = await createStandardYargs(args)
     .option('token', { type: 'string', description: 'Discord Bot Token' })
     .parseSync();
 
@@ -547,12 +547,15 @@ async function main() {
 // invocation starts the bridge, so importing this module in a test cannot open
 // a gateway connection — and a leaked VITEST env cannot silently no-op a real
 // start.
-const directEntry = isDirectEntry(import.meta.url, 'satellites/discord-bridge/src/index.ts');
+const directEntry = isDirectScript(import.meta.url, 'satellites/discord-bridge/src/index.ts');
+const runDiscordBridge = defineScript({
+  name: 'discord-bridge',
+  async run({ argv }) {
+    await main(['node', 'satellites/discord-bridge/src/index.ts', ...argv]);
+  },
+});
 if (directEntry && !getRegisteredEnvText('VITEST')) {
-  main().catch((error) => {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  void runDiscordBridge();
 } else if (directEntry) {
   logger.warn('[DiscordBridge] VITEST is set — suppressing the direct-entry start.');
 }
