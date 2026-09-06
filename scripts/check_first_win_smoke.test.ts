@@ -4,6 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import {
   checkFirstWinSmoke,
+  readFirstWinTextFile,
   validateCanonicalFirstWinDocumentation,
   validateFirstWinLifecyclePipeline,
   validateVerifySessionPipeline,
@@ -121,6 +122,12 @@ describe('check_first_win_smoke', () => {
     expect(source).toContain('return readValidatedPipelineAdf(file)');
     expect(source).not.toContain('readFoundationJson');
     expect(source).not.toContain('function readJson(');
+  });
+
+  it('rejects a directory replacement before first-win text parsing', () => {
+    expect(() => readFirstWinTextFile(pathResolver.rootDir(), 'fixture')).toThrow(
+      'fixture must be a regular file'
+    );
   });
 
   it('rejects a shell wrapper in place of the typed lifecycle smoke op', () => {
