@@ -12,6 +12,9 @@ describe('nexus daemon resource boundaries', () => {
     );
 
     expect(source).toContain('assertSafeRepositoryPath');
+    expect(source).toContain('readJsonLines');
+    expect(source).toContain('function readNexusStimuli(filePath: string): GuspStimulus[]');
+    expect(source).toContain('onMalformed: (_error, _lineNumber, rawLine)');
     expect(source).toContain('Nexus JSON resource must be an existing regular file');
     expect(source).toContain('function isExistingRegularFile(filePath: string): boolean');
     expect(source).toContain('function parseNexusDispatchResult(value: unknown)');
