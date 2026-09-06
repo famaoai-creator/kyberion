@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { findMissionProcessBindingViolations } from './check_mission_process_bindings.js';
+import {
+  findMissionProcessBindingViolations,
+  readMissionProcessBindingsTextFile,
+} from './check_mission_process_bindings.js';
 
 describe('mission process bindings checker', () => {
   it('passes the repository governance bindings', () => {
@@ -18,8 +21,15 @@ describe('mission process bindings checker', () => {
     expect(source).toContain('loadMissionReviewGateRegistry()');
     expect(source).toContain('loadMissionProcessRegistry()');
     expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain('readMissionProcessBindingsTextFile(filePath: string)');
     expect(source).not.toContain('safeReadFile(');
     expect(source).not.toContain('readFoundationJson');
     expect(source).not.toContain('function readJson(');
+  });
+
+  it('rejects a directory before reading phase frontmatter', () => {
+    expect(() => readMissionProcessBindingsTextFile(pathResolver.rootResolve('knowledge'))).toThrow(
+      'must be a regular file'
+    );
   });
 });
