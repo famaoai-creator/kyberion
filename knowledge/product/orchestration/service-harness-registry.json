@@ -613,7 +613,7 @@
       "service_id": "github",
       "display_name": "GitHub REST API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 17,
+      "operation_count": 19,
       "detail_ref": "knowledge/product/orchestration/service-presets/github.json",
       "operations": [
         {
@@ -751,13 +751,29 @@
           "risk": "read",
           "approval_required": false,
           "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_review",
+          "description": "Submits a pull request review (COMMENT, APPROVE, or REQUEST_CHANGES). Write-gated; approval is required.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_review_comment",
+          "description": "Creates a line-level review comment on a pull request. Write-gated; approval is required.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
         }
       ]
     },
     {
       "service_id": "github-mcp",
-      "display_name": "GitHub MCP Server",
-      "description": "MCP-based GitHub interactions (search, create issues, etc.)",
+      "display_name": "GitHub MCP Server (deprecated example)",
+      "description": "Deprecated external-MCP example using the retired @modelcontextprotocol/server-github package (3 tools). Canonical GitHub work uses the REST preset knowledge/product/orchestration/service-presets/github.json (service_id=github). Keep this file only as a fixture for service-actuator MCP-mode tests and as a pattern for wiring a third-party MCP server — do not add daily GitHub capture or review writes here.",
       "operation_count": 3,
       "detail_ref": "knowledge/product/orchestration/service-presets/github-mcp.json",
       "operations": [
@@ -777,10 +793,10 @@
         },
         {
           "action": "create_issue",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
-          "idempotency": "not_applicable"
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
         }
       ]
     },

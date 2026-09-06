@@ -1,10 +1,14 @@
 {
   "service_id": "github-mcp",
-  "name": "GitHub MCP Server",
-  "description": "MCP-based GitHub interactions (search, create issues, etc.)",
+  "name": "GitHub MCP Server (deprecated example)",
+  "deprecated": true,
+  "canonical_preset": "github",
+  "description": "Deprecated external-MCP example using the retired @modelcontextprotocol/server-github package (3 tools). Canonical GitHub work uses the REST preset knowledge/product/orchestration/service-presets/github.json (service_id=github). Keep this file only as a fixture for service-actuator MCP-mode tests and as a pattern for wiring a third-party MCP server — do not add daily GitHub capture or review writes here.",
   "operations": {
     "search_repositories": {
       "type": "mcp",
+      "kind": "capture",
+      "risk": "read",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "tool_name": "search_repositories",
@@ -14,6 +18,8 @@
     },
     "get_file_contents": {
       "type": "mcp",
+      "kind": "capture",
+      "risk": "read",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "tool_name": "get_file_contents",
@@ -25,6 +31,8 @@
     },
     "create_issue": {
       "type": "mcp",
+      "kind": "apply",
+      "risk": "write",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "tool_name": "create_issue",

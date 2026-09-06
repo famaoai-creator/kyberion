@@ -46,6 +46,17 @@ describe('service-preset-registry', () => {
     expect(preset?.operations).toHaveProperty('list_reviews');
     expect(preset?.operations).toHaveProperty('list_review_comments');
     expect(preset?.operations).toHaveProperty('list_pr_files');
+    expect(preset?.operations).toHaveProperty('create_review');
+    expect(preset?.operations).toHaveProperty('create_review_comment');
+  });
+
+  it('keeps github-mcp as a deprecated external-MCP example', () => {
+    const preset = getServicePresetRecord('github-mcp');
+    expect(preset?.service_id).toBe('github-mcp');
+    expect(preset?.deprecated).toBe(true);
+    expect(preset?.canonical_preset).toBe('github');
+    expect(preset?.operations).toHaveProperty('search_repositories');
+    expect(preset?.operations).toHaveProperty('create_issue');
   });
 
   it('resolves common SaaS presets', () => {

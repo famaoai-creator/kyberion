@@ -126,6 +126,8 @@
     "chronos:dev": "pnpm --filter @presence/chronos-mirror-v2 dev",
     "capabilities": "node scripts/capability_discovery_entry.mjs",
     "kyberion:list": "node scripts/capability_discovery_entry.mjs",
+    "playground": "pnpm exec tsx scripts/actuator_playground.ts",
+    "actuator:playground": "pnpm exec tsx scripts/actuator_playground.ts",
     "provider-capabilities:scan": "node dist/scripts/scan_provider_cli_capabilities.js",
     "examples": "node dist/scripts/example_discovery.js",
     "system:upgrade": "node --import ./scripts/ts-loader.mjs scripts/system_upgrade.ts",
