@@ -35,6 +35,18 @@
       "types": "./dist/foundation/primitives.d.ts",
       "default": "./dist/foundation/primitives.js"
     },
+    "./foundation/io": {
+      "types": "./dist/foundation/io.d.ts",
+      "default": "./dist/foundation/io.js"
+    },
+    "./foundation/text": {
+      "types": "./dist/foundation/text.d.ts",
+      "default": "./dist/foundation/text.js"
+    },
+    "./foundation/governed-catalog": {
+      "types": "./dist/foundation/governed-catalog.d.ts",
+      "default": "./dist/foundation/governed-catalog.js"
+    },
     "./cron-utils": {
       "types": "./dist/cron-utils.d.ts",
       "default": "./dist/cron-utils.js"
@@ -1370,6 +1382,26 @@
     "./script-harness": {
       "types": "./dist/script-harness.d.ts",
       "default": "./dist/script-harness.js"
+    },
+    "./camera-output-bridge": {
+      "types": "./dist/camera-output-bridge.d.ts",
+      "default": "./dist/camera-output-bridge.js"
+    },
+    "./obs-virtual-camera-output": {
+      "types": "./dist/obs-virtual-camera-output.d.ts",
+      "default": "./dist/obs-virtual-camera-output.js"
+    },
+    "./prompt-cache-discipline": {
+      "types": "./dist/prompt-cache-discipline.d.ts",
+      "default": "./dist/prompt-cache-discipline.js"
+    },
+    "./surface-request-input": {
+      "types": "./dist/surface-request-input.d.ts",
+      "default": "./dist/surface-request-input.js"
+    },
+    "./tenant-design-override": {
+      "types": "./dist/tenant-design-override.d.ts",
+      "default": "./dist/tenant-design-override.js"
     },
     "./service-recording-session": {
       "types": "./dist/service-recording-session.d.ts",

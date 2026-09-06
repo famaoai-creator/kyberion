@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 import {
   findDuplicatePackageExportKeys,
+  findUnexportedCoreSubpathImports,
   readPackagingTextFile,
 } from './check_packaging_contract.js';
 
@@ -39,6 +40,21 @@ describe('check_packaging_contract', () => {
 }`;
 
     expect(findDuplicatePackageExportKeys(raw)).toEqual([]);
+  });
+
+  it('detects production imports that are absent from the package exports map', () => {
+    expect(
+      findUnexportedCoreSubpathImports(
+        [
+          { path: 'satellites/example.ts', source: "import { ok } from '@agent/core/ok';" },
+          {
+            path: 'satellites/missing.ts',
+            source: "import { missing } from '@agent/core/missing.js';",
+          },
+        ],
+        new Set(['./ok'])
+      )
+    ).toEqual(['./missing <- satellites/missing.ts']);
   });
 
   it('rejects a directory replacement before packaging policy parsing', () => {
