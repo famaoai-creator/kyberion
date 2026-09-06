@@ -23969,3 +23969,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Nexus daemon の stimuli JSONL reader、SX-03／SX-08／SX-09
 - **変更**: stimuli の参照経路を手書きの本文分割・行 parser から foundation `readJsonLines` へ統一した。既存のGUSP shape validation、malformed／schema-invalid行のskip、operation-timeのregular-file boundaryは維持し、status更新経路では共通readerのraw line callbackで壊れた行を原文のまま再出力する契約を保持した。pending／injected projectionは同じ正規化readerを共有する。
 - **検証**: Nexus daemon／stimulus parser **2 files／9 tests passed**、対象ESLint、Prettier、foundation adoption、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1795
+
+- **対象**: Chronos intelligence observations の JSONL projection、SX-03／SX-09
+- **変更**: orchestration event／control action／owner summary の4つの手書き行分割・JSON parseを、regular-file boundary確認後の foundation `readJsonLines`へ統一した。malformed／primitive／array rowのskip、symlink拒否、event projection／lifecycle dedupe／sort・limit semanticsは維持し、browser sessionの単一JSON読込はJSONL readerの責務外として変更していない。
+- **検証**: intelligence observations **3 files／7 tests passed**、対象ESLint、Prettier、foundation adoption、`git diff --check`。全体typecheckは既存のPresence Studio boundary testの型エラー1件のみで停止した。

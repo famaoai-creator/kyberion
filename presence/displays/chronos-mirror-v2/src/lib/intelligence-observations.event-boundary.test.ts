@@ -43,4 +43,32 @@ describe('intelligence observation event resource boundary', () => {
     expect(collectControlActionDetails({ observationFiles: [linked] })).toEqual({});
     expect(collectOwnerSummaries({ observationFiles: [linked] })).toEqual([]);
   });
+
+  it('skips malformed and non-object JSONL rows while projecting valid events', () => {
+    const file = path.join(root, 'events.jsonl');
+    safeMkdir(root, { recursive: true });
+    safeWriteFile(
+      file,
+      [
+        '{',
+        '[]',
+        JSON.stringify({
+          decision: 'mission_orchestration_event_enqueued',
+          event_type: 'mission_control_requested',
+          event_id: 'valid-action',
+          mission_id: 'mission-1',
+          requested_by: 'operator',
+          ts: '2099-01-01T00:00:00.000Z',
+          payload: { operation: 'pause' },
+        }),
+      ].join('\n') + '\n'
+    );
+
+    expect(collectRecentEvents({ observationFiles: [file] })).toEqual([
+      expect.objectContaining({ decision: 'mission_orchestration_event_enqueued' }),
+    ]);
+    expect(collectControlActions({ observationFiles: [file] })).toEqual([
+      expect.objectContaining({ event_id: 'valid-action', status: 'queued' }),
+    ]);
+  });
 });
