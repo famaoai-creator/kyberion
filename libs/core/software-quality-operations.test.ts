@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from './path-resolver.js';
 import { registerReasoningBackend, resetReasoningBackend } from './reasoning-backend.js';
-import { safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { SoftwareQualityContract, TestInventory } from './software-quality.js';
 import {
   compileTestInventoryToAdf,
@@ -299,6 +299,12 @@ describe('software quality operations', () => {
       ].join('\n') + '\n'
     );
     expect(defectCurrentStatus('DEF-3', defectPath)).toBe('candidate');
+  });
+
+  it('treats a directory at the defect event path as an empty history', () => {
+    safeMkdir(defectPath, { recursive: true });
+
+    expect(defectCurrentStatus('DEF-DIRECTORY', defectPath)).toBeNull();
   });
 
   it('graduates enforcement from report-only through warn to blocking', () => {
