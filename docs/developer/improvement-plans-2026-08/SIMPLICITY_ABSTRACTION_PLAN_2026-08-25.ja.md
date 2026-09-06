@@ -23441,3 +23441,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/reasoning_config.ts`、`scripts/reasoning_config.entrypoint.test.ts`、PI-03
 - **変更**: reasoning configのprevious route config本文readを`readReasoningConfigTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをbackup／history mutation判定へ到達させないようにした。既存のdry-run、revision、governance action semanticsは維持した。
 - **検証**: reasoning config **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1707
+
+- **対象**: `scripts/report-review/stamp.ts`、`scripts/report-review/stamp.test.ts`、PI-03
+- **変更**: report-review stampのtarget HTML本文readを`readReportReviewStampTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをreview layer add/remove判定へ到達させないようにした。既存のdry-run、check、offline file:// semanticsは維持した。
+- **検証**: report-review stamp **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
