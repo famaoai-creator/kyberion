@@ -869,6 +869,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 の direct-loader inventory から、ADF repair の pipeline schema read 前へ `assertRegularAdfResource` 境界を追加し、directory replacement を repair prompt の schema readへ到達させない回帰を追加した。関連 **2 files / 19 tests passed**、Prettier、`git diff --check`で確認した。needs-review の個別確認と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、project mission ledger の Markdown removal read 前へ operation-time の regular-file 検査を追加し、directory replacement を ledger removal に到達させない回帰を追加した。関連 **2 files / 7 tests passed**、Prettier、`git diff --check`で確認した。needs-review の個別確認と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: SX-13 の knowledge frontmatter 再監査として、content-first の diagram renderer README を明示 exclusion に追加し、exclusion 外の Markdown に YAML frontmatter を要求する knowledge-index generator gate と回帰テストを追加した。関連 **3 files / focused 1 test passed**、frontmatter gate scan、Prettier、`git diff --check`で確認した。generator `--check` は既存の未コミット `knowledge/_integrity-manifest.json` 差分のみを報告した。完了計画の archive 移動と provider 実機受入は継続課題である。
+- 2026-09-06: SX-13 の計画 metadata checker を root package script `check:improvement-plan-metadata` へ登録し、335 文書の `title/tags/last_updated/status` 検査を正規入口へ接続した。checker 本体の実行、Prettier、`git diff --check`で確認した。`pnpm run` は既存 worktree の依存再構築が DNS 制約で停止したため、package entrypoint の再実行は環境復旧後の受入課題とする。完了計画の archive 移動と provider 実機受入も継続課題である。
 
 ## 7. 検証コマンド(実装時)
 
