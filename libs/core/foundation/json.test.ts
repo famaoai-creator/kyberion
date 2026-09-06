@@ -194,13 +194,28 @@ describe('foundation JSONL reader', () => {
     const errors: string[] = [];
 
     const records = readJsonLines<{ id: number }>('events.jsonl', {
-      onMalformed: (error, lineNumber) => {
-        errors.push(`${lineNumber}:${String(error).slice(0, 12)}`);
+      onMalformed: (error, lineNumber, rawLine) => {
+        errors.push(`${lineNumber}:${rawLine}:${String(error).slice(0, 12)}`);
       },
     });
 
     expect(records).toEqual([{ id: 1 }]);
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatch(/^2:/);
+    expect(errors[0]).toMatch(/^2:not-json:/);
+  });
+
+  it('passes the original raw line to domain mappers', () => {
+    files.set('events.jsonl', '{"id":1}\n  {"id":2}  \n');
+    const rawLines: string[] = [];
+
+    expect(
+      readJsonLines<{ id: number }>('events.jsonl', {
+        map: (value, _lineNumber, rawLine) => {
+          rawLines.push(rawLine);
+          return value as { id: number };
+        },
+      })
+    ).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(rawLines).toEqual(['{"id":1}', '  {"id":2}  ']);
   });
 });

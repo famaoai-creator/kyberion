@@ -1,6 +1,6 @@
-import { parseSafeJsonInput } from './foundation/json.js';
+import { parseSafeJsonInput, readJsonLines } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExec } from './secure-io.js';
+import { safeExec, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
 import {
@@ -11,7 +11,7 @@ import {
 import { createHash } from 'node:crypto';
 import {
   appendOpsAlertLogRecord,
-  readOpsAlertLogText,
+  ensureRegularOpsAlertLogFile,
   resolveOpsAlertLogPath,
   validateOpsAlertLogRecord,
 } from './ops-alert-log.js';
@@ -290,6 +290,32 @@ function classifyOpsAlertRecord(raw: Record<string, unknown>): OpsAlertLogRecord
   return 'unknown';
 }
 
+function buildParsedOpsAlertRecord(
+  raw: Record<string, unknown>,
+  rawLine: string
+): ParsedOpsAlertRecord {
+  const tsSource =
+    typeof raw.timestamp === 'string' ? raw.timestamp : typeof raw.ts === 'string' ? raw.ts : '';
+  const timestampMs = tsSource ? Date.parse(tsSource) : Number.NaN;
+  const trimmed = rawLine.trim();
+  return {
+    ref: typeof raw.id === 'string' && raw.id ? raw.id : fingerprintOpsAlertLine(trimmed),
+    kind: classifyOpsAlertRecord(raw),
+    timestampMs: Number.isFinite(timestampMs) ? timestampMs : null,
+    raw,
+  };
+}
+
+function buildUnknownOpsAlertRecord(rawLine: string): ParsedOpsAlertRecord {
+  const trimmed = rawLine.trim();
+  return {
+    ref: fingerprintOpsAlertLine(trimmed),
+    kind: 'unknown',
+    timestampMs: null,
+    raw: { unparsable_line: trimmed.slice(0, 200) },
+  };
+}
+
 export function parseOpsAlertLog(
   rawContent: string,
   sourcePath = '<memory>'
@@ -312,23 +338,30 @@ export function parseOpsAlertLog(
       });
       continue;
     }
-    const tsSource =
-      typeof raw.timestamp === 'string' ? raw.timestamp : typeof raw.ts === 'string' ? raw.ts : '';
-    const timestampMs = tsSource ? Date.parse(tsSource) : Number.NaN;
-    records.push({
-      ref: typeof raw.id === 'string' && raw.id ? raw.id : fingerprintOpsAlertLine(trimmed),
-      kind: classifyOpsAlertRecord(raw),
-      timestampMs: Number.isFinite(timestampMs) ? timestampMs : null,
-      raw,
-    });
+    records.push(buildParsedOpsAlertRecord(raw, trimmed));
   }
   return records;
 }
 
 export function readOpsAlertLogRecords(alertLogPath?: string): ParsedOpsAlertRecord[] {
-  const loaded = readOpsAlertLogText(alertLogPath ?? defaultAlertLogPath());
-  if (!loaded) return [];
-  return parseOpsAlertLog(loaded.text, loaded.path);
+  const safeFilePath = resolveOpsAlertLogPath(alertLogPath ?? defaultAlertLogPath());
+  if (!safeExistsSync(safeFilePath)) return [];
+  ensureRegularOpsAlertLogFile(safeFilePath);
+  const records: ParsedOpsAlertRecord[] = [];
+  readJsonLines(safeFilePath, {
+    // Keep valid and malformed rows in source order. The shared reader returns
+    // valid mapped rows, while the malformed callback is deliberately void.
+    map: (value, _lineNumber, rawLine) => {
+      const raw = validateOpsAlertLogRecord(value, safeFilePath);
+      const record = buildParsedOpsAlertRecord(raw, rawLine);
+      records.push(record);
+      return record;
+    },
+    onMalformed: (_error, _lineNumber, rawLine) => {
+      records.push(buildUnknownOpsAlertRecord(rawLine));
+    },
+  });
+  return records;
 }
 
 interface UndeliveredClassification {

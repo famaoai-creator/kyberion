@@ -23957,3 +23957,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: model cost governance の重複fallback、SX-04
 - **変更**: 一次の `model-cost-registry.json` と同じschema・責務を持つ `model-cost-registry.fallback.json` と、metrics側の二重読込・マージ経路を廃止した。一次カタログが欠落・不正な場合は、料金データを推測せずゼロレートへfail-closedし、observabilityの呼出し自体は継続できるようにした。catalog contract と integrity manifest からも削除した。
 - **検証**: metrics cost **1 file／4 tests passed**、対象ESLint、Prettier、`git diff --check`。一次カタログのschema／既知モデル料金解決は維持確認する。
+
+## 2026-09-06 再レビュー実装 1793
+
+- **対象**: ops-alert triage の persisted JSONL reader、SX-03／SX-09
+- **変更**: foundation `readJsonLines` のmapper／malformed callbackへ原文行を渡せるようにし、ops-alertのファイル読込を手書きの本文分割・parseから共通readerへ移行した。schema-invalid／malformed行のunknown化、fingerprint、source order、regular-file boundary、in-memory parserの互換性は維持し、不要になった専用text loaderを削除した。
+- **検証**: foundation JSON／ops-alert **2 files／29 tests passed**、対象ESLint、Prettier、foundation adoption、`git diff --check`。
