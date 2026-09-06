@@ -23339,3 +23339,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_ux_contract_docs.ts`、`scripts/check_ux_contract_docs.test.ts`、PI-03
 - **変更**: UX contract docs checkerのpublic document本文readを`readUxContractDocsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをplain-language／surface tagline判定へ到達させないようにした。既存のfront-door、vocabulary、surface role semanticsは維持した。
 - **検証**: UX contract docs **2 files／3 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1690
+
+- **対象**: `scripts/check_wire_error_boundary.ts`、`scripts/check_wire_error_boundary.test.ts`、PI-02／PI-03
+- **変更**: wire error boundary checkerのnetwork-facing source本文readを`readWireErrorBoundaryTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをraw exception exposure判定へ到達させないようにした。既存のwire error pattern semanticsは維持した。
+- **検証**: wire error boundary **2 files／9 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。

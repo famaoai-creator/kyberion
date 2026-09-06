@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { findWireErrorBoundaryViolations } from './check_wire_error_boundary.js';
+import {
+  findWireErrorBoundaryViolations,
+  readWireErrorBoundaryTextFile,
+} from './check_wire_error_boundary.js';
 
 describe('wire error boundary checker', () => {
   it('uses the foundation text reader for wire-facing source files', () => {
@@ -10,7 +13,14 @@ describe('wire error boundary checker', () => {
       }) || ''
     );
     expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain('readWireErrorBoundaryTextFile(filePath: string)');
     expect(source).not.toContain('safeReadFile(');
+  });
+
+  it('rejects a directory before reading a wire-facing source file', () => {
+    expect(() => readWireErrorBoundaryTextFile(pathResolver.rootResolve('presence'))).toThrow(
+      'must be a regular file'
+    );
   });
 
   it('rejects raw exception interpolation in a wire text response', () => {
