@@ -74,7 +74,14 @@ describe('meeting-to-value contract', () => {
           tier: 'confidential',
           status: 'active',
           assigned_persona: 'operator',
-          git: { checkpoints: [] },
+          // mission-state.json is now loaded through a schema-validated
+          // governed catalog; a fixture missing these required fields fails
+          // closed, so listMissionSummaries never sees the mission and the
+          // reminder sweep scans nothing.
+          execution_mode: 'local',
+          priority: 3,
+          confidence_score: 1.0,
+          git: { branch: 'main', start_commit: '', latest_commit: '', checkpoints: [] },
           history: [
             {
               ts: new Date().toISOString(),
@@ -124,7 +131,10 @@ describe('meeting-to-value contract', () => {
     );
     expect(pipeline.steps?.map((step) => step.id)).toEqual([
       'open_log',
-      'read_transcript',
+      // 1ffdae2ea (pipeline v2.1) replaced the plain system:read_file
+      // `read_transcript` step with meeting:normalize_transcript, which adds
+      // VTT/SRT cue parsing and speaker normalization on intake.
+      'normalize_transcript',
       'draft_minutes',
       'write_minutes',
       'extract_action_items',
