@@ -9,7 +9,7 @@
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineCatalog, readTextFile } from '@agent/core/foundation';
-import { safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -43,6 +43,13 @@ const policyCatalog = defineCatalog<Policy>({
   path: () => pathResolver.rootResolve(POLICY_PATH),
   schema: pathResolver.knowledge('product/schemas/tier-hygiene-policy.schema.json'),
 });
+
+export function readTierHygieneTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 async function loadPolicy(): Promise<Policy> {
   return policyCatalog.load();
@@ -237,7 +244,7 @@ export function scanPersistentTierFixturePollution(root: string, files: string[]
   for (const rel of targets) {
     let content: string;
     try {
-      content = readTextFile(path.join(root, rel));
+      content = readTierHygieneTextFile(path.join(root, rel));
     } catch {
       // Fail-open: an unreadable file is not this check's concern.
       continue;
@@ -315,7 +322,7 @@ export async function scan(): Promise<Violation[]> {
     const absolute = path.join(root, rel);
     let content: string;
     try {
-      content = readTextFile(absolute);
+      content = readTierHygieneTextFile(absolute);
     } catch {
       continue;
     }
