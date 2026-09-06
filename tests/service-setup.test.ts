@@ -27,6 +27,59 @@ vi.mock('@agent/core', async (importOriginal) => {
   };
 });
 
+// scripts/services_setup.ts imports these directly from their submodules
+// (SX simplicity abstraction pass, commit a877d9c12) rather than the
+// aggregate `@agent/core` entry point mocked above, so the fixtures above
+// never reached the real call sites — mock the actual import sites too.
+vi.mock('@agent/core/service-endpoint-registry', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
+  };
+});
+
+vi.mock('@agent/core/service-validator', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    inspectServiceAuth: mocks.inspectServiceAuth,
+  };
+});
+
+vi.mock('@agent/core/core', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    logger: mocks.logger,
+  };
+});
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    safeExistsSync: mocks.safeExistsSync,
+  };
+});
+
+vi.mock('@agent/core/path-resolver', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    pathResolver: { ...(actual as any).pathResolver, rootDir: mocks.rootDir },
+  };
+});
+
+vi.mock('@agent/core/customer-resolver', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    resolveOverlay: mocks.resolveOverlay,
+    overlayCandidates: mocks.overlayCandidates,
+  };
+});
+
 describe('services_setup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
