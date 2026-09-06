@@ -23741,3 +23741,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: environment capability の audit-chain JSONL probe、SX-03／SX-07
 - **変更**: audit-chain integrity probe の行単位読み込みを手書き `readTextFile` + `parseSafeJsonInput` から foundation `readJsonLines`へ統一した。regular-file boundary、空行処理、行番号付き malformed／shape error、fail-closed probe result、監査エントリの既存 validation semanticsは維持した。
 - **検証**: environment capability probe **3 files／73 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption gate、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1757
+
+- **対象**: browser extension observation の persisted JSONL loader、SX-03／SX-09
+- **変更**: per-procedure observation store の読み込みを手書き `readTextFile` + 行ごとの `parseSafeJsonInput` から foundation `readJsonLines`へ統一した。size／regular-file／symlink boundary、malformed／schema-invalid row skip、limit projection、PII redaction／append semanticsは維持し、valid rowと破損 row混在の回帰テストを追加した。
+- **検証**: browser extension observation **3 files／12 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption gate、`git diff --check`。
