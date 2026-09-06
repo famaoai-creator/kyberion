@@ -15,11 +15,12 @@
       { "check": "command -v node", "install_hint": "Install Node.js 20+" },
       { "check": "command -v pnpm", "install_hint": "npm install -g pnpm" }
     ],
-    "one_time_setup": [
-      "cd ${KYBERION_REPO_PATH} && pnpm install && pnpm build"
-    ],
+    "one_time_setup": ["cd ${KYBERION_REPO_PATH} && pnpm install && pnpm build"],
     "env_vars_required": [
-      { "name": "KYBERION_REPO_PATH", "description": "Absolute path to the Kyberion repository root" }
+      {
+        "name": "KYBERION_REPO_PATH",
+        "description": "Absolute path to the Kyberion repository root"
+      }
     ]
   },
   "expected_tools": [
@@ -28,6 +29,7 @@
     "kyberion.knowledge.search",
     "kyberion.knowledge.cowork_sync",
     "kyberion.capability.list",
+    "kyberion.service.capture",
     "kyberion.mission.create",
     "kyberion.mission.status",
     "kyberion.mission.journal",

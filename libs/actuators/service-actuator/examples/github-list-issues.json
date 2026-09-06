@@ -1,0 +1,22 @@
+{
+  "_comment": "GitHub issue 一覧 — service:preset の capture パターン。",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "list_issues",
+      "role": "source",
+      "op": "service:preset",
+      "produces": { "channel": "issues", "type": "GitHubIssues" },
+      "params": {
+        "service_id": "github",
+        "action": "list_issues",
+        "params": {
+          "owner": "OWNER",
+          "repo": "REPO",
+          "state": "open",
+          "per_page": 20
+        }
+      }
+    }
+  ]
+}

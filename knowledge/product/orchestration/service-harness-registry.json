@@ -613,7 +613,7 @@
       "service_id": "github",
       "display_name": "GitHub REST API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 10,
+      "operation_count": 17,
       "detail_ref": "knowledge/product/orchestration/service-presets/github.json",
       "operations": [
         {
@@ -695,6 +695,62 @@
           "risk": "write",
           "approval_required": true,
           "idempotency": "recommended"
+        },
+        {
+          "action": "list_issues",
+          "description": "Lists issues in a repository. GitHub also includes pull requests in this collection; use list_pulls for PR-only results.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_issue",
+          "description": "Gets a single issue (or a pull request presented as an issue).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_pulls",
+          "description": "Lists pull requests in a repository.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_pull",
+          "description": "Gets a single pull request, including mergeability metadata.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_reviews",
+          "description": "Lists submitted reviews on a pull request.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_review_comments",
+          "description": "Lists review comments (line comments) on a pull request.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_pr_files",
+          "description": "Lists files changed in a pull request.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
         }
       ]
     },
