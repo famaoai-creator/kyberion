@@ -6,6 +6,7 @@ import {
   applyPeerTenantMigrationPlan,
   buildPeerTenantMigrationPlan,
   parsePeerTenantMigrationPlan,
+  readMigrationTextFile,
   runPeerTenantMigration,
   type PeerTenantMigrationRoot,
 } from './migrate_peer_tenant_runtime.js';
@@ -27,6 +28,12 @@ afterEach(() => {
 });
 
 describe('peer tenant runtime migration', () => {
+  it('rejects a directory replacement before migration text parsing', () => {
+    expect(() => readMigrationTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'source must be a regular file'
+    );
+  });
+
   it('rejects malformed or unsafe persisted plans before apply', () => {
     const unsafePlan = {
       format: 'kyberion-peer-tenant-migration-v1',

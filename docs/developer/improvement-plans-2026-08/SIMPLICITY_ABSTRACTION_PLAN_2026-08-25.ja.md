@@ -23177,3 +23177,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/cli.ts`、`scripts/cli.test.ts`、PI-03
 - **変更**: operator CLIのartifact／packet／pipeline preview本文readを`readCliTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpreview・packet parse・artifact表示へ到達させないようにした。既存のpath scope、packet parsing、preview semanticsは維持した。
 - **検証**: operator CLI **2 files／40 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1663
+
+- **対象**: `scripts/migrate_peer_tenant_runtime.ts`、`scripts/migrate_peer_tenant_runtime.test.ts`、PI-03
+- **変更**: peer tenant migrationのplan生成／apply再検証本文readを`readMigrationTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant分割・hash再検証へ到達させないようにした。既存のtenant split、quarantine、migration plan semanticsは維持した。
+- **検証**: peer tenant migration **2 files／6 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
