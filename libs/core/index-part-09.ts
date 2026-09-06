@@ -36,6 +36,8 @@ export * from './surface-delivery.js';
 
 export * from './surface-mutation-guard.js';
 
+export * from './surface-request-input.js';
+
 export * from './ceo-surface-summary.js';
 
 export * from './mic-capture.js';

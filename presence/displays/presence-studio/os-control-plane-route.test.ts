@@ -35,9 +35,7 @@ describe('Presence Studio OS control-plane route contract', () => {
     expect(route).toContain('resolvePresenceStudioViewerContext(req)');
     expect(route).toContain('cloudflareOsSurface.snapshot(');
     expect(route).toContain("res.setHeader('Cache-Control', 'private, no-store')");
-    expect(route).toContain(
-      "typeof rawMissionId === 'string' ? rawMissionId : undefined,\n      access"
-    );
+    expect(route).toContain('readSurfaceStringParam(rawMissionId)');
     expect(route).not.toContain('error: error?.message || String(error)');
     expect(decisionRoute).toMatch(/decideHeldAction\(\s*actionId,\s*decision,\s*access\s*\)/u);
     expect(decisionRoute).toContain('readPresenceStudioStringParam(req.params.actionId)');
