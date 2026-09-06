@@ -1,13 +1,7 @@
-import {
-  safeReadFile,
-  safeWriteFile,
-  safeExec,
-  safeExistsSync,
-  safeMkdir,
-} from '@agent/core/secure-io';
+import { safeWriteFile, safeExec, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
-import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import { ledger } from '@agent/core/ledger';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
@@ -72,10 +66,7 @@ function loadRegistry(): KeychainRegistry {
     return { entries: [] };
   }
   try {
-    return parseSafeJsonInput(
-      withVaultIo(() => safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' })) as string,
-      'secret keychain registry'
-    ) as KeychainRegistry;
+    return withVaultIo(() => readJson<KeychainRegistry>(KEYCHAIN_REGISTRY_PATH));
   } catch {
     return { entries: [] };
   }
