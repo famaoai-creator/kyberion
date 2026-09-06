@@ -22614,6 +22614,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Slack approval／mission proposal の contract label、approval control、mission confirmation、fallback に残っていた日英直書きを bridge vocabulary と `SupportedLocale` に接続した。Slack bridge は `resolveOperatorLocale()` を builderへ渡し、省略時の既存互換表示、approval／proposal state、`shouldSend`／external delivery semantics は維持した。
 - **検証**: Slack approval／proposal／surface agent **4 files／34 tests passed**、root typecheck、Prettier、`git diff --check`。12 surface の全面 contract 描画、provider 実機依存、package scripts／framework-specific request parsing の削減は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1576
+
+- **対象**: `libs/core/channel-adapter.ts`、`libs/core/channel-adapter.test.ts`、4 bridge、SX-08b／SX-09b
+- **変更**: text-only contract projectionのlocaleを本文の日本語文字判定だけでなく `ChannelTurnInput.locale` から指定できるようにした。Slack／Telegram／Discord／iMessage が `resolveOperatorLocale()` を共通formatterへ渡し、thread contextとcontract labelsのlocaleを統一した。既存の推定fallback、delivery gate、approval semanticsは維持した。
+- **検証**: channel adapter／4 bridge **5 files／51 tests passed**、root typecheck、Prettier、`git diff --check`。12 surface の全面 contract 描画、provider 実機依存、package scripts／framework-specific request parsing の削減は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`

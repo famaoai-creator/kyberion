@@ -246,7 +246,12 @@ export function runSlackChannelTurn(
 ): Promise<SurfaceConversationResult> {
   return runChannelTurn(
     adapter,
-    { text: request.text, channel: request.channel, threadTs: request.threadTs },
+    {
+      text: request.text,
+      channel: request.channel,
+      threadTs: request.threadTs,
+      locale: resolveOperatorLocale(),
+    },
     ({ threadContext }) =>
       runSurfaceMessageConversation({
         surface: 'slack',

@@ -349,7 +349,12 @@ export async function handleDiscordMessage(message: Message) {
   try {
     await runChannelTurn(
       channelAdapter,
-      { text: message.content, channel: message.channelId, threadTs },
+      {
+        text: message.content,
+        channel: message.channelId,
+        threadTs,
+        locale: resolveOperatorLocale(),
+      },
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'discord',

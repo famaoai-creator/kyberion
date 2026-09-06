@@ -365,3 +365,13 @@ Slack の approval／mission proposal UI に残っていた contract label、app
 
 検証: Slack approval／proposal／surface agent **4 files／34 tests passed**、root typecheck、Prettier、
 `git diff --check`。framework-specific request parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 34
+
+共通 `ChannelAdapter` の text-only contract projection を再監査し、本文の言語推定だけに依存していた locale
+決定を `ChannelTurnInput.locale` へ拡張した。4 bridgeがoperator localeを共通formatterへ渡し、thread contextと
+approval／clarification contract labelsが同じlocaleで描画されるようにした。既存のdelivery gate、current message
+除外、provider配送semanticsは維持している。
+
+検証: channel adapter／4 bridge **5 files／51 tests passed**、root typecheck、Prettier、`git diff --check`。
+framework-specific request parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。

@@ -688,7 +688,7 @@ export async function handleTelegramUpdate(
   try {
     conversation = await runChannelTurn(
       channelAdapter,
-      { text, channel: chatId, threadTs },
+      { text, channel: chatId, threadTs, locale: resolveOperatorLocale() },
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'telegram',

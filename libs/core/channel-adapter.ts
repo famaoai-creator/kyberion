@@ -15,6 +15,7 @@ export interface ChannelTurnInput {
   text: string;
   channel: string;
   threadTs: string;
+  locale?: SupportedLocale;
   metadata?: Record<string, unknown>;
   attachments?: SurfaceConversationAttachment[];
   scope?: EventScopeInput;
@@ -84,7 +85,7 @@ export type ChannelTurnConversation = (
  */
 export function formatChannelTurnText(
   result: SurfaceConversationResult,
-  options: { includeContract?: boolean } = {}
+  options: { includeContract?: boolean; locale?: SupportedLocale } = {}
 ): string {
   const text = result.text.trim();
   const contract = result.intentResolution;
@@ -96,7 +97,8 @@ export function formatChannelTurnText(
   if (!text || !contract || !includeContract || !contractNeedsOperatorAttention) {
     return result.text;
   }
-  const locale = /[ぁ-んァ-ン一-龯]/u.test(text) ? ('ja' as const) : ('en' as const);
+  const locale =
+    options.locale ?? (/[ぁ-んァ-ン一-龯]/u.test(text) ? ('ja' as const) : ('en' as const));
   const labels = {
     understanding: t('bridge:contract_understanding', undefined, locale),
     missingInput: t('bridge:contract_missing_input', undefined, locale),
@@ -174,7 +176,7 @@ export async function runChannelTurn(
     });
     const deliveredResult = {
       ...result,
-      text: formatChannelTurnText(result),
+      text: formatChannelTurnText(result, { locale: input.locale }),
     };
     const deliveryMessage = {
       text: deliveredResult.text,
