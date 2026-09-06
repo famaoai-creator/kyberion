@@ -23141,3 +23141,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_entity_governance.ts`、`scripts/check_entity_governance.entrypoint.test.ts`、PI-03
 - **変更**: entity governance checkerの改善計画status／`.gitignore`本文readを`readEntityGovernanceTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant／retention／git boundary判定へ到達させないようにした。既存のdrift／warning semanticsは維持した。
 - **検証**: entity governance reader **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1657
+
+- **対象**: `scripts/check_first_win_smoke.ts`、`scripts/check_first_win_smoke.test.ts`、PI-03
+- **変更**: first-win smoke checkerのcanonical document／required-token本文readを`readFirstWinTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfirst-win受入判定へ到達させないようにした。ADF validationとweekly dry-run semanticsは維持した。
+- **検証**: first-win smoke **2 files／7 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
