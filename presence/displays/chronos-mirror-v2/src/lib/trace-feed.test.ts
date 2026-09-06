@@ -209,6 +209,14 @@ describe('trace-feed', () => {
     expect(collectTraceDetail('trace-linked', { dir: TEST_DIR })).toBeNull();
   });
 
+  it('fails closed when a discovered trace file is replaced by a directory', () => {
+    resetTestDir();
+    const tracePath = path.join(TEST_DIR, 'traces-2026-05-30.jsonl');
+    safeMkdir(tracePath, { recursive: true });
+
+    expect(collectTraceFeed({ dir: TEST_DIR })).toEqual([]);
+  });
+
   it('collects a detailed trace by trace id', () => {
     resetTestDir();
     safeWriteFile(
