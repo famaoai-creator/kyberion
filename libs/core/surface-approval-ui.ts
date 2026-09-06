@@ -20,6 +20,7 @@ import {
   renderIntentOutcomeLabel,
   type IntentResolutionContract,
 } from './intent-resolution-contract.js';
+import type { SupportedLocale } from './locale-normalize.js';
 import { t } from './t.js';
 
 /** MO-11 S-2: `brief` = the mission-brief HTML review surface (report-review). */
@@ -80,9 +81,10 @@ export function createSurfaceApprovalRequest(params: {
 export function buildSurfaceApprovalText(
   surface: SurfaceApproval,
   record: ApprovalRequestRecord,
-  intentResolution?: IntentResolutionContract
+  intentResolution?: IntentResolutionContract,
+  options: { locale?: SupportedLocale } = {}
 ): string {
-  const locale = 'ja' as const;
+  const locale = options.locale ?? 'ja';
   return [
     t('bridge:approval_heading', { surface }, locale),
     `${t('bridge:approval_title_label', undefined, locale)}: ${record.title}`,

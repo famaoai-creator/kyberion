@@ -430,6 +430,7 @@ export function stashMissionProposalForConfirmation(params: {
   routingDecision?: AgentRoutingDecision;
   fallbackSummary?: string;
   intentResolution?: IntentResolutionContract;
+  locale?: SupportedLocale;
 }): string {
   saveMissionProposalState({
     surface: params.surface,
@@ -441,18 +442,20 @@ export function stashMissionProposalForConfirmation(params: {
   });
   const summary =
     String(params.proposal.summary || params.fallbackSummary || '').trim() ||
-    t('bridge:mission_proposal_fallback', undefined, 'ja');
+    t('bridge:mission_proposal_fallback', undefined, params.locale ?? 'ja');
   return buildMissionProposalConfirmationText({
     summary,
     intentResolution: params.intentResolution,
+    locale: params.locale,
   });
 }
 
 export function buildMissionProposalConfirmationText(params: {
   summary: string;
   intentResolution?: IntentResolutionContract;
+  locale?: SupportedLocale;
 }): string {
-  const locale = 'ja' as const;
+  const locale = params.locale ?? 'ja';
   return [
     `${params.summary}\n${t('bridge:mission_proposal_confirmation_choices', undefined, locale)}`,
     ...(params.intentResolution
