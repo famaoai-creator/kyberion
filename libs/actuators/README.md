@@ -1,15 +1,18 @@
 # Kyberion Actuators (The Physical Engines)
 
 ## 1. Overview
+
 Actuators are the generic, high-fidelity execution engines of the Kyberion ecosystem. They serve as the physical interface between the agent's logic (Procedures) and reality (Filesystem, Network, OS, Blockchain).
 
 ## 2. Design Principles
-- **Agnostic Logic**: Actuators only know *how* to execute a specific class of physical actions based on ADF (Agentic Data Format).
+
+- **Agnostic Logic**: Actuators only know _how_ to execute a specific class of physical actions based on ADF (Agentic Data Format).
 - **Capability Manifest**: Each Actuator self-declares its canonical public operations, platforms, and binary requirements via `manifest.json`.
 - **Canonical Contract First**: Compatibility handlers may remain in code during migration, but `manifest.json` should expose only the recommended public `op` surface.
 - **High Fidelity**: Provides immutable evidence (hashes, signatures) for every action taken.
 
 ## 3. The Actuators (Core Nine)
+
 1. **Code-Actuator**: Logic analysis, refactoring, and testing.
 2. **File-Actuator**: Advanced file I/O and discovery.
 3. **Network-Actuator**: Secure API communications.
@@ -21,12 +24,19 @@ Actuators are the generic, high-fidelity execution engines of the Kyberion ecosy
 9. **Blockchain-Actuator**: **[NEW]** Immutable anchoring of mission evidence and trust scores.
 
 ## 4. Implementation Status & Capabilities
-Use the following command to check the actual status in your current environment:
+
+Use the following command to check the actual status in your current environment (works without `pnpm build`; scans manifests via the TypeScript entry):
+
 ```bash
 pnpm capabilities
 ```
 
+`pnpm kyberion list` uses the same discovery path when `dist/` is missing. Runtime execution (`pnpm pipeline`, `pnpm kyberion run`) still needs `pnpm build`.
+
+For Slack (conversation vs presence vs API) see [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../../docs/SLACK_CHANNEL_ROUTES.ja.md). The current catalog is 32 manifest-backed actuators — see [`CAPABILITIES_GUIDE.md`](../../CAPABILITIES_GUIDE.md) rather than the historical "Core Nine" list below.
+
 ## 5. Example Entry Points
+
 Sample inputs for individual actuators live under each actuator's `examples/` directory.
 
 - `libs/actuators/approval-actuator/examples/`
@@ -39,4 +49,5 @@ Sample inputs for individual actuators live under each actuator's `examples/` di
 - `libs/actuators/modeling-actuator/examples/`
 
 ---
-*Last Updated: 2026-03-11*
+
+_Last Updated: 2026-03-11_

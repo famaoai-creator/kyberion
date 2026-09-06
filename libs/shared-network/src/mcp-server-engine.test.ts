@@ -28,6 +28,7 @@ const {
   mockListApprovalRequests,
   mockLoadApprovalRequest,
   mockComputeApprovalPayloadHash,
+  mockExecuteServicePreset,
   registeredTools,
 } = vi.hoisted(() => {
   const registeredTools = new Map<
@@ -60,6 +61,7 @@ const {
     mockListApprovalRequests: vi.fn().mockReturnValue([]),
     mockLoadApprovalRequest: vi.fn(),
     mockComputeApprovalPayloadHash: vi.fn().mockReturnValue('payload-hash'),
+    mockExecuteServicePreset: vi.fn(),
     registeredTools,
   };
 });
@@ -137,6 +139,16 @@ vi.mock('@agent/core/approval-cowork-adapter.js', () => ({
 vi.mock('@agent/core/cowork-knowledge-bridge.js', () => ({
   runCoworkKnowledgeSync: mockRunCoworkKnowledgeSync,
 }));
+
+vi.mock('@agent/core/service-engine', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/service-engine')>(
+    '@agent/core/service-engine'
+  );
+  return {
+    ...actual,
+    executeServicePreset: mockExecuteServicePreset,
+  };
+});
 
 // ── Mock MCP SDK (server side) ────────────────────────────────────────────────
 vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
@@ -220,6 +232,7 @@ const governedToolNames = [
   'kyberion.approval.decide',
   'kyberion.audit.export',
   'kyberion.audit.verify',
+  'kyberion.service.capture',
   'kyberion.service.actuate',
 ];
 
@@ -713,6 +726,43 @@ describe('createKyberionMcpServer()', () => {
         { actuator: 'meeting-actuator', ops: ['join'] },
       ]);
       expect(mockSafeExec).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('kyberion.service.capture', () => {
+    it('runs a GitHub capture preset without the write-actuate gate', async () => {
+      mockExecuteServicePreset.mockResolvedValue({ issues: [{ number: 1 }] });
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.service.capture')!.handler;
+      const result = await handler({
+        service_id: 'github',
+        action: 'list_issues',
+        params: { owner: 'famaoai', repo: 'kyberion' },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(JSON.parse(result.content[0].text)).toEqual({ issues: [{ number: 1 }] });
+      expect(mockExecuteServicePreset).toHaveBeenCalledWith(
+        'github',
+        'list_issues',
+        { owner: 'famaoai', repo: 'kyberion' },
+        'secret-guard'
+      );
+    });
+
+    it('rejects write operations and does not execute them', async () => {
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.service.capture')!.handler;
+      const result = await handler({
+        service_id: 'github',
+        action: 'create_issue',
+        params: { owner: 'famaoai', repo: 'kyberion', title: 'nope' },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent?.ok).toBe(false);
+      expect(mockExecuteServicePreset).not.toHaveBeenCalled();
     });
   });
 
