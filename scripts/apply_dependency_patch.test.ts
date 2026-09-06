@@ -12,6 +12,7 @@ import {
 import {
   applyDependencyPatch,
   bumpDependencySpec,
+  readDependencyPatchTextFile,
   type PatchCommandResult,
   type PatchExecRunner,
 } from './apply_dependency_patch.js';
@@ -91,6 +92,12 @@ afterEach(() => {
 });
 
 describe('bumpDependencySpec', () => {
+  it('rejects a directory replacement before backup parsing', () => {
+    expect(() => readDependencyPatchTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('preserves the range operator and finds devDependencies', () => {
     const pkg = readRootPackage();
     expect(bumpDependencySpec(pkg, 'leftpad', '1.0.1')).toEqual({

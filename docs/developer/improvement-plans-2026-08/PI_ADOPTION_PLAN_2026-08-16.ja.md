@@ -900,6 +900,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、AI auditのinvariant／scope対象本文readを`readAiAuditTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをaudit prompt／scope contentへ到達させない回帰を追加した。関連 **2 files／11 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、storage governance scenarioのtenant mirror／process log本文readを`readScenarioTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをscenarioの監査・process log解析へ到達させない回帰を追加した。関連 **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、sovereign dashboardのorchestration／owner summary本文readを`readDashboardTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをdashboard event解析へ到達させない回帰を追加した。関連 **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、dependency patch apply時のpackage manifest backup本文readを`readDependencyPatchTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpatch backup・rollback処理へ到達させない回帰を追加した。関連 **2 files／13 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 

@@ -23213,3 +23213,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/sovereign_dashboard.ts`、`scripts/sovereign_dashboard.test.ts`、PI-03
 - **変更**: sovereign dashboardのorchestration／owner summary本文readを`readDashboardTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをdashboard event解析へ到達させないようにした。既存のscope filtering、status vocabulary、dashboard rendering semanticsは維持した。
 - **検証**: sovereign dashboard **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1669
+
+- **対象**: `scripts/apply_dependency_patch.ts`、`scripts/apply_dependency_patch.test.ts`、PI-03／PI-12
+- **変更**: dependency patch apply時のpackage manifest backup本文readを`readDependencyPatchTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpatch backup・rollback処理へ到達させないようにした。既存のproposal、gate、rollback semanticsは維持した。
+- **検証**: dependency patch **2 files／13 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
