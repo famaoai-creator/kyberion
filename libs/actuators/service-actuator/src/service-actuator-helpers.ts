@@ -4,13 +4,12 @@ import {
   getRegisteredEnv,
   getRegisteredEnvText,
   isRecord,
-  parseSafeJsonInput,
+  readJsonIfPresent,
   type GovernedCatalog,
 } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   safeExec,
-  safeReadFile,
   safeWriteFile,
   safeExistsSync,
   safeMkdir,
@@ -200,10 +199,8 @@ function serviceResourceId(serviceId: string): string {
 }
 
 function loadPids(): ServicePidRegistry {
-  if (!safeExistsSync(PID_FILE)) return {};
   try {
-    const content = safeReadFile(PID_FILE, { encoding: 'utf8' }) as string;
-    const parsed: unknown = parseSafeJsonInput(content, 'service PID registry');
+    const parsed = readJsonIfPresent<unknown>(PID_FILE);
     return parseServicePidRegistry(parsed) ?? {};
   } catch (_) {
     return {};

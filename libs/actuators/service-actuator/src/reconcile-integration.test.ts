@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleAction } from './index.js';
+import actuatorManifestSchema from '../../../../knowledge/product/schemas/actuator-manifest.schema.json';
 import serviceManifestSchema from '../../../../knowledge/product/schemas/service-manifest.schema.json';
+import serviceActuatorManifest from '../manifest.json';
 
 const mocks = vi.hoisted(() => ({
   resolveServiceBinding: vi.fn(),
@@ -14,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   }),
   safeReadFile: vi.fn(),
   safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeWriteFile: vi.fn(),
   derivePipelineStatus: vi.fn((results: Array<{ status: string }>) =>
     results.every((entry) => entry.status === 'success') ? 'succeeded' : 'failed'
@@ -51,6 +54,7 @@ vi.mock('@agent/core/secure-io', () => ({
   assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
   safeReadFile: mocks.safeReadFile,
   safeExistsSync: mocks.safeExistsSync,
+  safeLstat: mocks.safeLstat,
   safeWriteFile: mocks.safeWriteFile,
   safeMkdir: vi.fn(),
   safeExec: vi.fn(),
@@ -90,6 +94,12 @@ vi.mock('@agent/core/cloudflare-os-control-plane', () => ({
 describe('service-actuator: RECONCILE with auth check', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    mocks.safeReadFile.mockReset();
+    mocks.safeReadFile.mockReturnValue('');
+    mocks.safeExistsSync.mockReset();
+    mocks.safeExistsSync.mockReturnValue(false);
+    mocks.safeLstat.mockReset();
+    mocks.safeLstat.mockReturnValue({ isFile: () => true });
     mocks.retry.mockImplementation(async (fn: () => Promise<unknown>) => fn());
     mocks.derivePipelineStatus.mockImplementation((results: Array<{ status: string }>) =>
       results.every((entry) => entry.status === 'success') ? 'succeeded' : 'failed'
@@ -99,7 +109,11 @@ describe('service-actuator: RECONCILE with auth check', () => {
       loadJson: <T>(filePath: string): T =>
         String(filePath).endsWith('/service-manifest.schema.json')
           ? (serviceManifestSchema as T)
-          : (JSON.parse(String(mocks.safeReadFile(filePath))) as T),
+          : String(filePath).endsWith('/actuator-manifest.schema.json')
+            ? (actuatorManifestSchema as T)
+            : String(filePath).includes('libs/actuators/service-actuator/manifest.json')
+              ? (serviceActuatorManifest as T)
+              : (JSON.parse(String(mocks.safeReadFile(filePath))) as T),
       loadJsonIfPresent: <T>(filePath: string): T | null => {
         try {
           return JSON.parse(String(mocks.safeReadFile(filePath))) as T;
@@ -108,7 +122,9 @@ describe('service-actuator: RECONCILE with auth check', () => {
         }
       },
       appendFile: vi.fn(),
-      exists: (filePath: string) => mocks.safeExistsSync(filePath),
+      exists: (filePath: string) =>
+        String(filePath).includes('libs/actuators/service-actuator/manifest.json') ||
+        mocks.safeExistsSync(filePath),
       readFile: (filePath: string) => String(mocks.safeReadFile(filePath)),
       stat: () => ({ mtimeMs: 0, size: 0 }),
       writeFile: (filePath: string, content: string) => mocks.safeWriteFile(filePath, content),
