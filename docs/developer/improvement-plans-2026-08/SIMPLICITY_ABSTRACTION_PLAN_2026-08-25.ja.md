@@ -23417,3 +23417,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/import_design_md_catalog.ts`、`scripts/import_design_md_catalog.test.ts`、PI-03
 - **変更**: design-md catalog importerのDESIGN.md／README本文readを`readDesignMdCatalogTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをdesign parsing／catalog comparison判定へ到達させないようにした。既存のrepository path gate、metadata parser、dry-run generation semanticsは維持した。
 - **検証**: design-md catalog importer **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1703
+
+- **対象**: `scripts/intent_smoke.ts`、`scripts/intent_smoke.test.ts`、PI-03
+- **変更**: intent smokeのsummary本文readを`readIntentSmokeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをsmoke report outputへ到達させないようにした。既存のintent execution、governed output path、failure aggregation semanticsは維持した。
+- **検証**: intent smoke **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
