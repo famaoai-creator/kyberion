@@ -295,6 +295,7 @@ export function loadStateForRepair(
   const statePath = resolveMissionStatePath(id, options);
   if (!statePath) return null;
   try {
+    if (!safeLstat(statePath).isFile()) return null;
     return readJson<MissionState>(statePath);
   } catch (_) {
     return null;
