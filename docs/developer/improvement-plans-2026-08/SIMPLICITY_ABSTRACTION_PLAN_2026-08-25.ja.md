@@ -24053,3 +24053,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: package export boundary、SX-03／SX-07
 - **変更**: 実行時に使われるcore subpathのうちpackage manifestから漏れていた `foundation/io`／`text`／`governed-catalog`、camera output、prompt cache、surface request、tenant design overrideを公開した。さらに `packaging-contract` gateへproduction sourceの `@agent/core/<subpath>` とpackage exportsの突合を追加し、将来の未公開subpathをCIでfail-closedに検出する。
 - **検証**: core、media／shared-network／calendar／presence／voice／wisdom package build、packaging-contract **5 tests passed**、実workspace **3093 source files／未公開subpath 0件**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1809
+
+- **対象**: package export target boundary、SX-03／SX-07
+- **変更**: `@agent/core/native-pptx-engine/{text-metrics,design-cascade}` のpublic wrapperがcore `tsconfig` の対象外で、宣言済みexport targetがbuild成果物に生成されない残存を修正した。`packaging-contract` gateにtypes/default targetの実在検査も追加し、manifestだけ存在してruntime／型ファイルが欠ける状態を検出する。
+- **検証**: core build、media actuator build、native-pptx public subpath実import、packaging-contract **6 tests passed**、対象ESLint、Prettier、`git diff --check`。

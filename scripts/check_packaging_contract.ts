@@ -117,6 +117,25 @@ export function findDuplicatePackageExportKeys(raw: string): string[] {
   return [...duplicates].sort((left, right) => left.localeCompare(right));
 }
 
+/** Return conditional package export targets that are absent from the build. */
+export function findMissingPackageExportTargets(
+  exportsValue: unknown,
+  existingTargets: ReadonlySet<string>
+): string[] {
+  if (!exportsValue || typeof exportsValue !== 'object' || Array.isArray(exportsValue)) return [];
+  const missing: string[] = [];
+  for (const [subpath, value] of Object.entries(exportsValue)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    for (const field of ['types', 'default']) {
+      const target = (value as Record<string, unknown>)[field];
+      if (typeof target === 'string' && !existingTargets.has(target)) {
+        missing.push(`${subpath}.${field} -> ${target}`);
+      }
+    }
+  }
+  return missing.sort((left, right) => left.localeCompare(right));
+}
+
 function checkPackageExportKeys(): void {
   const packageJson = readPackagingTextFile(
     pathResolver.rootResolve('libs/core/package.json'),
@@ -126,6 +145,36 @@ function checkPackageExportKeys(): void {
     failures.push({
       clause: 'package-export-keys.unique',
       detail: `libs/core/package.json declares export subpath ${key} more than once; duplicate JSON keys are silently overwritten by the last entry.`,
+    });
+  }
+}
+
+function checkPackageExportTargets(): void {
+  const packagePath = pathResolver.rootResolve('libs/core/package.json');
+  const packageJson = parseSafeJsonInput(
+    readPackagingTextFile(packagePath, 'libs/core/package.json'),
+    packagePath
+  );
+  const exportsValue =
+    packageJson && typeof packageJson === 'object' && !Array.isArray(packageJson)
+      ? (packageJson as Record<string, unknown>).exports
+      : undefined;
+  const distPath = pathResolver.rootResolve('libs/core/dist');
+  if (!safeExistsSync(distPath) || !safeLstat(distPath).isDirectory()) return;
+  const existingTargets = new Set<string>();
+  const collect = (directory: string, relative = './dist'): void => {
+    for (const name of safeReaddir(directory)) {
+      const filePath = path.join(directory, name);
+      const stat = safeLstat(filePath);
+      if (stat.isDirectory()) collect(filePath, `${relative}/${name}`);
+      else existingTargets.add(`${relative}/${name}`);
+    }
+  };
+  collect(distPath);
+  for (const target of findMissingPackageExportTargets(exportsValue, existingTargets)) {
+    failures.push({
+      clause: 'package-export-targets.present',
+      detail: `libs/core/package.json exports a target that is absent from the built package (${target}).`,
     });
   }
 }
@@ -233,6 +282,7 @@ export function checkPackagingContract(): ClauseFailure[] {
   failures.length = 0;
   checkImageTierIsolation();
   checkPackageExportKeys();
+  checkPackageExportTargets();
   checkCoreSubpathExports();
   checkNoSecretValues();
   return [...failures];
