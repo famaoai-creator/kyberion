@@ -947,6 +947,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のsurface input再レビューとして、Presence Studioのheld-action decision／apply route paramを`readPresenceStudioRouteParam`のstrict string boundaryへ統一し、配列・オブジェクトの暗黙文字列化を副作用前に拒否する回帰を追加した。既存のlocaladmin、tenant scope、approval、held-action apply semanticsは維持した。関連 **2 files／24 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。隔離環境のroot typecheckは既存の`discord.js`型モジュール欠落で停止した。
 - 2026-09-06: PI-03 のsurface input再レビューとして、Presence Studioのapproval／artifact／task-session dynamic route parameterを`readPresenceStudioRouteParam`のstrict string boundaryへ統一し、配列・オブジェクトの暗黙文字列化をlookup／download／artifact projectionへ到達させない回帰を追加した。既存のresource scope、404、download semanticsは維持した。関連 **3 files／25 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のsurface input再レビューとして、Presence Studioのroute／query string parameterを`readPresenceStudioStringParam`へ抽象化し、knowledge-ref／runtime-refの重複 query 値や object-shaped inputをpath resolverへ到達させない回帰を追加した。既存のallowlist、safe file read、404／403 semanticsは維持した。関連 **3 files／25 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のsurface input再レビューとして、Presence Studio runtime-dataのonboarding voice-sample `profile_id` queryを`readPresenceStudioStringParam`へ接続し、repeated／object-shaped query値をprofile lookup／音声sample保存へ到達させない回帰を追加した。未指定値の空文字化と既存保存契約は維持した。関連 **1 file／3 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 

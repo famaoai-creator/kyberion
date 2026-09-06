@@ -57,6 +57,7 @@ import {
   narrowPresenceStudioTenant,
   presenceStudioHeadlessScope,
   resolvePresenceStudioViewerContext,
+  readPresenceStudioStringParam,
   validateLocalServiceUrl,
 } from './security.js';
 import {
@@ -1068,7 +1069,7 @@ app.post(
   }),
   (req, res) => {
     try {
-      const profileId = String(req.query.profile_id || '').trim();
+      const profileId = readPresenceStudioStringParam(req.query.profile_id) ?? '';
       const data = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
       const result = saveBrowserOnboardingVoiceSample({
         profileId,
