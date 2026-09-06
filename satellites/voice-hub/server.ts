@@ -1122,6 +1122,7 @@ function buildPresenceSurfaceConversationMessageInput(
     forcedReceiver?: string;
     delegationSummaryInstruction?: string;
     surfaceText?: string;
+    locale?: SupportedLocale;
     scope?: EventScopeInput;
   }
 ): Parameters<typeof runSurfaceMessageConversation>[0] {
@@ -1136,6 +1137,7 @@ function buildPresenceSurfaceConversationMessageInput(
     agentId: 'presence-surface-agent',
     forcedReceiver: options?.forcedReceiver,
     delegationSummaryInstruction: options?.delegationSummaryInstruction,
+    locale: options?.locale,
     scope: options?.scope,
   };
 }
@@ -1228,6 +1230,7 @@ async function generateReply(
   userText: string,
   context: { sessionKey: string; scope?: EventScopeInput }
 ): Promise<{ text: string; intentResolution?: IntentResolutionContract }> {
+  const locale = detectReplyLanguage(userText);
   try {
     const result = await runSurfaceMessageConversation(
       buildPresenceSurfaceConversationMessageInput(
@@ -1237,10 +1240,11 @@ async function generateReply(
           delegationSummaryInstruction:
             'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
           scope: context.scope,
+          locale,
         }
       )
     );
-    const text = formatChannelTurnText(result, { includeContract: false }).trim();
+    const text = formatChannelTurnText(result, { includeContract: false, locale }).trim();
     return {
       text: text || buildVoiceFallbackReply(userText),
       intentResolution: result.intentResolution,
@@ -1250,6 +1254,7 @@ async function generateReply(
     return {
       text: buildVoiceFallbackReply(userText),
       intentResolution: resolveIntentResolutionContract(userText, {
+        locale,
         tier: context.scope?.tier,
         tenantId: context.scope?.tenant_slug,
       }),

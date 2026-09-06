@@ -399,3 +399,9 @@ generic approval／proposal builderにoptional localeを追加し、Telegram／D
 mission steering のapproval-gated replyへ `SurfaceConversationInput.locale` を伝播し、承認待ちの状態・選択肢・次アクションをoperator localeで描画するようにした。既定の日本語、approval／tenant scope、provider配送、human-only decision semanticsは維持した。
 
 検証: mission steering **1 file／12 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、日英のchannelリテラル全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 39
+
+voice-hub の入力言語を共有 surface conversation inputとtext-only contract projectionへ伝播し、音声surfaceでも応答本文・契約ラベル・fallback intent contractのlocaleを揃えた。voice-hub boundary testをroot Vitestのinclude対象へ追加し、既存のscope、provider配送、音声応答 semanticsは維持した。
+
+検証: voice-hub boundary **1 file／2 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、日英のchannelリテラル全面移行は引き続き未完了である。

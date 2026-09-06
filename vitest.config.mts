@@ -52,6 +52,9 @@ export default defineConfig({
       // The Nexus bridge is a production daemon outside a package src tree;
       // keep its parser/resource-boundary tests in the root suite as well.
       'presence/bridge/**/*.test.ts',
+      // Voice Hub is another production daemon outside a package src tree;
+      // keep its runtime-boundary tests in the root suite as well.
+      'satellites/voice-hub/**/*.test.ts',
       'libs/core/**/*.test.ts',
       'libs/actuators/**/*.test.ts',
       'libs/shared-*/**/*.test.ts',

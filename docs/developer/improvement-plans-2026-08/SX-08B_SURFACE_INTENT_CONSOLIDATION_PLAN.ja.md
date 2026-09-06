@@ -1861,3 +1861,9 @@ pending mission proposalの取消返信と発行結果を再監査し、confirma
 approval-gated な mission steering の承認待ち応答に `SurfaceConversationInput.locale` を伝播した。locale未指定時の既存日本語、approval request／human decision／steering authorityの境界は維持し、qps-ploc の承認表示回帰を追加した。
 
 検証: mission steering **1 file／12 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 245
+
+voice-hub の共有 surface conversation に入力言語のlocaleを渡し、voice surfaceのtext-only contract formatterとfallback intent contractも同じlocaleを使うようにした。voice-hub boundary testをroot Vitestのinclude対象へ追加し、実行対象外だったdaemon境界をCI検証へ含めた。
+
+検証: voice-hub boundary **1 file／2 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は引き続き未完了である。
