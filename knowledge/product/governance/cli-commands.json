@@ -1316,6 +1316,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.browser.run",
+      "module": "scripts/run_browser_procedure.ts",
+      "command": "browser run",
+      "noun": "browser",
+      "verb": "run",
+      "audience": "operator"
+    },
+    {
       "id": "script.kyberion",
       "script": "kyberion",
       "command": "kyberion default",
