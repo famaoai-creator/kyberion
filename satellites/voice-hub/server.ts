@@ -980,7 +980,40 @@ async function processIngest(input: {
     let speechError: string | undefined;
     if (autoReply) {
       try {
-        const generatedReply = await generateReply(text, { sessionKey, scope });
+        const locale = detectReplyLanguage(text);
+        let generatedReply: { text: string; intentResolution?: IntentResolutionContract };
+        try {
+          const result = await runSurfaceMessageConversation(
+            buildPresenceSurfaceConversationMessageInput(
+              buildPresenceConversationPrompt(text, sessionKey),
+              {
+                surfaceText: text,
+                delegationSummaryInstruction:
+                  'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
+                scope,
+                locale,
+              }
+            )
+          );
+          const formattedText = formatChannelTurnText(result, {
+            includeContract: false,
+            locale,
+          }).trim();
+          generatedReply = {
+            text: formattedText || buildVoiceFallbackReply(text),
+            intentResolution: result.intentResolution,
+          };
+        } catch (error: any) {
+          logger.warn(`[voice-hub] Shared surface conversation failed: ${error?.message || error}`);
+          generatedReply = {
+            text: buildVoiceFallbackReply(text),
+            intentResolution: resolveIntentResolutionContract(text, {
+              locale,
+              tier: scope?.tier,
+              tenantId: scope?.tenant_slug,
+            }),
+          };
+        }
         replyText = generatedReply.text;
         intentResolution = generatedReply.intentResolution;
         rememberConversationTurn(sessionKey, 'assistant', replyText);
@@ -1219,42 +1252,6 @@ function buildVoiceFallbackReply(userText: string): string {
 
 function withTimeoutSignal(timeoutMs: number): AbortSignal {
   return AbortSignal.timeout(timeoutMs);
-}
-
-async function generateReply(
-  userText: string,
-  context: { sessionKey: string; scope?: EventScopeInput }
-): Promise<{ text: string; intentResolution?: IntentResolutionContract }> {
-  const locale = detectReplyLanguage(userText);
-  try {
-    const result = await runSurfaceMessageConversation(
-      buildPresenceSurfaceConversationMessageInput(
-        buildPresenceConversationPrompt(userText, context.sessionKey),
-        {
-          surfaceText: userText,
-          delegationSummaryInstruction:
-            'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
-          scope: context.scope,
-          locale,
-        }
-      )
-    );
-    const text = formatChannelTurnText(result, { includeContract: false, locale }).trim();
-    return {
-      text: text || buildVoiceFallbackReply(userText),
-      intentResolution: result.intentResolution,
-    };
-  } catch (error: any) {
-    logger.warn(`[voice-hub] Shared surface conversation failed: ${error?.message || error}`);
-    return {
-      text: buildVoiceFallbackReply(userText),
-      intentResolution: resolveIntentResolutionContract(userText, {
-        locale,
-        tier: context.scope?.tier,
-        tenantId: context.scope?.tenant_slug,
-      }),
-    };
-  }
 }
 
 ensureStimuliDir();

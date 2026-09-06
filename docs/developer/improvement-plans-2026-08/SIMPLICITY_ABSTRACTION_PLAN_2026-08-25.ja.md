@@ -23513,3 +23513,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos API全体（残存13 route）、request-input boundary test、SX-09b
 - **変更**: agent activity／agents／connections／cost、headless operator-home／A2UI、missions search、operator-home、organization operating model、OS control-plane、tenant design、intelligence snapshot／stream に残っていた query の個別既定値化を共通 `readChronosStringParam`／`readChronosOptionalStringParam` へ統一した。Chronos API **28 route** の scope／filter／limit／flag が trim 済みの単一 string 境界を通り、認可・projection・SSE・design resolutionへ渡るようにした。既存の viewer scope、tier、headless envelope、OS read-only semanticsは維持した。
 - **検証**: request-input boundary **1 file／2 tests passed**、Chronos API directory ESLint、Prettier、`git diff --check`。Next runtimeを含む統合実行とprovider実機受入はCI／環境依存の継続課題である。
+
+## 2026-09-06 再レビュー実装 1719
+
+- **対象**: `satellites/voice-hub/server.ts`、`tests/voice-hub-request-input.test.ts`、SX-08b
+- **変更**: voice-hub のローカル `generateReply` wrapperを削除し、ingest の auto-replyをcanonical `runSurfaceMessageConversation`へ直接接続した。locale、scope、delegation summary、fallback intent contract、音声再生・timeline dispatchの順序は維持し、voice surfaceだけが別のfree-text reply入口を持つ残存を解消した。
+- **検証**: voice-hub request／surface approval **3 files／22 tests passed**、対象 ESLint、Prettier、`git diff --check`。12 surfaceの全面UI投影、provider live model call、OS-level enforcementは継続課題である。

@@ -74,4 +74,14 @@ describe('voice-hub request input boundary', () => {
     expect(source).toContain('parseVoiceTranscriptionResponse(await response.json())');
     expect(source).not.toContain('as { text?: string }');
   });
+
+  it('uses the shared surface conversation chokepoint without a local reply wrapper', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/voice-hub/server.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('runSurfaceMessageConversation(');
+    expect(source).not.toContain('function generateReply(');
+  });
 });

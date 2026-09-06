@@ -1983,3 +1983,9 @@ Presence Studio runtime-data の `/api/minutes/session/start` に残っていた
 provider CLI受入の残差を、version／helpの静的検出だけでなく、既存のprovider capability registryが返すruntime probe（binary検出、認証状態、sandbox flag状態）まで governed snapshotへ投影するようにした。`provider-capability-overview` の型・parser・JSON Schemaを拡張し、`scan_provider_cli_capabilities` はbuild済みcore package経由でもruntime probeを保存する。probe error本文や実行引数はsnapshotへ持ち込まず、表示・監査用の最小証跡に限定した。
 
 検証: build後の実scanで **8 providers／registered 39／available capabilities 33／available providers 7／missing providers 2** を取得し、snapshotのruntime probe（認証 true／false／unknown、sandbox supported／unsupported）を確認。provider capability overview／scan entrypoint／report contract **3 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。live model call とOS-level enforcementの実証は外部CLI・環境依存の継続課題とする。
+
+## 2026-09-06 再レビュー実装 261
+
+voice-hub に残っていたローカル `generateReply` wrapper を削除し、ingest の auto-reply を canonical `runSurfaceMessageConversation` へ直接接続した。locale、scope、delegation summary、fallback intent contract、音声再生・timeline dispatchの順序は維持し、voice surfaceだけが別のfree-text reply入口を持つ残存を解消した。
+
+検証: voice-hub request／surface approval **3 files／22 tests passed**、対象 ESLint、Prettier、`git diff --check`。12 surfaceの全面UI投影、provider live model call、OS-level enforcementは継続課題である。
