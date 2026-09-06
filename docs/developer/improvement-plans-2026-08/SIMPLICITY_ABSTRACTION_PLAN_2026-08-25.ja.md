@@ -23855,3 +23855,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: trigger runner の bounded delivery JSONL loader、SX-03／SX-07／PI-03
 - **変更**: foundation `readJsonLines` に governed text reader の `readOptions` forwarding を追加し、既存の5MB read limitを保持したまま trigger receipt JSONLの手書き行分割・parseを共通化した。regular-file boundary、malformed／torn row skip、authority／tenant normalization、idempotency semanticsは維持した。
 - **検証**: foundation JSONL／trigger runner **2 files／26 tests passed**、foundation adoption **1 file／7 tests passed**、対象3ファイルのESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1776
+
+- **対象**: worker state journal の replay JSONL loader、SX-03／SX-11／PI-03
+- **変更**: operation-timeのregular-file確認後に行うworker journalの行分割・safe JSON parse・schema validation・version migrationを foundation `readJsonLines`へ統一した。malformed／torn／forward record skip、sequence projection、restore semantics、journal resource boundaryは維持した。
+- **検証**: worker-state-journal **1 file／21 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
