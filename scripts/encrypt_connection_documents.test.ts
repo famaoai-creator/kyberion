@@ -14,7 +14,10 @@ import {
   safeWriteFile,
   safeExistsSync,
 } from '@agent/core/secure-io';
-import { migrateConnectionDocuments } from './encrypt_connection_documents.js';
+import {
+  migrateConnectionDocuments,
+  readConnectionDocumentTextFile,
+} from './encrypt_connection_documents.js';
 
 let dir: string;
 
@@ -36,6 +39,11 @@ describe('migrateConnectionDocuments (AC-05)', () => {
       pathResolver.rootResolve('scripts/encrypt_connection_documents.ts')
     );
     expect(source).toContain('parseSafeJsonInput, readTextFile');
+    expect(source).toContain('readConnectionDocumentTextFile(filePath: string)');
+  });
+
+  it('rejects a directory before reading a connection document', () => {
+    expect(() => readConnectionDocumentTextFile(dir)).toThrow('must be a regular file');
   });
 
   it('encrypts plaintext documents with a raw .bak, then round-trips via --decrypt', () => {

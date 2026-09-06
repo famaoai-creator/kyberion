@@ -926,6 +926,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、Claude Code hookのStop transcript本文readを`readClaudeCodeHookTranscript`のoperation-time regular-file境界へ統一し、directory／symlink replacementをCLI usage metrics判定へ到達させない回帰を追加した。既存のhook protocol、fail-open、best-effort usage semanticsは維持した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、compliance checkerの対象ファイル本文readを`readComplianceTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtier／confidential marker判定へ到達させない回帰を追加した。既存のwrite permission、marker scan、read-error skip semanticsは維持した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、email workflowのtriage／body file本文readを`readEmailWorkflowTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをdraft／delivery本文判定へ到達させない回帰を追加した。既存のmissing-file、approval gate、dry-run semanticsは維持した。関連 **2 files／1 test passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、connection documents encryptionのJSON本文readを`readConnectionDocumentTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをencrypt／decrypt／backup判定へ到達させない回帰を追加した。既存のkey-loss backup、dangerous-key skip、plaintext escape hatch semanticsは維持した。関連 **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 
