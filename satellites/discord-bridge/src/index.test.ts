@@ -80,6 +80,14 @@ describe('discord bridge thread context', () => {
       })
     );
     expect(source).not.toContain('process.exit(');
+    expect(source).toContain(
+      "import { defineScript, isDirectScript } from '@agent/core/script-harness'"
+    );
+    expect(source).toContain("name: 'discord-bridge'");
+    expect(source).toContain(
+      "await main(['node', 'satellites/discord-bridge/src/index.ts', ...argv])"
+    );
+    expect(source).not.toContain('main().catch(');
   });
 
   it('uses localized vocabulary for interaction rejection replies', () => {
