@@ -102,6 +102,8 @@ pnpm meeting:participate \
   --platform meet
 ```
 
+The daily driver is **browser-playwright**. `zoom-sdk` and `recall-ai` are named seams only (not implemented). Do not select them.
+
 If the environment is missing browser or audio capability, bootstrap the
 meeting runtime first and resolve the missing prerequisites before retrying.
 

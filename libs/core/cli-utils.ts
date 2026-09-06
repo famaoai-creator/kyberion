@@ -2,7 +2,13 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
-import { defineActuator, type ActuatorDefinition } from './actuator-sdk.js';
+import {
+  defineActuator,
+  planActuatorDryRun,
+  resolveCliActionKind,
+  type ActuatorDefinition,
+} from './actuator-sdk.js';
+import type { PipelineStepType } from './actuator-op-registry.js';
 import { createAjv } from './foundation/ajv.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord, readTextFile } from './foundation/text.js';
@@ -28,6 +34,12 @@ export function createStandardYargs(args: string[]) {
       choices: ['personal', 'confidential', 'public'],
       default: 'public',
       description: 'Knowledge tier for the operation',
+    })
+    .option('dry-run', {
+      type: 'boolean',
+      default: false,
+      description:
+        'Validate contract/params only for apply/transform/control. Capture still executes (always side-effect-free).',
     })
     .help('h')
     .alias('h', 'help');
@@ -124,6 +136,8 @@ export async function runActuatorCli(opts: {
   schema?: object;
   /** Reuse an already-defined SDK actuator instead of creating a CLI-only ABI. */
   actuator?: ActuatorDefinition;
+  /** Override inner action kind for handleAction-style CLIs (get/list stay capture). */
+  resolveOpKind?: (input: unknown) => PipelineStepType;
   printResult?: (result: unknown) => void;
   args: string[];
 }): Promise<void> {
@@ -156,7 +170,22 @@ export async function runActuatorCli(opts: {
                   },
                 }
               : {}),
-            handler: (input: unknown) => opts.handleAction!(input),
+            handler: (input: unknown, context) => {
+              const kind = resolveCliActionKind(input, opts.resolveOpKind);
+              const plan = planActuatorDryRun({
+                kind,
+                dryRun: context.dryRun === true,
+              });
+              if (plan.skipHandler) {
+                return {
+                  dry_run: true,
+                  mode: plan.mode,
+                  kind,
+                  validated: true,
+                };
+              }
+              return opts.handleAction!(input);
+            },
           },
         },
       });
@@ -199,7 +228,11 @@ export async function runActuatorCli(opts: {
     throw new Error(`invalid JSON input: ${err?.message || err}`);
   }
 
-  const result = await actuator.dispatch('execute', input);
+  const dryRun = argv.dryRun === true;
+  const result = await actuator.dispatch('execute', input, {
+    dryRun,
+    dryRunKind: resolveCliActionKind(input, opts.resolveOpKind),
+  });
   if (!result.ok) {
     const error = result.error || 'unknown error';
     const label = error.startsWith('invalid input:') ? 'invalid input' : 'handleAction failed';

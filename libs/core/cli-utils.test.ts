@@ -52,6 +52,18 @@ describe('cli-utils', () => {
     expect(argv.input).toBe('in.json');
     expect(argv.out).toBe('out.json');
     expect(argv.tier).toBe('public');
+    expect(argv.dryRun).toBe(false);
+  });
+
+  it('parses --dry-run', async () => {
+    const argv = await createStandardYargs([
+      'node',
+      'script',
+      '--input',
+      'in.json',
+      '--dry-run',
+    ]).parse();
+    expect(argv.dryRun).toBe(true);
   });
 
   it('accepts the short aliases', async () => {
@@ -84,6 +96,48 @@ describe('cli-utils', () => {
     });
 
     expect(logSpy).toHaveBeenCalledWith(JSON.stringify({ echoed: { message: 'hello' } }, null, 2));
+  });
+
+  it('validates apply actions under --dry-run without calling handleAction', async () => {
+    safeMkdir(TMP_DIR, { recursive: true });
+    const inputPath = `${TMP_DIR}/apply.json`;
+    safeWriteFile(inputPath, JSON.stringify({ action: 'set', params: { name: 'x' } }, null, 2));
+    const handleAction = vi.fn(async () => ({ mutated: true }));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runActuatorCli({
+      name: 'test-actuator',
+      args: ['node', 'script', '--input', inputPath, '--dry-run'],
+      handleAction,
+    });
+
+    expect(handleAction).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(
+      JSON.stringify(
+        { dry_run: true, mode: 'validate-only', kind: 'apply', validated: true },
+        null,
+        2
+      )
+    );
+  });
+
+  it('still runs capture actions under --dry-run', async () => {
+    safeMkdir(TMP_DIR, { recursive: true });
+    const inputPath = `${TMP_DIR}/get.json`;
+    safeWriteFile(inputPath, JSON.stringify({ action: 'get', params: { name: 'x' } }, null, 2));
+    const handleAction = vi.fn(async (input) => ({ captured: input }));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runActuatorCli({
+      name: 'test-actuator',
+      args: ['node', 'script', '--input', inputPath, '--dry-run'],
+      handleAction,
+    });
+
+    expect(handleAction).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(
+      JSON.stringify({ captured: { action: 'get', params: { name: 'x' } } }, null, 2)
+    );
   });
 
   it('reports invalid JSON input through the caller error boundary', async () => {

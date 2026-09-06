@@ -18,23 +18,35 @@
   "capabilities": [
     {
       "op": "get",
-      "platforms": ["darwin", "win32"],
-      "requirements": {}
+      "platforms": ["darwin", "win32", "linux"],
+      "requirements": {
+        "env": ["KYBERION_ALLOW_FILE_SECRETS"],
+        "env_platforms": ["linux"]
+      }
     },
     {
       "op": "set",
-      "platforms": ["darwin", "win32"],
-      "requirements": {}
+      "platforms": ["darwin", "win32", "linux"],
+      "requirements": {
+        "env": ["KYBERION_ALLOW_FILE_SECRETS"],
+        "env_platforms": ["linux"]
+      }
     },
     {
       "op": "delete",
-      "platforms": ["darwin", "win32"],
-      "requirements": {}
+      "platforms": ["darwin", "win32", "linux"],
+      "requirements": {
+        "env": ["KYBERION_ALLOW_FILE_SECRETS"],
+        "env_platforms": ["linux"]
+      }
     },
     {
       "op": "list",
-      "platforms": ["darwin", "win32"],
-      "requirements": {}
+      "platforms": ["darwin", "win32", "linux"],
+      "requirements": {
+        "env": ["KYBERION_ALLOW_FILE_SECRETS"],
+        "env_platforms": ["linux"]
+      }
     }
   ]
 }
