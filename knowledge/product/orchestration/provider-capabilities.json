@@ -9,6 +9,7 @@
   "providers": {
     "gemini": {
       "models": [
+        "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
@@ -40,6 +41,17 @@
         "a2ui"
       ],
       "modelCapabilities": {
+        "gemini-3.8-flash": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "long_context",
+          "code",
+          "review",
+          "architecture",
+          "multimodal"
+        ],
         "gemini-3.7-flash": [
           "reasoning",
           "planning",
@@ -472,6 +484,10 @@
     },
     "agy": {
       "models": [
+        "Gemini 3.8 Flash (Medium)",
+        "Gemini 3.8 Flash (High)",
+        "Gemini 3.8 Flash (Low)",
+        "gemini-3.8-flash",
         "Gemini 3.7 Flash (Medium)",
         "Gemini 3.7 Flash (High)",
         "Gemini 3.7 Flash (Low)",
@@ -504,6 +520,46 @@
         "gateway"
       ],
       "modelCapabilities": {
+        "Gemini 3.8 Flash (Medium)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 3.8 Flash (High)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 3.8 Flash (Low)": [
+          "reasoning",
+          "analysis",
+          "code",
+          "structured_json",
+          "low_latency"
+        ],
+        "gemini-3.8-flash": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
         "Gemini 3.7 Flash (Medium)": [
           "reasoning",
           "planning",
