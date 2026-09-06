@@ -23843,3 +23843,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: mesh message broker の tenant-scoped delivery／dead-letter JSONL loader、SX-03／SX-09／PI-03
 - **変更**: operation-timeのregular-file確認後に行うdelivery／dead-letter JSONLの手書き行分割・parseを foundation `readJsonLines`へ統一した。malformed行skip、domain normalizeによるrecord shape filter、latest-by-key projection、tenant scope／delivery semanticsは維持した。
 - **検証**: mesh message broker／inspection **2 files／8 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1774
+
+- **対象**: contract semver checker の actuator contract schema loader、SX-03／SX-04／SX-06
+- **変更**: repository-bound contract schema の手書きtext読込＋JSON parseを foundation `readJson`へ統一した。invalid JSONをraw text fingerprintへフォールバックする既存互換、manifest／baseline loader、semver classification semanticsは維持し、source-contract testを新しい共通reader契約へ更新した。
+- **検証**: contract-semver **1 file／20 tests passed**、foundation adoption **1 file／7 tests passed**、対象2ファイルのESLint、Prettier、`git diff --check`。
