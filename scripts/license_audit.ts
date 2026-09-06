@@ -23,6 +23,7 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeStat,
@@ -70,6 +71,13 @@ const RESTRICTIVE_LICENSES = new Set([
 const ROOT = pathResolver.rootDir();
 const REPORT_PATH = path.join(ROOT, 'docs', 'legal', 'third-party-licenses.json');
 
+export function readLicenseAuditTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function readPackageJson(p: string): Record<string, unknown> | null {
   try {
     return readSafeJsonFile<Record<string, unknown>>(p, `license audit package manifest ${p}`);
@@ -83,7 +91,7 @@ function detectLicenseFile(pkgDir: string): string | null {
   for (const c of candidates) {
     const licensePath = path.join(pkgDir, c);
     if (safeExistsSync(licensePath)) {
-      const content = readTextFile(licensePath).slice(0, 2000);
+      const content = readLicenseAuditTextFile(licensePath).slice(0, 2000);
       if (/MIT License/i.test(content)) return 'MIT';
       if (/Apache License.*Version 2\.0/i.test(content)) return 'Apache-2.0';
       if (/BSD 3-Clause/i.test(content)) return 'BSD-3-Clause';
