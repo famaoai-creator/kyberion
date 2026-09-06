@@ -22943,3 +22943,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/background-review-patch.ts`、background-review-patch test、PI-03
 - **変更**: background-review の pipeline／managed skill／memory target read を共通 operation-time regular-file 境界へ統一し、directory replacement を pre-image hash／patch適用へ到達させないようにした。既存の path containment、provenance、approval、hash-bound patch semantics は維持した。
 - **検証**: background-review-patch **2 files／13 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1624
+
+- **対象**: `libs/core/cowork-knowledge-bridge.ts`、cowork-knowledge-bridge test、PI-03
+- **変更**: Cowork→Kyberion artifact ingest の本文 read 前へ operation-time の regular-file 検査を追加し、directory replacement を tier分類／memory promotion queueへ到達させないようにした。既存の repository scope、tier policy、hash idempotency、candidate enqueue semantics は維持した。
+- **検証**: cowork-knowledge-bridge **2 files／19 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。

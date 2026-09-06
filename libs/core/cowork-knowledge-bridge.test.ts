@@ -263,6 +263,21 @@ describe('ingestCoworkArtifacts()', () => {
     expect(mockCreateCandidate).not.toHaveBeenCalled();
   });
 
+  it('directory replacement を artifact 本文として読み込まない', () => {
+    mockSafeExistsSync.mockImplementation(defaultExistsImpl);
+    mockSafeLstat.mockImplementation((p: string) => ({
+      isFile: () => !p.includes('/work/directory.md'),
+    }));
+    mockSafeReadFile.mockReturnValue('artifact content');
+
+    const result = ingestCoworkArtifacts(['work/directory.md']);
+
+    expect(result.enqueued).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('must be a regular file');
+    expect(mockCreateCandidate).not.toHaveBeenCalled();
+  });
+
   it('repository 外の artifact path を読み込まない', () => {
     mockSafeExistsSync.mockImplementation(defaultExistsImpl);
     mockAssertSafeRepositoryPath.mockImplementation((filePath: string) => {
