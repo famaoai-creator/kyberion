@@ -77,6 +77,12 @@ function assertAdfRepairFile(filePath: string): void {
   }
 }
 
+export function assertRegularAdfResource(filePath: string): void {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[ADF_REPAIR] schema resource must be a regular file: ${filePath}`);
+  }
+}
+
 function assertPipelineRepairTrust(adfPath: string, options: AdfRepairOptions): void {
   const absolute = resolveAdfRepairPath(adfPath);
   const relative = path.relative(pathResolver.rootDir(), absolute).replaceAll('\\', '/');
@@ -345,9 +351,9 @@ async function attemptSubagentRepair(
   let schemaContent = '(schema not available)';
   try {
     if (schemaName === 'pipeline-adf') {
-      schemaContent = readTextFile(
-        pathResolver.knowledge('product/schemas/pipeline-adf.schema.json')
-      );
+      const schemaPath = pathResolver.knowledge('product/schemas/pipeline-adf.schema.json');
+      assertRegularAdfResource(schemaPath);
+      schemaContent = readTextFile(schemaPath);
     } else {
       schemaContent = JSON.stringify(loadSchema(schemaName), null, 2);
     }
