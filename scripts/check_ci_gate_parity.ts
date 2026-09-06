@@ -43,6 +43,18 @@ export function collectCheckScopeReferences(value: string): string[] {
   ];
 }
 
+const REQUIRED_VALIDATE_COMMANDS = [
+  'pnpm run build',
+  'pnpm run typecheck',
+  'pnpm run check -- --scope full',
+] as const;
+
+export function checkValidateComposition(validateCommand: string): string[] {
+  return REQUIRED_VALIDATE_COMMANDS.filter((command) => !validateCommand.includes(command)).map(
+    (command) => `package.json validate script is missing ${command}`
+  );
+}
+
 export function checkWorkflowSetupOrder(workflowPath: string, workflow: string): string[] {
   const failures: string[] = [];
   const setupIndex = workflow.indexOf(SETUP_ACTION_MARKER);
@@ -140,8 +152,8 @@ export function checkCiGateParity(): string[] {
   const validateCommand = packageJson.scripts?.validate;
   if (!validateCommand) {
     failures.push('package.json must declare a validate script');
-  } else if (!collectCheckScopeReferences(validateCommand).includes('full')) {
-    failures.push('package.json validate script must invoke pnpm run check -- --scope full');
+  } else {
+    failures.push(...checkValidateComposition(validateCommand));
   }
   return failures;
 }
