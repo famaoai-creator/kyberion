@@ -3,7 +3,7 @@ import { getAllFiles } from '@agent/core/fs-utils';
 import { readTextFile } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 import { readSafeJsonFile } from './lib/json-input.js';
@@ -33,6 +33,13 @@ const ROOT = pathResolver.rootDir();
 const CONFIG_PATH = pathResolver.knowledge('product/governance/module-layer-boundaries.json');
 const BASELINE_PATH = resolveCiGateBaselinePath('module-boundaries');
 const SOURCE_ROOTS = ['libs', 'presence', 'satellites', 'scripts'];
+
+export function readModuleBoundaryTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function relative(filePath: string): string {
   return path.relative(ROOT, filePath).split(path.sep).join('/');
@@ -169,7 +176,7 @@ export function maskComments(source: string): string {
 }
 
 function importsFor(filePath: string, includeDynamic = false, includeTypeOnly = false): string[] {
-  const text = maskComments(readTextFile(filePath));
+  const text = maskComments(readModuleBoundaryTextFile(filePath));
   const imports: string[] = [];
   const staticPattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
   const dynamicPattern = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;

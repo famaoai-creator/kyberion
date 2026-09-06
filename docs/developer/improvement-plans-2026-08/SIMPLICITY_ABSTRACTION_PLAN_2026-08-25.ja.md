@@ -23309,3 +23309,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_max_file_lines.ts`、`scripts/check_max_file_lines.entrypoint.test.ts`、PI-03
 - **変更**: max file lines checkerのsource本文readを`readMaxFileLinesTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをline count判定へ到達させないようにした。既存のroot、exception、line-count semanticsは維持した。
 - **検証**: max file lines **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミット`voice-actuator/src/index.ts`の1500行超過を表示したため、例外・分割は変更せず継続課題とした。
+
+## 2026-09-06 再レビュー実装 1685
+
+- **対象**: `scripts/check_module_boundaries.ts`、`scripts/check_module_boundaries.test.ts`、PI-03
+- **変更**: module boundaries checkerのmodule source本文readを`readModuleBoundaryTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをimport graph／cycle判定へ到達させないようにした。既存のlayer、direction、cycle semanticsは維持した。
+- **検証**: module boundaries **2 files／4 passed, 1 existing ratchet failure**、対象ESLint、Prettier、`git diff --check`で確認した。既存の未コミット変更によりcycles `0→1`、runtime cycles `2→3`となったため、baseline・ユーザー変更は変更せず継続課題とした。
