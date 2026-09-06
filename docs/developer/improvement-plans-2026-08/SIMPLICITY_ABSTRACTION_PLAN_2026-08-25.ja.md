@@ -22757,3 +22757,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `knowledge/product/governance/surface-provider-manifests.json`、surface provider schema、interaction model／policy tests、production approval wiring、integrity manifest、SX-08b
 - **変更**: `SurfaceAsyncChannel` と task-session schema にだけ存在していた `terminal` を、governed provider manifest、interaction provider seam、production-like approval wiringへ正式登録した。CLIと同じ session capabilitiesを利用しつつ provider id／channelをterminalとして分離し、manifest schema、一覧、routing policyの回帰を揃えた。
 - **検証**: surface provider／approval wiring **4 files／30 tests passed**、manifest schema JSON、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1593
+
+- **対象**: `presence/displays/presence-studio/server.ts`、Presence Studio route contract test、SX-08b
+- **変更**: Presence Studio の browser onboarding preview／apply に残っていた Express `req.body` の直接 domain parser渡しを、共有 `parseSafeJsonObjectValue` 境界へ揃えた。Zod draft validation、applyのlock／副作用、既存400 wire errorは維持し、配列・null・dangerous JSON keyをdomain parser前に拒否する回帰を追加した。
+- **検証**: Presence Studio route contract **3 files／10 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、package scriptsの削減は継続課題とする。

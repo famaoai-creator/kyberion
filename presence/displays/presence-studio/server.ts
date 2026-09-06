@@ -139,7 +139,11 @@ presenceStudioData.app.get('/api/onboarding/browser-state', (_req, res) => {
 
 presenceStudioData.app.post('/api/onboarding/preview', (req, res) => {
   try {
-    res.json(previewBrowserOnboarding(req.body));
+    res.json(
+      previewBrowserOnboarding(
+        parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding preview body')
+      )
+    );
   } catch (error: any) {
     res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
   }
@@ -147,7 +151,9 @@ presenceStudioData.app.post('/api/onboarding/preview', (req, res) => {
 
 presenceStudioData.app.post('/api/onboarding/apply', async (req, res) => {
   try {
-    const result = await applyBrowserOnboarding(req.body);
+    const result = await applyBrowserOnboarding(
+      parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding apply body')
+    );
     logger.info(
       presenceStudioData.presenceStudioAuditLine(req, 'onboarding/apply.complete', {
         artifacts: result.artifacts.length,
