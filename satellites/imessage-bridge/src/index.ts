@@ -543,7 +543,7 @@ async function pollIMessages() {
   }
 }
 
-async function main(args: string[] = process.argv) {
+async function main(args: string[] = []) {
   const argv = await createStandardYargs(args)
     .option('input', { alias: 'i', type: 'string' })
     .option('port', {

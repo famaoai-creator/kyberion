@@ -495,7 +495,7 @@ async function drainDiscordOutbox(client: Client): Promise<void> {
 
 const runDiscordOutbox = createSurfaceOutboxDrainGuard('discord');
 
-async function main(args: string[] = process.argv) {
+async function main(args: string[] = []) {
   const argv = await createStandardYargs(args)
     .option('token', { type: 'string', description: 'Discord Bot Token' })
     .parseSync();

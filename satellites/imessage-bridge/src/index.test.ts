@@ -101,6 +101,7 @@ describe('imessage bridge processing note', () => {
     expect(source).toContain(
       "await main(['node', 'satellites/imessage-bridge/src/index.ts', ...argv])"
     );
+    expect(source).not.toContain('args: string[] = process.argv');
     expect(source).not.toContain('main().catch(');
   });
 

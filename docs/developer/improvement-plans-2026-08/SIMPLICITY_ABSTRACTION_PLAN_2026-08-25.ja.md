@@ -24065,3 +24065,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: OAuth callback surface の core public facade 境界、SX-03／SX-09
 - **変更**: production に残っていた唯一の `@agent/core` root barrel import を、既に公開済みの `@agent/core/surface-request-input` subpath へ移した。`readSurfaceStringParam` の配列／object-shaped query fail-closed semantics と OAuth callback の既存処理は変更していない。
 - **検証**: production root-barrel import **0 occurrences**、OAuth callback surface **1 file／4 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1811
+
+- **対象**: text bridge の argv 境界、SX-06
+- **変更**: Telegram／Discord／iMessage／Slack の内部起動関数に残っていた `process.argv` fallback を除去した。実行時の argv は shared harness から明示的に渡し、import／テスト時に process-wide argv を暗黙参照しない境界へ揃えた。4 bridge の既存 direct-entry semantics は維持した。
+- **検証**: 4 bridge contract／process-exit **4 files／39 tests passed**、production `process.argv` 残存は terminal-hud と refactor utility の2箇所のみ、対象ESLint、Prettier、`git diff --check`。
