@@ -23639,3 +23639,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `check_script_integrity` の structured command validation、SX-07
 - **変更**: pipeline／environment manifest の `{ command: "pnpm", args: [...] }` 形式について、`run <script>` を package script registry と照合する検査を追加した。これまで文字列 command のみを検査していたため見逃していた削除済み package alias の再発を、structured probe／ADF command でも検出する。通常の非 pnpm command と任意 args は対象外にした。
 - **検証**: checker **1 file／9 tests passed**、canonical `pnpm run check -- --scope pr --only script-integrity` passed、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1740
+
+- **対象**: manifest-driven `pnpm check` の runtime manifest boundary、SX-07
+- **変更**: `validateGateManifest` が型定義を信頼していた残存を修正し、manifest version、gate object、id／owner／rationale、executable args の runtime shape を fail-closed で検証するようにした。既存の scope、script registry、recursive command、timeout の検査と gate 実行 semantics は維持した。
+- **検証**: `scripts/run_checks.test.ts` **1 file／7 tests passed**、対象 ESLint、Prettier、`git diff --check`、canonical `script-integrity`／`foundation-adoption` gate passed。全体 typecheck は既存の Presence Studio boundary test の `string | Buffer` narrowing error で未完了。
