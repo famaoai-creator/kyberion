@@ -13,6 +13,7 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeExec,
+  safeLstat,
   safeMkdir,
   safeStat,
   safeWriteFile,
@@ -188,6 +189,15 @@ export function resolveLatestEmailDraftPaths(): { markdown: string; json: string
     markdown: assertSafeRepositoryPath(path.join(dir, 'latest.md'), { allowMissingLeaf: true }),
     json: assertSafeRepositoryPath(path.join(dir, 'latest.json'), { allowMissingLeaf: true }),
   };
+}
+
+export function isRegularEmailDraftPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function emailRequestId(value: string): string {
@@ -661,7 +671,7 @@ export function buildFallbackEmailDraft(input: {
 
 export function readEmailDraftArtifact(): EmailDraftArtifact {
   const { markdown, json } = resolveLatestEmailDraftPaths();
-  if (safeExistsSync(json)) {
+  if (isRegularEmailDraftPath(json)) {
     try {
       const parsed = parseEmailDraftArtifact(readJson<unknown>(json));
       if (parsed) {
@@ -689,7 +699,7 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
       logger.warn(`suppressed error in readEmailDraftArtifact: ${err}`);
     }
   }
-  if (safeExistsSync(markdown)) {
+  if (isRegularEmailDraftPath(markdown)) {
     const draftMarkdown = readTextFile(markdown);
     const markdownStat = safeStat(markdown);
     return {
