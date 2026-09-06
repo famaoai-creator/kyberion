@@ -167,6 +167,15 @@ describe('knowledge-index', () => {
 
       expect(index.hints.some((hint) => hint.source.includes('linked-secret'))).toBe(false);
     });
+
+    it('skips a directory that only looks like a markdown document', async () => {
+      const proceduresDir = path.join(TEST_ROOT, 'public/procedures');
+      ensureDir(path.join(proceduresDir, 'directory.md'));
+
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+
+      expect(index.hints.some((hint) => hint.source.includes('directory.md'))).toBe(false);
+    });
   });
 
   describe('queryKnowledge', () => {
