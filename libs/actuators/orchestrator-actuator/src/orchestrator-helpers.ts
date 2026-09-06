@@ -551,8 +551,24 @@ async function opTransform(op: string, params: any, ctx: any) {
           timeoutMs: 120000,
         })
       );
-      const esmIntegrity = collectCommandHealth('pnpm', ['run', 'check:esm']);
-      const catalogIntegrity = collectCommandHealth('pnpm', ['run', 'check:catalogs']);
+      const esmIntegrity = collectCommandHealth('pnpm', [
+        'run',
+        'check',
+        '--',
+        '--scope',
+        'pr',
+        '--only',
+        'esm',
+      ]);
+      const catalogIntegrity = collectCommandHealth('pnpm', [
+        'run',
+        'check',
+        '--',
+        '--scope',
+        'full',
+        '--only',
+        'catalogs',
+      ]);
       const missionStatus =
         brief.scope === 'missions' || brief.scope === 'system'
           ? collectMissionStatusSnapshot(
