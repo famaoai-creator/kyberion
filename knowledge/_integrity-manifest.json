@@ -9315,7 +9315,7 @@
     {
       "path": "product/schemas/provider-capability-snapshot.schema.json",
       "tier": "public",
-      "size": 1948,
+      "size": 2484,
       "type": "json"
     },
     {
