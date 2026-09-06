@@ -311,6 +311,10 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push(
     `- [component-lifecycle-inventory.md](${path.relative(pathResolver.rootDir(), REPORT_PATH)})`
   );
+  lines.push('- Slack 3経路: [docs/SLACK_CHANNEL_ROUTES.ja.md](docs/SLACK_CHANNEL_ROUTES.ja.md)');
+  lines.push(
+    '- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` (not bare `pnpm doctor`).'
+  );
   return `${lines.join('\n')}\n`;
 }
 

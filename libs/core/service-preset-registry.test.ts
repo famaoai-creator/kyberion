@@ -39,6 +39,13 @@ describe('service-preset-registry', () => {
     expect(preset?.operations).toHaveProperty('actions_list_runs');
     expect(preset?.operations).toHaveProperty('actions_get_run');
     expect(preset?.operations).toHaveProperty('actions_dispatch_workflow');
+    expect(preset?.operations).toHaveProperty('list_issues');
+    expect(preset?.operations).toHaveProperty('get_issue');
+    expect(preset?.operations).toHaveProperty('list_pulls');
+    expect(preset?.operations).toHaveProperty('get_pull');
+    expect(preset?.operations).toHaveProperty('list_reviews');
+    expect(preset?.operations).toHaveProperty('list_review_comments');
+    expect(preset?.operations).toHaveProperty('list_pr_files');
   });
 
   it('resolves common SaaS presets', () => {

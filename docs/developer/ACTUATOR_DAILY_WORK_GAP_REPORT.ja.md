@@ -2,7 +2,7 @@
 title: アクチュエータ日常運用ギャップ報告
 tags: [actuators, daily-ops, gap-analysis, operator-ux]
 last_updated: 2026-09-06
-status: investigation
+status: p0-implemented
 ---
 
 # アクチュエータ日常運用ギャップ報告
@@ -26,6 +26,17 @@ status: investigation
 | アクチュエータが勝っている | テナント隔離、承認ゲート、証跡、日次/週次の揮発メモリ、会議/音声、38 SaaS preset、Chronos                                                                                |
 
 **P0 の形:** (1) GitHub capture op の穴埋め、(2) 助手向けの読み取り専用 `actuator`/`pipeline` 呼び出し面、(3) `dist` 無しでも発見できるオペレータ経路。詳細は §7。
+
+### P0 実装状況(2026-09-06)
+
+| ID   | 状態     | 入れたもの                                                                                                                                                                                                                                                                                                                         |
+| ---- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-1 | **done** | `github.json` に `list_issues`, `get_issue`, `list_pulls`, `get_pull`, `list_reviews`, `list_review_comments`, `list_pr_files`。harness registry 17 ops。review **投稿**は P1 のまま                                                                                                                                               |
+| P0-2 | **done** | MCP `kyberion.service.capture`(capture/read のみ、承認なし)。`pipelines/daily-routine.json` を pipeline allowlist へ。書き込みは従来の `service.actuate`                                                                                                                                                                           |
+| P0-3 | **done** | `pnpm capabilities` / `pnpm kyberion list` は `scripts/capability_discovery_entry.mjs` のマニフェスト走査(Node 22 でも可)。仮説「ts-loader だけで足りる」は破棄 — Node 22 に `registerHooks` が無く、`@agent/core` は dist export。実行系は引き続き `dist/` 必須。Doctor は `pnpm run doctor`(bare `pnpm doctor` は pnpm 組み込み) |
+| P0-4 | **done** | [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../SLACK_CHANNEL_ROUTES.ja.md)。`docs/SURFACES.md` / `CAPABILITIES_GUIDE.md` / `libs/actuators/README.md` からリンク                                                                                                                                                                           |
+
+残り(P1+): GitHub review 投稿、digest テンプレ、カレンダー template の shell 排除、`github-mcp` 退役、Linux secret。P1-6/P1-7 は README 誘導と `kyberion:doctor` で部分対応。
 
 ---
 
@@ -382,7 +393,7 @@ pnpm kyberion run browser-actuator -- --input libs/actuators/browser-actuator/ex
 
 ## 7. Brush-up 推奨(優先度つき)
 
-実装していない。形だけ具体化する。
+P0 は実装済み(上表)。P1/P2 は形だけ残す。
 
 ### P0 — 日常がアクチュエータに乗らない直接因
 
