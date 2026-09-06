@@ -16,6 +16,7 @@ import {
   shouldBootstrapRuntime,
   stripNpmSeparatorArg,
   routeLegacyIntentToAsk,
+  readCliTextFile,
 } from './cli.js';
 import { handleTaskCommand, withWorkflowOutputPrinter } from './cli-workflow-handlers.js';
 
@@ -26,6 +27,12 @@ async function captureMainOutput(args: string[]): Promise<string> {
 }
 
 describe('Kyberion CLI helpers', () => {
+  it('rejects a directory replacement before CLI text parsing', () => {
+    expect(() => readCliTextFile(pathResolver.rootDir(), 'CLI input')).toThrow(
+      'CLI input must be a regular file'
+    );
+  });
+
   it('uses the governed parser for packet and pipeline preview files', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/cli.ts'), { encoding: 'utf8' })

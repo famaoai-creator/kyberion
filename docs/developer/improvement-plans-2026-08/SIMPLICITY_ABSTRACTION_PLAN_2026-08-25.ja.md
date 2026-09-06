@@ -23171,3 +23171,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/cli-workflow-handlers.ts`、`scripts/cli-workflow-handlers.entrypoint.test.ts`、PI-03
 - **変更**: CLI workflow handlerのtriage／body本文readを`readWorkflowTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをemail draft／delivery処理へ到達させないようにした。既存のpath scopeとemail workflow semanticsは維持した。
 - **検証**: CLI workflow handler **2 files／3 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1662
+
+- **対象**: `scripts/cli.ts`、`scripts/cli.test.ts`、PI-03
+- **変更**: operator CLIのartifact／packet／pipeline preview本文readを`readCliTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpreview・packet parse・artifact表示へ到達させないようにした。既存のpath scope、packet parsing、preview semanticsは維持した。
+- **検証**: operator CLI **2 files／40 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
