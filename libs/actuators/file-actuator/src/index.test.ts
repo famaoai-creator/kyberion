@@ -195,6 +195,26 @@ describe('file-actuator', () => {
         expect((await import('@agent/core/async-utils')).retry).toHaveBeenCalled();
       });
 
+      it('read_json でfoundation readerを使用する', async () => {
+        const { readJson } = await import('@agent/core/foundation');
+        vi.mocked(readJson).mockReturnValueOnce({ key: 'value' });
+
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'capture',
+              op: 'read_json',
+              params: { path: 'some/data.json', export_as: 'json_data' },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(result.context.json_data).toEqual({ key: 'value' });
+        expect(readJson).toHaveBeenCalledWith(expect.stringContaining('some/data.json'));
+      });
+
       it('list でディレクトリ一覧を取得する', async () => {
         const { safeReaddir } = await import('@agent/core/secure-io');
         vi.mocked(safeReaddir).mockReturnValueOnce(['file1.txt', 'file2.txt'] as any);
