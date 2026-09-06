@@ -27,7 +27,7 @@
  */
 
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
+import { readJson, readJsonLines } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { readTextFile } from './foundation/text.js';
@@ -792,19 +792,10 @@ interface LedgerAssetLine {
 function readJsonlLines(absPath: string): Array<Record<string, unknown>> {
   const safePath = safeOptionalRepositoryPath(absPath);
   if (!safePath || !safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
-  const raw = readTextFile(safePath);
-  const records: Array<Record<string, unknown>> = [];
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const parsed = parseSafeJsonInput(trimmed, 'scope offboarding JSONL entry');
-      if (parsed && typeof parsed === 'object') records.push(parsed as Record<string, unknown>);
-    } catch {
-      /* skip corrupt line */
-    }
-  }
-  return records;
+  return readJsonLines<unknown>(safePath, { onMalformed: 'skip' }).filter(
+    (value): value is Record<string, unknown> =>
+      value !== null && typeof value === 'object' && !Array.isArray(value)
+  );
 }
 
 interface DedupRegistryPrune {
