@@ -423,3 +423,12 @@ terminal-hud、Concierge fallback、Chronos APIのlocaleをshared conversation i
 CLI／background review／iMessage demo／Telegram demoのsurface conversation inputにもlocaleを明示し、channel bridge以外の入口でもshared contractのlocale境界を落とさないようにした。既存のprovider配送、approval、tenant scope semanticsは変更していない。
 
 検証: CLI trust-boundary／locale wiring、demo／backgroundのtypecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、残る日英のchannelリテラル全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 43
+
+Presence Studio の Cloudflare OS held-action decision／apply route を再監査し、Express の route param を
+`String(...)` で暗黙変換して配列・オブジェクトを action ID として副作用へ渡し得る残存を検出した。
+共通 `readPresenceStudioRouteParam` を追加し、単一 string の trim 済み値だけを held-action の決定・適用へ渡すようにした。
+localadmin、tenant scope、approval decision、held-action apply semantics は変更していない。
+
+検証: Presence Studio approval／OS control-plane **2 files／24 tests passed**、対象 typecheck、Prettier、`git diff --check`。
