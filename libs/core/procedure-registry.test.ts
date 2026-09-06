@@ -11,7 +11,6 @@ import {
   resolveProcedure,
 } from './procedure-registry.js';
 import * as secureIo from './secure-io.js';
-import * as foundationText from './foundation/text.js';
 
 vi.mock('./foundation/json.js', () => ({
   readJson: <T>(filePath: string) => {
@@ -20,7 +19,20 @@ vi.mock('./foundation/json.js', () => ({
         fs.readFileSync(path.resolve('knowledge/product/schemas/procedures.schema.json'), 'utf8')
       ) as T;
     }
-    return JSON.parse(String(secureIo.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+    const value = JSON.parse(String(secureIo.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+    const hasDangerousKey = (candidate: unknown): boolean => {
+      if (Array.isArray(candidate)) return candidate.some(hasDangerousKey);
+      if (!candidate || typeof candidate !== 'object') return false;
+      return Object.entries(candidate).some(
+        ([key, nested]) =>
+          key === '__proto__' ||
+          key === 'constructor' ||
+          key === 'prototype' ||
+          hasDangerousKey(nested)
+      );
+    };
+    if (hasDangerousKey(value)) throw new Error('JSON input contains a dangerous JSON key');
+    return value;
   },
 }));
 
@@ -63,7 +75,7 @@ const DEPRECATED_ENTRY: ProcedureEntry = {
 };
 
 function stubCatalog(entries: ProcedureEntry[] = [BROWSER_ENTRY, SERVICE_ENTRY, DEPRECATED_ENTRY]) {
-  vi.spyOn(foundationText, 'readTextFile').mockReturnValue(
+  vi.spyOn(secureIo, 'safeReadFile').mockReturnValue(
     JSON.stringify({ schema_version: 'procedures.v1', procedures: entries })
   );
 }
@@ -80,7 +92,7 @@ describe('procedure-registry', () => {
   // -------------------------------------------------------------------------
   describe('loadProcedures', () => {
     it('returns empty array when file is missing', () => {
-      vi.spyOn(foundationText, 'readTextFile').mockImplementation(() => {
+      vi.spyOn(secureIo, 'safeReadFile').mockImplementation(() => {
         throw new Error('ENOENT');
       });
       expect(loadProcedures(true)).toEqual([]);
@@ -97,7 +109,7 @@ describe('procedure-registry', () => {
       // count is deterministic regardless of the host.
       vi.spyOn(secureIo, 'safeExistsSync').mockReturnValue(false);
       const spy = vi
-        .spyOn(foundationText, 'readTextFile')
+        .spyOn(secureIo, 'safeReadFile')
         .mockReturnValue(JSON.stringify({ schema_version: 'procedures.v1', procedures: [] }));
       loadProcedures(true); // force refresh — reads file
       loadProcedures(); // uses cache
@@ -134,7 +146,7 @@ describe('procedure-registry', () => {
       vi.spyOn(secureIo, 'safeExistsSync').mockImplementation((filePath) =>
         filePath.includes('knowledge/personal/browser-procedures.json')
       );
-      vi.spyOn(foundationText, 'readTextFile').mockImplementation((filePath) => {
+      vi.spyOn(secureIo, 'safeReadFile').mockImplementation((filePath) => {
         if (filePath.includes('knowledge/personal/browser-procedures.json')) {
           return JSON.stringify({ schema_version: 'procedures.v1', procedures: [personalEntry] });
         }
