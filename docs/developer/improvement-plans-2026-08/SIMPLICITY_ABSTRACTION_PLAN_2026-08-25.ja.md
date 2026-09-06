@@ -24095,3 +24095,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: foundation bootstrap cycleとtypecheckの型境界、SX-02／SX-07／SX-12
 - **変更**: `policy-engine`がbootstrap中の`secure-io`を直接importしていたため、`secure-io ↔ policy-engine`のruntime cycleが発生していた。repository path validatorをbootstrap可能な`path-resolver`へ移し、`secure-io`は互換re-exportを維持、policy fileの読込は登録済みFoundation I/Oへ統一した。Presence Studioのboundary testでは、UTF-8読込結果を文字列として扱う型境界を明示した。
 - **検証**: `libs/core` lint、全維持対象（`libs scripts satellites presence`）lint、policy／secure-io **3 files／49 tests passed**、root `pnpm run typecheck`、Prettier、`git diff --check`。`check:channel-adapter-adoption`は現行4 bridgeで引き続きOK。
+
+## 2026-09-07 再レビュー実装 1816
+
+- **対象**: Telegram polling server entrypoint、SX-06
+- **変更**: `satellites/telegram-bridge/src/polling.ts` に残っていた直接 `main().catch` を `@agent/core/script-harness` の明示 argv／失敗境界へ移行した。通常の Telegram bridge と同じ直接起動判定を採用し、Vitest／import 時には長時間 polling を開始しない契約をテストで固定した。Telegram API の offset、webhook forwarding、retry 待機、secret／token の fail-closed semanticsは変更していない。
+- **検証**: Telegram polling／response／process-exit boundary **3 files／5 tests passed**、Telegram bridge build、対象ESLint、Prettier、`git diff --check`。

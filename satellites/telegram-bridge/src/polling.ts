@@ -1,9 +1,11 @@
 import { logger } from '@agent/core/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { secretGuard } from '@agent/core/secret-guard';
+import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import { parsePollingResponse, parsePollingUpdates } from './polling-response.js';
 const BRIDGE_WEBHOOK_URL = 'http://127.0.0.1:3035/webhook';
 
-async function main() {
+export async function main(_args: string[] = []): Promise<void> {
   const connection = secretGuard.loadConnectionDocument('telegram');
   if (!connection || Object.keys(connection).length === 0) {
     logger.error('❌ [TelegramPolling] telegram.json not found in Personal connections.');
@@ -60,7 +62,14 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
+const directEntry = isDirectScript(import.meta.url, 'satellites/telegram-bridge/src/polling.ts');
+export const runTelegramPolling = defineScript({
+  name: 'telegram-polling',
+  async run({ argv }) {
+    await main(argv);
+  },
 });
+
+if (directEntry && !getRegisteredEnvText('VITEST')) {
+  void runTelegramPolling();
+}
