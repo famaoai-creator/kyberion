@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { readConciergeHome } from '../../../lib/headless-projections';
+import { readConciergeScopeQuery } from '../../../lib/request-input';
 import { resolveConciergeViewer } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
@@ -52,9 +53,7 @@ export function GET(req: NextRequest) {
         try {
           serialized = JSON.stringify(
             readConciergeHome(resolved.context, {
-              tenant: req.nextUrl.searchParams.get('tenant'),
-              organizationId: req.nextUrl.searchParams.get('organization_id'),
-              projectId: req.nextUrl.searchParams.get('project_id'),
+              ...readConciergeScopeQuery(req.nextUrl.searchParams),
             })
           );
         } catch (error) {
