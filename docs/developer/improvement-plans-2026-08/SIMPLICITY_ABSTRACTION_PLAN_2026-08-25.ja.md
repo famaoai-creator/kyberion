@@ -22961,3 +22961,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/src/knowledge-curation-tenant-ingest.ts`、tenant-ingest test、PI-03
 - **変更**: tenant curation card の frontmatter read 前へ operation-time の regular-file 検査を追加し、directory replacement を kind／last_updated parseへ到達させず ledgerの `ingested_at` fallbackへ閉じるようにした。既存の tenant scope、freshness SLO、advisory／fail-open semantics は維持した。
 - **検証**: knowledge-curation-tenant-ingest **2 files／5 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1627
+
+- **対象**: `libs/core/src/knowledge-index.ts`、knowledge-index test、PI-03
+- **変更**: knowledge index の Markdown scan read 前へ operation-time の regular-file 検査を追加し、`.md` 名の directoryを本文解析／chunk indexへ到達させないようにした。既存の scanner containment、symlink拒否、hint／chunk ranking semantics は維持した。
+- **検証**: knowledge-index **2 files／15 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
