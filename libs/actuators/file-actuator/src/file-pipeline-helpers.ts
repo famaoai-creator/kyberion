@@ -1,4 +1,9 @@
-import { isRecord, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import {
+  isRecord,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+  readJson,
+} from '@agent/core/foundation';
 import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/adf-engine';
 import {
   assertSafeRepositoryPath,
@@ -78,10 +83,7 @@ function readFileContext(filePath: string): Record<string, unknown> {
   if (!isExistingRegularFile(filePath)) {
     throw new Error(`file context must be an existing regular file: ${filePath}`);
   }
-  return parseSafeJsonObjectValue(
-    parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), 'file context'),
-    'file context'
-  );
+  return parseSafeJsonObjectValue(readJson(filePath), 'file context');
 }
 
 /**
