@@ -68,6 +68,7 @@ describe('slack bridge channel turn', () => {
     expect(source).toContain("from '@agent/core/script-harness'");
     expect(source).toContain("name: 'slack-bridge'");
     expect(source).toContain("['node', 'satellites/slack-bridge/src/index.ts', ...argv]");
+    expect(source).not.toContain('_args: string[] = process.argv');
     expect(source).not.toContain('start().catch(');
   });
 

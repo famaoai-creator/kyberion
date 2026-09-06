@@ -87,6 +87,7 @@ describe('discord bridge thread context', () => {
     expect(source).toContain(
       "await main(['node', 'satellites/discord-bridge/src/index.ts', ...argv])"
     );
+    expect(source).not.toContain('args: string[] = process.argv');
     expect(source).not.toContain('main().catch(');
   });
 
