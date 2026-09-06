@@ -47,6 +47,8 @@ pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
+After `pnpm build`, that `pnpm doctor` line runs the repo script. Bare `pnpm doctor` without a prior `pnpm run` / build context is pnpm's own diagnostic — use `pnpm run doctor` or `pnpm kyberion:doctor` when you mean Kyberion.
+
 ### Start an AI company in one governed step
 
 For a solo founder whose main workforce is AI, run the company onboarding flow after the build:

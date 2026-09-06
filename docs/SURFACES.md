@@ -39,6 +39,7 @@ Computer Surface の `/api/identity`・`/api/state`・`/api/stream`・`/api/os/c
 
 Related guidance:
 
+- [`docs/EMAIL_OPERATOR.ja.md`](./EMAIL_OPERATOR.ja.md) — inbox/triage is Gmail/gws (`pnpm kyberion email`); `email-actuator` is delivery-only
 - [`docs/OPERATOR_UX_GUIDE.md`](./OPERATOR_UX_GUIDE.md)
 - [`knowledge/product/architecture/surface-responsibility-model.md`](../knowledge/product/architecture/surface-responsibility-model.md)
 - [`knowledge/product/architecture/ceo-ux.md`](../knowledge/product/architecture/ceo-ux.md)

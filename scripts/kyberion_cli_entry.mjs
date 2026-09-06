@@ -36,7 +36,7 @@ if (existsSync(DIST_CLI)) {
       'Discovery without build: pnpm capabilities',
       '  or: pnpm kyberion list',
       'Execution: pnpm build && pnpm kyberion <command>',
-      "Doctor: pnpm run doctor  (not bare `pnpm doctor`, which is pnpm's own doctor)",
+      "Doctor: pnpm run doctor  or  pnpm kyberion:doctor  (not bare `pnpm doctor`, which is pnpm's own doctor)",
     ].join('\n')
   );
   process.exit(1);
