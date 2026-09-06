@@ -27,4 +27,17 @@ describe('voice hub runtime environment boundary', () => {
     );
     expect(source).toContain('locale,\n        tier: context.scope?.tier,');
   });
+
+  it('keeps direct voice fallback replies in the shared vocabulary', () => {
+    const source = safeReadFile(fileURLToPath(new URL('./server.ts', import.meta.url)), {
+      encoding: 'utf8',
+    });
+
+    expect(source).toContain("t('surface:voice_hub_error_fallback', undefined, language)");
+    expect(source).toContain(
+      "t('surface:voice_hub_capability_summary', { capabilities }, language)"
+    );
+    expect(source).not.toContain('うまく処理できませんでした。もう一度お願いします。');
+    expect(source).not.toContain('I could not process that. Please try again.');
+  });
 });

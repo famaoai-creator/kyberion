@@ -22721,3 +22721,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: surface interaction provider、surface provider policy、task-session schema、production-like approval wiring test、SX-08b
 - **変更**: manifestで公開済みだったCowork surfaceをinteraction provider seamへ登録し、routing policyが任意のCowork manifestでもfail-openせず未指定として扱うようにした。共有approval wiringは登録済み8 surfaceへ拡張し、CLI／Cowork task-sessionがschema境界で拒否されないようsurface enumを揃えた。承認保存、外部配送、tenant scope、人手判断の意味は変更していない。
 - **検証**: approval wiring／provider policy **2 files／16 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1587
+
+- **対象**: `satellites/voice-hub/server.ts`、voice-hub boundary test、user-facing vocabulary、generated vocabulary keys、SX-08b
+- **変更**: voice-hub の直接 fallback 応答（エラー、挨拶、能力案内、質問、受領、謝意）に残っていた日英固定文を shared vocabulary へ移行した。`t()` と `surface:voice_hub_*` を使い、既存の入力言語判定、音声再生、scope、fallback intent contract の意味は維持した。catalog の `qps-ploc` は生成器で更新し、固定文の再混入を境界テストで検出する。
+- **検証**: voice-hub／vocabulary **3 files／28 tests passed**、vocabulary generator、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
