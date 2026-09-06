@@ -248,6 +248,29 @@ describe('company', () => {
     expect(company.identity_ref).toMatchObject({ exists: true, data: null });
   });
 
+  it('does not read a customer component after the JSON leaf becomes a directory', () => {
+    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/customer/acme/customer.json`);
+    safeMkdir(`${tmpRoot}/vision`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/product/governance`, { recursive: true });
+    safeWriteFile(`${tmpRoot}/vision/_default.md`, '# Default Vision');
+    safeWriteFile(
+      `${tmpRoot}/knowledge/product/governance/decision-rights.json`,
+      JSON.stringify({
+        version: '1.0.0',
+        company_id: 'default',
+        tenant_slug: null,
+        source_kind: 'public',
+        source_path: 'knowledge/product/governance/decision-rights.json',
+        decisions: [],
+      })
+    );
+
+    const company = resolveCompany('acme', tmpRoot);
+
+    expect(company.customer_ref).toMatchObject({ exists: true, data: null });
+  });
+
   it('rejects tenant values that could escape the customer scope', () => {
     expect(() => resolveCompany('../outside', tmpRoot)).toThrow('[COMPANY_TENANT_SCOPE]');
     expect(() => resolveCompany('acme/other', tmpRoot)).toThrow('[COMPANY_TENANT_SCOPE]');

@@ -7,7 +7,7 @@ import { resolveFinancialModel, type FinancialModel } from './financial-model.js
 import { resolveOkrTracker, type OkrTracker } from './okr-tracker.js';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as customerResolver from './customer-resolver.js';
 import { loadOrganizationProfileAtPath } from './organization-profile.js';
@@ -56,6 +56,9 @@ function loadJsonComponent<T>(filePath: string): CompanyComponentRef<T> {
   }
 
   try {
+    if (!safeLstat(filePath).isFile()) {
+      return { path: filePath, exists: true, data: null };
+    }
     const value = parseSafeJsonObjectValue(
       readJson<unknown>(filePath),
       `company component ${path.basename(filePath)}`
