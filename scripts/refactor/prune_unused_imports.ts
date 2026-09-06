@@ -21,7 +21,7 @@
 import * as path from 'node:path';
 import ts from 'typescript';
 import { readTextFile } from '@agent/core/foundation';
-import { safeWriteFile, safeReaddir, safeLstat } from '@agent/core/secure-io';
+import { safeWriteFile, safeReaddir, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 
@@ -37,6 +37,13 @@ const SKIP_DIRS = new Set([
   '__snapshots__',
   'test-results',
 ]);
+
+export function readPruneUnusedImportsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 export interface PruneFileResult {
   /** Repo-relative path. */
@@ -472,7 +479,7 @@ export function run(argv: string[]): void {
 
   const results: PruneFileResult[] = [];
   for (const file of selected) {
-    const text = readTextFile(file);
+    const text = readPruneUnusedImportsTextFile(file);
     if (!text.includes('import')) continue;
     const result = pruneFile(file, text);
     results.push(result);

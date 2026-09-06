@@ -941,6 +941,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、report-review stampのtarget HTML本文readを`readReportReviewStampTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをreview layer add/remove判定へ到達させない回帰を追加した。既存のdry-run、check、offline file:// semanticsは維持した。関連 **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、pipeline promoteのcatalog README本文readを`readPipelinePromotionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpromoted catalog row判定へ到達させない回帰を追加した。既存のADF validation、provenance、dry-run catalog semanticsは維持した。関連 **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、ADF input static include fragment本文readを`readAdfInputTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをinclude expansion／guardrail判定へ到達させない回帰を追加した。既存のtrust gate、safe JSON repair、cycle detection semanticsは維持した。関連 **2 files／追加境界テスト passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、prune unused importsのsource本文readを`readPruneUnusedImportsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをimport pruning／rewrite判定へ到達させない回帰を追加した。既存のAST parse、re-parse guard、dry-run/write semanticsは維持した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 
