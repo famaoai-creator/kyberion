@@ -1,7 +1,7 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -608,7 +608,14 @@ async function main() {
       res.status(401).json({ ok: false, error: 'invalid_webhook_secret' });
       return;
     }
-    const message = parseBlueBubblesWebhook(req.body);
+    let webhookBody: Record<string, unknown>;
+    try {
+      webhookBody = parseSafeJsonObjectValue(req.body, 'BlueBubbles webhook body');
+    } catch {
+      res.status(400).json({ ok: false, error: 'invalid_webhook_payload' });
+      return;
+    }
+    const message = parseBlueBubblesWebhook(webhookBody);
     if (!message) {
       res.status(202).json({ ok: true, accepted: false, reason: 'ignored_event' });
       return;
@@ -633,7 +640,9 @@ async function main() {
 
   app.post('/send', async (req, res) => {
     try {
-      const body = parseIMessageBridgeInput(req.body || {});
+      const body = parseIMessageBridgeInput(
+        parseSafeJsonObjectValue(req.body ?? {}, 'iMessage request body')
+      );
       const result = await handleSend({
         recipient: body.recipient || '',
         text: body.text || '',
