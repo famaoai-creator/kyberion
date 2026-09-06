@@ -5,13 +5,20 @@ import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   checkFoundationAdoption,
   countSimpleIsoTimestampViolations,
+  readFoundationAdoptionTextFile,
 } from './check_foundation_adoption.js';
 
 describe('checkFoundationAdoption', () => {
+  it('rejects a directory replacement before source inspection', () => {
+    expect(() => readFoundationAdoptionTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for source inspection', () => {
     const source = readTextFile(pathResolver.rootResolve('scripts/check_foundation_adoption.ts'));
     expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
-    expect(source).not.toContain("from '@agent/core/secure-io'");
+    expect(source).toContain("from '@agent/core/secure-io'");
   });
 
   it('detects multiline foundation JSON loader bypasses', () => {
