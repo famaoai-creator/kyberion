@@ -149,6 +149,22 @@ export function parseIMessageBridgeInput(value: unknown): BridgeInput {
   };
 }
 
+export function readIMessageHeader(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+export function resolveBlueBubblesWebhookSecret(input: {
+  secret?: unknown;
+  authorization?: unknown;
+}): string | undefined {
+  const directSecret = readIMessageHeader(input.secret);
+  if (directSecret) return directSecret;
+
+  const authorization = readIMessageHeader(input.authorization);
+  const bearer = authorization?.match(/^Bearer\s+(.+)$/iu)?.[1];
+  return readIMessageHeader(bearer);
+}
+
 export function resolveIMessageBridgeInputPath(inputPath: string): string {
   const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(inputPath), {
     allowMissingLeaf: true,
@@ -601,9 +617,10 @@ async function main() {
       res.status(503).json({ ok: false, error: 'bluebubbles_webhook_secret_not_configured' });
       return;
     }
-    const authorization = String(req.get('authorization') || '');
-    const bearer = authorization.match(/^Bearer\s+(.+)$/iu)?.[1];
-    const providedSecret = req.get('x-kyberion-bluebubbles-secret') || bearer;
+    const providedSecret = resolveBlueBubblesWebhookSecret({
+      authorization: req.get('authorization'),
+      secret: req.get('x-kyberion-bluebubbles-secret'),
+    });
     if (!verifyBlueBubblesWebhookSecret(config.webhookSecret, providedSecret)) {
       res.status(401).json({ ok: false, error: 'invalid_webhook_secret' });
       return;
