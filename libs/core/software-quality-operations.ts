@@ -1,11 +1,11 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 
 import { getReasoningBackend } from './reasoning-backend.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
-import { isRecord, readTextFile } from './foundation/text.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { parseTestInventoryItem } from './software-quality.js';
@@ -367,18 +367,10 @@ function readDefectEvents(filePath: string): DefectTransitionEvent[] {
   } catch {
     return [];
   }
-  return readTextFile(filePath)
-    .split('\n')
-    .filter((line) => line.trim() !== '')
-    .flatMap((line) => {
-      try {
-        return [
-          parseDefectTransitionEvent(parseSafeJsonInput(line, 'defect transition event')),
-        ].filter((event): event is DefectTransitionEvent => event !== undefined);
-      } catch {
-        return [];
-      }
-    });
+  return readJsonLines<unknown>(filePath, { onMalformed: 'skip' }).flatMap((value) => {
+    const event = parseDefectTransitionEvent(value);
+    return event ? [event] : [];
+  });
 }
 
 export function defectCurrentStatus(

@@ -23795,3 +23795,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `intent_trace` の repository-bound JSONL loader、SX-03／SX-06／SX-09
 - **変更**: trace／audit JSONLの手書き `readTextFile`・行分割・`parseSafeJsonInput` を foundation `readJsonLines`へ統一した。operation-timeのrepository／regular-file検証、malformed行skip、normalize後のshape validation、symlink除外、intent trace projectionは維持した。
 - **検証**: intent-trace **1 file／5 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1766
+
+- **対象**: software-quality の defect transition JSONL loader、SX-03／SX-04／PI-03
+- **変更**: operation-timeのregular-file確認後に行う defect transition JSONL読込を、手書きの本文分割・JSON parseから foundation `readJsonLines`へ統一した。malformed行skip、event shape validation、directory replacementの空履歴扱い、append／transition semanticsは維持した。
+- **検証**: software-quality operations **1 file／10 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
