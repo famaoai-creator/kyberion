@@ -23951,3 +23951,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: presence controller の read-only perception JSONL loader、SX-03／SX-08／SX-09
 - **変更**: regular-file確認済みのpending／injected stimulus projectionを foundation `readJsonLines`へ統一した。malformed／invalid stimulus skip、channel priority／timestamp ordering、response解決とprune時の原文保持 semanticsは維持した。原文を再出力するresolve／prune pathは専用処理として残した。
 - **検証**: presence-controller **2 files／12 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1792
+
+- **対象**: model cost governance の重複fallback、SX-04
+- **変更**: 一次の `model-cost-registry.json` と同じschema・責務を持つ `model-cost-registry.fallback.json` と、metrics側の二重読込・マージ経路を廃止した。一次カタログが欠落・不正な場合は、料金データを推測せずゼロレートへfail-closedし、observabilityの呼出し自体は継続できるようにした。catalog contract と integrity manifest からも削除した。
+- **検証**: metrics cost **1 file／4 tests passed**、対象ESLint、Prettier、`git diff --check`。一次カタログのschema／既知モデル料金解決は維持確認する。

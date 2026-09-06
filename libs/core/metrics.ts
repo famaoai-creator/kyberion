@@ -77,13 +77,11 @@ interface ModelCostRegistryFile extends ModelCostRegistry {
 
 // Model pricing is data, not code: it lives in a knowledge-tier registry so models
 // can be added / repriced without a source change or redeploy. The file is the
-// source of truth; the fallback file keeps the runtime working when the primary
-// registry is missing or malformed. All rates are per-1k tokens.
+// source of truth; an empty zero-rate registry keeps observability available when
+// the primary registry is missing or malformed without maintaining a second copy
+// of governance data. All rates are per-1k tokens.
 const COST_REGISTRY_PATH = pathResolver.resolve(
   'knowledge/product/governance/model-cost-registry.json'
-);
-const FALLBACK_COST_REGISTRY_PATH = pathResolver.resolve(
-  'knowledge/product/governance/model-cost-registry.fallback.json'
 );
 const COST_REGISTRY_SCHEMA_PATH = pathResolver.resolve(
   'knowledge/product/schemas/model-cost-registry.schema.json'
@@ -91,7 +89,7 @@ const COST_REGISTRY_SCHEMA_PATH = pathResolver.resolve(
 const EMPTY_COST_REGISTRY: ModelCostRegistry = {
   models: {},
   aliases: {},
-  default: { prompt: 0.001, completion: 0.003 },
+  default: { prompt: 0, completion: 0 },
 };
 
 let _cachedCostRegistry: ModelCostRegistry | null = null;
@@ -102,18 +100,10 @@ const primaryCostRegistryCatalog = defineCatalog<ModelCostRegistryFile>({
   schema: COST_REGISTRY_SCHEMA_PATH,
 });
 
-const fallbackCostRegistryCatalog = defineCatalog<ModelCostRegistryFile>({
-  id: 'model-cost-registry-fallback',
-  path: FALLBACK_COST_REGISTRY_PATH,
-  schema: COST_REGISTRY_SCHEMA_PATH,
-});
-
-function readCostRegistry(filePath: string): ModelCostRegistry | null {
+function readCostRegistry(): ModelCostRegistry | null {
   try {
-    if (!safeExistsSync(filePath)) return null;
-    const catalog =
-      filePath === COST_REGISTRY_PATH ? primaryCostRegistryCatalog : fallbackCostRegistryCatalog;
-    const parsed = catalog.load();
+    if (!safeExistsSync(COST_REGISTRY_PATH)) return null;
+    const parsed = primaryCostRegistryCatalog.load();
     return { models: parsed.models, aliases: parsed.aliases ?? {}, default: parsed.default };
   } catch {
     /* ignore */
@@ -121,22 +111,19 @@ function readCostRegistry(filePath: string): ModelCostRegistry | null {
   return null;
 }
 
-/** Load (and cache) the model-cost registry from the knowledge tier, with fallback. */
+/** Load (and cache) the single model-cost registry from the knowledge tier. */
 export function loadModelCostRegistry(): ModelCostRegistry {
   if (_cachedCostRegistry) return _cachedCostRegistry;
-  const fallback = readCostRegistry(FALLBACK_COST_REGISTRY_PATH);
-  const primary = readCostRegistry(COST_REGISTRY_PATH);
-  if (fallback || primary) {
+  const primary = readCostRegistry();
+  if (primary) {
     _cachedCostRegistry = {
       models: {
-        ...(fallback?.models ?? {}),
         ...(primary?.models ?? {}),
       },
       aliases: {
-        ...(fallback?.aliases ?? {}),
         ...(primary?.aliases ?? {}),
       },
-      default: primary?.default ?? fallback?.default ?? EMPTY_COST_REGISTRY.default,
+      default: primary.default,
     };
     return _cachedCostRegistry;
   }
@@ -148,7 +135,6 @@ export function loadModelCostRegistry(): ModelCostRegistry {
 export function _resetModelCostRegistryCacheForTests(): void {
   _cachedCostRegistry = null;
   primaryCostRegistryCatalog.reset();
-  fallbackCostRegistryCatalog.reset();
 }
 
 function selectTier(entry: ModelCostEntry, inputTokens: number): CostRate {
