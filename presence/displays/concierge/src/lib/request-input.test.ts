@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  readConciergeScopeQuery,
   readRequestObject,
   requireKnownFormKeys,
   requireKnownRequestKeys,
@@ -7,6 +8,19 @@ import {
 } from './request-input';
 
 describe('readRequestObject', () => {
+  it('reads the shared scope query without duplicating route-specific defaults', () => {
+    expect(
+      readConciergeScopeQuery(
+        new URLSearchParams('tenant=tenant-a&organization_id=org-a&project_id=')
+      )
+    ).toEqual({ tenant: 'tenant-a', organizationId: 'org-a', projectId: undefined });
+    expect(readConciergeScopeQuery(new URLSearchParams())).toEqual({
+      tenant: undefined,
+      organizationId: undefined,
+      projectId: undefined,
+    });
+  });
+
   it.each([
     ['malformed JSON', () => Promise.reject(new SyntaxError('invalid JSON'))],
     ['null', async () => null],

@@ -23525,3 +23525,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `satellites/imessage-bridge/src/index.ts`、`satellites/imessage-bridge/src/index.test.ts`、SX-09b
 - **変更**: BlueBubbles webhook の authorization／secret header を strict scalar reader と共通の secret resolver へ接続した。配列・object・空文字を認証値へ暗黙変換せず、direct secret 優先、Bearer fallback、invalid scheme の既存 semantics をテストで固定した。
 - **検証**: iMessage bridge **1 file／9 tests passed**、対象 ESLint、Prettier、`git diff --check`。外部 BlueBubbles 実機受入と provider／OS-level enforcement は継続課題である。
+
+## 2026-09-06 再レビュー実装 1721
+
+- **対象**: Concierge summary／SSE／headless home route、`presence/displays/concierge/src/lib/request-input.ts`、SX-09b
+- **変更**: Concierge の4つの read-only home route に重複していた tenant／organization／project query reader を共有 `readConciergeScopeQuery` へ統合した。headless の認可判定と home projection、summary／SSE の scope filter が同一の optional scalar query を使い、空値を `undefined` とする既存 semanticsを維持した。
+- **検証**: Concierge request-input **1 file／9 tests passed**、対象 Prettier、`git diff --check`。Next runtimeを含む実ブラウザ／viewer scope統合受入は継続課題である。
