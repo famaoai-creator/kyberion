@@ -431,4 +431,4 @@ Presence Studio の Cloudflare OS held-action decision／apply route を再監�
 共通 `readPresenceStudioRouteParam` を追加し、単一 string の trim 済み値だけを held-action の決定・適用へ渡すようにした。
 localadmin、tenant scope、approval decision、held-action apply semantics は変更していない。
 
-検証: Presence Studio approval／OS control-plane **2 files／24 tests passed**、対象 typecheck、Prettier、`git diff --check`。
+検証: Presence Studio approval／OS control-plane **2 files／24 tests passed**、対象 ESLint、Prettier、`git diff --check`。隔離環境の root typecheck は既存の `discord.js` 型モジュール欠落で停止した。
