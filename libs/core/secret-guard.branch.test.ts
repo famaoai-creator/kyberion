@@ -32,10 +32,16 @@ vi.mock('./foundation/json.js', async () => {
   return {
     ...actual,
     readJson: <T>(filePath: string): T =>
-      JSON.parse(mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string) as T,
+      actual.parseSafeJsonInput(
+        mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string,
+        'test JSON'
+      ) as T,
     readJsonIfPresent: <T>(filePath: string): T | null => {
       try {
-        return JSON.parse(mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+        return actual.parseSafeJsonInput(
+          mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string,
+          'test JSON'
+        ) as T;
       } catch {
         return null;
       }

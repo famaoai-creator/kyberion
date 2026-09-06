@@ -14,7 +14,7 @@ import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { RISKY_OPS } from './risky-op-ids.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 
 /**
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
@@ -391,8 +391,7 @@ function _loadGrants(): AuthGrant[] {
   const grantsPath = safeSecretPath(GRANTS_FILE);
   if (!safeExistsSync(grantsPath)) return [];
   try {
-    const content = safeReadFile(grantsPath, { encoding: 'utf8' }) as string;
-    const parsed = parseSafeJsonInput(content, 'auth grants');
+    const parsed = readSensitiveJson<unknown>(grantsPath);
     return Array.isArray(parsed) ? parsed.filter(isAuthGrant) : [];
   } catch (_) {
     return [];
