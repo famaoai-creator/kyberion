@@ -126,7 +126,17 @@ export function normalizeInboxLockRecord(value: unknown): { pid: number } | unde
   return { pid: value.pid };
 }
 
+export function isRegularInboxLockPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function isStaleLock(lockPath: string): boolean {
+  if (!isRegularInboxLockPath(lockPath)) return false;
   try {
     const raw = readTextFile(lockPath);
     const parsed = normalizeInboxLockRecord(parseSafeJsonInput(raw, 'deliverable inbox lock'));

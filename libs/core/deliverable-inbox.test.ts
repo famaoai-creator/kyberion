@@ -101,6 +101,19 @@ describe('deliverable inbox', () => {
     expect(normalizeInboxLockRecord({ pid: process.pid })).toEqual({ pid: process.pid });
   });
 
+  it('accepts only regular files as inbox lock resources', async () => {
+    const { isRegularInboxLockPath } = await import('./deliverable-inbox.js');
+    const lockPath = path.join(tmpRoot, 'active/shared/inbox/entries.jsonl.lock');
+    const directoryPath = path.join(tmpRoot, 'active/shared/inbox/lock-directory');
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    fs.writeFileSync(lockPath, JSON.stringify({ pid: process.pid }));
+    fs.mkdirSync(directoryPath, { recursive: true });
+
+    expect(isRegularInboxLockPath(lockPath)).toBe(true);
+    expect(isRegularInboxLockPath(directoryPath)).toBe(false);
+    expect(isRegularInboxLockPath(path.join(tmpRoot, 'missing.lock'))).toBe(false);
+  });
+
   it('adds, lists, and marks inbox entries', async () => {
     const { acceptInboxEntryWithHumanReceipt, addInboxEntry, listInboxEntries, markInboxEntry } =
       await import('./deliverable-inbox.js');
