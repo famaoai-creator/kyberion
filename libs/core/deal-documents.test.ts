@@ -5,6 +5,7 @@ import { advanceDealStage, openDeal } from './deal-store.js';
 import {
   draftContractForDeal,
   generateQuoteForDeal,
+  isRegularDealDocumentPath,
   loadContractReviewAtPath,
   recordContractReview,
 } from './deal-documents.js';
@@ -22,6 +23,21 @@ afterEach(() => {
 });
 
 describe('deal document contract review loader', () => {
+  it('accepts only regular files for customer document delivery', () => {
+    const filePath = pathResolver.sharedTmp('deal-document-regular-file.md');
+    const directoryPath = pathResolver.sharedTmp('deal-document-directory.md');
+    try {
+      safeWriteFile(filePath, '# quote\n', { mkdir: true });
+      safeMkdir(directoryPath, { recursive: true });
+
+      expect(isRegularDealDocumentPath(filePath)).toBe(true);
+      expect(isRegularDealDocumentPath(directoryPath)).toBe(false);
+    } finally {
+      safeRmSync(filePath, { force: true });
+      safeRmSync(directoryPath, { recursive: true, force: true });
+    }
+  });
+
   it('loads a review record through the schema and exact deal/version binding', () => {
     const filePath = withExecutionContext('mission_controller', () =>
       recordContractReview({
