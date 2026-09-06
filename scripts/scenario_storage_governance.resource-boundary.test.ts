@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core';
+import { readScenarioTextFile } from './scenario_storage_governance.js';
 
 describe('storage governance scenario resource boundary', () => {
+  it('rejects a directory replacement before scenario log parsing', () => {
+    expect(() => readScenarioTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation reader for scenario text logs', () => {
     const source = readTextFile(pathResolver.rootResolve('scripts/scenario_storage_governance.ts'));
     expect(source).toContain('nowIso, parseSafeJsonInput, readTextFile');
