@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -18,6 +18,13 @@ const CANONICAL_FIRST_WIN_COMMANDS = [
   'pnpm doctor',
   'pnpm pipeline --input pipelines/verify-session.json',
 ] as const;
+
+export function readFirstWinTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 const RULES: SmokeRule[] = [
   {
@@ -204,7 +211,7 @@ export function extractCanonicalFirstWinCommands(source: string): string[] | nul
 export function validateCanonicalFirstWinDocumentation(
   documents: ReadonlyArray<{ file: string; source: string }> = FIRST_WIN_DOCUMENTS.map((file) => ({
     file,
-    source: readTextFile(pathResolver.rootResolve(file)),
+    source: readFirstWinTextFile(pathResolver.rootResolve(file), file),
   }))
 ): string[] {
   const violations: string[] = [];
@@ -248,7 +255,7 @@ export function checkFirstWinSmoke(): string[] {
       violations.push(`${rule.file}: missing`);
       continue;
     }
-    const text = readTextFile(abs);
+    const text = readFirstWinTextFile(abs, rule.file);
     for (const needle of rule.required) {
       if (!text.includes(needle)) {
         violations.push(`${rule.file}: missing "${needle}"`);
