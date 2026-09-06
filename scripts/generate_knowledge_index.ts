@@ -65,6 +65,24 @@ export function validateFrontmatterExclusions(files: readonly string[]): string[
   return failures;
 }
 
+export function validateKnowledgeFrontmatter(
+  files: readonly string[],
+  read: (filePath: string) => string = readTextFile
+): string[] {
+  const kbRoot = pathResolver.knowledge('');
+  const manifest = loadFrontmatterExclusions();
+  const failures: string[] = [];
+  for (const file of files) {
+    if (!file.endsWith('.md')) continue;
+    if (manifest.excluded_paths.some((pattern) => matchesExclusion(file, pattern))) continue;
+    const content = read(path.join(kbRoot, file));
+    if (!/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/u.test(content)) {
+      failures.push(`${file}: missing YAML frontmatter and no explicit exclusion`);
+    }
+  }
+  return failures;
+}
+
 function getTier(relPath: string): string {
   if (relPath.startsWith('personal/')) return 'personal';
   if (relPath.startsWith('confidential/')) return 'confidential';
@@ -172,6 +190,12 @@ function renderKnowledgeIndexFiles(): GeneratedFile[] {
   if (exclusionFailures.length > 0) {
     throw new Error(
       exclusionFailures.map((failure) => `[generate_knowledge_index] ${failure}`).join('\n')
+    );
+  }
+  const frontmatterFailures = validateKnowledgeFrontmatter(allFiles);
+  if (frontmatterFailures.length > 0) {
+    throw new Error(
+      frontmatterFailures.map((failure) => `[generate_knowledge_index] ${failure}`).join('\n')
     );
   }
 
