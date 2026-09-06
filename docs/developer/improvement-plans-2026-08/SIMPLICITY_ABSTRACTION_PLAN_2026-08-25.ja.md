@@ -23747,3 +23747,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: browser extension observation の persisted JSONL loader、SX-03／SX-09
 - **変更**: per-procedure observation store の読み込みを手書き `readTextFile` + 行ごとの `parseSafeJsonInput` から foundation `readJsonLines`へ統一した。size／regular-file／symlink boundary、malformed／schema-invalid row skip、limit projection、PII redaction／append semanticsは維持し、valid rowと破損 row混在の回帰テストを追加した。
 - **検証**: browser extension observation **3 files／12 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption gate、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1758
+
+- **対象**: skill plugin config／contribution manifest の JSON loader、SX-03／SX-04／security boundary
+- **変更**: 外部 project cwd も許容する plugin config と、symlink／regular-file確認済みの contribution manifest を `readTextFile` + `parseSafeJsonInput` から foundation `readJson`へ統一した。外部path許容、schema validation、provenance／activation gate、manifest contribution normalization、invalid config fail-closed semanticsは維持した。
+- **検証**: skill plugin loader／managed install **3 files／36 tests passed**、foundation adoption **1 file／7 tests passed**、`git diff --check`。
