@@ -1849,3 +1849,9 @@ qps-plocを含む明示localeの回帰を追加した。
 generic approval text と mission proposal confirmation の日本語固定を再監査し、Telegram／Discord／iMessageのoperator localeがapproval／proposal fallbackへ届かない残存を修正した。optionalな `SupportedLocale` を共通builderへ追加し、Slackで先行したlocale境界を3 bridgeへ揃えた。省略時の既存日本語、approval／proposal state、external delivery gateは維持した。
 
 検証: generic approval／proposal／3 bridge **5 test files／46 tests passed**、root typecheck、Prettier、`git diff --check`。残る自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は継続課題である。
+
+## 2026-09-06 再レビュー修正 243
+
+pending mission proposalの取消返信と発行結果を再監査し、confirmation promptだけlocale対応していて、確認後のgeneric replyが日本語固定の残存を修正した。`resolveMissionProposalReply` にoptional localeを追加し、Telegram／Discord／iMessageのoperator localeを取消／発行結果へ伝播した。proposal state、mission issuance、external delivery gate、既定の日本語は維持した。
+
+検証: mission proposal／3 bridge **4 test files／35 tests passed**、root typecheck、Prettier、`git diff --check`。残る自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は継続課題である。

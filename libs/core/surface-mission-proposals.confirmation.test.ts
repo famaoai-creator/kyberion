@@ -54,6 +54,26 @@ describe('mission proposal confirmation grammar (UX-04)', () => {
     expect(text).not.toContain(t('bridge:mission_proposal_confirmation_choices', undefined, 'ja'));
   });
 
+  it('uses an explicit locale for the mission issuance reply', () => {
+    const reply = buildMissionIssuanceReply(
+      {
+        missionId: 'MSN-QPS-123',
+        missionType: 'product_development',
+        tier: 'public',
+        persona: 'Ecosystem Architect',
+        orchestrationStatus: 'queued',
+      },
+      { locale: 'qps-ploc' }
+    );
+
+    expect(reply).toContain(
+      t('bridge:mission_issued_started', { missionId: 'MSN-QPS-123' }, 'qps-ploc')
+    );
+    expect(reply).not.toContain(
+      t('bridge:mission_issued_started', { missionId: 'MSN-QPS-123' }, 'ja')
+    );
+  });
+
   it('renders mission issuance outcomes from the shared catalog', () => {
     expect(
       buildMissionIssuanceReply({
