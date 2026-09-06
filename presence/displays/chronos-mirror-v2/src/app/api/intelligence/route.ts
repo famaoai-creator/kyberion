@@ -16,7 +16,7 @@ import {
   type ViewerContext,
 } from '../../../lib/viewer-context';
 import { resolveApprovalTenant } from '../../../lib/su-surface-data';
-import { readChronosJsonObject } from '../../../lib/request-input';
+import { readChronosJsonObject, readChronosOptionalStringParam } from '../../../lib/request-input';
 import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
 import { buildCompanyVisionRef, resolveCompany, type CompanyAggregate } from '@agent/core/company';
 import {
@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
     if (resolvedViewer.response) return resolvedViewer.response;
     const tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
     const tierAccess = resolvedViewer.context.tierAccess ?? ['public', 'confidential'];
     const allowedTiers = new Set<string>(tierAccess);
@@ -293,7 +293,7 @@ export async function GET(req: NextRequest) {
       memoryCandidateVisibleToViewer(
         candidate,
         resolvedViewer.context,
-        req.nextUrl.searchParams.get('tenant') || undefined
+        readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
       )
     );
     const nextActions = intelligenceData.buildChronosNextActions({

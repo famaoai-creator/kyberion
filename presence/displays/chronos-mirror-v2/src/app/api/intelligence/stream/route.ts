@@ -17,6 +17,7 @@ import {
   viewerErrorResponse,
   withViewerExecutionContextAsync,
 } from '../../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
@@ -213,7 +214,7 @@ export async function GET(req: NextRequest) {
   try {
     tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
   } catch (error) {
     return viewerErrorResponse(error, 403);

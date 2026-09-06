@@ -8,6 +8,7 @@ import {
 } from '../../../../lib/headless-response';
 import { readHeadlessOperatorHome } from '../../../../lib/headless-projections';
 import { resolveViewerContextForRequest } from '../../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,16 +22,24 @@ export function GET(req: NextRequest) {
 
   try {
     authorizeHeadlessOperation(resolvedViewer.context, 'chronos.operator_home.read', {
-      tenantSlug: req.nextUrl.searchParams.get('tenant') || undefined,
-      organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
-      projectId: req.nextUrl.searchParams.get('project_id') || undefined,
+      tenantSlug: readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant')),
+      organizationId: readChronosOptionalStringParam(
+        req.nextUrl.searchParams.get('organization_id')
+      ),
+      projectId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id')),
     });
-    const limit = parseHeadlessLimit(req.nextUrl.searchParams.get('limit'), 8, 50);
+    const limit = parseHeadlessLimit(
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('limit')),
+      8,
+      50
+    );
     const summary = readHeadlessOperatorHome(resolvedViewer.context, {
-      tenant: req.nextUrl.searchParams.get('tenant') || undefined,
-      organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
-      projectId: req.nextUrl.searchParams.get('project_id') || undefined,
-      since: req.nextUrl.searchParams.get('since') || undefined,
+      tenant: readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant')),
+      organizationId: readChronosOptionalStringParam(
+        req.nextUrl.searchParams.get('organization_id')
+      ),
+      projectId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id')),
+      since: readChronosOptionalStringParam(req.nextUrl.searchParams.get('since')),
       limit,
     });
     return NextResponse.json(headlessEnvelope('operator-home', summary, resolvedViewer.context));

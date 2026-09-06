@@ -494,6 +494,17 @@ scope query の個別既定値化を再監査し、mission／tenant／organizati
 検証: request-input boundary **1 file／2 tests passed**、対象 route の ESLint、Prettier、
 `git diff --check`。provider 実機受入と Next runtime を含む統合実行は継続課題である。
 
+## 2026-09-06 再レビュー修正 51
+
+Chronos API全体を再走査し、agent activity／agents／connections／cost、headless operator-home／A2UI、
+missions search、operator-home、organization operating model、OS control-plane、tenant design、
+intelligence snapshot／stream まで残っていた query の既定値化を共通入力ヘルパーへ統一した。これにより
+Chronos API **28 route** の query scope／filter／limit／flag が trim 済みの単一 string 境界を通り、認可・projection・
+SSE・design resolutionへ渡る。既存の viewer scope、tier、headless envelope、OS read-only semantics は変更していない。
+
+検証: request-input boundary **1 file／2 tests passed**、Chronos API directory ESLint、Prettier、
+`git diff --check`。Next runtimeを含む統合実行とprovider実機受入はCI／環境依存の継続課題である。
+
 ## 2026-09-06 再レビュー修正 47
 
 Presence Studio onboarding voice-sample の `content-type` header を再監査し、header array を `String(...)`
